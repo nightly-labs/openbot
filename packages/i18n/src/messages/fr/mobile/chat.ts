@@ -165,6 +165,7 @@ export const messages = {
   "mobile.chat.composer.send": "Envoyer le message",
   "mobile.chat.composer.stop": "Arrêter {name}",
   "mobile.chat.composer.dictate": "Dicter un message",
+  "mobile.chat.composer.voiceSettings": "Réglages de la voix",
   "mobile.chat.composer.stopDictation": "Arrêter la dictée",
   "mobile.chat.composer.mention": "Mentionner {name}",
   "mobile.chat.composer.skills": "Compétences",
@@ -423,7 +424,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "« Autoriser » donne à {name} ces autorisations sur {server}. « Refuser » conserve les autorisations actuelles.",
   "mobile.chat.approval.partial":
-    "Cette demande est trop longue pour s’afficher sur le téléphone. Pour l’autoriser, ouvrez OpenBot sur {server}. Vous pouvez la refuser ici.",
+    "{server} n’envoie au téléphone que le début de cette demande. Pour l’autoriser, mettez à jour OpenBot sur {server} ou ouvrez cette discussion dans l’app de bureau OpenBot. Vous pouvez la refuser ici.",
+  "mobile.chat.approval.loading": "Chargement de la demande complète…",
+  "mobile.chat.approval.loadFailed": "Impossible de charger la demande complète. Vous pouvez la refuser ici.",
+  "mobile.chat.approval.retry": "Réessayer",
+  "mobile.chat.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
+  "mobile.chat.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
+  "mobile.chat.approval.report.dontSend": "Pas maintenant",
+  "mobile.chat.approval.report.send": "Envoyer à l'équipe OpenBot",
   "mobile.chat.approval.allow": "Autoriser",
   "mobile.chat.approval.deny": "Refuser",
   "mobile.chat.approval.reconnect": "Connectez-vous à {server} pour répondre à cette demande.",

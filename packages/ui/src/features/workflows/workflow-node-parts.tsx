@@ -91,8 +91,8 @@ export function Port(props: {
   node: string;
   type: WfnPortType;
   side: WfnPortSide;
-  branch?: string;
-  label?: string;
+  branch?: string | undefined;
+  label?: string | undefined;
   missing?: boolean;
 }) {
   const board = useBoard();
@@ -341,6 +341,15 @@ export function oneOf<T extends WfnFieldValue>(values: readonly T[]): (value: Wf
 export const asProvider = (value: WfnFieldValue): WfProvider | undefined =>
   isAgentProviderRef(value) ? value : undefined;
 
+/** One input port of a step. */
+export interface WfnInputPort {
+  type: WfnPortType;
+  /** The field that holds the source of this port. */
+  branch?: string;
+  /** The name on hover. Without it, the name of the type. */
+  label?: string;
+}
+
 export interface ShellProps {
   id: string;
   label: string;
@@ -360,11 +369,18 @@ export interface ShellProps {
   /** The node has no label above its card, as a shape. The lock badge still shows. */
   bare?: boolean;
   inputs?: readonly WfnPortType[];
+  /**
+   * The input ports, when a type has more than one, as the first and the last frame of a video. A
+   * port with a branch puts its source in the field of that name. Without it, one port for each input.
+   */
+  inputPorts?: readonly WfnInputPort[] | undefined;
   /** The step cannot run until a line comes into one of its inputs. */
   requires?: boolean;
   output?: WfnPortType | undefined;
   toolbar: JSX.Element;
   media?: boolean;
+  /** The media has clear pixels: the card has no fill and no ring, so the canvas shows through. */
+  clear?: boolean;
   /** The image of a result in the results strip. A text step has none. */
   thumb?: (result: WfnResult) => string | undefined;
   style?: JSX.CSSProperties;
@@ -407,7 +423,9 @@ export function NodeShell(props: ShellProps) {
   /** A failed step that can run again shows Retry in place of its run button, and a step that runs alone Stop. */
   const action = children(() => props.action);
   const stop = () => stopOf(board, props.id);
-  const missing = () => props.requires === true && !props.inputs?.some((type) => board.connected(props.id, "in", type));
+  const inputPorts = (): readonly WfnInputPort[] => props.inputPorts ?? (props.inputs ?? []).map((type) => ({ type }));
+  const missing = () =>
+    props.requires === true && !inputPorts().some((port) => board.connected(props.id, "in", port.type, port.branch));
   const style = (): JSX.CSSProperties => {
     const size = board.size(props.id);
     return {
@@ -447,7 +465,11 @@ export function NodeShell(props: ShellProps) {
           <RunTime id={props.id} />
         </span>
         <div class="wfn-card-frame">
-          <div class="wfn-card" data-media={props.media ? "" : undefined}>
+          <div
+            class="wfn-card"
+            data-media={props.media ? "" : undefined}
+            data-clear={props.media && props.clear ? "" : undefined}
+          >
             {props.children}
             <Show when={missing() && (selected() || board.status(props.id) !== undefined)}>
               <p class="wfn-alert" data-tone="warning">
@@ -483,10 +505,19 @@ export function NodeShell(props: ShellProps) {
         <Show when={selected()}>
           <ResultStrip id={props.id} thumb={props.thumb} />
         </Show>
-        <Show when={props.inputs?.length}>
+        <Show when={inputPorts().length}>
           <span class="wfn-ports" data-side="in">
-            <For each={props.inputs}>
-              {(type) => <Port node={props.id} type={type} side="in" missing={missing()} />}
+            <For each={inputPorts()}>
+              {(port) => (
+                <Port
+                  node={props.id}
+                  type={port.type}
+                  side="in"
+                  branch={port.branch}
+                  label={port.label}
+                  missing={missing()}
+                />
+              )}
             </For>
           </span>
         </Show>

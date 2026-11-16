@@ -2,10 +2,12 @@ import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import { router } from "expo-router";
 import { Typography } from "heroui-native";
 import Bell from "lucide-react-native/icons/bell";
+import Bot from "lucide-react-native/icons/bot";
 import CreditCard from "lucide-react-native/icons/credit-card";
 import EyeOff from "lucide-react-native/icons/eye-off";
 import Info from "lucide-react-native/icons/info";
 import Languages from "lucide-react-native/icons/languages";
+import Layers2 from "lucide-react-native/icons/layers-2";
 import Lock from "lucide-react-native/icons/lock";
 import MessageCircleQuestionMark from "lucide-react-native/icons/message-circle-question-mark";
 import Mic from "lucide-react-native/icons/mic";
@@ -21,8 +23,12 @@ import { fileLimitText, MOBILE_LARGE_FILE_BYTES } from "@/features/chat/model/la
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
+import { agentDefaultsServers } from "@/features/settings/model/agent-defaults";
 import { useBillingState } from "@/features/settings/model/billing";
 import { saveLargeFilePreference, useLargeFilePreference } from "@/features/settings/model/large-files";
+import { savePhotoQualityPreference, usePhotoQualityPreference } from "@/features/settings/model/photo-quality";
+import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
+import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { haptics } from "@/shared/lib/haptics";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
@@ -34,11 +40,22 @@ export function SettingsScreen() {
   const { t } = text;
   const { theme } = useUniwind();
   const largeFiles = useLargeFilePreference();
+  // Only an owner or admin of a server with `agent-defaults-v1` can change the agent defaults.
+  const managesAgents = useMobileWorkspaceSelector((workspace) => agentDefaultsServers(workspace).length > 0);
   const [largeFilesError, setLargeFilesError] = useState<string | null>(null);
   function saveLargeFiles(automatic: boolean) {
     setLargeFilesError(null);
     void saveLargeFilePreference(automatic).catch(() => {
       setLargeFilesError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
+    });
+  }
+  const photoQuality = usePhotoQualityPreference();
+  const [photoQualityError, setPhotoQualityError] = useState<string | null>(null);
+  function savePhotoQuality(fullQuality: boolean) {
+    setPhotoQualityError(null);
+    void savePhotoQualityPreference(fullQuality).catch(() => {
+      setPhotoQualityError(t("mobile.settings.saveFailed"));
       void haptics.notification("error");
     });
   }
@@ -101,9 +118,20 @@ export function SettingsScreen() {
         <SettingsRow leading={<RowIcon icon={Mic} />} onPress={() => router.push("/settings/voice")}>
           <Typography.Paragraph>{t("mobile.settings.voice.title")}</Typography.Paragraph>
         </SettingsRow>
+        {/* The shortcuts need the Shortcuts app of iOS 26. */}
+        {shortcutsSupported ? (
+          <SettingsRow leading={<RowIcon icon={Layers2} />} onPress={() => router.push("/settings/shortcuts")}>
+            <Typography.Paragraph>{t("mobile.settings.shortcuts.title")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
         <SettingsRow leading={<RowIcon icon={Vibrate} />} onPress={() => router.push("/settings/haptics")}>
           <Typography.Paragraph>{t("mobile.settings.feedback.haptics")}</Typography.Paragraph>
         </SettingsRow>
+        {managesAgents ? (
+          <SettingsRow leading={<RowIcon icon={Bot} />} onPress={() => router.push("/settings/agents")}>
+            <Typography.Paragraph>{t("mobile.settings.agents.title")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
         {/* On iOS the screen also has the Live Activities, which exist only there. */}
         <SettingsRow leading={<RowIcon icon={Bell} />} onPress={() => router.push("/settings/notifications")}>
           <Typography.Paragraph>{t("mobile.settings.notifications.title")}</Typography.Paragraph>
@@ -135,6 +163,17 @@ export function SettingsScreen() {
             label={t("mobile.settings.conversations.largeFiles")}
             dark={theme === "dark"}
             onValueChange={saveLargeFiles}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={photoQualityError ?? t("mobile.settings.conversations.fullQualityPhotosFooter")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={photoQuality.fullQuality}
+            disabled={!photoQuality.ready || photoQuality.saving}
+            label={t("mobile.settings.conversations.fullQualityPhotos")}
+            dark={theme === "dark"}
+            onValueChange={savePhotoQuality}
           />
         </SettingsRow>
       </SettingsSection>

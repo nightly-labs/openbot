@@ -81,6 +81,7 @@ import { CUSTOM_AGENTS_ROUTES } from "@openbot/contracts/team-protocol/custom-ag
 import type { CUSTOM_PROVIDER_EDIT_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import type { CUSTOM_PROVIDER_HARNESS_ROUTES } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { DISCORD_ACCESS_ROUTES } from "@openbot/contracts/team-protocol/discord-access-v1";
+import { HOST_APPEARANCE_ROUTES, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { HOST_KEY_ROTATION_ROUTES } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/host-member-update-v1";
 import { HOST_PERSONALITY_ROUTES } from "@openbot/contracts/team-protocol/host-personality-v1";
@@ -133,6 +134,7 @@ import {
   type ClearBrowserDataInput,
   type ClearStorageInput,
   type ConnectProviderAccountInput,
+  type ConnectProviderAccountKeyInput,
   type CustomAgentResult,
   type CustomAgentSummary,
   type CustomProviderResult,
@@ -174,6 +176,7 @@ import {
   decodeHostSkillLearning,
   decodeHostTimezoneSettings,
   decodeHostUpdateStatus,
+  decodeHostVaultCodes,
   decodeHostVaultImport,
   decodeHostVaultState,
   decodeInstalledSkills,
@@ -184,6 +187,8 @@ import {
   decodeMcpSignInStatus,
   decodeMcpTestResult,
   decodePromptCacheTtlSetting,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
@@ -240,6 +245,8 @@ import {
   type PasswordManagerStatus,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
   type ProviderModelVisibility,
@@ -271,6 +278,7 @@ import {
   type SharedTable,
   type SignInRelayStatus,
   type SignOutMcpServerInput,
+  type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
@@ -283,6 +291,7 @@ import {
   type VaultHostImportResult,
   type VaultSaveInput,
   type VaultState,
+  type VaultTwoStepCodes,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import {
@@ -334,6 +343,8 @@ import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PROVIDER_ACCOUNT_CODE_ROUTES } from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import { PROVIDER_ACCOUNT_KEYS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import type {
@@ -366,6 +377,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
+import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
@@ -711,6 +723,18 @@ export function updateHostIdentity(
   if (input.logo !== undefined)
     body.logo = input.logo ? { mimeType: input.logo.mimeType, data: bytesToBase64(input.logo.bytes) } : null;
   return adminCall(() => request("POST", HOST_ADMIN_ROUTES.identity, ignoreResponse, body));
+}
+
+/** An owner or admin sets the server plush (`host-appearance-v1`). `null` gives the automatic look. */
+export function setHostAppearance(
+  request: TeamApiRequest,
+  appearance: ServerAppearance | null,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", HOST_APPEARANCE_ROUTES.appearance, ignoreResponse, {
+      appearance: appearance ? { shape: appearance.shape, color: appearance.color } : null,
+    }),
+  );
 }
 
 export function getHostUpdateStatus(
@@ -1433,6 +1457,54 @@ export function listProviderAccountsWithModels(
   );
 }
 
+/**
+ * `provider-account-keys-v1`: gives an account of a host's provider its API key, a new account when
+ * `accountId` is null. It fails with the host's reason when the provider refuses the key.
+ */
+export function connectProviderAccountKey(
+  request: TeamApiRequest,
+  input: ConnectProviderAccountKeyInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_KEYS_ROUTES.connect, ignoreResponse, { ...input }));
+}
+
+/**
+ * `provider-account-code-v1`: starts the code sign-in of an account of a host's provider, a new
+ * account when `accountId` is null. The answer names the account, the page and the code.
+ */
+export function startProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: ConnectProviderAccountInput,
+): Effect.Effect<ProviderAccountCodeLoginStart, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.start, decodeProviderAccountCodeLoginStart, { ...input }),
+  );
+}
+
+/** The code of a `paste` sign-in of an account. It is a credential: it goes in the body, and no reply carries it. */
+export function submitProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: SubmitProviderAccountCodeLoginInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.submit, ignoreResponse, { ...input }));
+}
+
+export function providerAccountCodeLoginStatus(
+  request: TeamApiRequest,
+  input: RemoveProviderAccountInput,
+): Effect.Effect<ProviderAccountCodeLoginStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.status, decodeProviderAccountCodeLoginStatus, { ...input }),
+  );
+}
+
+export function cancelProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: RemoveProviderAccountInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.cancel, ignoreResponse, { ...input }));
+}
+
 /** `provider-account-pool-v1`: turns the pool of a provider's accounts on the host on or off. */
 export function setProviderAccountPool(
   request: TeamApiRequest,
@@ -1994,33 +2066,53 @@ export function passwordManagerRequest(
   );
 }
 
-/** The routes of `vault-v2` when the host serves it, else of `vault-v1`, which has no API keys. */
-function vaultRoutes(v2: boolean) {
-  return v2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
+/**
+ * The newest Vault capability of the host: 3 is `vault-v3` with two-step keys, 2 is `vault-v2` with API
+ * keys, 1 is `vault-v1`.
+ */
+type HostVaultVersion = 1 | 2 | 3;
+
+function vaultRoutes(version: HostVaultVersion) {
+  return version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
 }
 
 /**
- * The host's Vault (`vault-v2`, or `vault-v1` without API keys). No list item carries a password, a
- * card number, a security code or an API key.
+ * The host's Vault (`vault-v3`, `vault-v2` without two-step keys, or `vault-v1` without API keys). No
+ * list item carries a password, a card number, a security code, an API key or a two-step key.
  */
-export function listHostVault(request: TeamApiRequest, v2: boolean): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(v2).list, decodeHostVaultState, {}));
+export function listHostVault(
+  request: TeamApiRequest,
+  version: HostVaultVersion,
+): Effect.Effect<VaultState, TeamAdminRequestError> {
+  return adminCall(() => request("POST", vaultRoutes(version).list, decodeHostVaultState, {}));
+}
+
+/** The current two-step code of each host login with a key (`vault-v3`). The key stays on the host. */
+export function listHostVaultCodes(request: TeamApiRequest): Effect.Effect<VaultTwoStepCodes, TeamAdminRequestError> {
+  return adminCall(() => request("POST", VAULT_V3_ROUTES.codes, decodeHostVaultCodes, {}));
 }
 
 /** Adds or changes one item of the host's Vault. A null secret keeps the saved one; a new one goes to the host once. */
 export function saveHostVaultItem(
   request: TeamApiRequest,
   input: VaultSaveInput,
-  v2: boolean,
+  version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
   // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
-  // key, and an absent key keeps the saved one. JSON has no undefined, so an absent field stays out.
-  const { fillSites, twoStepKey, ...item } = { fillSites: undefined, twoStepKey: undefined, ...input };
+  // key, and an absent key keeps the saved one. Absent agents keep the saved agents. JSON has no
+  // undefined, so an absent field stays out.
+  const { fillSites, twoStepKey, agents, ...item } = {
+    fillSites: undefined,
+    twoStepKey: undefined,
+    agents: undefined,
+    ...input,
+  };
   return adminCall(() =>
-    request("POST", vaultRoutes(v2).save, decodeHostVaultState, {
+    request("POST", vaultRoutes(version).save, decodeHostVaultState, {
       ...item,
       ...(fillSites === undefined ? {} : { fillSites }),
       ...(twoStepKey === undefined ? {} : { twoStepKey }),
+      ...(agents === undefined ? {} : { agents }),
     }),
   );
 }
@@ -2028,9 +2120,9 @@ export function saveHostVaultItem(
 export function deleteHostVaultItem(
   request: TeamApiRequest,
   id: string,
-  v2: boolean,
+  version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(v2).delete, decodeHostVaultState, { id }));
+  return adminCall(() => request("POST", vaultRoutes(version).delete, decodeHostVaultState, { id }));
 }
 
 /** Adds the logins of a CSV password export (`vault-import-v1`). The answer has only the counts. */

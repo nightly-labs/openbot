@@ -665,9 +665,16 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.folders.locateHere": "Use",
   "mobile.agent.folders.notAddedTitle": "Folder not added",
   "mobile.agent.folders.notExcludedTitle": "Folder not excluded",
-  "mobile.agent.fastMode.label": "Fast mode",
   "mobile.agent.fastMode.footer":
     "The agent asks its provider for faster answers. A change applies from the next turn.",
+  "mobile.agent.fastMode.speed": "Speed",
+  "mobile.agent.fastMode.standard": "Standard",
+  "mobile.agent.fastMode.fast": "Fast",
+  "mobile.agent.fastMode.ultrafast": "Ultrafast",
+  "mobile.agent.fastMode.confirmTitle": "Turn on fast mode?",
+  "mobile.agent.fastMode.confirmBody":
+    "Claude answers faster, but each token costs more. With a Claude subscription, fast mode always uses usage credits, also when your plan has usage left.",
+  "mobile.agent.fastMode.confirm": "Turn on",
   "mobile.agent.compact.title": "Compact context",
   "mobile.agent.compact.compacting": "Starting compaction…",
   "mobile.agent.compact.footer": "The provider makes the context of this chat shorter. The messages stay.",

@@ -282,6 +282,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Werk OpenBot bij op deze server om de naam en het logo hier te wijzigen.",
   "mobile.server.settings.identityOffline": "Maak verbinding met deze server om de naam en het logo te wijzigen.",
+  "mobile.server.settings.appearance": "Vorm en kleur",
+  "mobile.server.settings.appearanceShape": "Vorm",
+  "mobile.server.settings.appearanceShapeOption": "Vorm {number}",
+  "mobile.server.settings.appearanceColor": "Serverkleur",
+  "mobile.server.settings.appearanceAutomatic": "Automatisch",
+  "mobile.server.settings.appearanceReset": "Herstellen",
+  "mobile.server.settings.appearanceSaveFailed":
+    "De vorm en kleur van de server konden niet worden opgeslagen. Probeer het opnieuw.",
   "mobile.server.route.cropLogo": "Logo bijsnijden",
   "mobile.server.members.remove": "Lid verwijderen",
   "mobile.server.members.invitePeople": "Mensen uitnodigen",
@@ -376,6 +384,36 @@ export const messages = {
   "mobile.server.library.noMatches": "Geen overeenkomende bestanden",
   "mobile.server.library.showInChat": "Toon in chat",
   "mobile.server.library.share": "Delen",
+  "mobile.server.library.folders.title": "Mappen",
+  "mobile.server.library.folders.allFiles": "Alle bestanden",
+  "mobile.server.library.folders.removedAgents": "Verwijderde agents",
+  "mobile.server.library.folders.notInFolder": "In geen map",
+  "mobile.server.library.folders.path": "Map: {path}",
+  "mobile.server.library.folders.pathHint": "Toont de mappen",
+  "mobile.server.library.folders.new": "Nieuwe map",
+  "mobile.server.library.folders.name": "Mapnaam",
+  "mobile.server.library.folders.inFolder": "In {name}",
+  "mobile.server.library.folders.create": "Aanmaken",
+  "mobile.server.library.folders.rename": "Naam wijzigen",
+  "mobile.server.library.folders.renameTitle": "Mapnaam wijzigen",
+  "mobile.server.library.folders.save": "Opslaan",
+  "mobile.server.library.folders.delete": "Map verwijderen",
+  "mobile.server.library.folders.deleteTitle": "‘{name}’ verwijderen?",
+  "mobile.server.library.folders.deleteBody":
+    "De mappen erin worden ook verwijderd. De bestanden blijven bij de agent.",
+  "mobile.server.library.folders.moveTo": "Naar map verplaatsen",
+  "mobile.server.library.folders.actions": "Acties voor {name}",
+  "mobile.server.library.folders.expand": "Mappen van {name} tonen",
+  "mobile.server.library.folders.collapse": "Mappen van {name} verbergen",
+  "mobile.server.library.folders.emptyTitle": "Geen bestanden in deze map",
+  "mobile.server.library.folders.emptyBody": "{agent} kan hier bestanden opslaan met het mappad {path}.",
+  "mobile.server.library.folders.loadFailed": "Kan de mappen niet laden",
+  "mobile.server.library.folders.changeFailed": "Kan de mappen niet wijzigen",
+  "mobile.server.library.folders.gone": "Deze map staat niet meer op de server.",
+  "mobile.server.library.folders.fileGone":
+    "Dit bestand staat niet meer op de server, of je kunt het niet verplaatsen.",
+  "mobile.server.library.folders.unsupported":
+    "Deze server heeft geen mappen in de Bibliotheek. Werk de server bij om ze te gebruiken.",
   "mobile.server.route.providers": "Aanbieders",
   "mobile.server.route.provider": "Aanbieder",
   "mobile.server.route.providerModels": "Modellen",
@@ -714,6 +752,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de werkruimte en verbind hem opnieuw.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot op {host} kan geen Slack-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Deze werkruimte is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Slack. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij plaatst het antwoord in de thread.",
@@ -759,6 +799,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de Discord-server en verbind hem opnieuw.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot op {host} kan geen Discord-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Deze Discord-server is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Discord. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in het kanaal.",
@@ -793,6 +835,8 @@ export const messages = {
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot kan deze chat niet bereiken. Verbind opnieuw of ontkoppel de chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Deze chat is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Chat koppelen",
   "mobile.server.connectors.telegram.linkAnother": "Nog een chat koppelen",
@@ -833,6 +877,8 @@ export const messages = {
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot kan de opgeslagen sleutels van dit nummer niet lezen. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
@@ -1019,6 +1065,13 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.accountsKeyHint":
+    "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
+  "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",
+  "mobile.server.providers.accountKeyHint":
+    "Plak een API-sleutel van het {provider}-account. De sleutel gaat naar de server. Deze telefoon bewaart hem niet.",
+  "mobile.server.providers.accountKeyChecking": "Sleutel controleren…",
+  "mobile.server.providers.accountKeyAddFailed": "Kan het account niet toevoegen. Probeer het opnieuw.",
   "mobile.server.providers.pool": "Accounts bundelen",
   "mobile.server.providers.poolHint":
     "Agents gebruiken één account tot het een gebruikslimiet nadert, en dan het account waarvan de limiet het eerst reset.",
@@ -1472,6 +1525,7 @@ export const messages = {
   "mobile.server.route.transfer": "Overdracht",
   "mobile.server.route.transferExport": "Exporteren",
   "mobile.server.route.transferImport": "Importeren",
+  "mobile.server.route.transferCopy": "Kopiëren naar een andere server",
   "mobile.server.transfer.unsupported": "Werk OpenBot op deze server bij om hem hier over te dragen.",
   "mobile.server.transfer.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om hem over te dragen.",
@@ -1537,4 +1591,21 @@ export const messages = {
     "Deze aanbieders waren op de andere server ingelogd en zijn hier niet ingelogd. Log bij ze in via Serverinstellingen › Aanbieders.",
   "mobile.server.transfer.notImported": "Niet geïmporteerd",
   "mobile.server.transfer.warnings": "Controleer deze",
+  "mobile.server.transfer.copy": "Kopiëren naar een andere server",
+  "mobile.server.transfer.copyNote": "Stuur agents naar een andere server van je.",
+  "mobile.server.transfer.copyTo": "Naar",
+  "mobile.server.transfer.copyNoAgents": "Deze server heeft geen agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Hun kanalen en de map Shared worden ook gekopieerd. API-sleutels, aanmeldingen, connectors en chatgeschiedenis worden niet gekopieerd. Stel ze opnieuw in op de andere server.",
+  "mobile.server.transfer.copySubmit": { one: "Kopieer {count} agent", other: "Kopieer {count} agents" },
+  "mobile.server.transfer.copying": "Kopiëren…",
+  "mobile.server.transfer.copyFailed": "Het kopiëren is niet voltooid.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent gekopieerd naar {server}.",
+    other: "{count} agents gekopieerd naar {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents om te kopiëren",
+  "mobile.server.transfer.copyNext": "Gekopieerde agents gebruiken de goedkeuringsregels van {server}.",
+  "mobile.server.transfer.copyNoServer":
+    "Maak verbinding met een andere server als eigenaar of beheerder om er agents naar te kopiëren.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -75,9 +75,11 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "To połączenie nie może zapisać jednorazowych rutyn.",
   "error.team.routineRunCommandUnsupported": "To połączenie nie może podać polecenia uruchomienia rutyny.",
   "error.team.threadQueueUnsupported": "To połączenie nie może pokazać kolejki wątku pobocznego.",
+  "error.team.hostTurnLimitsUnsupported": "To połączenie nie może pokazać ani zmienić limitów wątków serwera.",
   "error.team.usageLimitUnsupported": "To połączenie nie może pokazać ani zmienić limitów użycia agentów.",
   "error.team.hermesImportUnsupported": "To połączenie nie może zaimportować profili Hermes z serwera.",
   "error.team.providerDetectionUnsupported": "To połączenie nie może znaleźć serwerów modeli i agentów serwera.",
+  "error.team.routineFlowStopUnsupported": "To połączenie nie może zatrzymać uruchomienia rutyny.",
   "error.team.sidebarFoldersUnsupported": "To połączenie nie obsługuje folderów w folderach.",
   "error.team.libraryFoldersUnsupported": "To połączenie nie obsługuje folderów Biblioteki.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -176,6 +178,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Żaden agent na tym serwerze nie pokazał tego linku logowania.",
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
   "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
+  "error.team.pendingApprovalUnsupported": "To połączenie nie pozwala odczytać całej prośby o zgodę.",
   "error.team.messagePinsUnsupported": "To połączenie nie obsługuje przypiętych wiadomości.",
   "error.team.queuedMessageThreadUnsupported":
     "To połączenie nie obsługuje uruchamiania wiadomości z kolejki jako nowego wątku.",

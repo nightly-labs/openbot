@@ -19,6 +19,13 @@ export const messages = {
   "error.workflow.conditionUnclear": "Il modello non ha risposto sì o no.",
   "error.workflow.modelFailed": "Il modello non ha potuto rispondere. Esegui di nuovo il passaggio.",
   "error.workflow.modelBusy": "È in corso un’altra richiesta al modello. Esegui di nuovo il passaggio tra poco.",
+  "error.workflow.mediaFailed": "Il modello non ha potuto creare l’immagine o il video. Esegui di nuovo il passaggio.",
+  "error.workflow.pictureMissing": "L’immagine non è più sul server. Inviala di nuovo.",
+  "error.workflow.pictureType": "Usa un’immagine PNG, JPEG o WebP.",
+  "error.workflow.mediaInputMissing":
+    "Un’immagine di un passaggio precedente non è disponibile. Esegui di nuovo quel passaggio.",
+  "error.workflow.mediaInputNotImage":
+    "Questo passaggio accetta solo immagini, non video. Rimuovi il collegamento dal video.",
   "error.workflow.stepMissing": "Questo passaggio non esiste più.",
   "error.workflow.nodeMissing": "Questo passaggio non è nel flusso di lavoro.",
   "error.workflow.runMissing": "Questa esecuzione non esiste più.",
@@ -66,4 +73,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "La modifica si è fermata a metà. Può essere già su GitHub. Controlla lì prima di eseguire di nuovo il passaggio.",
   "error.workflow.githubNoEvent": "Su GitHub non c'è una issue o pull request da cui parte questo trigger.",
+  "error.workflow.sunraSignIn": "Accedi a Sunra in App per usare i modelli Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Il tuo account Sunra non ha crediti sufficienti. Aggiungi crediti su sunra.ai/pricing, poi esegui di nuovo il passaggio.",
+  "error.workflow.sunraNeedsPlan":
+    "Questo modello Sunra richiede un piano Sunra. Scegli un piano su sunra.ai/pricing o seleziona un altro modello.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra usa le immagini di input solo con un account personale. Seleziona il tuo account personale in Sunra o rimuovi i collegamenti delle immagini.",
+  "error.workflow.sunraFailed": "Sunra non è riuscito a creare il file: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra non ha finito il file in tempo. Controlla il progetto OpenBot su sunra.ai prima di eseguire di nuovo il passaggio.",
 } as const satisfies PartialTranslation<typeof source>;

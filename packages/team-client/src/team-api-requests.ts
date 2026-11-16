@@ -8,6 +8,7 @@ import { bytesToBase64 } from "./base64";
 // stays at its call site.
 
 import {
+  type AgentApproval,
   type AgentImportPreview,
   type AgentMemory,
   type AgentMemorySelectionState,
@@ -126,6 +127,11 @@ import {
   type LiveVoiceStartRequest,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { decodeMessagePinsResponse, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutineRunPlace,
@@ -823,6 +829,19 @@ export const respondToApproval = Effect.fn("TeamClient.respondToApproval")(funct
   return yield* teamCall(() => request("POST", TEAM_API_ROUTES.respond.approval, ignoreResponse, { ...input }));
 });
 
+/**
+ * The whole copy of one approval that an agent waits on, with `pending-approval-v1`. A runtime snapshot
+ * cuts the texts of an approval, so a client reads this before it offers Allow for a cut copy.
+ */
+export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(function* (
+  request: TeamApiRequest,
+  input: { agentId: string; requestId: string | number },
+): Effect.fn.Return<AgentApproval, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, { ...input }),
+  );
+});
+
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
   request: TeamApiRequest,
   input: RespondToBrowserTakeoverInput,
@@ -1026,7 +1045,10 @@ export function teamAgentRoutinesApi(
   };
 }
 
-/** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
+/**
+ * The routine canvas calls of the desktop IPC surface. Send them only to a host that serves
+ * `routine-flows-v1`, and `stopRun` only to one that also serves `routine-flow-stop-v1`.
+ */
 export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
 
 const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
@@ -1043,6 +1065,7 @@ export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsAp
     connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
     disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
     updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
+    stopRun: (input) => post(ROUTINE_FLOW_STOP_ROUTES.stopRun, ignoreResponse, input),
   };
 }
 /** An Effect request lets the desktop reuse its managed request lifetime. */

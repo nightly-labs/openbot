@@ -88,6 +88,7 @@ export const messages = {
   "agent.error.settingsFailed": "تعذّر حفظ إعدادات الوكيل",
   "agent.error.adminOnly": "لا يغيّر إعدادات الوكيل إلا مسؤول الخادم.",
   "agent.error.continueFailed": "تعذّر على الوكيل المتابعة. أعد المحاولة.",
+  "agent.error.copyDetails": "نسخ التفاصيل",
   "agent.error.mcpNotStarted": "لم يبدأ خادم MCP",
   "agent.error.openMcpSettings": "فتح إعدادات MCP",
   "agent.error.provider": "خطأ في المزوّد",

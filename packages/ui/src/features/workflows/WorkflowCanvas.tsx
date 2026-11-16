@@ -14,6 +14,7 @@
 
 import {
   isWorkflowStepKind,
+  WORKFLOW_PICTURE_TYPES,
   type WorkflowDetail,
   type WorkflowGraph,
   type WorkflowNodeKind,
@@ -117,6 +118,7 @@ import {
   resizeCursor,
   takesKeys,
   type WfnEdge,
+  type WfnFields,
   type WfnHandle,
   type WfnPoint,
   type WfnSize,
@@ -475,15 +477,33 @@ function textFont(node: HTMLElement) {
   return input ? Number.parseFloat(getComputedStyle(input).fontSize) : TEXT_FONT.min;
 }
 
+/**
+ * The text fields of a node. A press on one that does not have the focus moves the node, and a click
+ * without a move puts the caret there, so that a note or a prompt that fills its card is easy to drag.
+ */
+const DRAG_FIELD = "textarea, input.wfn-input";
+
+/**
+ * The text of a note, a shape or free text. A click on one that is not selected only selects it, and a
+ * second click edits it, as a sticky note does on other canvases. A step's field edits on the first click.
+ */
+const ITEM_FIELD = ".wfn-note-input, .wfn-shape-input, .wfn-text-input";
+
+/** The caret offset in a text field under a point, or its end when the browser cannot tell. */
+function caretAt(field: HTMLTextAreaElement | HTMLInputElement, x: number, y: number) {
+  const position = document.caretPositionFromPoint?.(x, y);
+  return position?.offsetNode === field ? position.offset : field.value.length;
+}
+
 /** A press on these starts their own action, not a node drag. */
 const NO_DRAG = [
   ".wfn-port",
-  "input",
-  "textarea:not(.wfn-text-input)",
+  `input:not(${DRAG_FIELD})`,
   "[data-wfn-portal]",
   ".wfn-edge-actions",
   "button:not(.wfn-asset-trigger)",
   "[role=tab]",
+  ".ui-seek-slider",
 ].join(", ");
 
 /** A node of the canvas. Its fields are on the board, so each node reads them from there. */
@@ -1360,7 +1380,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
    * Adds a node with its top-left corner at a world point, or centred in the view. A node centred in the
    * view moves to the right past each card that it would cover, so it does not hide them.
    */
-  const addNode = (kind: WorkflowNodeKind, point?: WfnPoint): string => {
+  const addNode = (kind: WorkflowNodeKind, point?: WfnPoint, fields?: WfnFields): string => {
     commit();
     const { width, height } = view();
     const center = toWorld({ x: width / 2, y: height / 2 });
@@ -1379,7 +1399,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     setPositions((draft) => {
       draft[id] = at;
     });
-    canvas.putFields(id, hostDefaults(kind, props.catalogs, props.features));
+    canvas.putFields(id, { ...fields, ...hostDefaults(kind, props.catalogs, props.features, fields) });
     setNodes((list) => [...list, kind === "trigger" ? { id, kind, schedule: newTriggerSchedule() } : { id, kind }]);
     return id;
   };
@@ -1705,9 +1725,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return addGroups(allowed)
       .map((group) => ({
         label: group.label,
-        items: group.items.filter(
-          (item) => kinds.includes(item) && t(KIND_LABEL[item.kind]).toLowerCase().includes(words),
-        ),
+        items: group.items.filter((item) => kinds.includes(item) && t(item.label).toLowerCase().includes(words)),
       }))
       .filter((group) => group.items.length > 0);
   };
@@ -1739,20 +1757,20 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     return open !== undefined && ("edge" in open || "start" in open);
   };
   /** Adds a node where the line ends, with its matching port on the end, and connects it. */
-  const pickDrop = (kind: WorkflowNodeKind) => {
+  const pickDrop = (item: AddItem) => {
     const open = drop();
     if (!open) return;
     setDrop(undefined);
-    if ("edge" in open) return insertNode(kind, open.edge, open.at);
+    if ("edge" in open) return insertNode(item, open.edge, open.at);
     if (!("start" in open)) {
-      canvas.select([addNode(kind, open.at)]);
+      canvas.select([addNode(item.kind, open.at, item.fields)]);
       return;
     }
     const { start } = open;
     // The node, its place and its connection are one undo step.
     commit();
     const release = edits.join();
-    const id = addNode(kind, open.at);
+    const id = addNode(item.kind, open.at, item.fields);
     afterLayout(() => {
       const element = slot(id);
       const side = start.side === "out" ? "in" : "out";
@@ -1780,10 +1798,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
    * Puts a new node in the middle of a connection. When the nodes are too close for it, the nodes
    * from the end of the connection to the right move right to make room.
    */
-  const insertNode = (kind: WorkflowNodeKind, edge: WfnEdge, at: WfnPoint) => {
+  const insertNode = (item: AddItem, edge: WfnEdge, at: WfnPoint) => {
     commit();
     const release = edits.join();
-    const id = addNode(kind, at);
+    const id = addNode(item.kind, at, item.fields);
     afterLayout(() => {
       const element = slot(id);
       const from = boxOf(edge.from);
@@ -2070,7 +2088,8 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           start: WfnPoint;
           origin: WfnPoint;
           moved: boolean;
-          focus?: HTMLElement;
+          /** The text field that the press was on, and the caret that a click without a move puts in it. */
+          focus?: { field: HTMLTextAreaElement | HTMLInputElement; caret: number };
           /** The nodes that move together, with their places at the start. */
           group: readonly { id: string; origin: WfnPoint }[];
           /** The box around the moving nodes at the start. */
@@ -2116,7 +2135,14 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       event.preventDefault();
     };
     const onWheel = (event: WheelEvent) => {
-      if (event.target instanceof Element && event.target.closest("textarea, [data-wfn-portal]")) return;
+      // A popover, such as a video in full screen, is in the canvas but over it.
+      if (event.target instanceof Element && event.target.closest(":popover-open")) return;
+      // A textarea scrolls its own text, but a pinch (Ctrl+wheel) over it zooms the canvas.
+      if (
+        event.target instanceof Element &&
+        event.target.closest(event.ctrlKey ? "[data-wfn-portal]" : "textarea, [data-wfn-portal]")
+      )
+        return;
       event.preventDefault();
       // A wheel can count in lines or in pages, not pixels.
       const unit =
@@ -2366,7 +2392,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         return;
       }
       if (current.kind === "node" && !current.moved) {
-        current.focus?.focus();
+        if (current.focus && event.type !== "pointercancel") {
+          const { field, caret } = current.focus;
+          field.focus({ preventScroll: true });
+          field.setSelectionRange(caret, caret);
+        }
         // A click without a move on a node of a group selects only that node.
         if (current.group.length > 1) canvas.select([current.id]);
       }
@@ -2376,7 +2406,13 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
         setTimeout(() => window.removeEventListener("click", stopClick, { capture: true }));
       }
     };
+    /** A press that calls preventDefault does not move the focus, so it closes here a field that is open for edits. */
+    const closeField = () => {
+      const open = document.activeElement;
+      if (open instanceof HTMLElement && area.contains(open) && isEditable(open)) open.blur();
+    };
     const onDown = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest(":popover-open")) return;
       if ((event.button !== 0 && event.button !== 1) || !(event.target instanceof Element)) return;
       // A press takes the camera where it is.
       stopGlide();
@@ -2475,12 +2511,17 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       const id = target.closest<HTMLElement>("[data-node-id]")?.dataset.nodeId;
       const at = id && !board.isLocked(id) ? positions[id] : undefined;
       if (id && at) {
-        const text = target.closest<HTMLTextAreaElement>(".wfn-text-input");
-        // A press on free text moves it; a press without a move edits it.
-        if (text && document.activeElement === text) return;
+        const field = target.closest<HTMLTextAreaElement | HTMLInputElement>(DRAG_FIELD);
+        // A press on a text field moves the node; a press without a move edits it. A field that has the focus keeps the press, to select text.
+        if (field && document.activeElement === field) return;
         // Shift and a press adds the node to the selection or takes it out; it does not move.
         if (event.shiftKey) return;
-        if (text) event.preventDefault();
+        // A click on an item that is not selected only selects it. The selection does not change before this press.
+        const edits = field !== null && (board.isSelected(id) || !field.matches(ITEM_FIELD));
+        if (field) {
+          event.preventDefault();
+          closeField();
+        }
         // A press on a node of the selection moves all of it.
         const members = board.isSelected(id)
           ? group().filter((member) => member === id || !board.isLocked(member))
@@ -2500,10 +2541,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           group: moving,
           box,
           others: boxesOf(live().flatMap((node) => (members.includes(node.id) ? [] : [node.id]))),
-          ...(text ? { focus: text } : {}),
+          ...(field && edits ? { focus: { field, caret: caretAt(field, event.clientX, event.clientY) } } : {}),
         };
       } else if (!target.closest("[data-node-id]")) {
         event.preventDefault();
+        closeField();
         gesture = {
           kind: "box",
           start,
@@ -2599,11 +2641,43 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
       pastedAt = undefined;
       if (event.type === "cut") canvas.deleteNodes(ids);
     };
+    /**
+     * Pictures on the clipboard, such as a screenshot or an image copied in a browser, go into the
+     * files of the board, and each becomes an asset node at the pointer. The canvas takes the paste
+     * when it has the focus, or when the pointer is on it and no field has the focus: a click on the
+     * empty canvas does not move the focus from the button that opened it. A field with focus keeps
+     * a paste that also has text.
+     */
+    const pastePictures = (event: ClipboardEvent) => {
+      const data = event.clipboardData;
+      const active = document.activeElement;
+      const pictures = [...(data?.files ?? [])].filter((file) => WORKFLOW_PICTURE_TYPES.has(file.type));
+      if (pictures.length === 0 || !allows("asset") || !props.features.uploads) return;
+      if (!inCanvas(root, active) && (!pointer || isEditable(active))) return;
+      if (isEditable(active) && data?.types.includes("text/plain")) return;
+      event.preventDefault();
+      const start = pointer ? toWorld(pointer) : undefined;
+      pictures.forEach((picture, index) => {
+        const point = start && { x: start.x + index * (NEW_NODE.width + GRID * 2), y: start.y };
+        // The host shows a failed upload, so the canvas adds no node for it.
+        board.upload(picture).then(
+          (file) => {
+            if (!deleted() && !frozen() && allows("asset"))
+              addNode("asset", point, { file: file.name, fileId: file.id });
+          },
+          () => undefined,
+        );
+      });
+    };
     /** ⌘V pastes copied nodes at the pointer, also into a field, because the clipboard has no text then. */
     const onPaste = (event: ClipboardEvent) => {
       const key = event.clipboardData?.getData(CLIP_TYPE);
-      if (deleted() || frozen() || !inCanvas(root, document.activeElement)) return;
-      if (!key || copied()?.key !== key) return;
+      if (deleted() || frozen()) return;
+      if (!key || copied()?.key !== key) {
+        pastePictures(event);
+        return;
+      }
+      if (!inCanvas(root, document.activeElement)) return;
       event.preventDefault();
       pasteNodes(pointer && toWorld(pointer));
     };
@@ -2630,7 +2704,7 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     };
     const onShortcut = (event: KeyboardEvent) => {
       const active = document.activeElement;
-      if (deleted() || !inCanvas(root, active)) return;
+      if (deleted() || active?.closest(":popover-open") || !inCanvas(root, active)) return;
       const editing = isEditable(active);
       const mod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
@@ -3366,7 +3440,11 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
           >
             <Search />
           </HudButton>
-          <WorkflowAddMenu allowed={props.features.kinds} getAnchorRect={hudBarRect} onAdd={(kind) => addNode(kind)} />
+          <WorkflowAddMenu
+            allowed={props.features.kinds}
+            getAnchorRect={hudBarRect}
+            onAdd={(item) => addNode(item.kind, undefined, item.fields)}
+          />
         </div>
 
         <Show when={ui.search}>

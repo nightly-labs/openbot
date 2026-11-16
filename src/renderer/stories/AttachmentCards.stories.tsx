@@ -92,6 +92,51 @@ export const NarrowAudioTakes: Story = {
   ),
 };
 
+const videoClip = new URL("../../../packages/ui/src/assets/plush/fishing.webm", import.meta.url).href;
+
+/** A video file plays in the same player as a generated video. */
+export const VideoFile: Story = {
+  name: "Inline video",
+  args: {
+    attachments: [
+      {
+        id: "video-episode-report",
+        name: "episode-report-720p.webm",
+        size: 9.8 * 1024 * 1024,
+        kind: "file",
+        mimeType: "video/webm",
+        previewKind: "video",
+        previewUrl: videoClip,
+      },
+    ],
+  },
+};
+
+/** The web client loads the file on Play. The player shows that it waits for the host. */
+export const VideoFromHost: Story = {
+  name: "Inline video that loads from a host",
+  args: {
+    attachments: [
+      {
+        id: "video-host-report",
+        name: "episode-report-720p.mp4",
+        size: 9.8 * 1024 * 1024,
+        kind: "file",
+        mimeType: "video/mp4",
+        previewKind: "video",
+        previewUrl: null,
+      },
+    ],
+    mediaSource: {
+      url: () => undefined,
+      // Never settles, so the story keeps the waiting state after a click on Play.
+      load: () => new Promise<boolean>(() => undefined),
+      thumbnailLimit: 2 * 1024 * 1024,
+      mediaLimit: 25 * 1024 * 1024,
+    },
+  },
+};
+
 const remoteArchive = {
   ...compactFile,
   id: "attachment-release-archive",

@@ -10,8 +10,8 @@ import type {
   AgentAnalyticsInput,
   AgentBackupModelSettings,
   AgentBrowserProfile,
+  AgentDefaultsOverview,
   AgentExclusionChange,
-  AgentFastModeSettings,
   AgentFolderBrowse,
   AgentFolderChange,
   AgentFolderInput,
@@ -29,6 +29,7 @@ import type {
   AgentProviderId,
   AgentReasoningEffort,
   AgentSessionSettings,
+  AgentSpeedSettings,
   AgentTask,
   AgentTaskInput,
   AgentTaskLimitSettings,
@@ -42,6 +43,7 @@ import type {
   AvatarColor,
   AvatarHue,
   AvatarImageInput,
+  BackgroundProcess,
   BitwardenConnectorStatus,
   BitwardenHostConnectInput,
   BranchAgentTaskInput,
@@ -87,6 +89,8 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  LibraryFolderAction,
+  LibraryFoldersSnapshot,
   MachineMetrics,
   MarkAgentTaskReadInput,
   McpAccessSnapshot,
@@ -122,6 +126,7 @@ import type {
   SaveWorkflowGraphInput,
   ServerAuditLog,
   ServerNotificationLevel,
+  SetAgentDefaultChoiceInput,
   SetAgentMemoryInclusionInput,
   SetAgentNotificationLevelInput,
   SetAgentProviderAccountInput,
@@ -140,16 +145,18 @@ import type {
   SidebarPin,
   SignInRelayStatus,
   StartWhatsAppLinkInput,
+  StorageDisk,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
   UpdateAgentBrowserProfileInput,
-  UpdateAgentFastModeInput,
+  UpdateAgentDefaultsInput,
   UpdateAgentHostSettingsInput,
   UpdateAgentInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
+  UpdateAgentSpeedInput,
   UpdateAgentTaskLimitInput,
   UpdateBrowserProfileInput,
   UpdateRestartMode,
@@ -157,6 +164,7 @@ import type {
   VaultHostImportResult,
   VaultSaveInput,
   VaultState,
+  VaultTwoStepCodes,
   WhatsAppGroupList,
   WhatsAppLinkState,
   WhatsAppOverview,
@@ -186,6 +194,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -206,6 +215,7 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
+import type { PendingApproval } from "./pending-approvals";
 
 /** An export file on this phone, read when it is sent. */
 export interface AgentExportFile extends AgentExportParts {
@@ -230,6 +240,11 @@ export interface MobileServer {
   name: string;
   /** The logo version in the account directory, or null when the server has no logo. */
   logoKey: string | null;
+  /**
+   * The shape and colour of the plush that the server shows with no logo (`host-appearance-v1`).
+   * Null or absent keeps the flat tile with the initials.
+   */
+  appearance?: ServerAppearance | null;
   kind: MobileServerKind;
   state: MobileServerState;
   initialConnectionPending: boolean;
@@ -251,6 +266,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** The plan storage of a hosted server in GB. Absent for each other server, or when the account server gave none. */
+  storageGb?: number;
   /** False for a hosted server that the account service cannot restart. Absent for each other server. */
   restartAvailable?: boolean;
   /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
@@ -334,6 +351,13 @@ export interface MobileWorkspaceContextValue {
    * `InactiveRequestError`, and drops the request, when it no longer waits on the host.
    */
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
+  /** True when the server can send the whole copy of an approval that a runtime snapshot cut. */
+  readsWholeApprovals: (serverId: string) => boolean;
+  /**
+   * Reads the whole copy of a cut approval with `pending-approval-v1` and puts it in place of the cut
+   * one. Rejects with `InactiveRequestError`, and drops the request, when it no longer waits on the host.
+   */
+  readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
   respondToBrowserTakeover: (
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },
@@ -429,6 +453,8 @@ export interface MobileWorkspaceContextValue {
   knownServerChecks: (serverId: string) => ServerChecks | null;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
   canEditServerIdentity: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `host-appearance-v1`. The host checks the role again. */
+  canEditServerAppearance: (serverId: string) => boolean;
   /**
    * An online host that sends notifications to this phone: `push-notifications-v1` for an iPhone,
    * `push-notifications-android-v1` for an Android phone.
@@ -462,6 +488,8 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { serverName?: string; logo?: AvatarImageInput | null },
   ) => Promise<void>;
+  /** Saves the plush of a server with no logo. `null` gives the automatic look. */
+  setServerAppearance: (serverId: string, appearance: ServerAppearance | null) => Promise<void>;
   /** The owner of an online host that serves `host-key-rotation-v1`. The host checks the role again. */
   canRotateServerKey: (serverId: string) => boolean;
   /**
@@ -576,6 +604,8 @@ export interface MobileWorkspaceContextValue {
   canTransferServer: (serverId: string) => boolean;
   /** The same for API keys in the Vault (`vault-v2`). */
   canManageVaultApiKeys: (serverId: string) => boolean;
+  /** The same for two-step keys of Vault logins and their live codes (`vault-v3`). */
+  canManageVaultTwoStep: (serverId: string) => boolean;
   /**
    * True for an owner or admin of a host that serves its named browser profiles and the profile of
    * each agent (`browser-profiles-v1`). The host checks the role again.
@@ -615,6 +645,8 @@ export interface MobileWorkspaceContextValue {
   disconnectPasswordManager: (manager: PasswordManagerId, serverId: string) => Promise<PasswordManagerStatus>;
   /** The host's Vault. No answer carries a password, a card number or a security code. */
   loadVault: (serverId: string) => Promise<VaultState>;
+  /** The current two-step code of each login with a key. The key stays on the host. */
+  loadVaultCodes: (serverId: string) => Promise<VaultTwoStepCodes>;
   /** A new secret goes to the host once; a null secret keeps the saved one. */
   saveVaultItem: (input: VaultSaveInput, serverId: string) => Promise<VaultState>;
   deleteVaultItem: (id: string, serverId: string) => Promise<VaultState>;
@@ -854,6 +886,11 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `library-folders-v1` and `storage-v1`. Every member reads the
+   * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
+   */
+  canOrganizeLibrary: (serverId: string) => boolean;
   /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
   canReadMachineMetrics: (serverId: string) => boolean;
   /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
@@ -864,6 +901,15 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /** The Library folders of the host that this member can see (`library-folders-v1`). */
+  loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /** Applies one folder change. The host answers with all folders that this member can see. */
+  changeLibraryFolders: (action: LibraryFolderAction, serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /**
+   * The disk of the host data, with the bytes of the user's files from a host with
+   * `storage-user-files-v1`. Null when the host has neither that nor `storage-disk-v1`.
+   */
+  loadServerDisk: (serverId: string) => Promise<StorageDisk | null>;
   /** Owners and admins only; the host refuses a member. */
   clearServerStorage: (category: ClearableStorageCategory, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
@@ -917,13 +963,37 @@ export interface MobileWorkspaceContextValue {
   loadAgentPlanCard: (agentId: string, serverId: string) => Promise<AgentPlanCardSettings | null>;
   /** Owners and admins only; the host refuses a member. Resolves with the setting the host saved. */
   updateAgentPlanCard: (input: UpdateAgentPlanCardInput, serverId: string) => Promise<AgentPlanCardSettings>;
+  /** An owner or admin of an online host that serves `agent-defaults-v1`. The host checks the role again. */
+  canManageAgentDefaults: (serverId: string) => boolean;
   /**
-   * Null when the host does not advertise `agent-fast-mode-v1`. A member with view access reads the
-   * setting, and with manage access changes it, as the model. The host checks the access.
+   * Settings > Agents of the host: its agent defaults and the own value of each agent that this member
+   * sees. Null when the host does not advertise `agent-defaults-v1`. Owners and admins only.
    */
-  loadAgentFastMode: (agentId: string, serverId: string) => Promise<AgentFastModeSettings | null>;
-  /** Resolves with the setting the host saved. It applies from the next turn. */
-  updateAgentFastMode: (input: UpdateAgentFastModeInput, serverId: string) => Promise<AgentFastModeSettings>;
+  loadAgentDefaults: (serverId: string) => Promise<AgentDefaultsOverview | null>;
+  /** Changes the given defaults. Owners and admins only. Resolves with the overview the host saved. */
+  updateAgentDefaults: (input: UpdateAgentDefaultsInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** Gives one choice for one setting to each named agent. Owners and admins only. */
+  setAgentDefaultChoice: (input: SetAgentDefaultChoiceInput, serverId: string) => Promise<AgentDefaultsOverview>;
+  /** An owner or admin of an online host that serves `background-processes-v1`. The host checks the role again. */
+  canManageBackgroundProcesses: (serverId: string) => boolean;
+  /**
+   * The programs that the host's agents left running, such as a dev server. Null when the host cannot
+   * find them, as on Windows. Owners and admins only.
+   */
+  loadBackgroundProcesses: (serverId: string) => Promise<BackgroundProcess[] | null>;
+  /** Stops one of these programs with its children. A program that ended is not an error. Owners and admins only. */
+  stopBackgroundProcess: (id: string, serverId: string) => Promise<void>;
+  /**
+   * The speed of an agent, from `agent-speed-v1`, or from `agent-fast-mode-v1` on an older host. Null
+   * when the host advertises neither. A member with view access reads the setting, and with manage
+   * access changes it, as the model. The host checks the access.
+   */
+  loadAgentSpeed: (agentId: string, serverId: string) => Promise<AgentSpeedSettings | null>;
+  /**
+   * Resolves with the setting the host saved. It applies from the next turn. "ultrafast" needs
+   * `agent-speed-v1`; an older host has no Ultrafast tier in its model list, so no screen offers it.
+   */
+  updateAgentSpeed: (input: UpdateAgentSpeedInput, serverId: string) => Promise<AgentSpeedSettings>;
   /** An owner or admin of an online host that serves `agent-instructions-v1`. The host checks the role again. */
   canManageAgentInstructions: (serverId: string) => boolean;
   /** The instruction file at the root of the agent's workspace on the host. Owners and admins only. */
@@ -1208,6 +1278,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canOrganizeLibrary"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
@@ -1215,6 +1286,7 @@ export type MobileWorkspaceCapabilityCheck =
 type ServerCheckKey =
   | Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
   | "canEditServerIdentity"
+  | "canEditServerAppearance"
   | "canRotateServerKey"
   | "canCreateLocalServers"
   | "canRestartServerItself"
@@ -1239,6 +1311,7 @@ type ServerCheckKey =
   | "canImportAgents"
   | "canTransferServer"
   | "canManageVaultApiKeys"
+  | "canManageVaultTwoStep"
   | "canManageBrowserProfiles"
   | "canManageBrowserProxies"
   | "serverUpdateAccess"
@@ -1264,6 +1337,8 @@ type ServerCheckKey =
   | "canManageAgentTaskLimit"
   | "canManageAgentNewChat"
   | "canManageAgentPlanCard"
+  | "canManageAgentDefaults"
+  | "canManageBackgroundProcesses"
   | "canManageAgentInstructions"
   | "canPublishAgent"
   | "canManageProviderAccounts";

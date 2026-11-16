@@ -42,6 +42,8 @@
 //      message brings no question, and a later review sees the saved skill.
 //  21. "automatic" revises a local skill from its current text, at its current revision.
 //  22. When the writer answer is not JSON or the save fails, the review asks the user instead.
+//      It also asks when the revision drops much of the current text or writes its letters in
+//      ASCII (ş as s), and when the skill leaves no room for the lesson: then no writer runs.
 //  23. "off": the review prompt asks for no skill, and a skill in the answer shows nothing.
 //  24. When the review looks for skills, a turn in which the agent saved a memory stays in the next
 //      review: the memory does not hold how the agent did the task.
@@ -255,13 +257,15 @@ const LEARNED_SKILL_ID = "local-skill-00000000-0000-4000-8000-000000000002";
 const learned: { agentId: string; draft: LearnedSkillDraft }[] = [];
 /** True makes the next saves fail, as a failed install does. */
 let saveFails = false;
+/** The current instructions of the local skill. */
+let localSkillInstructions = "Write release notes as a short list.";
 /** Saves as the local library does: a new skill gets revision 1, a change the next revision. */
 const SKILL_LEARNER: SkillLearner = {
   read: (skillId) =>
     skillId === LOCAL_SKILL_ID
       ? Effect.succeed({
           description: "How the user wants release notes.",
-          instructions: "Write release notes as a short list.",
+          instructions: localSkillInstructions,
           revision: 1,
         })
       : Effect.fail(new Error("No such skill.")),
@@ -1049,7 +1053,10 @@ try {
     await reviewed(count + 1);
     const update = await waitFor("the update question", () => suggestionLines(asker.id)[1]);
     control({ operations: [] });
-    const revised = { description: "How the user wants release notes.", instructions: "Tag each release first." };
+    const revised = {
+      description: "How the user wants release notes.",
+      instructions: "Write release notes as a short list.\nTag each release first.",
+    };
     writer(revised);
     const turnsBeforeUpdate = logged("turn").length;
     assert.deepEqual(await save(update.id), { saved: true });
@@ -1208,6 +1215,57 @@ try {
     control({ operations: [] });
     return { questions: suggestionLines(fallback.id).length };
   });
+
+  await check(
+    "automatic: a revision that drops text or letters, or a skill too long to rewrite, asks the user",
+    async () => {
+      const keeper = await createAgent("Guarded");
+      const saves = learned.length;
+      const turkish =
+        "Kullanıcının düzeltmelerini uygula. Sürüm notlarını kısa bir liste olarak yaz. Önce etiketi oluştur.\n".repeat(
+          10,
+        );
+      localSkillInstructions = turkish;
+      try {
+        const ask = async (index: number, label: string) => {
+          const count = reviews().length;
+          control({
+            operations: [],
+            skill: {
+              action: "update",
+              skillId: LOCAL_SKILL_ID,
+              name: "Notes",
+              message: `Change the notes (${label})?`,
+            },
+          });
+          await chat(keeper.id, index, `Guarded ${label}`);
+          await reviewed(count + 1);
+          return waitFor(`the question after ${label}`, () => suggestionLines(keeper.id)[index - 2]);
+        };
+        const ascii = turkish
+          .replace(/ı/gu, "i")
+          .replace(/ü/gu, "u")
+          .replace(/ş/gu, "s")
+          .replace(/ğ/gu, "g")
+          .replace(/ö/gu, "o")
+          .replace(/Ö/gu, "O");
+        writer({ description: "How the user wants release notes.", instructions: `${ascii}\nEtiketi kontrol et.` });
+        await ask(2, "ASCII letters");
+        writer({ description: "How the user wants release notes.", instructions: "Kısa liste yaz." });
+        await ask(3, "a summary");
+        localSkillInstructions = "Write release notes as a short list.\n".repeat(400);
+        const writes = writers().length;
+        await ask(4, "a long skill");
+        assert.equal(writers().length, writes, "No writer runs for a skill that is too long to rewrite.");
+        assert.equal(learnedLines(keeper.id).length, 0, "No saved skill shows.");
+        assert.equal(learned.length, saves, "Nothing was saved.");
+        return { questions: suggestionLines(keeper.id).length };
+      } finally {
+        localSkillInstructions = "Write release notes as a short list.";
+        control({ operations: [] });
+      }
+    },
+  );
 
   await check("off: a review does not look for skills", async () => {
     skillLearningMode = "off";

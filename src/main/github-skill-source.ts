@@ -25,7 +25,13 @@ import { Effect, Result, Schema } from "effect";
 import { zipSync } from "fflate";
 import { causeHelpers } from "../backend/effect-boundary";
 import { GITHUB_REQUEST_TIMEOUT_MS, type GitHubFetch } from "./github-device-flow";
-import { inspectSkillMarkdown, isUnsafeArchivePath, MAX_BYTES, SKILL_FRONTMATTER } from "./skill-package";
+import {
+  inspectSkillMarkdown,
+  isUnsafeArchivePath,
+  MAX_BYTES,
+  SKILL_FRONTMATTER,
+  skillZippable,
+} from "./skill-package";
 
 const API = "https://api.github.com";
 const RAW = "https://raw.githubusercontent.com";
@@ -90,6 +96,8 @@ interface TreeEntry {
   size: number;
   /** A symbolic link. raw.githubusercontent.com gives its target as the file text. */
   link: boolean;
+  /** Git mode `100755`: the install keeps the file executable. */
+  executable: boolean;
 }
 
 /** The files of a commit. `truncated` when GitHub did not list all of them. */
@@ -152,7 +160,12 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
     const files: TreeEntry[] = [];
     for (const entry of body.tree)
       if (isDynamicRecord(entry) && entry.type === "blob" && isString(entry.path) && isNumber(entry.size))
-        files.push({ path: entry.path, size: entry.size, link: entry.mode === "120000" });
+        files.push({
+          path: entry.path,
+          size: entry.size,
+          link: entry.mode === "120000",
+          executable: entry.mode === "100755",
+        });
     const result: Tree = { files, truncated: body.truncated === true };
     return result;
   });
@@ -289,7 +302,8 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
           ),
         { concurrency: CONCURRENCY },
       );
-      const bundle = yield* sync(() => zipSync(Object.fromEntries(contents), { level: 6 }));
+      const executable = new Set(own.filter((file) => file.executable).map((file) => file.path));
+      const bundle = yield* sync(() => zipSync(skillZippable(Object.fromEntries(contents), executable), { level: 6 }));
       const detail: MarketplaceSkillDetail = {
         ...githubSkillDetail(
           { ...address, committedAt: new Date(0).toISOString(), skills: [skill] },

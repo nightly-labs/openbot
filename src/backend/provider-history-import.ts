@@ -29,7 +29,7 @@ interface ProviderHistoryImportDatabase {
     threadId: string;
     provider: AgentProviderId;
     externalSessionId: string;
-  }): unknown;
+  }): { state: string; createdAt: string };
   stageProviderHistoryFragment(input: { sessionId: string; fragment: ProviderHistoryFragment }): {
     turnImported: boolean;
   };
@@ -74,6 +74,12 @@ export interface ProviderHistoryImportInput {
    * routine's side thread, as at the turn completion. Left out, it cannot.
    */
   quietTeammateThread?: boolean;
+  /**
+   * Whether this teammate's answer replies to a request that a quiet routine run of the agent sent.
+   * Its turn can have ended quiet after a call to the no-update tool. A run whose record is gone does
+   * not count: the tool refused its answer, so the answer showed. Left out, no answer counts.
+   */
+  continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -105,13 +111,16 @@ export function importProviderHistory(
   input: ProviderHistoryImportInput,
 ): Effect.Effect<ProviderHistoryImportResult, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    yield* providerSync(() =>
-      input.database.ensureProviderHistoryImport({
-        sessionId: input.sessionId,
-        threadId: input.publicThreadId,
-        provider: input.provider,
-        externalSessionId: input.externalSessionId,
-      }),
+    const resumeKey = yield* providerSync(() =>
+      importResumeKey(
+        input,
+        input.database.ensureProviderHistoryImport({
+          sessionId: input.sessionId,
+          threadId: input.publicThreadId,
+          provider: input.provider,
+          externalSessionId: input.externalSessionId,
+        }),
+      ),
     );
     let turns = 0;
     let messages = 0;
@@ -162,6 +171,7 @@ export function importProviderHistory(
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
           items: "full",
           providerOnly: true,
+          ...(resumeKey === undefined ? {} : { resumeKey }),
         } satisfies ProviderHistoryRequest,
         consume,
       )
@@ -176,6 +186,27 @@ export function importProviderHistory(
       yield* providerSync(() => input.database.markProviderHistoryImportState(input.sessionId, "complete"));
     return { turns, messages };
   });
+}
+
+/**
+ * The key that lets the provider read send only changed turns. It is given only when the last read
+ * of this import row ended complete, and no complete turn waits for its import. A new import row has
+ * a new creation time, so a cursor of an earlier row does not apply to it.
+ */
+function importResumeKey(
+  input: ProviderHistoryImportInput,
+  current: { state: string; createdAt: string },
+): string | undefined {
+  if (current.state !== "complete") return undefined;
+  const waiting = databaseRow(
+    input.database.connection
+      .prepare(
+        `SELECT 1 AS waiting FROM provider_history_turns
+         WHERE session_id = ? AND imported = 0 AND complete = 1 LIMIT 1`,
+      )
+      .get(input.sessionId),
+  );
+  return waiting ? undefined : `${input.sessionId}:${current.createdAt}`;
 }
 
 function importCompletedTurn(
@@ -296,6 +327,8 @@ function routineTurnAnswers(
     let noUpdateCalled = false;
     let failureReported = false;
     let imageGenerated = false;
+    // A teammate's answer to a quiet routine run is quiet only after a call to the no-update tool.
+    let needsNoUpdate = false;
     let afterIndex = -1;
     while (true) {
       const page = yield* providerSync(() =>
@@ -307,10 +340,16 @@ function routineTurnAnswers(
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string") {
           const delivery = input.findDelivery(item.clientId)?.delivery;
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
+          const continuesQuietRun =
+            delivery !== undefined &&
+            input.quietTeammateThread === true &&
+            input.continuesQuietRun?.(delivery) === true;
+          if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
-              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
+              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
+              continuesQuietRun);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
@@ -326,7 +365,7 @@ function routineTurnAnswers(
       if (page.length < 50 || !last || last.itemIndex <= afterIndex) break;
       afterIndex = last.itemIndex;
     }
-    if (!routine) return "none";
+    if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";

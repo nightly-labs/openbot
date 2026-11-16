@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 // Computer Use, local scripts, the busy-message mode, the backup models, the task limit, the agent's
 // own new chats, the plan card and the fast mode of one agent, as this computer holds them. The
 // `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1`,
-// `agent-plan-card-v1` and `agent-fast-mode-v1` host routes use this, and they write through `AgentService.updateAgent`, the
+// `agent-plan-card-v1`, `agent-fast-mode-v1` and `agent-speed-v1` host routes use this, and they write through `AgentService.updateAgent`, the
 // writer of the local window, so a remote admin changes the same state.
 
 import {
@@ -12,17 +12,21 @@ import {
   type AgentHostSettings,
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
+  type AgentSpeedSettings,
   type AgentSummary,
   type AgentTaskLimitSettings,
   agentAutomationAllowed,
   agentComputerUseEnabled,
+  agentFastModeSettings,
   agentNewChatAllowed,
   agentQuickAcknowledgementEnabled,
+  agentSpeed,
   type UpdateAgentBackupModelsInput,
   type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
   type UpdateAgentNewChatInput,
   type UpdateAgentPlanCardInput,
+  type UpdateAgentSpeedInput,
   type UpdateAgentTaskLimitInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -55,6 +59,10 @@ export interface AgentHostSettingsService {
   updateFastMode(input: UpdateAgentFastModeInput): Effect.Effect<AgentFastModeSettings, AgentHostSettingsFailure>;
   /** The models of this computer that have a fast service tier. The released model list drops the tier. */
   listFastModels(): AgentFastModel[];
+  readSpeed(agentId: string): AgentSpeedSettings;
+  updateSpeed(input: UpdateAgentSpeedInput): Effect.Effect<AgentSpeedSettings, AgentHostSettingsFailure>;
+  /** `listFastModels` with the Ultrafast tiers and the Claude models, for `agent-speed-v1`. */
+  listSpeedModels(): AgentFastModel[];
 }
 
 export function createAgentHostSettings({
@@ -141,17 +149,35 @@ export function createAgentHostSettings({
     const agent = yield* agents.updateAgent({ agentId, quickAcknowledgement }).pipe(toAgentHostSettingsFailure);
     return planCard(agent);
   });
+  // `agent-fast-mode-v1` answers only `fastMode`: its frozen response has no other field.
   const fastMode = (agent: AgentSummary): AgentFastModeSettings => ({ fastMode: agent.fastMode ?? null });
-  const updateFastMode = Effect.fn("AgentHostSettings.updateFastMode")(function* ({
-    agentId,
-    fastMode: next,
-  }: UpdateAgentFastModeInput) {
+  const writeFastMode = Effect.fn("AgentHostSettings.writeFastMode")(function* (
+    agentId: string,
+    next: boolean,
+    ultrafast: boolean,
+  ) {
     yield* Effect.try({
       try: () => requireAgent(agentId),
       catch: (cause) => new AgentHostSettingsFailure({ cause }),
     });
-    const agent = yield* agents.updateAgent({ agentId, fastMode: next }).pipe(toAgentHostSettingsFailure);
-    return fastMode(agent);
+    // A `fastMode` change without `ultrafast: true` turns Ultrafast off, as in the local picker.
+    return yield* agents
+      .updateAgent({ agentId, fastMode: next, ...(next && ultrafast ? { ultrafast: true } : {}) })
+      .pipe(toAgentHostSettingsFailure);
+  });
+  const updateFastMode = Effect.fn("AgentHostSettings.updateFastMode")(function* ({
+    agentId,
+    fastMode: next,
+    ultrafast,
+  }: UpdateAgentFastModeInput) {
+    return fastMode(yield* writeFastMode(agentId, next, ultrafast === true));
+  });
+  const speed = (agent: AgentSummary): AgentSpeedSettings => ({
+    speed: agentSpeed({ fastMode: agent.fastMode ?? null, ...(agent.ultrafast ? { ultrafast: true } : {}) }),
+  });
+  const updateSpeed = Effect.fn("AgentHostSettings.updateSpeed")(function* (input: UpdateAgentSpeedInput) {
+    const { fastMode: next, ultrafast } = agentFastModeSettings({ speed: input.speed });
+    return speed(yield* writeFastMode(input.agentId, next === true, ultrafast === true));
   });
   return {
     read: (agentId) => settings(requireAgent(agentId)),
@@ -172,6 +198,17 @@ export function createAgentHostSettings({
         .listModels()
         .flatMap(({ provider, id, fastServiceTier }) =>
           fastServiceTier && provider !== "claude" ? [{ provider, id, fastServiceTier }] : [],
+        ),
+    readSpeed: (agentId) => speed(requireAgent(agentId)),
+    updateSpeed: (input) => updateSpeed(input).pipe(Effect.uninterruptible),
+    // A client with `agent-speed-v1` asks for the Claude price confirmation, so Claude models are listed.
+    listSpeedModels: () =>
+      agents
+        .listModels()
+        .flatMap(({ provider, id, fastServiceTier, ultrafastServiceTier }) =>
+          fastServiceTier
+            ? [{ provider, id, fastServiceTier, ...(ultrafastServiceTier ? { ultrafastServiceTier } : {}) }]
+            : [],
         ),
   };
 }

@@ -19,7 +19,6 @@ import { useTurns } from "../../turns";
 import { useAgentThreads } from "../agent-threads/agent-threads-context";
 import { useConversation } from "../conversation/conversation-context";
 import { agentConversationKey } from "../conversation/conversation-keys";
-import { useDirectMessages } from "../conversation/direct-messages-context";
 import { useServers } from "../servers/servers-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { type NewAgentDraft, newAgentInput } from "./agent-create-input";
@@ -52,7 +51,6 @@ const AgentActions = createSimpleContext({
       agentList,
       setAgentList,
       agentSetupOpen,
-      setAgentSetupOpen,
       agentSetupDraft,
       setAgentSetupError,
       creatingAgent,
@@ -77,8 +75,7 @@ const AgentActions = createSimpleContext({
     const { setActiveTurns, setFailedTurns, setQueues, setPendingPrompts } = useTurns();
     const { sidebarLayout, setSidebarLayout, applySidebarLayoutAction, removePinnedSidebarItemEverywhere } =
       useSidebar();
-    const { clearDirectSelection } = useDirectMessages();
-    const { selectAgent } = useNavigation();
+    const { selectAgent, openCreatedAgent } = useNavigation();
     const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<Set<string>>(new Set());
 
     /** Asks the host for the agent. */
@@ -119,9 +116,8 @@ const AgentActions = createSimpleContext({
       setAgentSetupError(null);
       try {
         const newAgent = addNewAgent(await requestNewAgent(submitted));
-        setAgentSetupOpen(false);
-        clearDirectSelection();
-        setActiveAgentId(newAgent.id);
+        // As a sidebar click does: the form and an open channel close, and the new chat opens.
+        openCreatedAgent(newAgent.id);
         const properties = analyticsAgentProperties(newAgent.id);
         analytics.track("agent_action", { action: "create", result: "succeeded", ...(properties ?? {}) });
       } catch (error) {

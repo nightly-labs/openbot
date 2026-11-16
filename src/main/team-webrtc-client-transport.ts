@@ -615,6 +615,7 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
                     channelPicture: true,
                     channelBrowser: true,
                     channelSeenSubtasks: true,
+                    channelTaskWaits: true,
                     mcpManyServers: true,
                   })
                 : decodeTeamProtocolV9WebRtcHttpResponse(method, path, status, envelope.body),

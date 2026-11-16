@@ -62,6 +62,7 @@ import {
   MessageMenuItems,
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { QueuePanel } from "@openbot/ui/features/conversation/QueuePanel";
 import {
   MessageSelectionActions,
@@ -244,8 +245,13 @@ export interface AgentThreadViewProps {
    * to the latest message shows. `onLoad` reads them in the place of the part.
    */
   newerMessages?: AgentThreadOlderMessages | undefined;
-  /** The card that the app draws in the place of a message row, such as an MCP sign-in. Undefined keeps the row. */
-  messageCard?: ((message: AgentMessage) => JSX.Element | undefined) | undefined;
+  /**
+   * The card that the app draws in the place of a message row, such as an MCP sign-in or a visual
+   * reply page. `quote` puts text in this message box. Undefined keeps the row.
+   */
+  messageCard?:
+    | ((message: AgentMessage, quote: (messageId: string, text: string) => void) => JSX.Element | undefined)
+    | undefined;
   /**
    * The steps of the finished turn above an answer, or on the thinking row of a finished turn with no
    * answer. Undefined for a message that has none.
@@ -272,6 +278,8 @@ export interface AgentThreadViewProps {
    * Branch in the row, as before.
    */
   compactMessageActions?: boolean | undefined;
+  /** How the reader's own bubbles look: the agent's color, solid or as a tint, or classic grey (the default). */
+  bubbleStyle?: ChatBubbleStyle | undefined;
   /**
    * Copies the thread through an answer into a new thread. Only the last answer of each finished turn
    * offers it. Missing where the host cannot branch.
@@ -515,7 +523,13 @@ export function AgentThreadView(props: AgentThreadViewProps) {
   };
   // An answer from another agent to a request of this thread shows with the name of that agent.
   const author = (message: AgentMessage): ChatMessageAuthor => {
-    if (message.author === "you") return { kind: "you", name: t("chat.message.you") };
+    if (message.author === "you")
+      return ownMessageAuthor({
+        name: t("chat.message.you"),
+        style: props.bubbleStyle ?? "classic",
+        agent: props.agent,
+        chatColor: undefined,
+      });
     const senderId = message.senderAgentId;
     if (senderId === undefined || senderId === props.agent.id)
       return { kind: "agent", name: props.agent.name, agent: props.agent };
@@ -786,7 +800,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
           </Show>
           <For each={props.messages.filter(shownRow)} keyed={(message) => message.id}>
             {(message) => {
-              const card = createMemo(() => props.messageCard?.(message()));
+              const card = createMemo(() => props.messageCard?.(message(), quoteSelection));
               return (
                 <div class="virtual-chat-row">
                   <Show when={props.stepsAbove?.(message().id)}>

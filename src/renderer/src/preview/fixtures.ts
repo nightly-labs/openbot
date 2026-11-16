@@ -735,6 +735,7 @@ export const STORY_HOST_STATUS: HostStatus = {
   serverId: "team",
   serverName: "OpenBot team",
   logoUrl: null,
+  appearance: null,
   apiUrl: "https://team.example.com",
   apiOnline: true,
   remoteDesktopReady: true,

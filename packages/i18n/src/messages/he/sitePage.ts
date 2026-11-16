@@ -373,6 +373,7 @@ export const messages = {
   "sitePage.landing.download.appStore": "הורדה מ-App Store",
   "sitePage.landing.download.googlePlay": "זמין ב-Google Play",
   "sitePage.landing.download.pages": "דרישות מערכת ושלבי התקנה:",
+  "sitePage.landing.download.apk": "הורדת APK",
   "sitePage.site.download": "הורדה",
   "sitePage.site.app": "אפליקציה",
   "sitePage.site.primaryNavigation": "ניווט ראשי",

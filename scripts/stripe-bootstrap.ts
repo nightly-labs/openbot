@@ -3,12 +3,17 @@ import {
   BILLING_INTERVALS,
   BILLING_OPTIONAL_CURRENCIES,
   BILLING_PLAN_IDS,
+  BILLING_STORAGE_UPGRADE_TIERS,
   type BillingCurrency,
   type BillingInterval,
   type BillingOptionalCurrency,
   type BillingPlanId,
+  type BillingStorageUpgradeTier,
   billingListPrices,
   billingLookupKey,
+  storageTierListPrices,
+  storageTierLookupKey,
+  storageTierPriceMetadata,
 } from "@openbot/contracts/billing";
 import {
   LICENSE_LOOKUP_KEYS,
@@ -27,9 +32,12 @@ import { z } from "zod";
 
 /**
  * Creates the Stripe catalog that the account server reads: one Product for each plan, and one Price
- * for each plan and interval with the lookup key `openbot_{plan}_{interval}`. It also creates the
- * license Product and one Price for each license plan (`LICENSE_PLANS`), and sets the Customer Portal
- * features. Run it again at any time: it changes only what differs.
+ * for each plan and interval with the lookup key `openbot_{plan}_{interval}`. Each plan also has a
+ * storage Product, with one add-on Price for each storage tier and interval
+ * (`openbot_storage_{plan}_{tier}_{interval}`). It also creates the license Product and one Price for each
+ * license plan (`LICENSE_PLANS`), and sets the Customer Portal features: the Portal does not change a
+ * plan, and the account server sells storage tiers itself. Run it again at any time: it changes only
+ * what differs.
  *
  *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-bootstrap.ts [--live] [--brl] [--webhook-url <url>]
  *
@@ -126,6 +134,79 @@ class StripeAdmin {
 
 function productId(plan: BillingPlanId): string {
   return `openbot_${plan}`;
+}
+
+function storageProductId(plan: BillingPlanId): string {
+  return `openbot_storage_${plan}`;
+}
+
+/** The storage Product of a plan. Its Prices are add-on items on the subscription of the plan. */
+async function ensureStorageProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
+  const id = storageProductId(plan);
+  const body = new URLSearchParams({
+    name: `OpenBot ${PLAN_NAME[plan]} storage`,
+    active: "true",
+    "metadata[openbot_kind]": "storage",
+    "metadata[openbot_plan]": plan,
+  });
+  if (await stripe.findProduct(id)) {
+    await stripe.request("POST", `/v1/products/${id}`, body, productSchema);
+    logger.info(`Product ${id} is up to date.`);
+    return;
+  }
+  body.set("id", id);
+  await stripe.request("POST", "/v1/products", body, productSchema);
+  logger.info(`Created product ${id}.`);
+}
+
+/**
+ * The add-on Price of one storage tier. As for a plan, a changed amount makes a new Price and moves the
+ * lookup key to it, and current subscriptions keep the old Price. The metadata names the tier, so the
+ * account server still knows the old Price.
+ */
+async function ensureStoragePrice(
+  stripe: StripeAdmin,
+  existing: readonly Price[],
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+  optional: readonly BillingOptionalCurrency[],
+): Promise<string> {
+  const lookupKey = storageTierLookupKey(plan, tier, interval);
+  const amounts = storageTierListPrices(plan, tier, interval);
+  const metadata = storageTierPriceMetadata(plan, tier, interval);
+  const current = existing.find((price) => price.lookup_key === lookupKey);
+  const currencies = optionalCurrenciesOf(current, optional);
+  if (
+    current &&
+    current.active !== false &&
+    current.product === storageProductId(plan) &&
+    current.currency === "eur" &&
+    current.unit_amount === amounts.eur &&
+    current.recurring?.interval === interval &&
+    current.currency_options?.usd?.unit_amount === amounts.usd &&
+    current.currency_options?.pln?.unit_amount === amounts.pln &&
+    currencies.every((currency) => current.currency_options?.[currency]?.unit_amount === amounts[currency]) &&
+    Object.entries(metadata).every(([key, value]) => current.metadata?.[key] === value)
+  ) {
+    logger.info(`Price ${lookupKey} is up to date.`);
+    return current.id;
+  }
+  const body = new URLSearchParams({
+    product: storageProductId(plan),
+    currency: "eur",
+    unit_amount: String(amounts.eur),
+    "recurring[interval]": interval,
+    lookup_key: lookupKey,
+    transfer_lookup_key: "true",
+    "currency_options[usd][unit_amount]": String(amounts.usd),
+    "currency_options[pln][unit_amount]": String(amounts.pln),
+  });
+  for (const [key, value] of Object.entries(metadata)) body.set(`metadata[${key}]`, value);
+  for (const currency of currencies) body.set(`currency_options[${currency}][unit_amount]`, String(amounts[currency]));
+  const created = await stripe.request("POST", "/v1/prices", body, priceSchema);
+  logger.info(`${current ? "Replaced" : "Created"} price ${lookupKey}.`);
+  return created.id;
 }
 
 async function ensureProduct(stripe: StripeAdmin, plan: BillingPlanId): Promise<void> {
@@ -347,26 +428,19 @@ async function defaultPortalConfiguration(stripe: StripeAdmin): Promise<string> 
   return created;
 }
 
-async function updatePortalConfiguration(stripe: StripeAdmin, prices: Record<BillingPlanId, string[]>): Promise<void> {
+/**
+ * The Portal shows the invoices, changes the payment method and cancels a plan at the end of its period.
+ * It does not change a plan: a plan change would keep the storage add-on of the old plan, and the
+ * account server sells storage tiers itself (`POST /v1/me/billing/storage`).
+ */
+async function updatePortalConfiguration(stripe: StripeAdmin): Promise<void> {
   const configuration = { id: await defaultPortalConfiguration(stripe) };
   const body = new URLSearchParams({
     "features[invoice_history][enabled]": "true",
     "features[payment_method_update][enabled]": "true",
     "features[subscription_cancel][enabled]": "true",
     "features[subscription_cancel][mode]": "at_period_end",
-    "features[subscription_update][enabled]": "true",
-    // An upgrade gives the larger server now, so it is charged now. A downgrade or a shorter interval
-    // starts at the next period, which the user already paid for.
-    "features[subscription_update][proration_behavior]": "always_invoice",
-    "features[subscription_update][schedule_at_period_end][conditions][0][type]": "decreasing_item_amount",
-    "features[subscription_update][schedule_at_period_end][conditions][1][type]": "shortening_interval",
-  });
-  body.append("features[subscription_update][default_allowed_updates][]", "price");
-  BILLING_PLAN_IDS.forEach((plan, index) => {
-    body.set(`features[subscription_update][products][${index}][product]`, productId(plan));
-    // One subscription pays for one server, so the quantity stays 1.
-    body.set(`features[subscription_update][products][${index}][adjustable_quantity][enabled]`, "false");
-    for (const price of prices[plan]) body.append(`features[subscription_update][products][${index}][prices][]`, price);
+    "features[subscription_update][enabled]": "false",
   });
   await stripe.request(
     "POST",
@@ -447,6 +521,11 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
 
   const lookupKeys = [
     ...BILLING_PLAN_IDS.flatMap((plan) => BILLING_INTERVALS.map((interval) => billingLookupKey(plan, interval))),
+    ...BILLING_PLAN_IDS.flatMap((plan) =>
+      BILLING_STORAGE_UPGRADE_TIERS.flatMap((tier) =>
+        BILLING_INTERVALS.map((interval) => storageTierLookupKey(plan, tier, interval)),
+      ),
+    ),
     ...LICENSE_LOOKUP_KEYS,
   ];
   const existing: Price[] = [];
@@ -467,12 +546,22 @@ export async function bootstrapStripe(options: StripeBootstrapOptions): Promise<
 
   for (const plan of BILLING_PLAN_IDS) logger.info(`Prices ${productId(plan)}: ${prices[plan].join(", ")}`);
 
+  for (const plan of BILLING_PLAN_IDS) {
+    await ensureStorageProduct(stripe, plan);
+    const storagePrices: string[] = [];
+    for (const tier of BILLING_STORAGE_UPGRADE_TIERS) {
+      for (const interval of BILLING_INTERVALS)
+        storagePrices.push(await ensureStoragePrice(stripe, existing, plan, tier, interval, optional));
+    }
+    logger.info(`Prices ${storageProductId(plan)}: ${storagePrices.join(", ")}`);
+  }
+
   // The license is not in the Portal product list, so the Portal cannot change its users or price.
   await ensureLicenseProduct(stripe);
   for (const plan of LICENSE_PLANS)
     logger.info(`Price ${licenseLookupKey(plan)}: ${await ensureLicensePrice(stripe, existing, plan, optional)}`);
 
-  await updatePortalConfiguration(stripe, prices);
+  await updatePortalConfiguration(stripe);
   return webhookUrl ? await ensureWebhookEndpoint(stripe, webhookUrl, options.replaceWebhook ?? false) : null;
 }
 
