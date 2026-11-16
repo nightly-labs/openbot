@@ -7,6 +7,12 @@
   max-width: 100%;
 }
 
+/* A table in the preview uses the wide width of an agent reply with a table (messages.css), so its
+   columns do not break each word while the chat row has free space. */
+.ui-block-card.ui-bubble:has(.ui-block-preview .message-markdown-table-scroll) {
+  width: var(--message-wide-bubble-width);
+}
+
 /* The card has a fixed width, so its content can be a size container for the narrow layout below. */
 .ui-block-card > .ui-block-content {
   container: ui-block / inline-size;
