@@ -101,6 +101,74 @@ export function followWindowGlass(window: BrowserWindow, darkColor: string): voi
   follow(window, update);
 }
 
+/**
+ * The surface under the top row of a window. The main window draws its top row on the frame
+ * (`--openbot-bg-frame`). A chat window has no frame, so its top row is on the canvas
+ * (`--openbot-bg-canvas`).
+ */
+export type TitleBarSurface = "frame" | "canvas";
+
+/**
+ * The surfaces and the icons of the top row (`--openbot-text-secondary`): dark in `tokens.css`, light in
+ * `tokens-light.css`. The Windows window buttons take these colors, so they look like part of the top row.
+ */
+const DARK_TITLE_BAR = { frame: "#0d0d0d", canvas: "#1a1a1a", symbolColor: "#dcdcdc" } as const;
+const LIGHT_TITLE_BAR = { frame: "#e8e8eb", canvas: LIGHT_WINDOW_BACKGROUND, symbolColor: "#3a3a3c" } as const;
+
+/** The height of the top row of the page at 100% (`--left-header-height` in `app-shell.css`). */
+const TITLE_BAR_HEIGHT = 38;
+
+/**
+ * The colors of the Windows window buttons for the current appearance. A theme palette gives its own
+ * surfaces and text, without the alpha: Windows draws the buttons on an opaque background.
+ */
+function titleBarOverlayColors(surface: TitleBarSurface): { color: string; symbolColor: string } {
+  const palette = selectedThemePalette(current);
+  if (palette !== null) {
+    return { color: palette.colors[surface].slice(0, 7), symbolColor: palette.colors.text.slice(0, 7) };
+  }
+  const dark = current.appearance === "system" ? nativeTheme.shouldUseDarkColors : current.appearance === "dark";
+  const colors = dark ? DARK_TITLE_BAR : LIGHT_TITLE_BAR;
+  return { color: colors[surface], symbolColor: colors.symbolColor };
+}
+
+/**
+ * On Windows the page draws the title bar: the native bar is hidden, and Windows draws only its
+ * minimize, maximize and close buttons over the top row of the page. They keep the Windows behavior:
+ * the hover and pressed states, the red close button, and the Snap Layouts menu over maximize. The
+ * top row is the drag region, so a drag moves the window and a double-click maximizes it. macOS has
+ * its own buttons (`window-buttons.ts`), and Linux keeps the native frame of its window manager.
+ */
+export function titleBarWindowOptions(surface: TitleBarSurface): {
+  titleBarStyle?: "hidden";
+  titleBarOverlay?: { color: string; symbolColor: string; height: number };
+} {
+  if (process.platform !== "win32") return {};
+  return { titleBarStyle: "hidden", titleBarOverlay: { ...titleBarOverlayColors(surface), height: TITLE_BAR_HEIGHT } };
+}
+
+const titleBarUpdates = new WeakMap<BrowserWindow, () => void>();
+
+/**
+ * Keeps the Windows window buttons of `window` on the colors of the current appearance, and on the
+ * height of the top row at the zoom of the page, until the window closes. No effect outside Windows.
+ */
+export function followTitleBarOverlay(window: BrowserWindow, surface: TitleBarSurface): void {
+  if (process.platform !== "win32") return;
+  const update = () => {
+    if (window.isDestroyed()) return;
+    const height = Math.round(TITLE_BAR_HEIGHT * window.webContents.getZoomFactor());
+    window.setTitleBarOverlay({ ...titleBarOverlayColors(surface), height });
+  };
+  titleBarUpdates.set(window, update);
+  follow(window, update);
+}
+
+/** Sets the height of the window buttons again after a change of the zoom of the page. */
+export function resizeTitleBarOverlay(window: BrowserWindow): void {
+  titleBarUpdates.get(window)?.();
+}
+
 function follow(window: BrowserWindow, update: () => void): void {
   nativeTheme.on("updated", update);
   listeners.add(update);

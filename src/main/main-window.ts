@@ -71,7 +71,15 @@ import type { RemoteWorkflowError } from "./remote-service-effects";
 import { sendToRenderer } from "./renderer-ipc";
 import { isTrustedRendererUrl } from "./trusted-renderer";
 import type { UpdateService } from "./update-service";
-import { followAppearance, followWindowGlass, glassWindowOptions, windowBackgroundColor } from "./window-appearance";
+import {
+  followAppearance,
+  followTitleBarOverlay,
+  followWindowGlass,
+  glassWindowOptions,
+  resizeTitleBarOverlay,
+  titleBarWindowOptions,
+  windowBackgroundColor,
+} from "./window-appearance";
 import { followWindowButtonSide, WINDOW_BUTTON_INSET } from "./window-buttons";
 
 /** The dark background of the main and setup windows, under the page's own canvas. */
@@ -304,6 +312,7 @@ export function createMainWindowController({
       ...(process.platform === "darwin"
         ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
+      ...titleBarWindowOptions("frame"),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -315,6 +324,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followTitleBarOverlay(window, "frame");
 
     window.once("ready-to-show", () => {
       performance.mark("openbot:window-ready");
@@ -372,6 +382,7 @@ export function createMainWindowController({
     window.webContents.on("did-navigate", () => {
       const interfaceSize = getServices()?.interfaceSize;
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
+      resizeTitleBarOverlay(window);
     });
     window.webContents.on("render-process-gone", onRendererGone);
     window.webContents.once("destroyed", onRendererGone);
@@ -461,6 +472,7 @@ export function createMainWindowController({
       ...(process.platform === "darwin"
         ? { titleBarStyle: "hidden" as const, trafficLightPosition: WINDOW_BUTTON_INSET }
         : {}),
+      ...titleBarWindowOptions("canvas"),
       webPreferences: {
         preload: join(__dirname, "../preload/index.cjs"),
         contextIsolation: true,
@@ -472,6 +484,7 @@ export function createMainWindowController({
     });
     hideMenuBar(window);
     followWindowGlass(window, MAIN_WINDOW_DARK_BACKGROUND);
+    followTitleBarOverlay(window, "canvas");
     chatWindows.set(key, { target: { serverId: target.serverId, agentId: target.agentId }, window });
     window.once("ready-to-show", () => window.show());
     window.on("closed", () => {
@@ -489,6 +502,7 @@ export function createMainWindowController({
     window.webContents.on("did-navigate", () => {
       const interfaceSize = getServices()?.interfaceSize;
       if (interfaceSize) window.webContents.setZoomFactor(interfaceSize.zoomFactor);
+      resizeTitleBarOverlay(window);
     });
     attachAppInput(window, getServices, getTranslate, { closesBrowserTabs: false, quitShortcut });
     allowPinchZoom(window.webContents);

@@ -45,6 +45,15 @@
     pointer-events: auto;
     -webkit-app-region: no-drag;
   }
+
+  /* The tools stop before the Windows window buttons (`--window-controls-end` in `window.css`). */
+  .app-frame-edge[data-window-page-kind="titled"]
+    > .window-page
+    > .library-panel
+    > .library-panel-content[data-folders]
+    .library-path-head {
+    padding-inline-end: calc(var(--openbot-space-4) + var(--window-controls-end, 0px));
+  }
 }
 
 /* The window card shows through the viewer, so the viewer keeps the card's border and rounded corners.

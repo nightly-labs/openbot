@@ -15,6 +15,19 @@
   background: var(--window-frame);
 }
 
+/* On Windows the page draws the title bar, and Windows draws its minimize, maximize and close buttons
+ * over the end of the top row (`titleBarOverlay` in `window-appearance.ts`). Each part of the top row
+ * that reaches the end of the window keeps clear of them by this width. Chromium sets
+ * `titlebar-area-*` only while the buttons show, so the width is 0 on macOS, on Linux and on the web.
+ * Windows puts the buttons at the left when OpenBot starts in a right-to-left language. */
+.app-window {
+  --window-controls-end: max(0px, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)));
+}
+
+.app-window:dir(rtl) {
+  --window-controls-end: env(titlebar-area-x, 0px);
+}
+
 /* A hidden rail stays out of the grid. The frame keeps the last column, which then takes the whole
  * window. */
 .app-window > .window-rail[hidden] {
@@ -30,7 +43,7 @@
  * its content starts 8px after them. */
 .app-window {
   --top-row-padding-block: 2px 0;
-  --top-row-padding-inline: var(--openbot-space-2) var(--openbot-space-3);
+  --top-row-padding-inline: var(--openbot-space-2) calc(var(--openbot-space-3) + var(--window-controls-end));
 }
 
 /* The frame below the edge layout keeps its own shape, so the rail would only take width. */
@@ -838,7 +851,7 @@
   /* Close sits in the top corner of the window, at the end of the page, above the end of the card. The
    * page clips its overflow, so a negative margin would cut the button. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-close {
-    margin-inline-end: 0;
+    margin-inline-end: var(--window-controls-end, 0px);
   }
 
   /* The row stays when it has no path, because a section page shows its title in the panel. It is
@@ -942,7 +955,7 @@
 
 .settings-page-path-row {
   /* The room of the Close button. */
-  --settings-page-close-room: calc(var(--openbot-space-8) + var(--openbot-space-4));
+  --settings-page-close-room: calc(var(--openbot-space-8) + var(--openbot-space-4) + var(--window-controls-end, 0px));
   display: flex;
   min-width: 0;
   grid-column: 2;
@@ -1458,4 +1471,14 @@
     > .tab-shape {
     transition: none;
   }
+}
+
+/* The ends of the top row keep clear of the Windows window buttons (`--window-controls-end` above). With
+ * a docked side panel, the tab row of the panel is the end of the top row, not the chat header. */
+.app-window .conversation-panel:not(.side-panel-docked) > .conversation-header {
+  padding-inline-end: calc(var(--openbot-space-3) + var(--window-controls-end));
+}
+
+.app-window .side-panel-docked > .side-panel-header {
+  padding-inline-end: calc(var(--openbot-space-2) + var(--window-controls-end));
 }

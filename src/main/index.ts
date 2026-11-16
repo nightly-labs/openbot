@@ -167,7 +167,7 @@ import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
-import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
+import { resizeTitleBarOverlay, setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
 
 const logger = createOpenBotLogger("main");
@@ -1849,9 +1849,15 @@ if (!hasSingleInstanceLock) {
         }
       });
       interfaceSize.subscribe((preference) => {
-        windows.getMainWindow()?.webContents.setZoomFactor(interfaceSize.zoomFactor);
-        for (const chatWindow of windows.getChatWindows())
+        const mainWindow = windows.getMainWindow();
+        if (mainWindow) {
+          mainWindow.webContents.setZoomFactor(interfaceSize.zoomFactor);
+          resizeTitleBarOverlay(mainWindow);
+        }
+        for (const chatWindow of windows.getChatWindows()) {
           chatWindow.webContents.setZoomFactor(interfaceSize.zoomFactor);
+          resizeTitleBarOverlay(chatWindow);
+        }
         for (const window of BrowserWindow.getAllWindows()) {
           sendToRenderer(window, IPC_ENDPOINTS.app.appInterfaceSizePreference, preference);
         }
