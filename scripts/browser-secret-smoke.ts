@@ -7,6 +7,100 @@ import type { DynamicToolCallParams } from "../src/backend/protocol";
 import { bitwardenLoginFixture, runBitwardenBrowserSmoke } from "./bitwarden-browser-smoke";
 import { waitForPresentedFrame } from "./browser-smoke-frames";
 
+/** The first frame host is on the page's site, the second is on another site. */
+const FRAME_HOSTS = ["login.openbot.test", "login.other-site.test"];
+const FRAME_PASSWORD = "fixture-frame-password-201938";
+
+/**
+ * A secure fill reaches a sign-in form in a frame of the page's site, with the vault origin of the
+ * frame. A form in a frame of another site is refused (#10018, #10148).
+ */
+async function runFrameScenario(browser: BrowserHost): Promise<void> {
+  const report: {
+    vaultOrigin?: string;
+    vaultFillable?: boolean;
+    submission?: string;
+    completed?: boolean;
+    snapshotHasValue?: boolean;
+    otherSiteRefused?: boolean;
+  } = {};
+  for (const path of ["framed", "framed-other"] as const) {
+    const tab = await runCauseEffect(
+      browser.open(`https://authentication.openbot.test/${path}`, "secret-thread", "secret-agent"),
+    );
+    try {
+      const contents = webContents.getAllWebContents().find((item) => item.getURL() === tab.url);
+      if (!contents) throw new Error(`Missing ${path} fixture.`);
+      await waitForPresentedFrame(contents);
+      // The frame loads after the page. Wait until the snapshot shows its fields.
+      const deadline = Date.now() + 10_000;
+      let read = await runCauseEffect(browser.snapshot(tab.id));
+      const element = (name: string) => read.elements.find((item) => item.name === name);
+      while ((!element("Frame password") || !element("Frame sign in")) && Date.now() < deadline) {
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            clearTimeout(timer);
+            contents.off("did-frame-finish-load", done);
+            resolve();
+          };
+          const timer = setTimeout(done, Math.max(0, deadline - Date.now()));
+          contents.once("did-frame-finish-load", done);
+        });
+        read = await runCauseEffect(browser.snapshot(tab.id));
+      }
+      const password = element("Frame password");
+      const submit = element("Frame sign in");
+      if (!password || !submit) throw new Error(`The ${path} snapshot does not show the frame's fields.`);
+      const prepared = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: `frame-${path}`,
+          arguments: {
+            tabId: tab.id,
+            method: "password",
+            targets: [{ kind: "ref", ref: password.ref, revision: read.revision }],
+            submission: "click",
+            submitTarget: { kind: "ref", ref: submit.ref, revision: read.revision },
+          },
+        }),
+      ).then(
+        (handoff) => ({ handoff, error: null }),
+        (error: unknown) => ({ handoff: null, error: error instanceof Error ? error.message : String(error) }),
+      );
+      if (path === "framed-other") {
+        report.otherSiteRefused = prepared.error?.includes("frame of another site") === true;
+        continue;
+      }
+      if (!prepared.handoff) throw new Error(`Secure fill refused the same-site frame: ${prepared.error}`);
+      report.vaultOrigin = prepared.handoff.request.origin;
+      report.vaultFillable = prepared.handoff.vaultFillable;
+      report.submission = await runCauseEffect(prepared.handoff.submit(FRAME_PASSWORD, true));
+      const after = await runCauseEffect(browser.snapshot(tab.id));
+      report.completed = after.url.endsWith("/complete");
+      report.snapshotHasValue = JSON.stringify(after).includes(FRAME_PASSWORD);
+    } finally {
+      await runCauseEffect(browser.close(tab.id));
+    }
+  }
+  const passed =
+    report.vaultOrigin === `https://${FRAME_HOSTS[0]}` &&
+    report.vaultFillable === true &&
+    report.submission === "submitted" &&
+    report.completed === true &&
+    report.snapshotHasValue === false &&
+    report.otherSiteRefused === true;
+  await mkdir(".openbot-build", { recursive: true });
+  await writeFile(
+    ".openbot-build/browser-secret-frame.json",
+    JSON.stringify({ status: passed ? "passed" : "issues_found", ...report }, null, 2),
+  );
+  if (!passed) throw new Error(`Secure fill in a frame is wrong: ${JSON.stringify(report)}`);
+}
+
 /** HTTPS is served inside this isolated session. No credentials or network service are used. */
 export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin: string): Promise<void> {
   const seed = await runCauseEffect(browser.open(localOrigin, "secret-thread", "secret-agent"));
@@ -20,7 +114,24 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   let lostPageOffline = false;
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
+    if (url.pathname === "/frame-form" && FRAME_HOSTS.includes(url.hostname))
+      // A sign-in form in a frame, as Apple's (#10018). The page goes on only when the frame got the value.
+      return new Response(
+        `<!doctype html><body>
+        <label>Frame password<input id="frame-password" type="password"></label>
+        <button id="frame-submit" onclick="parent.postMessage(document.querySelector('#frame-password').value === '${FRAME_PASSWORD}', 'https://authentication.openbot.test')">Frame sign in</button>
+        </body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
+    if (url.pathname === "/framed" || url.pathname === "/framed-other")
+      return new Response(
+        `<!doctype html><body>
+        <iframe title="Sign in" width="400" height="200" src="https://${url.pathname === "/framed" ? FRAME_HOSTS[0] : FRAME_HOSTS[1]}/frame-form"></iframe>
+        <script>addEventListener('message', (event) => { if (event.origin.startsWith('https://login.')) location.href = event.data === true ? '/complete' : '/wrong'; });</script>
+        </body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
     if (url.pathname === "/stuck") stuckPageLoads += 1;
     if (url.pathname === "/lost") {
       lostPageLoads += 1;
@@ -877,6 +988,7 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
     await writeFile(".openbot-build/browser-secret-ended-fill.json", JSON.stringify(lostReport, null, 2));
     if (lostReport.status !== "passed")
       throw new Error(`A tab stayed locked after its saved login ended: ${JSON.stringify(lostReport)}`);
+    await runFrameScenario(browser);
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {
     protocol.unhandle("https");

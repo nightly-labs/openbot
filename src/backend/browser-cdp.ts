@@ -418,7 +418,6 @@ export class BrowserCdpEngine {
   readonly prepareSecret = Effect.fn("BrowserCdp.prepareSecret")(function* (
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
-    origin: string,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
@@ -451,6 +450,8 @@ export class BrowserCdpEngine {
        * in the automation world. A worker that the page registers and claims later serves no navigation.
        */
       servedByWorker: boolean;
+      /** The HTTPS origin of the document, the page or a frame, that has every target. */
+      origin: string;
     },
     BrowserOperationError
   > {
@@ -479,37 +480,28 @@ export class BrowserCdpEngine {
               ),
             ),
           );
-        const inputs = nodes.slice(0, targets.length);
-        const button = submitTarget ? nodes[targets.length] : undefined;
-        const inFrame = (index: number) =>
-          browserFailure(
-            new Error(`${labels[index]} is inside a frame. Secure input does not support frames, so use takeover.`),
-          );
+        // Each target is checked in the automation world of its own document, so a sign-in form in a
+        // frame, as Apple's, gets the same checks as one in the page. All targets must be in one HTTPS
+        // document; the host decides if a secret may go to that document's origin.
+        const located: Array<{ backendNodeId: number; sessionId: string | undefined; contextId: number }> = [];
+        let fieldOrigin = "";
         for (const [index, node] of nodes.entries()) {
-          if (node.sessionId) return yield* inFrame(index);
-          const input = index < inputs.length;
-          // A frame in the page's process has no session of its own; its document is not the top one.
-          const valid = yield* this.#callOnNode(
-            send,
-            node.backendNodeId,
-            `function(origin, input) { if (this.isConnected && this.ownerDocument !== document) return 'frame'; return this.isConnected && location.origin === origin && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))); }`,
-            [origin, input],
-          ).pipe(
-            // The top frame's world cannot reach a node in a frame of another origin in the page's
-            // process, so the check fails before it can name the frame. Only a child frame that holds
-            // the node changes the reason.
-            Effect.catch((failure) =>
-              Effect.gen({ self: this }, function* () {
-                const holder = yield* Effect.gen({ self: this }, function* () {
-                  const childFrames = frameIds(yield* send("Page.getFrameTree", {})).slice(1);
-                  return yield* this.#nodeFrameWorld(send, node.backendNodeId, undefined, childFrames);
-                }).pipe(Effect.catch(() => Effect.succeed(undefined)));
-                return holder === undefined ? yield* Effect.fail(failure) : "frame";
-              }),
-            ),
+          const input = index < targets.length;
+          const contextId = yield* this.#nodeFrameContextId(send, node.backendNodeId, node.sessionId).pipe(
+            Effect.catch(() => Effect.succeed(undefined)),
           );
-          if (valid === "frame") return yield* inFrame(index);
-          if (valid !== true)
+          const valid =
+            contextId === undefined
+              ? false
+              : yield* this.#callOnNode(
+                  send,
+                  node.backendNodeId,
+                  `function(input) { return this.isConnected && this.ownerDocument === document && location.protocol === 'https:' && (!input || (this.localName === 'input' && !this.disabled && !this.readOnly && ['password','text','tel','number'].includes(this.type))) ? location.origin : false; }`,
+                  [input],
+                  node.sessionId,
+                  contextId,
+                );
+          if (contextId === undefined || !isString(valid))
             return yield* browserFailure(
               new Error(
                 input
@@ -517,12 +509,28 @@ export class BrowserCdpEngine {
                   : `${labels[index]} is not on this page. Take a fresh snapshot and target the page's submit button.`,
               ),
             );
+          const first = located[0];
+          if (first && (first.sessionId !== node.sessionId || first.contextId !== contextId || fieldOrigin !== valid))
+            return yield* browserFailure(
+              new Error(`${labels[index]} is in another frame than the first field target. Target one form.`),
+            );
+          fieldOrigin = valid;
+          located.push({ backendNodeId: node.backendNodeId, sessionId: node.sessionId, contextId });
         }
+        const inputs = located.slice(0, targets.length);
+        const button = submitTarget ? located[targets.length] : undefined;
         if (new Set(inputs.map((node) => node.backendNodeId)).size !== inputs.length)
           return yield* browserFailure(new Error("Authentication fields must be distinct."));
         const fingerprints: string[] = [];
-        for (const [index, node] of nodes.entries()) {
-          const value = yield* this.#callOnNode(send, node.backendNodeId, fingerprint, []);
+        for (const [index, node] of located.entries()) {
+          const value = yield* this.#callOnNode(
+            send,
+            node.backendNodeId,
+            fingerprint,
+            [],
+            node.sessionId,
+            node.contextId,
+          );
           if (!isString(value))
             return yield* browserFailure(new Error(`${labels[index]} is no longer available. Take a fresh snapshot.`));
           fingerprints.push(value);
@@ -547,6 +555,8 @@ export class BrowserCdpEngine {
               return { password: this.type === 'password' || (this.type === 'text' && !['', 'none'].includes(getComputedStyle(this).getPropertyValue('-webkit-text-security'))), oneTimeCode, network: ${LOADED_FROM_NETWORK} };
             }`,
             [],
+            node.sessionId,
+            node.contextId,
           );
           kinds.push({
             password: isDynamicRecord(kind) && kind.password === true,
@@ -554,7 +564,7 @@ export class BrowserCdpEngine {
           });
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
-        return { inputs, button, fingerprints, kinds, servedByWorker };
+        return { inputs, button, fingerprints, kinds, servedByWorker, origin: fieldOrigin };
       }),
     );
     if (generation !== this.#navigationGeneration)
@@ -567,20 +577,31 @@ export class BrowserCdpEngine {
               if (generation !== this.#navigationGeneration)
                 return yield* browserFailure(new Error("Authentication page changed."));
               for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
-                if ((yield* this.#callOnNode(send, node.backendNodeId, fingerprint, [])) !== nodes.fingerprints[index])
+                if (
+                  (yield* this.#callOnNode(
+                    send,
+                    node.backendNodeId,
+                    fingerprint,
+                    [],
+                    node.sessionId,
+                    node.contextId,
+                  )) !== nodes.fingerprints[index]
+                )
                   return yield* browserFailure(new Error("Authentication target changed."));
                 const valid = yield* this.#callOnNode(
                   send,
                   node.backendNodeId,
                   `function(origin, input) { return this.isConnected && this.ownerDocument === document && location.origin === origin && (!input || (!this.disabled && !this.readOnly)); }`,
-                  [origin, nodes.inputs.includes(node)],
+                  [nodes.origin, nodes.inputs.includes(node)],
+                  node.sessionId,
+                  node.contextId,
                 );
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
               for (const [index, node] of nodes.inputs.entries()) {
                 if (generation !== this.#navigationGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
-                yield* send("DOM.focus", { backendNodeId: node.backendNodeId });
+                yield* send("DOM.focus", { backendNodeId: node.backendNodeId }, node.sessionId);
                 yield* this.#callOnNode(
                   send,
                   node.backendNodeId,
@@ -588,7 +609,9 @@ export class BrowserCdpEngine {
                 if (!this.isConnected || this.ownerDocument !== document || location.origin !== origin || this.disabled || this.readOnly) throw new Error('Authentication target changed.');
                 this.select();
               }`,
-                  [origin],
+                  [nodes.origin],
+                  node.sessionId,
+                  node.contextId,
                 );
                 if (generation !== this.#navigationGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
@@ -596,13 +619,14 @@ export class BrowserCdpEngine {
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
                 const text = values[index];
                 if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
-                yield* send("Input.insertText", { text });
+                yield* send("Input.insertText", { text }, node.sessionId);
               }
               if (submission === "on_input" || generation !== this.#navigationGeneration) return;
-              if (submission === "click" && nodes.button) {
+              const { button } = nodes;
+              if (submission === "click" && button) {
                 yield* this.#callOnNode(
                   send,
-                  nodes.button.backendNodeId,
+                  button.backendNodeId,
                   `function(origin, expected) {
                 return new Promise((resolve, reject) => {
                   const finish = (error) => { observer.disconnect(); clearTimeout(timer); error ? reject(new Error(error)) : resolve(); };
@@ -617,23 +641,36 @@ export class BrowserCdpEngine {
                   check();
                 });
               }`,
-                  [origin, nodes.fingerprints.at(-1)],
+                  [nodes.origin, nodes.fingerprints.at(-1)],
+                  button.sessionId,
+                  button.contextId,
                 );
-                const point = yield* this.#elementPointEffect(send, nodes.button.backendNodeId, true);
+                const { sessionId, ...point } = yield* this.#elementPointEffect(
+                  send,
+                  button.backendNodeId,
+                  true,
+                  button.sessionId,
+                );
                 if (generation !== this.#navigationGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
-                yield* dispatchMouseClick(send, point, "left", 1, 0);
+                yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
               } else if (submission === "enter") {
                 const last = nodes.inputs.at(-1);
                 if (!last) return yield* browserFailure(new Error("Authentication target changed."));
                 // An input handler can change the form after the fill; the click branch checks the same.
                 if (
-                  (yield* this.#callOnNode(send, last.backendNodeId, fingerprint, [])) !==
-                  nodes.fingerprints[nodes.inputs.length - 1]
+                  (yield* this.#callOnNode(
+                    send,
+                    last.backendNodeId,
+                    fingerprint,
+                    [],
+                    last.sessionId,
+                    last.contextId,
+                  )) !== nodes.fingerprints[nodes.inputs.length - 1]
                 )
                   return yield* browserFailure(new Error("Authentication target changed."));
-                yield* send("DOM.focus", { backendNodeId: last.backendNodeId });
-                yield* dispatchShortcut(send, "Enter");
+                yield* send("DOM.focus", { backendNodeId: last.backendNodeId }, last.sessionId);
+                yield* dispatchShortcut(send, "Enter", last.sessionId);
               }
             }),
           );
@@ -661,24 +698,36 @@ export class BrowserCdpEngine {
               // React and similar libraries copy a field's value into its value attribute.
               `function() { this.value = ''; this.defaultValue = ''; return this.value === ''; }`,
               [],
+              node.sessionId,
+              node.contextId,
             ).pipe(Effect.catch(() => Effect.succeed(false)));
             if (cleared !== true) return false;
           }
-          const executionContextId = yield* automationContextId(send);
-          for (const secret of secrets) {
-            const scan = yield* send("Runtime.callFunctionOn", {
-              executionContextId,
-              functionDeclaration: SECRET_SCAN_FUNCTION,
-              arguments: [{ value: secret }],
-              returnByValue: true,
-            });
-            if (recordValue(scan.exceptionDetails) || recordValue(scan.result)?.value !== false) return false;
-          }
+          // A form in a frame can copy the value into its own document or, on one origin, the page's.
+          const field = nodes.inputs[0];
+          const documents = [
+            { executionContextId: yield* automationContextId(send), sessionId: undefined },
+            ...(field ? [{ executionContextId: field.contextId, sessionId: field.sessionId }] : []),
+          ];
+          for (const { executionContextId, sessionId } of documents)
+            for (const secret of secrets) {
+              const scan = yield* send(
+                "Runtime.callFunctionOn",
+                {
+                  executionContextId,
+                  functionDeclaration: SECRET_SCAN_FUNCTION,
+                  arguments: [{ value: secret }],
+                  returnByValue: true,
+                },
+                sessionId,
+              );
+              if (recordValue(scan.exceptionDetails) || recordValue(scan.result)?.value !== false) return false;
+            }
           return true;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
     const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
-    return { enter, clear, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker };
+    return { enter, clear, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker, origin: nodes.origin };
   });
 
   /**
@@ -3157,9 +3206,17 @@ export class BrowserCdpEngine {
       const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
       if (deadline !== undefined) {
         yield* browserSync(() => assertBeforeDeadline(deadline));
-        const current = yield* this.#targetFingerprint(send, record.backendNodeId, sessionId, record.drawnOnly).pipe(
-          Effect.catch(() => Effect.succeed(null)),
-        );
+        const contextId = record.ownFrame
+          ? yield* this.#nodeFrameContextId(send, record.backendNodeId, sessionId).pipe(
+              Effect.catch(() => Effect.succeed(undefined)),
+            )
+          : undefined;
+        const current =
+          record.ownFrame && contextId === undefined
+            ? null
+            : yield* this.#targetFingerprint(send, record.backendNodeId, sessionId, record.drawnOnly, contextId).pipe(
+                Effect.catch(() => Effect.succeed(null)),
+              );
         yield* browserSync(() => assertBeforeDeadline(deadline));
         if (!current?.visible) return yield* browserFailure(new Error("Element reference is no longer visible."));
         if (
@@ -3405,6 +3462,7 @@ export class BrowserCdpEngine {
     backendNodeId: number,
     sessionId?: string,
     drawnOnly = false,
+    contextId?: number,
   ): Effect.fn.Return<
     { role: string; name: string; tag: string; visibleText: string; visible: boolean },
     BrowserOperationError
@@ -3435,6 +3493,7 @@ export class BrowserCdpEngine {
         }`,
           [drawnOnly],
           sessionId,
+          contextId,
         ),
       ],
       { concurrency: "unbounded" },
