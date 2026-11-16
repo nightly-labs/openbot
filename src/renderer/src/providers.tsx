@@ -68,11 +68,12 @@ const Providers = createSimpleContext({
     /**
      * A CLI the user installed themselves, and the version it reports. Only the agent status knows
      * this, and the runtime store needs it to offer that install the same update a managed runtime
-     * gets. Updates install the managed copy without changing the system installation.
+     * gets. Updates install the managed copy without changing the system installation. An incomplete
+     * CLI has none: the Download of the copy that runs in its place is not an update of it (#9139).
      */
     function systemCliVersion(provider: AgentProviderId): string | null {
       const row = agentStatus().providers?.find((candidate) => candidate.id === provider);
-      return row?.cliSource === "system" ? (row.version ?? null) : null;
+      return row?.cliSource === "system" && !row.cliIncomplete ? (row.version ?? null) : null;
     }
     /**
      * The joined server whose host this window manages, when the account administers it and the host

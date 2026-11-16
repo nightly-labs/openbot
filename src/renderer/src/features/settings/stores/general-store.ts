@@ -73,12 +73,15 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
        *
        * A CLI the user installed that failed shows its own version too, so the row names the CLI
        * that failed. A copy that is not downloaded keeps its Download then.
+       *
+       * An incomplete CLI of the user's is read as a row with no owner: the copy that main offers in
+       * its place keeps its Download, as the copy runs instead once downloaded (#9139).
        */
       const agentVersionShown = Boolean(
         runtime &&
           agent &&
           (runtime.phase === "ready" || runtime.phase === "not-downloaded") &&
-          (agent.cliSource === "system"
+          (agent.cliSource === "system" && !agent.cliIncomplete
             ? agent.state === "available" ||
               agent.state === "sign-in-required" ||
               (agent.state === "error" && runtime.phase === "ready")

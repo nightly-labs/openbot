@@ -2758,7 +2758,7 @@ export async function createApplicationServices({
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (providerRuntimes.setSystemVersion(provider.id, version)) copyInUse = true;
+      if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
       if (
         hostedServer !== null &&
         provider.state === "outdated" &&
