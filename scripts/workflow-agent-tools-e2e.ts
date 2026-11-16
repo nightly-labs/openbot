@@ -9,7 +9,8 @@
 // size of each tool result, so the context cost is visible. It also checks that a search says to run
 // the tools with tool_call, that tool_call accepts the name as `tool`, that each delete asks the
 // user and a decline keeps the workflow, and that the change event names the agent that built it.
-// The run input goes from the trigger to the agent step, and a run from one node refuses it.
+// The run input goes from the trigger to the agent step. A run from a trigger takes it, and a run
+// from a later node refuses it.
 //
 // Run: bun scripts/workflow-agent-tools-e2e.ts
 // Writes .openbot-build/workflow-agent-tools-e2e/report.json and exits non-zero on a failure.
@@ -483,7 +484,7 @@ try {
     input: caseInput,
   });
   check(
-    "run_workflow refuses input with fromNodeId and starts no run",
+    "run_workflow refuses input with the fromNodeId of a later node and starts no run",
     !fromNode.ok &&
       JSON.stringify(fromNode.value).includes("full run") &&
       (await runCauseEffect(workflows.runs({ workflowId, limit: 1 }))).runs.length === 0,
@@ -524,6 +525,28 @@ try {
       .parse(runs.value)
       .steps.some((step) => step.nodeId === ids.news && step.kind === "agent" && step.label === "agent-research"),
     runs.value,
+  );
+  const triggerInput = "Shipment 4418: review the packet from the supplier in Poznan.";
+  const fromTrigger = await call(
+    "run-from-trigger",
+    "run_workflow",
+    { workflowId, fromNodeId: ids.start, input: triggerInput },
+    "run-from-trigger-call",
+  );
+  check("run_workflow takes input in a run from a trigger", fromTrigger.ok, fromTrigger.value);
+  const triggerRunId = runStarted.parse(fromTrigger.value).runId;
+  let triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
+  const triggerAnswered = () =>
+    runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.status === "done");
+  while (!triggerAnswered()) {
+    if (Date.now() > deadline) throw new Error(`The trigger did not answer: ${JSON.stringify(triggerRun.value)}`);
+    await new Promise((done) => setImmediate(done));
+    triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
+  }
+  check(
+    "the trigger of a run from that trigger gives the run input as its output",
+    runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),
+    triggerRun.value,
   );
   const list = await call("list", "list_workflows", {});
   check(

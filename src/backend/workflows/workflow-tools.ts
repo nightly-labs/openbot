@@ -117,7 +117,7 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   {
     name: "run_workflow",
     description:
-      "Start a run of a workflow, or from one node with the newest answers of the nodes before it. In a full run, the trigger gives input to the next steps.",
+      "Start a run of a workflow, or from one node with the newest answers of the nodes before it. The trigger gives input to the next steps, in a full run or a run from that trigger.",
     shape: runSchema.shape,
   },
   {
@@ -690,9 +690,15 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     }
     if (tool === "run_workflow") {
       const input = yield* toolStep(() => runSchema.parse(args));
-      // A run from one node does not run its trigger, so it has no step that would read the input.
-      if (input.input !== undefined && input.fromNodeId !== undefined)
-        return openBotToolFailure("input needs a full run. Leave out fromNodeId, or leave out input.");
+      if (input.input !== undefined && input.fromNodeId !== undefined) {
+        // A run from a later node gives the earlier answer of its trigger again, so the input would not
+        // reach the next steps. A run from a trigger runs that trigger with the input.
+        const from = (yield* workflows.get(input.workflowId)).graph.nodes.find((node) => node.id === input.fromNodeId);
+        if (from !== undefined && from.kind !== "trigger")
+          return openBotToolFailure(
+            "input needs a full run or a run from a trigger. Leave out fromNodeId, or leave out input.",
+          );
+      }
       const detail = yield* workflows.startRun(
         {
           workflowId: input.workflowId,
