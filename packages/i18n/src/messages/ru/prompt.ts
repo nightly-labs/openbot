@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Есть идея? Давайте воплотим.",
   "prompt.approval.report.dontSend": "Не сейчас",
   "prompt.approval.report.send": "Отправить команде OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Откройте этот чат в приложении OpenBot на телефоне и отправьте отчёт оттуда. Телефон добавляет свою версию, систему и журнал поддержки. Если телефон не может подключиться, откройте Настройки > Поддержка в приложении на телефоне и сообщите о проблеме на GitHub.",
   "prompt.approval.title.command": "Выполнить команду",
   "prompt.approval.title.fileChange": "Изменить файлы",
   "prompt.approval.title.permissions": "Предоставить разрешения",

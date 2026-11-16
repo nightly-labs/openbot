@@ -326,6 +326,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط اختيار هذا الإجراء.",
   "error.backend.approvalInactive": "هذه الموافقة لم تعد نشطة.",
   "error.backend.approvalOwnerOnly": "يمكن لمالك الخادم فقط الموافقة على هذا الإجراء.",
+  "error.backend.feedbackNeedsPhone":
+    "يمكن لتطبيق OpenBot على الهاتف فقط إرسال هذا البلاغ، لأنه يضيف إصدار الهاتف وسجل الدعم. افتح هذه المحادثة على الهاتف. إذا ظهرت لك هذه الرسالة هناك، فحدّث تطبيق الهاتف.",
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",

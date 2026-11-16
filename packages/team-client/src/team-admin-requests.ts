@@ -380,6 +380,7 @@ import { VAULT_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/vault-impo
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
+import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WEBHOOK_SENDER_SECRET_ROUTES } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_ROUTES } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { Effect, Schema } from "effect";
@@ -2079,24 +2080,36 @@ export function passwordManagerRequest(
 }
 
 /**
- * The newest Vault capability of the host: 3 is `vault-v3` with two-step keys, 2 is `vault-v2` with API
- * keys, 1 is `vault-v1`.
+ * The newest Vault capability of the host: 4 is `vault-v4` with the agents of each item, 3 is `vault-v3`
+ * with two-step keys, 2 is `vault-v2` with API keys, 1 is `vault-v1`.
  */
-type HostVaultVersion = 1 | 2 | 3;
+type HostVaultVersion = 1 | 2 | 3 | 4;
 
 function vaultRoutes(version: HostVaultVersion) {
-  return version === 3 ? VAULT_V3_ROUTES : version === 2 ? VAULT_V2_ROUTES : VAULT_ROUTES;
+  return version === 4
+    ? VAULT_V4_ROUTES
+    : version === 3
+      ? VAULT_V3_ROUTES
+      : version === 2
+        ? VAULT_V2_ROUTES
+        : VAULT_ROUTES;
+}
+
+/** Only a `vault-v4` state carries the agents of each item, and says so with `agentScope`. */
+function hostVaultState(version: HostVaultVersion) {
+  return (value: unknown) => decodeHostVaultState(value, version === 4);
 }
 
 /**
- * The host's Vault (`vault-v3`, `vault-v2` without two-step keys, or `vault-v1` without API keys). No
- * list item carries a password, a card number, a security code, an API key or a two-step key.
+ * The host's Vault (`vault-v4`, `vault-v3` without the agents of each item, `vault-v2` without two-step
+ * keys, or `vault-v1` without API keys). No list item carries a password, a card number, a security
+ * code, an API key or a two-step key.
  */
 export function listHostVault(
   request: TeamApiRequest,
   version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(version).list, decodeHostVaultState, {}));
+  return adminCall(() => request("POST", vaultRoutes(version).list, hostVaultState(version), {}));
 }
 
 /** The current two-step code of each host login with a key (`vault-v3`). The key stays on the host. */
@@ -2111,8 +2124,8 @@ export function saveHostVaultItem(
   version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
   // Only a card has approved sites, and an absent list keeps them all. Only a login has a two-step
-  // key, and an absent key keeps the saved one. Absent agents keep the saved agents. JSON has no
-  // undefined, so an absent field stays out.
+  // key, and an absent key keeps the saved one. Absent agents keep the saved agents, and only `vault-v4`
+  // takes them. JSON has no undefined, so an absent field stays out.
   const { fillSites, twoStepKey, agents, ...item } = {
     fillSites: undefined,
     twoStepKey: undefined,
@@ -2120,11 +2133,11 @@ export function saveHostVaultItem(
     ...input,
   };
   return adminCall(() =>
-    request("POST", vaultRoutes(version).save, decodeHostVaultState, {
+    request("POST", vaultRoutes(version).save, hostVaultState(version), {
       ...item,
       ...(fillSites === undefined ? {} : { fillSites }),
       ...(twoStepKey === undefined ? {} : { twoStepKey }),
-      ...(agents === undefined ? {} : { agents }),
+      ...(agents === undefined || version < 4 ? {} : { agents }),
     }),
   );
 }
@@ -2134,7 +2147,7 @@ export function deleteHostVaultItem(
   id: string,
   version: HostVaultVersion,
 ): Effect.Effect<VaultState, TeamAdminRequestError> {
-  return adminCall(() => request("POST", vaultRoutes(version).delete, decodeHostVaultState, { id }));
+  return adminCall(() => request("POST", vaultRoutes(version).delete, hostVaultState(version), { id }));
 }
 
 /** Adds the logins of a CSV password export (`vault-import-v1`). The answer has only the counts. */

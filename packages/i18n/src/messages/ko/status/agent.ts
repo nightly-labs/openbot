@@ -31,6 +31,8 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.reportProblem": "앱 버전과 시스템 정보가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
+  "status.agent.reportPhoneProblem":
+    "앱 버전과 시스템 정보, 그리고 휴대폰의 앱 버전, 시스템 정보, 지원 로그가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
   "status.agent.sendIdea": "공개 GitHub 이슈가 됩니다. 이름은 표시되지 않습니다.",
   "status.agent.feedbackRecentErrors": "채팅의 최근 오류:",
   "status.agent.feedbackSameAs": "이슈 #{issue}에 추가됩니다",

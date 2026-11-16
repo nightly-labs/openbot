@@ -4357,8 +4357,13 @@ export async function createApplicationServices({
   );
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
-      // A workflow model step lives in this process only; agent steps are queued deliveries.
-      agentWork: [...service.hasActiveWork(), ...(workflowRuntime.working() ? ["routine-run"] : [])],
+      // A workflow model step lives in this process only; agent steps are queued deliveries. The
+      // servers on this computer stop with this process, which installs the update for them too.
+      agentWork: [
+        ...service.hasActiveWork(),
+        ...(workflowRuntime.working() ? ["routine-run"] : []),
+        ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
+      ],
       hostBlockers: host.describeRestartBlockers(),
       activeBrowserControls: browser.getControlState().sessions.length,
       activeFileTransfers: remoteServers.hasActiveTransfers(),

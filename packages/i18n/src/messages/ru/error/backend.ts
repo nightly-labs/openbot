@@ -347,6 +347,8 @@ export const messages = {
   "error.backend.uiBlockAnswerInvalid": "Этот ответ не подходит к блоку агента.",
   "error.backend.uiBlockActionNotAllowed": "Это действие может выбрать только владелец или админ сервера.",
   "error.backend.approvalInactive": "Это подтверждение больше не активно.",
+  "error.backend.feedbackNeedsPhone":
+    "Этот отчёт может отправить только приложение OpenBot на телефоне: оно добавляет версию и журнал поддержки телефона. Откройте этот чат на телефоне. Если вы видите это сообщение там, обновите приложение на телефоне.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",

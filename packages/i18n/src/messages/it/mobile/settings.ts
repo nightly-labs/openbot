@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Cancellare il log di assistenza?",
   "mobile.settings.support.clearBody": "Verranno rimossi tutti gli eventi del log su questo telefono.",
   "mobile.settings.support.logFooter":
-    "Il log resta su questo telefono e OpenBot non lo invia. Registra i passaggi di connessione, le richieste e gli errori. Non registra messaggi o file e nasconde password e token. Leggi il file prima di condividerlo.",
+    "Il log resta su questo telefono. OpenBot ne invia alcune righe solo con una segnalazione di bug sull'app del telefono che invii tu, e la scheda della segnalazione le mostra prima. Registra i passaggi di connessione, le richieste e gli errori. Non registra messaggi o file e nasconde password e token. Leggi il file prima di condividerlo.",
   "mobile.settings.support.saveFailed": "Impossibile salvare il file del log. Riprova.",
   "mobile.settings.support.sharingUnavailable": "La condivisione non è disponibile su questo telefono.",
   "mobile.settings.support.newestFirst": "Prima i più recenti.",
