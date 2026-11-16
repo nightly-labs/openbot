@@ -21,6 +21,11 @@ export const messages = {
   "composer.update.manual": "יש לעדכן את {provider} במחשב שמריץ אותו כדי להמשיך.",
   "composer.update.pending": "מעדכן…",
   "composer.update.action": "עדכון",
+  "composer.imageInput.body":
+    "{model} מקבל רק טקסט, ולכן אינו רואה את התמונות שמצרפים. אם המודל הזה יכול לקרוא תמונות, הפעילו עבורו תמונות.",
+  "composer.imageInput.label": "הפעלת תמונות עבור {model}",
+  "composer.imageInput.pending": "מפעיל…",
+  "composer.imageInput.action": "הפעלת תמונות",
   "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
   "composer.usageLimit.creditsResets":
     "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",

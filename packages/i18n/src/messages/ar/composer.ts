@@ -21,6 +21,11 @@ export const messages = {
   "composer.update.manual": "حدّث {provider} على الحاسوب الذي يشغّله للمتابعة.",
   "composer.update.pending": "جارٍ التحديث…",
   "composer.update.action": "تحديث",
+  "composer.imageInput.body":
+    "يتلقى {model} النص فقط، لذلك لا يرى الصور التي ترفقها. إذا كان هذا النموذج يقرأ الصور، فشغّل الصور له.",
+  "composer.imageInput.label": "تشغيل الصور لـ {model}",
+  "composer.imageInput.pending": "جارٍ التشغيل…",
+  "composer.imageInput.action": "تشغيل الصور",
   "composer.usageLimit.credits": "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك الآن.",
   "composer.usageLimit.creditsResets":
     "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك حتى إعادة تعيينه {reset}.",

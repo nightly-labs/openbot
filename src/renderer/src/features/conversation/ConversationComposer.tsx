@@ -3,7 +3,13 @@ import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-fil
 import {
   type AccountUsageLimit,
   type AgentWait,
+  CUSTOM_PROVIDER_DEFAULT_INPUTS,
+  CUSTOM_PROVIDER_INPUT_KINDS,
+  type CustomProviderModel,
+  type CustomProviderSummary,
   canPreviewAttachment,
+  composedCustomModelId,
+  customProviderOfModel,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
   routineRunsTurn,
@@ -45,6 +51,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
 import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import { customProviderRestartMessage } from "../custom-providers/custom-provider-restart";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
@@ -143,7 +150,7 @@ export function ConversationComposer() {
     canTeachBrowserTask,
     openBrowserTeach,
   } = useConversationViewScope();
-  const { t, format, sourceText: localizeSourceText } = useText();
+  const { t, format, errorMessage, sourceText: localizeSourceText } = useText();
   const messageLabel = () =>
     channel
       ? t("channel.composer.placeholder", { name: channel.name() })
@@ -344,6 +351,48 @@ export function ConversationComposer() {
     !submitting()
       ? steerComposer
       : undefined;
+  /**
+   * The agent's Pi custom model while it takes text only and the draft has an image. Pi sends a note
+   * in place of each image, so the model does not see it, and nothing else tells the user (#9850).
+   */
+  const textOnlyCustomModel = createMemo(() => {
+    const agent = props.agent;
+    if (channel || agent?.provider !== "pi" || !props.onUpdateCustomProvider) return undefined;
+    if (!currentDraft().attachments.some((attachment) => attachment.kind === "image")) return undefined;
+    const endpoint = customProviderOfModel(agent.model, props.customProviders ?? []);
+    if (endpoint?.harness !== "pi") return undefined;
+    const model = endpoint.models.find((item) => composedCustomModelId(endpoint.id, item.id) === agent.model);
+    if (!model || (model.inputs ?? CUSTOM_PROVIDER_DEFAULT_INPUTS.pi).includes("image")) return undefined;
+    return { endpoint, model };
+  });
+  const [allowingImages, setAllowingImages] = createSignal(false);
+  /** Selects Images for the model, as its Accepts menu in Edit endpoints does. The user clears it there. */
+  const allowImages = async (endpoint: CustomProviderSummary, model: CustomProviderModel) => {
+    const update = props.onUpdateCustomProvider;
+    if (!update || allowingImages()) return;
+    setAllowingImages(true);
+    try {
+      // With no key and no headers, the update keeps the saved ones.
+      const restart = await update({
+        id: endpoint.id,
+        name: endpoint.name,
+        baseUrl: endpoint.baseUrl,
+        models: endpoint.models.map((item) =>
+          item.id === model.id
+            ? {
+                ...item,
+                inputs: CUSTOM_PROVIDER_INPUT_KINDS.filter((kind) => kind === "image" || item.inputs?.includes(kind)),
+              }
+            : item,
+        ),
+      });
+      toast.success(customProviderRestartMessage("Saved", restart, t));
+    } catch (error) {
+      toast.error(errorMessage(error, t("customProvider.saveFailed")));
+    } finally {
+      setAllowingImages(false);
+    }
+  };
   /** Why the running turn has no reply: the computer is offline, or the provider sends nothing. */
   const providerWaitNotice = createMemo(() => {
     const provider = agentProviderName();
@@ -601,6 +650,26 @@ export function ConversationComposer() {
           </div>
           <ComposerStackCard when={providerWaitNotice()}>
             {(notice) => <ComposerNotice title={notice().title} body={notice().body} />}
+          </ComposerStackCard>
+          <ComposerStackCard when={textOnlyCustomModel()}>
+            {(shown) => (
+              <ComposerNotice
+                body={t("composer.imageInput.body", { model: shown().model.name })}
+                action={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    loading={allowingImages()}
+                    loadingLabel={t("composer.imageInput.pending")}
+                    aria-label={t("composer.imageInput.label", { model: shown().model.name })}
+                    onClick={() => void allowImages(shown().endpoint, shown().model)}
+                  >
+                    {t("composer.imageInput.action")}
+                  </Button>
+                }
+              />
+            )}
           </ComposerStackCard>
           <ComposerStackCard when={editingDeliveryId()}>
             {() => (

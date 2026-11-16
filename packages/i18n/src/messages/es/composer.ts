@@ -22,6 +22,11 @@ export const messages = {
   "composer.update.manual": "Actualiza {provider} en el equipo donde se ejecuta para continuar.",
   "composer.update.pending": "Actualizando…",
   "composer.update.action": "Actualizar",
+  "composer.imageInput.body":
+    "{model} recibe solo texto, así que no ve las imágenes que adjuntas. Si este modelo puede leer imágenes, activa las imágenes para él.",
+  "composer.imageInput.label": "Activar imágenes para {model}",
+  "composer.imageInput.pending": "Activando…",
+  "composer.imageInput.action": "Activar imágenes",
   "composer.usageLimit.credits": "Has agotado el límite del plan de {provider}. Tus agentes usan ahora tus créditos.",
   "composer.usageLimit.creditsResets":
     "Has agotado el límite del plan de {provider}. Tus agentes usan tus créditos hasta que se restablezca {reset}.",

@@ -22,6 +22,11 @@ export const messages = {
   "composer.update.manual": "続行するには、{provider} を実行しているコンピューターで更新してください。",
   "composer.update.pending": "更新中…",
   "composer.update.action": "更新",
+  "composer.imageInput.body":
+    "{model} はテキストのみを受け取るため、添付した画像を見られません。このモデルが画像を読める場合は、画像をオンにしてください。",
+  "composer.imageInput.label": "{model} の画像をオンにする",
+  "composer.imageInput.pending": "オンにしています…",
+  "composer.imageInput.action": "画像をオン",
   "composer.usageLimit.credits":
     "{provider} のプランの上限をすべて使用しました。エージェントは現在クレジットを使用しています。",
   "composer.usageLimit.creditsResets":
