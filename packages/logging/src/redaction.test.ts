@@ -369,6 +369,20 @@ describe("registerSecretValue", () => {
     expect(redactText("sent prefix88/Basic c2VjcmV0 twice")).toBe("sent [redacted] twice");
   });
 
+  // A saved password such as a company name made every link to the company's site `https:[redacted]`.
+  it("keeps the host of a web address, and masks its user part and path", () => {
+    registerSecretValue("acmeshop", { allowShort: true });
+    registerSecretValue("feedtoken42x");
+
+    expect(redactText("see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl")).toBe(
+      "see https://acmeshop.pl/offer?x=1 and https://shop.acmeshop.pl",
+    );
+    expect(redactText("https://example.com/feed/feedtoken42x")).toBe("https://example.com[redacted]");
+    expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
+    expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
+    expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
+  });
+
   it("keeps a value that cannot be URL-encoded masked, without throwing", () => {
     const secret = "12345678\uD800";
     registerSecretValue(secret);
