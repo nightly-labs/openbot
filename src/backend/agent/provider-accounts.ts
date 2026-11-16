@@ -136,6 +136,8 @@ export class ProviderAccounts {
    * one provider can sign in at the same time, so the result is not one for each provider.
    */
   readonly #codeResults = new Map<string, { error: string | null }>();
+  /** Accounts whose running sign-in is a code sign-in. Another sign-in of the account is not one. */
+  readonly #codeSignIns = new Set<string>();
   /** The CLI of each account whose sign-in waits for a pasted code. `submitCode` types the code into it. */
   readonly #pasteLogins = new Map<string, CliCodeLogin>();
   readonly #checks = new Map<string, Fiber.Fiber<void>>();
@@ -292,7 +294,10 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
-    if (code) this.#codeResults.delete(account.id);
+    if (code) {
+      this.#codeResults.delete(account.id);
+      this.#codeSignIns.add(account.id);
+    }
     this.#setState(account.id, { state: "connecting", message: null });
     const signIn = Effect.scoped(
       Effect.gen({ self: this }, function* () {
@@ -385,6 +390,7 @@ export class ProviderAccounts {
         Effect.sync(() => {
           this.#signIns.delete(account.id);
           this.#added.delete(account.id);
+          if (code) this.#codeSignIns.delete(account.id);
         }),
       ),
     );
@@ -413,7 +419,15 @@ export class ProviderAccounts {
     // The sign-in can end before it prints anything: its error is then the answer.
     const first = yield* Effect.raceFirst(
       Deferred.await(prompt).pipe(Effect.map((printed) => ({ printed, error: null }))),
-      signIn.ended.pipe(Effect.map((error) => ({ printed: null, error }))),
+      // A cancel can interrupt the sign-in before it prints: that is an end with a reason too.
+      Fiber.await(signIn.signIn).pipe(
+        Effect.map((exit) => ({
+          printed: null,
+          error: Exit.isSuccess(exit)
+            ? exit.value
+            : sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }),
+        })),
+      ),
     );
     if (first.error) return yield* accountFailure(first.error);
     const printed = first.printed;
@@ -449,7 +463,11 @@ export class ProviderAccounts {
 
   /** Whether the code sign-in of an account goes on, and how it ended. */
   codeSignInStatus(provider: AgentProviderId, accountId: string): ProviderAccountCodeLoginStatus {
-    if (this.#signIns.has(accountId)) return { result: null };
+    if (this.#signIns.has(accountId)) {
+      if (this.#codeSignIns.has(accountId)) return { result: null };
+      // Another sign-in of the account replaced the code sign-in.
+      return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
+    }
     const ended = this.#codeResults.get(accountId);
     if (ended && (ended.error !== null || this.account(provider, accountId))) return { result: { error: ended.error } };
     return { result: { error: sourceText("error.provider.hostSignInEnded", { provider: providerLabel(provider) }) } };
@@ -1062,6 +1080,7 @@ export class ProviderAccounts {
 
   #forget(accountId: string): void {
     this.#states.delete(accountId);
+    this.#codeResults.delete(accountId);
     this.#usage.delete(accountId);
     this.#usageGates.delete(accountId);
     this.#models.delete(accountId);

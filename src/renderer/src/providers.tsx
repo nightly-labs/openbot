@@ -408,8 +408,10 @@ const Providers = createSimpleContext({
         return {
           connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
           // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-          cancel: async (provider) => {
+          // It does not stop a code sign-in, which the code route stops by its account.
+          cancel: async (provider, accountId) => {
             await accountSignIn(hostServerId).cancel(provider);
+            if (accountCodeServerId() === hostServerId) await accountCode(hostServerId).cancel(provider, accountId);
           },
           rename: (provider, accountId, label) =>
             changed(providerAdmin().renameAccount({ provider, accountId, label }, hostServerId)),
@@ -554,7 +556,8 @@ const Providers = createSimpleContext({
       return {
         start: async (provider: AgentProviderId, accountId: string | null) => {
           const started = await providerAdmin().startAccountCodeLogin({ provider, accountId }, serverId);
-          await refresh();
+          // The code is shown at once: the code lives for a short time only.
+          void refresh();
           return started;
         },
         submit: (provider: AgentProviderId, accountId: string, code: string) =>

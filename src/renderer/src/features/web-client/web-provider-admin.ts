@@ -579,7 +579,8 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     return {
       start: async (provider: AgentProviderId, accountId: string | null) => {
         const started = await admin.startAccountCodeLogin({ provider, accountId }, id);
-        await refresh();
+        // The code is shown at once: the code lives for a short time only.
+        void refresh();
         return started;
       },
       submit: (provider: AgentProviderId, accountId: string, code: string) =>
@@ -626,8 +627,10 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     return {
       connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
       // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-      cancel: async (provider) => {
+      // It does not stop a code sign-in, which the code route stops by its account.
+      cancel: async (provider, accountId) => {
         await accountSignIn(id).cancel(provider);
+        if (accountCodeServerId() === id) await accountCode(id).cancel(provider, accountId);
       },
       rename: (provider, accountId, label) => changed(admin.renameAccount({ provider, accountId, label }, id)),
       remove: (provider, accountId) => changed(admin.removeAccount({ provider, accountId }, id)),
