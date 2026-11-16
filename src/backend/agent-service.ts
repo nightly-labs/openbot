@@ -6894,9 +6894,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /**
+   * A new emoji on one of the agent's own replies is also the user's answer to that reply, so it is
+   * queued as a reply that quotes the message: the agent continues without a typed answer. A removed
+   * or unchanged reaction sends nothing. `sender` is the person the host saw react.
+   */
   readonly setMessageReaction = Effect.fn("AgentService.setMessageReaction")(function* (
     this: AgentService,
     input: SetMessageReactionInput,
+    sender?: ConversationMessageSender,
   ) {
     const agent = yield* this.#store
       .existing(input.agentId)
@@ -6910,12 +6916,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
       if (message) snapshot.messages.push(message);
     }
-    if (!snapshot.messages.some((message) => message.id === input.messageId)) {
+    const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+    if (!message) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
         cause: new Error(sourceText("error.agent.messageUnavailable")),
       });
     }
+    const answer =
+      message.author === "assistant" && input.emoji !== this.#mailbox.reactionFor(agent.id, input.messageId)
+        ? input.emoji
+        : null;
     yield* this.#mailbox
       .setReaction(agent.id, input.messageId, { kind: "user" }, input.emoji)
       .pipe(
@@ -6925,6 +6936,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
     this.#mailboxSync.syncMailboxMessages(snapshot);
     this.#conversation.emitConversation(snapshot);
+    if (answer)
+      yield* this.#sendUserMessage(
+        { agentId: agent.id, text: answer, replyToMessageId: input.messageId },
+        sender,
+        undefined,
+      );
   }, Effect.uninterruptible).bind(this);
 
   /** The channel, task or messaging thread of a delivery, or null for the agent's own chat. */
