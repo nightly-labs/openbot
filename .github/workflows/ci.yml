@@ -709,6 +709,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:memory-review
 
+      - name: Run the memory changes wire E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:memory-changes-wire
+
       - name: Run the local skill revision E2E test
         if: ${{ !cancelled() }}
         run: bun run test:skill-revision
@@ -748,6 +752,7 @@ jobs:
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
             .openbot-build/acp-subagents-e2e/
+            .openbot-build/memory-changes-e2e/
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
