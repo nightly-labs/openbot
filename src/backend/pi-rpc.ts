@@ -20,6 +20,9 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 
 const PI_RECORD_LIMIT_BYTES = 256 * 1024 * 1024;
+
+/** The wait of a request that gives none. */
+export const PI_REQUEST_TIMEOUT_MS = 30_000;
 const logger = createOpenBotLogger("provider-runtime");
 
 /** A JSON object with a string `type`, or null for any other line. */
@@ -153,7 +156,11 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
       );
   }
 
-  readonly request = Effect.fn("PiRpc.request")(function* (this: PiRpc, command: DynamicRecord, timeoutMs = 30_000) {
+  readonly request = Effect.fn("PiRpc.request")(function* (
+    this: PiRpc,
+    command: DynamicRecord,
+    timeoutMs = PI_REQUEST_TIMEOUT_MS,
+  ) {
     const id = randomUUID();
     return yield* Effect.callback<DynamicRecord, ProviderClientOperationError>((resume) => {
       const timer = setTimeout(() => {

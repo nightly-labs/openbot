@@ -139,7 +139,8 @@ export class ModelCatalog {
 
   /**
    * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
-   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed.
+   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed. The caller
+   * must read each one that timed out again with `relist`: only that read records its timeout.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
@@ -178,7 +179,12 @@ export class ModelCatalog {
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
-              this.#options.recordProviderError(provider, failure.cause);
+              // A slow list already had the full request timeout, so a second read gains nothing.
+              const timedOut = timeout && !catalog.slowList;
+              // The caller reads a list that timed out again with the full timeout, and that read keeps
+              // its own failure. A slow start that the second read repairs is no error: before, the row
+              // of a working provider showed "Error" with the timeout of the first read (#9945, #3436).
+              if (!timedOut) this.#options.recordProviderError(provider, failure.cause);
               logger.warn("A provider did not list its models.", {
                 provider,
                 durationMs: Math.round(performance.now() - startedAt),
@@ -188,8 +194,7 @@ export class ModelCatalog {
                 provider,
                 models: catalog.fallback?.(previous) ?? previous,
                 fresh: false,
-                // A slow list already had the full request timeout, so a second read gains nothing.
-                timedOut: timeout && !catalog.slowList,
+                timedOut,
                 // The list that stays can be the list of a CLI that an update replaced (#8321).
                 failed: !timeout,
               });
