@@ -22,4 +22,10 @@ export const messages = {
   "preview.unsupported.openExternally": "Apri con un'altra app",
   "preview.spreadsheet.readFailed": "Impossibile leggere questo foglio di calcolo.",
   "preview.spreadsheet.truncated": "Anteprima limitata alle prime {rows} righe e {columns} colonne.",
+  "preview.diff.label": "Modifiche in {name}",
+  "preview.diff.added": { one: "{count} riga aggiunta", other: "{count} righe aggiunte" },
+  "preview.diff.removed": { one: "{count} riga rimossa", other: "{count} righe rimosse" },
+  "preview.diff.noChanges": "Nessuna modifica.",
+  "preview.diff.instructionsButton": "Modifiche",
+  "preview.diff.instructionsTitle": "Modifiche alle istruzioni",
 } as const satisfies PartialTranslation<typeof source>;

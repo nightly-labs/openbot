@@ -1,0 +1,134 @@
+.diff-view {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--openbot-border);
+  border-radius: var(--openbot-radius-md);
+  overflow: hidden;
+}
+
+.diff-view-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--openbot-border);
+  font-size: var(--openbot-text-sm);
+}
+
+.diff-view-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diff-view-count[data-diff="added"] {
+  color: var(--openbot-success);
+}
+
+.diff-view-count[data-diff="removed"] {
+  color: var(--openbot-danger-text);
+}
+
+.diff-view-empty {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.diff-view-lines {
+  margin: 0;
+  overflow: auto;
+  color: var(--openbot-text-primary);
+  font-family: var(--openbot-font-mono);
+  font-size: var(--openbot-text-sm);
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.diff-view-row {
+  display: grid;
+  grid-template-columns: 4ch 4ch 1fr;
+  gap: 8px;
+  min-width: min-content;
+  padding-inline-end: 12px;
+}
+
+.diff-view-row[data-diff="added"] {
+  background: var(--openbot-success-soft);
+}
+
+.diff-view-row[data-diff="removed"] {
+  background: var(--openbot-danger-soft);
+}
+
+.diff-view-number {
+  color: var(--openbot-text-secondary);
+  text-align: end;
+  user-select: none;
+}
+
+.diff-view-text {
+  white-space: pre;
+}
+
+.diff-view-text::before {
+  display: inline-block;
+  width: 2ch;
+  content: " ";
+  user-select: none;
+}
+
+.diff-view-row[data-diff="added"] .diff-view-text::before {
+  content: "+";
+}
+
+.diff-view-row[data-diff="removed"] .diff-view-text::before {
+  content: "-";
+}
+
+/* `WordDiff`: the changed words inside one run of text. */
+.diff-word {
+  border-radius: var(--openbot-radius-xs);
+  text-decoration-thickness: 1px;
+}
+
+.diff-word[data-diff="removed"] {
+  background: var(--openbot-danger-soft);
+  color: var(--openbot-text-muted);
+  text-decoration-line: line-through;
+}
+
+.diff-word[data-diff="added"] {
+  background: var(--openbot-success-soft);
+  text-decoration-line: none;
+}
+
+/* The dialog that shows what an agent changed in its instruction file. */
+.instructions-diff-dialog {
+  width: min(760px, 100%);
+  max-height: calc(100dvh - 2 * var(--openbot-space-6));
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-3);
+  overflow: hidden;
+  padding: var(--openbot-space-4);
+  background: var(--openbot-bg-sidebar);
+  color: var(--openbot-text-primary);
+}
+
+.instructions-diff-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+}
+
+.instructions-diff-dialog .diff-view {
+  min-height: 0;
+}

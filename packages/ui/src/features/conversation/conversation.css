@@ -28,6 +28,7 @@
 @import "./styles/message-content.css";
 @import "./styles/math.css";
 @import "./styles/code-preview.css";
+@import "./styles/diff-view.css";
 @import "./styles/chat-visual.css";
 @import "./styles/composer.css";
 @import "./styles/attachments.css";

@@ -1,15 +1,17 @@
 /**
- * View and Undo on the chat line that says the agent changed its instructions. View opens the
- * Instructions page in the agent settings. Undo puts back the text from before the turn, but only while the file still has the
+ * View, Changes and Undo on the chat line that says the agent changed its instructions. View opens the
+ * Instructions page in the agent settings. Changes shows the text from before and after the turn as a
+ * diff. Undo puts back the text from before the turn, but only while the file still has the
  * agent's text: the save sends that text, so main refuses it after a later change.
  */
 
 import type { AgentInstructionsChange } from "@openbot/contracts/ipc";
-import { Button, FileText, MarkerIcon, Undo2 } from "@openbot/ui";
+import { Button, Dialog, FileDiff, FileText, IconButton, MarkerIcon, Undo2, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import { createSignal, onSettled, Show } from "solid-js";
 import { useText } from "../../text";
 import type { AgentInstructionsFileCalls } from "./AgentInstructionsView";
+import { DiffView } from "./DiffView";
 
 export function InstructionsChangeActions(props: {
   agentId: string;
@@ -21,6 +23,9 @@ export function InstructionsChangeActions(props: {
   const { t, errorMessage } = useText();
   /** The file text now, or null before the first read. */
   const [current, setCurrent] = createSignal<string | null>(null);
+  /** The name of the instruction file, or null before the first read. The diff shows it. */
+  const [fileName, setFileName] = createSignal<string | null>(null);
+  const [showChanges, setShowChanges] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   let closed = false;
@@ -31,7 +36,10 @@ export function InstructionsChangeActions(props: {
     const mine = ++request;
     try {
       const file = await props.calls.read(props.agentId);
-      if (!closed && mine === request) setCurrent(file.text);
+      if (!closed && mine === request) {
+        setCurrent(file.text);
+        setFileName(file.fileName);
+      }
     } catch {
       // Undo stays hidden. View still opens the page, which shows its own read error.
     }
@@ -43,6 +51,7 @@ export function InstructionsChangeActions(props: {
       if (agentId !== props.agentId) return;
       ++request;
       setCurrent(file.text);
+      setFileName(file.fileName);
     });
     return () => {
       closed = true;
@@ -81,6 +90,53 @@ export function InstructionsChangeActions(props: {
             </MarkerIcon>
             <span class="chat-action-target-name">{t("chat.marker.instructionsView")}</span>
           </Button>
+        )}
+      </Show>
+      <Show when={props.change}>
+        {(change) => (
+          <>
+            <Button
+              variant="ghost"
+              type="button"
+              class="chat-action-target"
+              aria-haspopup="dialog"
+              onClick={() => setShowChanges(true)}
+            >
+              <MarkerIcon>
+                <FileDiff aria-hidden="true" />
+              </MarkerIcon>
+              <span class="chat-action-target-name">{t("preview.diff.instructionsButton")}</span>
+            </Button>
+            <Show when={showChanges()}>
+              <Dialog.Root open onOpenChange={(open) => !open && setShowChanges(false)}>
+                <Dialog.Portal>
+                  {/* The overlay centers the dialog that it holds. */}
+                  <Dialog.Overlay>
+                    <Dialog.Content class="instructions-diff-dialog" as="section">
+                      <header class="instructions-diff-dialog-head">
+                        <Dialog.Title as="h2" class="ui-heading" data-size="md" data-tone="primary">
+                          {t("preview.diff.instructionsTitle")}
+                        </Dialog.Title>
+                        <IconButton
+                          label={t("common.close")}
+                          variant="ghost"
+                          data-cuelume-tap="close"
+                          onClick={() => setShowChanges(false)}
+                        >
+                          <X />
+                        </IconButton>
+                      </header>
+                      <DiffView
+                        name={fileName() ?? t("preview.diff.instructionsTitle")}
+                        oldText={change().before}
+                        newText={change().after}
+                      />
+                    </Dialog.Content>
+                  </Dialog.Overlay>
+                </Dialog.Portal>
+              </Dialog.Root>
+            </Show>
+          </>
         )}
       </Show>
       <Show when={undoable()}>

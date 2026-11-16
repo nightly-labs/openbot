@@ -22,4 +22,10 @@ export const messages = {
   "preview.unsupported.openExternally": "Abrir externamente",
   "preview.spreadsheet.readFailed": "No se pudo leer esta hoja de cálculo.",
   "preview.spreadsheet.truncated": "Vista previa limitada a las primeras {rows} filas y {columns} columnas.",
+  "preview.diff.label": "Cambios en {name}",
+  "preview.diff.added": { one: "{count} línea añadida", other: "{count} líneas añadidas" },
+  "preview.diff.removed": { one: "{count} línea eliminada", other: "{count} líneas eliminadas" },
+  "preview.diff.noChanges": "Sin cambios.",
+  "preview.diff.instructionsButton": "Cambios",
+  "preview.diff.instructionsTitle": "Cambios en las instrucciones",
 } as const satisfies PartialTranslation<typeof source>;

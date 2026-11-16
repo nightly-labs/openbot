@@ -201,7 +201,6 @@
 }
 
 .agent-step-memory-action,
-.agent-step-memory-previous,
 .agent-step-memory[data-action="forgotten"] s {
   color: var(--openbot-text-muted);
 }

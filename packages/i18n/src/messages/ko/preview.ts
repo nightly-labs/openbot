@@ -22,4 +22,10 @@ export const messages = {
   "preview.unsupported.openExternally": "외부 앱에서 열기",
   "preview.spreadsheet.readFailed": "이 스프레드시트를 읽을 수 없어요.",
   "preview.spreadsheet.truncated": "처음 {rows}행, {columns}열까지만 미리 볼 수 있어요.",
+  "preview.diff.label": "{name}의 변경 사항",
+  "preview.diff.added": { other: "{count}줄 추가됨" },
+  "preview.diff.removed": { other: "{count}줄 삭제됨" },
+  "preview.diff.noChanges": "변경 사항이 없습니다.",
+  "preview.diff.instructionsButton": "변경 사항",
+  "preview.diff.instructionsTitle": "지침 변경 사항",
 } as const satisfies PartialTranslation<typeof source>;
