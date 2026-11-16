@@ -65,6 +65,9 @@ export interface SidebarDragEngineDeps {
 /** A drag that rests this long on a closed folder opens it. */
 const SPRING_OPEN_MS = 700;
 
+/** With no pins, a chat dragged this close to the top of the list opens the empty pin area. */
+const PIN_DROP_EDGE_PX = 24;
+
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
   const {
     assignedSectionId,
@@ -419,7 +422,14 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   function updateSidebarNativeDrag(event: DragEvent): void {
     if (!dragSession) return;
+    const point = { clientX: event.clientX, clientY: event.clientY };
+    const list = dragGeometry.list;
+    // The empty pin area pushes every row down. Opened at drag start, it moved the rows under a still
+    // pointer, and the drag aimed at a row above the one the user held.
     if (
+      list &&
+      pointInRect(point, list) &&
+      point.clientY < list.top + PIN_DROP_EDGE_PX &&
       !dragState.emptyPinnedDropVisible() &&
       chatPinnedItems().length === 0 &&
       dragSession.source.kind === "chat" &&
@@ -433,8 +443,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
         if (dragPoint) scheduleSidebarDragTarget(dragPoint);
       });
     }
-    const point = { clientX: event.clientX, clientY: event.clientY };
-    if (pointInRect(point, dragGeometry.list)) {
+    if (pointInRect(point, list)) {
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
     }
