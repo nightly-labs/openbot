@@ -1,8 +1,10 @@
 // The `opencode acp` of `opencode-expired-key-e2e.ts`. It picks its key as OpenCode 1.18.30 to 1.18.35
 // do: config `options.apiKey` first, then the `auth.json` key (`FAKE_AUTH_KEY`), then
 // `OPENCODE_API_KEY`. The key named `expired` gets the text OpenCode Console sends for an expired key,
-// behind the ACP SDK's `Internal error:`. With `FAKE_PROVIDER_AUTH=1` it runs a third-party model with
-// no sign-in, and each prompt gets the `-32000` that OpenCode 2.1.1 sends for that (#2746).
+// behind the ACP SDK's `Internal error:`. The key named `expired-v2` gets what OpenCode 2.2.5 sends for
+// any key that the service refuses: `-32000` with empty data and no reason (#9095). With
+// `FAKE_PROVIDER_AUTH=1` it runs a third-party model with no sign-in, and each prompt gets the `-32000`
+// that OpenCode 2.1.1 sends for that (#2746).
 import { logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const EXPIRED =
@@ -47,7 +49,7 @@ serveFakeAcpAgent({
   },
   "session/prompt": (request, peer) => {
     logEntry({ event: "prompt", sessionId: request.params.sessionId, key });
-    if (PROVIDER_AUTH) {
+    if (PROVIDER_AUTH || key === "expired-v2") {
       peer.fail(request, {
         code: -32000,
         message: "Authentication required: provider authentication required",
