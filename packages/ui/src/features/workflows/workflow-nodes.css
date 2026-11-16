@@ -1409,7 +1409,6 @@ fieldset.wfn-picker-group {
   backdrop-filter: var(--wfn-glass-blur);
 }
 
-/* The title of a popover, with one action at the end, such as Upload. */
 /* A custom size: the width and the height side by side. */
 .ui-popover-menu-surface.wfn-popover.wfn-size-popover {
   width: 240px;
@@ -1426,6 +1425,7 @@ fieldset.wfn-picker-group {
   gap: var(--openbot-space-1);
 }
 
+/* The title of a popover, with one action at the end, such as Upload. */
 .wfn-popover-head {
   display: flex;
   gap: var(--openbot-space-2);

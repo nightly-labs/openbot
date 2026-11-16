@@ -330,8 +330,6 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     untrack(() => props.aspect ?? "1:1"),
     oneOf(FRAMES),
   );
-  const [width] = useField<number>(() => props.id, "width", CUSTOM_START["1:1"].width, asSide);
-  const [height] = useField<number>(() => props.id, "height", CUSTOM_START["1:1"].height, asSide);
   /**
    * A host without `workflows-media-size-v1` reads a custom frame, 4:5 and 5:4 as the first aspect
    * ratio of the model, so the canvas offers them only on a host with it and shows what an older host makes.
@@ -359,8 +357,9 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
     workflowMediaSpecs(
       {
         aspect: hostAspect(aspect()),
-        width: width(),
-        height: height(),
+        // The stored sides with no default: a missing (0) or out of range side gives no custom size, as on the host.
+        width: board.field(props.id, "width") ?? 0,
+        height: board.field(props.id, "height") ?? 0,
         duration: duration(),
         resolution: resolution(),
         background: background(),
@@ -369,10 +368,16 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
-  /** The shape of the card: the custom size, else the aspect ratio that the model makes. */
+  /**
+   * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
+   * stays from 9:16 to 16:9, so the card holds its controls; the picture fills the card.
+   */
   const frameRatio = () => {
     const size = specs().size;
-    if (size) return { css: `${size.width} / ${size.height}`, value: size.width / size.height };
+    if (size) {
+      const value = Math.min(16 / 9, Math.max(9 / 16, size.width / size.height));
+      return { css: String(value), value };
+    }
     const [w = 1, h = 1] = specs().aspect.split(":").map(Number);
     return { css: aspectRatio(specs().aspect), value: w / h };
   };

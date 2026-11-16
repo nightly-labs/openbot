@@ -2633,7 +2633,8 @@ export async function createApplicationServices({
           const file = yield* mailbox.resolveAttachment(attachmentId);
           if (!file) return yield* Effect.fail(new Error("The generated picture is gone."));
           const source = yield* Effect.tryPromise(() => readFile(file.path));
-          const bytes = sizeWorkflowPicture(source, size);
+          // A throw from the image decoder fails the crop, so the step keeps the model's picture.
+          const bytes = yield* Effect.try(() => sizeWorkflowPicture(source, size));
           if (!bytes) return yield* Effect.fail(new Error("The generated picture could not be decoded."));
           const stored = yield* mailbox.storeGeneratedAttachment({
             bytes,
