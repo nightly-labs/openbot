@@ -1753,8 +1753,31 @@ sends the operator one message:
 | The owner resumes that renewal | ``Resumed renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>.`` | None. |
 | A server plan or a license ends | ``Ended <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. Reason: <cancelled or not paid>.`` | None. |
 
-A pool message has no account, email or name. A purchase message (the last 5 rows) has the email of
-the account, on a developer decision, so keep the webhook in a private channel. Its amount is the list
+A purchase message (the last 5 rows) and a payment message (below) have the email of the account, on a
+developer decision, so keep the webhook in a private channel. A pool message has no account, email or
+name.
+
+The same webhook also gets one payment message for each invoice line of a server plan or a license
+that is paid or that fails, and for each refund and dispute:
+
+| Event | Message |
+| --- | --- |
+| A paid invoice line | ``Paid server plan for `<email>`: <plan>, <amount> (<currency>), 1 <month or year> period. <First purchase, Renewal or Adjustment>.`` |
+| A failed payment | ``Failed payment of the <server plan or license> for `<email>`: <product>, <amount> (<currency>), 1 <month or year> period. Reason: <Stripe reason>.`` |
+| A refund | ``Refunded <server plan or license> for `<email>`: <product>, <amount> (<currency>), 1 <month or year> period.`` |
+| A refund that failed after it was counted | ``Failed refund of the <server plan or license> for `<email>`: ...`` |
+| A dispute, and a lost dispute | ``Disputed payment of the <server plan or license> for `<email>`: ...``, ``Lost dispute of the <server plan or license> for `<email>`: ...`` |
+
+The product of a license is its number of users, such as `5 users`. The amount is the amount of the
+payment, the refund or the dispute. An adjustment is a plan change or a manual invoice. The sales
+ledger sends the message (`BillingSales.processPending`, in the cron of each 5 minutes), in the run that
+puts the fact in the OpenPanel ledger, so the message comes at most some minutes after the payment and
+one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` too. An imported payment, a $0 paid
+invoice (a trial start or a $0 proration) and a checkout step send no message. An account that is gone shows as `an unknown account`.
+`bun run test:billing-sale-alert` checks the messages. Thus a first purchase sends a `New` message and
+a `Paid` message.
+
+The amount of a purchase message is the list
 amount of one period, before a discount. A license at the bundle price adds `bundle price`, and a
 subscription that starts with a trial adds `It starts with a free trial.` Each new subscription sends
 one start message, and each ended subscription one end message: a claim in `billing_webhook_events`
@@ -1762,7 +1785,7 @@ one start message, and each ended subscription one end message: a claim in `bill
 A cancel or resume message goes out with the sync that stores the change, so a repeated event sends
 nothing. A cancel date that Stripe has for the subscription (`cancel_at`) is the date of the cancel
 message. One sync sends one message: a cancel that Stripe stores together with a change of plan or
-users sends no cancel message. A change of plan or users and a renewal payment send nothing. A server
+users sends no cancel message. A change of plan or users sends no purchase message. A server
 order with a license sends two messages, one for each subscription. A subscription that ends after its
 owner cancelled the renewal sends the cancel message and, later, the end message. A deleted server, a
 full refund and a dispute end the plan at once. The reason is `not paid` when the last payment of the

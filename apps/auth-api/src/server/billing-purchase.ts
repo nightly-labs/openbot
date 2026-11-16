@@ -103,12 +103,8 @@ const EVENT_TEXT = {
 
 /** The operator message of a subscription change: the account email, the product, the amount, the currency and the period. */
 export function purchaseAlertText(purchase: BillingPurchase): string {
-  const currency = purchase.currency.toUpperCase();
-  const amount =
-    purchase.amount === null
-      ? `amount not known (${currency})`
-      : `${new Intl.NumberFormat("en", { style: "currency", currency }).format(purchase.amount / 100)} (${currency})`;
-  const head = `${EVENT_TEXT[purchase.event]} ${purchase.product === "server" ? "server plan" : "license"} for ${code(purchase.email)}`;
+  const amount = alertAmount(purchase.amount, purchase.currency);
+  const head = `${EVENT_TEXT[purchase.event]} ${purchase.product === "server" ? "server plan" : "license"} for ${alertCode(purchase.email)}`;
   const product =
     purchase.product === "server"
       ? purchase.plan
@@ -125,7 +121,15 @@ function purchaseNote(purchase: BillingPurchase): string {
   return "";
 }
 
+/** An amount in minor units as operator text, such as `$29.00 (USD)`. */
+export function alertAmount(amount: number | null, currency: BillingCurrency): string {
+  const code = currency.toUpperCase();
+  return amount === null
+    ? `amount not known (${code})`
+    : `${new Intl.NumberFormat("en", { style: "currency", currency: code }).format(amount / 100)} (${code})`;
+}
+
 /** Discord shows the text between backticks as it is, so an email cannot make a link or a mention. */
-function code(value: string): string {
+export function alertCode(value: string): string {
   return `\`${value.replaceAll("`", "'")}\``;
 }
