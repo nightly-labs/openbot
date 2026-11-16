@@ -63,10 +63,6 @@ type ConversationDeltaEvent = Extract<AgentEvent, { type: "conversation-delta" }
 
 const LATEST_PAGE_SIZE = 50;
 /**
- * The newest messages that the `@` thread search reads. The agent's own chat has matches too, and the
- * list shows at most five threads, so this many leave room for them.
- */
-/**
  * How much of a snapshot an agent that is not open converts. Commentary of one turn becomes one
  * message and queued messages none, so a page needs more than a page of the thread.
  */
