@@ -8,6 +8,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
+import { TEAM_PROTOCOL_CAPABILITY_LIMITS } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
@@ -98,7 +99,6 @@ import {
 import {
   decodeTeamProtocolSupportV9,
   TEAM_LONG_CAPABILITY_LISTS_CAPABILITY,
-  TEAM_PROTOCOL_V9_CAPABILITY_LIMIT,
 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { Context, Deferred, Effect, Exit, Fiber, Layer, ManagedRuntime } from "effect";
@@ -1206,12 +1206,14 @@ function isHttpRequest(value: TeamProtocolV2Json): value is TeamProtocolV2Json &
     (value.capabilities === undefined ||
       (Array.isArray(value.capabilities) &&
         value.capabilities.length <=
-          (value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
-            ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT
-            : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
-                value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
-              ? 128
-              : 64) &&
+          TEAM_PROTOCOL_CAPABILITY_LIMITS[
+            value.capabilities.includes(TEAM_LONG_CAPABILITY_LISTS_CAPABILITY)
+              ? 9
+              : value.capabilities.includes(TEAM_PI_MUSE_CAPABILITY) ||
+                  value.capabilities.includes(TEAM_OPEN_PROVIDERS_CAPABILITY)
+                ? 7
+                : 1
+          ] &&
         value.capabilities.every(isString))) &&
     (value.bodyTransferId === undefined || isString(value.bodyTransferId)) &&
     (value.contentType === undefined || isString(value.contentType))

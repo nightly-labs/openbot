@@ -39,6 +39,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
@@ -56,7 +57,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -138,10 +139,7 @@ export function requestCapabilities(request: IncomingMessage): Set<string> {
   // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
 }
 

@@ -768,12 +768,19 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-// Keep the first request readable by every released peer. The v7 marker lets a current
-// host return the expanded list; older hosts ignore the marker and retain all old features.
-// A protocol 6 peer reads at most 64 capabilities, so each new capability is v7 only.
-// The v8 marker stays out: a client sends it only after the host reports protocol 8.
+// Keep the first request readable by every released peer. A client also sends this list to a host
+// of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
+// over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
+// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
+// protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
+// stays out: a client sends it only after the host reports protocol 8.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    // No host of protocol 6 or older knows these three. They came after v0.34.1, the last protocol 6
+    // release, and took the list over 64. A host of protocol 7 or newer gets them in its own list.
+    capability !== TEAM_ZIP_ATTACHMENTS_CAPABILITY &&
+    capability !== AGENT_HOST_SETTINGS_CAPABILITY &&
+    capability !== MCP_SIGN_IN_CAPABILITY &&
     capability !== TEAM_OPEN_PROVIDERS_CAPABILITY &&
     capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
