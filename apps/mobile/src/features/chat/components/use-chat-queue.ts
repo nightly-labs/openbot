@@ -41,6 +41,11 @@ const DRAFT_ERROR_KEYS = {
   pendingSave: "mobile.chat.queue.readPendingSaveFailed",
 } as const satisfies Record<QueueEditDraftError["part"], MobileTextKey>;
 
+/** The ids of every queued delivery, answers included, with `delivery` first and the others in their order. */
+function firstIds(waiting: readonly QueueDelivery[], delivery: QueueDelivery): string[] {
+  return [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)];
+}
+
 export function useChatQueue(
   agentId: string,
   serverId: string,
@@ -450,12 +455,10 @@ export function useChatQueue(
           const turnId = activeTurnId;
           if (!turnId) return;
           const waiting = orderedQueue(query.data?.deliveries ?? []);
-          // An edited message keeps its place, and the queue starts nothing while it is first.
+          // An edited message keeps its place. The actions screen disables Send now in this state.
           if (waiting[0]?.editing && waiting[0].id !== delivery.id) return;
           if (waiting[0]?.id !== delivery.id)
-            await workspace().changeQueue(agentId, serverId, "reorder", {
-              deliveryIds: [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)],
-            });
+            await workspace().changeQueue(agentId, serverId, "reorder", { deliveryIds: firstIds(waiting, delivery) });
           if (activeTurnRef.current !== turnId) return;
           await workspace().interruptTurn(agentId, turnId, serverId);
         }),
@@ -463,9 +466,8 @@ export function useChatQueue(
         run(async () => {
           // The host checks the order against every queued delivery, so the answers the sheet does
           // not list keep their places behind the moved message.
-          const waiting = orderedQueue(query.data?.deliveries ?? []);
           await workspace().changeQueue(agentId, serverId, "reorder", {
-            deliveryIds: [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)],
+            deliveryIds: firstIds(orderedQueue(query.data?.deliveries ?? []), delivery),
           });
         }),
     }),
