@@ -458,6 +458,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
   "mobile.chat.approval.report.dontSend": "Şimdi değil",
   "mobile.chat.approval.report.send": "OpenBot ekibine gönder",
+  "mobile.chat.approval.report.phoneAdds": "Bu telefon rapora şunları ekler:",
   "mobile.chat.approval.allow": "İzin ver",
   "mobile.chat.approval.deny": "Reddet",
   "mobile.chat.approval.reconnect": "Bu isteği yanıtlamak için {server} sunucusuna bağlanın.",

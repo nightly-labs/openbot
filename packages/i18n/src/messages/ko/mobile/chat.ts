@@ -450,6 +450,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
   "mobile.chat.approval.report.dontSend": "나중에",
   "mobile.chat.approval.report.send": "OpenBot 팀에 보내기",
+  "mobile.chat.approval.report.phoneAdds": "이 휴대폰이 신고에 추가하는 정보:",
   "mobile.chat.approval.allow": "허용",
   "mobile.chat.approval.deny": "거부",
   "mobile.chat.approval.reconnect": "이 요청에 응답하려면 {server}에 연결해 주세요.",

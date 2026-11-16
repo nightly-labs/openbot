@@ -454,6 +454,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
   "mobile.chat.approval.report.dontSend": "今はしない",
   "mobile.chat.approval.report.send": "OpenBot チームに送信",
+  "mobile.chat.approval.report.phoneAdds": "このスマートフォンがレポートに追加する情報:",
   "mobile.chat.approval.allow": "許可",
   "mobile.chat.approval.deny": "拒否",
   "mobile.chat.approval.reconnect": "このリクエストに回答するには {server} に接続してください。",

@@ -356,6 +356,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "Alleen de eigenaar van de server of een beheerder kan deze actie kiezen.",
   "error.backend.approvalInactive": "Deze goedkeuring is niet meer actief.",
   "error.backend.approvalOwnerOnly": "Alleen de eigenaar van de server kan deze actie goedkeuren.",
+  "error.backend.feedbackNeedsPhone":
+    "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",

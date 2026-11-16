@@ -541,6 +541,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "Masz pomysł? Zróbmy to.",
   "mobile.chat.approval.report.dontSend": "Nie teraz",
   "mobile.chat.approval.report.send": "Wyślij do zespołu OpenBot",
+  "mobile.chat.approval.report.phoneAdds": "Ten telefon dodaje do zgłoszenia:",
   "mobile.chat.approval.allow": "Zezwól",
   "mobile.chat.approval.deny": "Odmów",
   "mobile.chat.approval.reconnect": "Połącz się z serwerem {server}, aby odpowiedzieć na to żądanie.",

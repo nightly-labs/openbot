@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Wyczyścić dziennik pomocy?",
   "mobile.settings.support.clearBody": "Usuwa to wszystkie zdarzenia z dziennika na tym telefonie.",
   "mobile.settings.support.logFooter":
-    "Dziennik pozostaje na tym telefonie, a OpenBot go nie wysyła. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
+    "Dziennik pozostaje na tym telefonie. OpenBot wysyła jego wiersze tylko ze zgłoszeniem błędu aplikacji na telefon, które wysyłasz, a karta zgłoszenia najpierw je pokazuje. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
   "mobile.settings.support.saveFailed": "Nie udało się zapisać pliku dziennika. Spróbuj ponownie.",
   "mobile.settings.support.sharingUnavailable": "Udostępnianie jest niedostępne na tym telefonie.",
   "mobile.settings.support.newestFirst": "Od najnowszych.",

@@ -564,6 +564,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "لديك فكرة؟ لنحققها.",
   "mobile.chat.approval.report.dontSend": "ليس الآن",
   "mobile.chat.approval.report.send": "إرسال إلى فريق OpenBot",
+  "mobile.chat.approval.report.phoneAdds": "يضيف هذا الهاتف إلى البلاغ:",
   "mobile.chat.approval.allow": "سماح",
   "mobile.chat.approval.deny": "رفض",
   "mobile.chat.approval.reconnect": "اتصل بـ {server} للإجابة عن هذا الطلب.",

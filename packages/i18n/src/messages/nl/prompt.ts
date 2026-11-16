@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Een idee? Laten we het waarmaken.",
   "prompt.approval.report.dontSend": "Niet nu",
   "prompt.approval.report.send": "Naar het OpenBot-team sturen",
+  "prompt.approval.report.phoneOnly":
+    "Open deze chat in de OpenBot-app op de telefoon en stuur het rapport daar. De telefoon voegt zijn versie, zijn systeem en zijn ondersteuningslog toe. Kan de telefoon geen verbinding maken, open dan Instellingen > Ondersteuning in de telefoon-app en meld het probleem op GitHub.",
   "prompt.approval.title.command": "Een commando uitvoeren",
   "prompt.approval.title.fileChange": "Bestanden wijzigen",
   "prompt.approval.title.permissions": "Machtigingen verlenen",

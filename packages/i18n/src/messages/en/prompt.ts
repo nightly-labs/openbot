@@ -30,6 +30,8 @@ export const messages = defineMessages("prompt", {
   "prompt.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
   "prompt.approval.report.dontSend": "Not now",
   "prompt.approval.report.send": "Send to the OpenBot team",
+  "prompt.approval.report.phoneOnly":
+    "Open this chat in the OpenBot phone app and send the report there. The phone adds its version, its system and its support log. If the phone cannot connect, open Settings > Support in the phone app and report the problem on GitHub.",
   "prompt.approval.title.command": "Run a command",
   "prompt.approval.title.fileChange": "Change files",
   "prompt.approval.title.permissions": "Grant permissions",

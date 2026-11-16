@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "지원 로그를 지울까요?",
   "mobile.settings.support.clearBody": "이 휴대전화의 로그에서 모든 이벤트가 삭제돼요.",
   "mobile.settings.support.logFooter":
-    "로그는 이 휴대전화에만 남고 OpenBot이 전송하지 않아요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
+    "로그는 이 휴대전화에 남아요. OpenBot은 직접 보내는 휴대폰 앱 버그 신고에만 로그의 일부 줄을 함께 보내고, 보내기 전에 신고 카드에 먼저 보여 줘요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
   "mobile.settings.support.saveFailed": "로그 파일을 저장할 수 없었어요. 다시 시도해 주세요.",
   "mobile.settings.support.sharingUnavailable": "이 휴대전화에서는 공유를 사용할 수 없어요.",
   "mobile.settings.support.newestFirst": "최신순이에요.",

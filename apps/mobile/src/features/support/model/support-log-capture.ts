@@ -1,8 +1,10 @@
+import { FEEDBACK_LIMITS, type FeedbackPhone } from "@openbot/contracts/feedback";
 import * as Application from "expo-application";
 import * as Device from "expo-device";
 import { File, Paths } from "expo-file-system";
 import * as Updates from "expo-updates";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
+import { installPhoneNetwork, phoneNetwork } from "./phone-network-capture";
 import {
   formatSupportLogEntry,
   parseSupportLog,
@@ -12,9 +14,11 @@ import {
   supportLog,
   supportLogCacheLines,
   supportLogCacheText,
+  supportLogExcerpt,
   supportLogValue,
   withRequestLog,
 } from "./support-log";
+import { installSystemState } from "./system-state-capture";
 
 const CACHE_FILE = "support-log-v2.jsonl";
 /** The cache file of earlier versions: the whole log as one JSON array. It is read once, then deleted. */
@@ -175,11 +179,32 @@ export function supportLogFileText(): string {
     `App: ${appVersion()}`,
     `Bundle: ${bundleName()}`,
     `System: ${systemName()}`,
+    `Network: ${phoneNetwork()}`,
     `Entries: ${entries.length}`,
     "",
     ...entries.map(formatSupportLogEntry),
     "",
   ].join("\n");
+}
+
+/**
+ * What this phone adds to a bug report about the phone app: its system, the app version with the
+ * build and the update, the device, the network with the VPN of the last read (`refreshPhoneNetwork`
+ * reads it again), and the last lines of the support log. The report is a public
+ * GitHub issue, so the user sees this text on the card before Send. The host has none of it.
+ */
+export function phoneFeedback(): FeedbackPhone {
+  const update = Updates.isEmbeddedLaunch ? null : Updates.updateId?.slice(0, 8);
+  return {
+    platform: Platform.OS === "android" ? "Android" : "iOS",
+    appVersion: (update ? `${appVersion()} · ${update}` : appVersion()).slice(0, FEEDBACK_LIMITS.fact),
+    system: systemName().slice(0, FEEDBACK_LIMITS.fact),
+    network: phoneNetwork().slice(0, FEEDBACK_LIMITS.fact),
+    // A report needs a log. A cleared log has no line yet, and the report says so.
+    log:
+      supportLogExcerpt(supportLog.entries(), FEEDBACK_LIMITS.phoneLog) ||
+      "The support log has no warning, error or connection event.",
+  };
 }
 
 export function clearSupportLog(): void {
@@ -245,6 +270,8 @@ export function installSupportLog(): void {
   captureConsole();
   captureErrors();
   captureFetch();
+  installPhoneNetwork();
+  installSystemState();
   AppState.addEventListener("change", (state) => {
     supportLog.add("info", "app", `App state: ${state}`);
     if (state === "background") persist();

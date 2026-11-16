@@ -325,6 +325,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "רק בעל השרת או מנהל יכולים לבחור בפעולה הזו.",
   "error.backend.approvalInactive": "האישור הזה אינו פעיל עוד.",
   "error.backend.approvalOwnerOnly": "רק בעל השרת יכול לאשר את הפעולה הזו.",
+  "error.backend.feedbackNeedsPhone":
+    "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",
