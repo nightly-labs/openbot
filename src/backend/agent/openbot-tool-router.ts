@@ -632,10 +632,14 @@ export class OpenBotToolRouter {
           let params = this.#asSubagentParent(request.params);
           const fromSubagent = params.threadId !== request.params.threadId;
           if (params.namespace === "openbot") {
-            const deferredMcp = this.#deferredMcpNote(client, params.threadId);
-            const invalid = deferredMcp
-              ? `${sourceText("error.agent.toolRequestInvalid")} ${deferredMcp}`
-              : sourceText("error.agent.toolRequestInvalid");
+            // Read only where it is used: the Antigravity note reads the agent's access list.
+            const { threadId } = params;
+            const invalid = () => {
+              const note = this.#deferredMcpNote(client, threadId);
+              return note
+                ? `${sourceText("error.agent.toolRequestInvalid")} ${note}`
+                : sourceText("error.agent.toolRequestInvalid");
+            };
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
               if (!agentId) throw new Error("The calling OpenBot agent is unknown.");
@@ -644,14 +648,14 @@ export class OpenBotToolRouter {
                 this.#requireAgent(agentId);
                 result = discoverTools(params, client.provider);
               } catch {
-                client.respond(request.id, openBotToolFailure(invalid));
+                client.respond(request.id, openBotToolFailure(invalid()));
                 return;
               }
               if (givesBrowserSchemas(result)) this.#browserSchemasGiven.add(params.threadId);
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
-              const found =
-                deferredMcp && params.tool === "tool_search" ? { ...result, mcpTools: deferredMcp } : result;
+              const deferredMcp = params.tool === "tool_search" ? this.#deferredMcpNote(client, threadId) : null;
+              const found = deferredMcp ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,
                 openBotToolResult(signIns.length > 0 ? { ...found, mcpServers: signIns } : found),
@@ -666,7 +670,7 @@ export class OpenBotToolRouter {
                 if (request.signal?.aborted || !client.running) return;
                 client.respond(
                   request.id,
-                  mcpResult ?? openBotToolFailure(deferredCallArgumentsError(params) ?? invalid),
+                  mcpResult ?? openBotToolFailure(deferredCallArgumentsError(params) ?? invalid()),
                 );
                 return;
               }
@@ -996,10 +1000,12 @@ export class OpenBotToolRouter {
     if (client.deferredMcpTools?.(threadId)) return DEFERRED_MCP_NOTE;
     if (client.provider === "opencode")
       return openCodeMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? OPENCODE_DEFERRED_MCP_NOTE : null;
-    if (client.provider === "antigravity")
-      return this.#mcpServers?.list().some((config) => config.enabled && config.transport === "http")
-        ? ANTIGRAVITY_DEFERRED_MCP_NOTE
-        : null;
+    // The servers that tool_call runs for this agent (`#userMcpTool`), so the note never names a call
+    // that always fails.
+    if (client.provider === "antigravity") {
+      const agentId = this.#conversation.agentForThread(threadId);
+      return agentId && (this.#mcpServers?.forAgent(agentId).length ?? 0) > 0 ? ANTIGRAVITY_DEFERRED_MCP_NOTE : null;
+    }
     if (client.provider !== "codex") return null;
     return codexDeferredMcpServers(this.#mcpServers?.list() ?? []).length > 0 ? CODEX_DEFERRED_MCP_NOTE : null;
   }
