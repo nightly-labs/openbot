@@ -1,5 +1,4 @@
 import type { AgentStatus, BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
-import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -177,7 +176,6 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts() ||
         quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
