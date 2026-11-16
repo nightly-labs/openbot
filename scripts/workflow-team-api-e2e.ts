@@ -20,6 +20,11 @@
 // The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
 // or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
 // with the ask of its provider; a video and a step without the field do not.
+// The host advertises `workflows-media-size-v1` to a protocol 9 peer. An image step with `aspect`
+// "custom" asks the model for the nearest aspect ratio and keeps the file that the host cropped to its
+// width and height; a failed crop keeps the model's file, and a video or a side out of range is not cropped.
+// An image step with `aspect` "4:5" or "5:4" asks the model for that ratio; a video model without them gets
+// its first ratio.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -50,6 +55,7 @@ import {
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -98,8 +104,11 @@ let sunraSignedIn = false;
 let higgsfieldSignedIn = false;
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
-/** Whether each media request asks for a transparent image, and its prompt, in order. */
-const mediaRequests: { transparent: boolean; prompt: string }[] = [];
+/** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
+const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+/** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
+const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
+let sizeFails = false;
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -312,6 +321,14 @@ async function startHost(): Promise<Host> {
       // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
+      // The app crops the file with Electron's image decoder, which this check does not load. The stand-in
+      // keeps a new file id, as the app does.
+      sizePicture: (attachmentId, size) => {
+        sizeRequests.push({ attachmentId, ...size });
+        return sizeFails
+          ? Effect.fail({ message: "The e2e crop failed." })
+          : Effect.succeed(`${attachmentId}-${size.width}x${size.height}`);
+      },
       mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
       // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
       // quota after the sign-in. No Sunra or Higgsfield call is made.
@@ -325,7 +342,11 @@ async function startHost(): Promise<Host> {
       // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
-        mediaRequests.push({ transparent: request.specs.transparent, prompt: request.prompt });
+        mediaRequests.push({
+          transparent: request.specs.transparent,
+          prompt: request.prompt,
+          aspect: request.specs.aspect,
+        });
         if (request.account === null) return Effect.succeed("e2e-media-file");
         return agents.generateWorkflowMedia(request).pipe(
           Effect.mapError((failure) => ({
@@ -1509,6 +1530,71 @@ try {
       assert.equal(solid.transparent, false);
       assert.doesNotMatch(solid.prompt, /transparent background/);
       return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
+    },
+  );
+
+  await step(
+    "custom size, 4:5 and 5:4: the host advertises workflows-media-size-v1; the model gets the nearest aspect and the step keeps the cropped file",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_SIZE_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = { media: mediaRequests.length, size: sizeRequests.length };
+        const workflow = await hostWorkflow(`Size ${JSON.stringify(fields)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before.media];
+        assert.ok(request, "the step reached the media maker");
+        return { output: done.output, aspect: request.aspect, sizes: sizeRequests.slice(before.size) };
+      };
+      const wide = await run({ model: "gpt-image", aspect: "custom", width: 1600, height: 900 });
+      assert.equal(wide.aspect, "16:9");
+      assert.deepEqual(wide.sizes, [{ attachmentId: "e2e-media-file", width: 1600, height: 900 }]);
+      assert.equal(wide.output, "e2e-media-file-1600x900");
+      const tall = await run({ model: "grok-imagine", aspect: "custom", width: 700, height: 1300 });
+      assert.equal(tall.aspect, "9:16");
+      assert.equal(tall.output, "e2e-media-file-700x1300");
+      sizeFails = true;
+      const failed = await run({ model: "gpt-image", aspect: "custom", width: 800, height: 800 }).finally(() => {
+        sizeFails = false;
+      });
+      assert.equal(failed.sizes.length, 1);
+      assert.equal(failed.output, "e2e-media-file");
+      const video = await run({ model: "grok-imagine", media: "video", aspect: "custom", width: 1600, height: 900 });
+      assert.deepEqual(video.sizes, []);
+      assert.equal(video.output, "e2e-media-file");
+      const tooLarge = await run({ model: "gpt-image", aspect: "custom", width: 5000, height: 900 });
+      assert.deepEqual(tooLarge.sizes, []);
+      assert.equal(tooLarge.output, "e2e-media-file");
+      const post = await run({ model: "gpt-image", aspect: "4:5" });
+      assert.equal(post.aspect, "4:5");
+      assert.deepEqual(post.sizes, []);
+      const postVideo = await run({ model: "grok-imagine", media: "video", aspect: "4:5" });
+      assert.equal(postVideo.aspect, "1:1");
+      const postSize = await run({ model: "gpt-image", aspect: "custom", width: 1080, height: 1350 });
+      assert.equal(postSize.aspect, "4:5");
+      assert.equal(postSize.output, "e2e-media-file-1080x1350");
+      const print = await run({ model: "grok-imagine", aspect: "5:4" });
+      assert.equal(print.aspect, "5:4");
+      const printVideo = await run({ model: "grok-imagine", media: "video", aspect: "5:4" });
+      assert.equal(printVideo.aspect, "1:1");
+      const printSize = await run({ model: "gpt-image", aspect: "custom", width: 1350, height: 1080 });
+      assert.equal(printSize.aspect, "5:4");
+      assert.equal(printSize.output, "e2e-media-file-1350x1080");
+      return { wide, tall, failed, video, tooLarge, post, postVideo, postSize, print, printVideo, printSize };
     },
   );
 

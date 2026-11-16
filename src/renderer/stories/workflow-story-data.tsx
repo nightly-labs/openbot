@@ -43,6 +43,7 @@ export const STORY_CATALOGS: WorkflowCatalogs = {
     { id: "story-channel-launch", name: "launch" },
     { id: "story-channel-support", name: "support" },
   ],
+  mediaSize: true,
   imageModels: [
     {
       id: "gpt-image",

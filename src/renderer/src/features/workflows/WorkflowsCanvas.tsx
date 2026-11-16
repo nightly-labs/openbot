@@ -109,6 +109,9 @@ export function WorkflowsCanvas(props: {
         ];
       });
     },
+    get mediaSize() {
+      return props.host.mediaSizeSupported();
+    },
     get media() {
       return props.host.mediaSupported() ? props.host.mediaUrl : undefined;
     },

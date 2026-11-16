@@ -1101,6 +1101,11 @@ fieldset.wfn-picker-group {
   border-radius: var(--openbot-radius-xs);
 }
 
+/* A custom size has no fixed shape, so its frame is dashed. */
+.wfn-picker-aspect[data-custom] {
+  border-style: dashed;
+}
+
 /* An effort shows five bars. The bars up to the level are lit. */
 .wfn-picker-meter {
   display: flex;
@@ -1405,6 +1410,22 @@ fieldset.wfn-picker-group {
 }
 
 /* The title of a popover, with one action at the end, such as Upload. */
+/* A custom size: the width and the height side by side. */
+.ui-popover-menu-surface.wfn-popover.wfn-size-popover {
+  width: 240px;
+}
+
+.wfn-size-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--openbot-space-2);
+}
+
+.wfn-size-field {
+  display: grid;
+  gap: var(--openbot-space-1);
+}
+
 .wfn-popover-head {
   display: flex;
   gap: var(--openbot-space-2);
