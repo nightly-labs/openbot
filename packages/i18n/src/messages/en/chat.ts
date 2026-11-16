@@ -167,6 +167,7 @@ export const messages = defineMessages("chat", {
   "chat.marker.marketplaceSuggestion": "Suggested a Marketplace app",
   "chat.marker.settingLink": "Showed a setting",
   "chat.settingLink.desktopOnly": "Open it in the OpenBot app on your computer.",
+  "chat.settingLink.agentChatOnly": "Open it in your chat with this agent.",
   "chat.marker.skillSuggestion": "Suggested a skill",
   "chat.marker.mcpSignIn": "Asked you to sign in to an MCP server",
   "chat.marker.serverInstall": "Made a command to install a server",

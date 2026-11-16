@@ -196,7 +196,8 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   };
 
   // A setting card in a chat opens the settings at a row. The tab content comes into the page after the
-  // page shows, so the row is marked when it arrives. A new request or a closed page stops the wait.
+  // page shows, so the row is marked when it arrives. A new request, an input of the user in the page or
+  // a closed page stops the wait, so a row that shows later does not take the focus.
   let handledRowNonce = 0;
   createEffect(
     () => ({ request: settings.appSettingRowRequest(), root: contentElement() }),
@@ -204,11 +205,18 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       if (props.kind !== "personal" || !request || !root || request.nonce === handledRowNonce) return;
       handledRowNonce = request.nonce;
       if (markRow(root, request.tab, request.anchor)) return;
+      const stop = () => {
+        observer.disconnect();
+        root.removeEventListener("pointerdown", stop, true);
+        root.removeEventListener("keydown", stop, true);
+      };
       const observer = new MutationObserver(() => {
-        if (markRow(root, request.tab, request.anchor)) observer.disconnect();
+        if (markRow(root, request.tab, request.anchor)) stop();
       });
       observer.observe(root, { childList: true, subtree: true });
-      return () => observer.disconnect();
+      root.addEventListener("pointerdown", stop, true);
+      root.addEventListener("keydown", stop, true);
+      return stop;
     },
   );
 

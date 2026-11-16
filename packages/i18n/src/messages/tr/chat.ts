@@ -172,6 +172,7 @@ export const messages = {
   "chat.marker.marketplaceSuggestion": "Bir Pazaryeri uygulaması önerildi",
   "chat.marker.settingLink": "Bir ayar gösterildi",
   "chat.settingLink.desktopOnly": "Bilgisayarınızdaki OpenBot uygulamasında açın.",
+  "chat.settingLink.agentChatOnly": "Bu ajanla sohbetinizde açın.",
   "chat.marker.skillSuggestion": "Bir beceri önerildi",
   "chat.marker.serverInstall": "Sunucu kurmak için bir komut oluşturdu",
   "chat.marker.skill.created": "Beceri oluşturuldu",

@@ -40,7 +40,7 @@ export function SettingLinkChatCard(props: SettingLinkChatCardProps) {
         title: t(row.title),
         path,
         open: agent ? () => props.onOpenAgentSetting(agent.id, settingId) : undefined,
-        note: undefined,
+        note: agent ? undefined : t("chat.settingLink.agentChatOnly"),
       };
     }
     const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);

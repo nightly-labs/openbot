@@ -266,6 +266,7 @@ export const messages = {
   "chat.marker.marketplaceSuggestion": "اقترح تطبيقًا من المتجر",
   "chat.marker.settingLink": "عرض إعدادًا",
   "chat.settingLink.desktopOnly": "افتحه في تطبيق OpenBot على حاسوبك.",
+  "chat.settingLink.agentChatOnly": "افتحه في محادثتك مع هذا الوكيل.",
   "chat.marker.skillSuggestion": "اقترح مهارة",
   "chat.marker.mcpSignIn": "طلب منك تسجيل الدخول إلى خادم MCP",
   "chat.marker.serverInstall": "أنشأ أمرًا لتثبيت خادم",

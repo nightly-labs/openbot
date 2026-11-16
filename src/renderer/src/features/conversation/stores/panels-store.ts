@@ -146,6 +146,10 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setAgentSettingRowRequest({ agentId, settingId, nonce: agentSettingRowNonce });
     setActiveRightPanel("settings", agentId);
   }
+  /** The panel showed the row, so the request does not show it again when the panel mounts again. */
+  function handleAgentSettingRowRequest(nonce: number): void {
+    setAgentSettingRowRequest((current) => (current?.nonce === nonce ? null : current));
+  }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
   let routineSettingsRequestNonce = 0;
 
@@ -734,6 +738,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openInstructionsSettings,
     agentSettingRowRequest,
     openAgentSettingRow,
+    handleAgentSettingRowRequest,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,

@@ -230,6 +230,7 @@ export const messages = {
   "chat.marker.marketplaceSuggestion": "Предложено приложение из каталога",
   "chat.marker.settingLink": "Показан параметр",
   "chat.settingLink.desktopOnly": "Откройте его в приложении OpenBot на своём компьютере.",
+  "chat.settingLink.agentChatOnly": "Откройте его в чате с этим агентом.",
   "chat.marker.skillSuggestion": "Предложен навык",
   "chat.marker.serverInstall": "Создал команду для установки сервера",
   "chat.marker.skill.created": "Навык создан",

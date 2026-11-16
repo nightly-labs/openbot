@@ -176,6 +176,7 @@ export const messages = {
   "chat.marker.marketplaceSuggestion": "Ha suggerito un'app del Marketplace",
   "chat.marker.settingLink": "Ha mostrato un'impostazione",
   "chat.settingLink.desktopOnly": "Aprila nell'app OpenBot sul tuo computer.",
+  "chat.settingLink.agentChatOnly": "Aprila nella tua chat con questo agente.",
   "chat.marker.skillSuggestion": "Ha suggerito una skill",
   "chat.marker.serverInstall": "Ha creato un comando per installare un server",
   "chat.marker.skill.created": "Skill creata",

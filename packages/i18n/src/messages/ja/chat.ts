@@ -170,6 +170,7 @@ export const messages = {
   "chat.marker.marketplaceSuggestion": "マーケットプレイスのアプリを提案しました",
   "chat.marker.settingLink": "設定を表示しました",
   "chat.settingLink.desktopOnly": "コンピューターの OpenBot アプリで開いてください。",
+  "chat.settingLink.agentChatOnly": "このエージェントとのチャットで開いてください。",
   "chat.marker.skillSuggestion": "スキルを提案しました",
   "chat.marker.serverInstall": "サーバーをインストールするコマンドを作成しました",
   "chat.marker.skill.created": "スキルを作成しました",

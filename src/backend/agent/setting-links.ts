@@ -347,9 +347,14 @@ const terms = (text: string) =>
     .split(/[^\p{L}\p{N}]+/u)
     .filter((term) => term.length > 1);
 
-/** The term matches a word, or the start of a longer word: "notif" finds "notifications". */
+/**
+ * The term matches a word, or the start of a longer word: "notif" finds "notifications". A short word
+ * matches only itself, so "or" does not find "order".
+ */
 function hits(term: string, words: readonly string[]): boolean {
-  return words.some((word) => word === term || (term.length > 3 && (word.startsWith(term) || term.startsWith(word))));
+  return words.some(
+    (word) => word === term || (term.length > 3 && word.startsWith(term)) || (word.length > 3 && term.startsWith(word)),
+  );
 }
 
 /** The settings that fit the query best. A title match counts most. */
@@ -365,7 +370,8 @@ export function searchSettingLinks(query: string, limit = 5): SettingLinkSummary
     for (const term of queryTerms) {
       if (hits(term, title)) score += 3;
       else if (hits(term, words)) score += 2;
-      else if (hits(term, rest)) score += 1;
+      // The descriptions are sentences, so a word of two letters, such as "is" or "to", is not a match.
+      else if (term.length > 2 && hits(term, rest)) score += 1;
     }
     return { id, score };
   });

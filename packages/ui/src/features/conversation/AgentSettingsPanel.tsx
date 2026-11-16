@@ -109,7 +109,6 @@ import {
   createSignal,
   createStore,
   For,
-  flush,
   onCleanup,
   onSettled,
   Show,
@@ -380,14 +379,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
   }
 
   // The row can show later than its page, such as a row that waits for the host. A new request, another
-  // page or a closed panel stops the wait.
+  // page, an input of the user in the page or a closed panel stops the wait.
   createEffect(
     () => props.reveal,
     (reveal) => {
       if (!reveal) return;
       const row = AGENT_SETTING_LINK_ROWS[reveal.settingId];
+      // An effect cannot flush, so a new page shows after this callback, and the observer finds its row.
+      const pageShown = untrack(page) === row.page;
       setPage(row.page);
-      flush();
       // A detail page covers the panel: the page is where its Back goes, and no row shows to mark.
       if (untrack(() => props.detailOpen)) return;
       const root = pageRoot;
@@ -397,13 +397,20 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         return;
       }
       const label = t(row.match);
-      if (revealSettingRow(root, label)) return;
+      if (pageShown && revealSettingRow(root, label)) return;
+      const stop = () => {
+        observer.disconnect();
+        root.removeEventListener("pointerdown", stop, true);
+        root.removeEventListener("keydown", stop, true);
+      };
       const observer = new MutationObserver(() => {
         // The user went to another page: the row is not wanted there.
-        if (untrack(page) !== row.page || revealSettingRow(root, label)) observer.disconnect();
+        if (untrack(page) !== row.page || revealSettingRow(root, label)) stop();
       });
       observer.observe(root, { childList: true, subtree: true });
-      return () => observer.disconnect();
+      root.addEventListener("pointerdown", stop, true);
+      root.addEventListener("keydown", stop, true);
+      return stop;
     },
   );
 

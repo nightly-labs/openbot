@@ -97,6 +97,8 @@ interface AgentSettingsPanelProps
   instructionsRequest?: { agentId: string } | null | undefined;
   /** Shows one setting, from a setting card in the chat. A new object shows it again. */
   settingReveal?: AgentSettingReveal | null | undefined;
+  /** The panel took the `settingReveal` with this nonce. */
+  onSettingRevealHandled?: ((nonce: number) => void) | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
@@ -527,6 +529,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     // A detail page covers the panel, and its Back goes to the root list that holds its link row, so the
     // panel still moves to that page. The skills dialog opens over the page that the panel shows.
     setPanelReveal(detail === "skills" ? null : request);
+    props.onSettingRevealHandled?.(request.nonce);
   });
   /** The page that a link row opens for the setting, when this agent shows that row. */
   function revealDetail(settingId: AgentSettingLinkId): "instructions" | "memories" | "skills" | "routines" | null {

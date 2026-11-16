@@ -359,6 +359,7 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -5736,6 +5737,7 @@ try {
               excludeRoutineRunEvents: true,
               excludeHostedSiteEvents: true,
               excludeRoutineQuietAnswers: true,
+              excludeSettingLinks: true,
             },
           ],
         ]),
@@ -5842,6 +5844,42 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Setting cards (setting-link-markers-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises setting-link-markers-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The database leaves the setting cards out of a page for a client that cannot show them.
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=setting-card`;
+    const pageExclusions = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeSettingLinks" in options
+        ? options.excludeSettingLinks
+        : undefined;
+    };
+    const withCards = await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SETTING_LINK_MARKERS_CAPABILITY],
+    });
+    const withCardsExcluded = pageExclusions();
+    const withoutCards = await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const withoutCardsExcluded = pageExclusions();
+    check(
+      "a conversation page keeps the setting cards only for a client with setting-link-markers-v1",
+      withCards.status === 200 &&
+        withCardsExcluded === false &&
+        withoutCards.status === 200 &&
+        withoutCardsExcluded === true,
+      [summary(withCards), withCardsExcluded, summary(withoutCards), withoutCardsExcluded],
     );
   }
 
