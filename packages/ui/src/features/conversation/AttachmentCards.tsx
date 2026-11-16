@@ -27,11 +27,14 @@ export interface AttachmentMediaSource {
   url(attachmentId: string): string | undefined;
   /**
    * Loads the file for inline display. Resolves false when it cannot show inline. An image loads up to
-   * `thumbnailLimit`, or up to `mediaLimit` with `"media"`: the image that the user asked an agent to make.
+   * `thumbnailLimit`, or up to `generatedImageLimit` with `"generated"`: the image that the user asked an
+   * agent to make.
    */
-  load(attachment: AttachmentSummary, limit?: "thumbnail" | "media"): Promise<boolean>;
+  load(attachment: AttachmentSummary, limit?: "thumbnail" | "generated"): Promise<boolean>;
   /** An image up to this size loads when its card shows. */
   thumbnailLimit: number;
+  /** A generated image up to this size loads when its message shows. */
+  generatedImageLimit: number;
   /** Audio or video up to this size loads on a click. Above it, the card offers only the download. */
   mediaLimit: number;
 }
