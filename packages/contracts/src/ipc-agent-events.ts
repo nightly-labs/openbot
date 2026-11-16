@@ -63,6 +63,7 @@ export interface AgentTurnCompletedEvent {
   origin?: AgentTurnOrigin;
   quiet?: true;
   continues?: true;
+  answersAgent?: boolean;
 }
 
 export type AgentEvent =
@@ -327,7 +328,8 @@ export function isAgentEvent(value: unknown): value is AgentEvent {
         isString(value.turnId) &&
         (value.origin === undefined || isAgentTurnOrigin(value.origin)) &&
         (value.quiet === undefined || value.quiet === true) &&
-        (value.continues === undefined || value.continues === true)
+        (value.continues === undefined || value.continues === true) &&
+        (value.answersAgent === undefined || typeof value.answersAgent === "boolean")
       );
     case "prompt":
       return (

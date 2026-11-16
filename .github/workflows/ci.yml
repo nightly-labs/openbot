@@ -423,6 +423,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:thread-notifications
 
+      - name: Run the teammate turn notification E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:teammate-turn-notifications
+
       - name: Run the routine pause and resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:routine-pause-resume
@@ -820,6 +824,7 @@ jobs:
             .openbot-build/computer-activity-e2e/
             .openbot-build/notification-summary-e2e/
             .openbot-build/thread-notifications-e2e/
+            .openbot-build/teammate-turn-notifications-e2e/
             .openbot-build/routine-pause-resume-e2e/
             .openbot-build/routine-timezone-move-e2e/
             .openbot-build/routine-overnight-window-e2e/

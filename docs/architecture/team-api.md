@@ -564,6 +564,14 @@ released status routes carry no source, so the desktop remote branch and the web
 put the source on its status row. A client that fails to read it shows no source.
 `src/main/team-api/route-agents.ts` owns it.
 
+The optional `teammate-result-turn-v1` capability (protocol 10 only) adds the event
+`teammate-result-turn-completed`, with the fields of the released `turn-completed` but `origin`. The host
+sends it in place of `turn-completed` for a completed turn that a teammate's message started and whose
+result is for the user, such as an agent's answer with its teammates' results. A turn that continues
+its plan gets the released event, because the event has no `continues` field. Clients keep a turn
+that a teammate's message started quiet, so without the capability that answer shows no notification
+(see [agents](agents.md)).
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are

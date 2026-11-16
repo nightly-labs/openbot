@@ -2332,14 +2332,8 @@ export class MailboxStore {
   }
 
   routineDeliveryOfRequest(agentId: string, requestMessageId: string): DeliveryContext | null {
-    const request = this.#state.messages.find((message) => message.id === requestMessageId);
-    if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return null;
-    const turnId = this.#sourceTurnIds().get(request.id);
-    if (!turnId) return null;
-    const delivery = this.#state.deliveries.find(
+    const delivery = this.#sourceTurnDeliveries(agentId, requestMessageId).find(
       (candidate) =>
-        candidate.recipientAgentId === agentId &&
-        (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true) &&
         this.#state.messages.find((message) => message.id === candidate.messageId)?.sender.kind === "routine",
     );
     return delivery ? this.#context(delivery) : null;
@@ -2407,6 +2401,42 @@ export class MailboxStore {
     }
     read.sort((first, second) => second.createdAt.localeCompare(first.createdAt));
     return { turnIds: [...read.map((entry) => entry.turnId), start.turnId], waiting };
+  }
+
+  passedAnswerOn(agentId: string, requestMessageId: string, turnId: string): boolean {
+    const asked = new Set(
+      this.#sourceTurnDeliveries(agentId, requestMessageId).flatMap((delivery) => {
+        const message = this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
+        return message?.sender.kind === "agent" &&
+          message.sender.agentId !== agentId &&
+          message.expectsReply !== false &&
+          message.replyToMessageId === null
+          ? [message.id]
+          : [];
+      }),
+    );
+    if (asked.size === 0) return false;
+    const turnIds = this.#sourceTurnIds();
+    return this.#state.messages.some(
+      (message) =>
+        message.sender.kind === "agent" &&
+        message.sender.agentId === agentId &&
+        message.replyToMessageId !== null &&
+        asked.has(message.replyToMessageId) &&
+        turnIds.get(message.id) === turnId,
+    );
+  }
+
+  #sourceTurnDeliveries(agentId: string, requestMessageId: string): StoredDelivery[] {
+    const request = this.#state.messages.find((message) => message.id === requestMessageId);
+    if (request?.sender.kind !== "agent" || request.sender.agentId !== agentId) return [];
+    const turnId = this.#sourceTurnIds().get(request.id);
+    if (!turnId) return [];
+    return this.#state.deliveries.filter(
+      (candidate) =>
+        candidate.recipientAgentId === agentId &&
+        (candidate.turnId === turnId || candidate.resumeAfterUsageLimit?.previousTurnIds.includes(turnId) === true),
+    );
   }
 
   markStarting = Effect.fn("MailboxStore.markStarting")(function* (
