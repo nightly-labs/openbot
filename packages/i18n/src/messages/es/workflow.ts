@@ -526,7 +526,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} eliminado",
   "workflow.canvas.deleteUndo.action": "Deshacer",
   "workflow.page.failed": "OpenBot no pudo hacerlo. Inténtalo de nuevo.",
-  "workflow.page.conflict": "Cambiado en otro dispositivo. Deshaz para recuperar tus cambios.",
   "workflow.page.needsNewerApp":
     "Este flujo de trabajo tiene pasos de una versión más reciente de OpenBot. Actualiza OpenBot para cambiarlo.",
   "workflow.page.manageOnly":

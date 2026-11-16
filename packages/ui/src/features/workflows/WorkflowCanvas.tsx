@@ -152,6 +152,7 @@ import {
   union,
 } from "./workflow-ink";
 import { workflowLoops } from "./workflow-loops";
+import { mergeWorkflowGraphs } from "./workflow-merge";
 import type { WorkflowCatalogs, WorkflowFeatures } from "./workflow-model";
 import {
   BLOCK_RESIZE,
@@ -179,11 +180,14 @@ import { activeRun, indexRunView, isOpenRun, type WorkflowRunView } from "./work
 import { DrawArt, ShapesArt, StickyArt } from "./workflow-tool-art";
 
 export interface WorkflowCanvasProps {
-  /** The open workflow. The canvas reads its graph only when it opens, or when `resetKey` changes. */
+  /**
+   * The open workflow. The canvas loads its graph when it opens, or when `resetKey` changes. A newer
+   * graph of the same workflow, from another device or an agent, merges into the canvas edits.
+   */
   workflow: WorkflowDetail;
   /**
-   * A new value loads `workflow.graph` again, as after a restore or a change from another device. Undo
-   * then puts back the canvas from before. A save of the changes of this canvas must not change it.
+   * A new value loads `workflow.graph` again in place of the canvas edits, as after a restore. Undo then
+   * puts back the canvas from before. A save of the changes of this canvas must not change it.
    */
   resetKey?: number | undefined;
   runs: WorkflowRunView;
@@ -563,7 +567,14 @@ const fillMenu = (t: AppTranslate): readonly PickerGroup<CanvasColor>[] => [
 ];
 
 /** A graph as the canvas saves it, so a graph from the host and the same graph from the canvas compare equal. */
-const savedJson = (graph: WorkflowGraph) => stableJson(graphFromSnapshot(snapshotFromGraph(graph)));
+const asSaved = (graph: WorkflowGraph) => graphFromSnapshot(snapshotFromGraph(graph));
+const savedJson = (graph: WorkflowGraph) => stableJson(asSaved(graph));
+
+/**
+ * The saves that the canvas remembers until the host sends them back. The canvas sends each change, and
+ * the host saves only the last one before the pause, so many changes can come before an echo.
+ */
+const SENT_LIMIT = 200;
 
 /**
  * The workflow canvas.
@@ -1069,17 +1080,25 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
     },
   );
   onCleanup(() => cancelAnimationFrame(snapFrame));
-  /** The graph that the host has, as the canvas saves it. */
+  /** The last graph that the canvas sent to the host, or that the host sent, as the canvas saves it. */
   let savedGraph = untrack(() => savedJson(props.workflow.graph));
+  /** The graph of the host that the canvas edits are on. A newer graph of the host merges with it. */
+  let baseGraph = untrack(() => asSaved(props.workflow.graph));
+  let baseJson = savedGraph;
+  /** The saves that the host did not send back yet, so that their echo does not merge as another edit. */
+  let sent: string[] = [];
+  const send = (next: WorkflowGraph) => {
+    const json = stableJson(next);
+    if (json === savedGraph) return;
+    savedGraph = json;
+    sent = [...sent, json].slice(-SENT_LIMIT);
+    // The host reads its own state in the callback. That read must not track.
+    untrack(() => props.onGraphChange(next));
+  };
   createEffect(
     () => (frozen() || deleted() ? undefined : graph()),
     (next) => {
-      if (!next) return;
-      const json = stableJson(next);
-      if (json === savedGraph) return;
-      savedGraph = json;
-      // The host reads its own state in the callback. That read must not track.
-      untrack(() => props.onGraphChange(next));
+      if (next) send(next);
     },
   );
 
@@ -1090,7 +1109,10 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   const reset = (next: WorkflowGraph, same: boolean) => {
     const before = same ? (liveCanvas ?? capture()) : undefined;
     const snapshot = snapshotFromGraph(next);
-    savedGraph = savedJson(next);
+    baseGraph = graphFromSnapshot(snapshot);
+    savedGraph = stableJson(baseGraph);
+    baseJson = savedGraph;
+    sent = [];
     liveCanvas = undefined;
     scheduleEdit = undefined;
     canvas.endTyping();
@@ -1116,12 +1138,96 @@ export function WorkflowCanvas(props: WorkflowCanvasProps) {
   // what its compute function reads, even when the value is the same.
   const resetToken = createMemo(() => `${props.workflow.summary.id}\u0000${props.resetKey ?? ""}`);
   let openedId: string | undefined;
-  createEffect(resetToken, () => {
+  /** The reset token of the graph in `baseGraph`. A graph with another token waits for its reset. */
+  let baseToken: string | undefined;
+  createEffect(resetToken, (token) => {
     const id = untrack(() => props.workflow.summary.id);
     const before = openedId;
     openedId = id;
+    baseToken = token;
     if (before !== undefined) untrack(() => reset(props.workflow.graph, before === id));
   });
+
+  /** Puts a merged graph on the canvas, and writes only what changed: typing, a drag and the view stay. */
+  const mergeIn = (merged: WorkflowGraph) => {
+    const snapshot = snapshotFromGraph(merged);
+    const ids = new Set(snapshot.nodes.map((node) => node.id));
+    // The same item objects, so that a node that did not change does not mount again.
+    const known = new Map(nodes().map((node) => [node.id, node]));
+    const items = snapshot.nodes.map((item) => {
+      const old = known.get(item.id);
+      return old && stableJson(old) === stableJson(item) ? old : item;
+    });
+    const later = nodes().filter((node) => !ids.has(node.id));
+    const next = [...items, ...later];
+    if (next.some((node, index) => nodes()[index] !== node) || next.length !== nodes().length) setNodes(next);
+    setPositions((draft) => {
+      for (const id of Object.keys(draft)) if (!(id in snapshot.positions)) delete draft[id];
+      for (const [id, at] of Object.entries(snapshot.positions)) {
+        if (draft[id]?.x !== at.x || draft[id]?.y !== at.y) draft[id] = { ...at };
+      }
+    });
+    setSizes((draft) => {
+      for (const id of Object.keys(draft)) if (!(id in snapshot.sizes)) delete draft[id];
+      for (const [id, size] of Object.entries(snapshot.sizes)) {
+        if (stableJson(draft[id]) !== stableJson(size)) draft[id] = { ...size };
+      }
+    });
+    canvas.sync({ ...snapshot.board, removed: later.map((node) => node.id) });
+    const drawn = new Map(strokes().map((stroke) => [stroke.id, stroke]));
+    const lines = snapshot.strokes.map((stroke) => {
+      const old = drawn.get(stroke.id);
+      return old && stableJson(old) === stableJson(stroke) ? old : stroke;
+    });
+    if (lines.length !== strokes().length || lines.some((stroke, index) => strokes()[index] !== stroke)) {
+      setStrokes(lines);
+    }
+  };
+  /**
+   * Takes a newer graph of the host for the open workflow. The echo of a save of this canvas only moves
+   * the base. Another edit merges with the canvas edits, and with each snapshot of undo and redo, so
+   * undo takes back only the edits of this device. The merged graph then saves, as the host does not
+   * have the edits of this canvas yet.
+   */
+  const takeHostGraph = (incoming: WorkflowGraph) => {
+    const theirs = asSaved(incoming);
+    const json = stableJson(theirs);
+    if (json === baseJson) return;
+    const before = baseGraph;
+    baseGraph = theirs;
+    baseJson = json;
+    savedGraph = json;
+    const echo = sent.indexOf(json);
+    if (echo !== -1) {
+      // The later saves are still on their way, so the canvas compares with the last of them.
+      sent = sent.slice(echo + 1);
+      savedGraph = sent.at(-1) ?? json;
+      return;
+    }
+    sent = [];
+    const rebase = (snapshot: CanvasSnapshot): CanvasSnapshot => {
+      const graphOf = mergeWorkflowGraphs(before, graphFromSnapshot(snapshot), theirs);
+      const next = snapshotFromGraph(graphOf);
+      const ids = new Set(graphOf.nodes.map((node) => node.id));
+      return { ...next, board: { ...next.board, selection: snapshot.board.selection.filter((id) => ids.has(id)) } };
+    };
+    edits.rebase(rebase);
+    if (liveCanvas) {
+      liveCanvas = rebase(liveCanvas);
+      return;
+    }
+    const merged = asSaved(mergeWorkflowGraphs(before, graphFromSnapshot(capture()), theirs));
+    mergeIn(merged);
+    // The canvas reads its stores again only after the flush, so the save takes the merged graph, not
+    // `capture()`. A drag sends its graph when it ends.
+    if (!frozen() && !deleted() && !gesturing()) send(merged);
+  };
+  createEffect(
+    () => [resetToken(), props.workflow.graph] as const,
+    ([token, incoming]) => {
+      if (token === baseToken) untrack(() => takeHostGraph(incoming));
+    },
+  );
   // The host opens another workflow when a delete is kept, so the canvas shows again. A switch while
   // the Undo toast is open keeps that delete.
   const workflowId = createMemo(() => props.workflow.summary.id);
