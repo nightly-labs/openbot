@@ -731,7 +731,7 @@
 .routine-planner-add.ui-button {
   position: absolute;
   top: var(--openbot-space-1-5);
-  right: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
   opacity: 0;
 }
 
@@ -781,7 +781,8 @@
 }
 
 .routine-planner-create-when h3 {
-  margin: 0 0 6px 8px;
+  margin: 0 0 6px;
+  margin-inline-start: 8px;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
   font-weight: var(--openbot-weight-medium);
@@ -794,7 +795,7 @@
 }
 
 .routine-planner-create-agent .tasks-page-agent-chevron {
-  margin-left: auto;
+  margin-inline-start: auto;
 }
 
 .routine-planner-create-actions {
