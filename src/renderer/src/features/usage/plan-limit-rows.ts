@@ -28,7 +28,12 @@ export function usePlanLimitRows() {
     const held = usageLimitedModels().filter((limit) => {
       const account = limit.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
       const spent = spentUsageWindow(usage?.limits, limit.provider, account, limit.model, now);
-      return !(spent?.covers && !spent.onCredits);
+      // The ring shows only the reading's own windows, not a quota group such as Antigravity's
+      // "Claude and GPT models", so a spent group keeps the model line.
+      const ownWindow = usage?.limits.some(
+        (reading) => reading.primary === spent?.window || reading.secondary === spent?.window,
+      );
+      return !(spent?.covers && !spent.onCredits && ownWindow);
     });
     if (held.length === 0) return rows;
     const limits = usageLimits();
