@@ -444,9 +444,9 @@ export class DrainScheduler {
   taskHold(agentId: string, taskId: string): string | null {
     const lane = { agentId, taskId };
     if (!this.#mailbox.nextQueued(agentId, taskId)) return null;
-    return (
-      this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (this.#slotWaiters.has(laneKey(lane)) ? "machine" : null)
-    );
+    // In the order of the drain. `#heldByMachine` is not called here: it records the lane as waiting.
+    const heldByMachine = !this.#memory.mayDrain(agentId) || this.#slotWaiters.has(laneKey(lane));
+    return this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (heldByMachine ? "machine" : null);
   }
 
   /**
