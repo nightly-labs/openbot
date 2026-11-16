@@ -28,6 +28,8 @@ export const messages = defineMessages("error.connector", {
     "OpenBot could not install the 1Password CLI. Check the connection to the internet, then try again.",
   "error.connector.onePasswordCliSignedOut":
     "The 1Password CLI is not signed in. Turn on its integration in the 1Password app, then connect again.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot cannot reach the 1Password app. Open 1Password and unlock it. In Settings > Developer, make sure that “Integrate with 1Password CLI” is on. Then try again.",
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
