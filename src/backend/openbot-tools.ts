@@ -24,7 +24,11 @@ import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchem
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
 import { readImageToolShape } from "./agent/image-reader";
-import { libraryFolderArgument, listLibraryFoldersToolSchema } from "./agent/library-folder-tools";
+import {
+  libraryFolderArgument,
+  listLibraryFoldersToolSchema,
+  organizeLibraryToolSchema,
+} from "./agent/library-folder-tools";
 import { MCP_SERVER_TOOL_DEFINITIONS } from "./agent/mcp-tools";
 import { MEMORY_RECALL_TOOL_DEFINITIONS } from "./agent/memory-tool-inputs";
 import {
@@ -319,8 +323,14 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_library_folders",
     description:
-      "List your Library folders by path, with the id, name and stored path of each file in them, and the count of your files in no folder. Pass folder to list one folder and the folders in it. To put a file in a folder, pass folder to attach_files_to_response.",
+      "List your Library folders by path, with the id, name and stored path of each file in them, and your files in no folder. Pass folder to list one folder and the folders in it. Change folders and move files with organize_library.",
     shape: listLibraryFoldersToolSchema.shape,
+  },
+  {
+    name: "organize_library",
+    description:
+      'Organize your Library folders and the files in them, by the folder paths and file ids that list_library_folders gives, such as "Reports/2026". action create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder, with the folders in it, into to; omit to for the top level. delete removes folder and the folders in it; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; omit to to take them out of their folders. No action moves, copies or deletes a file on disk. Do not delete or rename a folder that the user did not ask you to change.',
+    shape: organizeLibraryToolSchema.shape,
   },
   {
     name: "html_preview",

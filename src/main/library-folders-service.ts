@@ -5,12 +5,13 @@
 
 import type { LibraryFolderAction, LibraryFolderContext, LibraryFoldersSnapshot } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
+import type { AgentLibraryFolders } from "../backend/agent/library-folder-tools";
 import type { LibraryFoldersStore } from "../backend/library-folders-store";
 import type { StorageUsageService } from "../backend/storage-usage";
 import { storedSync } from "../backend/stored-state-effects";
 
 export interface LibraryFoldersSources {
-  store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "removeAgent" | "removeFiles">;
+  store: Pick<LibraryFoldersStore, "getSnapshot" | "mutate" | "placeInPath" | "removeAgent" | "removeFiles">;
   /**
    * The Library shows the files of the host scan, each below the agent that the scan gives it. A
    * folder change must use the same agent, so it reads the same scan.
@@ -124,7 +125,8 @@ export class LibraryFoldersService {
   ) {
     const snapshot = this.#sources.store.getSnapshot();
     const targets = actionTargets(action, snapshot);
-    const fileAgents = yield* this.#fileAgents(targets.fileIds);
+    const fileAgents =
+      targets.fileIds.length === 0 ? new Map<string, string | null>() : yield* this.fileAgents(targets.fileIds);
     const agentIds = new Set(this.#sources.agents().map((agent) => agent.id));
     if (authorize) {
       const agents = actionAgents(targets, snapshot, fileAgents, agentIds);
@@ -148,15 +150,28 @@ export class LibraryFoldersService {
   }
 
   /**
+   * The folders for the agent tools of this host: the same store, and the agent of each file from the
+   * same scan, so an agent can organize each file that the Library shows under it.
+   */
+  forAgents(): AgentLibraryFolders {
+    const store = this.#sources.store;
+    return {
+      getSnapshot: () => store.getSnapshot(),
+      placeInPath: (agentId, names, fileIds, context) => store.placeInPath(agentId, names, fileIds, context),
+      mutate: (action, context) => store.mutate(action, context),
+      fileAgents: (fileIds) => this.fileAgents(fileIds),
+    };
+  }
+
+  /**
    * The agent of each file that the host scan lists. The scan result is kept for a short time, so a
    * file that an agent attached after it is not there: one new scan then finds it before the store
    * refuses the file as unknown.
    */
-  readonly #fileAgents = Effect.fn("LibraryFolders.fileAgents")(function* (
+  readonly fileAgents = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
     fileIds: readonly string[],
   ) {
-    if (fileIds.length === 0) return new Map<string, string | null>();
     const scan = () =>
       this.#sources.storage
         .usage({ scope: "host" })
