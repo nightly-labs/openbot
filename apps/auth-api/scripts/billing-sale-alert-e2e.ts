@@ -112,6 +112,17 @@ async function eachPaidInvoiceSendsOneMessage() {
       { suppressBillingAction: true },
     ),
   );
+  await run(
+    sales.webhook(
+      invoice("invoice.paid", "trial", {
+        subscription: "sub_trial",
+        currency: "usd",
+        amount_paid: 0,
+        billing_reason: "subscription_create",
+      }),
+      server,
+    ),
+  );
   check("a webhook sends no message: only the ledger run does", alerts.length === 0, alerts);
 
   await run(sales.processPending());
@@ -120,7 +131,7 @@ async function eachPaidInvoiceSendsOneMessage() {
     alerts.length === 2 && alerts.includes(SERVER_PAID) && alerts.includes(SERVER_FAILED),
     [...alerts],
   );
-  check("an imported payment sends no message, and no fact stays pending", pending() === 0, {
+  check("an imported payment and a $0 trial invoice send no message, and no fact stays pending", pending() === 0, {
     pending: pending(),
   });
 

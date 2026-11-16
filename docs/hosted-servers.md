@@ -1772,8 +1772,8 @@ The product of a license is its number of users, such as `5 users`. The amount i
 payment, the refund or the dispute. An adjustment is a plan change or a manual invoice. The sales
 ledger sends the message (`BillingSales.processPending`, in the cron of each 5 minutes), in the run that
 puts the fact in the OpenPanel ledger, so the message comes at most some minutes after the payment and
-one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` too. An imported payment and a
-checkout step send no message. An account that is gone shows as `an unknown account`.
+one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` too. An imported payment, a $0 paid
+invoice (a trial start or a $0 proration) and a checkout step send no message. An account that is gone shows as `an unknown account`.
 `bun run test:billing-sale-alert` checks the messages. Thus a first purchase sends a `New` message and
 a `Paid` message.
 

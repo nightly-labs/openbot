@@ -940,9 +940,11 @@ export class BillingSales {
         .run(),
     );
     // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
-    // FX lookup, or that two cron runs read, sends one message. An imported payment sends none.
+    // FX lookup, or that two cron runs read, sends one message. An imported payment sends none, and a
+    // $0 invoice (a trial start or a $0 proration) moves no money, so it sends none too.
     const event = SALE_EVENT_TEXT[row.fact_type];
     if (!this.#saleAlert || !event || marked.meta.changes !== 1 || attributes.suppressBillingAction) return;
+    if (row.fact_type === "payment_succeeded" && attributes.amount === 0) return;
     // The fact is ended, so a failed read of the email must not fail the run.
     const account = row.user_id
       ? yield* d1(this.#database, () =>
