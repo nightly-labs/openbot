@@ -21,6 +21,7 @@ import {
   mcpSignInEvent,
   modelSwitchReason,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
   settingLinkEvent,
@@ -219,10 +220,33 @@ export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListI
 
 const PLAN_TITLE_LIMIT = 80;
 
-/** The header of a plan block: a short explanation, else "Tasks", or "Stopped" for a stopped plan. */
-export function planTitle(plan: AgentMessagePlan): string {
+/**
+ * The plan rows that a later turn of the same agent replaced (`replacedConversationPlans`). Only the
+ * agent's own output counts: not an exchange with a teammate, a routine or event marker, or the
+ * memory changes, which are system rows.
+ */
+export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<string> {
+  return replacedConversationPlans(
+    messages.map((message) => ({
+      id: message.id,
+      turnId: message.turnId,
+      agent:
+        message.author === "agent" && !message.exchange && !message.actionMarker && message.kind !== "memory-changes"
+          ? (message.senderAgentId ?? "")
+          : null,
+      plan: message.kind === "plan",
+    })),
+  );
+}
+
+/**
+ * The header of a plan block: a short explanation, else "Tasks", or "Stopped" for a stopped plan
+ * that no later turn replaced.
+ */
+export function planTitle(plan: AgentMessagePlan, replaced: boolean): string {
   const { t } = currentText();
-  if (plan.stopped && plan.steps.some((step) => step.status !== "completed")) return t("chat.taskList.stopped");
+  if (plan.stopped && !replaced && plan.steps.some((step) => step.status !== "completed"))
+    return t("chat.taskList.stopped");
   if (plan.explanation && plan.explanation.length <= PLAN_TITLE_LIMIT) return plan.explanation;
   return t("chat.taskList.title");
 }
