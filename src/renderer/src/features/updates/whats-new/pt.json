@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Atualize também para esta versão cada servidor em que você entrou. Em um servidor, o CRM, Adicionar conta com código, um fundo que um agente define, pastas da Biblioteca que os agentes organizam e mensagens para um turno em andamento do Devin funcionam só quando o servidor tem esta versão."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Reproduza um fundo animado atrás de toda a janela. Escolha uma cena, como Lago de carpas ou Vaga-lumes, em Configurações → Fundo da janela, ou peça a um agente que crie uma para você.",
+          "Mantenha leads, clientes e pagamentos na nova página do CRM. Ela é experimental: um proprietário ou administrador a ativa em Configurações do servidor → Experimental. Ela pode importar do Stripe, e os agentes propõem mudanças que um proprietário ou administrador aprova.",
+          "Responda a um agente no chat do Dock de agentes. Permita ou negue um comando, responda a uma pergunta ou conclua uma etapa do navegador sem a janela principal.",
+          "Organize a Biblioteca com blocos de pastas, Favoritos, Recentes e Desfazer. Arraste arquivos para Nova pasta para criar uma pasta, ou peça a um agente que organize as pastas dele.",
+          "Adicione uma conta ChatGPT (Codex), Grok ou Claude com um código. Abra o menu ao lado de Adicionar conta e selecione Adicionar conta com código.",
+          "Uma mensagem que você envia enquanto um agente Devin ou OpenCode trabalha entra no turno em andamento. Isso exige o Devin CLI 3000.12.57 ou o OpenCode 2.3.0, ou posterior."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "As configurações têm um novo layout. As seções ficam em grupos com nome, e as Configurações do servidor têm novas seções Memória e Padrões dos agentes. No macOS, o OpenBot usa a fonte do sistema.",
+          "Adicione e edite servidores MCP personalizados em Loja → Apps. As Configurações do servidor não têm mais uma seção MCP.",
+          "Em um chat com um agente, os seus balões agora assumem a cor do avatar do agente. Altere isso em Configurações → Aparência → Seus balões.",
+          "Uma conversa por voz não abre mais o painel lateral. Uma pequena barra no topo do chat mostra os controles de voz."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Um chat que perde a sessão salva, ou fica grande demais, não fica mais quebrado. O agente inicia uma nova sessão com o histórico do chat e responde à sua mensagem.",
+          "Mais agentes passam para o modelo de reserva quando um limite de uso ou um erro do provedor interrompe um turno, incluindo agentes Grok, Hermes e Claude.",
+          "Os agentes podem usar um login salvo em mais lugares, como um formulário de login em um quadro.",
+          "Uma rotina continua ativa após uma execução com falha, e uma execução agendada enquanto o provedor não consegue iniciar roda depois.",
+          "O OpenBot usa menos CPU e bateria: vídeos no chat e em abas ocultas do navegador pausam quando você não consegue vê-los."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [
