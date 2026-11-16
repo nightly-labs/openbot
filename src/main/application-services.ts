@@ -2442,6 +2442,8 @@ export async function createApplicationServices({
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
     crm: () => crmHandle,
+    // `host` is built later, after the agent service; a CRM tool reads it when it runs.
+    crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,

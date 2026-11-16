@@ -2235,6 +2235,18 @@ export class HostService extends EventEmitter<HostEvents> {
   }
 
   /**
+   * Whether an active member who is not an owner or admin can see `agentId`. Such a member reads the
+   * agent's chat and can add a routine to it, so the CRM tools refuse the agent.
+   */
+  agentVisibleToMembers(agentId: string): boolean {
+    return this.#options.store
+      .listMembers()
+      .some(
+        (member) => member.role === "member" && !member.disabled && this.#api.agentLevel(member, agentId) !== "none",
+      );
+  }
+
+  /**
    * Whether `personId`, who wrote a channel request, is someone other than this computer's user: a
    * team member, whose app has only what the Team API gives it.
    */

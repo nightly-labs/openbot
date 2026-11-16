@@ -7,7 +7,8 @@
   export the sheet to CSV.
 - Agents can read the CRM and propose changes, such as a new customer or a paid payment. An owner or
   admin selects which agents may do this, and approves or rejects each proposal in Review. Agents
-  never change the CRM directly, and they do not see the fields that you hide from agents.
+  never change the CRM directly, and they do not see the fields that you hide from agents. An agent
+  that team members can see cannot use the CRM: set it to No access for Everyone and each role.
 - Connect Stripe to the CRM with a read-only restricted key: click Connectors on the CRM page, or
   right-click CRM in the rail and select Connectors. Create key in Stripe opens a key with only the
   Read access that OpenBot needs. Every 5 minutes, and when you click

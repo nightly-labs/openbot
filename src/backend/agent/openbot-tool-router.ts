@@ -515,6 +515,8 @@ export interface OpenBotToolRouterOptions {
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
   /** The CRM, for the `crm_*` tools; null where this process has none. */
   crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent. Without it, the CRM tools refuse every agent. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -574,6 +576,7 @@ export class OpenBotToolRouter {
   readonly #serverClaims: AgentServerClaims | null;
   readonly #browserProfiles: () => AgentBrowserProfiles | null;
   readonly #crm: () => CrmHandle | null;
+  readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -634,6 +637,7 @@ export class OpenBotToolRouter {
     this.#serverClaims = options.serverClaims ?? null;
     this.#browserProfiles = options.browserProfiles ?? (() => null);
     this.#crm = options.crm ?? (() => null);
+    this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -2248,6 +2252,11 @@ export class OpenBotToolRouter {
       // The Team API gives the CRM to owners and admins only, so a member's message does not reach it here.
       if (this.#fromRemoteMember(senderAgentId, params.turnId))
         return openBotToolFailure("A team member's message cannot use the CRM. Ask the member to use the CRM page.");
+      // A member who can see the agent reads its chat and can add a routine to it.
+      if (this.#crmAgentVisibleToMembers(senderAgentId))
+        return openBotToolFailure(
+          "Team members can see this agent, so it cannot use the CRM. Ask an owner or admin to set this agent to No access for Everyone and for each role, in the server's Roles settings.",
+        );
       // People who are not owners or admins read the replies in an external chat or a channel.
       if (
         this.#messaging.store.linkForThread(executionThreadId) ||

@@ -655,6 +655,50 @@ try {
     return { owner: owner.types.filter((type) => type === "crm-changed").length, member: member.types };
   });
 
+  await step("overview: many long proposals are cut to fit one frame, and the rest come back", async () => {
+    // An agent keeps at most 50 pending proposals. Eight full agents make 400 of about 5 KB each,
+    // which do not fit one WebRTC frame.
+    const agentIds: string[] = [];
+    for (let index = 0; index < 8; index++) {
+      const agent = await runCauseEffect(
+        current().agents.createAgentProfile({
+          name: `Clerk ${index}`,
+          description: "Clerk",
+          avatarSeed: `clerk-${index}`,
+          avatarHue: null,
+        }),
+      );
+      agentIds.push(agent.id);
+    }
+    await applied(ownerToken, { kind: "private-fields", fields: [] });
+    await applied(ownerToken, { kind: "agent-access", agentIds });
+    const ids: string[] = [];
+    for (const [number, agentId] of agentIds.entries())
+      for (let index = 0; index < 50; index++) {
+        const proposal = await Effect.runPromise(
+          current().crm.agentPropose(agentId, {
+            change: {
+              kind: "customer-update",
+              customerId,
+              patch: { notes: `${number}-${index} `.padEnd(4_000, "n") },
+            },
+            reason: "r".repeat(1_000),
+            threadId: null,
+          }),
+        );
+        ids.push(proposal.proposalId);
+      }
+    const first = await wire(CRM_ROUTES.overview, ownerToken, {});
+    assert.equal(first.status, 200, JSON.stringify(first.body).slice(0, 300));
+    const shown = decodeRemoteCrmOverview(first.body).proposals.length;
+    assert.ok(shown > 0 && shown < ids.length, `The overview showed ${shown} of ${ids.length} proposals.`);
+    for (const proposal of decodeRemoteCrmOverview(first.body).proposals)
+      await applied(ownerToken, { kind: "proposal-decide", proposalId: proposal.id, approve: false });
+    const next = await ok(CRM_ROUTES.overview, ownerToken, {}, decodeRemoteCrmOverview);
+    assert.ok(next.proposals.length > 0, "The cut proposals did not come back.");
+    return { proposals: ids.length, shown, next: next.proposals.length };
+  });
+
   report.passed = true;
 } finally {
   for (const socket of sockets) socket.close();

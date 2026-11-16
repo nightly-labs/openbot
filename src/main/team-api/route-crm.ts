@@ -1,4 +1,4 @@
-import type { CrmActor, CrmCustomerPage } from "@openbot/contracts/ipc";
+import type { CrmActor, CrmCustomerPage, CrmOverview } from "@openbot/contracts/ipc";
 import { CRM_CAPABILITY, CRM_ROUTES } from "@openbot/contracts/team-protocol/crm-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -44,23 +44,35 @@ function bytesOf(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value));
 }
 
+/** The list, cut at the end while `bytes` would not fit one WebRTC frame. One item always stays. */
+function cutToFrame<T>(items: readonly T[], bytes: number): T[] {
+  const kept = [...items];
+  while (kept.length > 1 && bytes > WEBRTC_FRAME_BODY_BUDGET) bytes -= bytesOf(kept.pop()) + 1;
+  return kept;
+}
+
 /**
  * The page, cut at the end while it would not fit one WebRTC frame. The customers' notes can make a
  * full page too large; the cut page names its last customer as the next cursor, so the client reads
  * the rest on the next page.
  */
 function fittedCustomers(page: CrmCustomerPage): CrmCustomerPage {
-  if (bytesOf(page) <= WEBRTC_FRAME_BODY_BUDGET) return page;
-  const customers = [...page.customers];
-  let bytes = bytesOf(page);
-  while (customers.length > 1 && bytes > WEBRTC_FRAME_BODY_BUDGET) {
-    const removed = customers.pop();
-    bytes -= bytesOf(removed) + 1;
-  }
+  const bytes = bytesOf(page);
+  if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return page;
+  const customers = cutToFrame(page.customers, bytes);
   const last = customers.at(-1);
-  const result = { customers, next: last ? last.number : page.next };
-  if (bytesOf(result) > WEBRTC_FRAME_BODY_BUDGET) throw new HttpError(413, sourceText("error.crm.tooLargeToSend"));
-  return result;
+  return fitted({ customers, next: last ? last.number : page.next });
+}
+
+/**
+ * The overview, with the pending proposals cut at the end while it would not fit one WebRTC frame.
+ * Agents can make up to 500 proposals with long notes. The cut proposals come back in a later
+ * overview, after the owner decides the ones shown.
+ */
+function fittedOverview(overview: CrmOverview): CrmOverview {
+  const bytes = bytesOf(overview);
+  if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return overview;
+  return fitted({ ...overview, proposals: cutToFrame(overview.proposals, bytes) });
 }
 
 function fitted<A>(value: A): A {
@@ -88,7 +100,7 @@ export async function routeCrm(context: TeamApiRequestContext, crm: TeamApiCrm |
   };
   switch (path) {
     case CRM_ROUTES.overview:
-      return json(200, fitted(await run(crm.overview())));
+      return json(200, fittedOverview(await run(crm.overview())));
     case CRM_ROUTES.customers:
       return json(200, fittedCustomers(await run(crm.customers(parse(parseCrmCustomerPage, body)))));
     case CRM_ROUTES.payments:
