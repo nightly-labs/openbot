@@ -786,7 +786,10 @@ enable the plugin. It can offer to create a specialist teammate, but it creates 
 An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
 description to 300 characters (`read_agent` returns all of it), its
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
-(channel work excluded), `turnStartedAt`, and `lastActivityAt`. The last two come from the provider
+(channel work excluded), `turnStartedAt`, `waitingFor`, and `lastActivityAt`. A turn that waits for
+a person's approval, answer or browser takeover stays open, so its agent stays `working`;
+`waitingFor` names what it waits for, from `AttentionRegistry.waitsFor`. A detached question holds
+no turn, so it does not count. `turnStartedAt` and `lastActivityAt` come from the provider
 notifications that `TurnLifecycle` sees; they are in memory only, so after a restart
 `lastActivityAt` falls back to the newest message for the agent. OpenBot does not record which
 files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)
