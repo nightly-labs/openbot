@@ -1461,7 +1461,11 @@ const fakeAgents: TeamApiAgents = {
   },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
-  setMessageReaction: unused("setMessageReaction"),
+  setMessageReaction: (input, sender) =>
+    Effect.sync(() => {
+      record("setMessageReaction", input, sender);
+      return undefined;
+    }),
   // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
   // running turn, as the agent service answers them.
   deleteConversationMessage: (input, access) => {
@@ -10813,6 +10817,30 @@ try {
           ],
         ]),
       { status: update.status, calls: callsOf("updateQueuedMessage") },
+    );
+    // A reaction on an agent reply is also the member's answer, so the host must know who reacted.
+    const react = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "👍" },
+    });
+    const unreact = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: null },
+    });
+    const badEmoji = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "nope" },
+    });
+    check(
+      "a reaction gives 204 and names the caller as sender, a removal too, and an emoji that is not in the list gets 400",
+      react.status === 204 &&
+        unreact.status === 204 &&
+        badEmoji.status === 400 &&
+        isDeepStrictEqual(callsOf("setMessageReaction"), [
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: "👍" }, bobSender],
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: null }, bobSender],
+        ]),
+      [summary(react), summary(unreact), summary(badEmoji), callsOf("setMessageReaction")],
     );
     const updateTooLong = await call("POST", TEAM_API_ROUTES.agent.queueUpdate("agent-ada"), {
       token: bobToken,

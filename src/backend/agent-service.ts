@@ -6898,9 +6898,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /**
+   * A new emoji on one of the agent's own replies is also the user's answer to that reply, so it is
+   * queued as a reply that quotes the message: the agent continues without a typed answer. A removed
+   * or unchanged reaction sends nothing. `sender` is the person the host saw react.
+   */
   readonly setMessageReaction = Effect.fn("AgentService.setMessageReaction")(function* (
     this: AgentService,
     input: SetMessageReactionInput,
+    sender?: ConversationMessageSender,
   ) {
     const agent = yield* this.#store
       .existing(input.agentId)
@@ -6914,21 +6920,38 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
       if (message) snapshot.messages.push(message);
     }
-    if (!snapshot.messages.some((message) => message.id === input.messageId)) {
+    const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+    if (!message) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
         cause: new Error(sourceText("error.agent.messageUnavailable")),
       });
     }
-    yield* this.#mailbox
-      .setReaction(agent.id, input.messageId, { kind: "user" }, input.emoji)
-      .pipe(
+    const previous = this.#mailbox.reactionFor(agent.id, input.messageId);
+    // A reply that streams, failed or stopped is not one the user can answer yet.
+    const answer =
+      message.author === "assistant" && message.status === "completed" && input.emoji !== previous ? input.emoji : null;
+    const saveReaction = (emoji: SetMessageReactionInput["emoji"]) =>
+      this.#mailbox.setReaction(agent.id, input.messageId, { kind: "user" }, emoji).pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "set message reaction", cause: failure.cause }),
         ),
+        Effect.tap(() =>
+          Effect.sync(() => {
+            this.#mailboxSync.syncMailboxMessages(snapshot);
+            this.#conversation.emitConversation(snapshot);
+          }),
+        ),
       );
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.emitConversation(snapshot);
+    // The check and the save have no wait between them, so the same reaction twice sends one answer.
+    yield* saveReaction(input.emoji);
+    if (!answer) return;
+    // When the answer cannot go, the old reaction comes back, so the user sees the failure and can try again.
+    yield* this.#sendUserMessage(
+      { agentId: agent.id, text: answer, replyToMessageId: input.messageId },
+      sender,
+      undefined,
+    ).pipe(Effect.tapError(() => saveReaction(previous).pipe(Effect.ignore)));
   }, Effect.uninterruptible).bind(this);
 
   /** The channel, task or messaging thread of a delivery, or null for the agent's own chat. */
