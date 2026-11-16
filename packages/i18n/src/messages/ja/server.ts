@@ -343,7 +343,7 @@ export const messages = {
     "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "server.settings.turnLimit": "同時に実行するスレッド",

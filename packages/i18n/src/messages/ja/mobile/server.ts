@@ -447,7 +447,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "この検索に一致するタイムゾーンはありません。",
   "mobile.server.settings.timezoneMore": "他のタイムゾーンを表示するには、名前をもっと入力してください。",
   "mobile.server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "mobile.server.settings.timezoneLoading": "タイムゾーンを読み込んでいます…",
   "mobile.server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "mobile.server.settings.timezoneSaveFailed": "タイムゾーンを保存できませんでした。もう一度お試しください。",

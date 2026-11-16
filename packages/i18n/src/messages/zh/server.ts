@@ -358,7 +358,8 @@ export const messages = {
   "server.settings.agents": "助手",
   "server.settings.agentsDescription": "选择在你未单独设置时，此服务器上的助手可以做什么。",
   "server.settings.timezone": "时区",
-  "server.settings.timezoneDescription": "当消息未提供发送者时区时，新创建的自动化任务使用该时间。",
+  "server.settings.timezoneDescription":
+    "当消息未提供发送者时区时，新创建的自动化任务使用该时间。在服务器上，浏览器也会在下次重启后使用该时区。",
   "server.settings.timezoneAutomatic": "自动（{zone}）",
   "server.settings.timezoneLoadFailed": "无法加载服务器时区。",
   "server.settings.turnLimit": "同时运行的话题数",

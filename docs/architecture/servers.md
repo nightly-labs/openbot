@@ -872,6 +872,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
 | `browser-teach-v1` | Start and stop the recording of a task that a member shows in an agent's browser tab. The steps go only to the session that started it. Protocol 9 only | none: each member, for a tab they can see |
 | `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
+| `feedback-withdraw-v1` | Remove on a feedback thank-you card in an agent's own chat (the owner only, who approves each report). The host takes the report off GitHub with its own OpenBot account, which sent it, and changes the card for every member. Protocol 9 only | `agent.withdrawFeedback` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
@@ -936,6 +937,10 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+On a server, main sets `TZ` to the chosen zone before the app is ready (`applyServerTimezone`),
+because Chromium reads the zone of its pages only when a renderer starts: the agent browser, the
+agent processes and main use it after the next restart (#8935). "Automatic" still shows and uses the
+zone of the computer from before that change.
 
 `host-turn-limits-v1` reads and sets the turn limits of the host (`openbot-host-turn-limits-v1.json`).
 `turnLimit` is the most turns that run at the same time on the host; `null` is automatic: 2, 8 or 16 by

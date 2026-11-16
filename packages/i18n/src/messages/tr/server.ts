@@ -354,7 +354,7 @@ export const messages = {
     "Bir ajan için ayarlamadığınızda bu sunucudaki ajanların neler yapabileceğini seçin.",
   "server.settings.timezone": "Saat dilimi",
   "server.settings.timezoneDescription":
-    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
+    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "server.settings.timezoneAutomatic": "Otomatik ({zone})",
   "server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
   "server.settings.turnLimit": "Aynı anda mesaj dizileri",

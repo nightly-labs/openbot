@@ -349,7 +349,7 @@ export const messages = {
     "Escolha o que os agentes deste servidor podem fazer quando você não define isso para um agente.",
   "server.settings.timezone": "Fuso horário",
   "server.settings.timezoneDescription":
-    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente.",
+    "As novas rotinas usam este fuso horário quando a mensagem não informa o fuso horário do remetente. Em um servidor, o navegador também o usa após a próxima reinicialização.",
   "server.settings.timezoneAutomatic": "Automático ({zone})",
   "server.settings.timezoneLoadFailed": "Não foi possível carregar o fuso horário do servidor.",
   "server.settings.turnLimit": "Tópicos ao mesmo tempo",

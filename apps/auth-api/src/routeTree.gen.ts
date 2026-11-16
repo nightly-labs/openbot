@@ -87,6 +87,7 @@ import { Route as V1AgentTemplatesMineRouteImport } from './routes/v1/agent-temp
 import { Route as V1AuthLogoutRouteImport } from './routes/v1/auth/logout'
 import { Route as V1AvatarsUserIdRouteImport } from './routes/v1/avatars/$userId'
 import { Route as V1FeedbackSimilarRouteImport } from './routes/v1/feedback/similar'
+import { Route as V1FeedbackWithdrawRouteImport } from './routes/v1/feedback/withdraw'
 import { Route as V1GithubInstallationTokensRouteImport } from './routes/v1/github/installation-tokens'
 import { Route as V1MeAnalyticsRouteImport } from './routes/v1/me/analytics'
 import { Route as V1MeAvatarRouteImport } from './routes/v1/me/avatar'
@@ -608,6 +609,11 @@ const V1AvatarsUserIdRoute = V1AvatarsUserIdRouteImport.update({
 const V1FeedbackSimilarRoute = V1FeedbackSimilarRouteImport.update({
   id: '/similar',
   path: '/similar',
+  getParentRoute: () => V1FeedbackRoute,
+} as any)
+const V1FeedbackWithdrawRoute = V1FeedbackWithdrawRouteImport.update({
+  id: '/withdraw',
+  path: '/withdraw',
   getParentRoute: () => V1FeedbackRoute,
 } as any)
 const V1GithubInstallationTokensRoute =
@@ -1408,6 +1414,7 @@ export interface FileRoutesByFullPath {
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
+  '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -1616,6 +1623,7 @@ export interface FileRoutesByTo {
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
+  '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -1829,6 +1837,7 @@ export interface FileRoutesById {
   '/v1/auth/logout': typeof V1AuthLogoutRoute
   '/v1/avatars/$userId': typeof V1AvatarsUserIdRoute
   '/v1/feedback/similar': typeof V1FeedbackSimilarRoute
+  '/v1/feedback/withdraw': typeof V1FeedbackWithdrawRoute
   '/v1/github/installation-tokens': typeof V1GithubInstallationTokensRoute
   '/v1/me/analytics': typeof V1MeAnalyticsRoute
   '/v1/me/avatar': typeof V1MeAvatarRoute
@@ -2039,6 +2048,7 @@ export interface FileRouteTypes {
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
+    | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -2247,6 +2257,7 @@ export interface FileRouteTypes {
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
+    | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -2459,6 +2470,7 @@ export interface FileRouteTypes {
     | '/v1/auth/logout'
     | '/v1/avatars/$userId'
     | '/v1/feedback/similar'
+    | '/v1/feedback/withdraw'
     | '/v1/github/installation-tokens'
     | '/v1/me/analytics'
     | '/v1/me/avatar'
@@ -3313,6 +3325,13 @@ declare module '@tanstack/solid-router' {
       path: '/similar'
       fullPath: '/v1/feedback/similar'
       preLoaderRoute: typeof V1FeedbackSimilarRouteImport
+      parentRoute: typeof V1FeedbackRoute
+    }
+    '/v1/feedback/withdraw': {
+      id: '/v1/feedback/withdraw'
+      path: '/withdraw'
+      fullPath: '/v1/feedback/withdraw'
+      preLoaderRoute: typeof V1FeedbackWithdrawRouteImport
       parentRoute: typeof V1FeedbackRoute
     }
     '/v1/github/installation-tokens': {
@@ -4302,10 +4321,12 @@ const TeamsRouteWithChildren = TeamsRoute._addFileChildren(TeamsRouteChildren)
 
 interface V1FeedbackRouteChildren {
   V1FeedbackSimilarRoute: typeof V1FeedbackSimilarRoute
+  V1FeedbackWithdrawRoute: typeof V1FeedbackWithdrawRoute
 }
 
 const V1FeedbackRouteChildren: V1FeedbackRouteChildren = {
   V1FeedbackSimilarRoute: V1FeedbackSimilarRoute,
+  V1FeedbackWithdrawRoute: V1FeedbackWithdrawRoute,
 }
 
 const V1FeedbackRouteWithChildren = V1FeedbackRoute._addFileChildren(

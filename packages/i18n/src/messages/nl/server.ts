@@ -360,7 +360,7 @@ export const messages = {
     "Kies wat de agents op deze server mogen doen als je het niet per agent instelt.",
   "server.settings.timezone": "Tijdzone",
   "server.settings.timezoneDescription":
-    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft.",
+    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet geeft. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "server.settings.timezoneAutomatic": "Automatisch ({zone})",
   "server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
   "server.settings.turnLimit": "Threads tegelijk",

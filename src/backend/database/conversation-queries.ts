@@ -245,6 +245,20 @@ export class ConversationQueries {
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
+  /** Reads the messages of one thread with one item type, such as the thank-you cards of one report. */
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND item_type = ?
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, itemType, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
   /** Reads only messages that restart recovery can change. */
   readConversationRecoveryMessages(
     agentId: string,

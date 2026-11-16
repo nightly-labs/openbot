@@ -415,7 +415,7 @@ export const messages = {
   "server.settings.agentsDescription": "اختر ما يمكن أن يفعله الوكلاء على هذا الخادم عندما لا تحدده لوكيل.",
   "server.settings.timezone": "المنطقة الزمنية",
   "server.settings.timezoneDescription":
-    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
+    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "server.settings.timezoneAutomatic": "تلقائي ({zone})",
   "server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
   "server.settings.turnLimit": "السلاسل في الوقت نفسه",

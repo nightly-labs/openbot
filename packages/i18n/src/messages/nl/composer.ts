@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Je bewerkt een bericht in de wachtrij. Sla de wijziging op of annuleer hem om het bericht te laten uitvoeren.",
   "composer.queueEdit.cancel": "Bewerking annuleren",
+  "composer.feedbackFix.body":
+    "Melding #{number} wordt gecorrigeerd. Verstuur het verzoek, of annuleer om de melding te laten zoals hij is.",
+  "composer.feedbackFix.cancel": "Annuleren",
   "composer.providerWait.offlineTitle": "Geen internetverbinding",
   "composer.providerWait.offline": "{provider} kan pas antwoorden als deze computer weer online is.",
   "composer.providerWait.silent": "{provider} heeft al {duration} geen update gestuurd.",
