@@ -31,4 +31,8 @@ export const messages = defineMessages("common", {
   "common.download": "Download",
   "common.removing": "Removing…",
   "common.sending": "Sending…",
+  "common.scrollLeft": "Scroll left",
+  "common.scrollRight": "Scroll right",
+  "common.scrollUp": "Scroll up",
+  "common.scrollDown": "Scroll down",
 });

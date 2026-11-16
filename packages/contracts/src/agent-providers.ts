@@ -183,11 +183,13 @@ export interface AgentProviderDescriptor {
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
    * step (Grok through its `x.ai/interject` ACP extension, OpenCode through its `_session/steering`
    * ACP extension, Antigravity and Devin through a second `session/prompt`). `deferred`: the protocol has no
-   * steer request (ACP), so the message can wait until the turn ends. Only a `native` provider steers
-   * a message sent in `steer` mode; the others queue it. A `native` CLI of a release before its
-   * steer request refuses the message, which then waits in the queue.
+   * steer request (ACP), so the message can wait until the turn ends. `reported`: each agent of the
+   * provider reports whether it steers, and its models carry `steersTurns` (a custom ACP agent with
+   * the `_session/steering` extension). Only a `native` provider, or a `reported` one whose model
+   * steers, steers a message sent in `steer` mode; the others queue it. A `native` CLI of a release
+   * before its steer request refuses the message, which then waits in the queue.
    */
-  readonly steer: "native" | "deferred";
+  readonly steer: "native" | "deferred" | "reported";
   /**
    * Whether the CLI runs turns of two sessions of one agent at the same time. `false`: the agent runs
    * one turn at a time, so its tasks and its own chat wait for each other. A custom ACP agent is
@@ -672,7 +674,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "instructions",
     workspaceInstructionFiles: [],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    // An agent that reports `_session/steering` in `initialize` steers; its models carry `steersTurns`.
+    steer: "reported",
     concurrentTurns: false,
     reportsUsage: false,
     approvalsInFullAccess: true,
@@ -690,10 +693,33 @@ export function agentProviderDescriptor(provider: AgentProviderId): AgentProvide
 
 /**
  * Whether the provider can take a queued message into its running turn. A provider that this build
- * does not know can: its host decides, and refuses the message when it cannot.
+ * does not know can: its host decides, and refuses the message when it cannot. A `reported` provider
+ * cannot here; `agentSteersTurns` reads its model.
  */
 export function providerSteersTurns(provider: AgentProviderRef): boolean {
   return !isKnownAgentProvider(provider) || agentProviderDescriptor(provider).steer === "native";
+}
+
+/**
+ * Whether an agent on this provider and model can take a queued message into its running turn. A
+ * `reported` provider steers only when `models` has a model with `steersTurns` from the same custom
+ * agent: the agent process reports it, not one model, so a saved model that the list no longer has, or
+ * that model visibility hides, still counts. An agent with no listed model, or a host without
+ * `model-steering-v1`, does not steer.
+ */
+export function agentSteersTurns(
+  runtime: { provider: AgentProviderRef; model: string },
+  models: readonly { provider: string; id: string; steersTurns?: boolean | undefined }[],
+): boolean {
+  if (!isKnownAgentProvider(runtime.provider) || agentProviderDescriptor(runtime.provider).steer !== "reported")
+    return providerSteersTurns(runtime.provider);
+  const agentId = customAgentIdOfModel(runtime.model);
+  return models.some(
+    (model) =>
+      model.provider === runtime.provider &&
+      model.steersTurns === true &&
+      (agentId === null ? model.id === runtime.model : customAgentIdOfModel(model.id) === agentId),
+  );
 }
 
 /** The provider name to put in front of a user. */

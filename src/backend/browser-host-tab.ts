@@ -48,7 +48,7 @@ export interface BrowserHostTab {
   /**
    * The origins whose agent code can run in the current document: the agent ran `evaluate` in it,
    * or a scripted page of a connected tab could reach it. While it is set, no page of the origin in
-   * the session fills. A main-frame navigation replaces the document and clears this.
+   * the session fills. A main-frame navigation or an idle unload ends the document and clears this.
    */
   scriptedOrigins?: Set<string>;
   /**

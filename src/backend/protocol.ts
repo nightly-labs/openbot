@@ -238,6 +238,8 @@ export type ResponseDecoder<T> = (value: unknown) => T;
 
 export interface ModelListResponse {
   nextCursor?: string;
+  /** ACP: the agent takes a message in its running turn (`_session/steering`), for each of its models. */
+  steersTurns?: boolean;
   data: Array<{
     model?: string;
     displayName?: string;
@@ -249,19 +251,24 @@ export interface ModelListResponse {
     serviceTiers?: Array<{ id: string; name?: string }>;
     /** Codex: the older, deprecated form of `serviceTiers`, such as `["fast"]`. */
     additionalSpeedTiers?: string[];
+    /** A custom ACP agent: the agent that serves this model takes a message in its running turn. */
+    steersTurns?: boolean;
   }>;
 }
 
 export function decodeModelListResponse(value: unknown): ModelListResponse {
   const data = getArray(value, "data");
   const nextCursor = getString(value, "nextCursor");
+  const steersTurns = isRecord(value) && value.steersTurns === true;
   return {
     ...(nextCursor ? { nextCursor } : {}),
+    ...(steersTurns ? { steersTurns } : {}),
     data: data.filter(isRecord).map((item) => ({
       ...(isString(item.model) ? { model: item.model } : {}),
       ...(isString(item.displayName) ? { displayName: item.displayName } : {}),
       ...(isString(item.defaultReasoningEffort) ? { defaultReasoningEffort: item.defaultReasoningEffort } : {}),
       ...(isBoolean(item.hidden) ? { hidden: item.hidden } : {}),
+      ...(item.steersTurns === true ? { steersTurns: true } : {}),
       ...(isBoolean(item.reasoningEffortConfigurable)
         ? { reasoningEffortConfigurable: item.reasoningEffortConfigurable }
         : {}),

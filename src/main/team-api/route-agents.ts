@@ -205,7 +205,10 @@ export async function routeAgents(
     // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
     // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
-    const models = (await agents.listModels()).filter((model) => modelId.test(model.id));
+    // The released model list does not carry `steersTurns`; `model-steering-v1` gives it on its own route.
+    const models = (await agents.listModels())
+      .filter((model) => modelId.test(model.id))
+      .map(({ steersTurns: _steersTurns, ...model }) => model);
     if (!visibleModels) return json(200, models);
     // The released model list does not carry `listing`; `model-visibility-v1` gives it on its own route.
     const listed = await runCauseEffect(visibleModels.picker(models));

@@ -1313,6 +1313,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         }
         return yield* providerSync(() =>
           decoder({
+            // The steer request is per process, so it holds for each model. Initialization is done here.
+            ...(this.#steerExtension || this.#steersByPrompt ? { steersTurns: true } : {}),
             data: this.#models.map((model) => ({
               model: model.id,
               displayName: model.name,
