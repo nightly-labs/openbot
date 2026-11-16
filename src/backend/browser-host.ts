@@ -1004,6 +1004,8 @@ export class BrowserHost {
       this.#bindTabEvents(tab);
       this.#unmountView(view);
       if (!contents.isDestroyed()) contents.close();
+      // The document ends with no navigation event, and agent code in it stops (#10232).
+      this.#releaseScriptedDocument(tab);
       // A person can open the tab while the engine stops, which shows the old view.
       this.#syncAttachedView();
     });
