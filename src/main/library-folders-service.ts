@@ -5,7 +5,7 @@
 
 import type { LibraryFolderAction, LibraryFolderContext, LibraryFoldersSnapshot } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import type { AgentLibraryFolders } from "../backend/agent/library-folder-tools";
+import type { AgentLibraryFolders, LibraryFileStamp } from "../backend/agent/library-folder-tools";
 import type { LibraryFoldersStore } from "../backend/library-folders-store";
 import type { StorageUsageService } from "../backend/storage-usage";
 import { storedSync } from "../backend/stored-state-effects";
@@ -102,6 +102,12 @@ function actionAgents(
   return { agentIds, orphanFile };
 }
 
+interface KnownFileAgents {
+  /** Milliseconds since the epoch. */
+  at: number;
+  agents: ReadonlyMap<string, string | null>;
+}
+
 export class LibraryFoldersService {
   readonly #sources: LibraryFoldersSources;
 
@@ -126,7 +132,9 @@ export class LibraryFoldersService {
     const snapshot = this.#sources.store.getSnapshot();
     const targets = actionTargets(action, snapshot);
     const fileAgents =
-      targets.fileIds.length === 0 ? new Map<string, string | null>() : yield* this.fileAgents(targets.fileIds);
+      targets.fileIds.length === 0
+        ? new Map<string, string | null>()
+        : yield* this.fileAgents(targets.fileIds.map((id) => ({ id, storedAt: null })));
     const agentIds = new Set(this.#sources.agents().map((agent) => agent.id));
     if (authorize) {
       const agents = actionAgents(targets, snapshot, fileAgents, agentIds);
@@ -165,21 +173,39 @@ export class LibraryFoldersService {
   }
 
   /**
-   * The agent of each file that the host scan lists. The scan result is kept for a short time, so a
-   * file that an agent attached after it is not there: one new scan then finds it before the store
-   * refuses the file as unknown.
+   * The last host scan: the agent of each file that it lists, and the time of the scan. The agent of a
+   * stored file does not change, so the map stays valid with no time limit.
+   */
+  #known: KnownFileAgents | null = null;
+
+  /**
+   * The agent of each file that the host scan lists. A new scan runs only when a file is not in the last
+   * one and was stored after it, or has no stored time. A file that the scan leaves out (it lists the
+   * largest files only) thus does not start a scan on each call.
    */
   readonly fileAgents = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
-    fileIds: readonly string[],
+    files: readonly LibraryFileStamp[],
   ) {
+    const missing = (known: KnownFileAgents) =>
+      files.some(
+        (file) => !known.agents.has(file.id) && (file.storedAt === null || Date.parse(file.storedAt) >= known.at),
+      );
+    if (this.#known && !missing(this.#known)) return this.#known.agents;
     const scan = () =>
-      this.#sources.storage
-        .usage({ scope: "host" })
-        .pipe(Effect.map((usage) => new Map(usage.files.map((file) => [file.id, file.agentId]))));
+      this.#sources.storage.usage({ scope: "host" }).pipe(
+        Effect.map((usage) => {
+          const known: KnownFileAgents = {
+            at: Date.parse(usage.scannedAt),
+            agents: new Map(usage.files.map((file) => [file.id, file.agentId])),
+          };
+          this.#known = known;
+          return known;
+        }),
+      );
     const known = yield* scan();
-    if (fileIds.every((fileId) => known.has(fileId))) return known;
+    if (!missing(known)) return known.agents;
     this.#sources.storage.invalidate();
-    return yield* scan();
+    return (yield* scan()).agents;
   }).bind(this);
 }

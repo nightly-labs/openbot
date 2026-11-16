@@ -12,7 +12,6 @@ import { Effect } from "effect";
 import { z } from "zod";
 import type { LibraryFoldersStore } from "../library-folders-store";
 import type { MailboxStoredFile } from "../mailbox-store";
-import { STORAGE_SCAN_TTL_MS } from "../storage-usage";
 import { StoredStateFailure } from "../stored-state-effects";
 
 /**
@@ -24,9 +23,16 @@ export interface AgentLibraryFolders
   /**
    * The agent of each file of the Library, from the same host scan as the Library: a folder takes only
    * files of its own agent. Null: the file has no agent. A file that is not in the map is unknown. A
-   * new scan runs when one of `fileIds` is not in the last one.
+   * new scan runs only when one of `files` is not in the last one and was stored after it, or has no
+   * stored time.
    */
-  fileAgents(fileIds: readonly string[]): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure>;
+  fileAgents(files: readonly LibraryFileStamp[]): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure>;
+}
+
+/** A Library file and the time it was stored (ISO 8601), or null when the time is not known. */
+export interface LibraryFileStamp {
+  id: string;
+  storedAt: string | null;
 }
 
 /** A folder path, such as `Autumn campaign/Images`: each level with a name of the full length. */
@@ -225,7 +231,6 @@ export function organizeLibrary(
   agentId: string,
   args: OrganizeLibraryArguments,
   storedFiles: readonly MailboxStoredFile[],
-  now = Date.now(),
 ): Effect.Effect<OrganizedLibrary, StoredStateFailure> {
   return Effect.gen(function* () {
     const snapshot = libraryFolders.getSnapshot();
@@ -256,10 +261,7 @@ export function organizeLibrary(
       if (missing !== undefined) throw unknown(missing);
       // A generated file has no stored time, so it can also be newer than the scan.
       const fileAgents = yield* libraryFolders.fileAgents(
-        fileIds.filter((fileId) => {
-          const file = stored.get(fileId);
-          return file !== undefined && (file.createdAt === null || storedAfterScan(file, now));
-        }),
+        fileIds.map((fileId) => ({ id: fileId, storedAt: stored.get(fileId)?.createdAt ?? null })),
       );
       for (const fileId of fileIds) {
         const fileAgent = fileAgents.get(fileId);
@@ -331,23 +333,16 @@ function safeFailure(failure: StoredStateFailure): StoredStateFailure {
 }
 
 /**
- * A file stored after the last host scan is not in it: the scan is kept for a short time. Only such a
- * file starts a new scan, so an old file that the scan leaves out (it lists the largest files only)
- * does not start one on each call.
- */
-function storedAfterScan(file: MailboxStoredFile, now: number): boolean {
-  return file.createdAt !== null && now - Date.parse(file.createdAt) < STORAGE_SCAN_TTL_MS;
-}
-
-/**
  * The agent of each file that the Library shows, for `list_library_folders`. A file that an agent
- * attached a moment ago is in it too.
+ * attached a moment ago is in it too. A file with no stored time is left out of the request, so a
+ * file that the scan leaves out does not start a scan on each call.
  */
 export function libraryFileAgents(
   libraryFolders: AgentLibraryFolders,
   storedFiles: readonly MailboxStoredFile[],
-  now = Date.now(),
 ): Effect.Effect<ReadonlyMap<string, string | null>, StoredStateFailure> {
-  const recent = storedFiles.filter((file) => storedAfterScan(file, now)).map((file) => file.attachment.id);
-  return libraryFolders.fileAgents(recent).pipe(Effect.mapError(safeFailure));
+  const stamped = storedFiles.flatMap((file) =>
+    file.createdAt === null ? [] : [{ id: file.attachment.id, storedAt: file.createdAt }],
+  );
+  return libraryFolders.fileAgents(stamped).pipe(Effect.mapError(safeFailure));
 }
