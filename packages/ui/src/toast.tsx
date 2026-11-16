@@ -1,7 +1,7 @@
 import { classifyFailure, type FailureProperties, type NotificationMetadata } from "@openbot/telemetry";
 import { errorReference } from "@openbot/user-errors";
 import type { ComponentProps, JSX } from "@solidjs/web";
-import { createEffect, createSignal, omit, onSettled } from "solid-js";
+import { createEffect, omit, onSettled } from "solid-js";
 import {
   Toaster as Sonner,
   type ExternalToast as SonnerExternalToast,
@@ -92,8 +92,6 @@ export const toast = Object.assign((...args: Parameters<typeof sonnerToast>) => 
 /** Toast lifetime; exported so manual timers settle on the same count. */
 export const TOAST_DURATION = 6_000;
 
-const [hasVisibleToasts, setHasVisibleToasts] = createSignal(false);
-
 export function Toaster(props: ToasterProps): JSX.Element {
   // The desktop app mounts the Toaster outside its text provider, so it follows the active locale.
   const { t } = currentText();
@@ -129,21 +127,18 @@ export function Toaster(props: ToasterProps): JSX.Element {
   let layer: HTMLDivElement | undefined;
   onSettled(() => {
     if (!layer) return;
-    const updateVisibility = () => {
-      setHasVisibleToasts(Boolean(layer?.querySelector("[data-sonner-toast]")));
+    const markCloseButtons = () => {
       // solid-sonner renders the close button, so mark it here for the close cue.
       for (const button of layer?.querySelectorAll("[data-close-button]:not([data-cuelume-close])") ?? []) {
         button.setAttribute("data-cuelume-close", "");
         button.setAttribute("data-cuelume-emphasis", "subtle");
       }
     };
-    // Track mounted toasts so native content stays behind their exit animation too.
-    const observer = new MutationObserver(updateVisibility);
+    const observer = new MutationObserver(markCloseButtons);
     observer.observe(layer, { childList: true, subtree: true });
-    updateVisibility();
+    markCloseButtons();
     return () => {
       observer.disconnect();
-      setHasVisibleToasts(false);
     };
   });
   return (
@@ -177,4 +172,3 @@ export function Toaster(props: ToasterProps): JSX.Element {
 }
 
 export type { ToastT } from "solid-sonner";
-export { hasVisibleToasts };

@@ -145,7 +145,7 @@ import {
 } from "@openbot/team-client/team-admin-requests";
 import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/team-api-requests";
 import { classifyFailure } from "@openbot/telemetry";
-import { hasVisibleToasts, toast } from "@openbot/ui";
+import { toast } from "@openbot/ui";
 import type { GlobalSearchRoutine } from "@openbot/ui/components/GlobalSearch";
 import type { AgentMessage } from "@openbot/ui/data";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
@@ -3761,13 +3761,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         activeTurnId={channelView.activeTurnId()}
                         skillsMarketplaceOpen={marketplaceOpen()}
                         mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
-                        globalOverlayOpen={
-                          joinOpen() ||
-                          serverSettings.state.open ||
-                          searchOpen() ||
-                          marketplaceOpen() ||
-                          hasVisibleToasts()
-                        }
+                        globalOverlayOpen={joinOpen() || serverSettings.state.open || searchOpen() || marketplaceOpen()}
                         settingsRequest={channelView.settingsRequest()}
                         messageFocusRequest={messageFocusRequest()}
                         queue={undefined}
@@ -3949,9 +3943,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   turnStepLines={workspace.stepLines()}
                   skillsMarketplaceOpen={marketplaceOpen()}
                   mcpSettingsOpen={serverSettings.state.open || marketplaceOpen()}
-                  globalOverlayOpen={
-                    joinOpen() || serverSettings.state.open || searchOpen() || marketplaceOpen() || hasVisibleToasts()
-                  }
+                  globalOverlayOpen={joinOpen() || serverSettings.state.open || searchOpen() || marketplaceOpen()}
                   settingsRequest={settingsRequest()}
                   messageFocusRequest={messageFocusRequest()}
                   queue={workspace.state.selectedId ? workspace.state.queues[workspace.state.selectedId] : undefined}

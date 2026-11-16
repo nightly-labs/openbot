@@ -13,7 +13,6 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
-import { hasVisibleToasts } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -636,7 +635,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts() ||
           quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
