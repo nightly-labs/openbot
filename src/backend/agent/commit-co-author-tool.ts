@@ -12,12 +12,12 @@ export const setCommitCoAuthorToolSchema = z.strictObject({
 });
 
 /** Where the user changes the setting, for an agent that tells the user. */
-const SETTING_PLACE = "Settings > Agents > Git commits > Credit OpenBot in commits";
+const SETTING_PLACE = "Server settings > Agent defaults > Git commits > Credit OpenBot in commits";
 
 export interface SetCommitCoAuthorToolOptions {
   /** The `commitCoAuthor` agent default now. */
   current(): boolean;
-  /** Saves the agent default, as Settings > Agents does, and gives it to every agent. */
+  /** Saves the agent default, as Server settings > Agent defaults does, and gives it to every agent. */
   set(enabled: boolean): Effect.Effect<unknown, { readonly cause: unknown }>;
   /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
