@@ -32,9 +32,10 @@ function useDemonstration(play: number, run: () => void) {
   const reduced = useReducedMotion();
   const played = useRef(play);
   useEffect(() => {
-    if (play === played.current) return;
+    // `play` goes back to 0 when another option is tapped. Only a larger value is a new tap.
+    const grew = play > played.current;
     played.current = play;
-    if (!reduced) run();
+    if (grew && !reduced) run();
   });
 }
 
