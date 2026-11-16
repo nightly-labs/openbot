@@ -1412,9 +1412,12 @@ export class DrainScheduler {
       .every((id) => this.#mailbox.getDelivery(id)?.delivery.sender.kind === "routine");
   }
 
-  /** The provider is available again: the routine runs that wait for it start now. */
+  /**
+   * The provider is available again: the routine runs that wait for it start now. The caller drains
+   * the agents of that provider; a run of an agent on another provider does not wait for this one.
+   */
   providerResumed(provider: AgentProvider): void {
-    for (const agentId of this.#startRetry.providerResumed(provider)) this.scheduleDrain(agentId);
+    this.#startRetry.providerResumed(provider);
   }
 
   /**

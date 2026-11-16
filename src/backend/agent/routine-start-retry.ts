@@ -5,12 +5,11 @@ import type { AgentProvider } from "../agent-client";
  * with no internet connection (#6751). A run that waits longer than its schedule does not run twice:
  * the next occurrence finds this run in the queue and does not add another.
  */
-export const ROUTINE_START_RETRY_DELAYS_MS: readonly number[] = [5 * 60_000, 15 * 60_000, 30 * 60_000];
+const DELAYS_MS: readonly number[] = [5 * 60_000, 15 * 60_000, 30 * 60_000];
 
 export interface RoutineStartRetryOptions {
   /** Called when the wait of a run ends: start its provider and its queue again. */
   retry(deliveryId: string, agentId: string, provider: AgentProvider): void;
-  delaysMs?: readonly number[];
 }
 
 interface Wait {
@@ -29,12 +28,10 @@ interface Wait {
  */
 export class RoutineStartRetry {
   readonly #retry: RoutineStartRetryOptions["retry"];
-  readonly #delaysMs: readonly number[];
   readonly #waits = new Map<string, Wait>();
 
   constructor(options: RoutineStartRetryOptions) {
     this.#retry = options.retry;
-    this.#delaysMs = options.delaysMs ?? ROUTINE_START_RETRY_DELAYS_MS;
   }
 
   /**
@@ -45,7 +42,7 @@ export class RoutineStartRetry {
     const current = this.#waits.get(deliveryId);
     if (current?.timer) clearTimeout(current.timer);
     const attempts = current?.attempts ?? 0;
-    const delayMs = this.#delaysMs[attempts] ?? (repeatLast ? this.#delaysMs.at(-1) : undefined);
+    const delayMs = DELAYS_MS[attempts] ?? (repeatLast ? DELAYS_MS.at(-1) : undefined);
     if (delayMs === undefined) {
       if (current) current.timer = null;
       return false;
@@ -76,19 +73,13 @@ export class RoutineStartRetry {
     return false;
   }
 
-  /**
-   * The provider is available again, so the runs that wait for it can start now. Gives the agents of
-   * those runs, so that their queues drain.
-   */
-  providerResumed(provider: AgentProvider): Set<string> {
-    const agentIds = new Set<string>();
+  /** The provider is available again, so the runs that wait for it can start now. */
+  providerResumed(provider: AgentProvider): void {
     for (const wait of this.#waits.values()) {
       if (wait.provider !== provider || !wait.timer) continue;
       clearTimeout(wait.timer);
       wait.timer = null;
-      agentIds.add(wait.agentId);
     }
-    return agentIds;
   }
 
   /** The run started, failed, or left the queue. */
