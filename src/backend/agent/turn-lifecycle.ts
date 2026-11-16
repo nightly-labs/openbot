@@ -405,7 +405,8 @@ export class TurnLifecycle {
   readonly #capacityNotices = new Set<string>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
-   * `produced` is set by the first item or delta: a refused turn is run again only without one.
+   * `produced` is set by the first item or delta other than the echo of the user's message: a
+   * refused turn is run again only without one.
    * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
    * and the echo of the user's message do not count. `sentAt` (when the message that started the
    * turn was sent) and `firstOutputAt` split a slow reply into OpenBot's wait and the provider's.
@@ -1187,7 +1188,9 @@ export class TurnLifecycle {
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
-        this.#markProduced(turnId, isRepeatedWork(item));
+        // Codex starts each turn with the echo of the user's message, which the model did not produce.
+        // Counted, it blocked the one run again of each refused Codex turn (#9915).
+        if (item.type !== "userMessage") this.#markProduced(turnId, isRepeatedWork(item));
         const running = this.#runningTurns.get(turnId);
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
