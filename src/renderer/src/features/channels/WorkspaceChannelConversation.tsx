@@ -1,5 +1,4 @@
 import type { AgentStatus, BrowserTakeoverRequest, CentralAuthUser } from "@openbot/contracts/ipc";
-import { hasVisibleToasts } from "@openbot/ui";
 import { createMemo, Show } from "solid-js";
 import { useNavigation } from "../../navigation";
 import { usePlatform } from "../../platform";
@@ -62,6 +61,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
     setSkillsMarketplaceOpen,
     setPendingMcpSignIn,
     mcpSignIns,
+    refreshMcpSignIns,
     generalSettings,
   } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
@@ -183,7 +183,6 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         serverSettingsOpen() ||
         appSettingsOpen() ||
         skillsMarketplaceOpen() ||
-        hasVisibleToasts() ||
         quitShortcutHintShown()
       }
       settingsRequest={view.settingsRequest()}
@@ -221,6 +220,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
         const known = mcpSignIns();
         return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
       }}
+      refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
     />
   );
 }

@@ -3032,11 +3032,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       cancelMessageLink: async () => undefined,
       searchConversationMessages: async (input) => {
         const query = input.query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
-        const results = agents.flatMap((agent) =>
-          getSnapshot(agent.id)
-            .messages.filter((message) => message.text.replace(/\s+/g, " ").toLocaleLowerCase().includes(query))
-            .map((message) => ({ agentId: agent.id, message: clone(message) })),
-        );
+        const matches = (message: ConversationMessage) =>
+          message.text.replace(/\s+/g, " ").toLocaleLowerCase().includes(query);
+        const results = agents
+          .filter((agent) => input.agentId === undefined || agent.id === input.agentId)
+          .flatMap((agent) => [
+            ...getSnapshot(agent.id)
+              .messages.filter(matches)
+              .map((message) => ({ agentId: agent.id, message: clone(message) })),
+            // As the backend does: side threads only when asked, and not an archived one.
+            ...(input.includeSideThreads ? (tasks.get(agent.id) ?? []) : [])
+              .filter((task) => task.closedAt === null)
+              .flatMap((task) =>
+                taskConversation(task)
+                  .messages.filter(matches)
+                  .map((message) => ({ agentId: agent.id, message: clone(message), taskId: task.id })),
+              ),
+          ])
+          // Newest first, as the backend returns them.
+          .sort((left, right) => right.message.createdAt.localeCompare(left.message.createdAt));
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };
       },
       searchConversationFiles: async (input) => {

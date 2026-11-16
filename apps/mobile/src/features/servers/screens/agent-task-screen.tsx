@@ -23,6 +23,7 @@ import {
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
@@ -56,6 +57,7 @@ import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
+import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -459,6 +461,18 @@ function AgentTaskChat({
     onSend: (text) => void send(text),
   });
   const voiceOpen = voice.stage !== "closed";
+  // As in the agent's chat: a pull past the latest message opens the agent's info sheet on top of
+  // this thread, unless Settings turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId, serverId } }),
+    [agentId, serverId],
+  );
+  const endPull = useChatEndPull({
+    motion,
+    enabled: pullOn && !attachments.menuOpen && !voiceOpen,
+    onOpen: openInfo,
+  });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
   const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
@@ -651,6 +665,8 @@ function AgentTaskChat({
           accessibilityHidden={voiceOpen}
         />
         <ChatMessageList
+          pullGesture={endPull.gesture}
+          pullShift={endPull.shift}
           agents={serverAgents}
           rowsShown={rowsShown}
           target={target}
@@ -734,6 +750,7 @@ function AgentTaskChat({
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
+          {pullOn ? <ChatEndPullRing pull={endPull} target={target} /> : null}
           <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
             <ConnectionStatus server={server} />
           </View>
@@ -858,6 +875,7 @@ function AgentTaskChat({
           anchor={attachments.menuAnchor}
           appActive={appActive}
           attachments={attachments}
+          context={contextMeter}
           fallbackBackground={fieldBackground}
           foreground={foreground}
           keyboardHeight={motion.keyboardHeight}

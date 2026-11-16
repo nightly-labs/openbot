@@ -68,6 +68,7 @@ import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -815,18 +816,21 @@ export class OpenBotToolRouter {
               if (result && client.running) client.respond(toolRequest.id, result);
               return;
             }
-            if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
+            const params = {
+              ...toolRequest.params,
+              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              ownerAgentId: agentId,
+            };
+            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
+            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
+            const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
+            if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,
                 contentItems: [{ type: "inputText", text: "Browser tools are unavailable during user takeover." }],
               });
               return;
             }
-            const params = {
-              ...toolRequest.params,
-              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
-              ownerAgentId: agentId,
-            };
             // While the user controls the tab, the call waits for the release and does not run.
             const userControl = (tabId: string) =>
               this.#browser.awaitUserControlRelease(tabId).pipe(Effect.as(browserUserControlResult()));
@@ -2247,8 +2251,8 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. End your answer: tell the user to connect GitHub in Server settings, Connectors. This connection also signs in gh and git."
-            : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Server settings, Connectors, also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
       });
     }
 

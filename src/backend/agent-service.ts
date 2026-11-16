@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  agentSteersTurns,
+  customAgentIdOfModel,
+} from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
@@ -1340,7 +1345,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser,
       attachments: this.#attachments,
       isStopping: () => this.#stopping,
-      hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
+      hasTakeover: (agentId, threadId, tabId) => this.#attention.browserTakeoverBlocks(agentId, threadId, tabId),
     });
     this.#threads = new ThreadLifecycle({
       store,
@@ -4322,7 +4327,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   });
 
-  /** Appends a system line to the agent's own chat, outside any turn. */
+  /** Appends a system line to the agent's own chat, outside any turn unless the line names one. */
   #appendSystemMessage(agentId: string, message: ConversationMessage, eventType: string): void {
     const database = this.#store.database;
     this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {
@@ -4402,11 +4407,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
+    // The note goes into the turn of the chat's next message, under its delivery's id until that turn
+    // starts (`MailboxSync.syncDeliveryMessage`). A note outside that turn showed after the turn's
+    // answer, which the new model wrote after the switch. A continuation and a plan step run in a turn
+    // of their own, which starts after the note.
+    const next = this.#mailbox.nextQueued(agent.id);
+    const turnId = next && !next.resumeAfterUsageLimit && !next.planContinuation ? next.delivery.id : undefined;
     try {
       this.#appendSystemMessage(
         agent.id,
         {
           id: `model-switch-${randomUUID()}`,
+          ...(turnId ? { turnId } : {}),
           author: "system",
           source: "system",
           text,
@@ -6673,7 +6685,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+    // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
+    const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
+    if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return "provider-unsupported";
     }

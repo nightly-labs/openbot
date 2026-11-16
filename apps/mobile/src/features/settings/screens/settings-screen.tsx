@@ -21,10 +21,17 @@ import { mobileUserName } from "@/features/auth/api/mobile-user-name";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { fileLimitText, MOBILE_LARGE_FILE_BYTES } from "@/features/chat/model/large-files";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import { RowIcon } from "@/features/settings/components/settings-row-icon";
 import { agentDefaultsServers } from "@/features/settings/model/agent-defaults";
 import { useBillingState } from "@/features/settings/model/billing";
+import {
+  type ChatSwipeAction,
+  saveChatPullPreference,
+  saveChatSwipePreference,
+  useChatPullPreference,
+  useChatSwipePreference,
+} from "@/features/settings/model/chat-swipe";
 import { saveLargeFilePreference, useLargeFilePreference } from "@/features/settings/model/large-files";
 import { savePhotoQualityPreference, usePhotoQualityPreference } from "@/features/settings/model/photo-quality";
 import { shortcutsSupported } from "@/features/shortcuts/shortcuts-native";
@@ -33,6 +40,7 @@ import { ProfileAvatar } from "@/shared/components/profile-avatar";
 import { haptics } from "@/shared/lib/haptics";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
+import { END_X } from "@/shared/lib/text-direction";
 
 export function SettingsScreen() {
   const { session } = useMobileSession();
@@ -50,6 +58,27 @@ export function SettingsScreen() {
       void haptics.notification("error");
     });
   }
+  const chatSwipe = useChatSwipePreference();
+  const [chatSwipeError, setChatSwipeError] = useState<string | null>(null);
+  function saveChatSwipe(action: ChatSwipeAction) {
+    setChatSwipeError(null);
+    void saveChatSwipePreference(action).catch(() => {
+      setChatSwipeError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
+    });
+  }
+  const chatPull = useChatPullPreference();
+  const [chatPullError, setChatPullError] = useState<string | null>(null);
+  function saveChatPull(enabled: boolean) {
+    setChatPullError(null);
+    void saveChatPullPreference(enabled).catch(() => {
+      setChatPullError(t("mobile.settings.saveFailed"));
+      void haptics.notification("error");
+    });
+  }
+  // The swipe goes away from Back: to the left, or to the right in a right-to-left layout.
+  const chatSwipeLabel =
+    END_X === 1 ? t("mobile.settings.conversations.swipeLeft") : t("mobile.settings.conversations.swipeRight");
   const photoQuality = usePhotoQualityPreference();
   const [photoQualityError, setPhotoQualityError] = useState<string | null>(null);
   function savePhotoQuality(fullQuality: boolean) {
@@ -163,6 +192,38 @@ export function SettingsScreen() {
             label={t("mobile.settings.conversations.largeFiles")}
             dark={theme === "dark"}
             onValueChange={saveLargeFiles}
+          />
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={chatSwipeError ?? t("mobile.settings.conversations.swipeFooter")}>
+        <SettingsRow
+          trailing={
+            <SettingsPicker<ChatSwipeAction>
+              value={chatSwipe.action}
+              options={[
+                { value: "threads", label: t("mobile.settings.conversations.swipeThreads") },
+                { value: "browser", label: t("mobile.settings.conversations.swipeBrowser") },
+              ]}
+              enabled={chatSwipe.ready}
+              dark={theme === "dark"}
+              label={chatSwipeLabel}
+              onChange={(next) => {
+                if (next !== chatSwipe.action) saveChatSwipe(next);
+              }}
+            />
+          }
+        >
+          <Typography.Paragraph>{chatSwipeLabel}</Typography.Paragraph>
+        </SettingsRow>
+      </SettingsSection>
+      <SettingsSection footer={chatPullError ?? t("mobile.settings.conversations.pullInfoFooter")}>
+        <SettingsRow>
+          <SettingsSwitch
+            value={chatPull.enabled}
+            disabled={!chatPull.ready}
+            label={t("mobile.settings.conversations.pullInfo")}
+            dark={theme === "dark"}
+            onValueChange={saveChatPull}
           />
         </SettingsRow>
       </SettingsSection>

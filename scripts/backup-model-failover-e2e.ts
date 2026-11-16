@@ -4,7 +4,8 @@
 // message on its current model, and fails it with the CLI's report of an Anthropic overload (529)
 // when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
 // Checks:
-//   1. A turn that wrote text before the error does not move: it fails with its error, as before.
+//   1. A turn that wrote text before the error continues on the backup model, and a thread turn
+//      moves to it too (#8406). These run after check 5.
 //   2. An agent with no backup models fails with its error, as before.
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
 //      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
@@ -666,15 +667,6 @@ try {
   );
   failing([PRIMARY]);
 
-  await check("a turn that wrote text does not move", async () => {
-    const since = events.length;
-    const outcome = await send(mover.id, "act-then-fail");
-    assert.equal(outcome.status, "failed", "The turn fails.");
-    assert.equal(agentOf(mover.id).model, PRIMARY, "The agent stays on its own model.");
-    assert.ok(errorsFor(mover.id, since).length > 0, "The error shows.");
-    return outcome;
-  });
-
   await check("an agent with no backup models fails as before", async () => {
     const since = events.length;
     const outcome = await send(stayer.id, "work");
@@ -739,6 +731,96 @@ try {
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);
     return { notes };
+  });
+
+  // A new agent for each check, made while no model fails. The restart ends the hold on the own model.
+  const withBackup = async (name: string) => {
+    const agent = await create(name);
+    await waitFor(`the first turn of ${name} to end`, () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    return agent;
+  };
+
+  await check("a turn that wrote text continues on the backup model", async () => {
+    const continuer = await withBackup("Continuer");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(continuer.id, "act-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(continuer.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(continuer.id, since), [], "No error shows for the moved turn.");
+    const shown = (await runCauseEffect(service.readConversation(continuer.id))).messages
+      .filter((message) => message.text.trim())
+      .slice(-4)
+      .map((message) => message.text);
+    assert.deepEqual(
+      shown,
+      [
+        "act-then-fail",
+        "Partial answer.",
+        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
+        "Done.",
+      ],
+      "The chat shows the stopped text, the switch and then the backup's answer.",
+    );
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model), shown };
+  });
+
+  await check("a thread turn moves to the backup model", async () => {
+    const threader = await withBackup("Threader");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "work" }));
+    await waitFor("the thread to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The thread ran on the own model, then on the backup.");
+    assert.equal(agentOf(threader.id).model, BACKUP, "The agent is on the backup model.");
+    failing([]);
+    await restart();
+    return { taskId: task.id, ran };
+  });
+
+  await check("a thread turn that wrote text continues on the backup model", async () => {
+    const threader = await withBackup("Weaver");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "act-then-fail" }));
+    await waitFor("the thread with work to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const order = () =>
+      service
+        .readTask(threader.id, task.id)
+        .messages.filter((message) => message.author !== "system" && message.text.trim())
+        .map((message) => message.text);
+    const expected = ["act-then-fail", "Partial answer.", "Done."];
+    assert.deepEqual(order(), expected, "The thread shows the stopped text, then the backup's answer.");
+    assert.ok(turns().slice(before).at(-1)?.input.includes("Continue the unfinished task"));
+    failing([]);
+    await restart();
+    assert.deepEqual(order(), expected, "The thread keeps the order after a restart.");
+    return { taskId: task.id, order: order() };
   });
 
   await check("a usage limit after partial work continues on the backup", async () => {

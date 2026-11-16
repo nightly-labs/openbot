@@ -424,14 +424,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "Yeni akış için bir parola sıfırlama e-postası taslağı hazırla.",
   "marketplace.plugin.omnisend.tagline": "E-posta ve SMS pazarlaması",
   "marketplace.plugin.omnisend.description":
-    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı tarayıcıda kendi Omnisend hesabına giriş yapar ve onay ekranında erişim düzeyini seçer. Yazma erişimiyle ajanlar kampanya da gönderebilir ve veri silebilir. Ajanlar yalnızca rapora ihtiyaç duyuyorsa salt okunur erişimi seç.",
+    "Omnisend, ajanların kampanya ve form raporlarını okumasını, kişileri ve segmentleri bulmasını, kampanyalar, otomasyonlar, e-posta şablonları, formlar ve ürünler oluşturup düzenlemesini sağlar. Her kullanıcı kendi Omnisend hesabından aldığı bir API anahtarıyla bağlanır. Ajanlar anahtarın izin verdiği her şeyi yapabilir; buna kampanya göndermek ve veri silmek de dahil olabilir.",
   "marketplace.plugin.omnisend.app":
-    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; tarayıcıda giriş ile Omnisend'in MCP sunucusu üzerinden.",
+    "Kampanyalar, otomasyonlar, kişiler, segmentler, formlar ve raporlar; API anahtarı ile Omnisend'in MCP sunucusu üzerinden.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Geçen haftanın kampanyaları bir önceki haftaya göre nasıl performans gösterdi?",
   "marketplace.plugin.omnisend.prompt.segment": "VIP segmentinde kaç kişi var ve bu ay nasıl değişti?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "Yeni koleksiyon için bir kampanya taslağı hazırla ama gönderme.",
   "marketplace.plugin.postiz.tagline": "Sosyal medya planlama",
+  "marketplace.plugin.omnisend.hint.apiKey":
+    "Omnisend'de Store settings > API keys bölümünü açın ve bir anahtar oluşturun.",
   "marketplace.plugin.postiz.description":
     "Postiz, ajanların sosyal medya kanallarınızı listelemesini ve X, LinkedIn, Instagram ve TikTok gibi 30'dan fazla ağda gönderi taslağı hazırlamasını, planlamasını ve yayımlamasını sağlar. Ajanlar ayrıca medya yükleyebilir ve yapay zekâ ile görsel ve video oluşturabilir. Postiz hesabınıza tarayıcıdan giriş yapın veya Postiz'deki Settings › Developers bölümünden API anahtarını yapıştırın. Tüm Postiz bulut planları API erişimi içerir. Ajanlar bir gönderiyi hemen yayımlayabilir, bu yüzden her gönderiyi onaylamadan önce inceleyin.",
   "marketplace.plugin.postiz.app":

@@ -239,6 +239,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
+  "error.backend.mcpSignInAccountRefused":
+    "The server refused the account that you signed in with. Check that this account can use the service. To use another account, sign out, then sign in again.",
   "error.backend.mcpSignInClientRefused":
     "The sign-in server did not accept OpenBot when it completed the sign-in. Sign in again: OpenBot registers with the server again.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",

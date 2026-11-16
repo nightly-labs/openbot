@@ -239,6 +239,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot bu MCP sunucusu yapılandırmasını kaydedemiyor.",
   "error.backend.mcpServerNoAnswer": "Sunucu {seconds} saniye içinde yanıt vermedi.",
   "error.backend.mcpSignInNotAccepted": "Sunucu bu oturum açmayı kabul etmedi.",
+  "error.backend.mcpSignInAccountRefused":
+    "Sunucu, oturum açtığınız hesabı reddetti. Bu hesabın hizmeti kullanabildiğini kontrol edin. Başka bir hesap kullanmak için oturumu kapatıp yeniden açın.",
   "error.backend.mcpSignInClientRefused":
     "Oturum açma sunucusu, oturum açma tamamlanırken OpenBot'u kabul etmedi. Yeniden oturum açın: OpenBot sunucuya yeniden kaydolur.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",

@@ -154,6 +154,7 @@ export const messages = {
   "composer.picker.section.files": "الملفات",
   "composer.picker.section.tabs": "علامات تبويب المتصفح",
   "composer.picker.section.threads": "السلاسل",
+  "composer.picker.section.messages": "في الرسائل",
   "composer.token.tab": "علامة تبويب المتصفح {name}",
   "composer.token.thread": "السلسلة {name}",
   "composer.token.unavailableTab": "علامة تبويب المتصفح المغلقة {name}",

@@ -254,6 +254,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInAccountRefused":
+    "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",

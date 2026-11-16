@@ -154,6 +154,13 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 ]);
 
 /**
+ * The provider errors after which a backup model continues the work that the turn started, as after a
+ * spent quota: a sign-in that failed, and a provider that does not answer, such as a firewall block
+ * in front of it (#8406). The backup gets the turn's work steps, so it does not do them again.
+ */
+const CONTINUE_CAUSES: ReadonlySet<CauseCode> = new Set(["authentication", "provider_unavailable"]);
+
+/**
  * The provider errors during a turn's own compaction that end the turn but can pass when it continues:
  * a connection that failed or stopped answering (#5822). A server error keeps the provider's text.
  */
@@ -405,6 +412,8 @@ export class TurnLifecycle {
       narration: string | null;
       /** The tool steps that started and did not end yet. While one is open, the turn works, it does not wait. */
       openTools: Set<string>;
+      /** The answer items that are the agent's own report of its failure (`AcpFlavor.failureReport`). */
+      failureReports: Set<string>;
       /** The time of the last provider notification that names this turn. */
       lastEventAt: number;
     }
@@ -1030,6 +1039,7 @@ export class TurnLifecycle {
           compacted: false,
           narration: null,
           openTools: new Set(),
+          failureReports: new Set(),
           lastEventAt: Date.now(),
         });
         this.#traces.begin(turnId, new Date().toISOString());
@@ -1086,6 +1096,7 @@ export class TurnLifecycle {
         );
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
+        if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
         this.#markProduced(turnId, isRepeatedWork(item));
         const running = this.#runningTurns.get(turnId);
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
@@ -1777,8 +1788,11 @@ export class TurnLifecycle {
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
-      const mayContinue =
-        failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
+      const stoppedAfterWork = failedOnProvider && this.#carriesWork(agentId, turnId, running);
+      const spentAfterWork = stoppedAfterWork && failover.context.causeCode === "usage_limit";
+      // Only for an agent set to switch without asking: this error is not a limit that the user knows.
+      const failedAfterWork = stoppedAfterWork && CONTINUE_CAUSES.has(failover.context.causeCode);
+      const mayContinue = spentAfterWork || failedAfterWork;
       // A spent quota, a failed compaction and a routine run's own session have their own handling.
       const failingSession =
         running !== undefined &&
@@ -1874,24 +1888,25 @@ export class TurnLifecycle {
       const requeue = repeatable && (!channelTurn || continuing);
       // The limit belongs to the model the turn ran on, which the agent may have left since.
       const model = this.#hooks.turnModel(agentId, turnId);
-      // The same for a provider error, when the agent moves to a backup model. Only the agent's own
-      // chat moves it: a task or a channel task fails as before. A message runs again once for each
-      // provider account and model that failed it, so a move that does not happen cannot run it on
-      // the same one again. A turn that a spent quota ended after work started continues on a backup,
-      // as after a plan limit, also when the agent is set to ask: there is no moment to ask.
+      // The same for a provider error, when the agent moves to a backup model. The agent's own chat
+      // and a thread move it (#8406): a channel task fails as before, because its channel assigns it
+      // and a provider error holds no queue. A message runs again once for each provider account and
+      // model that failed it, so a move that does not happen cannot run it on the same one again. A
+      // turn that a spent quota ended after work started continues on a backup, as after a plan
+      // limit, also when the agent is set to ask: there is no moment to ask. A turn that a failed
+      // sign-in or a provider that does not answer ended after work started continues there too.
       const failedKey = this.#usageLimits.failureKey(agentId, model);
       const failedOver =
         (mayRunAgain || mayContinue) &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        !taskTurn &&
         !channelTurn &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        ((mayRunAgain && this.#hooks.mayFailOver(agentId)) ||
-          (mayContinue && this.#hooks.mayContinueOnBackup(agentId)));
+        (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
+          (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)));
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
-      // answer (#7225). With no backup to take it, the turn runs once more on the same model. A thread
-      // turn never moves to a backup, so it always runs once more here (#8503). So does the turn of an
+      // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
+      // thread too (#8503). So does the turn of an
       // external chat, whose person waits for the result (#8573); a channel task does not. It did no
       // step, so it repeats nothing. A second empty run shows the error.
       const runsAgainHere =
@@ -1963,6 +1978,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           continuing ? yield* continuedWork : undefined,
+          running?.failureReports,
         );
         // After the requeue, so a routine set to skip finds its run back in the queue.
         yield* this.#usageLimits.reached(agentId, resetsAt, model);
@@ -1982,6 +1998,7 @@ export class TurnLifecycle {
           snapshot,
           deliveries,
           failedOver && mayContinue ? yield* continuedWork : undefined,
+          running?.failureReports,
         );
         // A turn that runs again on the same model keeps it.
         if (failedOver) this.#markFailed(agentId, model, failover);
@@ -1990,7 +2007,7 @@ export class TurnLifecycle {
         this.#hooks.scheduleDrain(agentId);
         return;
       }
-      // A thread turn does not move to a backup, but the agent leaves the failing model before its next turn (#5220).
+      // A thread turn that does not run again still makes the agent leave the failing model before its next turn (#5220).
       if (failover && mayRunAgain && taskTurn && failedKey !== null && this.#hooks.mayFailOver(agentId))
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as
@@ -2398,13 +2415,18 @@ export class TurnLifecycle {
     snapshot: ConversationSnapshot,
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    failureReports?: ReadonlySet<string>,
   ) {
     // With no continuation, the next attempt runs with this turn ID and writes its text into this
     // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
-    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does.
+    // that waited in the queue (#6504). The write deletes the stored rows, as `#clearPlan` does. The
+    // agent's report of the failure goes too: the next attempt answers in its place (#8293).
     if (!resumeAfterUsageLimit)
-      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1)
-        if (isEmptyAttemptText(snapshot.messages[index], turnId)) snapshot.messages.splice(index, 1);
+      for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+        const message = snapshot.messages[index];
+        if (isEmptyAttemptText(message, turnId) || (message && failureReports?.has(message.id)))
+          snapshot.messages.splice(index, 1);
+      }
     for (const context of deliveries) {
       const { delivery } = context;
       const continuation = resumeAfterUsageLimit
@@ -3009,11 +3031,13 @@ function noResultNote(
 
 /**
  * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
- * the provider's echo of the user's message are not repeated work.
+ * the provider's echo of the user's message are not repeated work. Nor is an agent's own report of
+ * the failure that it sent as answer text (`AcpFlavor.failureReport`, #8293).
  */
-function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown; failureReport?: unknown }): boolean {
   if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
   if (item.type !== "agentMessage") return true;
+  if (item.failureReport === true) return false;
   return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
 }
 

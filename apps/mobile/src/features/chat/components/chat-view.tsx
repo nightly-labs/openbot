@@ -26,6 +26,7 @@ import { useBrowserFeature } from "@/features/browser/components/use-browser-fea
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
 import { ChatComposer, type MentionReference, type MentionSkill } from "@/features/chat/components/chat-composer";
+import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
@@ -203,9 +204,23 @@ export interface ChatViewProps {
   showLatestMessages?: () => Promise<void>;
   /** Leaves the chat, from the back button and the Android edge swipe. */
   onLeave: () => void;
+  /**
+   * Runs on a swipe away from Back over the messages: to the left, or to the right in a right-to-left
+   * layout. Null turns the swipe off, such as when the host cannot open the chosen screen.
+   */
+  onSwipeForward?: (() => void) | null;
+  /**
+   * Runs when the reader pulls past the latest message until the ring above the composer is full,
+   * and lets go. Null turns the pull off.
+   */
+  onPullPastEnd?: (() => void) | null;
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
+/** The swipe away from Back opens its screen after this distance, or after a shorter fast flick. */
+const SWIPE_FORWARD_DISTANCE = 72;
+const SWIPE_FORWARD_FLICK_DISTANCE = 32;
+const SWIPE_FORWARD_FLICK_VELOCITY = 650;
 const NO_DELIVERIES: ChatQueueController["deliveries"] = [];
 /** A host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
@@ -308,6 +323,8 @@ export function ChatView({
   detached = false,
   showLatestMessages,
   onLeave: leaveConversation,
+  onSwipeForward = null,
+  onPullPastEnd = null,
 }: ChatViewProps) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspaceReader();
@@ -487,6 +504,23 @@ export function ChatView({
       if (thinkingAgentId) router.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
     },
     [thinkingAgentId],
+  );
+  const openMemoryChanges = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
+  const openSubagents = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({
+          pathname: "/subagent",
+          params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
+        });
+    },
+    [thinkingAgentId, target.serverId],
   );
   const queuedMessageIds = useMemo(
     () =>
@@ -928,6 +962,58 @@ export function ChatView({
     [menuOpenValue, voiceOpenValue, leaveVoiceMode, leaveConversation],
   );
 
+  // The swipe away from Back keeps one gesture object, as the edge swipe does: the list and each
+  // message bubble attach to it. The action and whether it is on change without a new gesture.
+  // Off while text is selected in a message: a selection handle can move in the same direction.
+  const swipeForwardOn = useSharedValue(onSwipeForward !== null && !selection);
+  const swipeForwardAction = useRef(onSwipeForward);
+  const selecting = Boolean(selection);
+  useEffect(() => {
+    swipeForwardAction.current = onSwipeForward;
+    swipeForwardOn.set(onSwipeForward !== null && !selecting);
+  }, [onSwipeForward, selecting, swipeForwardOn]);
+  const swipeForward = useCallback(() => {
+    const action = swipeForwardAction.current;
+    if (!action) return;
+    void haptics.impact("soft");
+    action();
+  }, []);
+  const swipeForwardGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        // Off, or while the attachment card or the voice mode covers the chat: the touch goes to the
+        // list and to the back swipe at once.
+        .onTouchesDown((_event, manager) => {
+          if (!swipeForwardOn.get() || menuOpenValue.get() || voiceOpenValue.get()) manager.fail();
+        })
+        // Away from Back: to the left, or to the right in a right-to-left layout. A swipe toward Back
+        // fails it at once, so the iOS back swipe, which waits for it, starts with no delay.
+        .activeOffsetX(-24 * END_X)
+        .failOffsetX(8 * END_X)
+        .failOffsetY([-12, 12])
+        .onEnd((event) => {
+          const distance = -event.translationX * END_X;
+          const velocity = -event.velocityX * END_X;
+          if (
+            distance >= SWIPE_FORWARD_DISTANCE ||
+            (distance >= SWIPE_FORWARD_FLICK_DISTANCE && velocity >= SWIPE_FORWARD_FLICK_VELOCITY)
+          )
+            scheduleOnRN(swipeForward);
+        }),
+    [swipeForwardOn, menuOpenValue, voiceOpenValue, swipeForward],
+  );
+
+  // The pull past the latest message. Off while text is selected, or the attachment card or the voice
+  // mode covers the chat.
+  const pullPastEnd = useRef(onPullPastEnd);
+  pullPastEnd.current = onPullPastEnd;
+  const openPastEnd = useCallback(() => pullPastEnd.current?.(), []);
+  const endPull = useChatEndPull({
+    motion,
+    enabled: onPullPastEnd !== null && !selecting && !attachments.menuOpen && !voiceOpen && !dictating,
+    onOpen: openPastEnd,
+  });
+
   // Hold the turn the stop was asked for, not a flag: the host clears the turn
   // when the stop lands, and the next turn must not inherit a pending state.
   const [stoppingTurnId, setStoppingTurnId] = useState<string | null>(null);
@@ -1244,6 +1330,10 @@ export function ChatView({
               threadMenu={threadMenu}
             />
             <ChatMessageList
+              // Only an agent's chat has the swipe: it is off in a channel. Every chat has the pull.
+              swipeGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
+              pullGesture={endPull.gesture}
+              pullShift={endPull.shift}
               agents={serverAgents}
               rowsShown={rowsShown}
               target={target}
@@ -1271,6 +1361,8 @@ export function ChatView({
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}
               onOpenTurn={thinkingAgentId ? openTurn : undefined}
+              onOpenSubagents={thinkingAgentId ? openSubagents : undefined}
+              onOpenMemoryChanges={thinkingAgentId ? openMemoryChanges : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}
@@ -1324,6 +1416,9 @@ export function ChatView({
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
+              {onPullPastEnd !== null ? (
+                <ChatEndPullRing pull={endPull} target={target} leadAgentId={channelLeadAgentId} />
+              ) : null}
               {!voiceOpen && (detached || !atLatest) && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
                   <ChatGlassIconButton
@@ -1527,6 +1622,7 @@ export function ChatView({
             anchor={attachments.menuAnchor}
             appActive={appActive}
             attachments={attachments}
+            context={contextMeter}
             fallbackBackground={fieldBackground}
             foreground={foreground}
             keyboardHeight={motion.keyboardHeight}

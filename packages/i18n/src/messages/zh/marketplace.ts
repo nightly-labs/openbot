@@ -368,13 +368,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "为新流程起草一封密码重置邮件。",
   "marketplace.plugin.omnisend.tagline": "邮件和短信营销",
   "marketplace.plugin.omnisend.description":
-    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每个用户在浏览器中登录自己的 Omnisend 账户，并在授权页面选择访问级别。拥有写入权限时，智能体还可以发送活动和删除数据。如果智能体只需要报告，请选择只读权限。",
+    "Omnisend 让智能体读取活动和表单报告，查找联系人和细分，并创建和编辑活动、自动化流程、邮件模板、表单和商品。每位用户使用自己 Omnisend 账号中的 API 密钥连接。智能体可以执行该密钥允许的操作，可能包括发送活动和删除数据。",
   "marketplace.plugin.omnisend.app":
-    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并在浏览器中登录。",
+    "活动、自动化流程、联系人、细分、表单和报告，通过 Omnisend 的 MCP 服务器并使用 API 密钥。",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "上周的活动与前一周相比效果如何？",
   "marketplace.plugin.omnisend.prompt.segment": "VIP 细分中有多少联系人，本月有什么变化？",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "为新系列起草一个活动，但不要发送。",
   "marketplace.plugin.postiz.tagline": "社交媒体排程",
+  "marketplace.plugin.omnisend.hint.apiKey": "在 Omnisend 中打开 Store settings > API keys，然后创建一个密钥。",
   "marketplace.plugin.postiz.description":
     "Postiz 让智能体列出你的社交媒体频道，并在 X、LinkedIn、Instagram、TikTok 等 30 多个平台上起草、排程和发布帖子。智能体还可以上传媒体，并用 AI 生成图片和视频。在浏览器中登录你的 Postiz 账户，或粘贴 Postiz 中 Settings › Developers 里的 API 密钥。所有 Postiz 云端方案都包含 API 访问权限。智能体可以立即发布帖子，因此请在批准前检查每个帖子。",
   "marketplace.plugin.postiz.app":

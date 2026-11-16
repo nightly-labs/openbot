@@ -236,6 +236,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot이 이 MCP 서버 설정을 저장할 수 없어요.",
   "error.backend.mcpServerNoAnswer": "서버가 {seconds}초 안에 응답하지 않았어요.",
   "error.backend.mcpSignInNotAccepted": "서버가 해당 로그인을 수락하지 않았어요.",
+  "error.backend.mcpSignInAccountRefused":
+    "서버가 로그인한 계정을 거부했어요. 이 계정이 서비스를 사용할 수 있는지 확인하세요. 다른 계정을 사용하려면 로그아웃한 다음 다시 로그인하세요.",
   "error.backend.mcpSignInClientRefused":
     "로그인을 완료할 때 로그인 서버가 OpenBot을 받아들이지 않았어요. 다시 로그인하세요. OpenBot이 서버에 다시 등록해요.",
   "error.backend.mcpCommandNotFound": "명령을 찾을 수 없어요: {command}",

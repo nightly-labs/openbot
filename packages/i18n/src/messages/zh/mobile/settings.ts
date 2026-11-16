@@ -121,6 +121,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",
+  "mobile.settings.appearance.fullVisuals": "完整显示可视化预览",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "智能体的可视化内容在聊天中按完整高度显示。关闭时，较高的内容会被截断，轻点即可查看全部。",
   "mobile.settings.animations.title": "动画",
   "mobile.settings.animations.footer":
     "关闭“动画”可减少整个应用的动态效果。当手机设置中开启“减弱动态效果”时，应用也会减少动效，下面的动画选项将保持关闭。",
@@ -218,6 +221,13 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "自动下载大文件",
   "mobile.settings.conversations.largeFilesFooter":
     "超过 {small} 的图片、视频和音频只在你轻点时下载。开启后，{large} 以内的会立即下载。这可能会使用大量移动数据。",
+  "mobile.settings.conversations.swipeLeft": "在助手聊天中向左滑动",
+  "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
+  "mobile.settings.conversations.swipeThreads": "话题",
+  "mobile.settings.conversations.swipeBrowser": "浏览器",
+  "mobile.settings.conversations.swipeFooter": "在助手聊天中朝返回的反方向滑动会打开此项。在消息上滑动仍会回复该消息。",
+  "mobile.settings.conversations.pullInfo": "上拉查看信息",
+  "mobile.settings.conversations.pullInfoFooter": "在聊天、频道或话题中越过最新消息继续上拉并松开，即可打开其信息。",
   "mobile.settings.conversations.fullQualityPhotos": "以原始画质发送照片",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "关闭时，应用会发送每张照片的较小副本，长边最多 2048 像素，在慢速连接上更快送达。打开后发送原始照片。",

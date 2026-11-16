@@ -254,6 +254,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "O OpenBot não pode salvar esta configuração de servidor MCP.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou esse login.",
+  "error.backend.mcpSignInAccountRefused":
+    "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
     "O servidor de login não aceitou o OpenBot ao concluir o login. Entre de novo: o OpenBot se registra outra vez no servidor.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",

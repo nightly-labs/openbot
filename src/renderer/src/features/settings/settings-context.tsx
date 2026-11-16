@@ -26,6 +26,8 @@ import { readSendShortcutMode, setSendShortcutMode, useSendShortcutMode } from "
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
 import { useSetup } from "../onboarding/onboarding-context";
+import { mcpSignInRecord } from "../servers/mcp-servers";
+import { desktopMarketplaceCalls } from "./marketplace-calls";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
@@ -127,6 +129,19 @@ const Settings = createSimpleContext({
       serverId: string;
       states: Readonly<Record<string, McpSignInState>>;
     } | null>(null);
+    /**
+     * Reads `mcpSignIns` again for the server whose states it holds. Each new Sign in card in a chat
+     * calls it: a read from before the agent's test can still say that a refused sign-in is current (#6661).
+     */
+    function refreshMcpSignIns(serverId: string | undefined): void {
+      if (!serverId || mcpSignIns()?.serverId !== serverId) return;
+      void desktopMarketplaceCalls()
+        .mcp.listMcpSignIns(serverId)
+        .then(mcpSignInRecord, () => null)
+        .then((states) => {
+          if (states && mcpSignIns()?.serverId === serverId) setMcpSignIns({ serverId, states });
+        });
+    }
     /**
      * The agent or skill that a Marketplace link named, held as the plugin slug is. It is a kind and
      * an id, never a listing: the page loads the listing, and only Add on that page adds it.
@@ -764,6 +779,7 @@ const Settings = createSimpleContext({
       setPendingMcpSignIn,
       mcpSignIns,
       setMcpSignIns,
+      refreshMcpSignIns,
       pendingMarketplaceListing,
       setPendingMarketplaceListing,
       pendingAgentTemplateId,
