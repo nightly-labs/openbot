@@ -1013,6 +1013,26 @@ to ungroup it; deleting a section also ungroups its agents and channels without 
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 
+`set_backdrop` puts an HTML page behind the user's whole window. The router stores the page like an
+`html_render` page, as a message with the item type `window-backdrop` (`CHAT_BACKDROP_ITEM_TYPE`),
+so a joined server and the web client need no new event or capability, and an older client shows the
+title and the file. A channel turn and a linked chat app turn get a tool failure: their requests
+come from other people. Each client keeps the newest backdrop message that is newer than its mark
+(`src/renderer/src/agent-backdrops.ts`, per device and browser) in one replaceable slot per agent in
+`custom-backdrops.ts`, selects it, and shows a notice with Undo. The mark moves to that message, so
+the history of a chat never changes the backdrop again. The desktop reads backdrop messages from the
+chat events of every agent; the web client reads only the open chat. The page plays in the locked
+frame of a custom backdrop and gets no input.
+
+The optional `bubbles` argument (`yours`, `agents`: `#rrggbb`) goes in the page as
+`<meta name="openbot-bubbles" content="yours=#…; agents=#…">` (`withChatBackdropBubbles`), so each
+client gets the colors with the page file and the protocol does not change. `WindowBackdrop` reads
+them with `chatBackdropBubbles` while that page shows and sets them in
+`features/window/backdrop-bubbles.tsx`; the render root gives them to `ChatMessageRow` through the
+`BackdropBubbles` context of `@openbot/ui`. They replace the chat color of the reader's own bubbles
+and of agent bubbles, not the saved agent `chatColor`. A built-in scene or a picture has no bubble
+colors.
+
 `html_render` publishes a visual reply: an HTML page that shows above the agent's reply. On desktop
 and in the web client, a button on the page opens it as a file tab of the side panel too. The router
 stores the page as a generated `text/html` attachment and adds an assistant message with the item

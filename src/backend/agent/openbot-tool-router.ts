@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { chatVisualItemType } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_BACKDROP_ITEM_TYPE,
+  chatVisualItemType,
+  withChatBackdropBubbles,
+  withChatBackdropRequesters,
+} from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import {
   BUG_REPORT_AREAS,
@@ -38,6 +43,7 @@ import type {
   AgentModelChoice,
   AgentModelOption,
   AgentSummary,
+  AvatarColor,
   AvatarImageInput,
   ConversationMessage,
   CreateAgentInput,
@@ -57,6 +63,7 @@ import {
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
@@ -96,6 +103,7 @@ import {
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
   serverInstallCommandToolSchema,
+  setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
@@ -132,7 +140,12 @@ import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
-import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
+import {
+  backdropMessageId,
+  responseAttachmentMessageId,
+  visualReplyFileName,
+  visualReplyMessageId,
+} from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
@@ -223,6 +236,11 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "remove_api_key",
   "save_api_key",
 ]);
+
+/** A `#rrggbb` color from a tool call, in the lower case that a chat color uses. */
+function lowerCaseColor(color: string): AvatarColor {
+  return `#${color.slice(1).toLowerCase()}`;
+}
 
 /**
  * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
@@ -1005,8 +1023,9 @@ export class OpenBotToolRouter {
                 }),
               ),
             );
-            // Both store a file and then add the message that names it.
-            if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
+            // Each stores a file and then adds the message that names it.
+            if (tool === "attach_files_to_response" || tool === "html_render" || tool === "set_backdrop")
+              yield* Effect.uninterruptible(response);
             // A side Codex search can take up to two minutes on the user's ChatGPT quota, and a video
             // download and transcript can take longer, so Stop ends them.
             else if (tool === "web_search" || tool === "read_video") {
@@ -1983,6 +2002,10 @@ export class OpenBotToolRouter {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
     }
 
+    if (params.tool === "set_backdrop") {
+      return yield* this.#setBackdrop(params, senderAgentId, executionThreadId);
+    }
+
     if (params.tool === "web_search") {
       const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
@@ -2425,6 +2448,65 @@ export class OpenBotToolRouter {
   });
 
   /**
+   * `set_backdrop`: stores the page as an HTML attachment and adds a backdrop message. Each client of
+   * the chat puts the newest one behind its window (`agent-backdrops.ts` in the renderer). A channel or
+   * external chat turn cannot use it: someone else's request would change the user's window. A task
+   * thread cannot use it either: the clients do not watch it. On a joined server, members share the
+   * agent's chat, so the page names the people who asked in this turn, and only their clients show it.
+   */
+  readonly #setBackdrop = Effect.fn("OpenBotToolRouter.setBackdrop")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    executionThreadId: string,
+  ) {
+    if (
+      this.#channels.store.channelForThread(executionThreadId) ||
+      this.#messaging.store.linkForThread(executionThreadId)
+    ) {
+      return openBotToolFailure("Only a turn in your own OpenBot chat can set the backdrop.");
+    }
+    // The clients watch the agent's own chat only, so a page from a task thread would not show.
+    if (this.#conversation.isTaskThread(executionThreadId)) {
+      return openBotToolFailure("Set the backdrop from your own chat, not from a task thread.");
+    }
+    const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
+    const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
+    if (
+      this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
+    ) {
+      return openBotToolResult({ status: "set", messageId });
+    }
+    yield* this.#addGeneratedMessage({
+      agentId: senderAgentId,
+      threadId: executionThreadId,
+      turnId: params.turnId,
+      messageId,
+      file: {
+        // The colors go in the page, so each client gets them with the page file.
+        bytes: new TextEncoder().encode(
+          withChatBackdropRequesters(
+            withChatBackdropBubbles(args.html, {
+              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+            }),
+            this.#turnRequesters(senderAgentId, params.turnId),
+          ),
+        ),
+        name: `${visualReplyFileName(args.title)}.html`,
+        mimeType: "text/html",
+      },
+      text: args.title,
+      itemType: CHAT_BACKDROP_ITEM_TYPE,
+      eventType: "response.backdrop-set",
+      detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
+    });
+    return openBotToolResult({ status: "set", messageId });
+  });
+
+  /**
    * Stores generated bytes as the attachment of one new assistant message. The file and its message
    * are saved together, so a failed save keeps no file and a retry stores one.
    */
@@ -2795,6 +2877,20 @@ export class OpenBotToolRouter {
   #remoteMember(messageId: string): boolean {
     const member = this.#mailbox.senderMember(messageId);
     return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+  }
+
+  /**
+   * The people who sent the messages of this turn, as their `senderMember` ids. A message with no
+   * sender is from a person on this computer who is signed out. A turn with no person's message, such
+   * as a routine run, has none.
+   */
+  #turnRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind !== "user") continue;
+      ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
+    }
+    return [...ids];
   }
 
   /** Whether a team member on another computer sent a message of this turn. */

@@ -291,6 +291,11 @@ export interface AgentThreadViewProps {
   onDeleteMessage?: ((messageId: string) => Promise<void>) | undefined;
   /** Whether the reader can delete a message. Without it, every message that is not streaming can. */
   canDeleteMessage?: ((message: AgentMessage) => boolean) | undefined;
+  /**
+   * The "Use as backdrop" action of a message, or undefined when the message has nothing that can go
+   * behind the window. Missing where the host has no backdrop.
+   */
+  backdropAction?: ((message: AgentMessage) => (() => void) | undefined) | undefined;
   /** Where the thread came from, when it is a branch. A line shows after the copied messages. */
   branchSource?: AgentThreadBranchSource | undefined;
   /** Makes the draft a reply to a message of the thread. Missing where the host cannot take a reply in a thread. */
@@ -597,7 +602,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const pinned = pins.isPinned(message.id);
     return { pinned, onToggle: () => pins.onToggle(message.id, !pinned) };
   }
-  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, and Delete. */
+  /** The items of a message's menu: Reply, Copy, Pin, Branch on the last answer of a finished turn, Use as backdrop, and Delete. */
   function menuItems(message: AgentMessage, onCopy: (message: AgentMessage) => void): MessageMenuItemsProps {
     return {
       message,
@@ -608,6 +613,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
       onBranch: branchAction(message),
       branchDisabled: branchBusy(),
       pin: pinAction(message),
+      onUseAsBackdrop: props.backdropAction?.(message),
       onDelete: deleteAction(message),
     };
   }

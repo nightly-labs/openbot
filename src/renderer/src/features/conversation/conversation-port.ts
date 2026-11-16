@@ -7,6 +7,7 @@ import type { DeleteSharedTableInput, OpenBotDesktopApi, SharedTable } from "@op
 export interface ConversationPort {
   agent: Pick<
     OpenBotDesktopApi["agent"],
+    | "addPreviewPage"
     | "readAgentSessionSettings"
     | "listAgentNotificationLevels"
     | "askSideQuestion"

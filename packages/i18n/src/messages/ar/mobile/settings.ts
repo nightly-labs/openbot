@@ -136,6 +136,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "الإضاءة",
   "mobile.settings.appearance.messageColorFooter":
     "مع لون الوكيل، تستخدم رسائلك في دردشة وكيل لون ذلك الوكيل. مع اللون المخصص، تستخدم رسائلك في كل الدردشات اللون الذي تختاره. يتغير لون النص ليبقى سهل القراءة.",
+  "mobile.settings.appearance.chatBackground": "خلفية الدردشة",
+  "mobile.settings.appearance.chatBackgroundDefault": "الافتراضي",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "يحتفظ كل مظهر بلونه الخاص. يصبح اللون الذي يصعّب قراءة النص أغمق أو أفتح.",
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",

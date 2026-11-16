@@ -152,6 +152,8 @@ function openbotGuidance(namespace: string, tool: string): string {
         "OpenBot renders GitHub-flavored Markdown tables: a header row, a separator row with three or more dashes per column, and one or more data rows. A fenced ```mermaid block shows a diagram. A fenced ```html block shows a static page next to its code: inline CSS, inline SVG, and data: URLs only, with no scripts or network loads.",
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
+    case "set_backdrop":
+      return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":
       return "React to clear emotional moments. Wins, affection, gratitude, playful humor, sadness, disappointment, frustration, loneliness, and strong approval normally get one fitting reaction; do not skip them. Negative emotions get an empathetic reaction, such as ❤️, 😔, or 🫂. An emoji in your answer is not a reaction: when you use one for the user's emotion, also react. Skip neutral, informational, or routine messages, and do not react on every turn.";
     case "pin_message":

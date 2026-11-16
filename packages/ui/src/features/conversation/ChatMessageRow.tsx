@@ -16,6 +16,7 @@ import type { AgentMessage, AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import type { AttachmentDownloads, AttachmentMediaSource } from "./AttachmentCards";
+import { useBackdropBubbles } from "./BackdropBubbles";
 import type { MessageImageFile } from "./MarkdownMessageText";
 import { conversationBubbleVariant, MessageBody } from "./MessageRendering";
 import { solidBubbleTakesDarkText } from "./own-bubble";
@@ -125,8 +126,8 @@ export interface ChatMessageRowProps {
  * It is shared because the agent chat and the channel chat draw the same message. They differed on
  * every part around the bubble - the channel had no entrance animation, no streaming state on the
  * bubble and no toolbar - for as long as each wrote its own row, and this component is what stops
- * that from happening a third time. It reads no context and no store: what a caller knows about a
- * conversation arrives as a prop.
+ * that from happening a third time. It reads no store: what a caller knows about a conversation
+ * arrives as a prop. The one context is the bubble colors of the backdrop (`BackdropBubbles`).
  */
 export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   const { t } = useText();
@@ -139,7 +140,14 @@ export function ChatMessageRow(props: ChatMessageRowProps): JSX.Element {
   // A colour literal in an inline style is refused by `check:ui`, and rightly: this is the agent's
   // own head colour, read through the same helper the action markers use, so a name matches the
   // face beside it.
-  const chatColor = () => props.author.chatColor ?? props.author.agent?.chatColor;
+  // The colors of the backdrop that shows now go before the chat colors, so the scene and the
+  // bubbles make one theme.
+  const backdropBubbles = useBackdropBubbles();
+  const chatColor = () => {
+    const bubbles = backdropBubbles();
+    const themed = own() ? bubbles?.yours : props.author.kind === "agent" ? bubbles?.agents : undefined;
+    return themed ?? props.author.chatColor ?? props.author.agent?.chatColor;
+  };
   const authorStyle = () => {
     const currentSeed = seed();
     const tint = chatColor();
