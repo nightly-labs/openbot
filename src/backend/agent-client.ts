@@ -52,6 +52,11 @@ export interface AgentClient {
    * because the other providers take the current servers on resume.
    */
   readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
+  /**
+   * True when the agent of `model` gets each OpenBot catalog tool as an MCP tool of its own (`AcpFlavor`
+   * `catalogAsMcpTools`). Optional, because the other providers do not hide OpenBot's tools.
+   */
+  readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;

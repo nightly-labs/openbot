@@ -149,6 +149,8 @@ export const messages = {
     "워크스페이스 전용 모드에는 Codex 샌드박스가 필요하지만 이 컴퓨터에서는 Codex가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 먼저 묻기나 전체 접근을 선택하세요.",
   "error.agent.claudeSandboxUnavailable":
     "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어요: {reason}. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
+  "error.agent.claudeSandboxBlocked":
+    "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.screenCaptureOff":
     "이 에이전트는 화면 캡처가 꺼져 있어요. 사용자가 에이전트 설정에서 컴퓨터 제어를 켤 수 있어요.",
   "error.agent.screenCaptureUnavailable": "이 컴퓨터에서는 화면 캡처를 사용할 수 없어요.",
@@ -159,7 +161,7 @@ export const messages = {
   "error.agent.mcpToolDeclined": "사용자가 이 MCP 도구 호출을 허용하지 않았어요. 도구는 실행되지 않았어요.",
   "error.agent.mcpServerNotSaved": "MCP 서버가 응답하지 않아 저장하지 않았어요. {error}",
   "error.agent.mcpServerKeysMove":
-    "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 서버 설정의 MCP에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
+    "MCP 서버 {name}에는 현재 서버용 키가 있어요. 사용자에게 마켓플레이스, 앱, {name}에서 주소, 명령, 인수 또는 전송 방식을 변경해 달라고 요청하세요.",
   "error.agent.mcpServerBuiltIn":
     "{name}은(는) OpenBot의 일부라서 MCP 도구로 테스트하거나 켜고 끄거나 제거할 수 없어요. 사용자가 OpenBot을 실행하는 컴퓨터에서 관리해요. GitHub 연결은 마켓플레이스, 앱, GitHub에서, 컴퓨터 제어는 설정, 컴퓨터 제어에서 관리해요.",
   "error.agent.mcpServerUnknown": "{name}(이)라는 MCP 서버가 없어요. list_mcp_servers를 호출해 이름을 확인하세요.",

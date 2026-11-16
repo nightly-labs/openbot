@@ -362,3 +362,9 @@ export type ComposerBrowserTab = Pick<BrowserTab, "id" | "title" | "url">;
 
 /** A side thread of the agent that the composer can tag. Its id is the task id. */
 export type ComposerThread = Pick<AgentTask, "id" | "title" | "state" | "outcome" | "progress" | "error">;
+
+/** A message in a side thread that has the `@` query. `body` is the stored message text. */
+export interface ComposerThreadMessageMatch {
+  threadId: string;
+  body: string;
+}

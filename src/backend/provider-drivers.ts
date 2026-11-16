@@ -30,7 +30,8 @@ import {
   GEMINI_DIR_FLAG,
   geminiSavedKeyLimitFailure,
 } from "./acp-flavor-antigravity";
-import { OPENCODE_ACP_FLAVOR, openCodeSteers, steerOpenCode } from "./acp-flavor-opencode";
+import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
@@ -766,7 +767,9 @@ interface ProviderModelCatalog {
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
+  modelFields?(
+    model: ModelListResponse["data"][number],
+  ): Pick<AgentModelOption, "fastServiceTier" | "ultrafastServiceTier" | "steersTurns">;
   /**
    * The models to keep when the list failed, timed out or came back empty. Without this hook a
    * failed list keeps the previous models, and an empty list is a real answer.
@@ -1184,8 +1187,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
-        steer: steerOpenCode,
-        steers: openCodeSteers,
+        steer: steerAcpSession,
+        steers: acpSessionSteers,
         history: context.history?.("opencode"),
       }),
     createProfileClient: (cli, timeout, context) =>
@@ -1723,7 +1726,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
     // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
     // the list is read once more after each start.
-    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
+    catalog: {
+      slowList: true,
+      partialListAtStart: true,
+      relistAfterStart: true,
+      // Whether the custom agent that serves the model takes a message in its running turn (#4977).
+      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+    },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
@@ -1789,6 +1798,10 @@ function customAgentChild(
     ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
+    // A custom agent that reports `_session/steering` takes a message in its running turn (#4977).
+    // Any other one gets no request, and the message waits in the queue.
+    steer: steerAcpSession,
+    steers: acpSessionSteers,
     ...(profileGeneration
       ? {}
       : {

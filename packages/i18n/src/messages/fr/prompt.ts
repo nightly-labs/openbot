@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",
   "prompt.approval.report.send": "Envoyer à l'équipe OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Ouvre cette discussion dans l'app OpenBot du téléphone et envoie le rapport depuis là. Le téléphone ajoute sa version, son système et son journal d'assistance. Si le téléphone ne peut pas se connecter, ouvre Réglages > Assistance dans l'app du téléphone et signale le problème sur GitHub.",
   "prompt.approval.title.command": "Exécuter une commande",
   "prompt.approval.title.fileChange": "Modifier des fichiers",
   "prompt.approval.title.permissions": "Accorder des autorisations",

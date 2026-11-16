@@ -2422,6 +2422,7 @@ export async function createApplicationServices({
     catalog: modelReleaseCatalog,
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
+    customEndpoints: () => customProviders.list(),
     modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());
@@ -2530,7 +2531,7 @@ export async function createApplicationServices({
           })),
         ),
       mediaProviders: () => service.workflowMediaProviders(),
-      mediaCredits: () => service.workflowMediaCredits(),
+      mediaCredits: (only) => service.workflowMediaCredits(only),
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       notify: forwardWorkflowNotice,
@@ -2758,7 +2759,7 @@ export async function createApplicationServices({
     for (const provider of status.providers ?? []) {
       if (!isManagedRuntimeProvider(provider.id)) continue;
       const version = provider.cliSource === "system" ? (provider.version ?? null) : null;
-      if (providerRuntimes.setSystemVersion(provider.id, version)) copyInUse = true;
+      if (providerRuntimes.setSystemVersion(provider.id, version, provider.cliIncomplete === true)) copyInUse = true;
       if (
         hostedServer !== null &&
         provider.state === "outdated" &&
@@ -3106,7 +3107,7 @@ export async function createApplicationServices({
     () => serverTimezone.effective(),
     join(app.getPath("userData"), "agent-import-uploads"),
   );
-  // Hermes profiles become agents through the same services; MCP servers through the MCP settings.
+  // Hermes profiles become agents through the same services; MCP servers through the Marketplace.
   const hermesImport = new HermesImportService(
     {
       listAgents: () => service.listAgents(),
@@ -4356,8 +4357,13 @@ export async function createApplicationServices({
   );
   const describeRestartReadiness = (): RestartReadiness =>
     checkRestartReadiness({
-      // A workflow model step lives in this process only; agent steps are queued deliveries.
-      agentWork: [...service.hasActiveWork(), ...(workflowRuntime.working() ? ["routine-run"] : [])],
+      // A workflow model step lives in this process only; agent steps are queued deliveries. The
+      // servers on this computer stop with this process, which installs the update for them too.
+      agentWork: [
+        ...service.hasActiveWork(),
+        ...(workflowRuntime.working() ? ["routine-run"] : []),
+        ...(localServers && localServers.workingAgents().length > 0 ? ["agent-turn"] : []),
+      ],
       hostBlockers: host.describeRestartBlockers(),
       activeBrowserControls: browser.getControlState().sessions.length,
       activeFileTransfers: remoteServers.hasActiveTransfers(),

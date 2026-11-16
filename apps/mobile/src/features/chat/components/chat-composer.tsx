@@ -45,6 +45,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
@@ -73,7 +74,7 @@ import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
-import { type ComposerContextMeter, ComposerContextRing } from "./composer-context-ring";
+import type { ComposerContextMeter } from "./composer-context-ring";
 import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
 import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
@@ -204,8 +205,8 @@ interface ChatComposerProps {
   /** The agent's colours for the glow in the call bar. */
   voicePalette?: VoicePalette;
   /**
-   * How full the chat's context is, for a host that reports it. The ring sits before the dictation
-   * mic while the composer is open; the resting bar does not show it.
+   * How full the chat's context is, for a host that reports it. The ring is a row of the attachment
+   * menu, so the bar keeps its four controls; the plus carries a dot from the warning level on.
    */
   contextMeter?: ComposerContextMeter;
 }
@@ -460,10 +461,7 @@ export const ChatComposer = memo(function ChatComposer({
   const lineHeight = 22 * fontScale;
   // Without the plus, the text starts at the card's own inset.
   const leadingInset = attachments ? ROW_CONTROL_INSET : FIELD_INSET;
-  // The context ring takes a control's box before the mic, only in the open composer. The resting
-  // bar keeps its own insets, so it is as narrow with the ring as without it.
-  const contextInset = contextMeter ? CONTROL_SIZE + CONTROL_GAP : 0;
-  const trailingInset = ROW_CONTROL_INSET + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0) + contextInset;
+  const trailingInset = ROW_CONTROL_INSET + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0);
   const rowTextWidth = barWidth - BAR_INSET * 2 - trailingInset - leadingInset;
   // One reading drives both the shape and the height. Measuring the two widths
   // separately gave the card two targets in two frames, so it animated twice.
@@ -643,28 +641,6 @@ export const ChatComposer = memo(function ChatComposer({
   const dictationMicStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
   }));
-  // The context ring is part of the open composer only. It comes in over the second half of the
-  // opening and leaves in the first half of the closing, on the same progress as the shape, so a
-  // dismissal drags it out frame by frame. It rides with the control row into the smaller bar, and
-  // leaves to the voice mode and to dictation as the mic does.
-  const contextRowWidth = CONTROL_SIZE + (dictationMic ? CONTROL_SIZE + CONTROL_GAP : 0);
-  const contextRingStyle = useAnimatedStyle(() => {
-    const progress = expansion.get();
-    const x = interpolate(progress, [0, 1], [restControlShift, 0]);
-    const y = interpolate(progress, [0, 1], [restControlOffset, 0]);
-    const scale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
-    // The control row scales about its centre, so its start edge moves in by half of what it loses.
-    // The ring keeps the scaled gap to that edge.
-    const follow =
-      x + micSlack * (1 - scale) + (contextRowWidth + CONTROL_SIZE) * ((1 - scale) / 2) + CONTROL_GAP * (1 - scale);
-    return {
-      opacity:
-        interpolate(progress, [0.5, 1], [0, 1], Extrapolation.CLAMP) *
-        interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP) *
-        (1 - dictationPresence.get()),
-      transform: [{ translateX: END_X * follow }, { translateY: y }, { scale }],
-    };
-  });
   // With Liquid Glass the round button stays glass, so the glow under it shows
   // through and spreads on it. Without glass the card is opaque, so the agent's
   // colour fills it while it listens. Continue is the card again.
@@ -857,12 +833,17 @@ export const ChatComposer = memo(function ChatComposer({
   const busy = preparing;
   const attachmentsBlocked = disabled || preparing;
   const leadingBlocked = attachmentsBlocked;
-  // The card covers this glyph and draws the same corner, so the two trade
-  // places on one progress: the glyph is gone by the time the card is drawn,
-  // and back on the frames the card fades out. Waiting for the card to
-  // unmount left the corner empty for the whole length of its collapse.
+  // The card opens above the bar, so the plus stays in view. It turns into a close mark on the
+  // card's own progress, so a dismissal turns it back frame by frame.
+  // The bar shows no ring, so the plus warns when the context nears its limit. The menu row gives the number.
+  const [warningColor, dangerColor] = useCSSVariable(["--openbot-warning", "--openbot-danger"]);
+  const contextAlert =
+    contextMeter && !contextMeter.compacting && (contextMeter.level === "warning" || contextMeter.level === "danger")
+      ? contextMeter
+      : undefined;
   const plusGlyphStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(menuMotion.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (leadingBlocked ? 0.45 : 1),
+    opacity: leadingBlocked ? 0.45 : 1,
+    transform: [{ rotate: `${45 * menuMotion.get()}deg` }],
   }));
   // Where the plus is drawn, in either shape, from the constants that draw it.
   // Measuring it cannot work: `measureInWindow` reads the layout tree, and the
@@ -870,8 +851,6 @@ export const ChatComposer = memo(function ChatComposer({
   // never reach it. `focused` and `hasDraft` are the React mirror of the two
   // things that open the composer, and both change once per interaction.
   const restingPlus = resizes && !hasDraft && !focused && !replyActive;
-  // The React mirror of the ring's visibility, for touch and for a screen reader.
-  const contextRingEnabled = !restingPlus && !voiceOpen && !dictating;
   const plusDrawn = CONTROL_SIZE * (restingPlus ? REST_CONTROL_SCALE : 1);
   const plusInset = (CONTROL_SIZE - plusDrawn) / 2;
   // `left` is from the start edge: React Native swaps it in a right-to-left layout.
@@ -884,6 +863,14 @@ export const ChatComposer = memo(function ChatComposer({
       (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
     bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
     size: plusDrawn,
+    barStart: (END_X === 1 ? insets.left : insets.right) + BAR_INSET + (restingPlus ? (cardWidth - restWidth) / 2 : 0),
+    // The card's height from the same constants that draw it. The reply row is out of flow and
+    // measured, so the press adds its height from the shared value.
+    barTop:
+      composerBottomGap(bottomInset) +
+      (restingPlus
+        ? restHeight
+        : fieldHeight + (stacked ? TOOLBAR_HEIGHT : 0) + (attachmentsOpen ? ATTACHMENT_BLOCK_HEIGHT : 0)),
   };
   const control = composerAction({
     disabled,
@@ -1454,8 +1441,7 @@ export const ChatComposer = memo(function ChatComposer({
                       {
                         position: "absolute",
                         left: FIELD_INSET,
-                        // The resting bar shows no ring, so its placeholder does not leave room for one.
-                        right: trailingInset - (restingPlus ? contextInset : 0),
+                        right: trailingInset,
                         top: 0,
                         bottom: 0,
                         justifyContent: "center",
@@ -1509,14 +1495,6 @@ export const ChatComposer = memo(function ChatComposer({
                     foreground={String(foreground)}
                     accent={accentFill}
                   />
-                ) : null}
-                {contextMeter ? (
-                  <Animated.View
-                    style={[{ marginEnd: CONTROL_GAP }, contextRingStyle]}
-                    pointerEvents={contextRingEnabled ? "auto" : "none"}
-                  >
-                    <ComposerContextRing meter={contextMeter} enabled={contextRingEnabled} />
-                  </Animated.View>
                 ) : null}
                 <Animated.View
                   style={[{ flexDirection: "row", alignItems: "center", gap: CONTROL_GAP }, controlStyle]}
@@ -1644,6 +1622,7 @@ export const ChatComposer = memo(function ChatComposer({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.chat.composer.addAttachment")}
+              accessibilityValue={contextAlert ? { text: contextAlert.label } : undefined}
               accessibilityState={{ disabled: leadingBlocked }}
               disabled={leadingBlocked}
               hitSlop={4}
@@ -1651,12 +1630,29 @@ export const ChatComposer = memo(function ChatComposer({
               onPress={() => {
                 void haptics.selection();
                 setOpenedWith({ expanded: !restingPlus, focused });
-                attachments?.openMenu(attachmentAnchor);
+                attachments?.openMenu({
+                  ...attachmentAnchor,
+                  barTop: attachmentAnchor.barTop + (replyActive ? replyRowHeight.get() : 0),
+                });
               }}
             >
               <Animated.View style={plusGlyphStyle}>
                 <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
               </Animated.View>
+              {contextAlert ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    end: 6,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: String(contextAlert.level === "danger" ? dangerColor : warningColor),
+                  }}
+                />
+              ) : null}
             </Pressable>
           </Animated.View>
         ) : null}

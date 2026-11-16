@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Effacer le journal d’assistance ?",
   "mobile.settings.support.clearBody": "Tous les événements du journal seront supprimés de ce téléphone.",
   "mobile.settings.support.logFooter":
-    "Le journal reste sur ce téléphone et OpenBot ne l’envoie pas. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
+    "Le journal reste sur ce téléphone. OpenBot en envoie des lignes uniquement avec un rapport de bug sur l’app du téléphone que vous envoyez, et la carte du rapport les affiche d’abord. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
   "mobile.settings.support.saveFailed": "Impossible d’enregistrer le fichier du journal. Réessayez.",
   "mobile.settings.support.sharingUnavailable": "Le partage n’est pas disponible sur ce téléphone.",
   "mobile.settings.support.newestFirst": "Les plus récents en premier.",
@@ -132,6 +132,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",
+  "mobile.settings.appearance.fullVisuals": "Afficher les aperçus visuels en entier",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Un visuel d’un agent s’affiche dans le chat sur toute sa hauteur. Si cette option est désactivée, un visuel haut est coupé ; touchez-le pour le voir en entier.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
@@ -236,6 +239,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
   "mobile.settings.conversations.largeFilesFooter":
     "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
+  "mobile.settings.conversations.swipeLeft": "Balayer à gauche dans un chat",
+  "mobile.settings.conversations.swipeRight": "Balayer à droite dans un chat",
+  "mobile.settings.conversations.swipeThreads": "Fils",
+  "mobile.settings.conversations.swipeBrowser": "Navigateur",
+  "mobile.settings.conversations.swipeFooter":
+    "Un balayage opposé à Retour dans le chat d’un agent ouvre ceci. Un balayage sur un message y répond toujours.",
+  "mobile.settings.conversations.pullInfo": "Tirer vers le haut pour les infos",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Dans un chat, un canal ou un fil, tirez vers le haut après le dernier message, puis relâchez pour ouvrir ses infos.",
   "mobile.settings.conversations.fullQualityPhotos": "Envoyer les photos en qualité maximale",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Si cette option est désactivée, l’app envoie une copie plus petite de chaque photo, jusqu’à 2048 pixels sur le grand côté. Elle arrive plus vite sur une connexion lente. Activez-la pour envoyer la photo d’origine.",

@@ -469,7 +469,7 @@ export const messages = {
   "chat.mcpSignIn.continue": "계속",
   "chat.mcpSignIn.continueNamed": "에이전트에게 {name}을(를) 다시 테스트하도록 요청",
   "chat.mcpSignIn.message": "MCP 서버 {name}에 로그인했어요. 다시 테스트해 줘.",
-  "chat.mcpSignIn.unavailable": "내 컴퓨터의 OpenBot에서 서버 설정의 MCP로 이동해 {name}에 로그인해 주세요.",
+  "chat.mcpSignIn.unavailable": "내 컴퓨터의 OpenBot에서 마켓플레이스, 앱, {name}(으)로 이동해 로그인해 주세요.",
   "chat.serverInstall.title": "새 서버",
   "chat.serverInstall.expired": "명령이 만료되었습니다. 에이전트에게 새 명령을 요청하세요.",
   "chat.compaction.running": "컨텍스트 압축 중",

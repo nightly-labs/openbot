@@ -157,6 +157,7 @@ export const messages = {
   "composer.picker.section.files": "Bestanden",
   "composer.picker.section.tabs": "Browsertabbladen",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In berichten",
   "composer.token.tab": "Browsertabblad {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Gesloten browsertabblad {name}",

@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
+import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { mcpFlowFields } from "@openbot/contracts/mcp-connect-flows";
 import { pluginLinkText } from "@openbot/contracts/plugin-links";
 import type { AppTextKey } from "@openbot/i18n";
@@ -278,7 +279,7 @@ function AccountRow(props: {
   const [removing, setRemoving] = createSignal(false);
   const busy = () => model().appBusy(props.app.id);
   const signInAgain = () => void model().reconnectApp(props.app, props.entry.id, props.account.id);
-  // A refused sign-in, or none at all, as after a sign-out in MCP settings: agents cannot use it.
+  // A refused sign-in, or none at all, as after a Sign out on the app page: agents cannot use it.
   const signInNeeded = () => props.account.signInNeeded || !props.account.signedIn;
   // A sign-in with tokens on file opens no browser, so a signed-in account has no "Sign in again".
   const above = () => props.account.renamable || signInNeeded();
@@ -673,8 +674,8 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         props.scope.nav.back();
       });
   };
-  /* OpenBot connects to a custom server only for a test, so the header says what the user set, as in
-     Server settings › MCP, and not that the server answers. */
+  /* OpenBot connects to a custom server only for a test, so the header says what the user set, and
+     not that the server answers. */
   return (
     <IntegrationPage
       class="marketplace-custom-page"
@@ -684,13 +685,16 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
       statusLabel={t(customServerStatus(props.app))}
       subtitle={t("marketplace.app.custom")}
       actions={
-        <Show when={model().canConnectApps() ? model().editServer : undefined}>
-          {(edit) => (
-            <Button type="button" variant="outline" size="sm" onClick={() => edit()(props.app.server.id)}>
-              <Pencil aria-hidden="true" />
-              {t("common.edit")}
-            </Button>
-          )}
+        <Show when={model().canConnectApps() ? model().servers : undefined}>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => props.scope.nav.go({ kind: "server", id: props.app.server.id })}
+          >
+            <Pencil aria-hidden="true" />
+            {t("common.edit")}
+          </Button>
         </Show>
       }
       danger={
@@ -718,6 +722,10 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
           </Item>
         </ItemGroup>
       </SettingsSection>
+      <Show when={model().canConnectApps() ? model().servers : undefined}>
+        {/* In JSX, so the card follows the slot and the row. */}
+        {(slots) => <>{slots().controls({ id: props.app.server.id })}</>}
+      </Show>
       <Show when={model().mcpAccess}>
         {(access) => (
           <AppAccessSections
@@ -758,6 +766,28 @@ function CustomServerPage(props: { scope: MarketplaceScope; app: CustomApp }) {
         }
       />
     </IntegrationPage>
+  );
+}
+
+/**
+ * The form of a custom MCP server, as a page of the Marketplace. It sits in the scroll of the window,
+ * so it has the fades of the other pages and no scroll of its own. A new server that saves opens its
+ * own page; Cancel and a saved edit go back.
+ */
+export function MarketplaceServerPage(props: { scope: MarketplaceScope; id: string | null }) {
+  const nav = () => props.scope.nav;
+  const close = (saved: McpServerConfig | null) => {
+    if (saved && props.id === null)
+      nav().set((draft) => {
+        draft.stack = [...draft.stack.slice(0, -1), { kind: "app", id: `custom:${saved.id}` }];
+      });
+    else nav().back();
+  };
+  return (
+    <div class="marketplace-view marketplace-server-page">
+      {/* In JSX, so another row opens a form of its own. */}
+      <Show when={props.scope.model.servers}>{(slots) => <>{slots().form({ id: props.id, onClose: close })}</>}</Show>
+    </div>
   );
 }
 

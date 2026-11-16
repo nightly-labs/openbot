@@ -439,6 +439,19 @@ can use workflows can read it, because those members spend the same credits. The
 shows it as a ring, and reads it again when the window comes to the front. A client of a host
 without the capability shows no Sunra models and no credits.
 
+`workflows-higgsfield-v1` does the same for the Higgsfield models (the ids that start with
+`higgsfield-`). The host calls the tools of Higgsfield's MCP server with the Higgsfield sign-in of an
+enabled Higgsfield row in its Apps (`src/backend/workflows/higgsfield-media.ts`, with the parts it
+shares with Sunra in `mcp-media.ts`), and the credits of that account pay for each file; the host
+always sends `use_unlim: false`. The capability has its own two routes, because a frozen answer cannot
+get a new field: `POST /v1/workflows/media/higgsfield/providers {}` answers `{ higgsfield }`, and
+`POST /v1/workflows/media/higgsfield/credits {}` answers `{ higgsfield: { available, quota } | null }`,
+read with Higgsfield's `balance` tool. `quota` is always null. The Sunra routes keep answering
+`{ sunra }` only. A client of a host without the capability shows no Higgsfield models and no
+Higgsfield credits. The `background` field of `workflows-media-transparent-v1` also applies to
+GPT Image 2.6 and Seedream 5.0 Pro on Higgsfield. A video model that takes no reference pictures
+(Wan 2.7) gets a reference picture as its first frame, or as its last frame when the first one is set.
+
 `workflows-media-account-v1` lets an `image` node choose the account that pays for its file. The node
 reads one more field, `account`: the id of one account of the model's provider, as `provider-accounts-v1`
 lists them. An empty field and `default` mean the provider's own sign-in. When the host does not have
@@ -784,8 +797,8 @@ An owner or admin of a joined server manages its host through optional `POST /v1
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
 except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`, `storage-user-files-v1`,
-`storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1`, `agent-speed-v1` and
-`usage-credits-v1`. The
+`storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1`, `agent-speed-v1`,
+`model-steering-v1` and `usage-credits-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -844,6 +857,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
 | `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
+| `model-steering-v1` | Every member reads which models of a provider that reports steering for each agent (a custom ACP agent) take a message into the running turn. A model that is not listed does not steer: the client shows "Send now" for it, and the host queues the message. Protocol 9 only | `hostAdmin` |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
 | `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
@@ -1493,7 +1507,9 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
   Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
   all children before the joined-server connections close (step 60). The sibling scan before an
-  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  update leaves out the child PIDs. The desktop installs the update for its children too, so a
+  restart when idle and the automatic install also wait while an agent of a child works (the
+  child's `OPENBOT_LOCAL_SERVER_WORKING` line, reason `agent-turn`). After an unexpected exit, the desktop starts the child again
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash

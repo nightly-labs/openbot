@@ -479,7 +479,7 @@ export const messages = {
   "chat.mcpSignIn.continue": "Doorgaan",
   "chat.mcpSignIn.continueNamed": "Vraag de agent {name} opnieuw te testen",
   "chat.mcpSignIn.message": "Ik heb ingelogd bij de MCP-server {name}. Test het opnieuw.",
-  "chat.mcpSignIn.unavailable": "Log in bij {name} in OpenBot op je computer, via Serverinstellingen, MCP.",
+  "chat.mcpSignIn.unavailable": "Log in bij {name} in OpenBot op je computer, via Marktplaats, Apps, {name}.",
   "chat.serverInstall.title": "Nieuwe server",
   "chat.serverInstall.expired": "De opdracht is verlopen. Vraag de agent om een nieuwe.",
   "chat.compaction.running": "Context comprimeren",

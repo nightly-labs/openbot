@@ -1554,8 +1554,12 @@ export class MailboxStore {
         const delivery = this.#publicDelivery(storedDelivery, positions, message);
         messages.push({
           id: delivery.id,
-          // A plan continuation keeps the request in its first turn, like `syncDeliveryMessage`.
-          turnId: storedDelivery.planContinuation?.turnIds[0] ?? storedDelivery.turnId ?? undefined,
+          // A plan continuation and continued work keep the request in its first turn, like `syncDeliveryMessage`.
+          turnId:
+            storedDelivery.planContinuation?.turnIds[0] ??
+            storedDelivery.resumeAfterUsageLimit?.previousTurnIds[0] ??
+            storedDelivery.turnId ??
+            undefined,
           author: message.sender.kind === "agent" ? "agent" : "user",
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
@@ -1979,6 +1983,16 @@ export class MailboxStore {
           delivery.recipientAgentId === agentId &&
           delivery.turnId === turnId &&
           (delivery.status === "starting" || delivery.status === "running"),
+      ),
+    );
+  }
+
+  /** The deliveries of this agent that completed in the turn `turnId`. */
+  completedDeliveriesOfTurn(agentId: string, turnId: string): DeliveryContext[] {
+    return this.#contexts(
+      this.#state.deliveries.filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId && delivery.turnId === turnId && delivery.status === "completed",
       ),
     );
   }
@@ -2826,15 +2840,19 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** A refused delivery, or unfinished work that a backup continues, back at its place in the queue. */
+  /**
+   * A refused delivery, or unfinished work that a backup continues, back at its place in the queue.
+   * `finished`: the delivery completed, and work that its turn started in the background goes on.
+   */
 
   requeueRefused = Effect.fn("MailboxStore.requeueRefused")(function* (
     this: MailboxStore,
     deliveryId: string,
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    finished = false,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+      yield* this.#updateDeliveryEffect(deliveryId, finished ? ["completed"] : ["starting", "running"], {
         status: "queued",
         turnId: null,
         error: null,

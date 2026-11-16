@@ -485,7 +485,7 @@ export const messages = {
   "chat.mcpSignIn.continue": "המשך",
   "chat.mcpSignIn.continueNamed": "לבקש מהסוכן לבדוק את {name} שוב",
   "chat.mcpSignIn.message": "התחברתי לשרת ה-MCP {name}. אפשר לבדוק אותו שוב.",
-  "chat.mcpSignIn.unavailable": "יש להתחבר ל-{name} ב-OpenBot במחשב שלך, בהגדרות השרת, MCP.",
+  "chat.mcpSignIn.unavailable": "יש להתחבר ל-{name} ב-OpenBot במחשב שלך, בחנות, אפליקציות, {name}.",
   "chat.serverInstall.title": "שרת חדש",
   "chat.serverInstall.expired": "תוקף הפקודה פג. בקש מהסוכן פקודה חדשה.",
   "chat.compaction.running": "מכווץ הקשר",

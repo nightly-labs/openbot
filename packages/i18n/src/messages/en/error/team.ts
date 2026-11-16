@@ -185,6 +185,7 @@ export const messages = defineMessages("error.team", {
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
   "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
   "error.team.pendingApprovalUnsupported": "Reading a whole approval is not supported by this connection.",
+  "error.team.phoneFeedbackUnsupported": "Sending a report from the phone app is not supported by this connection.",
   "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
   "error.team.queuedMessageThreadUnsupported":
     "Running a queued message as a new thread is not supported by this connection.",

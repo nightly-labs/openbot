@@ -3,10 +3,16 @@ import { Button, Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import Folder from "lucide-react-native/icons/folder";
 import ShieldAlert from "lucide-react-native/icons/shield-alert";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ScrollView, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showWarningAlert } from "@/features/analytics/failure-reports";
+import {
+  phoneNetwork,
+  refreshPhoneNetwork,
+  subscribePhoneNetwork,
+} from "@/features/support/model/phone-network-capture";
+import { showPhoneFeedback } from "@/features/support/model/support-log-capture";
 import {
   approvalIsPartial,
   InactiveRequestError,
@@ -50,7 +56,9 @@ function shortPath(path: string) {
  * and says what each answer does on the host. A request that the phone has only in part offers Deny
  * only: Allow must not cover text the user cannot see. With `readsWhole`, the card reads the whole
  * request from the host and then offers Allow. A bug report or an idea for the OpenBot team shows its
- * title and text in a box that scrolls, as the desktop card shows the whole report.
+ * title and text in a box that scrolls, as the desktop card shows the whole report. A bug report
+ * about the phone app also shows what this phone adds to it: the report is public, so the user reads
+ * the version, the system and the log lines before Send.
  */
 export function ChatApprovalCard({
   approval,
@@ -84,6 +92,19 @@ export function ChatApprovalCard({
   const disabled = !canAnswer || pending !== null;
   const report = feedbackApproval(approval);
   const reading = partial && readsWhole && canAnswer;
+  // What this phone adds to a report about the phone app, read one time for the card. Send sends this
+  // same data, so the public issue has no line that the user did not see.
+  const phoneReport = report?.phone === true;
+  const { agentId, requestId } = approval;
+  const phone = useMemo(
+    () => (phoneReport ? showPhoneFeedback({ agentId, requestId }) : null),
+    [phoneReport, agentId, requestId],
+  );
+  // The network and the VPN can change while the card is open, so the card shows each new read.
+  const network = useSyncExternalStore(subscribePhoneNetwork, phoneNetwork);
+  useEffect(() => {
+    if (phoneReport) void refreshPhoneNetwork();
+  }, [phoneReport]);
 
   // The list makes a new callback on each render, so the read starts once for each cut request.
   const loadWholeRef = useRef(loadWhole);
@@ -223,8 +244,9 @@ export function ChatApprovalCard({
                 )}
               </Typography.Paragraph>
             </View>
-            {/* The whole report scrolls inside the card, so the user reads all of it before Send. */}
-            <ScrollView className="max-h-72" nestedScrollEnabled>
+            {/* The whole report scrolls inside the card, so the user reads all of it before Send. A
+                report about the phone app also shows the phone's data under it, so its box is lower. */}
+            <ScrollView className={phone ? "max-h-56" : "max-h-72"} nestedScrollEnabled>
               <View className="gap-1 border-s-[3px] border-border ps-3">
                 <Typography.Paragraph weight="medium" selectable>
                   {report.title}
@@ -236,6 +258,27 @@ export function ChatApprovalCard({
                 ) : null}
               </View>
             </ScrollView>
+            {/* Outside the report's scroll box, so a long report does not hide what the phone adds. The
+                log has its own scroll box: it can have 60 lines. */}
+            {phone ? (
+              <View className="gap-1">
+                <Typography.Paragraph type="body-xs" className="text-muted">
+                  {t("mobile.chat.approval.report.phoneAdds")}
+                </Typography.Paragraph>
+                <Typography.Paragraph type="body-xs" className="text-text-secondary" selectable>
+                  {`${phone.platform} · ${phone.appVersion}\n${phone.system}\n${network}`}
+                </Typography.Paragraph>
+                <ScrollView className="max-h-32 rounded-xl bg-control px-2 py-1.5" nestedScrollEnabled>
+                  <Typography.Code
+                    selectable
+                    className="bg-transparent p-0"
+                    style={{ color: foreground, fontSize: 11, lineHeight: 15 }}
+                  >
+                    {phone.log}
+                  </Typography.Code>
+                </ScrollView>
+              </View>
+            ) : null}
             {approval.reason ? (
               <Typography.Paragraph type="body-xs" className="text-muted">
                 {sourceText(approval.reason)}

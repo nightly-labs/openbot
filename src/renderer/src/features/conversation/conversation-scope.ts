@@ -33,6 +33,7 @@ import {
   useContext,
 } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { holdNativeBrowserPage } from "../../native-browser-page";
 import { createScopeGuard } from "../../scope-lifetime";
 import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
@@ -2175,18 +2176,25 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
+  const browserPageVisible = () =>
+    browserExpandedOpen() &&
+    Boolean(browserSurface()) &&
+    !props.browserVisibilitySuspended &&
+    !props.globalOverlayOpen &&
+    !props.remoteDesktopVisible;
+  // A local tab's page is a native view above this window and would cut the toasts, so they wait
+  // until the page is hidden. A host's tab shows in the window, under the toasts.
+  createEffect(
+    () => props.browserEnabled !== false && browserPageVisible() && !props.runtime && props.server?.kind === "local",
+    (shown) => (shown ? holdNativeBrowserPage() : undefined),
+  );
   createEffect(
     () => ({
       agentId: props.agent?.id,
       // Tracked, so a switch to a server with no browser tears down the last view's observers.
       browserEnabled: props.browserEnabled !== false,
       surface: browserSurface(),
-      visible:
-        browserExpandedOpen() &&
-        Boolean(browserSurface()) &&
-        !props.browserVisibilitySuspended &&
-        !props.globalOverlayOpen &&
-        !props.remoteDesktopVisible,
+      visible: browserPageVisible(),
     }),
     ({ agentId, browserEnabled, visible, surface }) => {
       const generation = ++browserVisibilityGeneration;

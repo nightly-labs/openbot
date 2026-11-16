@@ -8,13 +8,15 @@ import {
   type ConversationSnapshot,
   openExchangesOutside,
 } from "@openbot/contracts/ipc";
+import { THREAD_MESSAGE_SEARCH_PAGE_LIMIT } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import type { AgentMessage } from "@openbot/ui/data";
+import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
+  collectThreadMessageMatches,
   formatMessageTime,
   retainThinkingMessages,
   toAgentMessage,
@@ -919,6 +921,19 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /** The side thread messages of the agent that have the `@` query. A message of the agent's own chat names no thread. */
+    function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
+      return collectThreadMessageMatches((cursor) =>
+        conversationPort().agent.searchConversationMessages({
+          query,
+          agentId,
+          ...(cursor ? { cursor } : {}),
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+          includeSideThreads: true,
+        }),
+      );
+    }
+
     function pruneInactiveAgentHistory(agentId: string): void {
       flushConversationDeltas();
       const messages = conversations[agentId]?.messages;
@@ -1310,6 +1325,7 @@ const Conversation = createSimpleContext({
       markReplyCompleted,
       clearRecentReply,
       searchAgentMessages,
+      searchAgentThreadMessages,
       sendMessage,
       markAgentMessagesRead,
       markAgentMessagesUnread,

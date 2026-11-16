@@ -254,6 +254,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInAccountRefused":
+    "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
@@ -285,9 +287,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。MCP 設定を開いて「サインイン」を選択してください。",
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} は MCP サーバー {name} を起動できませんでした。MCP 設定を開いて「接続をテスト」を選択すると、原因を確認できます。",
+    "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。{provider} はこのサーバーのツールを使えません。{provider} はサーバーを自分で起動するため、OpenBot の接続テストは成功することがあります。新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpServerTimedOutInProvider":
@@ -355,6 +357,8 @@ export const messages = {
   "error.backend.promptInactive": "この質問はもう有効ではありません。",
   "error.backend.promptAnswerMismatch": "回答が有効な質問と一致しません。",
   "error.backend.approvalInactive": "この承認はもう有効ではありません。",
+  "error.backend.feedbackNeedsPhone":
+    "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",

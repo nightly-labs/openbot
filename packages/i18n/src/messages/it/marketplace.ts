@@ -412,9 +412,9 @@ export const messages = {
     "Prepara una bozza di email per reimpostare la password nel nuovo flusso.",
   "marketplace.plugin.omnisend.tagline": "Marketing via email e SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente accede al proprio account Omnisend nel browser e sceglie il livello di accesso nella schermata di consenso. Con l'accesso in scrittura, gli agenti possono anche inviare campagne ed eliminare dati. Scegli l'accesso in sola lettura quando agli agenti servono solo i report.",
+    "Omnisend permette agli agenti di leggere i report di campagne e moduli, trovare contatti e segmenti, e creare e modificare campagne, automazioni, modelli email, moduli e prodotti. Ogni utente si collega con una chiave API del proprio account Omnisend. Gli agenti possono fare ciò che la chiave consente, compreso inviare campagne ed eliminare dati.",
   "marketplace.plugin.omnisend.app":
-    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con accesso nel browser.",
+    "Campagne, automazioni, contatti, segmenti, moduli e report, tramite il server MCP di Omnisend con una chiave API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Come sono andate le campagne della scorsa settimana rispetto a quella precedente?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -422,6 +422,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Prepara una bozza di campagna per la nuova collezione, ma non inviarla.",
   "marketplace.plugin.postiz.tagline": "Pianificazione social",
+  "marketplace.plugin.omnisend.hint.apiKey": "In Omnisend, apri Store settings > API keys e crea una chiave.",
   "marketplace.plugin.postiz.description":
     "Postiz consente agli agenti di elencare i tuoi canali social e di scrivere, programmare e pubblicare post su oltre 30 reti, come X, LinkedIn, Instagram e TikTok. Gli agenti possono anche caricare contenuti multimediali e creare immagini e video con l'IA. Accedi al tuo account Postiz dal browser, oppure incolla la chiave API da Settings › Developers in Postiz. Tutti i piani cloud di Postiz includono l'accesso alle API. Gli agenti possono pubblicare un post subito, quindi controlla ogni post prima di approvarlo.",
   "marketplace.plugin.postiz.app":

@@ -315,7 +315,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Ustawienia serwera › MCP, a potem wyślij wiadomość ponownie.",
+    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Marketplace, Aplikacje, a potem wyślij wiadomość ponownie.",
   "error.provider.hermesRefused":
     "Hermes odrzucił tę wiadomość, zanim się zaczęła. Wyślij ją ponownie. Jeśli Hermes odrzuca każdą wiadomość, uruchom ponownie OpenBot na komputerze, na którym działa ten agent.",
   "error.provider.copilotThinkingRejected":

@@ -227,6 +227,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot אינו יכול לשמור את תצורת שרת ה-MCP הזו.",
   "error.backend.mcpServerNoAnswer": "השרת לא ענה תוך {seconds} שניות.",
   "error.backend.mcpSignInNotAccepted": "השרת לא קיבל את ההתחברות הזו.",
+  "error.backend.mcpSignInAccountRefused":
+    "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
@@ -255,9 +257,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
+    "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את הגדרות ה-MCP ולבחור Test connection כדי לראות את הסיבה.",
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את {name} בחנות, אפליקציות, ולבחור Test connection כדי לראות את הסיבה.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -323,6 +325,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "רק בעל השרת או מנהל יכולים לבחור בפעולה הזו.",
   "error.backend.approvalInactive": "האישור הזה אינו פעיל עוד.",
   "error.backend.approvalOwnerOnly": "רק בעל השרת יכול לאשר את הפעולה הזו.",
+  "error.backend.feedbackNeedsPhone":
+    "רק אפליקציית OpenBot לטלפון יכולה לשלוח את הדיווח הזה, כי היא מוסיפה את גרסת הטלפון ואת יומן התמיכה. יש לפתוח את הצ'אט הזה בטלפון. אם ההודעה הזו מופיעה שם, יש לעדכן את אפליקציית הטלפון.",
   "error.backend.takeoverInactive": "השתלטות הדפדפן הזו אינה פעילה עוד.",
   "error.backend.authSubmitting": "שליחת האימות כבר מתבצעת.",
   "error.backend.apiKeySaveFailed": "OpenBot לא הצליח לשמור את מפתח ה-API. יש לנסות שוב.",

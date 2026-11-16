@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  agentSteersTurns,
+  customAgentIdOfModel,
+} from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
@@ -298,6 +303,7 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
+import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -323,6 +329,7 @@ import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
@@ -1176,6 +1183,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const endpoint = credentials.customProviders().find((provider) => provider.id === endpointId);
           return endpoint ? (endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) : null;
         },
+        savedEndpoints: () =>
+          new Map(
+            credentials.customProviders().map((endpoint) => [
+              endpoint.id,
+              {
+                harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+              },
+            ]),
+          ),
         // The model list reaches the renderer by pull, refreshed on a status event, and an exclusion
         // changes what that pull answers while no provider state moves.
         modelsChanged: () => this.#emit({ type: "status", status: this.getStatus() }),
@@ -1340,7 +1357,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser,
       attachments: this.#attachments,
       isStopping: () => this.#stopping,
-      hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
+      hasTakeover: (agentId, threadId, tabId) => this.#attention.browserTakeoverBlocks(agentId, threadId, tabId),
     });
     this.#threads = new ThreadLifecycle({
       store,
@@ -2959,22 +2976,40 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
-    return { sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null };
+    return {
+      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
+      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
+    };
   }
 
-  /** The credits of the media services that a workflow step can spend now. A failed read has none. */
-  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (this: AgentService) {
-    const signIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    if (!signIn || this.#stopping) return { sunra: null } satisfies WorkflowMediaCredits;
-    const sunra = yield* readSunraCredits(signIn).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          logger.warn("Could not read the Sunra credits.", { error: failure.message });
-          return null;
-        }),
-      ),
+  /**
+   * The credits of the media services that a workflow step can spend now. A failed read has none.
+   * With `only`, it reads that service alone and the other one is null.
+   */
+  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
+    this: AgentService,
+    only?: keyof WorkflowMediaCredits,
+  ) {
+    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
+    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
+    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
+      read.pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not read the media credits.", { service, error: failure.message });
+            return null;
+          }),
+        ),
+      );
+    const [sunra, higgsfield] = yield* Effect.all(
+      [
+        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
+        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
     );
-    return { sunra } satisfies WorkflowMediaCredits;
+    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
@@ -2987,9 +3022,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input: {
         kind: GeneratedMediaKind;
         provider: WorkflowMediaProvider;
-        /** The id of the model at its provider. Sunra reads it; Codex and Grok use their default. */
+        /** The id of the model at its provider. Sunra and Higgsfield read it; Codex and Grok use their default. */
         model: string;
-        /** The account of the provider that pays. Null is its own sign-in; Sunra ignores it. */
+        /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
         account: string | null;
         specs: WorkflowMediaSpecs;
         prompt: string;
@@ -3010,6 +3045,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() => logger.warn("Could not make workflow media with Sunra.", { error: failure.message })),
+          ),
+          Effect.mapError((failure) => failed(failure.message)),
+        );
+      }
+      if (input.provider === "higgsfield") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        return yield* generateHiggsfieldMedia(
+          {
+            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+            store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+          },
+          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+        ).pipe(
+          Effect.tapError((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not make workflow media with Higgsfield.", { error: failure.message }),
+            ),
           ),
           Effect.mapError((failure) => failed(failure.message)),
         );
@@ -4322,7 +4375,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   });
 
-  /** Appends a system line to the agent's own chat, outside any turn. */
+  /** Appends a system line to the agent's own chat, outside any turn unless the line names one. */
   #appendSystemMessage(agentId: string, message: ConversationMessage, eventType: string): void {
     const database = this.#store.database;
     this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {
@@ -4402,11 +4455,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
+    // The note goes into the turn of the chat's next message, under its delivery's id until that turn
+    // starts (`MailboxSync.syncDeliveryMessage`). A note outside that turn showed after the turn's
+    // answer, which the new model wrote after the switch. A continuation and a plan step run in a turn
+    // of their own, which starts after the note.
+    const next = this.#mailbox.nextQueued(agent.id);
+    const turnId = next && !next.resumeAfterUsageLimit && !next.planContinuation ? next.delivery.id : undefined;
     try {
       this.#appendSystemMessage(
         agent.id,
         {
           id: `model-switch-${randomUUID()}`,
+          ...(turnId ? { turnId } : {}),
           author: "system",
           source: "system",
           text,
@@ -6673,7 +6733,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+    // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
+    const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
+    if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return "provider-unsupported";
     }

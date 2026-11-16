@@ -254,6 +254,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "O OpenBot não pode salvar esta configuração de servidor MCP.",
   "error.backend.mcpServerNoAnswer": "O servidor não respondeu em {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "O servidor não aceitou esse login.",
+  "error.backend.mcpSignInAccountRefused":
+    "O servidor recusou a conta com que você entrou. Verifique se essa conta pode usar o serviço. Para usar outra conta, saia e entre de novo.",
   "error.backend.mcpSignInClientRefused":
     "O servidor de login não aceitou o OpenBot ao concluir o login. Entre de novo: o OpenBot se registra outra vez no servidor.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
@@ -284,9 +286,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra as configurações de MCP e escolha Entrar.",
+    "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra {name} na Loja, Apps, e escolha Entrar.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} não conseguiu iniciar o servidor MCP {name}. Abra as configurações de MCP e escolha Testar conexão para ver a causa.",
+    "{provider} não conseguiu iniciar o servidor MCP {name}. Abra {name} na Loja, Apps, e escolha Testar conexão para ver a causa.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}. As ferramentas dele não estão disponíveis para o {provider}. O {provider} inicia o servidor por conta própria, então o teste de conexão no OpenBot pode funcionar. Inicie um novo chat para tentar de novo.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -294,7 +296,7 @@ export const messages = {
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
   "error.backend.mcpServerSignInPage":
-    "O servidor MCP {name} pediu que você entre em uma página da web. O OpenBot não abre essa página para um servidor, então recusou o pedido. Abra as configurações de MCP, entre em {name} e peça de novo ao agente.",
+    "O servidor MCP {name} pediu que você entre em uma página da web. O OpenBot não abre essa página para um servidor, então recusou o pedido. Abra {name} na Loja, Apps, entre e peça de novo ao agente.",
   "error.backend.mcpServerRequestDeclined":
     "O servidor MCP {name} pediu algo que o OpenBot não consegue mostrar, então o OpenBot recusou o pedido.",
   "error.backend.mcpRequestDeclined":
@@ -360,6 +362,8 @@ export const messages = {
   "error.backend.promptInactive": "Esta pergunta não está mais ativa.",
   "error.backend.promptAnswerMismatch": "Uma resposta não corresponde a uma pergunta ativa.",
   "error.backend.approvalInactive": "Esta aprovação não está mais ativa.",
+  "error.backend.feedbackNeedsPhone":
+    "Só o app do OpenBot para celular pode enviar este relato, porque ele adiciona a versão e o registro de suporte do celular. Abra este chat no celular. Se você vir esta mensagem lá, atualize o app do celular.",
   "error.backend.takeoverInactive": "Este controle manual do navegador não está mais ativo.",
   "error.backend.authSubmitting": "O envio da autenticação já está em andamento.",
   "error.backend.apiKeySaveFailed": "O OpenBot não conseguiu salvar a chave de API. Tente novamente.",

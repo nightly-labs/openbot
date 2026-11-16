@@ -43,6 +43,7 @@ import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-ser
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -75,6 +76,7 @@ import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_ROUTES } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import { WHATSAPP_WORKING_MESSAGE_ROUTES } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKFLOWS_HIGGSFIELD_ROUTES } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_SUNRA_ROUTES } from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 
 /**
@@ -108,6 +110,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  MODEL_STEERING_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,
   PROVIDER_DEFAULT_ROUTES.settings,
@@ -153,6 +156,8 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   AGENT_SPEED_ROUTES.models,
   WORKFLOWS_SUNRA_ROUTES.providers,
   WORKFLOWS_SUNRA_ROUTES.credits,
+  WORKFLOWS_HIGGSFIELD_ROUTES.providers,
+  WORKFLOWS_HIGGSFIELD_ROUTES.credits,
   AGENT_FOLDERS_ROUTES.read,
   AGENT_FOLDERS_ROUTES.browse,
   BROWSER_PROFILES_ROUTES.list,

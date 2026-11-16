@@ -157,6 +157,7 @@ import {
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -177,6 +178,7 @@ import {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
@@ -209,6 +211,7 @@ import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-acce
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
+import { MODEL_STEERING_CAPABILITY } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
@@ -311,6 +314,7 @@ import {
   routeAgentPlanCard,
   routeAgentSpeed,
   routeAgentTaskLimit,
+  routeModelSteering,
 } from "./team-api/route-agent-admin";
 import { agentColorsOf, routeAgentColors, visibleAgentColors } from "./team-api/route-agent-colors";
 import { routeAgentFolders } from "./team-api/route-agent-folders";
@@ -390,6 +394,7 @@ import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePendingApproval } from "./team-api/route-pending-approval";
+import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
   routeProviderAccountCode,
@@ -1240,6 +1245,7 @@ export class TeamApiServer {
       if ((await routeAgentDefaults(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentFastMode(context, this.#options.admin, hidden)) === "handled") return;
       if ((await routeAgentSpeed(context, this.#options.admin, hidden)) === "handled") return;
+      if ((await routeModelSteering(context, this.#options.admin)) === "handled") return;
       if (
         (await routeBrowserProfiles(context, this.#options.browserProfiles, this.#options.browser, hidden)) ===
         "handled"
@@ -1345,6 +1351,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePhoneFeedback(context, this.#options.agents)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
@@ -1581,6 +1588,7 @@ export class TeamApiServer {
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
         promptMultiSelect: capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
         videoGeneration: capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+        memoryChanges: capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       });
       if (encoded === null) return null;
       const answered = capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)
@@ -2363,6 +2371,7 @@ export class TeamApiServer {
       subagents: route.capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
       promptMultiSelect: route.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
       videoGeneration: route.capabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+      memoryChanges: route.capabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
       usageTertiary: route.capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
       agentPendingRuntime: route.capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
     };
@@ -2667,6 +2676,7 @@ export class TeamApiServer {
           if (capability === AGENT_DEFAULTS_CAPABILITY) return this.#options.admin?.agentDefaults !== undefined;
           if (capability === AGENT_FAST_MODE_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (capability === AGENT_SPEED_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
+          if (capability === MODEL_STEERING_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           if (
             capability === BROWSER_PROFILES_CAPABILITY ||
             capability === BROWSER_PROFILES_EVENTS_CAPABILITY ||
@@ -2750,6 +2760,7 @@ export class TeamApiServer {
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === WORKFLOWS_HIGGSFIELD_CAPABILITY) return this.#options.workflows !== undefined;
           // The workflow store posts a chat-channel output into this host's channels.
           if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
           // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.

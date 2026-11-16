@@ -175,6 +175,8 @@ export const messages = {
     "„Nur Arbeitsbereich“ braucht die Codex-Sandbox, die Codex auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Erst fragen“ oder „Voller Zugriff“ in den Agenteneinstellungen.",
   "error.agent.claudeSandboxUnavailable":
     "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeSandboxBlocked":
+    "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
     "Die Bildschirmaufnahme ist für diesen Agenten deaktiviert. Der Benutzer kann die Computersteuerung in den Agenteneinstellungen aktivieren.",
   "error.agent.screenCaptureUnavailable": "Die Bildschirmaufnahme ist auf diesem Computer nicht verfügbar.",

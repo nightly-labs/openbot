@@ -157,6 +157,7 @@ export const messages = {
   "composer.picker.section.files": "ファイル",
   "composer.picker.section.tabs": "ブラウザーのタブ",
   "composer.picker.section.threads": "スレッド",
+  "composer.picker.section.messages": "メッセージ内",
   "composer.token.tab": "ブラウザーのタブ {name}",
   "composer.token.thread": "スレッド {name}",
   "composer.token.unavailableTab": "閉じたブラウザーのタブ {name}",

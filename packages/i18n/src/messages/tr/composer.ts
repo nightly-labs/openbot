@@ -158,6 +158,7 @@ export const messages = {
   "composer.picker.section.files": "Dosyalar",
   "composer.picker.section.tabs": "Tarayıcı sekmeleri",
   "composer.picker.section.threads": "Mesaj dizileri",
+  "composer.picker.section.messages": "Mesajlarda",
   "composer.token.tab": "Tarayıcı sekmesi {name}",
   "composer.token.thread": "Mesaj dizisi {name}",
   "composer.token.unavailableTab": "Kapalı tarayıcı sekmesi {name}",

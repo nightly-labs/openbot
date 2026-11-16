@@ -16,8 +16,9 @@
 #                                 Server Settings. Runs `stage`, or stops OpenBot, runs `apply` and
 #                                 starts it again.
 #   openbot-hosted-update trigger openbot.service, as root before OpenBot starts. Repairs the modes
-#                                 of the release, and installs the units of `request` and the boat
-#                                 pre-stop hook when an older release moved this one into place.
+#                                 of the release, and installs the units of `request`, the boat
+#                                 pre-stop hook and the AppArmor rule of the Claude sandbox when an
+#                                 older release moved this one into place.
 #
 # The manifest is the one that the Linux desktop updater reads, so a server trusts the same source as
 # a desktop install. A server only moves to a newer version: an older OpenBot cannot open a database
@@ -227,7 +228,8 @@ download() {
 # Ubuntu 26.04 gives /usr/bin/bwrap a profile that removes all capabilities from the programs that
 # bwrap starts. The Claude sandbox needs CAP_SYS_ADMIN there, so each sandboxed command of a Claude
 # agent with "Workspace only" fails. This adds one rule to the local file of that profile: those
-# programs keep the profile of bwrap. `openbot uninstall` removes the rule.
+# programs keep the profile of bwrap. `openbot uninstall` removes the rule. `trigger` also adds it,
+# because the `apply` of an older release does not know this function (#9909).
 allow_sandbox_capabilities() {
   local profile=/etc/apparmor.d/bwrap-userns-restrict
   local override=/etc/apparmor.d/local/bwrap-userns-restrict
@@ -447,6 +449,9 @@ trigger() {
   install_pre_stop "$source" || echo "The boat pre-stop hook is not installed." >&2
   install_boat_ignore || echo "The boat ignore file is not installed." >&2
   remove_lazy_harnesses || echo "The install-on-first-run agent commands of boat are not removed." >&2
+  if command -v apparmor_parser >/dev/null && [ -d /sys/kernel/security/apparmor ]; then
+    allow_sandbox_capabilities || echo "The AppArmor rule for the Claude sandbox is not installed." >&2
+  fi
   [ -e "$UNIT_DIRECTORY/openbot-update-request.path" ] || return 0
   # Without --no-block, a start during the start of openbot.service could wait for it.
   systemctl is-active --quiet openbot-update-request.path ||

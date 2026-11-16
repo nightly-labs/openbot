@@ -50,6 +50,8 @@ export interface WhatsAppInboundContext {
   threadOf(messageId: string): string | null;
   /** The phone number of a LID user, from WhatsApp's mapping. */
   numberForLid(lid: string): Promise<string | null>;
+  /** The message is older than a new one can be (see `freshUpsert`): it is saved, and nothing answers it. */
+  historyOnly?: boolean;
 }
 
 export type WhatsAppEvent =
@@ -88,6 +90,8 @@ export function whatsAppDedupKey(message: WAMessage): string | null {
 /**
  * Turns one WhatsApp message into a message for the agents, an answer to an approval menu, a pairing
  * request, or nothing. The sender rules run first, so a chat that may not give work leaves no trace.
+ * A message that only goes into the saved history, such as the owner's own message in an allowed group,
+ * gives nothing.
  */
 export async function whatsAppInbound(
   message: WAMessage,
@@ -130,13 +134,15 @@ export async function whatsAppInbound(
     fromMe: Boolean(key.fromMe),
   });
   if (decision.type === "ignore") return null;
+  const historyOnly = decision.type === "save" || context.historyOnly === true;
   const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   if (protocol) {
     applyChange(protocol, chatJid, authorId, context.chats);
     return null;
   }
   const name = message.pushName?.trim() || authorNumber || "WhatsApp";
-  if (decision.type === "pair") return authorNumber ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
+  if (decision.type === "pair")
+    return authorNumber && !historyOnly ? { type: "pairing", chatJid, senderId: authorNumber, name } : null;
 
   context.chats.rememberName(authorId, key.fromMe ? null : message.pushName);
   const contextInfo = contextOf(content);
@@ -162,7 +168,7 @@ export async function whatsAppInbound(
 
   // A numbered answer to an approval menu: the quoted menu, or the newest one of the conversation.
   const approve = APPROVE_TEXT.test(text.trim());
-  if ((approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
+  if (!historyOnly && (approve || DECLINE_TEXT.test(text.trim())) && files.length === 0) {
     const menu =
       (quotedId ? ((m) => (m ? { messageId: quotedId, menu: m } : null))(context.chats.menu(quotedId)) : null) ??
       context.chats.latestMenu(chatJid, threadKey);
@@ -194,7 +200,7 @@ export async function whatsAppInbound(
     sentAt: isoTime(message),
     ...(files.length ? { files } : {}),
   };
-  if (isGroup && !addressed && !quotedThread) {
+  if (historyOnly || (isGroup && !addressed && !quotedThread)) {
     context.chats.rememberMessage(remembered);
     return null;
   }

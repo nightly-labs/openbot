@@ -393,13 +393,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "נסח אימייל לאיפוס סיסמה עבור התהליך החדש.",
   "marketplace.plugin.omnisend.tagline": "שיווק באימייל וב-SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend מאפשר לסוכנים לקרוא דוחות קמפיינים וטפסים, למצוא אנשי קשר ופלחים וליצור ולערוך קמפיינים, אוטומציות, תבניות אימייל, טפסים ומוצרים. כל משתמש מתחבר לחשבון Omnisend שלו דרך הדפדפן ובוחר את רמת הגישה במסך ההסכמה. עם גישת כתיבה סוכנים יכולים גם לשלוח קמפיינים ולמחוק נתונים. יש לבחור גישה לקריאה בלבד כשהסוכנים צריכים רק דוחות.",
+    "Omnisend מאפשר לסוכנים לקרוא דוחות קמפיינים וטפסים, למצוא אנשי קשר ופלחים וליצור ולערוך קמפיינים, אוטומציות, תבניות אימייל, טפסים ומוצרים. כל משתמש מתחבר עם מפתח API מחשבון Omnisend שלו. סוכנים יכולים לעשות את מה שהמפתח מתיר, כולל שליחת קמפיינים ומחיקת נתונים.",
   "marketplace.plugin.omnisend.app":
-    "קמפיינים, אוטומציות, אנשי קשר, פלחים, טפסים ודוחות, דרך שרת MCP של Omnisend עם התחברות בדפדפן.",
+    "קמפיינים, אוטומציות, אנשי קשר, פלחים, טפסים ודוחות, דרך שרת MCP של Omnisend עם מפתח API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "איך הקמפיינים של השבוע שעבר הצליחו בהשוואה לשבוע שלפניו?",
   "marketplace.plugin.omnisend.prompt.segment": "כמה אנשי קשר יש בפלח VIP, ואיך זה השתנה החודש?",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "נסח קמפיין לקולקציה החדשה, אבל אל תשלח אותו.",
   "marketplace.plugin.postiz.tagline": "תזמון פוסטים ברשתות חברתיות",
+  "marketplace.plugin.omnisend.hint.apiKey": "ב-Omnisend, יש לפתוח את Store settings > API keys וליצור מפתח.",
   "marketplace.plugin.postiz.description":
     "Postiz מאפשר לסוכנים להציג את ערוצי הרשתות החברתיות שלך, ולכתוב טיוטות, לתזמן ולפרסם פוסטים ביותר מ-30 רשתות, כמו X,‏ LinkedIn,‏ Instagram ו-TikTok. סוכנים יכולים גם להעלות מדיה וליצור תמונות וסרטונים בבינה מלאכותית. התחבר לחשבון Postiz שלך בדפדפן, או הדבק את מפתח ה-API מ-Settings › Developers ב-Postiz. כל תוכניות הענן של Postiz כוללות גישה ל-API. סוכנים יכולים לפרסם פוסט מיד, לכן בדוק כל פוסט לפני שתאשר אותו.",
   "marketplace.plugin.postiz.app":

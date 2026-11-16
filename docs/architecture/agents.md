@@ -763,12 +763,13 @@ approval of `AttentionRegistry.awaitToolApproval`, which states that every agent
 the tools. Full access answers it, as for other built-in tool approvals. `save_mcp_server` connects
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
 server that needs an OAuth sign-in or a key is saved. The tools never take or return a header or
-environment value, and show an address without its query: the user enters a key in Server settings,
-MCP. An edit keeps the row's headers and environment, and an edit that would send them to another
+environment value, and show an address without its query: the user enters a key with Edit on the
+server's page in Marketplace, Apps. An edit keeps the row's headers and environment, and an edit that would send them to another
 transport, origin, command, arguments or folder is refused. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
-the conversation. Its Sign in opens Server settings, MCP, and starts the row's normal sign-in, so a
-joined server signs in through its relay or live page. Continue sends a message that tells the agent
+the conversation. Its Sign in opens the row's page in Marketplace, Apps, and starts the row's normal sign-in,
+so a joined server signs in through its relay (`sign-in-relay-v1`). A host without the relay shows no
+Sign in on the card. Continue sends a message that tells the agent
 to test again. A saved change reaches the agents from their next turn.
 
 When its own tools fail, the agent checks its teammates. When a teammate reports that it is blocked
@@ -786,7 +787,11 @@ enable the plugin. It can offer to create a specialist teammate, but it creates 
 An agent that delegates work can follow and stop it. `openbot.list_agents` reports each agent's
 description to 300 characters (`read_agent` returns all of it), its
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
-(channel work excluded), `turnStartedAt`, and `lastActivityAt`. The last two come from the provider
+(channel work excluded), `turnStartedAt`, `waitingFor`, and `lastActivityAt`. A turn that waits for
+a person's approval, answer or browser takeover stays open, so its agent stays `working`;
+`waitingFor` names what a turn of the agent waits for, from `AttentionRegistry.waitsFor`. Another
+turn of the agent, such as a channel turn, can still work. A detached question holds no turn, so it
+does not count. `turnStartedAt` and `lastActivityAt` come from the provider
 notifications that `TurnLifecycle` sees; they are in memory only, so after a restart
 `lastActivityAt` falls back to the newest message for the agent. OpenBot does not record which
 files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)
@@ -810,11 +815,15 @@ with the `empty_answer` cause, as an ACP turn with no answer fails, unless the t
 by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
 error. With no backup, a turn that only teammate results started runs once more on the same model.
-A thread turn never moves to a backup, so it always runs once more on the same model (#8503). So
+A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
+the same model (#8503, #8406). So
 does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
 so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
 nothing. A second empty run, or an empty turn from the person, shows the error.
+A turn that a failed sign-in or a provider that does not answer ended after work started continues
+on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
+to switch without asking (#8406).
 
 Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
 answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
@@ -833,8 +842,8 @@ exists only after the user changes the setting, so a stored "queue" stays "queue
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
 "queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
 own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
-(`steerOpenCode`). An OpenCode release before the extension does not report
-`_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
+(`steerAcpSession` in `src/backend/acp-session-steering.ts`). An OpenCode release before the
+extension does not report `_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
 waits in the queue. `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
 a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
 `steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
@@ -842,6 +851,19 @@ reports the version "0.0.0-dev"). While an approval or a question is open, the m
 queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
 so `AcpFlavor.promptRun` reports it once. `scripts/antigravity-steer-e2e.ts` and
 `scripts/devin-steer-e2e.ts` check these paths.
+
+A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
+agent process reports at `initialize` whether it steers, so the provider alone does not tell.
+`AcpAgentClient` adds `steersTurns` to its `model/list` answer, `CustomAcpAgentsClient` puts it on
+each model of that agent, and the catalog keeps it as `AgentModelOption.steersTurns`.
+`agentSteersTurns(runtime, models)` reads it for any listed model of the same custom agent, so a
+saved model that the list no longer has, or that model visibility hides, still counts: the host gates
+(`#steerWhenBusy`, `QueueControls.steer`) and the composer, the queue and the agent settings use it.
+A custom agent that does not steer keeps "Send now", and a steer stays in the queue with the reason.
+A remote client reads the steering models from `model-steering-v1`, because the released model list
+does not carry the flag. The route leaves out a model that the server's model picker hides.
+A host before it does not advertise the capability, so the client keeps "Send now" and the host queues the message. `scripts/custom-agent-steer-e2e.ts` checks the catalog,
+a steer, a `promptRequired` answer and an agent without the extension.
 
 A steered message joins work that the model already does, and a model that gets it as plain user
 text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block

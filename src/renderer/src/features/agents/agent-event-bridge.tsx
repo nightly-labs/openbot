@@ -27,8 +27,8 @@ import { latestIncomingConversationMessage } from "../conversation/conversation-
 import { noteSocialFollowReplyCompleted } from "../conversation/social-follow-prompt";
 import { appendTurnStepLine } from "../conversation/turn-step-lines";
 import { serverCanManageMcp } from "../servers/server-capabilities";
-import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
+import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
 import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
@@ -76,7 +76,7 @@ export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
-  const { openServerSettings } = useServerSettings();
+  const { setSkillsMarketplaceOpen } = useSettings();
   const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const {
@@ -472,17 +472,17 @@ export function AgentEventBridge() {
         if (claimErrorToast(toastKey)) {
           // An MCP server that a provider was not given or could not use is not the provider failing,
           // and calling it a provider error sends the user to the wrong settings page. The button
-          // shows only to a user who can see the server's MCP settings.
+          // opens the Marketplace, which holds the MCP servers, and shows only to a user who can
+          // manage them.
           const { t } = currentText();
           const mcp = event.code === "mcp_server_not_started";
-          const serverId = activeServerId();
           toast.error(mcp ? t("agent.error.mcpNotStarted") : providerErrorTitle(event.code), {
             ...{ description: toastKey },
             ...(mcp && serverCanManageMcp(activeServer())
               ? {
                   action: {
-                    label: t("agent.error.openMcpSettings"),
-                    onClick: () => openServerSettings(serverId, null, "mcp"),
+                    label: t("agent.error.openMarketplace"),
+                    onClick: () => setSkillsMarketplaceOpen(true),
                   },
                 }
               : {}),

@@ -1,4 +1,10 @@
-import { FEEDBACK_REPOSITORY, feedbackComment, feedbackIssue, parseFeedback } from "@openbot/contracts/feedback";
+import {
+  FEEDBACK_REPOSITORY,
+  feedbackComment,
+  feedbackIssue,
+  feedbackLacksPhone,
+  parseFeedback,
+} from "@openbot/contracts/feedback";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { runApiResponse } from "../../server/effect-runtime";
@@ -13,14 +19,18 @@ import {
   uncountFeedback,
 } from "../../server/request-auth";
 
-/** A report with each text field full of non-Latin text, in UTF-8. */
-const FEEDBACK_BODY_LIMIT = 32 * 1024;
+/** A report with each text field and the phone's log lines full of non-Latin text, in UTF-8. */
+const FEEDBACK_BODY_LIMIT = 64 * 1024;
 
 /**
  * Opens a bug report or a feature idea from the app as an issue by `openbotgit[bot]`, so that a user
  * with no GitHub account can send feedback. Only a signed-in account can send, a few times a day.
  * With `sameAs`, the report is a comment on that open issue instead. The issue names no account, and the Worker does not store
  * or log the text: GitHub keeps it, in public.
+ *
+ * A bug report about the phone app must have the phone's version, system and support log, which the
+ * phone adds when the user sends the report there. An app that cannot add them, such as an older
+ * version, gets `feedback_needs_phone`, and no issue is opened.
  *
  * `/v1/feedback/similar` finds the open issues with similar titles, so that the agent can add to one of them.
  */
@@ -34,6 +44,12 @@ export const Route = createFileRoute("/v1/feedback")({
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const feedback = parseFeedback(yield* readJsonObject(request, FEEDBACK_BODY_LIMIT));
             if (!feedback) return apiError(400, "invalid_feedback", "The feedback is invalid.");
+            if (feedbackLacksPhone(feedback))
+              return apiError(
+                400,
+                "feedback_needs_phone",
+                "A report about the phone app needs the phone's version, system and support log.",
+              );
             const github = requestGitHubInstallationTokens();
             const day = yield* enforceFeedbackRateLimit(user.id);
             const open = github.openIssue(FEEDBACK_REPOSITORY, feedbackIssue(feedback));

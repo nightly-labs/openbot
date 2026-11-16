@@ -941,7 +941,10 @@ key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`
 (`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
 Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
+and a model that no group names has no reading. Google lists no models for the Argon group (its
+description is a plan note), so a group with no list takes its own name as its model while other groups
+list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
+no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
@@ -1360,6 +1363,22 @@ turns on a free Nous Portal model in a temporary Hermes profile, and writes
 reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.hermes` installs its
 own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
 user's runtime, and stops when the launchers change.
+
+Hermes hides all MCP tools behind its own `tool_search`, `tool_describe` and `tool_call`. In Hermes
+0.23.1, the default `tools.tool_search.enabled: auto` is the same as `on`, and a session cannot turn it
+off. Behind OpenBot's own search, the model had to find OpenBot's `tool_call` with the Hermes search,
+and the Hermes `tool_call` refused `openbot.channel_result` (#9312). So the Hermes flavors, also that of
+a custom `hermes` agent, set `catalogAsMcpTools`: `AcpClient` gives the bridge `withCatalogTools`,
+which adds each catalog tool to its namespace and removes OpenBot's `tool_search` and `tool_describe`.
+OpenBot's `tool_call` stays for the instructions that name it. Hermes names a tool
+`mcp__editor_openbot_<tag>__<tool>`, and the developer instructions give that form. A tool's guidance
+goes in the root `description` of its schema, which the Hermes `tool_describe` shows and its search
+does not read; in the tool description it moved results down. The tools that every agent has directly
+get it too, because OpenBot's `tool_describe` is not listed. The browser core guidance comes with the
+first browser result (`browserToolsPrimer`), as for the other providers. With the Hermes search off,
+the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun run test:hermes-catalog-tools`
+(`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
+checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
 
 ### Custom agents
 
