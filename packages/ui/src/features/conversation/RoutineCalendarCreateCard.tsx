@@ -250,187 +250,183 @@ export function RoutineCalendarCreateCard(props: {
   const agentName = () => agentOf(props.agents, draft.agentId)?.name ?? draft.agentId;
 
   return (
-    <>
-      <Popover.Root
-        open={props.slot !== null}
-        onOpenChange={(next) => {
-          if (!next) props.onClose();
-        }}
-        // The point of the click, in the viewport.
-        getAnchorRect={() => ({ x: props.slot?.x ?? 0, y: props.slot?.y ?? 0, width: 0, height: 0 })}
-        placement="right-start"
-        gutter={8}
-        modal={false}
-      >
-        <Popover.Portal>
-          <Popover.Content
-            ref={card}
-            class="ui-popover-menu-surface routine-planner-create"
-            // The name is the first thing to write; the agent is already set.
-            onOpenAutoFocus={(event) => {
-              event.preventDefault();
-              nameInput?.focus();
-            }}
-          >
-            <header class="routine-planner-create-head">
-              <Popover.Title class="routine-planner-create-title">{t("routine.calendar.new")}</Popover.Title>
-              <IconButton variant="ghost" size="icon-sm" label={t("common.close")} onClick={() => props.onClose()}>
-                <X aria-hidden="true" />
-              </IconButton>
-            </header>
-            <div class="settings-field">
-              <span id={`${id}-agent`}>{t("routine.calendar.agent")}</span>
-              <AgentSearchSelect
-                agents={props.agents}
-                agentId={draft.agentId}
-                label={t("routine.calendar.agentChoice", { name: agentName() })}
-                variant="outline"
-                class="routine-planner-create-agent"
-                onChange={(agentId) => {
-                  lastAgentId = agentId;
-                  setDraft((value) => {
-                    value.agentId = agentId;
-                  });
-                }}
-              />
-            </div>
-            <label class="settings-field">
-              <span>{t("routine.settings.name")}</span>
-              <Input
-                ref={nameInput}
-                value={draft.name}
-                placeholder={t("routine.settings.namePlaceholder")}
-                maxlength={INPUT_LIMITS.routineName}
-                invalid={nameMissing()}
-                aria-describedby={nameMissing() ? `${id}-name-error` : undefined}
-                onValueChange={(name) =>
-                  setDraft((value) => {
-                    value.name = name;
-                  })
-                }
-              />
-              <Show when={nameMissing()}>
-                <Text id={`${id}-name-error`} variant="caption" tone="danger">
-                  {t("routine.settings.nameRequired")}
-                </Text>
-              </Show>
-            </label>
-            <section class="routine-planner-create-when" aria-labelledby={`${id}-when`}>
-              <h3 id={`${id}-when`}>{t("routine.settings.whenToRun")}</h3>
-              <RoutineSchedulePicker
-                schedule={draft.schedule}
-                today={props.now}
-                kinds={props.create.fields.onceSchedule ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS}
-                onChange={changeSchedule}
-              />
-            </section>
-            <div class="settings-field">
-              <span id={`${id}-instruction`}>{t("routine.settings.instruction")}</span>
-              <Textarea
-                aria-labelledby={`${id}-instruction`}
-                value={draft.instruction}
-                placeholder={t("routine.settings.instructionPlaceholderAgent")}
-                maxlength={INPUT_LIMITS.routineInstruction}
-                invalid={instructionMissing()}
-                aria-describedby={instructionMissing() ? `${id}-instruction-error` : undefined}
-                onValueChange={(instruction) =>
-                  setDraft((value) => {
-                    value.instruction = instruction;
-                  })
-                }
-              />
-              <Show when={instructionMissing()}>
-                <Text id={`${id}-instruction-error`} variant="caption" tone="danger">
-                  {t("routine.settings.instructionRequired")}
-                </Text>
-              </Show>
-            </div>
-            {/* The host does not skip a one-time run at a spent plan: it waits, so the reminder is not lost. */}
-            <Show when={props.create.fields.limitPolicy && draft.schedule.kind !== "once"}>
-              <div class="settings-field">
-                <span id={`${id}-limit`}>{t("routine.settings.limitPolicy")}</span>
-                <Select<RoutineLimitPolicy>
-                  options={[...ROUTINE_LIMIT_POLICIES]}
-                  value={draft.limitPolicy}
-                  onChange={(limitPolicy) => {
-                    if (limitPolicy)
-                      setDraft((value) => {
-                        value.limitPolicy = limitPolicy;
-                      });
-                  }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>{t(LIMIT_LABELS[item.item.rawValue])}</SelectItem>
-                  )}
-                >
-                  <SelectTrigger aria-labelledby={`${id}-limit`}>
-                    <SelectValue<RoutineLimitPolicy>>{(state) => t(LIMIT_LABELS[state.selectedOption()])}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent />
-                </Select>
-              </div>
+    <Popover.Root
+      open={props.slot !== null}
+      onOpenChange={(next) => {
+        if (!next) props.onClose();
+      }}
+      // The point of the click, in the viewport.
+      getAnchorRect={() => ({ x: props.slot?.x ?? 0, y: props.slot?.y ?? 0, width: 0, height: 0 })}
+      placement="right-start"
+      gutter={8}
+      modal={false}
+    >
+      <Popover.Portal>
+        <Popover.Content
+          ref={card}
+          class="ui-popover-menu-surface routine-planner-create"
+          // The name is the first thing to write; the agent is already set.
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            nameInput?.focus();
+          }}
+        >
+          <header class="routine-planner-create-head">
+            <Popover.Title class="routine-planner-create-title">{t("routine.calendar.new")}</Popover.Title>
+            <IconButton variant="ghost" size="icon-sm" label={t("common.close")} onClick={() => props.onClose()}>
+              <X aria-hidden="true" />
+            </IconButton>
+          </header>
+          <div class="settings-field">
+            <span id={`${id}-agent`}>{t("routine.calendar.agent")}</span>
+            <AgentSearchSelect
+              agents={props.agents}
+              agentId={draft.agentId}
+              label={t("routine.calendar.agentChoice", { name: agentName() })}
+              variant="outline"
+              class="routine-planner-create-agent"
+              onChange={(agentId) => {
+                lastAgentId = agentId;
+                setDraft((value) => {
+                  value.agentId = agentId;
+                });
+              }}
+            />
+          </div>
+          <label class="settings-field">
+            <span>{t("routine.settings.name")}</span>
+            <Input
+              ref={nameInput}
+              value={draft.name}
+              placeholder={t("routine.settings.namePlaceholder")}
+              maxlength={INPUT_LIMITS.routineName}
+              invalid={nameMissing()}
+              aria-describedby={nameMissing() ? `${id}-name-error` : undefined}
+              onValueChange={(name) =>
+                setDraft((value) => {
+                  value.name = name;
+                })
+              }
+            />
+            <Show when={nameMissing()}>
+              <Text id={`${id}-name-error`} variant="caption" tone="danger">
+                {t("routine.settings.nameRequired")}
+              </Text>
             </Show>
-            <Show when={props.create.fields.missedPolicy}>
-              <div class="settings-field">
-                <span id={`${id}-missed`}>{t("routine.settings.missedPolicy")}</span>
-                <Select<RoutineMissedPolicy>
-                  options={[...ROUTINE_MISSED_POLICIES]}
-                  value={draft.missedPolicy}
-                  onChange={(missedPolicy) => {
-                    if (missedPolicy)
-                      setDraft((value) => {
-                        value.missedPolicy = missedPolicy;
-                      });
-                  }}
-                  itemComponent={(item) => (
-                    <SelectItem item={item.item}>{t(MISSED_LABELS[item.item.rawValue])}</SelectItem>
-                  )}
-                >
-                  <SelectTrigger aria-labelledby={`${id}-missed`}>
-                    <SelectValue<RoutineMissedPolicy>>
-                      {(state) => t(MISSED_LABELS[state.selectedOption()])}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent />
-                </Select>
-              </div>
+          </label>
+          <section class="routine-planner-create-when" aria-labelledby={`${id}-when`}>
+            <h3 id={`${id}-when`}>{t("routine.settings.whenToRun")}</h3>
+            <RoutineSchedulePicker
+              schedule={draft.schedule}
+              today={props.now}
+              kinds={props.create.fields.onceSchedule ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS}
+              onChange={changeSchedule}
+            />
+          </section>
+          <div class="settings-field">
+            <span id={`${id}-instruction`}>{t("routine.settings.instruction")}</span>
+            <Textarea
+              aria-labelledby={`${id}-instruction`}
+              value={draft.instruction}
+              placeholder={t("routine.settings.instructionPlaceholderAgent")}
+              maxlength={INPUT_LIMITS.routineInstruction}
+              invalid={instructionMissing()}
+              aria-describedby={instructionMissing() ? `${id}-instruction-error` : undefined}
+              onValueChange={(instruction) =>
+                setDraft((value) => {
+                  value.instruction = instruction;
+                })
+              }
+            />
+            <Show when={instructionMissing()}>
+              <Text id={`${id}-instruction-error`} variant="caption" tone="danger">
+                {t("routine.settings.instructionRequired")}
+              </Text>
             </Show>
-            <Show when={props.create.fields.runIn}>
-              <div class="settings-field">
-                <SwitchField
-                  label={t("routine.settings.runInThread")}
-                  checked={draft.runInThread}
-                  onChange={(thread) =>
+          </div>
+          {/* The host does not skip a one-time run at a spent plan: it waits, so the reminder is not lost. */}
+          <Show when={props.create.fields.limitPolicy && draft.schedule.kind !== "once"}>
+            <div class="settings-field">
+              <span id={`${id}-limit`}>{t("routine.settings.limitPolicy")}</span>
+              <Select<RoutineLimitPolicy>
+                options={[...ROUTINE_LIMIT_POLICIES]}
+                value={draft.limitPolicy}
+                onChange={(limitPolicy) => {
+                  if (limitPolicy)
                     setDraft((value) => {
-                      value.runInThread = thread;
-                    })
-                  }
-                />
-              </div>
-            </Show>
-            <Show when={draft.error}>
-              {(error) => (
-                <Text variant="caption" tone="danger" role="alert">
-                  {error()}
-                </Text>
-              )}
-            </Show>
-            <div class="routine-planner-create-actions">
-              <Button type="button" variant="ghost" size="sm" onClick={() => props.onClose()}>
-                {t("common.cancel")}
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                loading={draft.saving}
-                loadingLabel={t("common.saving")}
-                onClick={() => void create()}
+                      value.limitPolicy = limitPolicy;
+                    });
+                }}
+                itemComponent={(item) => (
+                  <SelectItem item={item.item}>{t(LIMIT_LABELS[item.item.rawValue])}</SelectItem>
+                )}
               >
-                {t("routine.settings.create")}
-              </Button>
+                <SelectTrigger aria-labelledby={`${id}-limit`}>
+                  <SelectValue<RoutineLimitPolicy>>{(state) => t(LIMIT_LABELS[state.selectedOption()])}</SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
             </div>
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
-    </>
+          </Show>
+          <Show when={props.create.fields.missedPolicy}>
+            <div class="settings-field">
+              <span id={`${id}-missed`}>{t("routine.settings.missedPolicy")}</span>
+              <Select<RoutineMissedPolicy>
+                options={[...ROUTINE_MISSED_POLICIES]}
+                value={draft.missedPolicy}
+                onChange={(missedPolicy) => {
+                  if (missedPolicy)
+                    setDraft((value) => {
+                      value.missedPolicy = missedPolicy;
+                    });
+                }}
+                itemComponent={(item) => (
+                  <SelectItem item={item.item}>{t(MISSED_LABELS[item.item.rawValue])}</SelectItem>
+                )}
+              >
+                <SelectTrigger aria-labelledby={`${id}-missed`}>
+                  <SelectValue<RoutineMissedPolicy>>{(state) => t(MISSED_LABELS[state.selectedOption()])}</SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </div>
+          </Show>
+          <Show when={props.create.fields.runIn}>
+            <div class="settings-field">
+              <SwitchField
+                label={t("routine.settings.runInThread")}
+                checked={draft.runInThread}
+                onChange={(thread) =>
+                  setDraft((value) => {
+                    value.runInThread = thread;
+                  })
+                }
+              />
+            </div>
+          </Show>
+          <Show when={draft.error}>
+            {(error) => (
+              <Text variant="caption" tone="danger" role="alert">
+                {error()}
+              </Text>
+            )}
+          </Show>
+          <div class="routine-planner-create-actions">
+            <Button type="button" variant="ghost" size="sm" onClick={() => props.onClose()}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              loading={draft.saving}
+              loadingLabel={t("common.saving")}
+              onClick={() => void create()}
+            >
+              {t("routine.settings.create")}
+            </Button>
+          </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
