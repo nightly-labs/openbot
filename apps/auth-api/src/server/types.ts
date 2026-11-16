@@ -111,6 +111,11 @@ export interface WorkerBindings {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   /**
+   * The seller's EU VAT ID, such as `PL1234567890`. VIES then gives a consultation number for each VAT ID
+   * check, the proof of the check. Not secret. Absent: the check works with no consultation number.
+   */
+  VIES_REQUESTER_VAT_ID?: string;
+  /**
    * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
    * a new license is paid at once.
    */

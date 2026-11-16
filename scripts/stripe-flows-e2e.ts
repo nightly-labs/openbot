@@ -60,6 +60,11 @@
  * - `order-trial`: a server order with a license gives a Checkout page with the server Price only, and
  *   the order in its metadata. After the payment a trialing license of the order starts on its own
  *   subscription, the order metadata leaves the server subscription, and a second order is refused.
+ *
+ * The `vat` scenario needs the VAT Tax Rate of `bun run api:stripe:bootstrap`. It sets the billing details
+ * of `PUT /v1/me/billing/details` and reads the VAT of each new Checkout page: Polish VAT for Poland and for
+ * an EU consumer, none outside the EU, reverse charge for an Irish company that VIES confirms, Polish VAT
+ * for a Polish company, and 409 with no country. The reverse charge steps call the real VIES service.
  */
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
@@ -80,6 +85,7 @@ import {
   storageTierGb,
   storageTierOf,
 } from "@openbot/contracts/billing";
+import { type BillingDetailsRequest, VAT_TAX_RATE } from "@openbot/contracts/billing-details";
 import { DEFAULT_TEAM_MEMBER_LIMIT } from "@openbot/contracts/input-limits";
 import {
   LICENSE_INCLUDED_USERS,
@@ -145,6 +151,7 @@ const SCENARIOS = [
   "license-self-hosted-limit",
   "license-trial",
   "order-trial",
+  "vat",
 ] as const;
 type Scenario = (typeof SCENARIOS)[number];
 const DAY = 86_400;
@@ -310,7 +317,8 @@ const checkoutLinesSchema = z.object({
   currency: z.string().nullable(),
   amount_total: z.number().nullable(),
   metadata: z.record(z.string(), z.string()).nullable(),
-  automatic_tax: z.object({ enabled: z.boolean() }),
+  amount_subtotal: z.number().nullable(),
+  total_details: z.object({ amount_tax: z.number() }).nullable(),
   line_items: z.object({
     data: z.array(
       z.object({
@@ -344,6 +352,7 @@ type BrowserApiBody =
   | { confirmName: string }
   | BillingPortalRequest
   | BillingStorageRequest
+  | BillingDetailsRequest
   | LicenseCheckoutRequest
   | LicenseUsersRequest
   | LicensePlanRequest
@@ -497,6 +506,8 @@ class Account {
       payment_method: "pm_card_visa",
       "invoice_settings[default_payment_method]": "pm_card_visa",
       "metadata[openbot_user_id]": this.id,
+      // The billing country decides the VAT of a Checkout page. `payCheckout` pays with an address in Poland.
+      "address[country]": "PL",
     });
     this.customer = customer.id;
     // The Worker makes a customer without a test clock, so the account gets this one before its first Checkout.
@@ -509,7 +520,7 @@ class Account {
   }
 
   async request(
-    method: "GET" | "POST" | "PATCH" | "DELETE",
+    method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: BrowserApiBody,
     headers: Record<string, string> = {},
@@ -1326,6 +1337,36 @@ function legacyMemberLimits(serverId: string) {
       z.object({ legacy_member_limits: z.number() }),
     )[0]?.legacy_member_limits ?? null
   );
+}
+
+type CheckoutView = z.infer<typeof checkoutLinesSchema>;
+
+/** The VAT facts of a Checkout page, for the report. */
+function vatView(session: CheckoutView | null) {
+  return (
+    session && {
+      country: session.metadata?.openbot_vat_country ?? null,
+      treatment: session.metadata?.openbot_vat_treatment ?? null,
+      subtotal: session.amount_subtotal,
+      tax: session.total_details?.amount_tax ?? null,
+    }
+  );
+}
+
+/** The page charges the VAT rate of `VAT_TAX_RATE` on top of its subtotal. */
+function addsPolishVat(session: CheckoutView | null) {
+  const view = vatView(session);
+  return (
+    view?.treatment === "standard" &&
+    view.subtotal !== null &&
+    view.tax === Math.round((view.subtotal * VAT_TAX_RATE.percentage) / 100)
+  );
+}
+
+/** The page charges no VAT, for the `treatment` that the billing details give. */
+function addsNoVat(session: CheckoutView | null, treatment: "reverse" | "none") {
+  const view = vatView(session);
+  return view?.treatment === treatment && view.tax === 0;
 }
 
 /** The Checkout Session of a license page, with its line and metadata. */
@@ -2282,9 +2323,9 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
     record(
       "license-checkout",
-      "the license Checkout page adds VAT on top with Stripe Tax",
-      session?.automatic_tax.enabled === true && line?.price.tax_behavior === "exclusive",
-      { automaticTax: session?.automatic_tax, taxBehavior: line?.price.tax_behavior },
+      "the license Checkout page adds Polish VAT on top for a buyer in Poland",
+      addsPolishVat(session) && line?.price.tax_behavior === "exclusive",
+      { vat: vatView(session), taxBehavior: line?.price.tax_behavior },
     );
     if (REAL_CHECKOUT) {
       const returned = await payCheckout(url, account.api, "license-e2e-checkout.png");
@@ -2989,11 +3030,9 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     );
     record(
       "order-bundle",
-      "the order Checkout page adds VAT on top of both Prices with Stripe Tax",
-      session?.automatic_tax.enabled === true &&
-        lines.length > 0 &&
-        lines.every((line) => line.price.tax_behavior === "exclusive"),
-      { automaticTax: session?.automatic_tax, taxBehavior: lines.map((line) => line.price.tax_behavior) },
+      "the order Checkout page adds Polish VAT on top of both Prices for a buyer in Poland",
+      addsPolishVat(session) && lines.length > 0 && lines.every((line) => line.price.tax_behavior === "exclusive"),
+      { vat: vatView(session), taxBehavior: lines.map((line) => line.price.tax_behavior) },
     );
     if (!created) return;
 
@@ -3576,6 +3615,162 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       "a second server order with a license: 409 license_exists",
       again.status === 409 && again.code === "license_exists",
       { status: again.status, code: again.code },
+    );
+  },
+
+  async vat(account) {
+    const detailsSchema = z.object({ country: z.string().nullable(), vatId: z.string().nullable() });
+    const details = async () =>
+      detailsSchema.safeParse((await account.request("GET", "v1/me/billing/details")).body).data;
+    const save = (body: BillingDetailsRequest) => account.request("PUT", "v1/me/billing/details", body);
+    const taxExempt = async () =>
+      (await stripe("GET", `/v1/customers/${account.customer}`, z.object({ tax_exempt: z.string().nullable() })))
+        .tax_exempt;
+
+    const first = await details();
+    record(
+      "vat",
+      "the billing details give the country of the Stripe customer and no VAT ID",
+      first?.country === "PL" && first.vatId === null,
+      first,
+    );
+
+    const created = await account.createServer("VAT server");
+    const serverId = created.server.serverId;
+    const page = async () => {
+      const opened = await account.checkout(serverId);
+      return opened.checkoutUrl ? licenseSession(opened.checkoutUrl) : null;
+    };
+    const domestic = created.checkoutUrl ? await licenseSession(created.checkoutUrl) : null;
+    record("vat", "a buyer in Poland pays 23% Polish VAT on top", addsPolishVat(domestic), vatView(domestic));
+
+    const consumer = await save({ country: "DE" });
+    const consumerPage = await page();
+    record(
+      "vat",
+      "a buyer in Germany with no VAT ID pays Polish VAT: the seller is not in the One Stop Shop",
+      consumer.status === 200 && addsPolishVat(consumerPage) && vatView(consumerPage)?.country === "DE",
+      { status: consumer.status, vat: vatView(consumerPage) },
+    );
+
+    const outside = await save({ country: "US" });
+    const outsidePage = await page();
+    record(
+      "vat",
+      "a buyer in the United States pays no VAT",
+      outside.status === 200 && addsNoVat(outsidePage, "none"),
+      { status: outside.status, vat: vatView(outsidePage) },
+    );
+
+    const foreignId = await save({ country: "US", vatId: "DE123456789" });
+    const otherPrefix = await save({ country: "DE", vatId: "FR40303265045" });
+    record(
+      "vat",
+      "a VAT ID outside the EU, or of another country: 400 invalid_billing_details",
+      foreignId.code === "invalid_billing_details" && otherPrefix.code === "invalid_billing_details",
+      { foreignId: foreignId.code, otherPrefix: otherPrefix.code },
+    );
+
+    // A real VAT ID of a company in Ireland: the Worker checks it with VIES, which has no test numbers there.
+    const company = await save({ country: "IE", vatId: "IE 6388047V" });
+    if (company.status === 503 && company.code === "vat_id_unverified") {
+      print("SKIP [vat] reverse charge: VIES did not answer");
+    } else {
+      const companyPage = await page();
+      const saved = await details();
+      record(
+        "vat",
+        "a company in Ireland with a VAT ID that VIES confirms pays no VAT (reverse charge), and its customer is tax exempt as reverse",
+        company.status === 200 &&
+          saved?.vatId === "IE6388047V" &&
+          addsNoVat(companyPage, "reverse") &&
+          (await taxExempt()) === "reverse",
+        { status: company.status, code: company.code, saved, vat: vatView(companyPage) },
+      );
+      const unknown = await save({ country: "DE", vatId: "DE000000000" });
+      const kept = await details();
+      record(
+        "vat",
+        "a VAT ID that VIES does not know: 400 vat_id_invalid, and the saved details do not change",
+        unknown.status === 400 && unknown.code === "vat_id_invalid" && kept?.vatId === "IE6388047V",
+        { status: unknown.status, code: unknown.code, kept },
+      );
+    }
+
+    const polishCompany = await save({ country: "PL", vatId: "5260250995" });
+    const polishPage = await page();
+    record(
+      "vat",
+      "a company in Poland pays Polish VAT also with a VAT ID, and its customer is not tax exempt",
+      polishCompany.status === 200 && addsPolishVat(polishPage) && (await taxExempt()) === "none",
+      { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
+    );
+
+    // A customer from before the billing details step that never paid has no address.
+    await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
+    const refused = await account.checkout(serverId);
+    const cleared = await details();
+    record(
+      "vat",
+      "with no billing country a Checkout page is refused: 409 billing_country_required",
+      refused.status === 409 && refused.code === "billing_country_required" && cleared?.country === null,
+      { status: refused.status, code: refused.code, details: cleared },
+    );
+
+    // Cloudflare sets CF-IPCountry; a local Worker reads the header that the client sends.
+    const located = async (country: string) =>
+      (await account.request("GET", "v1/me/billing/details", undefined, { "CF-IPCountry": country })).body;
+    const [france, unknownPlace, tor] = [await located("FR"), await located("XX"), await located("T1")];
+    const suggestion = (value: unknown) =>
+      z.object({ suggestedCountry: z.string().optional() }).safeParse(value).data?.suggestedCountry;
+    await save({ country: "DE" });
+    const savedFirst = await located("FR");
+    record(
+      "vat",
+      "with no saved country the details suggest the CF-IPCountry country (not XX or T1); a saved country gets no suggestion",
+      suggestion(france) === "FR" &&
+        suggestion(unknownPlace) === undefined &&
+        suggestion(tor) === undefined &&
+        suggestion(savedFirst) === undefined,
+      { france, unknownPlace, tor, savedFirst },
+    );
+
+    // The One Stop Shop count: a paid invoice of a consumer in Germany adds its net amount, in euro cents.
+    const rates = await stripe(
+      "GET",
+      "/v1/tax_rates",
+      z.object({ data: z.array(z.object({ id: z.string(), metadata: z.record(z.string(), z.string()) })) }),
+      { active: "true", limit: "100" },
+    );
+    const vatRate = rates.data.find((rate) => rate.metadata[VAT_TAX_RATE.metadataKey] === VAT_TAX_RATE.metadataValue);
+    if (!vatRate) throw new Error("No VAT Tax Rate: run bun run api:stripe:bootstrap.");
+    const paid = await stripe("POST", "/v1/subscriptions", z.object({ id: z.string(), latest_invoice: z.string() }), {
+      customer: account.customer,
+      "items[0][price]": await priceId("standard", "month"),
+      currency: "eur",
+      "default_tax_rates[0]": vatRate.id,
+      payment_behavior: "error_if_incomplete",
+    });
+    const invoice = await stripe(
+      "GET",
+      `/v1/invoices/${paid.latest_invoice}`,
+      z.object({ total: z.number(), total_excluding_tax: z.number().nullable() }),
+    );
+    const counted = await waitFor("OSS sale", async () => {
+      const rows = d1(
+        `SELECT country, amount_eur FROM billing_vat_oss_sales WHERE invoice_id = ${quote(paid.latest_invoice)}`,
+        z.object({ country: z.string(), amount_eur: z.number() }),
+      );
+      return rows[0] ?? null;
+    });
+    await stripe("DELETE", `/v1/subscriptions/${paid.id}`, idSchema);
+    record(
+      "vat",
+      "a paid invoice of a consumer in Germany adds its net amount, not the VAT, to the One Stop Shop count",
+      counted.country === "DE" &&
+        counted.amount_eur === invoice.total_excluding_tax &&
+        invoice.total > counted.amount_eur,
+      { counted, invoice },
     );
   },
 };

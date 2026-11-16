@@ -164,6 +164,7 @@ import {
   decodeAppLogoColorPreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingDetails,
   decodeBillingState,
   decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
@@ -1115,6 +1116,8 @@ const openbotApi: OpenBotDesktopApi = {
     getState: decodeBillingState,
     openPortal: decodeVoid,
     buyStorage: decodeBillingState,
+    getDetails: decodeBillingDetails,
+    setDetails: decodeBillingDetails,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,

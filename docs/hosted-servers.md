@@ -1752,6 +1752,8 @@ sends the operator one message:
 | The owner cancels the renewal of a server plan or a license | ``Cancelled renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. It ends on <date>.`` | None. |
 | The owner resumes that renewal | ``Resumed renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>.`` | None. |
 | A server plan or a license ends | ``Ended <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. Reason: <cancelled or not paid>.`` | None. |
+| A paid Checkout page has a billing address in another country than the saved billing country | `VAT check: Checkout page <session ID> took the VAT of <country> (<treatment>), but its billing address is in <country>. ...` | Check the VAT of its invoice. |
+| Paid sales to consumers in other EU countries reach EUR 9,000 (net) in a calendar year, once a year | `VAT limit: in <year>, sales to consumers in other EU countries reached <amount> (net). ...` | Register for the EU One Stop Shop and charge the VAT of the buyer's country before EUR 10,000. |
 
 A purchase message (the last 5 rows) and a payment message (below) have the email of the account, on a
 developer decision, so keep the webhook in a private channel. A pool message has no account, email or

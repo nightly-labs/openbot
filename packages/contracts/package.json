@@ -19,6 +19,7 @@
     "./attachment-references": "./src/attachment-references.ts",
     "./avatar-images": "./src/avatar-images.ts",
     "./billing": "./src/billing.ts",
+    "./billing-details": "./src/billing-details.ts",
     "./license": "./src/license.ts",
     "./discord-app": "./src/discord-app.ts",
     "./discord-guild-grant": "./src/discord-guild-grant.ts",

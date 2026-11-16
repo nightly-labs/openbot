@@ -1,5 +1,6 @@
 import { Effect } from "effect";
 import { createAccountAnalytics } from "./account-analytics";
+import { BillingOss } from "./billing-oss";
 import { purchaseAlertText } from "./billing-purchase";
 import { BillingSales } from "./billing-sales";
 import { BillingService } from "./billing-service";
@@ -20,6 +21,7 @@ import { parseLicenseTrialEnd } from "./license-service";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { SmtpFailure } from "./smtp-email-delivery";
 import type { WorkerBindings } from "./types";
+import { ViesClient } from "./vies-client";
 
 export type HostedBillingBindings = HostedServerBindings &
   EmailDeliveryBindings &
@@ -28,6 +30,7 @@ export type HostedBillingBindings = HostedServerBindings &
       WorkerBindings,
       | "STRIPE_SECRET_KEY"
       | "STRIPE_WEBHOOK_SECRET"
+      | "VIES_REQUESTER_VAT_ID"
       | "LICENSE_TRIAL_END"
       | "OPENPANEL_CLIENT_ID"
       | "OPENPANEL_CLIENT_SECRET"
@@ -92,8 +95,19 @@ export function createHostedBilling(
               message,
             ),
           ),
+        vies: new ViesClient(send, bindings.VIES_REQUESTER_VAT_ID?.trim() || null),
+        oss: new BillingOss({
+          database: bindings.DB,
+          fetch: send,
+          alert: (text) => {
+            if (operatorAlert) options.schedule(operatorAlert(text));
+          },
+        }),
         ...(operatorAlert
-          ? { onPurchase: (purchase) => options.schedule(operatorAlert(purchaseAlertText(purchase))) }
+          ? {
+              onPurchase: (purchase) => options.schedule(operatorAlert(purchaseAlertText(purchase))),
+              onVatMismatch: (text) => options.schedule(operatorAlert(text)),
+            }
           : {}),
         onSubscriptionSynced: (sync) =>
           hosting.onSubscriptionSynced(sync).pipe(Effect.andThen(() => options.planChanged(sync.serverId))),

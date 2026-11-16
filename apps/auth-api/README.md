@@ -35,12 +35,19 @@ commands continue to use that file.
 
 `bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
 the twelve storage add-on Prices (`openbot_storage_{plan}_{1|2}_{month|year}`, one Product for each
-plan), the license Prices and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`.
+plan), the license Prices, the Polish VAT Tax Rate and the Customer Portal settings in the Stripe account of
+`STRIPE_SECRET_KEY`.
 It is safe to run again: a changed amount makes a new Price and moves the lookup key to it. The Portal
 has no plan change (`subscription_update` is off); it cancels plans and updates payment methods.
 `POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
 `{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
 [Hosted servers](../../docs/hosted-servers.md#storage-tiers).
+
+The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (for example
+`PL1234567890`). With it, the EU VIES check of a buyer's VAT ID returns a consultation number, which the
+Stripe customer keeps as proof of the check. Without it, the check works and has no number.
+`bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
+a dry run unless you give `--apply`.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:

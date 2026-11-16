@@ -3381,6 +3381,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     onRefreshServers={workspace.retryHosts}
                     resume={hostedServers.addServer()?.resume}
                     license={licenseCalls}
+                    billingDetails={billingCalls}
                     onOpenUrl={(url) => window.open(url, "_blank", "noopener")}
                     onClose={hostedServers.closeAddServer}
                     onOpenServer={(serverId) => {
@@ -3568,6 +3569,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onContactUs={licenseContactUs(() => window.location.assign(HOSTED_SERVER_CONTACT_URL))}
                         startBuying={licenseStart() !== null}
                         startOrder={licenseStart()?.order ?? undefined}
+                        billingDetails={billingCalls}
                       />
                     }
                   />

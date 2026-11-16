@@ -25,6 +25,7 @@ import {
   storageTierLookupKey,
   storageTierOf,
 } from "@openbot/contracts/billing";
+import type { BillingDetails, BillingDetailsRequest } from "@openbot/contracts/billing-details";
 import {
   type HostedServerCatalog,
   type HostedServerCatalogPlan,
@@ -60,6 +61,7 @@ import {
   stripeFailure,
   stripeRequest,
 } from "./billing-errors";
+import type { BillingOss } from "./billing-oss";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import {
   type BillingSales,
@@ -68,6 +70,7 @@ import {
   paymentReversal,
   withoutTax,
 } from "./billing-sales";
+import { billingDetailsOf, checkoutCountryMismatch, checkoutTax, setCustomerBillingDetails } from "./billing-tax";
 import type { HostedFailure } from "./hosted-server-service";
 import {
   type FailedLicenseInvoice,
@@ -99,6 +102,7 @@ import {
   subscriptionStorageTier,
   verifyStripeSignature,
 } from "./stripe-client";
+import { ViesClient } from "./vies-client";
 
 /** Stripe retries a webhook for up to 3 days, so older event ids are not needed to stop duplicates. */
 const WEBHOOK_EVENT_RETENTION_MS = 7 * 24 * 60 * 60_000;
@@ -192,6 +196,15 @@ export interface BillingServiceOptions {
    * It must not throw or wait: the operator message goes after the webhook answers.
    */
   onPurchase?: (purchase: BillingPurchase) => void;
+  /** Checks the EU VAT IDs of the billing details. Without it, the service asks VIES itself. */
+  vies?: ViesClient;
+  /**
+   * Runs once for each paid Checkout page whose billing address is in another country than the one that
+   * decided its VAT, with the operator text. It must not throw or wait.
+   */
+  onVatMismatch?: (text: string) => void;
+  /** Counts the paid invoices of consumers in other EU countries, for the One Stop Shop limit. */
+  oss?: BillingOss;
 }
 
 /** The first plan of an account, for its welcome email. */
@@ -261,6 +274,9 @@ export class BillingService {
   readonly #sales: BillingSales | null;
   readonly #onFirstPlanStarted: ((start: FirstPlanStart) => void) | null;
   readonly #onPurchase: ((purchase: BillingPurchase) => void) | null;
+  readonly #vies: ViesClient;
+  readonly #onVatMismatch: ((text: string) => void) | null;
+  readonly #oss: BillingOss | null;
   /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
 
@@ -275,6 +291,9 @@ export class BillingService {
     this.#sales = options.sales ?? null;
     this.#onFirstPlanStarted = options.onFirstPlanStarted ?? null;
     this.#onPurchase = options.onPurchase ?? null;
+    this.#vies = options.vies ?? new ViesClient(options.fetch, null);
+    this.#onVatMismatch = options.onVatMismatch ?? null;
+    this.#oss = options.oss ?? null;
     this.#layer = Layer.succeed(BillingDependencies, {
       database,
       stripe,
@@ -381,6 +400,36 @@ export class BillingService {
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);
 
+  /** The billing country and the VAT ID of the account. An account with no Stripe customer has none. */
+
+  readonly getBillingDetails = Effect.fn("BillingService.getBillingDetails")(
+    function* (
+      this: BillingService,
+      userId: string,
+    ): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const customerId = yield* this.#customerId(userId);
+      if (!customerId) return billingDetailsOf(null);
+      return billingDetailsOf(yield* this.#stripeCall(() => dependencies.stripe.getCustomerTax(customerId)));
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
+  /** Saves the billing details on the Stripe customer, which the next Checkout page reads (`billing-tax.ts`). */
+
+  readonly setBillingDetails = Effect.fn("BillingService.setBillingDetails")(
+    function* (
+      this: BillingService,
+      user: { id: string; email: string },
+      request: BillingDetailsRequest,
+    ): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError, BillingDependencies> {
+      const dependencies = yield* BillingDependencies;
+      const customerId = yield* this.ensureCustomer(user);
+      return yield* setCustomerBillingDetails(dependencies.stripe, this.#vies, customerId, request, dependencies.now());
+    },
+    (operation) => operation.pipe(Effect.provide(this.#layer)),
+  ).bind(this);
+
   /** A Stripe Checkout page that starts the plan of one server, and its license when the order has one. */
 
   readonly createCheckout = Effect.fn("BillingService.createCheckout")(
@@ -400,6 +449,7 @@ export class BillingService {
       if (order) yield* this.license.assertCanOrder(request.user.id, order.users);
       yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
       // During a promotion the license is free until its trial end, so the order pays for the server only.
@@ -417,6 +467,7 @@ export class BillingService {
           currency: request.currency,
           userId: request.user.id,
           serverId: request.serverId,
+          tax,
           ...(orderMetadata && trialEnd !== null
             ? {
                 metadata: {
@@ -988,6 +1039,7 @@ export class BillingService {
       if (this.#sales) {
         yield* this.#sales.webhook(event, sold, payment).pipe(Effect.mapError(() => new BillingOperationError({})));
       }
+      if (this.#oss) yield* this.#oss.record(event);
       // The event is recorded only after it is applied, so a failed event is applied again on retry.
       yield* billingCall(() =>
         dependencies.database.batch([
@@ -1000,6 +1052,12 @@ export class BillingService {
         ]),
       );
       if (!this.#sales) yield* this.#trackEvent(event, synced);
+      // After the record, so that a retry of a failed event sends no second alert.
+      const mismatch = event.type === "checkout.session.completed" ? checkoutCountryMismatch(event.data.object) : null;
+      if (mismatch) {
+        console.warn(`billing: ${mismatch}`);
+        this.#onVatMismatch?.(mismatch);
+      }
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

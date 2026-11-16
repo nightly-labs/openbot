@@ -353,6 +353,7 @@ function AddServer() {
       entryPoint={addServerEntryPoint() ?? undefined}
       calls={appPort().hostedServers}
       license={appPort().license}
+      billingDetails={appPort().billing}
       thisComputer
       pricingPage={windowPage.pricing}
       onOpenUrl={(url) => void appPort().openUrl(url)}

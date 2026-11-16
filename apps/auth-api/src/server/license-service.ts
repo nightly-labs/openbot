@@ -49,6 +49,7 @@ import {
 } from "./billing-errors";
 import { type BillingPurchase, purchaseEvent, reportPurchase, subscriptionEnd } from "./billing-purchase";
 import type { BillingSales } from "./billing-sales";
+import { checkoutTax } from "./billing-tax";
 import type { LicenseEmailInput } from "./email-templates";
 import type { RemoteFailure } from "./remote-control-plane";
 import type { SmtpLicenseMessage } from "./smtp-email-delivery";
@@ -335,6 +336,7 @@ export class LicenseService {
       if (locked && locked !== request.currency)
         return yield* new BillingError(409, "license_currency", sourceText("error.billing.licenseCurrency"));
       const customerId = yield* this.#ensureCustomer(user);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId);
       const returnUrl = licenseReturnUrl(origin, target);
       const trialEnd = this.trialEnd();
       const session = yield* this.#stripeCall(() =>
@@ -344,6 +346,7 @@ export class LicenseService {
           currency: request.currency,
           userId: user.id,
           quantity: request.users,
+          tax,
           metadata: licenseMetadata(plan),
           ...(trialEnd === null ? {} : { trialEndSeconds: Math.floor(trialEnd / 1_000) }),
           successUrl: returnUrl,
@@ -649,6 +652,7 @@ export class LicenseService {
                 anchorSeconds,
                 trial: ordered !== null,
                 automaticTax: subscription.automatic_tax?.enabled === true,
+                taxRateIds: (subscription.default_tax_rates ?? []).map((rate) => rate.id),
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,

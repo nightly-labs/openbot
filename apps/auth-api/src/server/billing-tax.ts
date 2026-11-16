@@ -1,0 +1,182 @@
+import {
+  type BillingDetails,
+  type BillingDetailsRequest,
+  isBillingCountry,
+  isEuVatCountry,
+  VAT_SELLER_COUNTRY,
+  VAT_TAX_RATE,
+  vatIdPrefix,
+} from "@openbot/contracts/billing-details";
+import { sourceText } from "@openbot/i18n/source";
+import { Effect, Option, Schema } from "effect";
+import { BillingError, type BillingOperationError, stripeFailure, stripeRequest } from "./billing-errors";
+import {
+  type StripeClient,
+  type StripeCustomerTax,
+  type StripeEvent,
+  type StripeRequestError,
+  type StripeTransportError,
+  VAT_METADATA,
+} from "./stripe-client";
+import type { ViesClient } from "./vies-client";
+
+/**
+ * The VAT of a new subscription. The seller is in Poland and is not in the EU One Stop Shop:
+ * - `standard`: Polish VAT, for a buyer in Poland and for a buyer in another EU country with no valid VAT ID.
+ * - `reverse`: no VAT, for a company with a valid VAT ID of another EU country. The buyer pays the VAT of
+ *   its own country (reverse charge), and the invoice says so.
+ * - `none`: no VAT, for a buyer outside the EU.
+ */
+export type VatTreatment = "standard" | "reverse" | "none";
+
+/** The VAT of a Checkout page. `rateId` is the Stripe Tax Rate of a `standard` page. */
+export interface CheckoutTax {
+  rateId: string | null;
+  country: string;
+  treatment: VatTreatment;
+}
+
+/**
+ * The customer metadata of a VAT ID that VIES confirmed. A VAT ID gives reverse charge only when its
+ * value is in `vatId`: a VAT ID that someone added in the Stripe Dashboard has no check.
+ */
+const CUSTOMER_METADATA = {
+  vatId: "openbot_vat_id",
+  viesRequest: "openbot_vies_request",
+  checkedAt: "openbot_vat_checked_at",
+} as const;
+
+export function vatTreatment(country: string, validVatId: boolean): VatTreatment {
+  if (!isEuVatCountry(country)) return "none";
+  if (country === VAT_SELLER_COUNTRY || !validVatId) return "standard";
+  return "reverse";
+}
+
+/**
+ * The VAT ID of the customer's country that a check confirmed: by VIES through `setBillingDetails`, or by
+ * Stripe for an ID that Checkout collected while it used Stripe Tax. A Polish VAT ID needs no check: it
+ * does not change the VAT.
+ */
+function confirmedVatId(tax: StripeCustomerTax): string | null {
+  if (!tax.country || !isEuVatCountry(tax.country)) return null;
+  const prefix = vatIdPrefix(tax.country);
+  const ids = tax.taxIds.filter((id) => id.type === "eu_vat" && id.value.startsWith(prefix));
+  const recorded = tax.metadata[CUSTOMER_METADATA.vatId];
+  const checked =
+    ids.find((id) => id.value === recorded) ?? ids.find((id) => id.verification?.status === "verified") ?? null;
+  if (checked) return checked.value;
+  return tax.country === VAT_SELLER_COUNTRY ? (ids[0]?.value ?? null) : null;
+}
+
+/** The billing details that the account gave, from its Stripe customer. */
+export function billingDetailsOf(tax: StripeCustomerTax | null): BillingDetails {
+  if (!tax || tax.deleted) return { country: null, vatId: null };
+  return { country: isBillingCountry(tax.country) ? tax.country : null, vatId: confirmedVatId(tax) };
+}
+
+const stripeCall = <A>(call: () => Effect.Effect<A, StripeRequestError | StripeTransportError>) =>
+  stripeRequest(call).pipe(Effect.mapError(stripeFailure));
+
+/**
+ * The VAT of a new Checkout page of the customer. The customer must have a country: a client from before
+ * the billing details step sends none, and the account then updates OpenBot. The tax exemption of the
+ * customer follows the decision, so that the invoice of a reverse charge says so.
+ */
+export const checkoutTax = Effect.fn("BillingTax.checkoutTax")(function* (
+  stripe: StripeClient,
+  customerId: string,
+): Effect.fn.Return<CheckoutTax, BillingError | BillingOperationError> {
+  const tax = yield* stripeCall(() => stripe.getCustomerTax(customerId));
+  if (!tax.country || !isBillingCountry(tax.country))
+    return yield* new BillingError(409, "billing_country_required", sourceText("error.billing.countryRequired"));
+  const treatment = vatTreatment(tax.country, confirmedVatId(tax) !== null);
+  const rateId =
+    treatment === "standard"
+      ? yield* stripeCall(() => stripe.findTaxRate(VAT_TAX_RATE.metadataKey, VAT_TAX_RATE.metadataValue))
+      : null;
+  if (treatment === "standard" && !rateId) {
+    console.error("billing: the standard VAT Tax Rate is missing; run scripts/stripe-bootstrap.ts");
+    return yield* new BillingError(503, "vat_unavailable", sourceText("error.billing.vatUnavailable"));
+  }
+  const taxExempt = treatment === "reverse" ? "reverse" : "none";
+  if (tax.taxExempt !== taxExempt)
+    yield* stripeCall(() => stripe.setCustomerTax(customerId, { taxExempt, metadata: {} }));
+  return { rateId, country: tax.country, treatment };
+});
+
+/**
+ * Saves the country and the VAT ID of a customer. A VAT ID of another EU country than Poland gives
+ * reverse charge, so VIES must confirm it first: an unknown ID is refused, and when VIES does not answer,
+ * nothing changes. A request with no VAT ID removes the old one.
+ */
+export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillingDetails")(function* (
+  stripe: StripeClient,
+  vies: ViesClient,
+  customerId: string,
+  request: BillingDetailsRequest,
+  now: number,
+): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError> {
+  const vatId = request.vatId ?? null;
+  const check =
+    vatId && vatTreatment(request.country, true) === "reverse"
+      ? yield* vies
+          .check(vatId)
+          .pipe(
+            Effect.mapError(
+              () => new BillingError(503, "vat_id_unverified", sourceText("error.billing.vatIdUnverified")),
+            ),
+          )
+      : null;
+  if (check && !check.valid)
+    return yield* new BillingError(400, "vat_id_invalid", sourceText("error.billing.vatIdInvalid"));
+  const tax = yield* stripeCall(() => stripe.getCustomerTax(customerId));
+  // The tax IDs change first. If a later step fails, the customer has no confirmed VAT ID and pays VAT.
+  for (const id of tax.taxIds) {
+    if (id.type === "eu_vat" && id.value !== vatId)
+      yield* stripeCall(() => stripe.deleteCustomerTaxId(customerId, id.id));
+  }
+  if (vatId && !tax.taxIds.some((id) => id.type === "eu_vat" && id.value === vatId))
+    yield* stripeCall(() => stripe.addCustomerVatId(customerId, vatId));
+  const treatment = vatTreatment(request.country, check?.valid === true);
+  yield* stripeCall(() =>
+    stripe.setCustomerTax(customerId, {
+      ...(tax.country === request.country ? {} : { country: request.country }),
+      taxExempt: treatment === "reverse" ? "reverse" : "none",
+      metadata: {
+        [CUSTOMER_METADATA.vatId]: check ? (vatId ?? "") : "",
+        [CUSTOMER_METADATA.viesRequest]: check?.requestIdentifier ?? "",
+        [CUSTOMER_METADATA.checkedAt]: check ? new Date(now).toISOString() : "",
+      },
+    }),
+  );
+  return { country: request.country, vatId };
+});
+
+/** The fields of a paid Checkout Session that the VAT check reads. */
+const paidCheckoutSchema = Schema.Struct({
+  id: Schema.String,
+  metadata: Schema.optional(Schema.NullOr(Schema.Record(Schema.String, Schema.String))),
+  customer_details: Schema.optional(
+    Schema.NullOr(
+      Schema.Struct({
+        address: Schema.optional(
+          Schema.NullOr(Schema.Struct({ country: Schema.optional(Schema.NullOr(Schema.String)) })),
+        ),
+      }),
+    ),
+  ),
+});
+
+/**
+ * The operator text for a paid Checkout page whose billing address is in another country than the one
+ * that decided its VAT. Null when they agree, or for a page from before the billing details step.
+ */
+export function checkoutCountryMismatch(object: StripeEvent["data"]["object"]): string | null {
+  const session = Schema.decodeUnknownOption(paidCheckoutSchema)(object);
+  if (Option.isNone(session)) return null;
+  const declared = session.value.metadata?.[VAT_METADATA.country];
+  const paid = session.value.customer_details?.address?.country;
+  if (!declared || !paid || declared === paid) return null;
+  const treatment = session.value.metadata?.[VAT_METADATA.treatment] ?? "unknown";
+  return `VAT check: Checkout page ${session.value.id} took the VAT of ${declared} (${treatment}), but its billing address is in ${paid}. Check the VAT of its invoice.`;
+}
