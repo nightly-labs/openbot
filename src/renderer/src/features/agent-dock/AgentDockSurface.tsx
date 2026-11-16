@@ -1,8 +1,11 @@
 import type {
+  AgentApproval,
   AgentDockAction,
+  AgentDockApproval,
   AgentDockChannel,
   AgentDockPresentation,
   AgentDockSeatRef as AgentDockSeatContract,
+  AgentRuntimeApproval,
 } from "@openbot/contracts/ipc";
 import type { AgentMessage } from "@openbot/ui/data";
 import {
@@ -286,7 +289,7 @@ export function AgentDockSurface() {
         messages,
         working: chat.working,
         wait: chat.wait,
-        approval: chat.approval,
+        approval: chat.approval ? { approval: shownApproval(chat.approval), attempt: chat.approval.attempt } : null,
         prompt: chat.prompt,
         takeover: chat.takeover,
         usageLimit: chat.usageLimit,
@@ -491,4 +494,11 @@ function uiChannel(channel: AgentDockChannel): AgentDockUiChannel {
 /** A plain seat for the action: the dock state can hold a store copy. */
 function contractSeat(seat: AgentDockSeatRef): AgentDockSeatContract {
   return seat.kind === "channel" ? { kind: "channel", id: seat.id } : { kind: "agent", id: seat.id };
+}
+
+/** The approval as the card reads it. A cut approval gets its runtime mark back, so the card offers only Deny. */
+function shownApproval(current: AgentDockApproval): AgentApproval {
+  if (!current.cut) return current.approval;
+  const cut: AgentRuntimeApproval = { ...current.approval, truncated: true };
+  return cut;
 }

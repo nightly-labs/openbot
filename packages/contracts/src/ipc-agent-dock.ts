@@ -124,11 +124,13 @@ export interface AgentDockMessage {
 
 /**
  * An approval that the user answers in the dock chat. `attempt` changes when an answer fails, so the
- * card shows its buttons again.
+ * card shows its buttons again. `cut` is true when a runtime snapshot cut the request: the card then
+ * offers only Deny, as in the main chat.
  */
 export interface AgentDockApproval {
   approval: AgentApproval;
   attempt: number;
+  cut: boolean;
 }
 
 /**
@@ -593,7 +595,7 @@ function isChat(value: unknown): value is AgentDockChat {
 }
 
 function isApproval(value: unknown): value is AgentDockApproval {
-  return isDynamicRecord(value) && isAgentApproval(value.approval) && isCount(value.attempt);
+  return isDynamicRecord(value) && isAgentApproval(value.approval) && isCount(value.attempt) && isBoolean(value.cut);
 }
 
 function isPrompt(value: unknown): value is AgentDockPrompt {

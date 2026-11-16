@@ -207,7 +207,7 @@ export function AgentDockChat(props: {
   const usageLimit = () => (props.answers ? (props.chat.usageLimit ?? undefined) : undefined);
   const usageLimitKey = () => {
     const current = usageLimit();
-    return current ? `${current.agentId}:${current.attempt}` : undefined;
+    return current ? `${current.agentId}:${current.resetsAt ?? ""}:${current.attempt}` : undefined;
   };
   const answering = () => Boolean(approval() || prompt() || takeover() || usageLimit());
   const waitReason = () => (answering() ? null : props.chat.wait);

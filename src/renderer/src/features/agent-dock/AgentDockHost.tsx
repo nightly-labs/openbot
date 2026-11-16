@@ -23,6 +23,7 @@ import {
   isAttachmentSummary,
   sameAgentModelChoice,
 } from "@openbot/contracts/ipc";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage, ComposerAgent } from "@openbot/ui/data";
 import {
   AgentDock,
@@ -397,14 +398,18 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
           agent.id === seat.id && agent.threadId ? [{ agentId: agent.id, threadId: agent.threadId }] : [],
         )
       : (shownChannels().find((channel) => channel.id === seat.id)?.threads ?? []);
-  /** The newest approval of the seat, as the sidebar badge counts it. The user answers it in the dock chat. */
+  /** The oldest approval of the seat, the same one that the main chat shows. The user answers it in the dock chat. */
   const approvalOf = (seat: AgentDockSeatRef): AgentDockApproval | null => {
     const threads = threadsOf(seat);
-    const approval = approvals()
-      .filter((item) => threads.some((thread) => thread.agentId === item.agentId && thread.threadId === item.threadId))
-      .at(-1);
+    const approval = approvals().find((item) =>
+      threads.some((thread) => thread.agentId === item.agentId && thread.threadId === item.threadId),
+    );
     if (!approval) return null;
-    return { approval, attempt: attemptOf(answerKey("approval", approval.agentId, approval.requestId)) };
+    return {
+      approval,
+      attempt: attemptOf(answerKey("approval", approval.agentId, approval.requestId)),
+      cut: approvalIsCut(approval),
+    };
   };
   /** The question that a thread of the seat waits for. */
   const promptOf = (seat: AgentDockSeatRef): AgentDockPrompt | null => {
@@ -495,16 +500,19 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
       provider: ask.provider,
       model: ask.model?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
       agentName: ask.agentName?.slice(0, INPUT_LIMITS.agentName) ?? null,
-      resetsAt: ask.resetsAt,
-      options: ask.options.slice(0, AGENT_DOCK_LIMITS.backupModels).map(
-        (option): AgentDockBackupModel => ({
-          key: option.key.slice(0, AGENT_DOCK_LIMITS.backupModelKey),
-          choice: { ...option.choice },
-          model: option.model.slice(0, AGENT_DOCK_LIMITS.backupModelLabel),
-          account: option.account?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
-          state: option.state,
-        }),
-      ),
+      resetsAt: ask.resetsAt === null ? null : Math.max(0, Math.floor(ask.resetsAt)),
+      options: ask.options
+        .filter((option) => option.key.length > 0 && option.key.length <= AGENT_DOCK_LIMITS.backupModelKey)
+        .slice(0, AGENT_DOCK_LIMITS.backupModels)
+        .map(
+          (option): AgentDockBackupModel => ({
+            key: option.key,
+            choice: { ...option.choice },
+            model: option.model.slice(0, AGENT_DOCK_LIMITS.backupModelLabel),
+            account: option.account?.slice(0, AGENT_DOCK_LIMITS.backupModelLabel) ?? null,
+            state: option.state,
+          }),
+        ),
       rememberable: ask.rememberable !== false,
       attempt: attemptOf(answerKey("usage-limit", seat.id, ask.resetsAt ?? "")),
     };
@@ -1034,6 +1042,8 @@ function dockApproval(current: { approval: AgentApproval; attempt: number }): Ag
         : null,
     },
     attempt: current.attempt,
+    // The copy drops the runtime fields, so the cut mark goes with it on its own.
+    cut: approvalIsCut(current.approval),
   };
 }
 

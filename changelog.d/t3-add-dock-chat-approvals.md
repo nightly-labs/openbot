@@ -5,8 +5,8 @@
   - a request to run a command or to change files: Allow or Deny. "Always allow" stays in the main
     window.
   - a question: options, more than one choice, your own answer, and private answers.
-  - a browser step: the card shows the page title. Open shows the page in the main window, then Done
-    or Cancel. You can also type a password or a code in the dock.
+  - a browser step: the card shows the page title. Open goes to the agent's chat in the main window.
+    Done and Cancel stay in the dock. You can also type a password or a code in the dock.
   - a usage limit that holds a message: send it on a backup model, or wait for the reset.
 - Answers in the dock chat also work for an agent on a joined server. On a joined server, "Next
   time, switch without asking" stays in the main window. For a channel, the usage-limit card stays

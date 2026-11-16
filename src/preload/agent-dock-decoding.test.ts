@@ -163,7 +163,7 @@ const PRESENTATION: AgentDockPresentation = {
       ],
       working: true,
       wait: "approval",
-      approval: { approval: APPROVAL, attempt: 1 },
+      approval: { approval: APPROVAL, attempt: 1, cut: true },
       prompt: { ...PROMPT, attempt: 2 },
       takeover: TAKEOVER,
       usageLimit: null,
@@ -230,13 +230,15 @@ describe("agent dock decoding", () => {
     );
   });
 
-  it("rejects a chat approval that is not whole and a chat without the approval field", () => {
+  it("rejects a chat approval that is not whole or has no cut mark, and a chat without the approval field", () => {
     const chat = PRESENTATION.chats[1];
     if (!chat) throw new Error("The presentation fixture has no channel chat.");
     for (const approval of [
-      { approval: { ...APPROVAL, kind: "network" }, attempt: 0 },
-      { approval: APPROVAL, attempt: -1 },
-      { approval: APPROVAL },
+      { approval: { ...APPROVAL, kind: "network" }, attempt: 0, cut: false },
+      { approval: APPROVAL, attempt: -1, cut: false },
+      { approval: APPROVAL, cut: false },
+      { approval: APPROVAL, attempt: 0 },
+      { approval: APPROVAL, attempt: 0, cut: "yes" },
     ]) {
       expect(() => decodeAgentDockPresentation({ ...PRESENTATION, chats: [{ ...chat, approval }] })).toThrow(
         "Invalid agent dock presentation.",
