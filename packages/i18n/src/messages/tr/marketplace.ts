@@ -111,6 +111,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} tamamlanmadı",
   "marketplace.app.partialDescription": "Bazı uygulamaları veya becerileri yüklü değil. Yeniden bağlan bunları yükler.",
   "marketplace.app.notConnected": "Bağlı değil",
+  "marketplace.app.paused": "Duraklatıldı",
   "marketplace.app.custom": "MCP sunucusu",
   "marketplace.app.githubTagline": "Depolar, sorunlar ve çekme istekleri",
   "marketplace.app.onePasswordTagline": "Paylaştığınız oturum bilgileriyle sitelerde oturum açın",

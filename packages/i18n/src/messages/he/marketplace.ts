@@ -117,6 +117,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} אינו שלם",
   "marketplace.app.partialDescription": "חלק מהאפליקציות או המיומנויות שלו לא הותקנו. חיבור מחדש יתקין אותן.",
   "marketplace.app.notConnected": "לא מחובר",
+  "marketplace.app.paused": "מושהה",
   "marketplace.app.custom": "שרת MCP",
   "marketplace.app.githubTagline": "מאגרים, בעיות ו-pull requests",
   "marketplace.app.onePasswordTagline": "התחברות לאתרים עם פרטי כניסה משותפים",

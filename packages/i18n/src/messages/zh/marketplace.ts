@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} 未完成安装",
   "marketplace.app.partialDescription": "部分应用或技能尚未安装。重新连接即可安装。",
   "marketplace.app.notConnected": "未连接",
+  "marketplace.app.paused": "已暂停",
   "marketplace.app.custom": "MCP 服务器",
   "marketplace.app.githubTagline": "仓库、Issue 与拉取请求",
   "marketplace.app.onePasswordTagline": "用你共享的登录信息登录网站",

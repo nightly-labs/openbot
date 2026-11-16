@@ -83,6 +83,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}이(가) 완료되지 않았어요",
   "marketplace.app.partialDescription": "일부 앱 또는 스킬이 설치되지 않았어요. 다시 연결하면 설치돼요.",
   "marketplace.app.notConnected": "연결 안 됨",
+  "marketplace.app.paused": "일시 중지됨",
   "marketplace.app.custom": "MCP 서버",
   "marketplace.app.githubTagline": "저장소, 이슈, 풀 리퀘스트",
   "marketplace.app.onePasswordTagline": "공유한 로그인 정보로 사이트에 로그인",

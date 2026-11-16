@@ -115,6 +115,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name}: установка не завершена",
   "marketplace.app.partialDescription": "Часть приложений или навыков не установлена. «Переподключить» установит их.",
   "marketplace.app.notConnected": "Не подключено",
+  "marketplace.app.paused": "Приостановлено",
   "marketplace.app.custom": "Сервер MCP",
   "marketplace.app.githubTagline": "Репозитории, задачи и пул-реквесты",
   "marketplace.app.onePasswordTagline": "Вход на сайты с общими учётными данными",

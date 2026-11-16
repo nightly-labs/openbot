@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Algunas de sus apps o habilidades no están instaladas. Reconectar las instala.",
   "marketplace.app.notConnected": "Sin conectar",
+  "marketplace.app.paused": "En pausa",
   "marketplace.app.custom": "Servidor MCP",
   "marketplace.app.githubTagline": "Repositorios, incidencias y pull requests",
   "marketplace.app.onePasswordTagline": "Inicia sesión en sitios con las credenciales que compartes",

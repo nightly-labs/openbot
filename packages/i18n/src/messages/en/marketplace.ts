@@ -116,6 +116,8 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.partialTitle": "{name} is not complete",
   "marketplace.app.partialDescription": "Some of its apps or skills are not installed. Reconnect installs them.",
   "marketplace.app.notConnected": "Not connected",
+  // The status of a messaging app whose places are all paused: agents cannot use it until Resume.
+  "marketplace.app.paused": "Paused",
   "marketplace.app.custom": "MCP server",
   "marketplace.app.githubTagline": "Repositories, issues and pull requests",
   "marketplace.app.onePasswordTagline": "Sign in to sites with logins you share",

@@ -97,6 +97,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Einige Apps oder Skills sind nicht installiert. „Neu verbinden“ installiert sie.",
   "marketplace.app.notConnected": "Nicht verbunden",
+  "marketplace.app.paused": "Pausiert",
   "marketplace.app.custom": "MCP-Server",
   "marketplace.app.githubTagline": "Repositorys, Issues und Pull Requests",
   "marketplace.app.onePasswordTagline": "Bei Websites mit von dir geteilten Zugangsdaten anmelden",
