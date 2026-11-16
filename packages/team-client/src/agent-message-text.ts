@@ -7,8 +7,10 @@ const STREAMING_INTERNAL_CITATION = /\u{e200}(?:c(?:i(?:t(?:e(?:\u{e202}[^\u{e20
  * quoted value can hold `}`. The start of a citation that is still streaming, at the end of the text,
  * does not show until the citation is complete.
  */
+// Attributes need a space between them, so that the pattern reads each one in a single way. The
+// streaming end is at most as long as a path, so a long line of citation starts is read in linear time.
 const FILE_CITATION_OR_CODE =
-  /(```[\s\S]*?(?:```|$)|`[^`\r\n]*`)|(?<![:\\]):codex-file-citation\{(?:((?:\s*[A-Za-z_][\w-]*=(?:"[^"<>\r\n]*"|[^\s"<>{}]+))*\s*)\}|[^}\r\n]*$)/gu;
+  /(```[\s\S]*?(?:```|$)|`[^`\r\n]*`)|(?<![:\\]):codex-file-citation\{(?:(\s*(?:[A-Za-z_][\w-]*=(?:"[^"<>\r\n]*"|[^\s"<>{}]+)(?:\s+[A-Za-z_][\w-]*=(?:"[^"<>\r\n]*"|[^\s"<>{}]+))*\s*)?)\}|[^}\r\n]{0,4096}$)/gu;
 const FILE_CITATION_ATTRIBUTE = /([A-Za-z_][\w-]*)=(?:"([^"]*)"|(\S+))/gu;
 const LABEL_MARKDOWN = /[\\`*_[\]<>~$&|]/gu;
 
