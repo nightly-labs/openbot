@@ -173,6 +173,8 @@ export const messages = {
     "« Espace de travail uniquement » nécessite le bac à sable de Codex, que Codex ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Demander d’abord » ou « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
+  "error.agent.claudeNoSandbox":
+    "Claude ne peut pas utiliser de bac à sable sur cet ordinateur, donc « Espace de travail uniquement » ne fonctionne pas avec lui. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.claudeSandboxBlocked":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":

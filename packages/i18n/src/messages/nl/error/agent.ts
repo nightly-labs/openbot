@@ -170,6 +170,8 @@ export const messages = {
     "Alleen werkruimte heeft de Codex-sandbox nodig, maar Codex kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Eerst vragen of Volledige toegang in de instellingen van de agent.",
   "error.agent.claudeSandboxUnavailable":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
+  "error.agent.claudeNoSandbox":
+    "Claude kan op deze computer geen sandbox gebruiken, dus Alleen werkruimte werkt er niet mee. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.claudeSandboxBlocked":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":

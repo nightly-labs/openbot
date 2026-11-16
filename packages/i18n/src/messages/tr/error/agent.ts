@@ -158,6 +158,8 @@ export const messages = {
     "“Yalnızca çalışma alanı” Codex korumalı alanına ihtiyaç duyar, ancak Codex bu bilgisayarda onu başlatamıyor, bu yüzden ajanın komutları başarısız oluyor. Ajan ayarlarından Önce sor'u veya Tam erişim'i seçin.",
   "error.agent.claudeSandboxUnavailable":
     "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor: {reason}. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
+  "error.agent.claudeNoSandbox":
+    "Claude bu bilgisayarda korumalı alan kullanamıyor, bu yüzden “Yalnızca çalışma alanı” onunla çalışmaz. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.claudeSandboxBlocked":
     "“Yalnızca çalışma alanı” Claude korumalı alanına ihtiyaç duyar, ancak Claude bu bilgisayarda onu başlatamıyor, bu yüzden ajanın komutları başarısız oluyor. Ajan ayarlarından Tam erişim'i veya başka bir sağlayıcıyı seçin.",
   "error.agent.screenCaptureOff":
