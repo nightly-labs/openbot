@@ -205,10 +205,16 @@ export interface AcpFlavor {
   cancelLocallyThenResume?: true;
   /**
    * The CLI version from which a second `session/prompt` during a running turn joins that turn. The
-   * CLI answers the first prompt with `end_turn` at once, and the work goes on under the new prompt.
-   * Without it, ACP has no steer request, and a second prompt can cancel the running turn.
+   * CLI answers the prompt before it with `end_turn`, and the work goes on under the new prompt.
+   * Without it or `steerByPromptCapability`, ACP has no steer request, and a second prompt can cancel
+   * the running turn.
    */
   steerByPromptSince?: string;
+  /**
+   * The `agentCapabilities._meta` key that is `true` when a second `session/prompt` during a running
+   * turn joins that turn, for a CLI whose `agentInfo.version` does not tell the release.
+   */
+  steerByPromptCapability?: string;
   /** A turn that does not complete marks its open tool calls as stopped. */
   interruptToolsOnStop?: true;
   /** Answer text is shown at once, not only when `session/prompt` answers. */
@@ -347,6 +353,11 @@ export interface AcpFlavor {
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
   promptUsage?(response: PromptResponse): DynamicRecord | null;
+  /**
+   * The run of the agent that a prompt reply ends. Replies of the same run carry the same usage, so
+   * a steered turn reports it once.
+   */
+  promptRun?(response: PromptResponse): string | undefined;
   /**
    * The agent asks the user its questions with this extension method (the name without the `_` of
    * the wire) and reads a reply of its own shape. `answers` has the answers of each question by its
@@ -639,6 +650,15 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+  // Devin CLI 3000.12.57 reports `agentInfo.version` "0.0.0-dev", and sets this capability. In a live
+  // probe, a second prompt during a turn moved the running command to the background, and the agent
+  // went on under the new prompt. Both prompts got `end_turn` when that run ended.
+  steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  // Each reply of that probe had the same `usage` and `cognition.ai/userMessageId`.
+  promptRun: (response) => {
+    const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
+    return typeof run === "string" ? run : undefined;
+  },
 };
 
 /**
