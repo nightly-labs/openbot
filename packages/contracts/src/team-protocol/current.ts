@@ -53,6 +53,7 @@ import { BROWSER_SIGN_IN_STORAGE_CAPABILITY } from "./browser-sign-in-storage-v1
 import { BROWSER_SIGN_IN_CAPABILITY } from "./browser-sign-in-v1";
 import { BROWSER_TEACH_CAPABILITY } from "./browser-teach-v1";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "./browser-user-control-v1";
+import { BROWSER_VAULT_SKIP_CAPABILITY } from "./browser-vault-skip-v1";
 import {
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
@@ -308,6 +309,7 @@ export {
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   BROWSER_TEACH_CAPABILITY,
   BROWSER_USER_CONTROL_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
@@ -658,6 +660,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -894,7 +897,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
     capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
     capability !== HOST_APPEARANCE_CAPABILITY &&
-    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+    capability !== BROWSER_VAULT_SKIP_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1007,6 +1011,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1202,6 +1207,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
       capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
       capability !== HOST_APPEARANCE_CAPABILITY &&
-      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+      capability !== BROWSER_VAULT_SKIP_CAPABILITY,
   );
 }

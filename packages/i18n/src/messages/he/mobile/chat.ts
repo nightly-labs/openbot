@@ -343,6 +343,17 @@ export const messages = {
   "mobile.chat.browserSecret.done": "סיימתי",
   "mobile.chat.browserSecret.submitOnce": "שליחה חד-פעמית אל {origin}. הערך הזה לא מתווסף לצ'אט.",
   "mobile.chat.browserSecret.submitFailed": "לא ניתן להשלים את הבקשה. יש לבדוק את החיבור ולנסות שוב.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן הריץ סקריפט בדף הזה. כדי להשתמש בהם, צריך לבקש מהסוכן לטעון מחדש את הדף ולנסות שוב.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind": "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן בחר שדה שגוי בדף.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי הסוכן לא בחר אף אחד מפרטי ההתחברות השמורים לאתר הזה. צריך לומר לסוכן באיזה חשבון להשתמש.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם סיסמה לאתר הזה.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם מפתח של אפליקציית אימות.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי לא הצליח לקרוא את מנהל הסיסמאות.",
   "mobile.chat.browserSecret.submit": "שליחה",
   "mobile.chat.browserSecret.takeOver": "השתלטות",
   "mobile.chat.starter.title": "על מה נעבוד קודם?",

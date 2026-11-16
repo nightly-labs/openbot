@@ -6,6 +6,7 @@ import { isBoolean, isDynamicRecord, isNumber, isString } from "../runtime-value
 import { withEventAgentPendingRuntimes } from "./agent-pending-runtime-v1";
 import { restoreBrowserSecretMetadata } from "./browser-secret-v1";
 import { restoreBrowserTakeoverReason } from "./browser-sign-in-v1";
+import { restoreBrowserVaultSkip } from "./browser-vault-skip-v1";
 import { withRuntimeSnapshotContextUsage } from "./context-usage-v1";
 import { eventConversationKey, withConversationPlans } from "./conversation-plan-v4";
 import { withConversationSenders } from "./conversation-sender-v5";
@@ -48,13 +49,16 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
   try {
     current = withEventPromptMultiSelect(
       withEventConversationPlans(
-        restoreBrowserTakeoverReason(
-          restoreBrowserSecretMetadata(
-            toCurrentAgentKeys(
-              withEventAgentPendingRuntimes(
-                withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value),
-                value,
+        restoreBrowserVaultSkip(
+          restoreBrowserTakeoverReason(
+            restoreBrowserSecretMetadata(
+              toCurrentAgentKeys(
+                withEventAgentPendingRuntimes(
+                  withUsageEventTertiary(withRuntimeSnapshotContextUsage(decodedValue, value), value),
+                  value,
+                ),
               ),
+              value,
             ),
             value,
           ),
@@ -63,7 +67,8 @@ export function decodeTeamProtocolV8BaseCurrentEvent(value: unknown): TeamProtoc
         value,
         // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
         // video request only under video-generation-v1, a multi-select flag only under
-        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, context states only
+        // prompt-multi-select-v1, a takeover reason only under browser-sign-in, a vault skip reason only
+        // under browser-vault-skip-v1, context states only
         // under context-usage-v1, a third usage window only under usage-tertiary-v1, and a pending runtime
         // only under agent-pending-runtime-v1, so a present one is always kept.
         value,
@@ -86,6 +91,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     preserveSemanticTags?: boolean;
     preserveBrowserSecrets?: boolean;
     browserSignIn?: boolean;
+    browserVaultSkip?: boolean;
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
@@ -115,6 +121,7 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
     !encoded ||
     (!options.preserveBrowserSecrets &&
       !options.browserSignIn &&
+      !options.browserVaultSkip &&
       !eventConversationKey(event.type) &&
       !promptMultiSelect &&
       !contextUsage &&
@@ -138,7 +145,8 @@ export function encodeTeamProtocolV8BaseCurrentEvent(
   const withUsage = usageTertiary ? withUsageEventTertiary(withContext, wireValue, true) : withContext;
   const output = pendingRuntime ? withEventAgentPendingRuntimes(withUsage, wireValue, true) : withUsage;
   const withSecrets = options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output;
-  return JSON.stringify(options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets);
+  const withReason = options.browserSignIn ? restoreBrowserTakeoverReason(withSecrets, wireValue) : withSecrets;
+  return JSON.stringify(options.browserVaultSkip ? restoreBrowserVaultSkip(withReason, wireValue) : withReason);
 }
 
 /**

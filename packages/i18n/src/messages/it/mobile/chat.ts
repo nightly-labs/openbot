@@ -348,6 +348,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce":
     "Invia una sola volta a {origin}. Questo valore non viene aggiunto alla chat.",
   "mobile.chat.browserSecret.submitFailed": "Impossibile completare la richiesta. Controlla la connessione e riprova.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha eseguito uno script in questa pagina. Per usarle, chiedi all’agente di ricaricare la pagina e riprovare.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha scelto il campo sbagliato nella pagina.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot non ha usato credenziali salvate perché l’agente non ha scelto nessuna delle credenziali salvate per questo sito. Di’ all’agente quale account usare.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una password per questo sito.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una chiave dell’autenticatore.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot non ha usato credenziali salvate perché non è riuscito a leggere il tuo gestore di password.",
   "mobile.chat.browserSecret.submit": "Invia",
   "mobile.chat.browserSecret.takeOver": "Intervieni",
   "mobile.chat.starter.title": "Da dove cominciamo?",
