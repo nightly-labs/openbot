@@ -12,6 +12,12 @@ export const messages = {
     "Araç çalışmadı. tool_call içinde arguments metin değil, bir JSON nesnesi olmalı. Çağrıyı arguments bir nesne olacak şekilde yeniden gönderin.",
   "error.agent.toolCallDiscoveryTool":
     "Araç çalışmadı. tool_call, openbot.tool_search veya openbot.tool_describe çalıştıramaz. Bunları aynı bağımsız değişkenlerle doğrudan çağırın.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Araç çalışmadı. tool_call yalnızca name ve arguments alır. Aracın bağımsız değişkenlerini arguments içine nesne olarak koyun ve çağrıyı yeniden gönderin.",
+  "error.agent.toolCallUnknownTool":
+    "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Araç çalışmadı. tool_call bu adla bir araç bulamadı. Nitelikli ad büyük olasılıkla {name}. Öyleyse çağrıyı bu adla yeniden gönderin.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
   // Agent errors that the main process and the backend send.

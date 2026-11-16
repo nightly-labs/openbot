@@ -12,6 +12,12 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. In tool_call muss arguments ein JSON-Objekt sein, kein Text. Sende den Aufruf erneut mit arguments als Objekt.",
   "error.agent.toolCallDiscoveryTool":
     "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallUnknownTool":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Der Zeitplan der Routine ist ungültig: {detail} Korrigiere den Zeitplan und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
