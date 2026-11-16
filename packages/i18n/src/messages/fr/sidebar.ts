@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "Tout marquer comme lu",
   "sidebar.order.title": "Trier les discussions",
   "sidebar.order.manual": "Manuel",
+  "sidebar.order.recent": "Activité récente",
   "sidebar.order.unreadGroup": "Non lues dans un groupe",
   "sidebar.order.unreadFirst": "Non lues en tête des dossiers",
   "sidebar.topbar.openSettings": "Ouvrir les réglages de {name}",

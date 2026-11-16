@@ -38,18 +38,26 @@ type MobileChatItem = Extract<MobileSidebarItem, { kind: "agent" | "channel" }>;
  * each order, and none of them changes the saved `agentOrder`. The phone keeps the choice; it is not
  * synced.
  * - `manual`: the saved order of the layout.
+ * - `recent`: each section shows its chats by last activity, the most recent first. Chats do not move
+ *   in the list by drag in this order, because the order is not manual.
  * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
  *   back to their place when they are read.
  * - `unread-first`: each section shows its unread chats first, then the others, both by last
  *   activity. Chats do not move in the list by drag in this order, because the order is not manual.
  */
-export type MobileChatOrder = "manual" | "unread-group" | "unread-first";
+export type MobileChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
 
 export const MOBILE_CHAT_ORDERS = [
   "manual",
+  "recent",
   "unread-group",
   "unread-first",
 ] as const satisfies readonly MobileChatOrder[];
+
+/** True when the order sorts the chats of each section itself, so a drag in the list cannot place a chat. */
+export function mobileChatOrderSortsSections(order: MobileChatOrder): boolean {
+  return order === "recent" || order === "unread-first";
+}
 
 /** When a chat last had activity, in epoch milliseconds: the agent's last update, or the channel's last message. */
 function chatActivity(chat: MobileChatItem): number {
@@ -74,6 +82,7 @@ function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], 
 }
 
 /**
+ * `order.recent`: each section shows its chats by last activity, for the `recent` order.
  * `order.unreadFirst`: the unread chats, for the `unread-first` order. Each section then shows them
  * first and then the other chats, both by last activity. Null keeps the saved order.
  * `order.aside`: the chats that show in another group, such as "Unread". A folder leaves them out,
@@ -85,16 +94,18 @@ export function mobileSidebarItems(
   channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
-  order: { unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
+  order: { recent?: boolean; unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
 ): MobileSidebarItem[] {
-  const { unreadFirst, aside } = order;
+  const { recent, unreadFirst, aside } = order;
   const sorted = chatItems(layout, agents, channels);
   const chats = unreadFirst
     ? [
         ...byRecent(sorted.filter((chat) => unreadFirst.has(chat.id))),
         ...byRecent(sorted.filter((chat) => !unreadFirst.has(chat.id))),
       ]
-    : sorted;
+    : recent
+      ? byRecent(sorted)
+      : sorted;
   if (!layout) return aside ? chats.filter((chat) => !aside.has(chat.id)) : chats;
   const names = new Map(layout.sections.map((section) => [section.id, section.name]));
   const groups = new Map<string, MobileSidebarItem[]>();
