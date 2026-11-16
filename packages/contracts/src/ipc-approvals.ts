@@ -132,7 +132,7 @@ export interface BrowserTakeoverRequest {
   tabId: string;
   secret?: BrowserSecretRequest;
   reason?: BrowserTakeoverReason;
-  /** Set on a secret card when a saved login fits the site but OpenBot did not fill it. */
+  /** Set on a secret card when OpenBot did not fill a saved login, or could not read a password manager. */
   vaultSkip?: BrowserVaultSkipReason;
 }
 

@@ -1,8 +1,8 @@
 // Frozen optional browser-vault-skip-v1 wire contract.
 //
 // A host adds `vaultSkip` beside the frozen keys of a takeover request, in a `browser-takeover-requested`
-// event and in the `pendingBrowserTakeovers` of a `runtime-snapshot`, when a saved login fits the site but
-// the host did not fill it and asks the user for the password or code. The value says why:
+// event and in the `pendingBrowserTakeovers` of a `runtime-snapshot`, when the host did not fill a saved
+// login and asks the user for the password or code. The value says why:
 //
 // - `agent-script`: a script that the agent ran can still run in a page of this site.
 // - `field-kind`: the agent's target is not a password field, or not a code field.
