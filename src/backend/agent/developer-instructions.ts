@@ -666,7 +666,8 @@ export function developerInstructions(
     // the user set `attribution` or `includeCoAuthoredBy` in a Claude settings file.
     ...(agentDefaults.commitCoAuthor
       ? [
-          `When you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
+          // The trailer comes last, so that no period follows it.
+          `When the user does not want the OpenBot co-author trailer in commits, call openbot.set_commit_co_author with enabled false: the owner approves it on a card. The user can also turn off Credit OpenBot in commits in Settings > Agents. Until then, when you create or amend a git commit, also with a message from the user, end its message with this trailer once: ${OPENBOT_COMMIT_TRAILER}`,
         ]
       : []),
     ...(options.memoriesInTurns

@@ -41,6 +41,8 @@ export const messages = {
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
   "status.agent.browserProfileNamed":
     "העבר את {agents} לפרופיל הדפדפן {profile}. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.commitCoAuthorOff": "להפסיק להוסיף את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
+  "status.agent.commitCoAuthorOn": "להוסיף שוב את OpenBot כמחבר שותף בקומיטים של כל הסוכנים.",
   "status.agent.browserProfileNew":
     "צור את פרופיל הדפדפן החדש {profile} והעבר אליו את {agents}. אין בו התחברויות. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.browserProfileShared":
