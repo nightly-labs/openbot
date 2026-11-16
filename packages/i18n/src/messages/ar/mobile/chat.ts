@@ -640,6 +640,7 @@ export const messages = {
   "mobile.chat.queue.position": "الموضع {position} · {date}",
   "mobile.chat.queue.attachments": "المرفقات",
   "mobile.chat.queue.steer": "توجيه",
+  "mobile.chat.queue.sendNow": "أرسل الآن",
   "mobile.chat.queue.more": {
     zero: "لا مزيد",
     one: "واحدة أخرى",
@@ -651,6 +652,7 @@ export const messages = {
   "mobile.chat.queue.nextLabel": "الرسالة التالية في قائمة الانتظار: {text}. إظهار الرسائل في قائمة الانتظار",
   "mobile.chat.queue.editNext": "تعديل الرسالة التالية في قائمة الانتظار",
   "mobile.chat.queue.steerNext": "توجيه الرسالة التالية في قائمة الانتظار",
+  "mobile.chat.queue.sendNowNext": "أوقف الوكيل وأرسل الرسالة التالية في قائمة الانتظار الآن",
   "mobile.chat.queue.deleteNext": "حذف الرسالة التالية في قائمة الانتظار",
   "mobile.chat.queue.moveFirst": "نقل إلى الأول",
   "mobile.chat.queue.deleteTitle": "حذف الرسالة من قائمة الانتظار؟",
@@ -658,6 +660,7 @@ export const messages = {
   "mobile.chat.queue.keep": "إبقاء",
   "mobile.chat.queue.editedElsewhere": "يعدّل جهاز آخر هذه الرسالة.",
   "mobile.chat.queue.steerNeedsTurn": "يحتاج التوجيه إلى دور قيد التشغيل.",
+  "mobile.chat.queue.sendNowNeedsTurn": "يحتاج «أرسل الآن» إلى دور قيد التشغيل.",
   "mobile.chat.queue.stillHoldingTitle": "لا تزال الرسالة معلّقة",
   "mobile.chat.queue.stillHoldingMessage":
     "تعذّر على OpenBot تحرير هذه الرسالة، لذا يستمر الوكيل في انتظارها. حاول مرة أخرى بعد إعادة اتصال الهاتف.",
