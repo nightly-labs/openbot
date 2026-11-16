@@ -151,11 +151,13 @@ export class WhatsAppConnect implements WhatsAppPolicy {
 
   rules(workspaceId: string): WhatsAppSenderRules {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
-    if (!record) return { ownNumber: true, contacts: new Set(), groups: new Set() };
+    if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set() };
     const senders = this.#store.allowedSenders(record.connectionId);
     return {
       ownNumber: this.#ownNumber(record.connectionId),
-      contacts: new Set(senders.filter((sender) => sender.kind === "contact").map((sender) => sender.id)),
+      contacts: new Map(
+        senders.filter((sender) => sender.kind === "contact").map((sender) => [sender.id, sender.name.trim()]),
+      ),
       groups: new Set(senders.filter((sender) => sender.kind === "group").map((sender) => sender.id)),
     };
   }
