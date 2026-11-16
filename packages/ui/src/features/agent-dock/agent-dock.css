@@ -284,6 +284,12 @@
   scrollbar-width: none;
 }
 
+/* The empty text is longer than the menu is wide. It wraps, so the menu does not cut it. */
+.agent-dock-add-menu.ui-action-menu .agent-dock-add-empty[role="menuitem"] {
+  height: auto;
+  white-space: normal;
+}
+
 /* A Bloub drawing is larger than its avatar box. Without the clip, the last row overflows the list by a
  * few pixels, so a short list scrolls and shows the bottom fade. The list already cut that part. */
 .agent-dock-add-list > [role="menuitem"] {
