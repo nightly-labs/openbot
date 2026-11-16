@@ -60,19 +60,19 @@ desktop profile (the developer's), 2026-11-17:
 | `conversation.snapshot-updated` events | 3,822 rows, 186 MB of payload |
 | `turn.started` events | 330 rows, 96 MB of payload (about 290 KB each) |
 
-Hosted servers on `openbot-core` (8 customer containers, read-only check, 2026-11-17):
+Hosted servers on one operator host (8 customer servers, read-only check, 2026-11-17):
 
 | Server | `openbot.db` | Free on its data volume |
 |---|---|---|
-| huskytail | 17.0 GB | 676 GB |
-| hello | 905 MB | 99 GB |
-| sylwester-2 | 184 MB | 101 GB |
-| enzo | 184 MB | 521 GB |
-| sylwester | 21 MB | 535 GB |
-| rayanalmaliki96 | 12 MB | 105 GB |
-| apple-review, apliksns | about 1.2 MB | 41 GB |
+| Server A | 17.0 GB | 676 GB |
+| Server B | 905 MB | 99 GB |
+| Server C | 184 MB | 101 GB |
+| Server D | 184 MB | 521 GB |
+| Server E | 21 MB | 535 GB |
+| Server F | 12 MB | 105 GB |
+| Servers G, H | about 1.2 MB | 41 GB |
 
-The 17 GB database (huskytail): `orchestration_events` 11.9 GB (70%), of which
+The 17 GB database (server A): `orchestration_events` 11.9 GB (70%), of which
 `conversation.snapshot-updated` is 9.0 GB (712,589 rows) and `conversation.mailbox-reconciled`
 1.6 GB (112,501 rows). `provider_history_staging` is 2.9 GB (277,979 rows). The free list is
 empty, so `VACUUM` gives nothing back. Consequences:
