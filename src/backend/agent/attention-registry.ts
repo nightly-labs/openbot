@@ -440,7 +440,6 @@ interface PendingBrowserTakeover {
 interface HeldTakeoverResult {
   threadId: string;
   turnId: string;
-  tool: string;
   result: DynamicToolResult;
 }
 
@@ -1342,11 +1341,12 @@ export class AttentionRegistry {
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     if (tab.ownerThreadId !== publicThreadId || tab.ownerAgentId !== agentId)
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
-    // The provider stopped the last call for this tab before the user finished (#9689).
+    // The provider stopped the last call for this tab before the user finished (#9689). The result goes
+    // to the next takeover call of the turn for the tab, also when the model changed the tool.
     const held = this.#heldTakeoverResults.get(tabId);
     if (held) {
       this.#heldTakeoverResults.delete(tabId);
-      if (held.threadId === threadId && held.turnId === turnId && held.tool === params.tool) return held.result;
+      if (held.threadId === threadId && held.turnId === turnId) return held.result;
     }
     const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
     if (waiting) {
@@ -1495,7 +1495,7 @@ export class AttentionRegistry {
     pending.resolve = (result) => {
       if (held) return;
       held = true;
-      this.#heldTakeoverResults.set(tabId, { threadId, turnId, tool, result });
+      this.#heldTakeoverResults.set(tabId, { threadId, turnId, result });
     };
     answerCall(browserTakeoverWaitingResult(tool, tabId));
   }
@@ -1932,7 +1932,8 @@ export class AttentionRegistry {
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
-    const detachAfterMs = request.detachAfterMs ?? request.answerBeforeMs;
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    const detachAfterMs = deadlines.length > 0 ? Math.min(...deadlines) : undefined;
     const target =
       detachAfterMs === undefined || questions.some((question) => question.isSecret)
         ? null
@@ -2435,6 +2436,9 @@ export class AttentionRegistry {
       if (!tabs.some((tab) => tab.id === pending.request.tabId)) {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
+    }
+    for (const tabId of this.#heldTakeoverResults.keys()) {
+      if (!tabs.some((tab) => tab.id === tabId)) this.#heldTakeoverResults.delete(tabId);
     }
   }
 

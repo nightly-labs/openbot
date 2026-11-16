@@ -224,6 +224,20 @@ try {
     return next;
   });
 
+  await step("a result between two calls also reaches a call with the other tool", async () => {
+    const shown = count("browser-takeover-requested");
+    const first = answerOf(await call("request_takeover", "turn-2b", DEADLINE_MS));
+    assert.equal(first.status, "waiting");
+    const requestId = openCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(registry.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    const next = answerOf(await call("submit_secret", "turn-2b", 60_000));
+    assert.equal(next.status, "completed");
+    assert.equal(count("browser-takeover-requested"), shown + 1, "the next call showed a new card");
+    assert.equal(openCards().length, 0);
+    return next;
+  });
+
   await step("the end of the turn closes a waiting card, and a new turn gets a new card", async () => {
     const resolved = count("browser-takeover-resolved");
     const first = answerOf(await call("request_takeover", "turn-3", DEADLINE_MS));
