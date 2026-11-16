@@ -5,6 +5,7 @@ import {
   type PromptResponse,
   RequestError,
 } from "@agentclientprotocol/sdk";
+import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { type CauseCode, classifyFailure } from "@openbot/telemetry";
@@ -387,6 +388,14 @@ export interface AcpFlavor {
 /** The protocol's own behavior, with no change for one agent. */
 export const DEFAULT_ACP_FLAVOR: AcpFlavor = {};
 
+/**
+ * The billing wall of Cursor and GitHub Copilot when the account needs a payment method for more use
+ * (#4556, #9808). As answer text, only the whole chunk matches, so an answer that quotes it stays an
+ * answer. In an error, the text can be part of a longer message.
+ */
+const PAYMENT_METHOD_WALL = /^\s*Add a payment method to continue\.?\s*$/u;
+const PAYMENT_METHOD_WALL_TEXT = /\bAdd a payment method to continue\b/u;
+
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
 export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
 
@@ -397,6 +406,10 @@ export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
 export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   relayStdioMcpServers: true,
   turnFailure: copilotTurnFailure,
+  // GitHub Copilot CLI 1.0.112 sent its billing wall as the whole answer, or as the turn's error. The
+  // chat showed only "Add a payment method to continue", and no backup model took the turn (#9808).
+  planUsedUpChunk: PAYMENT_METHOD_WALL,
+  failureCause: (error) => (PAYMENT_METHOD_WALL_TEXT.test(errorText(error)) ? "usage_limit" : null),
 };
 
 /**
@@ -406,9 +419,18 @@ export const COPILOT_ACP_FLAVOR: AcpFlavor = {
  * and the effort, so the user's action is another model.
  */
 function copilotTurnFailure(_error: unknown, detail: string): string {
+  if (PAYMENT_METHOD_WALL_TEXT.test(detail))
+    return sourceText("error.provider.acpPlanUsedUp", { provider: agentProviderName("copilot") });
   return /"thinking\.type\.enabled" is not supported for this model/u.test(detail)
     ? sourceText("error.provider.copilotThinkingRejected")
     : detail;
+}
+
+/** The message of an error and the data that it carries, such as the `RequestError` of a prompt. */
+function errorText(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const data = isRecord(error) && "data" in error ? JSON.stringify(error.data) : undefined;
+  return data ? `${error.message} ${data}` : error.message;
 }
 
 /**
@@ -656,8 +678,9 @@ export const CURSOR_ACP_FLAVOR: AcpFlavor = {
   signInLostChunk:
     /^\n\n(?:Please sign in to continue|Error: \[unauthenticated\] Backend rejected authentication\.[^\n]*)$/u,
   // Cursor sends a used-up plan as one chunk in the same form, and then ends the turn as a success
-  // (#5668). Only the full chunk matches, so an answer that quotes the text stays an answer.
-  planUsedUpChunk: /^\n\nUpgrade your plan to continue$/u,
+  // (#5668), and a plan that needs a payment method too (#4556). Only the full chunk matches, so an
+  // answer that quotes the text stays an answer.
+  planUsedUpChunk: /^(?:\n\nUpgrade your plan to continue|\s*Add a payment method to continue\.?\s*)$/u,
   // Cursor 2026.10.22-27dcf5f asks its server for the model list on each model set, and reports a
   // failed request as "Invalid model value" (#3800). One set per change, not one per turn.
   processWideModel: true,
