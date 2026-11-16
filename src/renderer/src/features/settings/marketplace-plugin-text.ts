@@ -141,6 +141,18 @@ const PLUGIN_TEXT = {
       "prompt-clip": "marketplace.plugin.higgsfield.prompt.clip",
     },
   },
+  sunra: {
+    tagline: "marketplace.plugin.sunra.tagline",
+    description: "marketplace.plugin.sunra.description",
+    apps: {
+      "app-sunra-mcp": "marketplace.plugin.sunra.app",
+    },
+    prompts: {
+      "prompt-balance": "marketplace.plugin.sunra.prompt.balance",
+      "prompt-poster": "marketplace.plugin.sunra.prompt.poster",
+      "prompt-clip": "marketplace.plugin.sunra.prompt.clip",
+    },
+  },
   elevenlabs: {
     tagline: "marketplace.plugin.elevenlabs.tagline",
     description: "marketplace.plugin.elevenlabs.description",
@@ -357,6 +369,18 @@ const PLUGIN_TEXT = {
       "prompt-draft": "marketplace.plugin.postiz.prompt.draft",
     },
   },
+  trypost: {
+    tagline: "marketplace.plugin.trypost.tagline",
+    description: "marketplace.plugin.trypost.description",
+    apps: {
+      "app-trypost-mcp": "marketplace.plugin.trypost.app",
+    },
+    prompts: {
+      "prompt-week": "marketplace.plugin.trypost.prompt.week",
+      "prompt-draft": "marketplace.plugin.trypost.prompt.draft",
+      "prompt-analytics": "marketplace.plugin.trypost.prompt.analytics",
+    },
+  },
   composio: {
     tagline: "marketplace.plugin.composio.tagline",
     description: "marketplace.plugin.composio.description",
@@ -543,6 +567,7 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
     "marketplace.plugin.obsidian.hint.apiKey",
   "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
   "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
+  "In Omnisend, open Store settings > API keys and create a key.": "marketplace.plugin.omnisend.hint.apiKey",
 };
 
 const english = translateFor("en");

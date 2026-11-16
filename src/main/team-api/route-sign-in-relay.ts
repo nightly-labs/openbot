@@ -1,11 +1,16 @@
 import { PROVIDER_ACCOUNT_RELAYS } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_ROUTES,
+} from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
+import {
   SIGN_IN_RELAY_CAPABILITY,
   SIGN_IN_RELAY_PROVIDERS,
   SIGN_IN_RELAY_ROUTES,
 } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
+import { MCP_OAUTH_REDIRECT_URL } from "../deep-link-router";
 import { parseTestMcpServer } from "../ipc/mcp-inputs";
 import type { TeamApiMcpServerOwners, TeamApiMcpServers, TeamApiSignInRelay } from "./dependencies";
 import { HttpError } from "./http-error";
@@ -13,7 +18,10 @@ import { requireMcpAccess, requireOwnMcpAddress } from "./mcp-member-access";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import { nullableString, readJson, requireAdmin, stringField } from "./request-helpers";
 
-const ROUTES: ReadonlySet<string> = new Set(Object.values(SIGN_IN_RELAY_ROUTES));
+const ROUTES: ReadonlySet<string> = new Set([
+  ...Object.values(SIGN_IN_RELAY_ROUTES),
+  ...Object.values(SIGN_IN_RELAY_DEEP_LINK_ROUTES),
+]);
 
 /**
  * Sign-ins of this host that an administrator finishes in the browser of their own computer. Frozen
@@ -48,11 +56,17 @@ export async function routeSignInRelay(
     );
   }
   if (method !== "POST" || !ROUTES.has(url.pathname)) return "unmatched";
-  if (!relay || !capabilities.has(SIGN_IN_RELAY_CAPABILITY))
+  const deepLink = url.pathname === SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart;
+  if (
+    !relay ||
+    !capabilities.has(SIGN_IN_RELAY_CAPABILITY) ||
+    (deepLink && !capabilities.has(SIGN_IN_RELAY_DEEP_LINK_CAPABILITY))
+  )
     throw new HttpError(400, sourceText("error.team.signInRelayUnsupported"));
   // A provider's sign-in and an agent's link stay with owners and admins. A flow answers only the
   // member who started it, so a member reads and ends only an MCP sign-in of their own.
   const memberRoute =
+    deepLink ||
     url.pathname === SIGN_IN_RELAY_ROUTES.mcpStart ||
     url.pathname === SIGN_IN_RELAY_ROUTES.status ||
     url.pathname === SIGN_IN_RELAY_ROUTES.complete ||
@@ -62,10 +76,15 @@ export async function routeSignInRelay(
   // `readJson` has already run the body through the `sign-in-relay-v1` codec.
   const body = await readJson(request);
   switch (url.pathname) {
+    case SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart:
     case SIGN_IN_RELAY_ROUTES.mcpStart: {
       const input = parseTestMcpServer(body);
       requireOwnMcpAddress(access, mcpServers?.listMcpServers() ?? [], input.config.url);
-      return json(200, await runCauseEffect(relay.startMcp(member.id, input)));
+      // The client's computer opens `openbot://mcp-auth` in OpenBot, and passes its callback on by `state`.
+      return json(
+        200,
+        await runCauseEffect(relay.startMcp(member.id, input, deepLink ? MCP_OAUTH_REDIRECT_URL : undefined)),
+      );
     }
     case SIGN_IN_RELAY_ROUTES.providerStart: {
       // The codec admits only `SIGN_IN_RELAY_PROVIDERS`.

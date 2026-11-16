@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "Test zdalnego pulpitu jest aktywny. Spróbuj ponownie po jego zakończeniu.",
   "error.remote.screenRecordingDenied":
     "Host nie zezwolił OpenBot na nagrywanie ekranu. Przyznaj na hoście uprawnienie do nagrywania ekranu, a następnie spróbuj ponownie.",
+  "error.remote.windowsSessionDisconnected":
+    "Sesja Windows na hoście jest rozłączona, więc nie ma ekranu do udostępnienia. Zaloguj się do Windows na ekranie hosta, a następnie spróbuj ponownie.",
   "error.remote.teamSessionExpired": "Sesja zespołu wygasła.",
   "error.remote.finishTestBeforeSwitch": "Zakończ test zdalnego pulpitu, zanim przełączysz ekran.",
   "error.remote.displayNotFound": "Nie znaleziono zdalnego ekranu.",

@@ -54,6 +54,14 @@ export interface LocalMcpSession {
 const LOCAL_MCP_PROGRESS_INTERVAL_MS = 20_000;
 
 /**
+ * How long a call with no progress token may wait before OpenBot must answer it. Such a client gets
+ * no progress notification, so its own timeout cannot be reset: 60 seconds in the MCP TypeScript SDK,
+ * which Cursor 2026.10 uses with no option to change it. A question answers the call before then and
+ * stays open (#6230).
+ */
+const LOCAL_MCP_UNEXTENDED_DETACH_MS = 45_000;
+
+/**
  * The `_meta` key in which OpenCode 2.1.4 names the session that makes a tool call. Its ACP session
  * id is that session id, so a call on a token that a directory's sessions share finds its own thread.
  */
@@ -79,7 +87,8 @@ interface BridgeRoute {
   /**
    * `signal` aborts when the client abandons the call: it sent `notifications/cancelled` (an MCP
    * client does this when its own timeout ends) or closed the response stream. Nothing reads the
-   * result after that, so the owner must stop waiting for the user.
+   * result after that, so the owner must stop waiting for the user. `detachAfterMs` is set when the
+   * client cannot be kept waiting: see `AppServerRequest.detachAfterMs`.
    */
   call: (
     params: {
@@ -91,6 +100,7 @@ interface BridgeRoute {
       arguments: unknown;
     },
     signal: AbortSignal,
+    detachAfterMs: number | undefined,
   ) => Effect.Effect<DynamicToolResult, ProviderClientOperationError>;
   /**
    * The calls still running, by JSON-RPC id. Each POST gets a new MCP server, so the POST that
@@ -335,6 +345,7 @@ export class LocalMcpBridge {
                   arguments: params.arguments ?? {},
                 },
                 abandoned.signal,
+                progressToken === undefined ? LOCAL_MCP_UNEXTENDED_DETACH_MS : undefined,
               )
               .pipe(Effect.mapError(({ cause }) => mcpFailure(cause)));
           }).pipe(

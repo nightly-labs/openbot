@@ -76,7 +76,11 @@ export function channelRequester(
   message: (messageId: string) => ChannelMessage | null,
 ): { id: string; name: string } | null {
   const root = tasks.find((item) => item.id === task.rootTaskId);
-  const request = root ? message(root.requestMessageId) : null;
+  return requestPerson(root ? message(root.requestMessageId) : null);
+}
+
+/** The person who wrote `request`, or null for the request of a routine or an agent. */
+export function requestPerson(request: ChannelMessage | null): { id: string; name: string } | null {
   if (
     request?.author.kind !== "member" ||
     request.author.id.startsWith("routine:") ||

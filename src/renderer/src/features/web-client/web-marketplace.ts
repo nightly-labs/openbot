@@ -12,10 +12,16 @@ import {
   listAgentSkills,
   listMcpServers,
   listMcpSignIns,
+  mcpSignInApp,
+  readGithubSkills,
   removeMcpServer,
+  removeMcpSignInApp,
   saveMcpServer,
+  saveMcpSignInApp,
   setAgentSkillEnabled,
   setHostMcpAccess,
+  setMcpServerEnabled,
+  signOutMcpServer,
   testMcpServer,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
@@ -64,6 +70,9 @@ export function createWebMarketplaceCalls(
         runTeamEffect(uninstallAgentSkill(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       setEnabled: async (input) =>
         runTeamEffect(setAgentSkillEnabled(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      // The Marketplace asks only a host with `github-skills-v1`.
+      readGithub: async (link) =>
+        runTeamEffect(readGithubSkills(request(serverId), link).pipe(Effect.mapError((error) => error.cause))),
     }),
     mcp: {
       listMcpServers: async (serverId) =>
@@ -77,6 +86,17 @@ export function createWebMarketplaceCalls(
         runTeamEffect(saveMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       removeMcpServer: async (input, serverId) =>
         runTeamEffect(removeMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      setMcpServerEnabled: async (input, serverId) =>
+        runTeamEffect(setMcpServerEnabled(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      signOutMcpServer: async (input, serverId) =>
+        runTeamEffect(signOutMcpServer(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      // The Marketplace asks only a host with `mcp-sign-in-app-v1`.
+      mcpSignInApp: async (input, serverId) =>
+        runTeamEffect(mcpSignInApp(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      saveMcpSignInApp: async (input, serverId) =>
+        runTeamEffect(saveMcpSignInApp(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      removeMcpSignInApp: async (input, serverId) =>
+        runTeamEffect(removeMcpSignInApp(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       // The marketplace asks only a host that relays its sign-ins (`sign-in-relay-v1`): the page opens
       // in this browser, and the user pastes the address it ends on.
       signInMcpServer: async ({ config }, serverId) => {

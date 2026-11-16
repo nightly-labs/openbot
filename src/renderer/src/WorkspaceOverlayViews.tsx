@@ -1,6 +1,5 @@
-import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
+import type { AddedAgent, McpSignInState, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
-import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
@@ -10,7 +9,7 @@ import { useChannels } from "./features/channels/channels-context";
 import type { ConnectorRegistry } from "./features/connectors/connector-registry";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
-import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
+import { canManageStorage, serverHasBackgroundProcesses, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
 import {
@@ -85,8 +84,16 @@ export function MarketplaceOverlay(props: {
   calls?: MarketplaceCalls | undefined;
   /** This computer runs macOS. The web client leaves it out: it cannot ask macOS for anything. */
   macOS?: boolean | undefined;
-  /** Opens the form that adds a custom MCP server to the server with this ID. */
-  onAddServer?: ((serverId: string) => void) | undefined;
+  /**
+   * One sentence about the managed runtime that starts a STDIO server, for the computer whose
+   * runtimes this window holds. Absent for another host, which starts its servers with its own runtime.
+   */
+  mcpToolRuntimeNote?: string | null | undefined;
+  /** An MCP row of `server` to sign in to: the user pressed Sign in on an agent's card. */
+  mcpSignInRequest?: string | null | undefined;
+  onMcpSignInRequestHandled?: (() => void) | undefined;
+  /** The sign-in state of the MCP rows of a server, after each read, for the agents' cards. */
+  onMcpSignIns?: ((serverId: string, states: Readonly<Record<string, McpSignInState>>) => void) | undefined;
 }) {
   const controller = useConversationController();
   const manage = createMemo(() => serverCanAdminister(props.server, "skills-admin-v1"));
@@ -105,13 +112,6 @@ export function MarketplaceOverlay(props: {
     const member = serverSupportsCapability(server, "mcp-servers-v1") && !serverRoleCanAdminister(server);
     return { reason: member ? "member" : "update", host: server.name };
   });
-  /** Add custom, for a user who can add a server to the host. */
-  const addServer = () => {
-    const serverId = pluginServerId();
-    const open = props.onAddServer;
-    if (serverId === undefined || !open) return undefined;
-    return () => open(serverId);
-  };
   /* What both example controls need: a managed agent whose composer is free to take another line. */
   const composerFree = createMemo(
     () =>
@@ -143,6 +143,7 @@ export function MarketplaceOverlay(props: {
           hostServerId={remoteAdminServer(props.server, "skills-admin-v1")?.id}
           agentServerId={remoteAdminServer(props.server, "agent-install-v1")?.id}
           agentUpdateServerId={remoteAdminServer(props.server, "agent-update-v1")?.id}
+          githubSkills={manage() && serverCanAdminister(props.server, "github-skills-v1")}
           onOpenChange={(open) => {
             /* The slug is consumed by opening, so closing forgets it: reopening the marketplace by
                hand lands on the catalog rather than on the listing a link once named. */
@@ -171,7 +172,11 @@ export function MarketplaceOverlay(props: {
           onInitialListingConsumed={props.onMarketplaceListingConsumed}
           pluginServerId={pluginServerId()}
           pluginsBlocked={pluginsBlocked()}
-          onAddServer={addServer()}
+          pluginSignInApp={serverSupportsCapability(props.server, "mcp-sign-in-app-v1")}
+          mcpToolRuntimeNote={props.mcpToolRuntimeNote}
+          mcpSignInRequest={props.mcpSignInRequest}
+          onMcpSignInRequestHandled={props.onMcpSignInRequestHandled}
+          onMcpSignIns={props.onMcpSignIns}
           pluginHostName={
             props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
           }
@@ -224,31 +229,26 @@ export function SharedAgentInstallOverlay(props: {
 }
 
 /**
- * Settings for one server. The MCP and Storage sections are gated on the server here: a remote host
- * answers 403 to a `member` and 400 without the capability, so neither ever sees the MCP section,
- * and a host without `storage-v1` has no Storage section at all.
+ * Settings for one server. The Storage and Updates sections are gated on the server here: a host
+ * without `storage-v1` has no Storage section at all.
  */
 export function ServerSettingsOverlay(
-  props: Omit<ServerSettingsModalProps, "mcpServers" | "storage" | "hostUpdate"> & {
-    mcpServers: McpServerConfig[];
+  props: Omit<ServerSettingsModalProps, "storage" | "hostUpdate"> & {
     storage: Omit<ServerStorageOptions, "canManage">;
     hostUpdate: ServerUpdateOptions;
   },
 ) {
-  const modal = omit(props, "mcpServers", "storage", "hostUpdate");
+  const modal = omit(props, "storage", "hostUpdate");
   return (
     <Loading>
       <ServerSettingsModal
         {...modal}
-        mcpServers={serverCanManageMcp(props.server) ? props.mcpServers : undefined}
         storage={
           serverHasStorage(props.server)
             ? {
                 ...props.storage,
                 canManage: canManageStorage(props.server),
-                backgroundProcesses:
-                  props.server.kind === "remote" &&
-                  serverSupportsCapability(props.server, BACKGROUND_PROCESSES_CAPABILITY),
+                backgroundProcesses: serverHasBackgroundProcesses(props.server),
               }
             : undefined
         }

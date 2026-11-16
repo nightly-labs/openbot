@@ -7,6 +7,7 @@ import type {
   QueueSnapshot,
   RoutineFields,
 } from "@openbot/contracts/ipc";
+import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { desktopAnalytics } from "./analytics";
@@ -140,6 +141,36 @@ const Turns = createSimpleContext({
           : current,
       );
     }
+    // A runtime snapshot cuts the long texts of an approval. Main reads the whole copy once for each cut
+    // request. Until it comes, and when the server cannot send it, the card offers only Deny.
+    const wholeApprovalReads = new Set<string>();
+    createEffect(
+      () => approvals().filter(approvalIsCut),
+      (cut) => {
+        for (const approval of cut) {
+          const key = JSON.stringify([scopeServerId, approval.agentId, approval.turnId, approval.requestId]);
+          if (wholeApprovalReads.has(key)) continue;
+          wholeApprovalReads.add(key);
+          void turnsPort()
+            .agent.readPendingApproval({ agentId: approval.agentId, requestId: approval.requestId })
+            .then((whole) => {
+              // Before a joined server connects, main does not know its capabilities and returns null. The
+              // next change of the approvals tries again.
+              if (!whole) {
+                wholeApprovalReads.delete(key);
+                return;
+              }
+              if (!scopeIsCurrent()) return;
+              setApprovals((current) => {
+                const next = withWholeApproval(current, whole);
+                return next === current ? current : [...next];
+              });
+            })
+            // The next change of the approvals tries again.
+            .catch(() => wholeApprovalReads.delete(key));
+        }
+      },
+    );
     const completedTurnByAgent = new Map<string, string>();
     const queueSnapshotRequests = new Map<string, number>();
     const waitSnapshotRequests = new Map<string, number>();
@@ -190,7 +221,7 @@ const Turns = createSimpleContext({
       },
     );
 
-    function loadWaits(agentId: string, serverId: string): void {
+    function loadWaits(agentId: string): void {
       const request = (waitSnapshotRequests.get(agentId) ?? 0) + 1;
       waitSnapshotRequests.set(agentId, request);
       void turnsPort()
@@ -199,16 +230,16 @@ const Turns = createSimpleContext({
           if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
-        .catch((error) => {
-          if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
-          appendUiError(agentId, error, currentText().t("app.errorStatus.waitsLoad"), serverId);
-        });
+        // As in `loadQueue`: this background read can time out on a joined server while the agent
+        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
+        // `waits-changed` event updates them. A failed cancel still reports an error.
+        .catch(() => undefined);
     }
 
     createEffect(
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
-      ({ agentId, serverId }) => {
-        if (agentId) loadWaits(agentId, serverId);
+      ({ agentId }) => {
+        if (agentId) loadWaits(agentId);
       },
     );
 
@@ -407,7 +438,7 @@ const Turns = createSimpleContext({
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
         // A joined server sends no event when a wait closes, so the list is read again.
-        .then(() => loadWaits(agent.id, serverId))
+        .then(() => loadWaits(agent.id))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 

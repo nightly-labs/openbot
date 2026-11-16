@@ -29,7 +29,11 @@ function writeSelection(event: ClipboardEvent): void {
   const handled = event.defaultPrevented;
   if (handled && !event.clipboardData.getData("text/html").includes("katex-mathml")) return;
   // As the native copy: without unselectable text, which `toString` also skips, and with no-break spaces as spaces.
-  const text = selection.toString().replace(/\u00a0/gu, " ");
+  const native = selection.toString().replace(/\u00a0/gu, " ");
+  // A triple-click, or a drag past the end of a block, selects to the start of the next block, so the
+  // text gets empty lines at its ends. A paste then gives these empty lines. Text that can be edited
+  // keeps them, because its user can select them on purpose.
+  const text = isEditable(event.target) ? native : native.replace(/^\s*\n|\n\s*$/gu, "");
   if (!text) return;
   const container = document.createElement("div");
   for (let index = 0; index < selection.rangeCount; index += 1) {

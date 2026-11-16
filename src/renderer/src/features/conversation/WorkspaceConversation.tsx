@@ -13,7 +13,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
-import { hasVisibleToasts } from "@openbot/ui";
+import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
 import { unloadedHistory } from "@openbot/ui/features/conversation/ChatScrollRail";
@@ -87,12 +87,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const connectors = useConnectors();
   const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
-  const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
-    useServerSettings();
+  const { serverSettingsOpen, openServerSettings } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
     setSkillsMarketplaceOpen,
+    setPendingMcpSignIn,
+    mcpSignIns,
+    refreshMcpSignIns,
     setPendingPluginSlug,
     setPendingPluginConnect,
     agentAutoApproves,
@@ -176,6 +178,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
+    searchAgentThreadMessages,
     setTeamTyping,
     presentPromptResolution,
   } = useConversation();
@@ -297,9 +300,9 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     const busyMessageMode = remoteAgentAdmin.busyMessageMode();
     const backupModels = remoteAgentAdmin.backupModels();
     const usageLimitReturn = remoteAgentAdmin.usageLimitReturn();
-    const taskLimit = remoteAgentAdmin.taskLimit();
     const quickAcknowledgement = remoteAgentAdmin.quickAcknowledgement();
     const fastMode = remoteAgentAdmin.fastMode();
+    const ultrafast = remoteAgentAdmin.ultrafast();
     const computerUse = remoteAgentAdmin.computerUse();
     const allowNewChat = remoteAgentAdmin.allowNewChat();
     return agent
@@ -310,9 +313,8 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           ...(activeServer()?.kind === "remote" && busyMessageMode ? { busyMessageMode } : {}),
           ...(activeServer()?.kind === "remote" && backupModels ? { backupModels } : {}),
           ...(activeServer()?.kind === "remote" && usageLimitReturn ? { usageLimitReturn } : {}),
-          ...(activeServer()?.kind === "remote" && typeof taskLimit === "number" ? { taskLimit } : {}),
           ...(activeServer()?.kind === "remote" && quickAcknowledgement !== undefined ? { quickAcknowledgement } : {}),
-          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode } : {}),
+          ...(activeServer()?.kind === "remote" && typeof fastMode === "boolean" ? { fastMode, ultrafast } : {}),
           ...(activeServer()?.kind === "remote" && computerUse !== undefined ? { computerUse } : {}),
           ...(activeServer()?.kind === "remote" && allowNewChat !== undefined ? { allowNewChat } : {}),
         }
@@ -435,6 +437,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
   /** Pin and Unpin of the active server. A host without `message-pins-v1` has none; this computer always has. */
   const messagePinsAction = () => (activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY) ? messagePins : undefined);
+  /** An older host does not name the thread of a search result, so its `@` list finds thread titles only. */
+  const searchThreadsAction = () =>
+    activeServerSupportsCapability(THREAD_MESSAGE_SEARCH_CAPABILITY) ? searchActiveAgentThreads : undefined;
+  function searchActiveAgentThreads(query: string) {
+    const agentId = activeAgent()?.id;
+    return agentId ? searchAgentThreadMessages(agentId, query) : Promise.resolve([]);
+  }
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -536,16 +545,21 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        // The server settings sign in as their MCP panel does: on this computer, or through a host that
-        // relays its sign-in page.
+        // Sign in opens the server's Marketplace page, which signs in as its own button does: on this
+        // computer, or through a host that relays its sign-in page.
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
-          return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
+          return (mcpServerId: string) => {
+            setPendingMcpSignIn(mcpServerId);
+            setSkillsMarketplaceOpen(true);
+          };
         })()}
-        mcpSignedIn={(mcpServerId) =>
-          serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
-        }
+        mcpSignedIn={(mcpServerId) => {
+          const known = mcpSignIns();
+          return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
+        }}
+        refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
         serverInstall={{
           get servers() {
             return servers();
@@ -630,14 +644,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
-        mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
+        mcpSettingsOpen={skillsMarketplaceOpen()}
         globalOverlayOpen={
           globalSearchOpen() ||
           joinServerOpen() ||
           serverSettingsOpen() ||
           appSettingsOpen() ||
           skillsMarketplaceOpen() ||
-          hasVisibleToasts() ||
           quitShortcutHintShown()
         }
         settingsRequest={settingsRequest()}
@@ -668,6 +681,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
             ? searchAgentMessages(activeAgent()?.id ?? "", query)
             : Promise.resolve({ messageIds: [], total: 0 })
         }
+        onSearchThreads={searchThreadsAction()}
         onOpenSearchMessage={async (messageId) => {
           const agentId = activeAgent()?.id;
           if (agentId) await openAgentMessage(agentId, messageId);
@@ -679,7 +693,6 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         onAlwaysAllowApproval={alwaysAllowApproval()}
         agentAutoApproves={activeAgentAutoApproves()}
         remoteBackupModelsLoaded={remoteAgentAdmin.backupModels() !== undefined}
-        remoteTaskLimitLoaded={remoteAgentAdmin.taskLimit() !== undefined}
         remotePlanCardLoaded={remoteAgentAdmin.quickAcknowledgement() !== undefined}
         remoteComputerUseLoaded={remoteAgentAdmin.computerUse() !== undefined}
         remoteNewChatLoaded={remoteAgentAdmin.allowNewChat() !== undefined}

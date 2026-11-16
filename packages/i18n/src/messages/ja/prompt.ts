@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "許可",
   "prompt.approval.alwaysAllow": "常に許可",
   "prompt.approval.deny": "拒否",
+  "prompt.approval.cut":
+    "このカードにはリクエストの冒頭だけが表示されているため、拒否のみ選べます。「許可」がすぐに表示されない場合は、サーバーの OpenBot を更新してください。",
   "prompt.approval.report.bugHeadline": "バグを見つけましたか？直しましょう。",
   "prompt.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
   "prompt.approval.report.dontSend": "今はしない",

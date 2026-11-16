@@ -5,6 +5,7 @@ import {
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -12,7 +13,10 @@ import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
+  type RemoteDownloadProgress,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
+  type RemoteLargeDownload,
   type RemoteTeamCommand,
   type RemoteTeamCommandResult,
   type RemoteTeamConnectionUpdate,
@@ -63,6 +67,10 @@ export interface RemoteTeamTransportRef {
     upload?: RemoteFileUpload,
     /** Hears the fraction of the uploaded file sent so far, from 0 to 1. */
     onUploadProgress?: (fraction: number) => void,
+    /** Lets one file larger than the attachment limit answer this request. */
+    largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file of `size` that answers this request. */
+    download?: RemoteDownloadWatch,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
@@ -109,7 +117,15 @@ interface RemoteTeamTransportProps {
 type RemoteTeamCommandInput =
   | { type: "connect"; hostId: string; hostPublicKey: string }
   | { type: "disconnect" }
-  | { type: "request"; method: string; path: string; body: TeamProtocolV2Json; upload?: RemoteFileUpload };
+  | {
+      type: "request";
+      method: string;
+      path: string;
+      body: TeamProtocolV2Json;
+      upload?: RemoteFileUpload;
+      largeDownload?: RemoteLargeDownload;
+      downloadSize?: number;
+    };
 
 /**
  * The text for a refused live voice request. A 409 has the host's sentence: no Codex sign-in with
@@ -193,10 +209,13 @@ export const RemoteTeamTransport = memo(
 
     // Upload progress arrives from the web view by command ID, while the command is still pending.
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
+    // Download progress arrives the same way, for a request that names the size of its file.
+    const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
         onUploadProgress?: (fraction: number) => void,
+        onDownloadProgress?: (received: number, total: number) => void,
       ): Promise<RemoteTeamCommandResult> => {
         const id = Crypto.randomUUID();
         const command: RemoteTeamCommand =
@@ -213,15 +232,22 @@ export const RemoteTeamTransport = memo(
                   // As on desktop and web: a read that makes the server usable fails in seconds, so a
                   // dead path does not keep the connection attempt running for the 10 min request limit.
                   timeoutMs: remoteWorkspaceReadTimeout(next.method, next.path),
-                  // The transfer file is the one answer larger than an attachment.
+                  // The transfer file, and a large file that the user asked for, can be larger than an attachment.
                   ...(next.path === INSTANCE_TRANSFER_ROUTES.export
                     ? { largeDownload: { maxBytes: INSTANCE_TRANSFER_REMOTE_BYTES, mimeType: "application/zip" } }
-                    : {}),
+                    : next.largeDownload
+                      ? { largeDownload: next.largeDownload }
+                      : {}),
+                  ...(next.downloadSize === undefined ? {} : { downloadSize: next.downloadSize }),
                 }
               : { id, type: "disconnect" };
-        if (!onUploadProgress) return mailbox.send(command);
-        uploadListeners.current.set(id, onUploadProgress);
-        return mailbox.send(command).finally(() => uploadListeners.current.delete(id));
+        if (!onUploadProgress && !onDownloadProgress) return mailbox.send(command);
+        if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
+        if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
+        return mailbox.send(command).finally(() => {
+          uploadListeners.current.delete(id);
+          downloadListeners.current.delete(id);
+        });
       },
       [mailbox],
     );
@@ -259,9 +285,16 @@ export const RemoteTeamTransport = memo(
           body: TeamProtocolV2Json = {},
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
+          largeDownload?: RemoteLargeDownload,
+          download?: RemoteDownloadWatch,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload }, onUploadProgress);
+          const send = () =>
+            enqueue(
+              { type: "request", method, path, body, upload, largeDownload, downloadSize: download?.size },
+              onUploadProgress,
+              download?.onProgress,
+            );
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
@@ -283,7 +316,11 @@ export const RemoteTeamTransport = memo(
           if (result.status === 409 && isQueueEditRoute(method, path))
             throw new QueueEditRejectedError(currentText().t("mobile.workspace.error.queueEditRejected"));
           // The host answers 409 when a form or an approval no longer waits: answered elsewhere, or ended.
-          if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.approval)
+          if (
+            result.status === 409 &&
+            method === "POST" &&
+            (path === TEAM_API_ROUTES.respond.approval || path === PENDING_APPROVAL_ROUTES.read)
+          )
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.formUnavailable"));
@@ -406,6 +443,8 @@ export const RemoteTeamTransport = memo(
       },
       onUploadProgress: async ({ commandId, sent, total }: RemoteUploadProgress) =>
         uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1),
+      onDownloadProgress: async ({ commandId, received, total }: RemoteDownloadProgress) =>
+        downloadListeners.current.get(commandId)?.(received, total),
       onAccountProfileChanged: () => latest.current.refreshProfile(),
       onBrowserViewEvent: async (event: BrowserViewBridgeEvent) => {
         const listener = viewListeners.current.get(event.viewId);

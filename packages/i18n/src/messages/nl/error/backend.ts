@@ -68,6 +68,8 @@ export const messages = {
     "Comprimeren maakt deze chat niet kleiner: na twee keer comprimeren gebruikt hij nog {percent}% van het contextvenster van het model, dus OpenBot stopt met comprimeren. Tools en instructies gebruiken het grootste deel van het venster. Zet de MCP-servers of computerbediening uit die deze agent niet nodig heeft, of kies een model met een groter venster. Start daarna een nieuwe chat.",
   "error.backend.contextCompactionStopped":
     "Twee compressies van deze chat zijn na elkaar mislukt, dus OpenBot comprimeert hem niet meer automatisch. Elke poging stuurt de hele chat naar het model en gebruikt je abonnementslimiet. Kies ‘Nu comprimeren’ om het opnieuw te proberen, of start een nieuwe chat.",
+  "error.backend.providerModelAtCapacity":
+    "Het model zit aan zijn capaciteit. De provider probeert het over een paar minuten opnieuw. Stop de beurt en kies een ander model om nu door te gaan.",
   "error.backend.providerRetrying":
     "De provider kon dit verzoek {attempts} keer niet uitvoeren en probeert het opnieuw. Als de agent niet verdergaat, stop dan de beurt.",
   "error.backend.providerRetryingLargeContext":
@@ -86,6 +88,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "Wacht tot het werk in dit kanaal stopt en wis dan de geschiedenis.",
   "error.backend.channelCompactUnavailable":
     "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
+  "error.backend.channelCompactNoSession":
+    "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
+  "error.backend.channelCompactNotSupported":
+    "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
@@ -119,6 +125,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "De geheugenbewerking is mislukt. Probeer het opnieuw.",
   "error.backend.memoryGone": "Deze herinnering bestaat niet meer.",
   "error.backend.routineGone": "Deze routine bestaat niet meer.",
+  "error.backend.routineRunGone": "Deze routine-uitvoering bestaat niet meer.",
   "error.backend.turnNotStarted": "De aanbieder heeft deze beurt niet gestart.",
   "error.backend.routineResultConnectionOff":
     "Deze berichtenverbinding staat uit of is verwijderd. Kies een andere plek.",
@@ -169,6 +176,10 @@ export const messages = {
   "error.backend.attachBetween": "Voeg tussen 1 en {limit} bestanden toe.",
   "error.backend.attachmentNotFile": "Bijlage is geen bestand: {path}",
   "error.backend.generatedImageTooLarge": "De gemaakte afbeelding is groter dan de limiet van 100 MB.",
+  "error.backend.generatedVideoTooLarge": "De gemaakte video is groter dan de limiet van 100 MB.",
+  "error.backend.videoGenerationFailed": "Het maken van de video is mislukt.",
+  "error.backend.videoGenerationNoVideo": "Het maken van de video gaf geen video terug.",
+  "error.backend.videoGenerationInterrupted": "Het maken van de video is onderbroken.",
   "error.backend.attachmentNotRegularFile": "Alleen gewone bestanden kunnen worden bijgevoegd: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot kon {name} niet kopiëren.",
   "error.backend.routineNameRequired": "Een naam voor de routine is verplicht.",
@@ -197,6 +208,8 @@ export const messages = {
   "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
   "error.backend.interruptOtherWork":
     "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptSharedWork":
+    "De beurt van deze agent werkt aan je bericht en ook aan een bericht van de gebruiker of een andere agent. Alleen de gebruiker kan hem stoppen, met Agent stoppen in de chat van die agent.",
   "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
   "error.backend.interruptNoSession":
     "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
@@ -239,6 +252,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInAccountRefused":
+    "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
     "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
@@ -264,12 +279,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpToolSchemaRefused":
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
+    "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -364,8 +385,12 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxySignInRefused":
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserSystemProxyFailed":
+    "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "De computer die dit profiel gebruikt, opent alleen openbare sites. Hij opent geen adressen in een lokaal netwerk, dus de pagina is niet geopend.",
   "error.backend.browserCertificateUntrusted":
     "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
@@ -395,6 +420,8 @@ export const messages = {
     "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
   "error.backend.mcpServerHttpUrl":
     "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpServerBearerKey":
+    "Deze server gebruikt een API-sleutel, geen aanmelding. Zet bij Headers de sleutel op Authorization en de waarde op Bearer, een spatie en je API-sleutel.",
   "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
   "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
   "error.backend.mcpSignInAppIssuerChanged":

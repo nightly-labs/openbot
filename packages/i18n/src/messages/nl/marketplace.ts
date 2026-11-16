@@ -110,6 +110,10 @@ export const messages = {
   "marketplace.app.remove.action": "Verwijderen",
   "marketplace.app.remove.confirmTitle": "{name} verwijderen?",
   "marketplace.app.remove.keep": "Behouden",
+  "marketplace.app.replace.title": "{server} vervangen?",
+  "marketplace.app.replace.description":
+    "Je hebt al een server met de naam {server}, maar dat is niet {name}. Vervangen door {name}? Het adres en de opgeslagen sleutels worden verwijderd.",
+  "marketplace.app.replace.action": "Vervangen",
   "marketplace.app.connection": "Verbinding",
   "marketplace.app.access.use": "Mag gebruiken",
   "marketplace.app.access.noAgents": "Geen agents",
@@ -243,6 +247,16 @@ export const messages = {
     "Maak met Higgsfield een productfoto van een keramische mok op een houten tafel.",
   "marketplace.plugin.higgsfield.prompt.clip":
     "Maak met Higgsfield een video van 5 seconden met golven bij zonsondergang.",
+  "marketplace.plugin.sunra.tagline": "AI-afbeeldingen, -video's, -audio en 3D",
+  "marketplace.plugin.sunra.description":
+    "Met Sunra maken agents afbeeldingen, video's, audio en 3D-modellen met modellen zoals GPT Image, Nano Banana, Seedream, FLUX, Seedance, Kling en Veo, controleren ze het creditsaldo en halen ze de resultaten op. Resultaten komen in een project in het Sunra-account van de gebruiker. Elke gebruiker meldt zich in de browser aan bij een eigen Sunra-account. Sunra noemt eerst de kosten van elke generatie en gebruikt pas na bevestiging credits van dat account.",
+  "marketplace.plugin.sunra.app":
+    "Afbeeldingen, video, audio en 3D genereren, credits en resultaten, via de MCP-server van Sunra met aanmelden in de browser.",
+  "marketplace.plugin.sunra.prompt.balance": "Hoeveel Sunra-credits heb ik?",
+  "marketplace.plugin.sunra.prompt.poster":
+    "Maak met Sunra een poster van een nachtmarkt in de regen, in staand formaat.",
+  "marketplace.plugin.sunra.prompt.clip":
+    "Maak met Sunra een video van 5 seconden van een papieren bootje op een rivier. Vertel me eerst wat het kost.",
   "marketplace.plugin.elevenlabs.tagline": "Spraak, stemmen en spraakagenten",
   "marketplace.plugin.elevenlabs.description":
     "Met ElevenLabs zetten agenten tekst om in spraak, werken ze met stemmen, en maken, testen en bekijken ze ElevenLabs-spraakagenten en hun gesprekken. Gegenereerde audio komt terug als een kortlevende downloadlink. Elke gebruiker meldt zich in de browser aan bij een eigen ElevenLabs-account, en elke generatie gebruikt credits van dat account.",
@@ -387,9 +401,9 @@ export const messages = {
     "Stel een e-mail op voor het opnieuw instellen van een wachtwoord in de nieuwe flow.",
   "marketplace.plugin.omnisend.tagline": "E-mail- en sms-marketing",
   "marketplace.plugin.omnisend.description":
-    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker meldt zich in de browser aan bij een eigen Omnisend-account en kiest het toegangsniveau op het toestemmingsscherm. Met schrijftoegang kunnen agents ook campagnes versturen en gegevens verwijderen. Kies alleen-lezen toegang als agents alleen rapporten nodig hebben.",
+    "Met Omnisend lezen agents rapporten van campagnes en formulieren, vinden ze contacten en segmenten, en maken en bewerken ze campagnes, automatiseringen, e-mailsjablonen, formulieren en producten. Elke gebruiker maakt verbinding met een API-sleutel uit het eigen Omnisend-account. Agents kunnen doen wat de sleutel toestaat, ook campagnes versturen en gegevens verwijderen.",
   "marketplace.plugin.omnisend.app":
-    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met aanmelding in de browser.",
+    "Campagnes, automatiseringen, contacten, segmenten, formulieren en rapporten, via de MCP-server van Omnisend met een API-sleutel.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Hoe presteerden de campagnes van vorige week ten opzichte van de week ervoor?",
   "marketplace.plugin.omnisend.prompt.segment":
@@ -397,6 +411,7 @@ export const messages = {
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Maak een concept van een campagne voor de nieuwe collectie, maar verstuur die niet.",
   "marketplace.plugin.postiz.tagline": "Socialemediaplanning",
+  "marketplace.plugin.omnisend.hint.apiKey": "Open in Omnisend Store settings > API keys en maak een sleutel.",
   "marketplace.plugin.postiz.description":
     "Met Postiz kunnen agents je socialemediakanalen tonen en berichten opstellen, inplannen en publiceren op meer dan 30 netwerken, zoals X, LinkedIn, Instagram en TikTok. Agents kunnen ook media uploaden en AI-afbeeldingen en -video's maken. Log in de browser in op je Postiz-account, of plak de API-sleutel uit Settings › Developers in Postiz. Alle cloudabonnementen van Postiz bevatten API-toegang. Agents kunnen een bericht direct publiceren, dus controleer elk bericht voordat je het goedkeurt.",
   "marketplace.plugin.postiz.app":
@@ -405,6 +420,15 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.week": "Welke berichten zijn voor volgende week ingepland?",
   "marketplace.plugin.postiz.prompt.draft":
     "Stel een LinkedIn-bericht op over onze nieuwe release, maar plan het niet in.",
+  "marketplace.plugin.trypost.tagline": "Socialemediaplanning",
+  "marketplace.plugin.trypost.description":
+    "Met TryPost kunnen agents je gekoppelde kanalen weergeven en posts opstellen, inplannen, in de wachtrij zetten en publiceren op X, LinkedIn, Instagram, Facebook, TikTok, YouTube, Threads, Bluesky, Mastodon, Pinterest en meer. Agents kunnen ook statistieken lezen, ideeën en goedkeuringen beheren en publicatietijden instellen. Log in de browser in op je TryPost-account en kies een workspace. Agents kunnen een post direct publiceren, dus controleer elke post voordat je hem goedkeurt.",
+  "marketplace.plugin.trypost.app":
+    "Kanalen, posts, wachtrij, ideeën en statistieken, via de MCP-server van TryPost met inloggen in de browser.",
+  "marketplace.plugin.trypost.prompt.week": "Welke posts staan deze week ingepland?",
+  "marketplace.plugin.trypost.prompt.draft":
+    "Schrijf een concept voor een LinkedIn-post over onze nieuwe release, maar plan hem niet in.",
+  "marketplace.plugin.trypost.prompt.analytics": "Welke van mijn posts van vorige maand hadden de meeste interactie?",
   "marketplace.plugin.composio.tagline": "Gmail, Slack, GitHub en meer dan 1000 andere apps",
   "marketplace.plugin.composio.description":
     "Composio koppelt je agents via één MCP-server met Gmail, Slack, GitHub en meer dan 1000 andere apps. Log in met je Composio-account. Als een agent een app nodig heeft, vraagt hij je die app te koppelen.",
@@ -563,6 +587,14 @@ export const messages = {
   "marketplace.skills.origin.local": "Gemaakt op deze computer",
   "marketplace.skills.origin.workspace": "In de map van deze agent",
   "marketplace.skills.origin.marketplace": "Uit de Marktplaats · versie {version}",
+  "marketplace.skills.origin.github": "Van GitHub · {repository}",
+  "marketplace.skills.github.search": "Zoek, of plak een GitHub-link",
+  "marketplace.skills.github.reading": "Vaardigheden zoeken in de repository",
+  "marketplace.skills.github.trust":
+    "OpenBot heeft vaardigheden van GitHub niet gecontroleerd. Lees een vaardigheid voordat je die toevoegt.",
+  "marketplace.skills.github.source": "GitHub · {repository} op {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "{repository} openen op GitHub",
   "marketplace.skills.status.notAdded": "Niet toegevoegd",
   "marketplace.skills.status.on": "Aan op {agents}",
   "marketplace.skills.agentCount": { one: "{count} agent", other: "{count} agents" },

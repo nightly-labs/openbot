@@ -43,6 +43,8 @@ export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
  *   back to their place when they are read.
  * - `unread-first`: each section shows its unread chats first, then the others, both by last
  *   activity. Chats do not drag in this order, because the order is not manual.
+ *
+ * Neither unread order moves a muted agent (`mutedAgentIds`): it stays in its place with its badge.
  */
 export type SidebarChatOrder = "manual" | "unread-group" | "unread-first";
 
@@ -90,6 +92,8 @@ export interface SidebarProps {
   chatHistory?: SidebarChatHistory | undefined;
   /** A new OpenBot version of the server. The header shows a button that opens its update. */
   serverUpdate?: { version: string; running: boolean; onOpen: () => void } | undefined;
+  /** Content at the end of the top bar, after its buttons. The desktop dev build puts the worktree branch here. */
+  topbarDetail?: JSX.Element | undefined;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean | undefined;

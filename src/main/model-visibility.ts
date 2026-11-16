@@ -7,16 +7,19 @@ import type {
   AgentModelOption,
   AgentProviderRef,
   AgentSummary,
+  CustomProviderSummary,
   ProviderModelVisibility,
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
 import {
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
   OPENCODE_RECOMMENDED_FREE_MODELS,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
+import { encodedModelId } from "../backend/encoded-model-id";
 import { isMissingFileError } from "../backend/file-errors";
 import { OPENCODE_CONFINED_ENV } from "../backend/process-confinement";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
@@ -409,6 +412,23 @@ function modelKey(provider: string, model: string): ModelKey {
   return `${provider}\u0000${model}`;
 }
 
+/**
+ * The models that the user saved on an endpoint, under the provider that runs it. The user chose
+ * each one, so the catalogue age rules do not fold it. Before, when one model of an endpoint was in
+ * the catalogue, such as a model of the `lmstudio` endpoint or a Claude model of a gateway, the
+ * endpoint's other models were folded under Older models as models that the catalogue lacks (#7962).
+ */
+function savedEndpointModels(endpoints: readonly CustomProviderSummary[]): Set<ModelKey> {
+  return new Set(
+    endpoints.flatMap((endpoint) =>
+      endpoint.models.map((model) =>
+        // As the harness lists it: Pi encodes an id that the contract refuses, such as `@cf/...`.
+        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, encodedModelId(`${endpoint.id}/`, model.id)),
+      ),
+    ),
+  );
+}
+
 /** Every model an agent is on, goes back to, moves to next, or keeps as a backup. */
 function modelsInUse(agents: readonly AgentSummary[]): Set<ModelKey> {
   const keys = new Set<ModelKey>();
@@ -437,6 +457,8 @@ export interface ModelVisibilityOptions {
   /** Every model the connected providers list. */
   listModels(): AgentModelOption[];
   listAgents(): AgentSummary[];
+  /** The user's saved endpoints. The models saved on them are in the main list (#7962). */
+  customEndpoints(): readonly CustomProviderSummary[];
   /** Tells each client to read the model list again. */
   modelsChanged(): void;
 }
@@ -480,6 +502,41 @@ export class ModelVisibility {
   set(change: ProviderModelVisibilityChange): Effect.Effect<ProviderModelVisibility, PreferenceFileFailure> {
     return this.#set(change);
   }
+
+  /** The models that an admin turned off, for each provider, as a server transfer carries them. */
+  hiddenModels(): { provider: string; hidden: string[] }[] {
+    return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
+  }
+
+  /**
+   * Replaces the turned-off models with those of a server transfer. Unlike `set`, it keeps the models
+   * that no provider lists now: on a new server the providers are often not signed in yet.
+   */
+  replaceHidden(
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ): Effect.Effect<void, PreferenceFileFailure> {
+    return this.#replaceHidden(models);
+  }
+
+  readonly #replaceHidden = Effect.fn("ModelVisibility.replaceHidden")(function* (
+    this: ModelVisibility,
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ) {
+    const next = new Map<string, ReadonlySet<string>>();
+    for (const entry of models) if (entry.hidden.length > 0) next.set(entry.provider, new Set(entry.hidden));
+    yield* this.#writes.withPermit(
+      Effect.uninterruptible(
+        writePreferenceFile(this.#options.path, encodeHidden(next)).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              this.#hidden = next;
+            }),
+          ),
+        ),
+      ),
+    );
+    this.#options.modelsChanged();
+  });
 
   /**
    * The models of `models` that the picker lists, in the same order: less those that an admin turned
@@ -562,7 +619,9 @@ export class ModelVisibility {
     }
     const lookup = yield* this.#options.catalog.lookup();
     const pickers = new Map<string, ProviderPicker>();
-    for (const [provider, listed] of providers) pickers.set(provider, this.#providerPicker(provider, listed, lookup));
+    const saved = savedEndpointModels(this.#options.customEndpoints());
+    for (const [provider, listed] of providers)
+      pickers.set(provider, this.#providerPicker(provider, listed, lookup, saved));
     const inUse = modelsInUse(this.#options.listAgents());
     const now = yield* Clock.currentTimeMillis;
     // The provider lists give no `listing` of their own.
@@ -579,10 +638,18 @@ export class ModelVisibility {
     });
   });
 
-  #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
+  #providerPicker(
+    provider: string,
+    models: readonly { id: string }[],
+    lookup: ReleaseLookup,
+    saved: ReadonlySet<ModelKey>,
+  ): ProviderPicker {
     const byDefault = new Set(defaultShownModelIds(models, lookup));
     const recommended = RECOMMENDED_MODELS.get(provider) ?? [];
-    for (const model of models) if (recommended.includes(model.id.toLowerCase())) byDefault.add(model.id);
+    for (const model of models) {
+      if (recommended.includes(model.id.toLowerCase()) || saved.has(modelKey(provider, model.id)))
+        byDefault.add(model.id);
+    }
     const released = new Map<string, string>();
     for (const model of models) {
       const date = matchCatalog(model.id, lookup).release?.date;

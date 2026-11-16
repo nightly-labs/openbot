@@ -8,6 +8,11 @@ import type { WebWorkspaceRuntime } from "./web-runtime";
 
 /** An image above this size keeps its file icon: a thumbnail must not cost a large download. */
 const WEB_THUMBNAIL_BYTES = 2 * 1024 * 1024;
+/**
+ * The image that the user asked an agent to make. Above this size, the download and the base64 decode
+ * stop the page for too long: about 0.5 s for 15 MB and 1 s for 30 MB.
+ */
+const WEB_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
 /** The chat holds each shown file in memory, so a larger file keeps its card and downloads on a click. */
 const WEB_MEDIA_BYTES = MOBILE_ATTACHMENT_BYTES;
 const CACHE_BYTES = 64 * 1024 * 1024;
@@ -25,6 +30,9 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "image/webp",
   "image/avif",
   "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/aac",
   "video/quicktime",
   "video/mp4",
 ]);
@@ -134,9 +142,10 @@ export function createWebAttachmentMedia(
 
   return {
     thumbnailLimit: WEB_THUMBNAIL_BYTES,
+    generatedImageLimit: WEB_GENERATED_IMAGE_BYTES,
     mediaLimit: WEB_MEDIA_BYTES,
     url: (id) => (disposed ? undefined : shown().get(`${hostId()}:${id}`)),
-    load(attachment) {
+    load(attachment, size = "thumbnail") {
       const host = currentHost();
       const key = `${host}:${attachment.id}`;
       const entry = entries.get(key);
@@ -149,7 +158,11 @@ export function createWebAttachmentMedia(
       if (running) return running;
       const type = mediaType(attachment);
       if (!type) return Promise.resolve(false);
-      const limit = playableMediaKind(type) ? WEB_MEDIA_BYTES : WEB_THUMBNAIL_BYTES;
+      const limit = playableMediaKind(type)
+        ? WEB_MEDIA_BYTES
+        : size === "generated"
+          ? WEB_GENERATED_IMAGE_BYTES
+          : WEB_THUMBNAIL_BYTES;
       if (attachment.size > limit) return Promise.resolve(false);
       const job = download(attachment, type, limit, key).finally(() => {
         if (loading.get(key) === job) loading.delete(key);

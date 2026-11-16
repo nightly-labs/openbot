@@ -132,11 +132,17 @@ export function createSidebarDataStore(deps: {
     return (state?.kind === "unread" && state.count > 0) || (channelById().get(chatId)?.unreadCount ?? 0) > 0;
   };
   /**
-   * The chats that an unread order puts first: the unread chats, and the open chat when it was in the
-   * set before and the pointer is over the list. The open chat keeps its place while the pointer is
-   * there, so that a row does not move away under the pointer when the user reads it. When the pointer
-   * leaves the list, the read chat goes back to its section. Without this, a chat that the user reads
-   * and keeps open stays in the unread set until the user opens another chat. The manual order has none.
+   * A muted agent keeps its place in its section in each order. The user muted it because its replies
+   * are not important, so its unread replies show only as the badge on its row.
+   */
+  const chatMovesWhenUnread = (chatId: string) => !(props.mutedAgentIds?.has(chatId) ?? false);
+  /**
+   * The chats that an unread order puts first: the unread chats that are not muted, and the open chat
+   * when it was in the set before and the pointer is over the list. The open chat keeps its place
+   * while the pointer is there, so that a row does not move away under the pointer when the user reads
+   * it. When the pointer leaves the list, the read chat goes back to its section. Without this, a chat
+   * that the user reads and keeps open stays in the unread set until the user opens another chat. The
+   * manual order has none.
    *
    * The key is a string and holds still during a drag, for the same reasons as `waitingKey`.
    */
@@ -149,7 +155,11 @@ export function createSidebarDataStore(deps: {
     const previous = new Set(heldUnreadKey ? heldUnreadKey.split("\n") : []);
     const active = activeChatId();
     const next = [...props.agents.map((agent) => agent.id), ...channels().map((channel) => channel.id)]
-      .filter((chatId) => chatIsUnread(chatId) || (chatId === active && previous.has(chatId) && deps.pointerInList()))
+      .filter(
+        (chatId) =>
+          chatMovesWhenUnread(chatId) &&
+          (chatIsUnread(chatId) || (chatId === active && previous.has(chatId) && deps.pointerInList())),
+      )
       .sort()
       .join("\n");
     if (!deps.dragActive()) heldUnreadKey = next;
@@ -373,6 +383,15 @@ export function createSidebarDataStore(deps: {
     ];
   }
 
+  /**
+   * The chats that a closed section hides, for the count on its header: its own and those of the
+   * folders in it. Pinned chats and the chats in "Needs you" or "Unread" show elsewhere, so they do
+   * not count. Without it, an agent that another agent creates in a closed section shows nowhere (#7982).
+   */
+  function sectionChatCount(sectionId: string): number {
+    return sectionChatIdsDeep(sectionId).length;
+  }
+
   /** The unread messages in a folder and in the folders in it, for the badge on a closed folder. */
   function sectionUnreadCount(sectionId: string): number {
     let count = 0;
@@ -459,6 +478,7 @@ export function createSidebarDataStore(deps: {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionIsInside,

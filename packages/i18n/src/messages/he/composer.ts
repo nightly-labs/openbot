@@ -19,6 +19,10 @@ export const messages = {
   "composer.update.manual": "יש לעדכן את {provider} במחשב שמריץ אותו כדי להמשיך.",
   "composer.update.pending": "מעדכן…",
   "composer.update.action": "עדכון",
+  "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
+  "composer.usageLimit.creditsResets":
+    "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",
+  "composer.usageLimit.creditsTitle": "שימוש בקרדיטים",
   "composer.usageLimit.resets": "ניצלת את כל המכסה של {provider}. היא תתאפס {reset}.",
   "composer.usageLimit.selectModel": "ניצלת את כל המכסה של {provider}. יש לבחור מודל אחר כדי להמשיך.",
   "composer.usageLimit.title": "הגעת למכסת השימוש",
@@ -150,6 +154,7 @@ export const messages = {
   "composer.picker.section.files": "קבצים",
   "composer.picker.section.tabs": "לשוניות דפדפן",
   "composer.picker.section.threads": "שרשורים",
+  "composer.picker.section.messages": "בהודעות",
   "composer.token.tab": "לשונית דפדפן {name}",
   "composer.token.thread": "שרשור {name}",
   "composer.token.unavailableTab": "לשונית דפדפן סגורה {name}",

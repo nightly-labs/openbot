@@ -20,6 +20,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.usageLimit.credits":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
+  "composer.usageLimit.creditsResets":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken je tegoed tot de limiet {reset} wordt gereset.",
+  "composer.usageLimit.creditsTitle": "Tegoed in gebruik",
   "composer.usageLimit.resets":
     "Je hebt je limiet voor {provider} volledig gebruikt. De limiet wordt op {reset} gereset.",
   "composer.usageLimit.selectModel":
@@ -152,6 +157,7 @@ export const messages = {
   "composer.picker.section.files": "Bestanden",
   "composer.picker.section.tabs": "Browsertabbladen",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In berichten",
   "composer.token.tab": "Browsertabblad {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Gesloten browsertabblad {name}",

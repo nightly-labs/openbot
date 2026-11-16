@@ -17,6 +17,10 @@ export const messages = {
   "menu.quitConfirmBody": "Les agents et les routines s’arrêtent jusqu’à la prochaine ouverture d’OpenBot.",
   "menu.quitConfirm": "Quitter",
   "menu.quitHint": "Maintenez ⌘Q ou appuyez deux fois pour quitter",
+  "menu.closeWorkingTitle": { one: "{count} agent travaille encore", other: "{count} agents travaillent encore" },
+  "menu.closeWorkingBody":
+    "Si vous quittez OpenBot, les agents s’arrêtent. Laissez-le tourner pour qu’ils terminent. Pour revoir la fenêtre, ouvrez OpenBot.",
+  "menu.closeKeepRunning": "Continuer",
   "menu.trayOpen": "Ouvrir OpenBot",
   "menu.trayQuit": "Quitter OpenBot",
   "menu.trayTooltip": "OpenBot",

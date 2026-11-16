@@ -209,7 +209,13 @@ async function scanClaudeHistory(
         await selectConversation(database, signal);
         await populateTurnMetadata(database, transcript, request.items === "full", signal);
         if (request.items === "none") await emitMetadata(database, consume, signal);
-        else await emitTurns(database, transcript, consume, signal);
+        else {
+          const { resumeKey } = request;
+          const fromSeq = resumeKey === undefined ? 0 : resumeStartSeq(database, resumeKey);
+          if ((await emitTurns(database, transcript, consume, signal, fromSeq)) && resumeKey !== undefined) {
+            writeResumePoint(database, resumeKey);
+          }
+        }
         return;
       } finally {
         database.close();
@@ -615,24 +621,100 @@ async function emitMetadata(
   }
 }
 
+/** Sends the turns that start at `fromSeq` or later, newest first. False when the consumer stopped. */
 async function emitTurns(
   database: DatabaseSync,
   filePath: string,
   consume: ProviderHistoryConsumer,
   signal: AbortSignal,
-): Promise<void> {
+  fromSeq: number,
+): Promise<boolean> {
   let cursor = Number.MAX_SAFE_INTEGER;
   const statement = database.prepare(
-    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? ORDER BY start_seq DESC LIMIT 1",
+    "SELECT turn_id, start_seq, end_seq, timestamp, final_answer_uuid FROM turn_metadata WHERE start_seq < ? AND start_seq >= ? ORDER BY start_seq DESC LIMIT 1",
   );
   for (;;) {
     if (signal.aborted) throw signal.reason;
-    const raw = statement.get(cursor);
-    if (raw === undefined) return;
+    const raw = statement.get(cursor, fromSeq);
+    if (raw === undefined) return true;
     const row = decodeTurnMetadata(raw);
     cursor = row.startSeq;
-    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return;
+    if (!(await emitTurnFragments(database, filePath, row, consume, signal))) return false;
   }
+}
+
+const RESUME_POINT_KEY = "resume_point";
+
+interface TurnListDigest {
+  turns: number;
+  digest: string;
+  /** The start of the newest turn. It is sent again, because new records can add to it. */
+  lastStart: number;
+}
+
+/**
+ * The first `limit` turns of the index as one hash. Each turn adds its id, range and final answer, and
+ * the last one only its id and start: its end and answer move when records come after it. The hash
+ * also counts the selected records before the last turn. A changed branch, a compaction or a
+ * rewritten transcript changes an earlier turn or that count, so the hash changes too.
+ */
+function turnListDigest(database: DatabaseSync, limit: number): TurnListDigest | null {
+  const rows = [
+    ...database
+      .prepare("SELECT turn_id, start_seq, end_seq, final_answer_uuid FROM turn_metadata ORDER BY start_seq LIMIT ?")
+      .iterate(limit),
+  ].map((raw) => {
+    const row = databaseRow(raw);
+    if (!row) throw new Error("Invalid Claude history turn row.");
+    return [
+      requiredStringColumn(row, "turn_id"),
+      requiredNumberColumn(row, "start_seq"),
+      requiredNumberColumn(row, "end_seq"),
+      optionalStringColumn(row, "final_answer_uuid") ?? null,
+    ] as const;
+  });
+  const last = rows.at(-1);
+  if (!last) return null;
+  const selectedBefore = databaseRow(
+    database.prepare("SELECT COUNT(*) AS count FROM selected WHERE seq < ?").get(last[1]),
+  );
+  const hash = createHash("sha256");
+  for (const row of rows.slice(0, -1)) hash.update(`${JSON.stringify(row)}\n`);
+  hash.update(JSON.stringify([last[0], last[1], selectedBefore ? requiredNumberColumn(selectedBefore, "count") : 0]));
+  return { turns: rows.length, digest: hash.digest("hex"), lastStart: last[1] };
+}
+
+/**
+ * Where a read with `resumeKey` starts. After a full read with the same key, the turns before the
+ * newest turn of that read did not change when the hash of the turn list is the same, so they are
+ * not sent again. Any other case sends all turns.
+ */
+function resumeStartSeq(database: DatabaseSync, resumeKey: string): number {
+  const raw = database.prepare("SELECT value FROM history_meta WHERE key = ?").get(RESUME_POINT_KEY);
+  const row = raw === undefined ? null : databaseRow(raw);
+  if (!row) return 0;
+  let stored: unknown;
+  try {
+    stored = JSON.parse(requiredStringColumn(row, "value"));
+  } catch {
+    return 0;
+  }
+  if (!isRecord(stored) || stored.key !== resumeKey || typeof stored.turns !== "number") return 0;
+  const current = turnListDigest(database, stored.turns);
+  return current && current.turns === stored.turns && current.digest === stored.digest ? current.lastStart : 0;
+}
+
+/** Saves the turn list of a read that sent every turn to a consumer with this key. */
+function writeResumePoint(database: DatabaseSync, resumeKey: string): void {
+  const current = turnListDigest(database, -1);
+  const value = current ? JSON.stringify({ key: resumeKey, turns: current.turns, digest: current.digest }) : null;
+  if (value === null) database.prepare("DELETE FROM history_meta WHERE key = ?").run(RESUME_POINT_KEY);
+  else
+    database
+      .prepare(
+        "INSERT INTO history_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(RESUME_POINT_KEY, value);
 }
 
 async function emitTurnFragments(

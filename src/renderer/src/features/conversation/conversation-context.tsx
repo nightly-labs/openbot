@@ -6,14 +6,17 @@ import {
   type ConversationPageInfo,
   type ConversationReadState,
   type ConversationSnapshot,
+  openExchangesOutside,
 } from "@openbot/contracts/ipc";
+import { THREAD_MESSAGE_SEARCH_PAGE_LIMIT } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import type { AgentMessage } from "@openbot/ui/data";
+import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
+  collectThreadMessageMatches,
   formatMessageTime,
   retainThinkingMessages,
   toAgentMessage,
@@ -768,11 +771,27 @@ const Conversation = createSimpleContext({
         // A delta that came before this page can show a commentary item as its own message. The page
         // groups that item under its turn's thinking message, so the loaded copy goes.
         const pageItemIds = new Set(page.messages.map((message) => message.id));
-        conversation.messages = mergeConversationPage(
-          currentMessages.filter((message) => !pageItemIds.has(message.id)),
-          pageMessages,
-          merge,
-        );
+        // A latest page is the end of the thread. The loaded messages can reach further back, and
+        // their cursor of the older pages stays. Two cases must not join end to end, because the
+        // messages between would be out of view with no sign: a window around an old message keeps
+        // its place, and loaded messages that the page does not meet give way to the page.
+        const mappedIds = new Set(pageMessages.map((message) => message.id));
+        // A chat with no page yet, or a trimmed one, has no cursor of its own, so it takes the page's.
+        const own = conversation.page;
+        const trimmed = !own || (own.hasOlder && !own.olderCursor);
+        const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
+        const keepsWindow = tail && conversation.windowMode === "around";
+        const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
+        const kept = currentMessages.filter((message) => !pageItemIds.has(message.id));
+        conversation.messages = keepsWindow
+          ? windowedSnapshotMessages(currentMessages, pageMessages, { mode: "around", capped: true }).filter(
+              (message) => mappedIds.has(message.id) || !pageItemIds.has(message.id),
+            )
+          : mergeConversationPage(kept, pageMessages, apart ? "replace" : merge);
+        const first = conversation.messages[0];
+        // The loaded messages start before the page, so the cursor of the older pages is still theirs.
+        // A window that starts in the page dropped the page's messages before it, so it keeps its cursor too.
+        const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(
@@ -783,11 +802,14 @@ const Conversation = createSimpleContext({
           ...(merge === "replace" ? {} : conversation.missingReferences),
           ...missingReplyOriginals(page),
         };
-        conversation.page = page.pageInfo;
-        if (windowMode) conversation.windowMode = windowMode;
+        if (!keepsOlder) conversation.page = page.pageInfo;
+        if (windowMode && !keepsWindow) conversation.windowMode = windowMode;
         conversation.revision = page.revision;
         conversation.loaded = true;
       });
+      if (merge === "latest")
+        for (const messageId of openExchangesOutside(conversations[page.agentId]?.messages ?? [], page.messages))
+          refreshOpenExchange(page.agentId, messageId);
       setActiveTurns((current) => ({
         ...current,
         [page.agentId]: completedTurnByAgent.get(page.agentId) === page.activeTurnId ? null : page.activeTurnId,
@@ -802,6 +824,47 @@ const Conversation = createSimpleContext({
         applyConversationReadState(page.agentId, retainedState ?? page.readState);
       }
       return true;
+    }
+
+    /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+    const openExchangeReads = new Map<string, { again: boolean }>();
+
+    /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
+    function refreshOpenExchange(agentId: string, messageId: string): void {
+      const key = agentMessageKey(agentId, messageId);
+      const running = openExchangeReads.get(key);
+      if (running) {
+        running.again = true;
+        return;
+      }
+      const read = { again: true };
+      openExchangeReads.set(key, read);
+      void (async () => {
+        try {
+          while (read.again && scopeIsCurrent()) {
+            read.again = false;
+            // The page around the request holds its whole turn at least, with the request as the host has it.
+            const page = await conversationPort().agent.readConversationPage({
+              agentId,
+              anchor: { type: "around", messageId },
+              limit: 1,
+            });
+            const message = page.messages.find((candidate) => candidate.id === messageId);
+            if (!scopeIsCurrent() || !message) return;
+            const fresh = toAgentMessage(message, agentId);
+            updateConversation(agentId, (conversation) => {
+              const stored = conversation.messages.find((candidate) => candidate.id === messageId);
+              if (stored && page.revision >= (conversation.revision ?? -1) && !agentMessagesEqual(stored, fresh))
+                updateStored(stored, stored.animate === undefined ? fresh : { ...fresh, animate: stored.animate });
+            });
+          }
+        } finally {
+          // In the same step as the last check, so a later page starts a new read and is not lost.
+          openExchangeReads.delete(key);
+        }
+      })()
+        // The next latest page reads it again.
+        .catch(() => undefined);
     }
 
     async function loadOlderAgentMessages(agentId = activeAgent()?.id): Promise<void> {
@@ -856,6 +919,19 @@ const Conversation = createSimpleContext({
         analytics.track("search_action", { scope: "agent", result: "failed", failure_code: "search_failed" });
         throw error;
       }
+    }
+
+    /** The side thread messages of the agent that have the `@` query. A message of the agent's own chat names no thread. */
+    function searchAgentThreadMessages(agentId: string, query: string): Promise<ComposerThreadMessageMatch[]> {
+      return collectThreadMessageMatches((cursor) =>
+        conversationPort().agent.searchConversationMessages({
+          query,
+          agentId,
+          ...(cursor ? { cursor } : {}),
+          limit: THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
+          includeSideThreads: true,
+        }),
+      );
     }
 
     function pruneInactiveAgentHistory(agentId: string): void {
@@ -1249,6 +1325,7 @@ const Conversation = createSimpleContext({
       markReplyCompleted,
       clearRecentReply,
       searchAgentMessages,
+      searchAgentThreadMessages,
       sendMessage,
       markAgentMessagesRead,
       markAgentMessagesUnread,

@@ -5,6 +5,7 @@ import { useAuth } from "../account/account-context";
 import { useAgents } from "../agents/agents-context";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { useServers } from "../servers/servers-context";
+import { useUsage } from "../usage/usage-context";
 import { WorkflowsCanvas } from "./WorkflowsCanvas";
 import { desktopWorkflowHost, type WorkflowHost } from "./workflows-port";
 
@@ -39,6 +40,7 @@ export function WorkflowsPage(props: { serverId: string }) {
     >
       {(serverId) => (
         <DesktopWorkflowsCanvas
+          serverId={serverId}
           host={desktopWorkflowHost(serverId, server)}
           admin={serverRoleCanAdminister(server())}
         />
@@ -48,9 +50,18 @@ export function WorkflowsPage(props: { serverId: string }) {
 }
 
 /** The canvas with the agents, models and account of the desktop app. */
-function DesktopWorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
+function DesktopWorkflowsCanvas(props: { serverId: string; host: WorkflowHost; admin: boolean }) {
   const { agentList, agentStatus, modelOptions } = useAgents();
   const { signedInAccount } = useAuth();
+  const usage = useUsage();
+  /** The workflow that a notification asks this server's page to open. */
+  const request = {
+    workflowId: () => {
+      const requested = usage.workflowRequest();
+      return requested?.serverId === props.serverId ? requested.workflowId : undefined;
+    },
+    taken: usage.takeWorkflowRequest,
+  };
   return (
     <WorkflowsCanvas
       host={props.host}
@@ -59,6 +70,7 @@ function DesktopWorkflowsCanvas(props: { host: WorkflowHost; admin: boolean }) {
       models={modelOptions()}
       status={agentStatus()}
       self={signedInAccount()?.name ?? undefined}
+      request={request}
     />
   );
 }

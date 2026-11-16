@@ -10,6 +10,7 @@ export const messages = {
   "mobile.share.content": "Do udostępnienia",
   "mobile.share.footer":
     "Czat otworzy się z tą treścią w polu wiadomości. Nic nie zostanie wysłane, dopóki jej nie wyślesz.",
+  "mobile.share.sendFooter": "OpenBot wyśle to do agenta, a potem otworzy czat.",
   "mobile.share.lastUsed": "Ostatnio używany",
   "mobile.share.noAgents": "Brak agentów",
   "mobile.share.chooseAgent": "Wybierz agenta",

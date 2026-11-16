@@ -20,6 +20,7 @@ import {
   decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
   encodeTeamProtocolV8WebRtcHttpRequest,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   type TeamProtocolV2AuthFrame,
@@ -90,6 +91,7 @@ import {
   type ProbeSample,
   unmeasuredProbeMs,
 } from "./remote-path-check";
+import { startRemoteRequestDeadline } from "./remote-recovery";
 import { createTeamRequestId } from "./request-id";
 import { encodeTeamWebRtcPayload, TeamWebRtcPayloadDecoder } from "./webrtc-framing";
 
@@ -116,6 +118,8 @@ export type RemoteTeamCommand =
       timeoutMs?: number | undefined;
       /** A larger cap for the one file that answers this request, such as a transfer file. */
       largeDownload?: RemoteLargeDownload | undefined;
+      /** The size of the file that answers this request. The page then reports its download progress. */
+      downloadSize?: number | undefined;
     };
 
 export interface RemoteTeamBootstrapPayload {
@@ -223,6 +227,8 @@ export function decodeRemoteTeamCommand(value: unknown): {
   if (largeDownload === null) return invalid;
   const upload = value.upload === undefined ? undefined : decodeRemoteFileUpload(value.upload);
   if (upload === null) return invalid;
+  const downloadSize = value.downloadSize;
+  if (!(downloadSize === undefined || (isNumber(downloadSize) && downloadSize > 0))) return invalid;
   let body: TeamProtocolV2Json;
   try {
     body = decodeTeamProtocolV2Json(value.body);
@@ -239,6 +245,7 @@ export function decodeRemoteTeamCommand(value: unknown): {
       ...(upload ? { upload } : {}),
       ...(timeoutMs === undefined ? {} : { timeoutMs }),
       ...(largeDownload ? { largeDownload } : {}),
+      ...(downloadSize === undefined ? {} : { downloadSize }),
     },
     commandId: id,
   };
@@ -308,10 +315,25 @@ export interface RemoteUploadProgress {
   total: number;
 }
 
+/** The size of the file that answers a request, and a listener for the bytes that have arrived. */
+export interface RemoteDownloadWatch {
+  size: number;
+  onProgress: (received: number, total: number) => void;
+}
+
+/** How much of the file that answers one request command has arrived. */
+export interface RemoteDownloadProgress {
+  commandId: string;
+  received: number;
+  total: number;
+}
+
 export interface RemoteTeamPeerActions {
   onHostStreamData?: (data: string | ArrayBuffer) => void;
   /** Hears upload progress, at most once per whole percent. Optional, and never affects the upload. */
   onUploadProgress?: (progress: RemoteUploadProgress) => Promise<void>;
+  /** Hears download progress of a command with `downloadSize`, at most once per whole percent. Optional, and never affects the download. */
+  onDownloadProgress?: (progress: RemoteDownloadProgress) => Promise<void>;
   onAccountProfileChanged?: () => Promise<void>;
   /** The account's server list changed on another device of this account. */
   onAccountServersChanged?: () => Promise<void>;
@@ -400,6 +422,15 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
+  /**
+   * This peer asked for a runtime snapshot after the host learned its full capabilities. The
+   * compatibility read goes with the bootstrap list, and the host sends its first snapshot for that
+   * list, without the fields of later capabilities such as the context usage. The host does not send
+   * the snapshot again when the next request widens the list.
+   */
+  fullSnapshotRequested: boolean;
+  /** When the host last answered a request on this peer, as `performance.now()`. A request deadline counts from it. */
+  lastAnswerAt: number;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
   lastSignalClose: number | null;
   /** For the support log: when the current socket opened, and when and why the last offer went out. */
@@ -998,6 +1029,7 @@ export function createRemoteTeamPeer(
           return { commandId: command.id, ok: true };
         }
         let reported = -1;
+        let downloaded = -1;
         const response = yield* requestEffect(
           command.method,
           command.path,
@@ -1013,6 +1045,19 @@ export function createRemoteTeamPeer(
           },
           command.timeoutMs,
           command.largeDownload,
+          command.downloadSize === undefined
+            ? undefined
+            : {
+                size: command.downloadSize,
+                onProgress: (received, total) => {
+                  const percent = total > 0 ? Math.floor((received / total) * 100) : 100;
+                  if (percent === downloaded) return;
+                  downloaded = percent;
+                  void runPeerEffect(
+                    peerCall(() => actions.current.onDownloadProgress?.({ commandId: command.id, received, total })),
+                  ).catch(() => undefined);
+                },
+              },
         );
         return { commandId: command.id, ok: true, status: response.status, body: response.body };
       }).pipe(Effect.result);
@@ -1119,6 +1164,8 @@ export function createRemoteTeamPeer(
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
+        fullSnapshotRequested: false,
+        lastAnswerAt: 0,
         lastSignalClose: null,
         signalOpenedAt: 0,
         offerSentAt: null,
@@ -1753,6 +1800,7 @@ export function createRemoteTeamPeer(
         if (frame.type !== "response")
           return yield* new RemotePeerError({ message: "The host returned an invalid RPC frame." });
         state.answeredRequest = true;
+        state.lastAnswerAt = performance.now();
         const pending = pendingRequests.get(frame.requestId);
         if (!pending) return;
         pending.profile?.responded(data);
@@ -1791,6 +1839,8 @@ export function createRemoteTeamPeer(
                     channelIsolation: true,
                     channelPicture: true,
                     channelBrowser: true,
+                    channelSeenSubtasks: true,
+                    channelTaskWaits: true,
                     mcpManyServers: true,
                   }),
                 )
@@ -1927,6 +1977,7 @@ export function createRemoteTeamPeer(
     onUploadProgress?: (sent: number, total: number) => void,
     timeoutMs = REQUEST_TIMEOUT_MS,
     largeDownload?: RemoteLargeDownload,
+    download?: RemoteDownloadWatch,
   ) {
     return Effect.fn("RemotePeer.request")(function* () {
       const state = peer;
@@ -1945,6 +1996,7 @@ export function createRemoteTeamPeer(
         largeDownload === undefined
           ? null
           : downloads.allow(Math.min(largeDownload.maxBytes, TEAM_PROTOCOL_V2_MAX_FILE_BYTES), largeDownload.mimeType);
+      const stopDownloadWatch = download ? downloads.watch(download.size, download.onProgress) : null;
       return yield* Effect.gen(function* () {
         const bodyTransferId = upload ? yield* files.upload(upload, delivery?.queued) : null;
         if (peer !== state || !isPeerOnline(state))
@@ -1967,6 +2019,8 @@ export function createRemoteTeamPeer(
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
+        // The list that this request declares to the host. The snapshot request below depends on it.
+        const sentCapabilities = teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol);
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -1978,7 +2032,7 @@ export function createRemoteTeamPeer(
               path,
               body: payloadBody,
               ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
-              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
+              capabilities: [...sentCapabilities],
             },
           }),
         );
@@ -2041,12 +2095,19 @@ export function createRemoteTeamPeer(
               resolve,
               reject,
               profile: startRemoteRequest(method, path, payload),
-              timer: setTimeout(
-                checksConnection ? checkPath : expire,
-                checksConnection
-                  ? Math.min(arm ? PATH_CHECK_INTERVAL_MS : unmeasuredProbeMs(!state.answeredRequest), timeoutMs)
-                  : timeoutMs,
-              ),
+              timer: checksConnection
+                ? setTimeout(
+                    checkPath,
+                    Math.min(arm ? PATH_CHECK_INTERVAL_MS : unmeasuredProbeMs(!state.answeredRequest), timeoutMs),
+                  )
+                : startRemoteRequestDeadline(
+                    timeoutMs,
+                    () => state.lastAnswerAt,
+                    expire,
+                    (timer) => {
+                      pending.timer = timer;
+                    },
+                  ),
             };
             pendingRequests.set(requestId, pending);
             return pending;
@@ -2074,12 +2135,23 @@ export function createRemoteTeamPeer(
         );
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
+        // The host applied this request's capabilities before it answered, on the same event socket that
+        // the request below goes to, so the snapshot it sends has the fields of every capability.
+        // A request that went with the bootstrap list does not count, also when the protocol is known now.
+        if (!state.fullSnapshotRequested && sentCapabilities !== TEAM_BOOTSTRAP_CAPABILITIES) {
+          state.fullSnapshotRequested = true;
+          // A send that fails, such as on a channel that is not open yet, lets the next answer ask again.
+          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => {
+            state.fullSnapshotRequested = false;
+          });
+        }
         return response;
       }).pipe(
         Effect.ensuring(
           Effect.sync(() => {
             delivery?.stop();
             releaseDownload?.();
+            stopDownloadWatch?.();
             if (protocolRead) Deferred.doneUnsafe(protocolRead, Effect.void);
           }),
         ),

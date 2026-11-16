@@ -17,6 +17,7 @@ import { lstat, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { type Browser, chromium, type Page } from "playwright-core";
 import { developmentInstanceIdForWorktree, developmentUserDataName } from "../../src/main/development-profile";
@@ -137,6 +138,16 @@ async function connect(app: BenchApp): Promise<{ browser: Browser; page: Page }>
     const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/version`);
     return response.ok ? true : null;
   });
+  // The window exists before it loads the app page. A Playwright connection made in that time keeps
+  // the empty page and does not see the load, so the connection waits for the page in the target list.
+  await waitFor("the app page", READY_TIMEOUT_MS, async () => {
+    const response = await fetch(`http://127.0.0.1:${app.remoteDebuggingPort}/json/list`);
+    const targets = response.ok ? await response.json() : null;
+    if (!Array.isArray(targets)) return null;
+    return targets.some((target) => isDynamicRecord(target) && isString(target.url) && isAppWindowUrl(target.url))
+      ? true
+      : null;
+  });
   const browser = await chromium.connectOverCDP(`http://127.0.0.1:${app.remoteDebuggingPort}`);
   if (!(await verifyBrowserOwnership(browser, app.pid))) {
     await browser.close();
@@ -150,7 +161,8 @@ async function connect(app: BenchApp): Promise<{ browser: Browser; page: Page }>
   await signInBenchAccount(page, logger);
   // The workspace, not the sign-in or connecting screen, is what a run measures.
   if (agentCount > 0) {
-    await page.locator("[data-chat-id]").first().waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
+    // A row of the "Unread" or "Needs you" group has no `data-chat-id`, and a seed can put every chat there.
+    await page.locator(".sidebar-agent-item").first().waitFor({ state: "attached", timeout: READY_TIMEOUT_MS });
   }
   return { browser, page };
 }

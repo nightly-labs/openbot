@@ -9,6 +9,9 @@ export const messages = {
   "error.billing.restartUnavailable": "Questo server non può riavviarsi da qui. Contatta l’assistenza.",
   "error.billing.planRequired": "Il piano di questo server è terminato. Rinnovalo per avviare il server.",
   "error.billing.planSoldOut": "Questo piano è esaurito. Scegli un altro piano.",
+  "error.billing.storageUnavailable": "Questo spazio di archiviazione non è disponibile per questo server.",
+  "error.billing.storagePaymentFailed":
+    "Il pagamento per lo spazio di archiviazione non è riuscito. Aggiorna il metodo di pagamento e riprova.",
   "error.billing.licenseExists": "Questo account ha già una licenza. Modifica invece i suoi utenti.",
   "error.billing.licenseCurrency": "La licenza deve usare la valuta degli altri piani.",
   "error.billing.planCurrency": "Un nuovo piano deve usare la valuta degli altri piani.",

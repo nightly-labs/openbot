@@ -14,6 +14,7 @@ import { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import {
+  ACCOUNT_ANALYTICS_SCHEMA_VERSION,
   type AccountAnalyticsEvent,
   createAccountAnalytics,
   MAX_HOSTED_START_MS,
@@ -205,7 +206,7 @@ async function openPanelBodyHasTheTime() {
     properties[0]?.action === "ready" &&
       properties[0]?.reason === "create" &&
       properties[0]?.duration_ms === 61_234 &&
-      properties[0]?.event_schema_version === 15,
+      properties[0]?.event_schema_version === ACCOUNT_ANALYTICS_SCHEMA_VERSION,
     properties[0],
   );
   check(

@@ -13,9 +13,15 @@ The overlays that both clients raise - join, marketplace, shared agent, server s
 search and channel creation - are prop-driven views in `WorkspaceOverlayViews.tsx`.
 `WorkspaceOverlays` fills them from the desktop contexts, and the web client fills them from its
 host connection, so what an overlay decides from its server is decided in one place.
+An open overlay hides the page of a local tab, because that page is a native view above the window.
+A toast does not hide the page. While the full view shows the page of a local tab, the toasts are
+hidden (`native-browser-page.ts`), so the page does not cut them. A toast that stays until the user
+closes it shows again when the page is hidden; a toast with a timer can end while it is hidden, and
+it is then not reported as shown. A host's tab shows in the window, under the toasts.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
-Small screens switch between the same conversation and workspace components. The shared browser
+On a phone, `WebPhoneAppScreen` first points to the phone app. After "Continue in browser", small
+screens switch between the same conversation and workspace components. The shared browser
 panel receives the web live-view runtime and hides unsupported native controls. `BrowserLiveView`
 accepts an explicit runtime; desktop and the existing preview still default to the preload-compatible
 API. The web Storybook runtime uses
@@ -35,7 +41,7 @@ checks still apply. `web-account.ts` makes these calls, and the Profile tab of t
 
 An owner or admin gets the host controls of a desktop remote admin. Shared components keep their
 desktop port as the default and take injected calls: `web-server-settings.ts` gives
-`ServerSettingsModal` the host identity, MCP, and storage routes through
+`ServerSettingsModal` the host identity and storage routes through
 `@openbot/team-client/team-admin-requests`, and member and invitation calls through the closed
 `/api/browser/*` list. The Worker applies the same `RemoteControlPlane` role checks as the bearer
 routes. A member or role change revokes every session on the host; the browser reconnects once when
@@ -99,9 +105,9 @@ object URL has the origin of the app. Remote support is additive through the
 A file whose name has no known type is stored as `application/octet-stream` with `kind: "file"` and
 `previewKind: "none"`. Import drops a MIME type that the importer supplies for such a name, because a
 sent attachment takes its type from the name, and because a HEIC or TIFF must not become an image
-block that a provider refuses. Only the voice recording keeps its `audio/webm` type. Delivery sends
-the path as a mention. The desktop app
-never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
+block that a provider refuses. For the same reason, a HEIF photo with an image name, such as `.jpg`,
+is also an opaque file: the host reads its first bytes. Only the voice recording keeps its
+`audio/webm` type. Delivery sends the path as a mention. The desktop app never opens such a file with the default app (`OPENABLE_ATTACHMENT_EXTENSIONS`). Remote support is
 additive through the `any-file-attachments` capability, which only protocol 9 peers get. Clients keep
 the extension list for a host without it.
 
@@ -120,7 +126,8 @@ The browser session and service-worker fallback remove the `OpenBot/` and `Elect
 tokens. They keep the installed Chromium major version and host platform, and give the other version
 parts as `0.0.0` (`Chrome/156.0.0.0`), as Chrome does: some bot checks refuse the full version that
 Electron sends. The `Accept-Language` header adds the base language of each regional language
-(`en-GB,en;q=0.9`), also as Chrome does. Requests to `accounts.google.com`
+(`en-GB,en;q=0.9`), also as Chrome does. The session sets it, not the request hook, so a value that
+a page sets on its own request stays: a site can sign that header. Requests to `accounts.google.com`
 keep the `Electron/` token because Google rejects the account identifier step without it. This
 exception does not change the page identity or the identity sent to other sites.
 Electron provides native `navigator.userAgentData` but no client-hint request headers. On HTTPS and
@@ -135,6 +142,19 @@ load after a restart is as a first visit. Windows sends no platform version: the
 contract version that the host cannot compute. The focused check is
 `bun run test:browser --scenario=identity`; add `--google-live` for the Google identifier check.
 The local identity report is `.openbot-build/browser-identity.json`.
+The tab preload (`src/preload/browser-page.ts`) makes page values agree with Chrome: the outer size,
+the screen position, `window.chrome` and the passkey dialog. Each replaced function is a Proxy that
+reads as native code. Its `setPrototypeOf` trap throws `Cyclic __proto__ value` as a native function
+does, because V8 stops that check at a Proxy and bot checks find a Proxy that way. CDP calls do not
+turn on the `Runtime` domain: while it is on, Chromium formats each console argument for DevTools,
+and DataDome and other bot checks see that from the page (`Error.prepareStackTrace` runs). On a
+Linux server with no GPU, WebGL runs on SwiftShader, which bot checks read as headless Chrome. There,
+the WebGL vendor and renderer names in each tab are those of a common Intel laptop GPU; the
+rendering, the limits and the extensions stay those of SwiftShader. The preload does not run in a
+worker, so WebGL on an `OffscreenCanvas` in a worker still names SwiftShader. A computer with a GPU
+keeps its real names. The check is `bun scripts/browser-fingerprint-e2e.ts`; on Linux it uses the server GPU
+switches, so CI checks the SwiftShader case. Its report is
+`.openbot-build/browser-fingerprint-e2e/report.json`.
 Website popups are adopted into managed `WebContentsView` tabs through Electron's window creation
 hook. Native guests retain their opener, request body, and the browser session of the opener. Local tab and
 agent tool results expose `openerTabId` while that relationship is live. Independent `noopener`
@@ -176,7 +196,8 @@ Sourcepoint) are not handled. `bun run test:browser --scenario=cookie-banner` co
 Each snapshot also looks for a bot check (`browser-challenge.ts`). It reads the DOM of the main frame
 in an isolated world: vendor markers of the interstitial page (Cloudflare, DataDome, PerimeterX,
 Imperva, Akamai, AWS WAF) and, only on a short page, captcha frames and phrases such as "verify you
-are human". A long page that only mentions a captcha does not count. A check that passes by itself
+are human". A long page that only mentions a captcha does not count. Akamai markers also count only
+on a short page, because Akamai can leave them, hidden, on the normal page after its check passed. A check that passes by itself
 (`non-interactive`) makes the tab read wait: it reads the page again every second for up to 15
 seconds, and stops at once when the tab closes, a person takes control, or the tab holds a secret.
 All reads of one document share the 15 seconds: a read with a shorter timeout, such as `navigate`,
@@ -230,7 +251,7 @@ one failed), as a site memory, and a class of task as a skill. The review drops 
 host and keeps the fact. The browser guidance has no site memory text: the agent context budget
 (`tools/agent-context/budget.json`) leaves no space for it, and the review saves these steps.
 
-"Learn from my browsing" (Server settings → General → Agents, off by default, `browsing-memory-v1`)
+"Learn from my browsing" (Server settings → Memory, off by default, `browsing-memory-v1`)
 lets the review also learn from what a person does in an agent's tab. `BrowserHost` records steps only
 while a person holds the tab (takeover or Take control), so no step is the agent's own. It skips a
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
@@ -494,6 +515,10 @@ whose profile no longer exists fails with `browserProfileMissing`; it never fall
 `#configureSession` applies the same user agent, headers, permissions and download policy to every
 partition. Shutdown and `flushPersistentStorage` flush every persistent partition.
 
+A reload, by the person or by an agent, uses `reloadIgnoringCache`: it gets the files of the page
+from the site again. A site can send a bad file that the browser keeps for hours, and a normal
+reload used that file again (#7772). Opening an address keeps the saved files.
+
 `src/main/browser-profile-service.ts` owns the operations: list, create (name of 1 to 60
 characters, unique, at most 100 profiles), update (name or color), clear data, delete, and assign.
 Clear and delete close the tabs in the partition before they clear its storage and cache. Delete also
@@ -698,7 +723,8 @@ resolves fields before consent and checks the document and origin again before e
 stops recording, suppresses page diagnostics, blocks inspection and capture, rejects remote input,
 and invalidates existing live-view streams. Capture protection remains after same-document navigation
 or an uncertain submission. After a completed submit action without document replacement, the host
-waits up to five seconds, then empties the filled fields. When every field is empty and an automation-world scan finds the
+waits up to five seconds, then empties the filled fields and their `value` attributes, which React
+keeps in step with the value. When every field is empty and an automation-world scan finds the
 value in no title, URL, text node, value, or attribute, including open shadow roots, it keeps the
 document so a single-page sign-in can show its next step, and blocks evaluation and recording in the
 opener group until a main-frame navigation, which also clears history. Otherwise it loads the current
