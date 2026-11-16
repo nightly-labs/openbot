@@ -36,6 +36,8 @@ export const messages = {
     "De opgeslagen kaart {card} invullen op {site}. Na je goedkeuring kunnen agents deze kaart op deze site invullen zonder goedkeuring. Verwijder de site in Serverinstellingen > Kluis.",
   "status.agent.reportProblem":
     "Dit wordt een openbare GitHub-issue, met de appversie en je systeem. Je naam is niet zichtbaar.",
+  "status.agent.reportPhoneProblem":
+    "Dit wordt een openbare GitHub-issue, met de appversie, je systeem en de versie, het systeem en het ondersteuningslog van je telefoon. Je naam is niet zichtbaar.",
   "status.agent.sendIdea": "Dit wordt een openbaar GitHub-issue. Je naam wordt niet getoond.",
   "status.agent.feedbackRecentErrors": "Recente fouten in de chat:",
   "status.agent.feedbackSameAs": "Wordt toegevoegd aan issue #{issue}",
@@ -107,7 +109,10 @@ export const messages = {
   "status.agent.mcpServerEnable": "De MCP-server {name} aanzetten voor elke agent op deze server.",
   "status.agent.mcpServerDisable": "De MCP-server {name} uitzetten voor elke agent op deze server.",
   "status.agent.mcpServerRemove": "De MCP-server {name} en de inlog ervan verwijderen bij elke agent op deze server.",
-  "status.agent.mcpSignInRequested": "De MCP-server {name} vraagt om in te loggen. Log in via Serverinstellingen, MCP.",
+  "status.agent.mcpToolCall": "De tool {tool} van de MCP-server {name} uitvoeren.",
+  "status.agent.mcpSignInRequested":
+    "De MCP-server {name} vraagt om in te loggen. Log in via Marktplaats, Apps, {name}.",
+  "status.agent.uiBlockClosedByMessage": "Gesloten door een nieuw bericht",
   "status.agent.vaultAdded": "Opgeslagen in de Kluis: {name}",
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",
   "status.agent.vaultDeleted": "Verwijderd uit de Kluis: {name}",

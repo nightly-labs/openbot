@@ -247,7 +247,7 @@ An image costs `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens on Claude. 
 
 ### Screenshots and clicks
 
-The computer use driver (cua-driver, `cua-driver-rs-v0.41.3`) has two screenshots on Linux:
+The computer use driver (cua-driver, `cua-driver-rs-v0.43.2`) has two screenshots on Linux:
 
 - **One window** (`get_window_state`). The driver makes the image 1.15 megapixels or less, with a long
   edge of 1568 px or less, and changes the x and y of each click back to screen pixels. A 1260x780
@@ -313,7 +313,8 @@ installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app
 scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
-On Ubuntu 26.04, the install also adds one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
+When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
+and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
 `priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all
 capabilities from the programs that `bwrap` starts, and the Claude sandbox ("Workspace only") needs
 `CAP_SYS_ADMIN` there. With the rule, those programs keep the profile of `bwrap`, for all users of

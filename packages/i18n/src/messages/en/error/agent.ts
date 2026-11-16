@@ -11,6 +11,12 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. In tool_call, arguments must be a JSON object, not text. Send the call again with arguments as an object.",
   "error.agent.toolCallDiscoveryTool":
     "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
+  "error.agent.toolCallEnvelopeKeys":
+    "The tool did not run. tool_call takes only name and arguments. Put the arguments of the tool in arguments, as an object, and send the call again.",
+  "error.agent.toolCallUnknownTool":
+    "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "The tool did not run. tool_call found no tool with this name. The qualified name is possibly {name}. If it is, send the call again with that name.",
   "error.agent.routineScheduleArgumentsInvalid":
     "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
   // Agent errors that the main process and the backend send.
@@ -145,6 +151,8 @@ export const messages = defineMessages("error.agent", {
     "Workspace only needs the Codex sandbox, which Codex cannot start on this computer, so the agent's commands fail. Choose Ask first or Full access in the agent settings.",
   "error.agent.claudeSandboxUnavailable":
     "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
+  "error.agent.claudeSandboxBlocked":
+    "Workspace only needs the Claude sandbox, which Claude cannot start on this computer, so the agent's commands fail. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
     "Screen capture is off for this agent. The user can turn on Computer Use in the agent settings.",
   "error.agent.screenCaptureUnavailable": "Screen capture is not available on this computer.",
@@ -152,9 +160,10 @@ export const messages = defineMessages("error.agent", {
     "Screen capture does not work in a Slack, Discord or Telegram conversation, because other people get its files.",
   "error.agent.screenCaptureDeclined": "The user did not allow this screen capture. Nothing was captured.",
   "error.agent.mcpServerDeclined": "The user did not allow this MCP server change. Nothing changed.",
+  "error.agent.mcpToolDeclined": "The user did not allow this MCP tool call. The tool did not run.",
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
   "error.agent.mcpServerKeysMove":
-    "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Server settings, MCP.",
+    "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Marketplace, Apps, {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} is part of OpenBot, so the MCP tools cannot test, turn on or off, or remove it. The user controls it on the computer that runs OpenBot: the GitHub connection in Marketplace, Apps, GitHub, and Computer Use in Settings, Computer Use.",
   "error.agent.mcpServerUnknown": "No MCP server is named {name}. Call list_mcp_servers for the names.",

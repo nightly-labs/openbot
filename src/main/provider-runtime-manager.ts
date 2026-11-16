@@ -247,6 +247,8 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   readonly #cancelled = new Set<ManagedRuntimeId>();
   /** Versions of provider CLIs the user installed, kept only to compare against the update target. */
   readonly #systemVersions = new Map<ManagedProviderId, string>();
+  /** Providers whose installed CLI lacks a part that some models need (#9139). */
+  readonly #incompleteSystemClis = new Set<ManagedProviderId>();
   /** The latest upstream release of each provider CLI, as the last check found it. */
   readonly #latest = new Map<ManagedProviderId, RuntimeSpec>();
   /** What each running download installs, so a cancel removes the right partial file. */
@@ -355,7 +357,10 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
         const system = this.#systemVersions.get(provider);
         const copy = providers[provider].phase === "ready" ? providers[provider].version : null;
         const installed = system && copy && olderVersion(system, copy) ? copy : (system ?? providers[provider].version);
-        const offer = installed !== null && installed !== undefined && olderVersion(installed, version);
+        // An incomplete CLI of the user's gives way to the copy, so a missing copy is offered (#9139).
+        const missingCopy = this.#incompleteSystemClis.has(provider) && copy === null;
+        const offer =
+          missingCopy || (installed !== null && installed !== undefined && olderVersion(installed, version));
         // After an app upgrade the first check updates an installed CLI itself, so it is not offered
         // until that check has started its download.
         const automatic = this.#updateInstalled && this.#updatesInstalled(provider, this.#target);
@@ -656,10 +661,16 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    *
    * True when the provider runs its copy in the store again. The caller then runs
    * `providerUseChanged`, which stamps the copy, or reads the store again when a sibling collected it.
+   *
+   * `incomplete`: that CLI lacks a part that some models need. A copy that is not downloaded is then
+   * offered, as the copy runs in its place once downloaded (#9139).
    */
-  setSystemVersion(provider: ManagedProviderId, version: string | null): boolean {
+  setSystemVersion(provider: ManagedProviderId, version: string | null, incomplete = false): boolean {
     const previous = this.#systemVersions.get(provider) ?? null;
-    if (previous === version) return false;
+    const flagged = Boolean(version) && incomplete;
+    if (previous === version && flagged === this.#incompleteSystemClis.has(provider)) return false;
+    if (flagged) this.#incompleteSystemClis.add(provider);
+    else this.#incompleteSystemClis.delete(provider);
     if (version) this.#systemVersions.set(provider, version);
     else this.#systemVersions.delete(provider);
     this.#revision += 1;

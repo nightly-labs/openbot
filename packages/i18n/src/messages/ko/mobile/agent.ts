@@ -594,6 +594,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "모두 읽음으로 표시",
   "mobile.agent.home.sort.title": "채팅 정렬",
   "mobile.agent.home.sort.manual": "수동",
+  "mobile.agent.home.sort.recent": "최근 활동",
   "mobile.agent.home.sort.unreadGroup": "읽지 않음을 그룹으로",
   "mobile.agent.home.sort.unreadFirst": "폴더에서 읽지 않음 먼저",
   "mobile.agent.route.appearance": "외형",

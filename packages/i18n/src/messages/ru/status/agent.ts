@@ -31,6 +31,8 @@ export const messages = {
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
   "status.agent.reportProblem":
     "Это станет публичным issue на GitHub с версией приложения и вашей системой. Ваше имя не показывается.",
+  "status.agent.reportPhoneProblem":
+    "Это станет публичным issue на GitHub с версией приложения, вашей системой, а также версией, системой и журналом поддержки вашего телефона. Ваше имя не показывается.",
   "status.agent.sendIdea": "Это станет публичным issue на GitHub. Ваше имя не показывается.",
   "status.agent.feedbackRecentErrors": "Последние ошибки в чате:",
   "status.agent.feedbackSameAs": "Добавляется к issue #{issue}",
@@ -97,6 +99,8 @@ export const messages = {
   "status.agent.memoryChanges": "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Память: сохранено {saved}, обновлено {updated}, забыто {forgotten}, не изменено {notChanged}, потому что другая ветка изменила их раньше.",
+  "status.agent.mcpToolCall": "Запустить инструмент {tool} MCP-сервера {name}.",
+  "status.agent.uiBlockClosedByMessage": "Закрыто новым сообщением",
   "status.agent.nextStepContinues": "Агент остановился перед следующим шагом. Он продолжает ({current} из {limit}).",
   "status.agent.planContinues": "В плане есть незавершённые шаги. Агент продолжает ({current} из {limit}).",
   "status.agent.compactionContinues": "Соединение прервалось, пока агент сжимал контекст. Агент продолжает.",

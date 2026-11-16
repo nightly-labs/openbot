@@ -488,8 +488,11 @@ export function mockWorkflows(
     },
     // The preview keeps no files: the draft id names the kept picture.
     keepPicture: async (draftId) => draftId,
-    mediaProviders: async () => ({ sunra: true }),
-    mediaCredits: async () => ({ sunra: { available: 1240, quota: 2000 } }),
+    mediaProviders: async () => ({ sunra: true, higgsfield: true }),
+    mediaCredits: async () => ({
+      sunra: { available: 1240, quota: 2000 },
+      higgsfield: { available: 860, quota: null },
+    }),
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

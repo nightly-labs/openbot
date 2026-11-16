@@ -222,6 +222,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "{name} を開く",
   "routine.calendar.completed": "完了",
+  "routine.calendar.new": "新しいルーティン",
+  "routine.calendar.newOn": "{day} に新しいルーティン",
+  "routine.calendar.agent": "エージェント",
+  "routine.calendar.agentChoice": "エージェント: {name}",
 
   "routine.settings.loadFailed": "ルーティンを読み込めませんでした。",
   "routine.settings.loadRunsFailed": "実行履歴を読み込めませんでした。",

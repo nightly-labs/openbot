@@ -12,6 +12,7 @@ import {
   MotionTooltip,
   Pin,
   Settings,
+  Sparkles,
   Store,
   Waypoints,
   Workflow,
@@ -226,9 +227,9 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
   );
 }
 
-/** The credits of a media service that a canvas step spends, such as Sunra. */
+/** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
-  provider: "sunra";
+  provider: "sunra" | "higgsfield";
   name: string;
   /** The credits that the account can spend now. */
   available: number;
@@ -285,6 +286,7 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
                     }),
                     remainingPercent: percent(),
                     tone: usageTone(percent()),
+                    durationMins: null,
                     resetsAt: null,
                     resetsAtLabel: null,
                   },
@@ -341,6 +343,7 @@ export type PageRailPage =
   | "schedule"
   | "usage"
   | "library"
+  | "providers"
   | "marketplace"
   | "settings";
 
@@ -352,6 +355,7 @@ export const PAGE_RAIL_PINNABLE_PAGES = [
   "schedule",
   "usage",
   "library",
+  "providers",
 ] as const satisfies readonly PageRailPage[];
 export type PageRailPinnablePage = (typeof PAGE_RAIL_PINNABLE_PAGES)[number];
 
@@ -382,6 +386,8 @@ export interface PageRailProps {
   onUsage: (button: HTMLElement) => void;
   /** Absent where the server keeps no files, such as the web client. */
   onLibrary?: ((button: HTMLElement) => void) | undefined;
+  /** Opens the Providers settings of the server. Absent when this account cannot manage them. */
+  onProviders?: ((button: HTMLElement) => void) | undefined;
   /** Absent while Marketplace cannot open. */
   onMarketplace?: (() => void) | undefined;
   onSettings: (button: HTMLElement) => void;
@@ -601,6 +607,10 @@ export function PageRail(props: PageRailProps) {
     const onLibrary = props.onLibrary;
     if (onLibrary) {
       list.push({ id: "library", label: t("app.rail.library"), icon: GalleryVerticalEnd, open: onLibrary });
+    }
+    const onProviders = props.onProviders;
+    if (onProviders) {
+      list.push({ id: "providers", label: t("app.rail.providers"), icon: Sparkles, open: onProviders });
     }
     return list;
   });

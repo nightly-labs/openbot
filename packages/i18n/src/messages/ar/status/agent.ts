@@ -31,6 +31,8 @@ export const messages = {
   "status.agent.vaultCardFill":
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
   "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
+  "status.agent.reportPhoneProblem":
+    "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك، ومع إصدار تطبيق الهاتف ونظام هاتفك وسجل الدعم فيه. لا يظهر اسمك.",
   "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
   "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
   "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
@@ -107,7 +109,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "تشغيل خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerDisable": "إيقاف خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerRemove": "إزالة خادم MCP {name} وتسجيل دخوله من كل وكيل على هذا الخادم.",
-  "status.agent.mcpSignInRequested": "يحتاج خادم MCP {name} إلى تسجيل الدخول. سجّل الدخول من إعدادات الخادم، MCP.",
+  "status.agent.mcpToolCall": "تشغيل الأداة {tool} من خادم MCP {name}.",
+  "status.agent.mcpSignInRequested": "يحتاج خادم MCP {name} إلى تسجيل الدخول. سجّل الدخول من المتجر، التطبيقات، {name}.",
+  "status.agent.uiBlockClosedByMessage": "أُغلق برسالة جديدة",
   "status.agent.vaultAdded": "تم الحفظ في الخزنة: {name}",
   "status.agent.vaultUpdated": "تم التغيير في الخزنة: {name}",
   "status.agent.vaultDeleted": "تم الحذف من الخزنة: {name}",

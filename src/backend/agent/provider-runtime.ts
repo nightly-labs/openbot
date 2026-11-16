@@ -15,6 +15,7 @@ import type {
   CustomAgentUsage,
   CustomProviderHarness,
   CustomProviderRestart,
+  ProviderAccountCodeLoginStatus,
   ProviderAccountPool,
   ProviderAccountStatus,
   ProviderCodeLoginStart,
@@ -96,7 +97,7 @@ import { shortenDiagnostic } from "./../stderr-diagnostics";
 import { stopProcessTree } from "../windows-process-tree";
 import { normalizeAccountUsage, usageWindowHasReset, usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
-import { startCliCodeLogin } from "./cli-code-login";
+import { CliCodeLoginFailed, type CliCodePrompt, PROMPT_TIMEOUT_MS, startCliCodeLogin } from "./cli-code-login";
 import { CliLoginFailed, CliLoginFlow, toCliLoginFailed } from "./cli-login-flow";
 import { CodexLoginFlow, toCodexLoginFailed } from "./codex-login";
 import type { ConversationRuntime } from "./conversation-runtime";
@@ -114,6 +115,7 @@ import {
   isIgnoredConfigDiagnostic,
   isMcpSignInDiagnostic,
   isMcpSubsystemDiagnostic,
+  isMcpTimeoutDiagnostic,
   isRustLogBelowErrorDiagnostic,
   isTelemetryExportDiagnostic,
   isToolCallDiagnostic,
@@ -373,6 +375,8 @@ export interface ProviderHooks {
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   /** Runs after an account after the first listed its models, which `accountModels` now answers. */
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  /** Runs after a change to the accounts of a provider, such as an account that connected. */
+  onAccountsChanged?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -410,6 +414,13 @@ const INITIAL_STATUS: AgentStatus = {
   message: null,
   fullAccess: true,
 };
+
+/** The text of each kind of provider MCP failure that `#reportMcpServerFailure` shows. */
+const MCP_SERVER_FAILURE_TEXT = {
+  sign_in: "error.backend.mcpServerSignInForProvider",
+  timeout: "error.backend.mcpServerTimedOutInProvider",
+  failed: "error.backend.mcpServerFailedInProvider",
+} as const;
 
 /**
  * Owns provider processes, their CLIs, accounts, login flows and the derived AgentStatus.
@@ -467,9 +478,9 @@ export class ProviderRuntime implements ProviderPort {
    * `#cli` holds only the CLI a client runs on, and a provider that is signed out has no client
    * although its binary is resolved and its version is on the row. Without this record that row
    * names no owner, and an unowned CLI is read as the managed copy: the user's own install would be
-   * offered a download instead of its own updater.
+   * offered a download instead of its own updater. `incomplete` goes on the row too (#9139).
    */
-  readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
+  readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
   /** The CLI the last resolution passed over, which the user can switch to (`chooseInstalledCli`). */
   readonly #passedOverClis = new Map<AgentProvider, { source: AgentCliInfo["source"]; version: string }>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
@@ -758,7 +769,10 @@ export class ProviderRuntime implements ProviderPort {
             this.#consumeUsageReset(client).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          changed: () => this.#setStatus({}),
+          changed: () => {
+            this.#setStatus({});
+            this.#hooks.onAccountsChanged?.();
+          },
           // Forked: the hook can move agents, and the check that listed the models must not wait for that.
           modelsListed: (provider, accountId) =>
             (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
@@ -796,7 +810,8 @@ export class ProviderRuntime implements ProviderPort {
       ...status,
       providers: status.providers.map((row) => {
         if (this.#off.has(row.id)) return { id: row.id, state: "not-started", version: null, message: null, off: true };
-        const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
+        const resolved = this.#cli.get(row.id) ?? this.#cliSources.get(row.id);
+        const source = resolved?.source ?? this.#cliSources.get(row.id)?.source;
         const passedOver = this.#passedOverClis.get(row.id);
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
@@ -807,6 +822,7 @@ export class ProviderRuntime implements ProviderPort {
             ? { state: "sign-in-required" as const, message: sourceText("error.provider.museAuthUnverified") }
             : {}),
           ...(source ? { cliSource: source } : {}),
+          ...(source === "system" && resolved?.incomplete ? { cliIncomplete: true } : {}),
           ...(passedOver && source && passedOver.source !== source ? { otherCliVersion: passedOver.version } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
@@ -938,7 +954,7 @@ export class ProviderRuntime implements ProviderPort {
         preferInstalled,
         this.#installedChosen.has(cliProvider),
       ).pipe(toProviderOperationFailed);
-      this.#cliSources.set(provider, cli.source);
+      this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
       else this.#passedOverClis.delete(provider);
       return cli;
@@ -2018,6 +2034,37 @@ export class ProviderRuntime implements ProviderPort {
     if (error) return yield* new ProviderOperationFailed({ cause: new Error(error) });
   }).bind(this);
 
+  /**
+   * Signs a provider account after the first in with a code or a link that the user finishes on any
+   * device: a new one when `accountId` is null. Answers with what the provider's CLI printed.
+   * `providerAccountCodeLoginStatus` tells how it ends, and `cancelProviderAccountSignIn` stops it.
+   */
+  readonly startProviderAccountCodeLogin = Effect.fn("ProviderRuntime.startProviderAccountCodeLogin")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+    accountId: string | null,
+  ) {
+    yield* providerStep(() => this.requireProviderOn(provider));
+    const accounts = yield* this.#requireAccounts(provider);
+    return yield* accounts.connectWithCode(provider, accountId).pipe(toProviderOperationFailed);
+  }).bind(this);
+
+  /** See `ProviderAccounts.submitCode`. Throws when the provider has no account that waits for a code. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    const accounts = this.#providerAccounts;
+    if (!accounts || provider === "acp") throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+    accounts.submitCode(provider, accountId, code);
+  }
+
+  /** See `ProviderAccounts.codeSignInStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    const accounts = this.#providerAccounts;
+    if (accounts && provider !== "acp") return accounts.codeSignInStatus(provider, accountId);
+    return {
+      result: { error: sourceText("error.provider.accountsUnsupported", { provider: providerLabel(provider) }) },
+    };
+  }
+
   /** Stops the sign-in of an account. A new account goes with its folder; another one shows as signed out. */
   readonly cancelProviderAccountSignIn = Effect.fn("ProviderRuntime.cancelProviderAccountSignIn")(function* (
     this: ProviderRuntime,
@@ -2290,6 +2337,47 @@ export class ProviderRuntime implements ProviderPort {
         .startCode(
           provider,
           (cli) => startMuseDeviceLogin({ cli, timeoutMs: codeSignIn.timeoutMs }),
+          codeSignIn.timeoutMs,
+        )
+        .pipe(toProviderOperationFailed);
+    }
+    if (codeSignIn.kind === "acp-delegated") {
+      const page = Deferred.makeUnsafe<string>();
+      const noLink = () => new CliCodeLoginFailed({ cause: new Error(sourceText("error.provider.codeLoginNoLink")) });
+      return yield* this.#cliLogin
+        .startCode(
+          provider,
+          (cli) =>
+            startAcpAuthentication({
+              executable: cli.executable,
+              argv: codeSignIn.argv,
+              env: { ...codeSignIn.env },
+              methodId: codeSignIn.methodId,
+              timeoutMs: codeSignIn.timeoutMs,
+              onSignInUrl: (url) => Deferred.doneUnsafe(page, Effect.succeed(url)),
+            }).pipe(
+              Effect.map(({ child, done }) => ({
+                child,
+                done,
+                // The server's page, null when it signed in with no page, or the reason it stopped first.
+                prompt: Effect.raceFirst(
+                  Deferred.await(page).pipe(
+                    Effect.map((verificationUrl): CliCodePrompt => ({ flow: "link", verificationUrl })),
+                  ),
+                  done.pipe(
+                    Effect.as(null),
+                    Effect.mapError((cause) => new CliCodeLoginFailed({ cause })),
+                  ),
+                ).pipe(
+                  Effect.timeoutOrElse({ duration: PROMPT_TIMEOUT_MS, orElse: () => Effect.fail(noLink()) }),
+                  // A sign-in with no page stops, as a CLI code sign-in does.
+                  Effect.tapError(() => stopProcessTree(child).pipe(Effect.ignore)),
+                ),
+                submit() {
+                  throw new Error(sourceText("error.provider.codeLoginNotWaiting"));
+                },
+              })),
+            ),
           codeSignIn.timeoutMs,
         )
         .pipe(toProviderOperationFailed);
@@ -4218,7 +4306,7 @@ export class ProviderRuntime implements ProviderPort {
         return;
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
-      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
       // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
       // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed
@@ -4724,8 +4812,9 @@ export class ProviderRuntime implements ProviderPort {
   /**
    * Shows that a provider could not use an MCP server from this app's list, once for each server and
    * kind in this run: a server spawns for each session, so the same line arrives at every start. The
-   * provider works without the server, so its row keeps no error, and the toast sends the user to
-   * the MCP settings, where Sign in and Test connection give the cause.
+   * provider works without the server, so its row keeps no error, and the toast links to the MCP
+   * settings. The provider connects with its own client, so OpenBot's connection test can pass while
+   * the provider fails, and the toast does not send the user to the test for the cause (#7370).
    */
   #reportMcpServerFailure(
     provider: AgentProvider,
@@ -4733,15 +4822,13 @@ export class ProviderRuntime implements ProviderPort {
     message: string,
     signIn = isMcpSignInDiagnostic(message),
   ): void {
-    const key = [provider, server, signIn].join("\u0000");
+    const kind = signIn ? "sign_in" : isMcpTimeoutDiagnostic(message) ? "timeout" : "failed";
+    const key = [provider, server, kind].join("\u0000");
     if (this.#reportedMcpFailures.has(key)) return;
     this.#reportedMcpFailures.add(key);
     this.#emitError(
       "mcp_server_not_started",
-      sourceText(signIn ? "error.backend.mcpServerSignInForProvider" : "error.backend.mcpServerFailedForProvider", {
-        provider: providerLabel(provider),
-        name: server,
-      }),
+      sourceText(MCP_SERVER_FAILURE_TEXT[kind], { provider: providerLabel(provider), name: server }),
     );
   }
 

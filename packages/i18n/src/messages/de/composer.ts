@@ -162,6 +162,7 @@ export const messages = {
   "composer.picker.section.files": "Dateien",
   "composer.picker.section.tabs": "Browser-Tabs",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In Nachrichten",
   "composer.token.tab": "Browser-Tab {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Geschlossener Browser-Tab {name}",

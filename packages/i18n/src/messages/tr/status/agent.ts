@@ -31,6 +31,8 @@ export const messages = {
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.reportProblem":
     "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
+  "status.agent.reportPhoneProblem":
+    "Bu; uygulama sürümü, sisteminiz ve telefonunuzun sürümü, sistemi ve destek günlüğüyle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
   "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
   "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",
@@ -96,6 +98,8 @@ export const messages = {
   "status.agent.memoryChanges": "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu.",
   "status.agent.memoryChangesWithConflicts":
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
+  "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
+  "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",

@@ -12,6 +12,12 @@ export const messages = {
     "Il tool non è stato eseguito. In tool_call, arguments deve essere un oggetto JSON, non testo. Invia di nuovo la chiamata con arguments come oggetto.",
   "error.agent.toolCallDiscoveryTool":
     "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Il tool non è stato eseguito. tool_call accetta solo name e arguments. Metti gli argomenti del tool in arguments, come oggetto, e invia di nuovo la chiamata.",
+  "error.agent.toolCallUnknownTool":
+    "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Usa il nome qualificato esatto fornito da tool_search, ad esempio openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Il nome qualificato è forse {name}. Se è così, invia di nuovo la chiamata con quel nome.",
   "error.agent.routineScheduleArgumentsInvalid":
     "La pianificazione della routine non è valida: {detail} Correggi la pianificazione e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",
@@ -155,6 +161,8 @@ export const messages = {
     "Solo workspace richiede la sandbox di Codex, che Codex non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Chiedi prima o Accesso completo nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxUnavailable":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
+  "error.agent.claudeSandboxBlocked":
+    "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":
     "L'acquisizione dello schermo è disattivata per questo agente. L'utente può attivare il Controllo del computer nelle impostazioni dell'agente.",
   "error.agent.screenCaptureUnavailable": "L'acquisizione dello schermo non è disponibile su questo computer.",
@@ -162,6 +170,8 @@ export const messages = {
     "L'acquisizione dello schermo non funziona in una conversazione Slack, Discord o Telegram, perché altre persone ricevono i suoi file.",
   "error.agent.screenCaptureDeclined":
     "L'utente non ha permesso questa acquisizione dello schermo. Non è stato acquisito nulla.",
+  "error.agent.mcpToolDeclined":
+    "L'utente non ha permesso questa chiamata allo strumento MCP. Lo strumento non è stato eseguito.",
   "error.agent.screenCaptureWindowMissing":
     "Quella finestra ora non è aperta. Chiama list_capture_sources per ottenere gli id attuali delle finestre.",
   "error.agent.screenCaptureDisplayMissing":

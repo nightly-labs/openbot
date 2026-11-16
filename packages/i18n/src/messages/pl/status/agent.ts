@@ -32,6 +32,8 @@ export const messages = {
     "Przechwyć obszar ekranu w punkcie {x}, {y} o rozmiarze {width} × {height} punktów i wyślij obraz do modelu agenta.",
   "status.agent.reportProblem":
     "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji i Twoim systemem. Twoje imię nie jest widoczne.",
+  "status.agent.reportPhoneProblem":
+    "To będzie publiczne zgłoszenie na GitHubie, z wersją aplikacji, Twoim systemem oraz wersją, systemem i dziennikiem pomocy Twojego telefonu. Twoje imię nie jest widoczne.",
   "status.agent.sendIdea": "To będzie publiczne zgłoszenie na GitHubie. Twoje imię nie będzie widoczne.",
   "status.agent.feedbackRecentErrors": "Ostatnie błędy w czacie:",
   "status.agent.feedbackSameAs": "Dodaje do zgłoszenia #{issue}",
@@ -98,6 +100,8 @@ export const messages = {
   "status.agent.memoryChanges": "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}.",
   "status.agent.memoryChangesWithConflicts":
     "Wspomnienia: zapisane {saved}, zaktualizowane {updated}, zapomniane {forgotten}, niezmienione {notChanged}, bo inny wątek zmienił je wcześniej.",
+  "status.agent.mcpToolCall": "Uruchomić narzędzie {tool} serwera MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Zamknięto po nowej wiadomości",
   "status.agent.nextStepContinues": "Agent zatrzymał się przed następnym krokiem. Kontynuuje ({current} z {limit}).",
   "status.agent.planContinues": "Plan ma otwarte kroki. Agent kontynuuje ({current} z {limit}).",
   "status.agent.compactionContinues": "Połączenie przerwało się, gdy agent kompaktował kontekst. Agent kontynuuje.",

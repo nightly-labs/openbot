@@ -263,9 +263,6 @@ export const messages = {
   "server.settings.membersDescription": "Bu sunucuyu yayımlayın, kişileri davet edin ve erişimi yönetin.",
   "server.settings.desktopTitle": "Uzak masaüstü",
   "server.settings.desktopDescription": "Bu sunucunun masaüstünü yapılandırın veya masaüstüne bağlanın.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "MCP sunucularını bağlayın ve bu sunucunun ajanlarının hangilerini kullanabileceğini seçin.",
   "server.settings.storageTitle": "Depolama",
   "server.settings.storageDescription": "OpenBot'un bu sunucunun diskinde ne sakladığını ve boş alanı görün.",
   "server.settings.hostedSitesTitle": "Siteler",
@@ -307,7 +304,6 @@ export const messages = {
   "server.settings.copyFailedTitle": "Kopyalama başarısız oldu",
   "server.settings.copyFailed": "OpenBot bu değeri kopyalayamadı.",
   "server.settings.unavailableTitle": "Sunucu ayarları kullanılamıyor",
-  "server.settings.unsavedMcpChanges": "Kaydedilmemiş MCP değişiklikleri",
   "server.settings.reset": "Sıfırla",
   "server.settings.unsavedChanges": "Kaydedilmemiş değişiklikler",
   "server.settings.changesNotSaved": "Değişiklikler kaydedilmedi",

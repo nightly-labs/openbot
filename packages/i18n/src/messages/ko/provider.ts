@@ -213,6 +213,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "다시 연결할 수 없어요.",
   "provider.account.add": "계정 추가",
   "provider.account.addLabel": "{name} 계정 추가",
+  "provider.account.addWithCode": "코드로 계정 추가",
   "provider.account.count": { other: "계정 {count}개" },
   "provider.account.numbered": "계정 {number}",
   "provider.account.apiKey": "API 키",

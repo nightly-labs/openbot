@@ -253,6 +253,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot no puede guardar esta configuración del servidor MCP.",
   "error.backend.mcpServerNoAnswer": "El servidor no respondió en {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
+  "error.backend.mcpSignInAccountRefused":
+    "El servidor rechazó la cuenta con la que iniciaste sesión. Comprueba que esa cuenta puede usar el servicio. Para usar otra cuenta, cierra sesión y vuelve a iniciar sesión.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
@@ -279,12 +281,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
   "error.backend.mcpToolSchemaRefused":
     "Su herramienta {tool} tiene un formato de entrada que este proveedor no puede leer. Los agentes con otros proveedores siguen recibiendo el servidor.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre los ajustes de MCP y elige Iniciar sesión.",
+    "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre {name} en Marketplace, Apps, y elige Iniciar sesión.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} no pudo iniciar el servidor MCP {name}. Abre los ajustes de MCP y elige Probar conexión para ver la causa.",
+    "{provider} no pudo iniciar el servidor MCP {name}. Abre {name} en Marketplace, Apps, y elige Probar conexión para ver la causa.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}. Sus herramientas no están disponibles para {provider}. {provider} inicia el servidor por su cuenta, así que la prueba de conexión en OpenBot puede funcionar. Inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no respondió a tiempo. Inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -347,6 +355,8 @@ export const messages = {
   "error.backend.promptInactive": "Esta pregunta ya no está activa.",
   "error.backend.promptAnswerMismatch": "Una respuesta no coincide con ninguna pregunta activa.",
   "error.backend.approvalInactive": "Esta aprobación ya no está activa.",
+  "error.backend.feedbackNeedsPhone":
+    "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
@@ -374,6 +384,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "El proxy {name} no responde, así que la página no se abrió.",
   "error.backend.browserProxySignInRefused":
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
+  "error.backend.browserSystemProxyFailed":
+    "El proxy de la configuración del ordenador que ejecuta OpenBot no responde o rechazó la conexión, así que la página no se abrió. Revisa la configuración de proxy de ese ordenador.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -407,6 +419,8 @@ export const messages = {
     "El servidor respondió {status}. Comprueba la clave de API u otras credenciales.",
   "error.backend.mcpServerHttpUrl":
     "El servidor respondió {status}. Comprueba la URL. El enlace puede ser incorrecto, haber caducado o haberse eliminado.",
+  "error.backend.mcpServerBearerKey":
+    "Este servidor usa una clave de API, no un inicio de sesión. En los encabezados, pon Authorization como clave y, como valor, Bearer, un espacio y tu clave de API.",
   "error.backend.mcpSignInAppUrl": "La app de inicio de sesión necesita una URL de servidor válida.",
   "error.backend.mcpSignInAppClientId": "Introduce el ID de cliente de la app de inicio de sesión.",
   "error.backend.mcpSignInAppIssuerChanged":

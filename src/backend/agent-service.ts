@@ -2,7 +2,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AGENT_PROVIDERS, agentProviderDescriptor, customAgentIdOfModel } from "@openbot/contracts/agent-providers";
+import {
+  AGENT_PROVIDERS,
+  agentProviderDescriptor,
+  agentSteersTurns,
+  customAgentIdOfModel,
+} from "@openbot/contracts/agent-providers";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { developmentStartingModel } from "@openbot/contracts/development-defaults";
 import type { FeedbackFacts } from "@openbot/contracts/feedback";
@@ -77,6 +82,8 @@ import type {
   McpTestResult,
   MessagePinner,
   PinnedMessagesSnapshot,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
@@ -140,6 +147,7 @@ import {
   DEFAULT_RESPONSE_STYLE,
   isContextResetMarker,
   isCustomProviderHarness,
+  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -269,6 +277,7 @@ import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/u
 import type { VideoReaderHost } from "./agent/video-reader";
 import { WarmGenerations } from "./agent/warm-generations";
 import type { WebhookRoutineWriter } from "./agent/webhook-routine-tool";
+import { workflowGenerationError } from "./agent/workflow-generation-error";
 import { confinedWritesAllowed } from "./agent/workspace-sandbox";
 import type { AgentApiKeys } from "./agent-api-keys";
 import type { AgentProvider } from "./agent-client";
@@ -294,6 +303,7 @@ import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
+import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
@@ -319,6 +329,7 @@ import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
@@ -552,6 +563,8 @@ export interface AgentServiceOptions {
   agentCursorDrawn?: boolean;
   /** The Computer Use driver drives a native Wayland desktop, where video can have no route (#9127). */
   computerUseOnWayland?: boolean;
+  /** The Computer Use driver refuses keys and clicks on this Wayland desktop (#9703). Read at each start of a session. */
+  computerUseInputRefused?: () => boolean;
   /** When an idle Codex session is unloaded, and how many idle sessions one app server keeps. Tests make it short. */
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
 }
@@ -1104,7 +1117,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
           }
+          this.#retryHeldMoves();
         },
+        onAccountsChanged: () => this.#retryHeldMoves(),
       },
       emit: (event) => this.#emit(event),
       emitError: (code, error, agentId, context) => this.#emitError(code, error, agentId, context),
@@ -1170,6 +1185,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const endpoint = credentials.customProviders().find((provider) => provider.id === endpointId);
           return endpoint ? (endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) : null;
         },
+        savedEndpoints: () =>
+          new Map(
+            credentials.customProviders().map((endpoint) => [
+              endpoint.id,
+              {
+                harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+                models: endpoint.models.map((model) => encodedModelId(`${endpoint.id}/`, model.id)),
+              },
+            ]),
+          ),
         // The model list reaches the renderer by pull, refreshed on a status event, and an exclusion
         // changes what that pull answers while no provider state moves.
         modelsChanged: () => this.#emit({ type: "status", status: this.getStatus() }),
@@ -1334,7 +1359,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       browser,
       attachments: this.#attachments,
       isStopping: () => this.#stopping,
-      hasTakeover: (agentId) => this.#attention.hasBrowserTakeoverForAgent(agentId),
+      hasTakeover: (agentId, threadId, tabId) => this.#attention.browserTakeoverBlocks(agentId, threadId, tabId),
     });
     this.#threads = new ThreadLifecycle({
       store,
@@ -1360,6 +1385,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
       ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
+      ...(options.computerUseInputRefused ? { computerUseInputRefused: options.computerUseInputRefused } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",
@@ -1671,7 +1697,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.asVoid,
           ),
         // A channel task that went back to its queue is assigned again only by a pump. An agent that
-        // left this model for a backup goes back to it.
+        // left this model for a backup goes back to it, and an agent held on another model can move to it.
         released: (limit) =>
           this.channels.wake().pipe(
             Effect.catch((failure) => Effect.sync(() => this.#emitError("usage_limit_release_failed", failure.cause))),
@@ -1684,6 +1710,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 { discard: true },
               ),
             ),
+            Effect.andThen(Effect.sync(() => this.#retryHeldMoves())),
             Effect.forkIn(this.#scope, { startImmediately: true }),
             Effect.asVoid,
           ),
@@ -1785,6 +1812,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
+      // The rule of the drain for the agent's own chat: a task or a channel turn runs beside it.
+      busy: (agentId) => this.#drain.ownChatHold(agentId) !== null,
+      answer: (agentId, threadId, turnId) =>
+        this.#store.list().find((agent) => agent.id === agentId)?.threadId === threadId
+          ? this.#turnAnswer(agentId, turnId)
+          : null,
+      summarize: (agentId, prompt) => this.#liveVoiceSummary(agentId, prompt),
       emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
     });
@@ -1957,7 +1991,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      // The saved http rows that the agent gets. The built-in servers are left out: OpenBot gives their
+      // tools another way, and their bearer is the main process's. A stdio server is left out too: a
+      // Workspace only provider starts it in its sandbox, and OpenBot would start it outside.
+      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        const saved = new Set(this.#mcp.list().map((config) => config.id));
+        return this.enabledMcpServers(agentId).filter(
+          (config) => saved.has(config.id) && config.transport === "http" && !isReservedMcpServerName(config.name),
+        );
+      }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,
@@ -1973,6 +2015,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
+        customEndpoints: () =>
+          credentials.customProviders().map((endpoint) => {
+            const provider = endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+            return {
+              id: endpoint.id,
+              name: endpoint.name,
+              provider,
+              loading: this.#endpoints.waits(provider, endpoint.id),
+            };
+          }),
         preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) =>
           this.createAgent(
@@ -2925,7 +2977,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             failed(
               failure instanceof GenerationUsageLimitError
                 ? sourceText("error.provider.usageLimitReached")
-                : sourceText("error.workflow.modelFailed"),
+                : workflowGenerationError(failure.cause, provider),
             ),
           ),
         );
@@ -2937,22 +2989,40 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
-    return { sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null };
+    return {
+      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
+      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
+    };
   }
 
-  /** The credits of the media services that a workflow step can spend now. A failed read has none. */
-  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (this: AgentService) {
-    const signIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    if (!signIn || this.#stopping) return { sunra: null } satisfies WorkflowMediaCredits;
-    const sunra = yield* readSunraCredits(signIn).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          logger.warn("Could not read the Sunra credits.", { error: failure.message });
-          return null;
-        }),
-      ),
+  /**
+   * The credits of the media services that a workflow step can spend now. A failed read has none.
+   * With `only`, it reads that service alone and the other one is null.
+   */
+  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
+    this: AgentService,
+    only?: keyof WorkflowMediaCredits,
+  ) {
+    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
+    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
+    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    const orNull = <A>(read: Effect.Effect<A, { readonly message: string }>, service: string) =>
+      read.pipe(
+        Effect.catch((failure) =>
+          Effect.sync(() => {
+            logger.warn("Could not read the media credits.", { service, error: failure.message });
+            return null;
+          }),
+        ),
+      );
+    const [sunra, higgsfield] = yield* Effect.all(
+      [
+        sunraSignIn ? orNull(readSunraCredits(sunraSignIn), "sunra") : Effect.succeed(null),
+        higgsfieldSignIn ? orNull(readHiggsfieldCredits(higgsfieldSignIn), "higgsfield") : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
     );
-    return { sunra } satisfies WorkflowMediaCredits;
+    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
@@ -2965,9 +3035,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input: {
         kind: GeneratedMediaKind;
         provider: WorkflowMediaProvider;
-        /** The id of the model at its provider. Sunra reads it; Codex and Grok use their default. */
+        /** The id of the model at its provider. Sunra and Higgsfield read it; Codex and Grok use their default. */
         model: string;
-        /** The account of the provider that pays. Null is its own sign-in; Sunra ignores it. */
+        /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
         account: string | null;
         specs: WorkflowMediaSpecs;
         prompt: string;
@@ -2988,6 +3058,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() => logger.warn("Could not make workflow media with Sunra.", { error: failure.message })),
+          ),
+          Effect.mapError((failure) => failed(failure.message)),
+        );
+      }
+      if (input.provider === "higgsfield") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        return yield* generateHiggsfieldMedia(
+          {
+            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+            store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+          },
+          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+        ).pipe(
+          Effect.tapError((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not make workflow media with Higgsfield.", { error: failure.message }),
+            ),
           ),
           Effect.mapError((failure) => failed(failure.message)),
         );
@@ -3103,7 +3191,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#mailbox.storeGeneratedAttachment({
               sourcePath: savedPath,
               kind: input.kind,
-              name: input.kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+              name:
+                input.kind === "video" ? generatedVideoName(savedPath, input.prompt) : generatedImageName(savedPath),
             }),
           )
         : null;
@@ -3544,6 +3633,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The fields of `input` other than its runtime, applied now while its provider change waits for
+   * the next turn. The declared type lets `#applyAgentUpdate` call it.
+   */
+  #applyFieldsNow(
+    input: AgentUpdate,
+    initiatingAgentId: string | undefined,
+  ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
+    return this.#applyAgentUpdate(withoutRuntimeFields(input), initiatingAgentId).pipe(
+      Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })),
+    );
+  }
+
+  /**
    * `move` is "return" for the move back to the model a usage limit or a provider error made the
    * agent leave, "provider-error" for the move away from a model that failed a turn, and "next-turn"
    * for a queued `pendingRuntime` that applies before the next turn. `queueWhileBusy` is set for a
@@ -3694,14 +3796,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
       input.providerAccountId !== undefined;
-    // Only an update of the runtime alone waits for the next turn. An update with other fields is
-    // refused while work runs, as before, and so is a move to a backup model: `pendingRuntime` does
-    // not keep the model to go back to.
-    const queueable =
-      queueWhileBusy &&
-      previous !== undefined &&
-      !input.leaveUsageLimit &&
-      Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // A move to a backup model is refused while work runs, as before: `pendingRuntime` does not keep
+    // the model to go back to.
+    const queueable = queueWhileBusy && previous !== undefined && !input.leaveUsageLimit;
+    const runtimeOnly = Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // The provider checks access and resets fast mode, so a provider change with them is refused while
+    // work runs, as before, and does not apply them to the provider that the agent leaves.
+    const providerBound = Object.keys(input).some((key) => PROVIDER_BOUND_UPDATE_KEYS.has(key));
     const pinnedAccountId = this.#accountPin(
       input,
       move,
@@ -3727,10 +3828,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // An effort that the queued model does not support becomes the model's default.
     const queuedEffort = (effort: AgentReasoningEffort, model = requestedModel) =>
       model && !model.supportedReasoningEfforts.includes(effort) ? model.defaultReasoningEffort : effort;
-    if (queueable && previous && requestedProvider && runtimeFields && handoverNeeded && idleRefusal(previous)) {
+    if (
+      queueable &&
+      !providerBound &&
+      previous &&
+      requestedProvider &&
+      runtimeFields &&
+      handoverNeeded &&
+      idleRefusal(previous)
+    ) {
       yield* this.#providers.ensureProvider(requestedProvider);
       if (input.provider || input.model)
         yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requestedProvider));
+      // The other fields of the same update apply now, as they do without a runtime change; only the
+      // handover waits (#9628). They are written after the checks above, so a refused provider change
+      // leaves them unchanged.
+      if (!runtimeOnly) yield* this.#applyFieldsNow(input, initiatingAgentId);
       return yield* queue({
         provider: requestedProvider,
         model: requestedModel?.id ?? previous.model,
@@ -3747,6 +3860,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const queued = previous?.pendingRuntime;
     if (
       queueable &&
+      runtimeOnly &&
       queued &&
       !handoverNeeded &&
       input.provider === undefined &&
@@ -4129,6 +4243,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * Starts the drain of each agent that a usage limit holds, with waiting work and a backup that is
+   * ready now, so the drain moves it. A backup can become ready after the limit started, as when its
+   * account connects or its own limit ends; nothing else reads the held queue again before the reset (#9877).
+   */
+  #retryHeldMoves(): void {
+    for (const agent of this.#store.list())
+      if (
+        !this.#usageLimits.mayDrain(agent.id) &&
+        this.#hasWaitingWork(agent.id) &&
+        (this.#usageLimitBackup(agent.id, this.#queuedContinuation(agent.id)) !== undefined ||
+          this.#poolBackup(agent.id))
+      )
+        this.#drain.scheduleDrain(agent.id);
+  }
+
+  /**
    * Whether the next queued work of the agent, in its chat, a task or a channel, continues work that
    * a limit stopped.
    */
@@ -4274,7 +4404,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   });
 
-  /** Appends a system line to the agent's own chat, outside any turn. */
+  /** Appends a system line to the agent's own chat, outside any turn unless the line names one. */
   #appendSystemMessage(agentId: string, message: ConversationMessage, eventType: string): void {
     const database = this.#store.database;
     this.#conversation.withConversationTransaction(agentId, ({ threadId, snapshot }) => {
@@ -4354,11 +4484,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     } catch (error) {
       this.#emitError("model_switch_marker_failed", error, agent.id);
     }
+    // The note goes into the turn of the chat's next message, under its delivery's id until that turn
+    // starts (`MailboxSync.syncDeliveryMessage`). A note outside that turn showed after the turn's
+    // answer, which the new model wrote after the switch. A continuation and a plan step run in a turn
+    // of their own, which starts after the note.
+    const next = this.#mailbox.nextQueued(agent.id);
+    const turnId = next && !next.resumeAfterUsageLimit && !next.planContinuation ? next.delivery.id : undefined;
     try {
       this.#appendSystemMessage(
         agent.id,
         {
           id: `model-switch-${randomUUID()}`,
+          ...(turnId ? { turnId } : {}),
           author: "system",
           source: "system",
           text,
@@ -4815,7 +4952,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...localWorkspaceAccess(agent),
       ...(options.exactPath
         ? { exactPath: true }
-        : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
+        : {
+            fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+            workFolders: this.#turn.fileHistory.folders(agent.id, agent.threadId),
+          }),
     }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
@@ -5049,6 +5189,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
         ),
       );
+  }
+
+  /** See `ProviderRuntime.startProviderAccountCodeLogin`. */
+  startProviderAccountCodeLogin(
+    provider: AgentProvider,
+    accountId: string | null,
+  ): Effect.Effect<ProviderAccountCodeLoginStart, AgentLifecycleFailed> {
+    return this.#providers
+      .startProviderAccountCodeLogin(provider, accountId)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
+  /** See `ProviderRuntime.submitProviderAccountCodeLogin`. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    this.#providers.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** See `ProviderRuntime.providerAccountCodeLoginStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    return this.#providers.providerAccountCodeLoginStatus(provider, accountId);
   }
 
   /** See `ProviderRuntime.connectProviderAccountKey`. */
@@ -5736,6 +5900,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The model of a small Codex side job that only passes on or reads text: the default Codex model, with
+   * low effort when the model has it.
+   */
+  #sideCodexModel(): AgentModelOption | undefined {
+    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
+    const model =
+      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    if (!model) return undefined;
+    return model.supportedReasoningEfforts.includes("low") ? { ...model, defaultReasoningEffort: "low" } : model;
+  }
+
+  /**
    * The Codex process of a live voice session. An agent on Codex lends its own Codex account; any other
    * agent uses the Codex sign-in of this computer. The relay model only passes requests on, so it is
    * the small default model, with low effort.
@@ -5746,19 +5922,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
     yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () =>
         this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
       catch: signIn,
     });
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
-    return { client, model: model.id, effort };
+    return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);
 
   /**
@@ -5787,13 +5958,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // Codex can take a while to start, and a shutdown or other generations can begin in that time.
     if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
     if (!this.#profileClients.hasSpare()) return yield* failed(sourceText("error.agent.webSearchBusy"));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* failed(sourceText("error.provider.noModel"));
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex"),
       catch: () => failed(sourceText("error.agent.webSearchSignIn")),
@@ -5802,7 +5968,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          { ...model, defaultReasoningEffort: effort },
+          model,
           query,
           cancelled,
           sideSessionUsageObserver("web-search", this.#store.database.usage, agent.id, "codex", model.id),
@@ -5844,17 +6010,63 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return { success: false, text: delivery.error ?? "The agent could not finish the request." };
       case "completed": {
         const turnId = delivery.turnId;
-        const ofTurn = (messages: readonly ConversationMessage[]) =>
-          messages.filter((message) => message.turnId === turnId);
-        const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
-        const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
-        const messages =
-          loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
-        const answer = turnId ? messages.findLast(isAnswer)?.text : undefined;
-        return { success: true, text: answer ?? "The agent finished and gave no answer." };
+        const answer = turnId ? this.#turnAnswer(agentId, turnId) : null;
+        return {
+          success: true,
+          text: answer ?? "The agent finished and gave no answer.",
+          ...(turnId ? { turnId } : {}),
+        };
       }
     }
   }
+
+  /** The answer of a turn in the agent's own chat, or null when the turn wrote none. */
+  #turnAnswer(agentId: string, turnId: string): string | null {
+    const ofTurn = (messages: readonly ConversationMessage[]) =>
+      messages.filter((message) => message.turnId === turnId);
+    const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+    const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
+    const messages =
+      loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+    return messages.findLast(isAnswer)?.text ?? null;
+  }
+
+  /**
+   * A spoken summary of a long answer for live voice, from one turn on a new Codex thread with no tools.
+   * Like the relay, it uses the agent's own Codex account when the agent is on Codex, and else the Codex
+   * sign-in of this computer. Also like the relay, it uses the small default model with low effort,
+   * and its usage counts for the agent. Like other background work, it leaves one generation slot for the
+   * user's own.
+   */
+  readonly #liveVoiceSummary = Effect.fn("AgentService.liveVoiceSummary")(function* (
+    this: AgentService,
+    agentId: string,
+    prompt: string,
+  ) {
+    const failed = (message: string) => ({ cause: new Error(message) });
+    if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => ({ cause: failure })));
+    if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
+    const model = this.#sideCodexModel();
+    if (!model) return yield* Effect.fail(failed("No Codex model."));
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const client = yield* Effect.try({
+      try: () =>
+        this.#providers.createProfileClient("codex", agent?.provider === "codex" ? agent.providerAccountId : undefined),
+      catch: (cause) => ({ cause }),
+    });
+    return yield* this.#profileClients
+      .run(client, (cancelled) =>
+        generateTextWithoutTools(
+          client,
+          model,
+          prompt,
+          cancelled,
+          sideSessionUsageObserver("voice-summary", this.#store.database.usage, agentId, "codex", model.id),
+        ),
+      )
+      .pipe(Effect.mapError((failure) => ({ cause: failure.cause })));
+  }).bind(this);
 
   /** Keeps the Opus/WebM recording of a spoken message as a draft, for the message to replay. */
   prepareVoiceRecording(audio: Uint8Array): Effect.Effect<DraftAttachment[], AgentLifecycleFailed> {
@@ -6550,7 +6762,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+    // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
+    const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
+    if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
       return "provider-unsupported";
     }
@@ -6989,6 +7203,16 @@ const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "providerAccountId",
   "leaveUsageLimit",
 ]);
+
+/** Fields that depend on the agent's provider, so they do not apply now while a provider change waits. */
+const PROVIDER_BOUND_UPDATE_KEYS: ReadonlySet<string> = new Set(["access", "fastMode", "ultrafast"]);
+
+/** `update` without the fields of `RUNTIME_UPDATE_KEYS`, which a provider change during work queues. */
+function withoutRuntimeFields(update: AgentUpdate): AgentUpdate {
+  const fields: AgentUpdate = { ...update };
+  for (const key of RUNTIME_UPDATE_KEYS) if (key !== "agentId") Reflect.deleteProperty(fields, key);
+  return fields;
+}
 
 const MODEL_SWITCH_TEXT = {
   "usage-limit": "status.agent.modelSwitchedForLimit",

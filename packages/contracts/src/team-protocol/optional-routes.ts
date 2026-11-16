@@ -61,6 +61,7 @@ import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CODECS } from "./custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
@@ -92,11 +93,14 @@ import { MCP_SIGN_IN_CODECS } from "./mcp-sign-in-v1";
 import { MEMORY_REVIEW_CODECS } from "./memory-review-v1";
 import { MESSAGE_DELETE_CODECS } from "./message-delete-v1";
 import { MESSAGE_PINS_CODECS } from "./message-pins-v1";
+import { MODEL_STEERING_CODECS } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PENDING_APPROVAL_CODECS } from "./pending-approval-v1";
+import { PHONE_FEEDBACK_CODECS } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
@@ -149,6 +153,7 @@ import { WEBHOOK_TESTS_CODECS } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CODECS } from "./whatsapp-connector-v1";
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
+import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -171,6 +176,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_V8_CODECS,
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
   ...CUSTOM_PROVIDER_EDIT_CODECS,
+  ...CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS,
   ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
@@ -186,6 +192,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...SKILL_LEARNING_CODECS,
   ...BROWSING_MEMORY_CODECS,
   ...PROMPT_CACHE_TTL_CODECS,
+  ...MODEL_STEERING_CODECS,
   ...MODEL_VISIBILITY_CODECS,
   ...SERVER_AUDIT_CODECS,
   ...PROVIDER_DEFAULT_CODECS,
@@ -234,6 +241,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
+  ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
@@ -243,6 +251,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_QUEUE_TASK_CODECS,
   ...AGENT_WAITS_CODECS,
   ...PENDING_APPROVAL_CODECS,
+  ...PHONE_FEEDBACK_CODECS,
   ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_FLOW_STOP_CODECS,
@@ -298,6 +307,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_GITHUB_CODECS,
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,
+  ...WORKFLOWS_HIGGSFIELD_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
   ...VAULT_CODECS,

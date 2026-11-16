@@ -11,6 +11,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} zamanında yanıt vermedi, bu yüzden OpenBot işlemini sonlandırdı.",
   "error.provider.acpSignInLost":
     "{provider} oturumunu kaybetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} bir mesajı reddetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpSettingsTimedOut": "{provider} zamanında yanıt vermedi. Biraz sonra yeniden deneyin.",
   "error.provider.acpPlanUsedUp":
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
   "error.provider.acpMcpNotLoaded":
@@ -209,6 +212,8 @@ export const messages = {
     '"{provider}" uç noktası bir API anahtarı gerektiriyor. Anahtarı Sunucu ayarları → Sağlayıcılar bölümünde ekleyin, ardından tekrar deneyin.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API anahtarınızın süresi doldu. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go kayıtlı API anahtarınızı reddetti. Anahtarın süresi dolmuş olabilir. OpenCode Console'da yeni bir anahtar oluşturun, OpenCode ayarlarına yapıştırın, ardından tekrar deneyin.",
   "error.provider.opencodeServiceFailure":
     "Yerel hizmeti başarısız olduğu için OpenCode bu turu tamamlayamadı. Tekrar deneyin. Hata devam ederse Ayarlar'dan OpenCode'a yeniden bağlanın.",
   "error.provider.opencodeRateLimited":
@@ -277,8 +282,14 @@ export const messages = {
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
+  "error.provider.antigravityLocationUnsupported":
+    "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini, aracısıyla bağlantısını kaybetti ve durdu. Devam etmek için bir mesaj gönderin.",
+  "error.provider.grokServiceFailure":
+    "Grok hizmeti yoğun veya bir hata veriyor. Birkaç dakika sonra yeniden deneyin ya da başka bir model seçin.",
+  "error.provider.grokConnectionFailed":
+    "Grok hizmetine bağlanamıyor. İnternet bağlantınızı kontrol edin, ardından mesajı yeniden gönderin.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ana bilgisayarında Gemini, Google sayfasını ana bilgisayarın kendisinde açar. Gemini'yi ana bilgisayarda bağlayın.",
   "error.provider.cursorArchivePath": "Cursor arşivi beklenmeyen bir dosya içeriyor.",
@@ -317,7 +328,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.hermesTurnFailed":
-    "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Sunucu ayarları › MCP bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+    "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Pazaryeri, Uygulamalar bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+  "error.provider.hermesRefused":
+    "Hermes bu mesajı başlamadan önce reddetti. Yeniden gönderin. Hermes her mesajı reddediyorsa bu ajanı çalıştıran bilgisayarda OpenBot'u yeniden başlatın.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot bu modeli kullanamadı: model, düşünme ayarını kabul etmedi. Bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",
@@ -325,6 +338,8 @@ export const messages = {
     "Bu sohbet Claude için çok uzun hale geldi. OpenBot sohbet geçmişiyle yeni bir Claude Code oturumu başlattı. Tekrar deneyin.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API anahtarında API kredisi yok. Claude planı, API anahtarıyla yapılan istekleri ödemez. Anthropic Console'da kredi ekleyin ya da Ayarlar'da Claude'da oturum açıp ajanın model menüsünde Claude hesabını seçin.",
+  "error.provider.claudeServiceBlocked":
+    "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooSmall":
@@ -335,6 +350,8 @@ export const messages = {
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageUnreadable":
     "Model bu sohbetteki bir görseli okuyamadı. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin. Bir görsel gönderdiyseniz, başka bir görsel gönderin.",
+  "error.provider.requestTooLarge":
+    "Bu sohbet, modele gönderilemeyecek kadar büyüdü. Bunun nedeni çoğu zaman sohbetteki görsellerdir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
     "OpenCode isteği reddetti ve nedenini belirtmedi. Bu, uzun bir sohbette veya model değişikliğinden sonra olabilir. OpenBot, sohbet geçmişiyle yeni bir OpenCode oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model veya daha düşük bir efor seçin.",
   "error.provider.opencodeCompactionFailed":
@@ -352,6 +369,8 @@ export const messages = {
     "Gemini oturum açma sayfasını tarayıcınızda açamadı. Varsayılan tarayıcınızı kontrol edin, ardından yeniden bağlanın.",
   "error.provider.acpSignInFailed": "Oturum açma tamamlanmadı.",
   "error.provider.acpSignInFailedReason": "Oturum açma tamamlanmadı: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Oturum açma, sağlayıcının sunucusuna ulaşamadı. OpenBot'u çalıştıran bilgisayarın ağ bağlantısını ve DNS ayarlarını kontrol edip yeniden deneyin.",
   "error.provider.acpSignOutFailed": "Oturum kapatma tamamlanmadı.",
   "error.provider.acpSignOutFailedReason": "Oturum kapatma tamamlanmadı: {reason}",
   "error.provider.acpSignInMethodMissing":

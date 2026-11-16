@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
   "prompt.approval.report.dontSend": "Şimdi değil",
   "prompt.approval.report.send": "OpenBot ekibine gönder",
+  "prompt.approval.report.phoneOnly":
+    "Bu sohbeti OpenBot telefon uygulamasında açın ve raporu oradan gönderin. Telefon kendi sürümünü, sistemini ve destek günlüğünü ekler. Telefon bağlanamıyorsa telefon uygulamasında Ayarlar > Destek bölümünü açın ve sorunu GitHub'da bildirin.",
   "prompt.approval.title.command": "Bir komut çalıştır",
   "prompt.approval.title.fileChange": "Dosyaları değiştir",
   "prompt.approval.title.permissions": "İzinleri ver",

@@ -310,11 +310,16 @@ const checkoutLinesSchema = z.object({
   currency: z.string().nullable(),
   amount_total: z.number().nullable(),
   metadata: z.record(z.string(), z.string()).nullable(),
+  automatic_tax: z.object({ enabled: z.boolean() }),
   line_items: z.object({
     data: z.array(
       z.object({
         quantity: z.number().nullable(),
-        price: z.object({ id: z.string(), lookup_key: z.string().nullable() }),
+        price: z.object({
+          id: z.string(),
+          lookup_key: z.string().nullable(),
+          tax_behavior: z.string().nullable(),
+        }),
       }),
     ),
   }),
@@ -2275,6 +2280,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         session?.currency === "eur",
       { status: opened.status, code: opened.code, session: session && { status: session.status, line } },
     );
+    record(
+      "license-checkout",
+      "the license Checkout page adds VAT on top with Stripe Tax",
+      session?.automatic_tax.enabled === true && line?.price.tax_behavior === "exclusive",
+      { automaticTax: session?.automatic_tax, taxBehavior: line?.price.tax_behavior },
+    );
     if (REAL_CHECKOUT) {
       const returned = await payCheckout(url, account.api, "license-e2e-checkout.png");
       const paid = await licenseWhere(account, "license paid", (state) => state.license?.status === "active", 120_000);
@@ -2975,6 +2986,14 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
         serverLine?.quantity === 1 &&
         licenseLine?.quantity === order.users,
       { status: opened.status, code: opened.code, lines },
+    );
+    record(
+      "order-bundle",
+      "the order Checkout page adds VAT on top of both Prices with Stripe Tax",
+      session?.automatic_tax.enabled === true &&
+        lines.length > 0 &&
+        lines.every((line) => line.price.tax_behavior === "exclusive"),
+      { automaticTax: session?.automatic_tax, taxBehavior: lines.map((line) => line.price.tax_behavior) },
     );
     if (!created) return;
 

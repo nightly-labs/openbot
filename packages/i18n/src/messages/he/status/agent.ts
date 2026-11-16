@@ -30,6 +30,8 @@ export const messages = {
   "status.agent.vaultCardFill":
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
   "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
+  "status.agent.reportPhoneProblem":
+    "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך, ועם הגרסה, המערכת ויומן התמיכה של הטלפון שלך. השם שלך לא מוצג.",
   "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
   "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
   "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
@@ -102,7 +104,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
-  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
+  "status.agent.mcpToolCall": "הפעלת הכלי {tool} של שרת MCP {name}.",
+  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהחנות, אפליקציות, {name}.",
+  "status.agent.uiBlockClosedByMessage": "נסגר בגלל הודעה חדשה",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",
   "status.agent.vaultDeleted": "נמחק מהכספת: {name}",

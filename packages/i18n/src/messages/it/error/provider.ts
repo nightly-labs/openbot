@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} non ha risposto in tempo, quindi OpenBot ha terminato il suo processo.",
   "error.provider.acpSignInLost":
     "{provider} ha perso l’accesso, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} ha rifiutato un messaggio, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpSettingsTimedOut": "{provider} non ha risposto in tempo. Riprova tra un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
   "error.provider.acpMcpNotLoaded":
@@ -209,6 +212,8 @@ export const messages = {
     'L\'endpoint "{provider}" ha bisogno di una chiave API. Aggiungi la chiave in Impostazioni server → Provider, poi riprova.',
   "error.provider.opencodeKeyExpired":
     "La tua chiave API di OpenCode è scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go ha rifiutato la tua chiave API salvata. La chiave potrebbe essere scaduta. Crea una nuova chiave in OpenCode Console, incollala nelle impostazioni di OpenCode, poi riprova.",
   "error.provider.opencodeServiceFailure":
     "OpenCode non ha potuto completare questo turno perché il suo servizio locale è andato in errore. Riprova. Se l'errore continua, riconnetti OpenCode in Impostazioni.",
   "error.provider.opencodeRateLimited":
@@ -277,8 +282,14 @@ export const messages = {
     "Gemini ha rifiutato questa richiesta. Scegli un altro modello, poi invia di nuovo il messaggio. Se non funziona ancora, inizia una nuova chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini ha rifiutato questa richiesta senza indicarne la causa. Può dipendere da un elemento della cronologia della chat, come un’immagine aperta dall’agente. OpenBot ha avviato una nuova sessione Gemini con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello.",
+  "error.provider.antigravityLocationUnsupported":
+    "Google non consente a Gemini di funzionare dalla posizione di rete del computer che esegue questo agente. Usa Gemini su un altro computer oppure scegli un altro provider per questo agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini ha perso la connessione con il suo agente e si è fermato. Invia un messaggio per continuare.",
+  "error.provider.grokServiceFailure":
+    "Il servizio Grok è occupato o ha un errore. Riprova tra qualche minuto o scegli un altro modello.",
+  "error.provider.grokConnectionFailed":
+    "Grok non riesce a connettersi al suo servizio. Controlla la connessione a internet, poi invia di nuovo il messaggio.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Su un host Windows, Gemini apre la pagina di Google sull’host stesso. Connetti Gemini sul computer host.",
   "error.provider.cursorArchivePath": "L'archivio di Cursor contiene un file inatteso.",
@@ -315,7 +326,9 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "Impossibile leggere la versione di Hermes Agent.",
   "error.provider.hermesSignIn": "Accedi con Nous Portal o esegui `hermes setup` in un terminale per usare Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Impostazioni server › MCP, poi invia di nuovo il messaggio.",
+    "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Marketplace, App, poi invia di nuovo il messaggio.",
+  "error.provider.hermesRefused":
+    "Hermes ha rifiutato questo messaggio prima di iniziare. Invialo di nuovo. Se Hermes rifiuta ogni messaggio, riavvia OpenBot sul computer che esegue questo agente.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot non ha potuto usare questo modello: il modello non ha accettato la sua impostazione di ragionamento. Seleziona un altro modello per questo agente, poi invia di nuovo il messaggio.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",
@@ -323,6 +336,8 @@ export const messages = {
     "Questa chat è diventata troppo lunga per Claude. OpenBot ha avviato una nuova sessione di Claude Code con la cronologia della chat. Riprova.",
   "error.provider.claudeApiKeyNoCredit":
     "La chiave API di Anthropic non ha credito API. Un piano Claude non paga le richieste fatte con una chiave API. Aggiungi credito nella Anthropic Console, oppure accedi a Claude nelle Impostazioni e seleziona l'account Claude nel menu dei modelli dell'agente.",
+  "error.provider.claudeServiceBlocked":
+    "Il servizio di Claude ha bloccato questa richiesta. Di solito è un breve problema di Claude, non del tuo account. Invia di nuovo il messaggio tra qualche minuto.",
   "error.provider.foreignReasoning":
     "{provider} non ha accettato il ragionamento precedente in questa chat, perché lo ha ricevuto un altro account o un'altra chiave API. OpenBot ha avviato una nuova sessione di {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageTooSmall":
@@ -333,6 +348,8 @@ export const messages = {
     "Il modello non ha accettato questa chat perché contiene troppe immagini. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.imageUnreadable":
     "Il modello non è riuscito a leggere un'immagine in questa chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova. Se hai inviato un'immagine, inviane un'altra.",
+  "error.provider.requestTooLarge":
+    "Questa chat è diventata troppo grande da inviare al modello. Spesso la causa sono le immagini nella chat. OpenBot ha avviato una nuova sessione {provider} con la cronologia della chat. Riprova.",
   "error.provider.opencodeSessionRejected":
     "OpenCode ha rifiutato la richiesta senza indicarne la causa. Può succedere in una chat lunga o dopo un cambio di modello. OpenBot ha avviato una nuova sessione OpenCode con la cronologia della chat. Riprova. Se l’errore continua, scegli un altro modello o un impegno minore.",
   "error.provider.opencodeCompactionFailed":
@@ -350,6 +367,8 @@ export const messages = {
     "Gemini non è riuscito ad aprire la pagina di accesso nel browser. Controlla il browser predefinito, poi connettiti di nuovo.",
   "error.provider.acpSignInFailed": "L'accesso non è stato completato.",
   "error.provider.acpSignInFailedReason": "L'accesso non è stato completato: {reason}",
+  "error.provider.acpSignInNetwork":
+    "L'accesso non è riuscito a raggiungere il server del provider. Controlla la connessione di rete e le impostazioni DNS del computer che esegue OpenBot, poi riprova.",
   "error.provider.acpSignOutFailed": "La disconnessione non è stata completata.",
   "error.provider.acpSignOutFailedReason": "La disconnessione non è stata completata: {reason}",
   "error.provider.acpSignInMethodMissing":

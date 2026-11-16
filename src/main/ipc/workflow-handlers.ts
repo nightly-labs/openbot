@@ -2,12 +2,16 @@
 // and its events service owns webhook secrets. A joined server answers through `workflows-v1`, and
 // its GitHub catalog, options, event history and last-event runs through `workflows-github-v1`, and
 // keeps an uploaded picture through `workflows-media-v1`. It says whether it can use Sunra through
-// `workflows-sunra-v1`.
+// `workflows-sunra-v1`, and Higgsfield through `workflows-higgsfield-v1`.
 
 import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_ROUTES,
@@ -19,6 +23,8 @@ import {
 import { WORKFLOWS_CAPABILITY, WORKFLOWS_ROUTES } from "@openbot/contracts/team-protocol/workflows-v1";
 import { sourceText } from "@openbot/i18n/source";
 import {
+  decodeRemoteHiggsfieldCredits,
+  decodeRemoteHiggsfieldProviders,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
@@ -72,7 +78,8 @@ interface WorkflowRemoteServers {
       | typeof WORKFLOWS_CAPABILITY
       | typeof WORKFLOWS_GITHUB_CAPABILITY
       | typeof WORKFLOWS_MEDIA_CAPABILITY
-      | typeof WORKFLOWS_SUNRA_CAPABILITY,
+      | typeof WORKFLOWS_SUNRA_CAPABILITY
+      | typeof WORKFLOWS_HIGGSFIELD_CAPABILITY,
   ): boolean;
   request<T>(
     serverId: string,
@@ -217,19 +224,35 @@ export function workflowIpcHandlers({
       }),
       mediaProviders: scopedQueryHandler({
         local: () => workflows.mediaProviders(),
-        // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra.
-        remote: async (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-            : { sunra: false },
+        // A host without `workflows-sunra-v1` does not run the Sunra models, so it has no Sunra. The
+        // same is true for Higgsfield and `workflows-higgsfield-v1`.
+        remote: async (serverId) => {
+          const [sunra, higgsfield] = await Promise.all([
+            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+              : { sunra: false },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+              : { higgsfield: false },
+          ]);
+          return { ...sunra, ...higgsfield };
+        },
       }),
       mediaCredits: scopedQueryHandler({
         local: () => runCauseEffect(workflows.mediaCredits()),
-        // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show.
-        remote: async (serverId) =>
-          remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
-            ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-            : { sunra: null },
+        // A host without `workflows-sunra-v1` has no Sunra, so it has no credits to show. The same is
+        // true for Higgsfield and `workflows-higgsfield-v1`.
+        remote: async (serverId) => {
+          const [sunra, higgsfield] = await Promise.all([
+            remoteServers.supportsCapability(serverId, WORKFLOWS_SUNRA_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+              : { sunra: null },
+            remoteServers.supportsCapability(serverId, WORKFLOWS_HIGGSFIELD_CAPABILITY)
+              ? remote(serverId, WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+              : { higgsfield: null },
+          ]);
+          return { ...sunra, ...higgsfield };
+        },
       }),
     },
   };

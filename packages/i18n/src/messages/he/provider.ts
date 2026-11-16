@@ -215,6 +215,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "לא ניתן להתחבר מחדש.",
   "provider.account.add": "הוספת חשבון",
   "provider.account.addLabel": "הוספת חשבון {name} נוסף",
+  "provider.account.addWithCode": "הוספת חשבון עם קוד",
   "provider.account.count": { one: "חשבון אחד", two: "שני חשבונות", other: "{count} חשבונות" },
   "provider.account.numbered": "חשבון {number}",
   "provider.account.apiKey": "מפתח API",

@@ -371,13 +371,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_sections",
     description:
-      "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
+      "List sidebar sections (folders), their stable ids, and assigned agents and channels before choosing message recipients or grouping.",
     shape: {},
   },
   {
     name: "create_section",
     description:
-      "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+      "Create a sidebar section (folder) to group agents and channels. List sections first; reuse a matching one.",
     shape: createSectionToolSchema.shape,
   },
   {
@@ -392,7 +392,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "assign_agent_section",
-    description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+    description: "Move an agent or channel (id as agentId) into a sidebar section. Null sectionId ungroups it.",
     shape: assignAgentSectionToolSchema.shape,
   },
   {
@@ -422,7 +422,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_agents",
     description:
-      "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, lastActivityAt, and openWaits. OpenBot does not track which files an agent changed.",
+      "List local OpenBot agents: name, title, description (300 characters; read_agent has all), status (working, queued or ready), queuedMessages, turnStartedAt, waitingFor (approval, answer, browser) while working, lastActivityAt, openWaits. Changed files are not tracked.",
     shape: {},
   },
   {
@@ -446,13 +446,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "create_agent",
     description:
-      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, and reasoning effort. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits.",
+      "Create a persistent local OpenBot agent when the user asks for a new teammate. Choose its profile from the user's request and supply its first task. The new agent gets your provider, model, effort and account. Set provider, model, or reasoningEffort only when the user asks for different ones; call list_models first. Use update_profile for an existing agent. After it exists, add skills with install_local_skill and routines with create_routine as needed. A new agent gets your own access and Computer Use limits.",
     shape: createAgentToolSchema.shape,
   },
   {
     name: "update_profile",
     description:
-      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an avatar color, use avatarHue. For an image, use avatarPath with a PNG, JPEG, or WebP copy up to 512 KB. Call list_models before you change a model, an account, or the backup models. A new model applies from the agent's next turn. A provider or account change fails while the agent has a turn or queued messages; try again when it is ready. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
+      "Update a local OpenBot agent’s name, title, description, avatar, provider, model, reasoning effort, account, backup models, access, Computer Use, or notifications from the user’s request. You can restrict access to workspace and turn Computer Use off; only the user can widen them again. For an avatar color, use avatarHue. For an image, use avatarPath with a PNG, JPEG, or WebP copy up to 512 KB. Call list_models before you change a model, an account, or the backup models. A new model, provider or account applies from the agent's next turn; other fields apply now. While it works, access with a provider change fails. backupModels replaces the whole list. To give several agents the same settings, use update_agents.",
     shape: updateProfileToolSchema.shape,
   },
   {
@@ -717,7 +717,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     /* The description does not list the apps: the catalog has more than 200, and each agent turn would
        carry them. An unknown name returns the list. */
     description:
-      "Call this when the user needs an outside service, such as Notion, Slack or Linear, and you have no working tools for it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
+      "Call this when the user needs an outside service, such as Notion or Slack, and your shell or browser cannot do it. It shows a card in the chat to connect the app; only the user connects it. For an installed app, it tests it and returns the fix, such as a Sign in card or setup steps. An unknown name returns the list of apps.",
     shape: {
       app: z.string().min(1).max(63).describe("The app id, such as notion or brave-search."),
     },

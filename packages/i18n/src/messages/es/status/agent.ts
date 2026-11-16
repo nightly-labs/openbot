@@ -31,6 +31,8 @@ export const messages = {
     "Capturar el área de la pantalla en {x}, {y}, de {width} × {height} puntos, y enviar la imagen al modelo del agente.",
   "status.agent.reportProblem":
     "Esto será un issue público en GitHub, con la versión de la app y tu sistema. Tu nombre no aparece.",
+  "status.agent.reportPhoneProblem":
+    "Esto será un issue público en GitHub, con la versión de la app, tu sistema, y la versión, el sistema y el registro de soporte de tu teléfono. Tu nombre no aparece.",
   "status.agent.sendIdea": "Esto se convierte en un issue público de GitHub. Tu nombre no se muestra.",
   "status.agent.feedbackRecentErrors": "Errores recientes en el chat:",
   "status.agent.feedbackSameAs": "Se añade al issue #{issue}",
@@ -96,6 +98,8 @@ export const messages = {
   "status.agent.memoryChanges": "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados.",
   "status.agent.memoryChangesWithConflicts":
     "Recuerdos: {saved} guardados, {updated} actualizados, {forgotten} olvidados, {notChanged} sin cambios porque otro hilo los cambió antes.",
+  "status.agent.mcpToolCall": "Ejecutar la herramienta {tool} del servidor MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Cerrado por un mensaje nuevo",
   "status.agent.nextStepContinues": "El agente se detuvo antes del siguiente paso. Continúa ({current} de {limit}).",
   "status.agent.planContinues": "El plan tiene pasos pendientes. El agente continúa ({current} de {limit}).",
   "status.agent.compactionContinues":

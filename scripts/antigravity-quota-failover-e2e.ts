@@ -29,7 +29,8 @@ const fakeAgy = join(install, "1.5.4", "bin", "antigravity");
 const logPath = join(root, "agy.jsonl");
 const BACKUP = "gemini-flash";
 // The continuation note that a backup model gets for work that a usage limit stopped.
-const CONTINUATION = "The previous provider reached its usage limit after starting this task.";
+const CONTINUATION =
+  "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.";
 
 // Before the service modules load: the stores read the home folder.
 process.env.HOME = home;

@@ -61,6 +61,10 @@ import { recordRestartActivity } from "./restart-activity";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 /** How much of a delivery's error the note for a failed request quotes. */
 const FAILED_REQUEST_REASON_LIMIT = 2_000;
+/** The key of the note for a failed request (`answerFailedRequest`). Stored keys use it. */
+const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
+/** The key of the result that OpenBot relays when a requested turn ends. Stored keys use it. */
+export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
 /** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
@@ -1554,8 +1558,12 @@ export class MailboxStore {
         const delivery = this.#publicDelivery(storedDelivery, positions, message);
         messages.push({
           id: delivery.id,
-          // A plan continuation keeps the request in its first turn, like `syncDeliveryMessage`.
-          turnId: storedDelivery.planContinuation?.turnIds[0] ?? storedDelivery.turnId ?? undefined,
+          // A plan continuation and continued work keep the request in its first turn, like `syncDeliveryMessage`.
+          turnId:
+            storedDelivery.planContinuation?.turnIds[0] ??
+            storedDelivery.resumeAfterUsageLimit?.previousTurnIds[0] ??
+            storedDelivery.turnId ??
+            undefined,
           author: message.sender.kind === "agent" ? "agent" : "user",
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
@@ -1983,6 +1991,16 @@ export class MailboxStore {
     );
   }
 
+  /** The deliveries of this agent that completed in the turn `turnId`. */
+  completedDeliveriesOfTurn(agentId: string, turnId: string): DeliveryContext[] {
+    return this.#contexts(
+      this.#state.deliveries.filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId && delivery.turnId === turnId && delivery.status === "completed",
+      ),
+    );
+  }
+
   /** Without `taskId`, any lane of the agent; with it, only that lane (null: the agent's own chat). */
   startingDeliveryForAgent(agentId: string, taskId?: string | null): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => this.#startingIn(candidate, agentId, taskId));
@@ -2188,6 +2206,36 @@ export class MailboxStore {
   }
 
   /**
+   * Whether the recipient answered this teammate request with its own `send_message` reply in the turn
+   * that ran it (or an earlier turn of a run that resumed after a usage limit). The result that OpenBot
+   * relays when the turn ends and the note for a failed request do not count, and neither does a reply
+   * from a later turn, so the turn completion and a later history import decide the same.
+   */
+  hasOwnReplyFrom(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery?.turnId) return false;
+    const replies = new Set(
+      this.#state.messages
+        .filter(
+          (message) =>
+            message.sender.kind === "agent" &&
+            message.sender.agentId === delivery.recipientAgentId &&
+            message.replyToMessageId === delivery.messageId,
+        )
+        .map((message) => message.id),
+    );
+    if (replies.size === 0) return false;
+    const turnIds = new Set([delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
+    return Object.entries(this.#state.idempotency).some(
+      ([key, messageId]) =>
+        replies.has(messageId) &&
+        !key.startsWith(AUTO_RESULT_KEY_PREFIX) &&
+        !key.startsWith(FAILED_REQUEST_KEY_PREFIX) &&
+        turnIds.has(key.split(":").at(-2) ?? ""),
+    );
+  }
+
+  /**
    * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
@@ -2229,7 +2277,7 @@ export class MailboxStore {
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
       expectsReply: false,
-      idempotencyKey: `failed-request:${deliveryId}`,
+      idempotencyKey: `${FAILED_REQUEST_KEY_PREFIX}${deliveryId}`,
     });
     return requesterId;
   }, Effect.uninterruptible).bind(this);
@@ -2335,17 +2383,36 @@ export class MailboxStore {
     error: string | null = null,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      // A teammate that already sent its answer to this request did answer it, also when its turn
+      // then failed or stopped. The request ends completed, so the agent that asked does not see it
+      // as failed (#7259). The turn keeps its own failure.
+      const answered = status !== "completed" && this.#answeredRequest(deliveryId);
       // Redacted here, not at the call site: this text is written to the database and read back by
       // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
       // a custom endpoint can carry that endpoint's API key or a header value.
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
-        status,
-        error: error === null ? null : redactText(error),
+        status: answered ? "completed" : status,
+        error: answered || error === null ? null : redactText(error),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether the delivery is a teammate request outside a channel that its recipient has answered. */
+  #answeredRequest(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const request = this.#state.messages.find((message) => message.id === delivery.messageId);
+    if (request?.sender.kind !== "agent" || request.channelId) return false;
+    // A linked question from this agent is not an answer.
+    return this.#state.messages.some(
+      (message) =>
+        isAnswer(message) &&
+        message.sender.agentId === delivery.recipientAgentId &&
+        message.replyToMessageId === request.id,
+    );
+  }
 
   cancel = Effect.fn("MailboxStore.cancel")(function* (
     this: MailboxStore,
@@ -2826,15 +2893,19 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** A refused delivery, or unfinished work that a backup continues, back at its place in the queue. */
+  /**
+   * A refused delivery, or unfinished work that a backup continues, back at its place in the queue.
+   * `finished`: the delivery completed, and work that its turn started in the background goes on.
+   */
 
   requeueRefused = Effect.fn("MailboxStore.requeueRefused")(function* (
     this: MailboxStore,
     deliveryId: string,
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    finished = false,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+      yield* this.#updateDeliveryEffect(deliveryId, finished ? ["completed"] : ["starting", "running"], {
         status: "queued",
         turnId: null,
         error: null,

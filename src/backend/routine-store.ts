@@ -226,7 +226,7 @@ export class RoutineStore {
       this.database.connection
         .prepare(
           `SELECT ${this.routineColumns}
-           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?
+           FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}
            ORDER BY updated_at DESC, routine_id`,
         )
         .all(ownerId),
@@ -237,7 +237,8 @@ export class RoutineStore {
     const row = this.database.connection
       .prepare(
         `SELECT ${this.routineColumns}
-         FROM ${this.tables.routineTable} WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?`,
+         FROM ${this.tables.routineTable}
+         WHERE routine_id = ? AND ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}`,
       )
       .get(routineId, ownerId);
     return isDynamicRecord(row) ? this.#record(row) : null;
@@ -246,6 +247,15 @@ export class RoutineStore {
   /** The released routine API sees only routines that a schedule starts. */
   get #hasSchedule(): string {
     return `EXISTS (SELECT 1 FROM ${this.tables.triggerTable} WHERE routine_id = ${this.tables.routineTable}.routine_id)`;
+  }
+
+  /**
+   * A routine with no trigger row of either kind cannot run, and reading it would fail. Leave it
+   * out, as `#hasSchedule` does for the released API, so that it does not stop the whole list.
+   */
+  get #hasTrigger(): string {
+    return `(${this.#hasSchedule} OR EXISTS (SELECT 1 FROM ${this.tables.webhookTable}
+             WHERE routine_id = ${this.tables.routineTable}.routine_id))`;
   }
 
   protected getRoutine(ownerId: string, routineId: string): OwnedRoutine | null {
@@ -1244,10 +1254,13 @@ export class RoutineStore {
     };
   }
 
-  /** The limit counts routines of every trigger kind. */
+  /** The limit counts routines of every trigger kind, but not a routine that the lists leave out. */
   #assertBelowLimit(ownerId: string): void {
     const row = this.database.connection
-      .prepare(`SELECT COUNT(*) AS count FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ?`)
+      .prepare(
+        `SELECT COUNT(*) AS count FROM ${this.tables.routineTable}
+         WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasTrigger}`,
+      )
       .get(ownerId);
     if (isDynamicRecord(row) && requiredNumberColumn(row, "count") >= this.tables.limit) {
       throw new RoutineInputError(this.tables.limitMessage);

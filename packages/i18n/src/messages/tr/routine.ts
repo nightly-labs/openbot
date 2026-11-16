@@ -231,6 +231,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "{name} ajanını aç",
   "routine.calendar.completed": "Tamamlandı",
+  "routine.calendar.new": "Yeni rutin",
+  "routine.calendar.newOn": "{day} için yeni rutin",
+  "routine.calendar.agent": "Ajan",
+  "routine.calendar.agentChoice": "Ajan: {name}",
 
   "routine.settings.loadFailed": "Rutinler yüklenemedi.",
   "routine.settings.loadRunsFailed": "Çalıştırma geçmişi yüklenemedi.",

@@ -264,6 +264,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kann diese MCP-Server-Konfiguration nicht speichern.",
   "error.backend.mcpServerNoAnswer": "Der Server hat innerhalb von {seconds} Sekunden nicht geantwortet.",
   "error.backend.mcpSignInNotAccepted": "Der Server hat diese Anmeldung nicht akzeptiert.",
+  "error.backend.mcpSignInAccountRefused":
+    "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
@@ -290,12 +292,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
   "error.backend.mcpToolSchemaRefused":
     "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne die MCP-Einstellungen und wähle Anmelden.",
+    "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne {name} unter Marketplace, Apps und wähle Anmelden.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} konnte den MCP-Server {name} nicht starten. Öffne die MCP-Einstellungen und wähle Verbindung testen, um die Ursache zu sehen.",
+    "{provider} konnte den MCP-Server {name} nicht starten. Öffne {name} unter Marketplace, Apps und wähle Verbindung testen, um die Ursache zu sehen.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -362,6 +370,8 @@ export const messages = {
   "error.backend.promptInactive": "Diese Rückfrage ist nicht mehr aktiv.",
   "error.backend.promptAnswerMismatch": "Eine Antwort passt zu keiner aktiven Frage.",
   "error.backend.approvalInactive": "Diese Genehmigung ist nicht mehr aktiv.",
+  "error.backend.feedbackNeedsPhone":
+    "Nur die OpenBot-Telefon-App kann diesen Bericht senden, weil sie Version und Supportprotokoll des Telefons hinzufügt. Öffne diesen Chat auf dem Telefon. Wenn du diese Meldung dort siehst, aktualisiere die Telefon-App.",
   "error.backend.takeoverInactive": "Diese Browserübernahme ist nicht mehr aktiv.",
   "error.backend.authSubmitting": "Die Authentifizierung wird bereits übermittelt.",
   "error.backend.apiKeySaveFailed": "OpenBot konnte den API-Schlüssel nicht speichern. Versuche es erneut.",
@@ -388,6 +398,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "Der Proxy {name} antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxySignInRefused":
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserSystemProxyFailed":
+    "Der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, antwortet nicht oder hat die Verbindung abgelehnt, daher wurde die Seite nicht geöffnet. Prüfe die Proxy-Einstellungen dieses Computers.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -421,6 +433,8 @@ export const messages = {
     "Der Server hat mit {status} geantwortet. Prüfe den API-Schlüssel oder andere Zugangsdaten.",
   "error.backend.mcpServerHttpUrl":
     "Der Server hat mit {status} geantwortet. Prüfe die URL. Der Link ist möglicherweise falsch, abgelaufen oder gelöscht.",
+  "error.backend.mcpServerBearerKey":
+    "Dieser Server nutzt einen API-Schlüssel, keine Anmeldung. Setze unter Header den Schlüssel auf Authorization und den Wert auf Bearer, ein Leerzeichen und deinen API-Schlüssel.",
   "error.backend.mcpSignInAppUrl": "Die Anmelde-App braucht eine gültige Server-URL.",
   "error.backend.mcpSignInAppClientId": "Gib die Client-ID der Anmelde-App ein.",
   "error.backend.mcpSignInAppIssuerChanged":

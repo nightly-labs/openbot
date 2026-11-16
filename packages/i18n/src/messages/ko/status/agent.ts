@@ -31,6 +31,8 @@ export const messages = {
   "status.agent.screenCaptureRegion":
     "화면의 {x}, {y} 위치에서 {width} × {height} 포인트 영역을 캡처해서 이미지를 에이전트의 모델에 보내요.",
   "status.agent.reportProblem": "앱 버전과 시스템 정보가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
+  "status.agent.reportPhoneProblem":
+    "앱 버전과 시스템 정보, 그리고 휴대폰의 앱 버전, 시스템 정보, 지원 로그가 포함된 공개 GitHub 이슈가 돼요. 이름은 표시되지 않아요.",
   "status.agent.sendIdea": "공개 GitHub 이슈가 됩니다. 이름은 표시되지 않습니다.",
   "status.agent.feedbackRecentErrors": "채팅의 최근 오류:",
   "status.agent.feedbackSameAs": "이슈 #{issue}에 추가됩니다",
@@ -100,7 +102,10 @@ export const messages = {
   "status.agent.mcpServerEnable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 켜요.",
   "status.agent.mcpServerDisable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 꺼요.",
   "status.agent.mcpServerRemove": "이 서버의 모든 에이전트에서 MCP 서버 {name}과(와) 로그인 정보를 제거해요.",
-  "status.agent.mcpSignInRequested": "MCP 서버 {name}에 로그인이 필요해요. 서버 설정의 MCP에서 로그인해 주세요.",
+  "status.agent.mcpToolCall": "MCP 서버 {name}의 도구 {tool}을(를) 실행해요.",
+  "status.agent.mcpSignInRequested":
+    "MCP 서버 {name}에 로그인이 필요해요. 마켓플레이스, 앱, {name}에서 로그인해 주세요.",
+  "status.agent.uiBlockClosedByMessage": "새 메시지로 종료되었어요",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",
   "status.agent.planContinues": "계획에 남은 단계가 있어요. 에이전트가 계속해요 ({current}/{limit}).",
   "status.agent.compactionContinues": "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겼어요. 에이전트가 계속해요.",

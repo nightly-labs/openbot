@@ -33,6 +33,8 @@ export const messages = {
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.reportProblem":
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.reportPhoneProblem":
+    "アプリのバージョンとシステム情報に加え、スマートフォンのバージョン、システム情報、サポートログ付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
   "status.agent.feedbackSameAs": "issue #{issue} に追加します",
@@ -94,6 +96,8 @@ export const messages = {
   "status.agent.memoryChanges": "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却。",
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
+  "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
+  "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.compactionContinues":

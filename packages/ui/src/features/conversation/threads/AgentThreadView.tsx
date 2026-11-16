@@ -109,11 +109,10 @@ function shownInThread(message: AgentMessage): boolean {
   );
 }
 
-/** Why the next message of a queued thread waits. */
+/** Why the next message of a queued thread waits. Without a known hold, the thread names no reason. */
 export function agentThreadHoldText(task: AgentTask, limit: number, t: TextValue["t"]): string | null {
-  if (task.state !== "queued") return null;
-  if (task.hold === "task-limit" || task.hold === null)
-    return t("conversation.threads.hold.threadLimit", { count: limit });
+  if (task.state !== "queued" || task.hold === null) return null;
+  if (task.hold === "task-limit") return t("conversation.threads.hold.threadLimit", { count: limit });
   return t(HOLD_TEXT[task.hold]);
 }
 
@@ -1071,6 +1070,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                     onStart={() => voice().onStart()}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={() => void send()}
                     send={sendButton()}
                   />
                 )}

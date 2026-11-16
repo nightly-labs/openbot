@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} לא הגיב בזמן, ולכן OpenBot סיים את התהליך שלו.",
   "error.provider.acpSignInLost":
     "ההתחברות של {provider} אבדה, ולכן OpenBot סיים את התהליך שלו. יש לשלוח את ההודעה שוב.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} דחה הודעה, ולכן OpenBot סיים את התהליך שלו. יש לשלוח את ההודעה שוב.",
+  "error.provider.acpSettingsTimedOut": "{provider} לא הגיב בזמן. יש לנסות שוב בעוד רגע.",
   "error.provider.acpPlanUsedUp":
     "{provider} מדווח שהתוכנית שלך נוצלה במלואה. יש לבחור מודל אחר או לשדרג את התוכנית של {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -191,6 +194,8 @@ export const messages = {
     "נקודת הקצה ״{provider}״ דורשת מפתח API. יש להוסיף את המפתח בהגדרות שרת ← ספקים, ואז לנסות שוב.",
   "error.provider.opencodeKeyExpired":
     "תוקף מפתח ה-API של OpenCode פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go דחה את מפתח ה-API השמור. ייתכן שתוקף המפתח פג. יש ליצור מפתח חדש ב-OpenCode Console, להדביק אותו בהגדרות OpenCode ואז לנסות שוב.",
   "error.provider.opencodeServiceFailure":
     "OpenCode לא הצליח להשלים את הפעולה הזו כי השירות המקומי שלו נכשל. יש לנסות שוב. אם השגיאה נמשכת, יש לחבר מחדש את OpenCode בהגדרות.",
   "error.provider.opencodeRateLimited":
@@ -255,7 +260,13 @@ export const messages = {
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
+  "error.provider.antigravityLocationUnsupported":
+    "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
+  "error.provider.grokServiceFailure":
+    "השירות של Grok עמוס או שיש בו שגיאה. יש לנסות שוב בעוד כמה דקות, או לבחור מודל אחר.",
+  "error.provider.grokConnectionFailed":
+    "Grok לא מצליח להתחבר לשירות שלו. יש לבדוק את החיבור לאינטרנט ואז לשלוח את ההודעה שוב.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "במארח Windows, ‏Gemini פותח את דף Google במארח עצמו. יש לחבר את Gemini במחשב המארח.",
   "error.provider.cursorArchivePath": "בארכיון של Cursor יש קובץ לא צפוי.",
@@ -290,7 +301,9 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "לא ניתן לקרוא את הגרסה של Hermes Agent.",
   "error.provider.hermesSignIn": "יש להתחבר עם Nous Portal, או להריץ `hermes setup` בטרמינל, כדי להשתמש ב-Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בהגדרות השרת › MCP, ואז שלח את ההודעה שוב.",
+    "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בחנות, אפליקציות, ואז שלח את ההודעה שוב.",
+  "error.provider.hermesRefused":
+    "Hermes דחה את ההודעה הזו לפני שהתחילה. שלח אותה שוב. אם Hermes דוחה כל הודעה, הפעל מחדש את OpenBot במחשב שמריץ את הסוכן הזה.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot לא הצליח להשתמש במודל הזה: המודל לא קיבל את הגדרת החשיבה שלו. בחרו מודל אחר לסוכן הזה ושלחו שוב את ההודעה.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
@@ -298,6 +311,8 @@ export const messages = {
     "הצ'אט הזה נעשה ארוך מדי עבור Claude. OpenBot התחיל סשן חדש של Claude Code עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.claudeApiKeyNoCredit":
     "אין קרדיט API במפתח Anthropic API. מינוי Claude לא משלם על בקשות עם מפתח API. אפשר להוסיף קרדיט ב-Anthropic Console, או להתחבר ל-Claude בהגדרות ולבחור את חשבון Claude בתפריט המודל של הסוכן.",
+  "error.provider.claudeServiceBlocked":
+    "השירות של Claude חסם את הבקשה הזו. בדרך כלל זו תקלה קצרה אצל Claude, ולא בעיה בחשבון שלך. אפשר לשלוח את ההודעה שוב בעוד כמה דקות.",
   "error.provider.foreignReasoning":
     "{provider} לא קיבל את החשיבה הקודמת בצ'אט הזה, כי חשבון או מפתח API אחר קיבל אותה. OpenBot התחיל סשן חדש של {provider} עם היסטוריית הצ'אט. יש לנסות שוב.",
   "error.provider.imageTooSmall":
@@ -308,6 +323,8 @@ export const messages = {
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageUnreadable":
     "המודל לא הצליח לקרוא תמונה בצ'אט הזה. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב. אם שלחת תמונה, שלח תמונה אחרת.",
+  "error.provider.requestTooLarge":
+    "הצ'אט הזה נעשה גדול מדי לשליחה למודל. תמונות בצ'אט גורמות לכך לעיתים קרובות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":
     "OpenCode דחה את הבקשה ולא מסר את הסיבה. זה יכול לקרות בצ'אט ארוך או אחרי החלפת מודל. OpenBot התחיל סשן חדש של OpenCode עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר או רמת מאמץ נמוכה יותר.",
   "error.provider.opencodeCompactionFailed":
@@ -325,6 +342,8 @@ export const messages = {
     "Gemini לא הצליח לפתוח את דף ההתחברות בדפדפן שלך. יש לבדוק את דפדפן ברירת המחדל ואז להתחבר שוב.",
   "error.provider.acpSignInFailed": "ההתחברות לא הושלמה.",
   "error.provider.acpSignInFailedReason": "ההתחברות לא הושלמה: {reason}",
+  "error.provider.acpSignInNetwork":
+    "ההתחברות לא הצליחה להגיע לשרת של הספק. בדקו את חיבור הרשת ואת הגדרות ה-DNS של המחשב שמריץ את OpenBot, ואז נסו שוב.",
   "error.provider.acpSignOutFailed": "ההתנתקות לא הושלמה.",
   "error.provider.acpSignOutFailedReason": "ההתנתקות לא הושלמה: {reason}",
   "error.provider.acpSignInMethodMissing":

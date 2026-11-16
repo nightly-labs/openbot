@@ -1,5 +1,6 @@
 import { dummyLogger, type Logger } from "ts-log";
 
+export { maskIdentifiers } from "./identifiers";
 export type { Logger };
 export { dummyLogger };
 

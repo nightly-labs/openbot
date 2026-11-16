@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} reageerde niet op tijd, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpSignInLost":
     "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} heeft een bericht geweigerd, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpSettingsTimedOut": "{provider} reageerde niet op tijd. Probeer het zo opnieuw.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
   "error.provider.acpMcpNotLoaded":
@@ -207,6 +210,8 @@ export const messages = {
     "Het endpoint “{provider}” heeft een API-sleutel nodig. Voeg de sleutel toe bij Serverinstellingen → Aanbieders en probeer het daarna opnieuw.",
   "error.provider.opencodeKeyExpired":
     "Je OpenCode-API-sleutel is verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go heeft je opgeslagen API-sleutel geweigerd. De sleutel is misschien verlopen. Maak een nieuwe sleutel in OpenCode Console, plak hem in de OpenCode-instellingen en probeer het opnieuw.",
   "error.provider.opencodeServiceFailure":
     "OpenCode kon deze beurt niet voltooien, omdat de lokale service is mislukt. Probeer het opnieuw. Blijft de fout, verbind OpenCode dan opnieuw in Instellingen.",
   "error.provider.opencodeRateLimited":
@@ -275,8 +280,14 @@ export const messages = {
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
+  "error.provider.antigravityLocationUnsupported":
+    "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini is de verbinding met zijn agent kwijtgeraakt en is gestopt. Stuur een bericht om verder te gaan.",
+  "error.provider.grokServiceFailure":
+    "De Grok-service is druk of heeft een fout. Probeer het over een paar minuten opnieuw of kies een ander model.",
+  "error.provider.grokConnectionFailed":
+    "Grok kan geen verbinding maken met zijn service. Controleer je internetverbinding en stuur het bericht daarna opnieuw.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Op een Windows-host opent Gemini de Google-pagina op de host zelf. Verbind Gemini op de hostcomputer.",
   "error.provider.cursorArchivePath": "Het Cursor-archief bevat een onverwacht bestand.",
@@ -312,7 +323,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.hermesTurnFailed":
-    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Serverinstellingen › MCP en stuur je bericht opnieuw.",
+    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
+  "error.provider.hermesRefused":
+    "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",
@@ -320,6 +333,8 @@ export const messages = {
     "Deze chat is te lang geworden voor Claude. OpenBot heeft een nieuwe Claude Code-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.claudeApiKeyNoCredit":
     "De Anthropic-API-sleutel heeft geen API-tegoed. Een Claude-abonnement betaalt geen verzoeken met een API-sleutel. Voeg tegoed toe in de Anthropic Console, of log bij Instellingen in bij Claude en kies het Claude-account in het modelmenu van de agent.",
+  "error.provider.claudeServiceBlocked":
+    "De Claude-dienst heeft dit verzoek geblokkeerd. Meestal is dit een kort probleem bij Claude, geen probleem met je account. Stuur het bericht over een paar minuten opnieuw.",
   "error.provider.foreignReasoning":
     "{provider} heeft het eerdere redeneren in deze chat niet geaccepteerd, omdat een ander account of een andere API-sleutel het heeft ontvangen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageTooSmall":
@@ -330,6 +345,8 @@ export const messages = {
     "Het model accepteerde deze chat niet, omdat de chat te veel afbeeldingen bevat. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.imageUnreadable":
     "Het model kon een afbeelding in deze chat niet lezen. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Stuurde je een afbeelding, stuur dan een andere.",
+  "error.provider.requestTooLarge":
+    "Deze chat is te groot geworden om naar het model te sturen. Afbeeldingen in de chat zijn vaak de oorzaak. OpenBot heeft een nieuwe {provider}-sessie gestart met de chatgeschiedenis. Probeer het opnieuw.",
   "error.provider.opencodeSessionRejected":
     "OpenCode heeft het verzoek geweigerd zonder de oorzaak te geven. Dit kan gebeuren in een lange chat of na een modelwijziging. OpenBot heeft een nieuwe OpenCode-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model of een lager niveau.",
   "error.provider.opencodeCompactionFailed":
@@ -347,6 +364,8 @@ export const messages = {
     "Gemini kon de inlogpagina niet in je browser openen. Controleer je standaardbrowser en verbind daarna opnieuw.",
   "error.provider.acpSignInFailed": "Het inloggen is niet voltooid.",
   "error.provider.acpSignInFailedReason": "Het inloggen is niet voltooid: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Het inloggen kon de server van de provider niet bereiken. Controleer de netwerkverbinding en de DNS-instellingen van de computer waarop OpenBot draait en probeer het opnieuw.",
   "error.provider.acpSignOutFailed": "Het uitloggen is niet voltooid.",
   "error.provider.acpSignOutFailedReason": "Het uitloggen is niet voltooid: {reason}",
   "error.provider.acpSignInMethodMissing":

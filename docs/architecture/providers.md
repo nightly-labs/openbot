@@ -21,6 +21,12 @@ Claude gets a refused call of these tools (`accepted: false`) as a failed call, 
 for an answer after it. The other providers keep the refusal as a result. Other threads do not get
 these tools, so their requests do not grow.
 
+Every Claude session also names `routine_no_update` in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Its `quiet`
+result tells the agent to end the turn with no text. Without it, the CLI asked again, and after a
+teammate's request the agent wrote its result once more in the user's chat (#7465). Each other result
+of the tool (`shown`, or a refusal) reaches Claude as a failed call, so the CLI still asks for the
+answer that someone waits for.
+
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or
 one `query` string, because models often send one string. Up to three strong results, an exact name or
@@ -748,6 +754,11 @@ A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
 maps that code to `error.provider.opencodeAuthRequired`, which names the provider from the model ID
 before its first `/` and lists the fixes: a Free model, a Go key, or `opencode auth login`.
+OpenCode 2.2.5 sends the same error, with no reason, when OpenCode Go refuses a key, such as an
+expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a saved key and an
+`opencode-go/` model the client's `savedKey` option makes the flavor show
+`error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
+same, and the text stays `error.provider.opencodeAuthRequired`.
 
 #### Turns of a background subagent or shell command
 
@@ -936,7 +947,10 @@ key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`
 (`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
 Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
+and a model that no group names has no reading. Google lists no models for the Argon group (its
+description is a plan note), so a group with no list takes its own name as its model while other groups
+list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
+no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not
@@ -1161,9 +1175,14 @@ organization's managed configuration from Mistral is a higher layer, so it can t
 again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
 not confirmed in a run).
 
-Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+Vibe 3.1.0 lists the ACP auth method `browser-auth`. Sign in calls `authenticate` with it: the CLI
 opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
-has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+has no `127.0.0.1` callback and no device code (`localCodeSignIn: null`). A client that sets
+`_meta["browser-auth-delegated"]` at `initialize` also gets `browser-auth-delegated`: its `start`
+gives the page and opens no browser, and its `complete` polls Mistral until the user finishes there.
+That is the code sign-in of a joined server (`acp-delegated` in `provider-drivers.ts`): the host gives
+the page as a `link` on the released providers-v8 `codeLoginStart`, and a client offers it only on a
+host with `mistral-code-sign-in-v1`. The
 sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
 `$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
 `config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
@@ -1351,6 +1370,22 @@ reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.he
 own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
 user's runtime, and stops when the launchers change.
 
+Hermes hides all MCP tools behind its own `tool_search`, `tool_describe` and `tool_call`. In Hermes
+0.23.1, the default `tools.tool_search.enabled: auto` is the same as `on`, and a session cannot turn it
+off. Behind OpenBot's own search, the model had to find OpenBot's `tool_call` with the Hermes search,
+and the Hermes `tool_call` refused `openbot.channel_result` (#9312). So the Hermes flavors, also that of
+a custom `hermes` agent, set `catalogAsMcpTools`: `AcpClient` gives the bridge `withCatalogTools`,
+which adds each catalog tool to its namespace and removes OpenBot's `tool_search` and `tool_describe`.
+OpenBot's `tool_call` stays for the instructions that name it. Hermes names a tool
+`mcp__editor_openbot_<tag>__<tool>`, and the developer instructions give that form. A tool's guidance
+goes in the root `description` of its schema, which the Hermes `tool_describe` shows and its search
+does not read; in the tool description it moved results down. The tools that every agent has directly
+get it too, because OpenBot's `tool_describe` is not listed. The browser core guidance comes with the
+first browser result (`browserToolsPrimer`), as for the other providers. With the Hermes search off,
+the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun run test:hermes-catalog-tools`
+(`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
+checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:
@@ -1520,6 +1555,27 @@ adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last
 a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
 with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
 without the capability gives no flag, and the client shows **Usage limit reached** as before.
+
+### Account code sign-in
+
+An account after the first of Codex, Grok or Claude can also sign in with a code (`accountCodeSignIn` in the
+descriptor, `accounts.codeSignIn` in `provider-drivers.ts`). The browser sign-in of a second account
+is not always possible, for example when the browser stays signed in to the first account.
+`ProviderAccounts.connectWithCode` runs the CLI's device sign-in
+(`codex login --device-auth`, `grok login --device-auth`) in the home folder of the account and gives
+the page and the code; the person types the code on any device. The client reads
+`codeSignInStatus` until the sign-in ends. A new account whose sign-in fails, expires or is
+cancelled is removed. This computer always has it. A joined server offers it with
+`provider-account-code-v1` (start, submit, status, cancel; owner or admin), and the desktop and the web
+client hide "Add account with code" and "Log in with code" on a host that does not have it.
+
+Claude has a `paste` sign-in (`claude auth login --claudeai`): the page shows a code after the
+sign-in, the person pastes it into the dialog, and `ProviderAccounts.submitCode` types it into the
+CLI. The code is a credential: it goes to the CLI's stdin only, and no reply or log line has it. As
+for Claude's own sign-in, only a Linux computer can run it (`pasteCodeSignInSupported`), so the
+clients offer it for Claude only there: on this computer by its platform, and on a joined server by
+`providers-v3`, which only a host that can run a pasted code advertises. Mobile
+does not offer it yet: the phone signs an account in on the page that the host relays.
 
 ### Disconnect the own sign-in
 

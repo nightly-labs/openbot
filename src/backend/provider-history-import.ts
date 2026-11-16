@@ -7,7 +7,8 @@ import {
   isNoUpdateToolCall,
   isTextAnswer,
   keptQuietAnswer,
-  quietTeammateDelivery,
+  quietTeammateTurnDelivery,
+  teammateRequest,
 } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
@@ -80,6 +81,11 @@ export interface ProviderHistoryImportInput {
    * not count: the tool refused its answer, so the answer showed. Left out, no answer counts.
    */
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
+  /**
+   * Whether the agent answered this teammate request with its own `send_message` reply in the turn that
+   * ran it, so the turn can have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   */
+  hasOwnReplyFrom?(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -306,8 +312,9 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a quiet routine run or a teammate update (`quietTeammateDelivery`) started answered: `quiet` when each answer is only the
- * no-update marker, or the agent called the no-update tool and generated no image, so the turn
+ * How a turn that a quiet routine run, a teammate update or an answered request (`quietTeammateTurnDelivery`) started answered: `quiet` when each answer is only the
+ * no-update marker, or the agent called the no-update tool or ran only answered teammate requests,
+ * and generated no image, so the turn
  * completion kept only its quiet answers; `image` when the agent called the tool
  * and generated an image, so the completion dropped only the text answers; `answered` for any
  * other such turn, and `none` for a turn that no quiet routine run started. A Test run keeps its
@@ -322,6 +329,8 @@ function routineTurnAnswers(
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
   return Effect.gen(function* () {
     let routine: boolean | undefined;
+    // Only answered teammate requests: the turn completion makes their text answers quiet (#7465).
+    let requestsOnly = true;
     let markers = 0;
     let reported = false;
     let noUpdateCalled = false;
@@ -347,9 +356,11 @@ function routineTurnAnswers(
           if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
-            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
+            ((input.quietTeammateThread === true &&
+              quietTeammateTurnDelivery(delivery, (request) => input.hasOwnReplyFrom?.(request.id) === true)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
+          requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
@@ -368,8 +379,26 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
+    // A file, an image or a question keeps the turn shown, as at the turn completion.
+    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
+}
+
+/**
+ * Whether the chat holds a file or a question of this turn. OpenBot writes them to the chat itself, so
+ * the provider history does not hold them; the import reads the stored messages instead.
+ */
+function storedTurnReport(input: ProviderHistoryImportInput, turnId: string): boolean {
+  const row = input.database.connection
+    .prepare(
+      `SELECT 1 AS found FROM projection_thread_messages
+       WHERE thread_id = ? AND turn_id = ? AND author = 'assistant'
+         AND (item_type = 'question_prompt' OR json_array_length(message_json, '$.attachments') > 0)
+       LIMIT 1`,
+    )
+    .get(input.publicThreadId, turnId);
+  return row !== undefined;
 }
 
 function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {

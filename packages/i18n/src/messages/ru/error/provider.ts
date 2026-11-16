@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} не ответил вовремя, поэтому OpenBot завершил его процесс.",
   "error.provider.acpSignInLost":
     "{provider} потерял вход в аккаунт, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} отклонил сообщение, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
+  "error.provider.acpSettingsTimedOut": "{provider} не ответил вовремя. Повторите попытку чуть позже.",
   "error.provider.acpPlanUsedUp":
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -201,6 +204,8 @@ export const messages = {
     "Эндпоинту «{provider}» нужен API-ключ. Добавьте ключ в разделе «Настройки сервера → Провайдеры», затем повторите попытку.",
   "error.provider.opencodeKeyExpired":
     "Срок действия API-ключа OpenCode истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go отклонил сохранённый API-ключ. Возможно, срок действия ключа истёк. Создайте новый ключ в OpenCode Console, вставьте его в настройках OpenCode, затем повторите попытку.",
   "error.provider.opencodeServiceFailure":
     "OpenCode не смог завершить этот ход из-за сбоя локальной службы. Повторите попытку. Если ошибка повторяется, подключите OpenCode заново в настройках.",
   "error.provider.opencodeRateLimited":
@@ -268,8 +273,14 @@ export const messages = {
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini отклонил этот запрос и не указал причину. Причиной может быть элемент истории чата, например изображение, которое открыл агент. OpenBot начал новый сеанс Gemini с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель.",
+  "error.provider.antigravityLocationUnsupported":
+    "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini потерял соединение со своим агентом и остановился. Отправьте сообщение, чтобы продолжить.",
+  "error.provider.grokServiceFailure":
+    "Сервис Grok перегружен или выдаёт ошибку. Повторите попытку через несколько минут или выберите другую модель.",
+  "error.provider.grokConnectionFailed":
+    "Grok не может подключиться к своему сервису. Проверьте подключение к интернету и отправьте сообщение ещё раз.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "На хосте с Windows Gemini открывает страницу Google на самом хосте. Подключите Gemini на компьютере-хосте.",
   "error.provider.cursorArchivePath": "В архиве Cursor неожиданный файл.",
@@ -306,7 +317,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Настройки сервера › MCP и отправьте сообщение ещё раз.",
+    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Каталог, Приложения и отправьте сообщение ещё раз.",
+  "error.provider.hermesRefused":
+    "Hermes отклонил это сообщение до начала работы. Отправьте его ещё раз. Если Hermes отклоняет каждое сообщение, перезапустите OpenBot на компьютере, где работает этот агент.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot не смог использовать эту модель: модель не приняла его настройку размышлений. Выберите другую модель для этого агента и отправьте сообщение ещё раз.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",
@@ -314,6 +327,8 @@ export const messages = {
     "Этот чат стал слишком длинным для Claude. OpenBot начал новую сессию Claude Code с историей чата. Повторите попытку.",
   "error.provider.claudeApiKeyNoCredit":
     "На API-ключе Anthropic нет кредитов API. Тариф Claude не оплачивает запросы с API-ключом. Пополните кредиты в Anthropic Console или войдите в Claude в настройках и выберите аккаунт Claude в меню моделей агента.",
+  "error.provider.claudeServiceBlocked":
+    "Сервис Claude заблокировал этот запрос. Обычно это короткий сбой на стороне Claude, а не проблема с вашим аккаунтом. Отправьте сообщение снова через несколько минут.",
   "error.provider.foreignReasoning":
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
   "error.provider.imageTooSmall":
@@ -324,6 +339,8 @@ export const messages = {
     "Модель не приняла этот чат, потому что в нем слишком много изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageUnreadable":
     "Модель не смогла прочитать изображение в этом чате. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова. Если вы отправили изображение, отправьте другое.",
+  "error.provider.requestTooLarge":
+    "Этот чат стал слишком большим, чтобы отправить его модели. Часто причина — изображения в чате. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.opencodeSessionRejected":
     "OpenCode отклонил запрос и не указал причину. Это может произойти в длинном чате или после смены модели. OpenBot начал новый сеанс OpenCode с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель или меньший уровень усилий.",
   "error.provider.opencodeCompactionFailed":
@@ -341,6 +358,8 @@ export const messages = {
     "Gemini не удалось открыть страницу входа в браузере. Проверьте браузер по умолчанию и подключитесь снова.",
   "error.provider.acpSignInFailed": "Вход не завершён.",
   "error.provider.acpSignInFailedReason": "Вход не завершён: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Не удалось связаться с сервером провайдера при входе. Проверьте подключение к сети и настройки DNS компьютера, на котором работает OpenBot, и повторите попытку.",
   "error.provider.acpSignOutFailed": "Выход не завершён.",
   "error.provider.acpSignOutFailedReason": "Выход не завершён: {reason}",
   "error.provider.acpSignInMethodMissing":

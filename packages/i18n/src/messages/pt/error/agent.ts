@@ -12,6 +12,12 @@ export const messages = {
     "A ferramenta não foi executada. Em tool_call, arguments deve ser um objeto JSON, não texto. Envie a chamada de novo com arguments como objeto.",
   "error.agent.toolCallDiscoveryTool":
     "A ferramenta não foi executada. tool_call não pode executar openbot.tool_search nem openbot.tool_describe. Chame-as diretamente com os mesmos argumentos.",
+  "error.agent.toolCallEnvelopeKeys":
+    "A ferramenta não foi executada. tool_call aceita apenas name e arguments. Coloque os argumentos da ferramenta em arguments, como objeto, e envie a chamada novamente.",
+  "error.agent.toolCallUnknownTool":
+    "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. Use o nome qualificado exato que tool_search fornece, como openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. O nome qualificado talvez seja {name}. Se for, envie a chamada novamente com esse nome.",
   "error.agent.routineScheduleArgumentsInvalid":
     "O agendamento da rotina é inválido: {detail} Corrija o agendamento e tente novamente. openbot.tool_describe fornece o esquema.",
   "error.agent.approvalWhileDeleting": "Não é possível conceder aprovação enquanto o agente está sendo excluído.",
@@ -150,12 +156,16 @@ export const messages = {
     "O acesso Somente o espaço de trabalho precisa do sandbox do Codex, que o Codex não consegue iniciar neste computador, então os comandos do agente falham. Escolha Perguntar antes ou Acesso completo nas configurações do agente.",
   "error.agent.claudeSandboxUnavailable":
     "O acesso Somente o espaço de trabalho precisa do sandbox do Claude, que o Claude não consegue iniciar neste computador: {reason}. Escolha Acesso completo ou outro provedor nas configurações do agente.",
+  "error.agent.claudeSandboxBlocked":
+    "O acesso Somente o espaço de trabalho precisa do sandbox do Claude, que o Claude não consegue iniciar neste computador, então os comandos do agente falham. Escolha Acesso completo ou outro provedor nas configurações do agente.",
   "error.agent.screenCaptureOff":
     "A captura de tela está desativada para este agente. O usuário pode ativar o Uso do computador nas configurações do agente.",
   "error.agent.screenCaptureUnavailable": "A captura de tela não está disponível neste computador.",
   "error.agent.screenCaptureShared":
     "A captura de tela não funciona em uma conversa do Slack, Discord ou Telegram, porque outras pessoas recebem os arquivos dela.",
   "error.agent.screenCaptureDeclined": "O usuário não permitiu esta captura de tela. Nada foi capturado.",
+  "error.agent.mcpToolDeclined":
+    "O usuário não permitiu esta chamada da ferramenta MCP. A ferramenta não foi executada.",
   "error.agent.screenCaptureWindowMissing":
     "Essa janela não está aberta agora. Chame list_capture_sources para obter os ids atuais das janelas.",
   "error.agent.screenCaptureDisplayMissing":

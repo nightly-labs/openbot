@@ -29,6 +29,8 @@ export const messages = {
   "status.agent.vaultCardFill":
     "在 {site} 上填入已保存的银行卡 {card}。批准后，助手可以在该网站上免批准填入这张卡。可在“服务器设置 > 保险库”中移除该网站。",
   "status.agent.reportProblem": "这会成为一个公开的 GitHub issue，附带应用版本和你的系统信息。不会显示你的名字。",
+  "status.agent.reportPhoneProblem":
+    "这会成为一个公开的 GitHub issue，附带应用版本、你的系统信息，以及手机的版本、系统信息和支持日志。不会显示你的名字。",
   "status.agent.sendIdea": "这会成为一个公开的 GitHub issue。不会显示你的名字。",
   "status.agent.feedbackRecentErrors": "聊天中的最近错误：",
   "status.agent.feedbackSameAs": "添加到 issue #{issue}",
@@ -96,7 +98,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "为该服务器上的每个助手开启 MCP 服务器 {name}。",
   "status.agent.mcpServerDisable": "为该服务器上的每个助手关闭 MCP 服务器 {name}。",
   "status.agent.mcpServerRemove": "从该服务器上的每个助手移除 MCP 服务器 {name} 及其登录。",
-  "status.agent.mcpSignInRequested": "MCP 服务器 {name} 需要登录。请在“服务器设置”的 MCP 中登录。",
+  "status.agent.mcpToolCall": "运行 MCP 服务器 {name} 的工具 {tool}。",
+  "status.agent.mcpSignInRequested": "MCP 服务器 {name} 需要登录。请在 市场、应用、{name} 中登录。",
+  "status.agent.uiBlockClosedByMessage": "因新消息而关闭",
   "status.agent.vaultAdded": "已保存到保险库：{name}",
   "status.agent.vaultUpdated": "已在保险库中修改：{name}",
   "status.agent.vaultDeleted": "已从保险库删除：{name}",

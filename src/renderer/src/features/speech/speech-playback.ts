@@ -1,7 +1,7 @@
 import type { SpeechAudio, SpeechLanguage } from "@openbot/contracts/ipc";
 import { createStore } from "solid-js";
 import { speechPort } from "./speech-port";
-import { speechParts } from "./speech-text";
+import { partBudget, SpeechParts } from "./speech-text";
 
 /**
  * How many level samples a speaking waveform keeps, and how often a new one arrives. There are as many
@@ -87,6 +87,12 @@ interface Reading {
   played: AudioBuffer[];
   /** For a reading: it asked for its last part, so the host is free for the next reading. */
   lastPartAsked: boolean;
+}
+
+/** The audio of one part of a reading, and how long its synthesis took. */
+interface SpokenPart {
+  audio: SpeechAudio;
+  synthesisMs: number | undefined;
 }
 
 /** A text that is read aloud after the reading of now. */
@@ -277,7 +283,7 @@ export function setUpcomingReading(next: UpcomingReading | undefined): void {
 function prepareUpcoming(): void {
   const next = upcoming;
   if (!next || next.first) return;
-  const first = speechParts(next.text, next.language)[0];
+  const first = new SpeechParts(next.text, next.language).next();
   if (first === undefined) return;
   next.first = speechPort().voice.speak({ text: first, language: next.language });
   // A reading that stops before this part plays never reads its answer.
@@ -326,8 +332,8 @@ export async function readAloud(
   const calledAt = performance.now();
   const result: ReadAloudResult = { completed: false, firstAudioMs: null, seconds: 0 };
   stopSpeech();
-  const parts = speechParts(text, language, replyRate);
-  const first = parts[0];
+  const parts = new SpeechParts(text, language, replyRate);
+  const first = parts.next();
   if (first === undefined) return result;
   const own = newReading(true, source);
   // A reading of an agent on hold waits for the end of the hold.
@@ -349,22 +355,31 @@ export async function readAloud(
   });
   const voice = speechPort().voice;
   const preparedFirst = prepared?.text === text && prepared.language === language ? prepared.first : undefined;
+  // The time from a request to its answer is the synthesis time of the part. A prepared part was asked
+  // for before this reading, so it has no synthesis time.
+  const ask = (part: string): Promise<SpokenPart> => {
+    const askedAt = performance.now();
+    return voice.speak({ text: part, language }).then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
+  };
   // A prepared part that failed is asked for again, as it was before the reading started.
-  let next: Promise<SpeechAudio> | undefined = preparedFirst
-    ? preparedFirst.catch(() => voice.speak({ text: first, language }))
-    : voice.speak({ text: first, language });
+  let next: Promise<SpokenPart> | undefined = preparedFirst
+    ? preparedFirst.then((audio) => ({ audio, synthesisMs: undefined })).catch(() => ask(first))
+    : ask(first);
+  let part = first;
   try {
-    for (let index = 1; next; index += 1) {
-      const audio = await next;
+    while (next) {
+      const { audio, synthesisMs } = await next;
       if (own.stopped) return result;
-      const part = parts[index - 1];
-      if (part !== undefined)
-        setState((draft) => {
-          if (!draft.reading) return;
-          draft.reading.part = part;
-        });
-      const following = parts[index];
-      next = following === undefined ? undefined : voice.speak({ text: following, language });
+      const seconds = audio.pcm.byteLength / 2 / audio.sampleRate;
+      const current = part;
+      setState((draft) => {
+        if (!draft.reading) return;
+        draft.reading.part = current;
+      });
+      // The next part must be ready before this part ends, so its length fits the speed of this computer.
+      const budget = synthesisMs === undefined ? undefined : partBudget(current, seconds, synthesisMs, replyRate);
+      const following = parts.next(budget);
+      next = following === undefined ? undefined : ask(following);
       // A reading that stops before this part plays never reads its answer.
       next?.catch(() => undefined);
       if (!next) {
@@ -372,9 +387,10 @@ export async function readAloud(
         prepareUpcoming();
       }
       result.firstAudioMs ??= Math.round(performance.now() - calledAt);
-      result.seconds += audio.pcm.byteLength / 2 / audio.sampleRate;
+      result.seconds += seconds;
       await play(own, audio);
       if (own.stopped) return result;
+      if (following !== undefined) part = following;
     }
     const messageId = source?.messageId;
     if (messageId) keepSpokenAudio(messageId, own.played);
