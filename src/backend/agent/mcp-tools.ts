@@ -1,11 +1,13 @@
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AgentAccess,
   MCP_TRANSPORTS,
   type McpServerConfig,
   type McpSignInState,
   mcpConfigErrors,
   normalizeMcpConfig,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -116,7 +118,7 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled http servers that the agent gets. */
+  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
   forAgent(agentId: string): McpServerConfig[];
   /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
   callTool(
@@ -124,6 +126,16 @@ export interface AgentMcpServers {
     name: string,
     args: McpToolArguments,
   ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+/**
+ * Whether OpenBot can run a tool of this server itself, for a provider that left the tool out (#7427).
+ * An http server can always run. A stdio server runs only for a Full access agent: a Workspace only
+ * provider starts it in its sandbox, and OpenBot would start it outside. A Full access provider has
+ * no sandbox, so OpenBot starts the server as the Test button does (#10146).
+ */
+export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
+  return config.transport === "http" || !workspaceAccessEnforced(agent);
 }
 
 /**
