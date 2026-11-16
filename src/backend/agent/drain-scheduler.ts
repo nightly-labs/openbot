@@ -440,6 +440,11 @@ export class DrainScheduler {
     });
   }
 
+  /** Why a new message in the agent's own chat waits now, or null when it can start at once. */
+  ownChatHold(agentId: string): string | null {
+    return this.#heldBy({ agentId, taskId: null });
+  }
+
   /** Why the next message of this task waits, or null when it can start or nothing waits. */
   taskHold(agentId: string, taskId: string): string | null {
     const lane = { agentId, taskId };

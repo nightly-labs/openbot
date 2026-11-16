@@ -1792,6 +1792,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
+      // The rule of the drain for the agent's own chat: a task or a channel turn runs beside it.
+      busy: (agentId) => this.#drain.ownChatHold(agentId) !== null,
+      answer: (agentId, threadId, turnId) =>
+        this.#store.list().find((agent) => agent.id === agentId)?.threadId === threadId
+          ? this.#turnAnswer(agentId, turnId)
+          : null,
+      summarize: (agentId, prompt) => this.#liveVoiceSummary(agentId, prompt),
       emit: (event, memberId) => this.emit("liveVoice", event, memberId),
       redact: (text) => this.#mcp.redact(text),
     });
@@ -5804,6 +5811,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The model of a small Codex side job that only passes on or reads text: the default Codex model, with
+   * low effort when the model has it.
+   */
+  #sideCodexModel(): AgentModelOption | undefined {
+    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
+    const model =
+      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    if (!model) return undefined;
+    return model.supportedReasoningEfforts.includes("low") ? { ...model, defaultReasoningEffort: "low" } : model;
+  }
+
+  /**
    * The Codex process of a live voice session. An agent on Codex lends its own Codex account; any other
    * agent uses the Codex sign-in of this computer. The relay model only passes requests on, so it is
    * the small default model, with low effort.
@@ -5814,19 +5833,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
     yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () =>
         this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
       catch: signIn,
     });
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
-    return { client, model: model.id, effort };
+    return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);
 
   /**
@@ -5855,13 +5869,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // Codex can take a while to start, and a shutdown or other generations can begin in that time.
     if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
     if (!this.#profileClients.hasSpare()) return yield* failed(sourceText("error.agent.webSearchBusy"));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* failed(sourceText("error.provider.noModel"));
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex"),
       catch: () => failed(sourceText("error.agent.webSearchSignIn")),
@@ -5870,7 +5879,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          { ...model, defaultReasoningEffort: effort },
+          model,
           query,
           cancelled,
           sideSessionUsageObserver("web-search", this.#store.database.usage, agent.id, "codex", model.id),
@@ -5912,17 +5921,63 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return { success: false, text: delivery.error ?? "The agent could not finish the request." };
       case "completed": {
         const turnId = delivery.turnId;
-        const ofTurn = (messages: readonly ConversationMessage[]) =>
-          messages.filter((message) => message.turnId === turnId);
-        const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
-        const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
-        const messages =
-          loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
-        const answer = turnId ? messages.findLast(isAnswer)?.text : undefined;
-        return { success: true, text: answer ?? "The agent finished and gave no answer." };
+        const answer = turnId ? this.#turnAnswer(agentId, turnId) : null;
+        return {
+          success: true,
+          text: answer ?? "The agent finished and gave no answer.",
+          ...(turnId ? { turnId } : {}),
+        };
       }
     }
   }
+
+  /** The answer of a turn in the agent's own chat, or null when the turn wrote none. */
+  #turnAnswer(agentId: string, turnId: string): string | null {
+    const ofTurn = (messages: readonly ConversationMessage[]) =>
+      messages.filter((message) => message.turnId === turnId);
+    const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
+    const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
+    const messages =
+      loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+    return messages.findLast(isAnswer)?.text ?? null;
+  }
+
+  /**
+   * A spoken summary of a long answer for live voice, from one turn on a new Codex thread with no tools.
+   * Like the relay, it uses the agent's own Codex account when the agent is on Codex, and else the Codex
+   * sign-in of this computer. Also like the relay, it uses the small default model with low effort,
+   * and its usage counts for the agent. Like other background work, it leaves one generation slot for the
+   * user's own.
+   */
+  readonly #liveVoiceSummary = Effect.fn("AgentService.liveVoiceSummary")(function* (
+    this: AgentService,
+    agentId: string,
+    prompt: string,
+  ) {
+    const failed = (message: string) => ({ cause: new Error(message) });
+    if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
+    yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => ({ cause: failure })));
+    if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
+    const model = this.#sideCodexModel();
+    if (!model) return yield* Effect.fail(failed("No Codex model."));
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    const client = yield* Effect.try({
+      try: () =>
+        this.#providers.createProfileClient("codex", agent?.provider === "codex" ? agent.providerAccountId : undefined),
+      catch: (cause) => ({ cause }),
+    });
+    return yield* this.#profileClients
+      .run(client, (cancelled) =>
+        generateTextWithoutTools(
+          client,
+          model,
+          prompt,
+          cancelled,
+          sideSessionUsageObserver("voice-summary", this.#store.database.usage, agentId, "codex", model.id),
+        ),
+      )
+      .pipe(Effect.mapError((failure) => ({ cause: failure.cause })));
+  }).bind(this);
 
   /** Keeps the Opus/WebM recording of a spoken message as a draft, for the message to replay. */
   prepareVoiceRecording(audio: Uint8Array): Effect.Effect<DraftAttachment[], AgentLifecycleFailed> {
