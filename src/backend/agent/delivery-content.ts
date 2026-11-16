@@ -14,6 +14,7 @@ import { redactSecrets, redactText } from "@openbot/logging";
 import { wokenWaitsPromptText } from "../agent-waits/agent-waits";
 import { homeSkillRoot, homeSkillTagSlug } from "../home-skills";
 import type { DeliveryContext } from "../mailbox-store";
+import { withoutWorkflowPackageContext } from "../workflows/workflow-package-context";
 import { quietRoutineRun, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import { pendingSkillSuggestionNote } from "./skill-suggestion";
 
@@ -295,7 +296,9 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
   // A teammate's tags name the sender's tabs and threads, not the recipient's. They keep the name and
   // id only, so `isTeammatePromptOf` can find the message in the prompt again.
   const fromTeammate = delivery.sender.kind === "agent" && delivery.sender.agentId !== delivery.recipientAgentId;
-  const displayText = displayMessageReferences(delivery.text, delivery.attachments, agentNames, {
+  // Workflow package-context marker is internal (Criterion 6); strip before the agent prompt.
+  const deliveryText = withoutWorkflowPackageContext(delivery.text);
+  const displayText = displayMessageReferences(deliveryText, delivery.attachments, agentNames, {
     fileHeadings: true,
     tags: fromTeammate ? undefined : sources.tags,
   });

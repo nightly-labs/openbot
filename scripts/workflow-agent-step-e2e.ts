@@ -11,12 +11,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { WorkflowGraph, WorkflowRunDetail } from "@openbot/contracts/ipc";
+import type { QueueDelivery, WorkflowGraph, WorkflowRunDetail } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import { deliveryPromptInput } from "../src/backend/agent/delivery-content";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { WorkflowGitHubStore } from "../src/backend/workflows/workflow-github-store";
+import { withoutWorkflowPackageContext } from "../src/backend/workflows/workflow-package-context";
 import { WorkflowRunStore } from "../src/backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../src/backend/workflows/workflow-store";
 import { workflowScheduleDueAt } from "../src/backend/workflows/workflow-triggers";
@@ -27,7 +29,14 @@ const WAIT_MS = 5_000;
 
 interface Report {
   checks: string[];
-  handoffs: { agentId: string; deliveryId: string }[];
+  handoffs: {
+    agentId: string;
+    deliveryId: string;
+    originId: string;
+    workflowId: string;
+    key: string;
+    prompt: string;
+  }[];
   stopped: { agentId: string; deliveryId: string }[];
   passed: boolean;
   failure?: string;
@@ -67,7 +76,44 @@ async function open() {
       sendHandoff: (input) =>
         Effect.sync(() => {
           const deliveryId = `delivery-${report.handoffs.length + 1}`;
-          report.handoffs.push({ agentId: input.agentId, deliveryId });
+          const delivery: QueueDelivery = {
+            id: deliveryId,
+            messageId: deliveryId,
+            recipientAgentId: input.agentId,
+            sender: {
+              kind: "routine",
+              routineId: input.run.routineId,
+              runId: input.run.id,
+              routineName: input.run.routineName,
+              scheduledFor: input.run.scheduledFor,
+            },
+            text: input.text,
+            attachments: [],
+            replyToMessageId: null,
+            status: "running",
+            position: null,
+            turnId: null,
+            error: null,
+            createdAt: input.run.scheduledFor,
+          };
+          const prompt = deliveryPromptInput(
+            { delivery, managedAttachments: [] },
+            {
+              agentNames: new Map(),
+              routineRun: null,
+              snapshot: { agentId: input.agentId, threadId: "fixture", messages: [], activeTurnId: null, revision: 0 },
+            },
+          )
+            .flatMap((item) => (item.type === "text" ? [item.text] : []))
+            .join("\n");
+          report.handoffs.push({
+            agentId: input.agentId,
+            deliveryId,
+            originId: input.run.id,
+            workflowId: input.run.routineId,
+            key: input.idempotencyKey,
+            prompt,
+          });
           return deliveryId;
         }),
       stopDelivery: (agentId, deliveryId) =>
@@ -124,6 +170,53 @@ async function startRun(workflows: WorkflowsHandle, title: string, agentId: stri
 
 try {
   let { workflows, runs } = await open();
+
+  const first = await startRun(workflows, "Same title", "agent-first");
+  const second = await startRun(workflows, "Same title", "agent-second");
+  for (const origin of [first, second]) {
+    const detail = await runUntil(workflows, origin.runId, answering);
+    const sent = report.handoffs.find((item) => item.originId === origin.runId);
+    assert.ok(sent);
+    check(
+      "recipient sees exact stored origin",
+      sent.prompt.includes(`Workflow ID: ${origin.workflowId}`) &&
+        sent.prompt.includes(`Workflow run ID: ${origin.runId}`) &&
+        !sent.prompt.includes("OpenBot-Package-Context:") &&
+        withoutWorkflowPackageContext(sent.prompt) === sent.prompt,
+      sent,
+    );
+    check("delivery key remains the stored step key", sent.key === `workflow-step:${agentStep(detail)?.id}`);
+    await Effect.runPromise(workflows.sweep());
+    check(
+      "reconciliation does not duplicate the effect",
+      report.handoffs.filter((item) => item.originId === origin.runId).length === 1,
+    );
+  }
+  check("same-title origins remain distinct", first.runId !== second.runId);
+  const firstDetail = await runCauseEffect(workflows.run(first.runId));
+  const firstStep = agentStep(firstDetail);
+  assert.ok(firstStep);
+  await runCauseEffect(workflows.stopStep(firstStep.id));
+  const retryInput = { stepId: firstStep.id, requestId: crypto.randomUUID() };
+  const retry = await runCauseEffect(workflows.retryStep(retryInput));
+  const duplicateRetry = await runCauseEffect(workflows.retryStep(retryInput));
+  const retrySent = report.handoffs.find((item) => item.key === `workflow-step:${retry.id}`);
+  assert.ok(retrySent);
+  check("retry preserves the stored run origin", retrySent.prompt.includes(`Workflow run ID: ${first.runId}`));
+  check(
+    "repeating the retry request does not repeat delivery",
+    duplicateRetry.id === retry.id && report.handoffs.filter((item) => item.key === retrySent.key).length === 1,
+  );
+  const standalone = await runCauseEffect(
+    workflows.runStep({ workflowId: first.workflowId, nodeId: "agent", requestId: crypto.randomUUID() }),
+  );
+  const sentStandalone = report.handoffs.find((item) => item.originId === standalone.id);
+  assert.ok(sentStandalone);
+  check(
+    "standalone origin is explicitly a step",
+    sentStandalone.prompt.includes(`Standalone workflow step ID: ${standalone.id}`) &&
+      !sentStandalone.prompt.includes(`Workflow run ID: ${standalone.id}`),
+  );
 
   // 1. A deleted agent fails the step that it was answering.
   const research = await startRun(workflows, "Competitor watch", "agent-research");

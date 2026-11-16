@@ -131,6 +131,11 @@ export function parseStartWorkflowRun(value: unknown): StartWorkflowRunInput {
     workflowId: value.workflowId,
     requestId: value.requestId,
     ...(value.fromNodeId === undefined ? {} : { fromNodeId: value.fromNodeId }),
+    ...(value.caseId === undefined ? {} : { caseId: value.caseId }),
+    ...(value.product === undefined ? {} : { product: value.product }),
+    ...(value.package === undefined ? {} : { package: value.package }),
+    ...(value.owner === undefined ? {} : { owner: value.owner }),
+    ...(value.input === undefined ? {} : { input: value.input }),
   };
 }
 

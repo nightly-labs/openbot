@@ -611,6 +611,16 @@ export interface StartWorkflowRunInput {
   requestId: string;
   /** Runs this node and what comes after it, with the newest results of the steps before it. */
   fromNodeId?: string;
+  /**
+   * Isolates answered reuse on shared templates. Required for safe from-node starts across products;
+   * without it, a from-node start reuses no prior answers.
+   */
+  caseId?: string;
+  product?: string;
+  package?: string;
+  owner?: string;
+  /** Case brief stored with the run snapshot; not permission. */
+  input?: string;
 }
 
 export interface RunWorkflowStepInput {
@@ -892,12 +902,33 @@ export function isWorkflowVersionInput(value: unknown): value is WorkflowVersion
 }
 
 export function isStartWorkflowRunInput(value: unknown): value is StartWorkflowRunInput {
-  return (
-    isDynamicRecord(value) &&
-    isIdentifier(value.workflowId) &&
-    isIdentifier(value.requestId) &&
-    (value.fromNodeId === undefined || isIdentifier(value.fromNodeId))
-  );
+  if (
+    !isDynamicRecord(value) ||
+    !isIdentifier(value.workflowId) ||
+    !isIdentifier(value.requestId) ||
+    (value.fromNodeId !== undefined && !isIdentifier(value.fromNodeId)) ||
+    (value.caseId !== undefined && !isIdentifier(value.caseId)) ||
+    (value.product !== undefined && !isIdentifier(value.product)) ||
+    (value.package !== undefined && !isIdentifier(value.package)) ||
+    (value.owner !== undefined && !isIdentifier(value.owner)) ||
+    (value.input !== undefined &&
+      !(
+        typeof value.input === "string" &&
+        value.input.length > 0 &&
+        value.input.length <= INPUT_LIMITS.workflowStepInput
+      ))
+  )
+    return false;
+  // Case metadata requires caseId — otherwise callers would accept then silently discard it.
+  if (
+    value.caseId === undefined &&
+    (value.product !== undefined ||
+      value.package !== undefined ||
+      value.owner !== undefined ||
+      value.input !== undefined)
+  )
+    return false;
+  return true;
 }
 
 export function isRunWorkflowStepInput(value: unknown): value is RunWorkflowStepInput {

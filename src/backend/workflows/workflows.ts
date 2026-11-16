@@ -132,6 +132,13 @@ import {
 } from "./telegram-matching";
 import { REPEATABLE_GITHUB_ACTIONS, type WorkflowGitHubApi } from "./workflow-github-api";
 import type { WaitingGitHubDelivery, WorkflowGitHubStore } from "./workflow-github-store";
+import { withWorkflowPackageContext } from "./workflow-package-context";
+import {
+  bindingsEqual,
+  encodeWorkflowRunBinding,
+  graphCompatibleForReuse,
+  workflowRunBinding,
+} from "./workflow-run-binding";
 import {
   isOpenStep,
   publicRun,
@@ -148,7 +155,6 @@ import {
   agentStepText,
   conditionAnswer,
   conditionPrompt,
-  currentAnswers,
   fieldText,
   inputText,
   type MediaImageRole,
@@ -157,6 +163,7 @@ import {
   mediaInputs,
   mediaStepPrompt,
   mediaVoice,
+  missingFromNodePrerequisites,
   modelStepPrompt,
   nextActions,
   runScope,
@@ -500,7 +507,32 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                 scheduledFor: run?.scheduledFor ?? run?.startedAt ?? step.createdAt,
               },
               agentId: step.agentId,
-              text: step.input,
+              text: withWorkflowPackageContext(
+                [
+                  `Workflow ID: ${step.workflowId}`,
+                  step.runId
+                    ? `Workflow run ID: ${step.runId}`
+                    : `Standalone workflow step ID: ${step.id} (no workflow run)`,
+                  ...(() => {
+                    const bound = workflowRunBinding(run?.payload);
+                    if (!bound) return [];
+                    const lines: string[] = [
+                      [
+                        "Case bindings:",
+                        `caseId=${bound.caseId}`,
+                        bound.product ? `product=${bound.product}` : null,
+                        bound.package ? `package=${bound.package}` : null,
+                        bound.owner ? `owner=${bound.owner}` : null,
+                        bound.input ? `input=${bound.input}` : null,
+                      ]
+                        .filter((line): line is string => line !== null)
+                        .join("\n"),
+                    ];
+                    return lines;
+                  })(),
+                  step.input,
+                ].join("\n\n"),
+              ),
               idempotencyKey: `workflow-step:${step.id}`,
             })
             .pipe(Effect.exit);
@@ -1165,31 +1197,6 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             new Set([...latest.values()].filter((step) => step.status === "done").map((step) => step.nodeId)),
           );
 
-        /**
-         * The graph that an answer ran with: the graph of its run. A step alone has no run, and a retry
-         * ran with the node's settings at the time of the retry, so their graph is not known. Each run
-         * is read once.
-         */
-        const answerGraphs = () => {
-          const read = new Map<string, { graph: WorkflowGraph; steps: StoredWorkflowStep[] } | null>();
-          return (step: StoredWorkflowStep) => {
-            if (step.runId === null) return undefined;
-            let run = read.get(step.runId);
-            if (run === undefined) {
-              const found = runs.run(step.runId);
-              run = found ? { graph: found.graph, steps: runs.steps(found.id) } : null;
-              read.set(step.runId, run);
-            }
-            const retry = run?.steps.some(
-              (earlier) =>
-                earlier.nodeId === step.nodeId &&
-                earlier.attempt === step.attempt - 1 &&
-                (earlier.status === "failed" || earlier.status === "stopped"),
-            );
-            return run && !retry ? run.graph : undefined;
-          };
-        };
-
         /** Starts every node of the run that can start now, then sets the run's status. */
         const advance = Effect.fn("Workflows.advance")(function* (runId: string) {
           const run = runs.run(runId);
@@ -1412,10 +1419,34 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             fromNodeId: from && from.kind !== "trigger" ? from.id : null,
           };
           const workflowId = detail.summary.id;
-          const answered = currentAnswers(detail.graph, runs.latestDone(workflowId), answerGraphs());
-          const scope = runScope(detail.graph, start, new Set(answered.keys()));
+          // Shared templates (Oracle A/B): from-node reuse comes from one prior run whose immutable
+          // bindings match exactly and whose graph is compatible. Never aggregate across runs; never
+          // fall back to workflow-wide latestDone. Omitted caseId + fromNodeId → empty reuse.
+          const binding = workflowRunBinding(origin.payload);
+          let answered = new Map<string, StoredWorkflowStep>();
+          let scope = runScope(detail.graph, start, new Set());
+          if (start.fromNodeId !== null && binding) {
+            for (const prior of runs.runsWithBindingPayload(workflowId)) {
+              const priorBinding = workflowRunBinding(prior.payload);
+              if (!priorBinding || !bindingsEqual(binding, priorBinding)) continue;
+              const priorDone = runs.doneStepsOfRun(prior.id);
+              if (!graphCompatibleForReuse(detail.graph, prior.graph, new Set(priorDone.keys()))) continue;
+              const candidate = runScope(detail.graph, start, new Set(priorDone.keys()));
+              if (missingFromNodePrerequisites(detail.graph, start.fromNodeId, candidate).length > 0) continue;
+              answered = priorDone;
+              scope = candidate;
+              break;
+            }
+          } else {
+            scope = runScope(detail.graph, start, new Set(answered.keys()));
+          }
           if (detail.graph.nodes.some((node) => scope.nodes.has(node.id) && unsupportedNode(node)))
             return yield* refuse("refused", sourceText("error.workflow.nodeUnsupported"));
+          if (
+            start.fromNodeId !== null &&
+            missingFromNodePrerequisites(detail.graph, start.fromNodeId, scope).length > 0
+          )
+            return yield* refuse("refused", sourceText("error.workflow.answersMissing"));
           const started = yield* attempt(() =>
             runs.startRun(
               { workflowId, ...start, ...origin, revision: detail.revision, graph: detail.graph },
@@ -1459,11 +1490,32 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               const detail = yield* attempt(() => detailOf(input.workflowId));
               const from = input.fromNodeId ? detail.graph.nodes.find((node) => node.id === input.fromNodeId) : null;
               if (from === undefined) return yield* refuse("missing", sourceText("error.workflow.nodeMissing"));
+              if (
+                input.caseId === undefined &&
+                (input.product !== undefined ||
+                  input.package !== undefined ||
+                  input.owner !== undefined ||
+                  input.input !== undefined)
+              )
+                return yield* refuse(
+                  "refused",
+                  "Case metadata requires caseId. Pass caseId with product/package/owner/input, or omit them.",
+                );
+              const binding =
+                input.caseId === undefined
+                  ? null
+                  : encodeWorkflowRunBinding({
+                      caseId: input.caseId,
+                      ...(input.product === undefined ? {} : { product: input.product }),
+                      ...(input.package === undefined ? {} : { package: input.package }),
+                      ...(input.owner === undefined ? {} : { owner: input.owner }),
+                      ...(input.input === undefined ? {} : { input: input.input }),
+                    });
               const { run } = yield* begin(detail, from, {
                 source: "manual",
                 scheduledFor: null,
-                idempotencyKey: `manual:${input.requestId}`,
-                payload: null,
+                idempotencyKey: `manual:${input.caseId ?? "legacy"}:${input.requestId}`,
+                payload: binding,
               });
               return runDetail(run);
             }),

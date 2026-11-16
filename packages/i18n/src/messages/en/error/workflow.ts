@@ -26,6 +26,8 @@ export const messages = defineMessages("error.workflow", {
     "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",
   "error.workflow.nodeMissing": "This step is not in the workflow.",
+  "error.workflow.answersMissing":
+    "This start needs earlier answers from a prior run with the same case bindings. Start from the beginning, or reuse a matching run.",
   "error.workflow.runMissing": "This run no longer exists.",
   "error.workflow.notRetryable": "Only a step that failed or stopped can run again.",
   "error.workflow.noDecision": "This step does not wait for a decision.",

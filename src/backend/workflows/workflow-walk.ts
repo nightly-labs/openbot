@@ -137,6 +137,22 @@ function readsOf(node: WorkflowNode, graph: WorkflowGraph): string {
   return JSON.stringify([runtimeFields(node), inputs]);
 }
 
+/**
+ * Nodes a from-node start still needs to run that sit before the start node. Oracle B-isolation-1:
+ * when those exist, refuse before dispatch instead of re-running them or falling back to
+ * workflow-wide answers.
+ */
+export function missingFromNodePrerequisites(
+  graph: WorkflowGraph,
+  fromNodeId: string,
+  scope: { nodes: ReadonlySet<string>; reused: ReadonlySet<string> },
+): string[] {
+  const loops = workflowLoopEdges(graph.nodes, graph.edges);
+  const forward = graph.edges.filter((edge) => !loops.has(edge.id));
+  const ahead = reach(fromNodeId, outgoing(forward));
+  return [...scope.nodes].filter((id) => !ahead.has(id) && !scope.reused.has(id)).sort();
+}
+
 export type WalkAction = { nodeId: string; action: "run"; inputs: string[] } | { nodeId: string; action: "skip" };
 
 /**

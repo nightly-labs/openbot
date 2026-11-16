@@ -80,7 +80,32 @@ const editSchema = z
   })
   .strict();
 const deleteSchema = z.object({ workflowId: identifier }).strict();
-const runSchema = z.object({ workflowId: identifier, fromNodeId: identifier.optional() }).strict();
+const runSchema = z
+  .object({
+    workflowId: identifier,
+    fromNodeId: identifier.optional(),
+    caseId: identifier.optional().describe("Isolates answered reuse on shared templates"),
+    product: identifier.optional(),
+    package: identifier.optional(),
+    owner: identifier.optional(),
+    input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional().describe("Case brief"),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.caseId === undefined &&
+      (value.product !== undefined ||
+        value.package !== undefined ||
+        value.owner !== undefined ||
+        value.input !== undefined)
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "product, package, owner and input require caseId",
+        path: ["caseId"],
+      });
+    }
+  });
 const runsSchema = z
   .object({ workflowId: identifier, runId: identifier.optional(), limit: z.number().int().min(1).max(5).optional() })
   .strict();
@@ -110,7 +135,8 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   },
   {
     name: "run_workflow",
-    description: "Start a run of a workflow, or from one node with the newest answers of the nodes before it.",
+    description:
+      "Start a run of a workflow, or from one node. Pass caseId plus product/package/owner/input so a from-node start reuses answers from one prior run with the same bindings; without caseId, a from-node start reuses none and needs no earlier answers.",
     shape: runSchema.shape,
   },
   {
@@ -687,6 +713,11 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
         workflowId: input.workflowId,
         requestId: callKey,
         ...(input.fromNodeId === undefined ? {} : { fromNodeId: input.fromNodeId }),
+        ...(input.caseId === undefined ? {} : { caseId: input.caseId }),
+        ...(input.product === undefined ? {} : { product: input.product }),
+        ...(input.package === undefined ? {} : { package: input.package }),
+        ...(input.owner === undefined ? {} : { owner: input.owner }),
+        ...(input.input === undefined ? {} : { input: input.input }),
       });
       return openBotToolResult({ runId: detail.run.id, number: detail.run.number, status: detail.run.status });
     }

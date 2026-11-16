@@ -50,6 +50,7 @@ import {
 } from "../mcp-provider-shapes";
 import { decodeRecordResponse, decodeThreadResponse, getRecord, getString, type ResponseDecoder } from "../protocol";
 import { TimeoutError, withTimeout } from "../with-timeout";
+import { routineSessionAmbientHandoff } from "../workflows/workflow-package-context";
 import type { AgentMemories } from "./agent-memories";
 import { readCodexMcpConfig } from "./codex-mcp-config";
 import { type CodexPromptSettings, codexPromptSettings } from "./codex-prompt-settings";
@@ -671,8 +672,9 @@ export class ThreadLifecycle {
    * Starts the provider session of one routine run. It is not saved as a session of a thread, and
    * `closeRoutineThread` ends it with the run: so no session grows with each run, and a run does not
    * read a whole session again. Its items go to `routineThreadId`, the routine's own side thread, or
-   * with no such thread to the agent's chat. Its first turn reads the newest messages of the chat
-   * and of the routine's thread.
+   * with no such thread to the agent's chat. Its first turn normally reads the newest messages of the
+   * chat and of the routine's thread. Workflow package-context handoffs omit that ambient history
+   * (Oracle Criterion 6 B): the delivery text alone carries pins, brief and predecessor outputs.
    *
    * Codex still saves the session: a subagent that forks the run's context reads it from the saved
    * history, and an ephemeral session fails that with `no rollout found` (#8743).
@@ -682,17 +684,20 @@ export class ThreadLifecycle {
     owner: AgentSummary,
     client: AgentClient,
     routineThreadId?: string,
+    options?: { omitAmbientHistory?: boolean },
   ) {
     const chatThreadId = yield* this.#store.ensureThreadId(owner.id).pipe(toThreadOperationFailed);
     const publicThreadId = routineThreadId ?? chatThreadId;
-    const handoff = yield* threadStep(() => {
-      const names = agentNamesById(this.#store.list());
-      const chat = readHandoffHistory(this.#store.database, owner.id, chatThreadId, names);
-      const earlierRuns = routineThreadId
-        ? readHandoffHistory(this.#store.database, owner.id, routineThreadId, names)
-        : undefined;
-      return renderRoutineHandoff(chat, names, earlierRuns);
-    });
+    const handoff = yield* threadStep(() =>
+      routineSessionAmbientHandoff(options?.omitAmbientHistory === true, () => {
+        const names = agentNamesById(this.#store.list());
+        const chat = readHandoffHistory(this.#store.database, owner.id, chatThreadId, names);
+        const earlierRuns = routineThreadId
+          ? readHandoffHistory(this.#store.database, owner.id, routineThreadId, names)
+          : undefined;
+        return renderRoutineHandoff(chat, names, earlierRuns);
+      }),
+    );
     const { params } = yield* this.#startParams(owner, client, publicThreadId);
     const response = yield* client
       .request("thread/start", { ...params, ephemeral: false, persistSession: false }, decodeThreadResponse)

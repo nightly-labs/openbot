@@ -308,6 +308,32 @@ export class WorkflowRunStore {
     return new Map(rows.map((step) => [step.nodeId, step]));
   }
 
+  /** Done steps of one run only (newest attempt per node). */
+  doneStepsOfRun(runId: string): Map<string, StoredWorkflowStep> {
+    const rows = databaseRows(
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE run_id = ? AND status = 'done' ORDER BY created_at, attempt, step_id`)
+        .all(runId),
+    ).map(toStep);
+    return new Map(rows.map((step) => [step.nodeId, step]));
+  }
+
+  /**
+   * Runs of a workflow that carry a binding payload, newest first. Callers match immutable bindings
+   * and graph compatibility, then take `doneStepsOfRun` from exactly one prior run.
+   */
+  runsWithBindingPayload(workflowId: string): StoredWorkflowRun[] {
+    return databaseRows(
+      this.#database.connection
+        .prepare(
+          `${RUN_SELECT}
+           WHERE workflow_id = ? AND payload IS NOT NULL AND payload != ''
+           ORDER BY started_at DESC, run_id DESC`,
+        )
+        .all(workflowId),
+    ).map(toRun);
+  }
+
   /**
    * Adds a step, or answers the step that the same request already added. The attempt is the
    * node's next one in its run; a step alone is always the first.

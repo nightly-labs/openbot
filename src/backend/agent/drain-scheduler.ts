@@ -19,12 +19,12 @@ import { channelLane, type DeliveryContext, laneChannelId, type MailboxStore } f
 import type { MessagingThreads } from "../messaging/messaging-threads";
 import { decodeTurnResponse } from "../protocol";
 import { ProviderSignInError } from "../provider-client-effects";
+import { batchOmitsAmbientHistory, composeEphemeralRoutineFirstTurn } from "../workflows/workflow-package-context";
 import type { ContextCompaction } from "./context-compaction";
 import type { ConversationRuntime } from "./conversation-runtime";
 import {
   type AnsweredRoutine,
   agentNamesById,
-  CURRENT_MESSAGE_SEPARATOR,
   combinedPromptInput,
   deliveryPromptInput,
   restatedContinuationInput,
@@ -877,8 +877,9 @@ export class DrainScheduler {
           this.#mailboxSync.emitQueue(agent.id);
           return;
         }
+        const omitAmbientHistory = batchOmitsAmbientHistory(batch);
         routineThreadId = yield* this.#threads
-          .startRoutineThread(agent, client, execution?.threadId)
+          .startRoutineThread(agent, client, execution?.threadId, { omitAmbientHistory })
           .pipe(toDeliveryStartFailed);
       }
       let threadId =
@@ -943,20 +944,16 @@ export class DrainScheduler {
       // The handoff that each start sent: the cleanup after the turn removes only that part.
       const sentHandoffs = new Map<string, string>();
       const inputForThread = (providerThreadId: string) => {
-        const handoff = this.#threads.consumePendingHandoff(providerThreadId);
+        const handoff = this.#threads.consumePendingHandoff(providerThreadId) ?? null;
         const input =
           deltaInput && shortened?.sendsDelta(delivery.id, providerThreadId)
             ? deltaInput
             : planNote !== undefined && handoff && handoffHasHistory(handoff)
               ? restatedContinuationInput(promptInput(execution?.text), planNote)
               : completeInput;
-        if (!handoff) return input;
-        sentHandoffs.set(providerThreadId, handoff);
-        return input.map((item, index) =>
-          index === 0 && item.type === "text"
-            ? { ...item, text: `${handoff}${CURRENT_MESSAGE_SEPARATOR}${item.text}` }
-            : item,
-        );
+        if (handoff) sentHandoffs.set(providerThreadId, handoff);
+        // Package-context sessions leave no pending ambient handoff (omitAmbientHistory).
+        return composeEphemeralRoutineFirstTurn(input, handoff);
       };
 
       for (const { delivery: item, senderTaskId } of batch) {
