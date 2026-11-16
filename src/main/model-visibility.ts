@@ -7,10 +7,12 @@ import type {
   AgentModelOption,
   AgentProviderRef,
   AgentSummary,
+  CustomProviderSummary,
   ProviderModelVisibility,
   ProviderModelVisibilityChange,
 } from "@openbot/contracts/ipc";
 import {
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderContextWindow,
   isCustomProviderMaxOutput,
   OPENCODE_RECOMMENDED_FREE_MODELS,
@@ -409,6 +411,22 @@ function modelKey(provider: string, model: string): ModelKey {
   return `${provider}\u0000${model}`;
 }
 
+/**
+ * The models that the user saved on an endpoint, under the provider that runs it. The user chose
+ * each one, so the catalogue age rules do not fold it. Before, when one model of an endpoint was in
+ * the catalogue, such as a model of the `lmstudio` endpoint or a Claude model of a gateway, the
+ * endpoint's other models were folded under Older models as models that the catalogue lacks (#7962).
+ */
+function savedEndpointModels(endpoints: readonly CustomProviderSummary[]): Set<ModelKey> {
+  return new Set(
+    endpoints.flatMap((endpoint) =>
+      endpoint.models.map((model) =>
+        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, `${endpoint.id}/${model.id}`),
+      ),
+    ),
+  );
+}
+
 /** Every model an agent is on, goes back to, moves to next, or keeps as a backup. */
 function modelsInUse(agents: readonly AgentSummary[]): Set<ModelKey> {
   const keys = new Set<ModelKey>();
@@ -437,6 +455,8 @@ export interface ModelVisibilityOptions {
   /** Every model the connected providers list. */
   listModels(): AgentModelOption[];
   listAgents(): AgentSummary[];
+  /** The user's saved endpoints. The models saved on them are in the main list (#7962). */
+  customEndpoints(): readonly CustomProviderSummary[];
   /** Tells each client to read the model list again. */
   modelsChanged(): void;
 }
@@ -597,7 +617,9 @@ export class ModelVisibility {
     }
     const lookup = yield* this.#options.catalog.lookup();
     const pickers = new Map<string, ProviderPicker>();
-    for (const [provider, listed] of providers) pickers.set(provider, this.#providerPicker(provider, listed, lookup));
+    const saved = savedEndpointModels(this.#options.customEndpoints());
+    for (const [provider, listed] of providers)
+      pickers.set(provider, this.#providerPicker(provider, listed, lookup, saved));
     const inUse = modelsInUse(this.#options.listAgents());
     const now = yield* Clock.currentTimeMillis;
     // The provider lists give no `listing` of their own.
@@ -614,10 +636,18 @@ export class ModelVisibility {
     });
   });
 
-  #providerPicker(provider: string, models: readonly { id: string }[], lookup: ReleaseLookup): ProviderPicker {
+  #providerPicker(
+    provider: string,
+    models: readonly { id: string }[],
+    lookup: ReleaseLookup,
+    saved: ReadonlySet<ModelKey>,
+  ): ProviderPicker {
     const byDefault = new Set(defaultShownModelIds(models, lookup));
     const recommended = RECOMMENDED_MODELS.get(provider) ?? [];
-    for (const model of models) if (recommended.includes(model.id.toLowerCase())) byDefault.add(model.id);
+    for (const model of models) {
+      if (recommended.includes(model.id.toLowerCase()) || saved.has(modelKey(provider, model.id)))
+        byDefault.add(model.id);
+    }
     const released = new Map<string, string>();
     for (const model of models) {
       const date = matchCatalog(model.id, lookup).release?.date;

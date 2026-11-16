@@ -2422,6 +2422,7 @@ export async function createApplicationServices({
     catalog: modelReleaseCatalog,
     listModels: () => service.listModels(),
     listAgents: () => service.listAgents(),
+    customEndpoints: () => customProviders.list(),
     modelsChanged: () => service.notifyProviderSettingsChanged(),
   });
   await runCauseEffect(modelVisibility.load());

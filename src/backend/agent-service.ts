@@ -1181,6 +1181,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const endpoint = credentials.customProviders().find((provider) => provider.id === endpointId);
           return endpoint ? (endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS) : null;
         },
+        savedEndpoints: () =>
+          new Map(
+            credentials.customProviders().map((endpoint) => [
+              endpoint.id,
+              {
+                harness: endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS,
+                models: endpoint.models.map((model) => model.id),
+              },
+            ]),
+          ),
         // The model list reaches the renderer by pull, refreshed on a status event, and an exclusion
         // changes what that pull answers while no provider state moves.
         modelsChanged: () => this.#emit({ type: "status", status: this.getStatus() }),
