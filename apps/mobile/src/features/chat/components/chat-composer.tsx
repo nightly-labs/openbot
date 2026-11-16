@@ -926,6 +926,8 @@ export const ChatComposer = memo(function ChatComposer({
 
   // A press and hold on the mic or the waveform opens the voice settings over the chat.
   const openVoiceSettings = useCallback(() => {
+    // A Stop just before the hold must not open the keyboard behind Settings > Voice.
+    editAfterDictation.current = false;
     void haptics.selection();
     inputRef.current?.blur();
     router.push("/settings/voice");
@@ -1544,7 +1546,7 @@ export const ChatComposer = memo(function ChatComposer({
                       onLongPress={control.mode === "dictate" ? openVoiceSettings : undefined}
                       delayLongPress={LONG_PRESS_MS}
                       accessibilityActions={
-                        control.mode === "dictate"
+                        control.mode === "dictate" && controlReady
                           ? [{ name: "activate" }, { name: "longpress", label: voiceSettingsLabel }]
                           : undefined
                       }

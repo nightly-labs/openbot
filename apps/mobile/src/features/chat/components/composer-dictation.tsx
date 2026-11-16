@@ -118,7 +118,9 @@ export function DictationMic({
         accessibilityLabel={label}
         accessibilityState={{ disabled: !enabled, selected: active }}
         accessibilityActions={
-          active ? [{ name: "activate" }] : [{ name: "activate" }, { name: "longpress", label: longPressLabel }]
+          enabled && !active
+            ? [{ name: "activate" }, { name: "longpress", label: longPressLabel }]
+            : [{ name: "activate" }]
         }
         onAccessibilityAction={({ nativeEvent }) => {
           if (!enabled) return;

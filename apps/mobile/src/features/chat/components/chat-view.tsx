@@ -686,6 +686,8 @@ export function ChatView({
             ...dictation,
             available: true,
             start: () => {
+              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
+              Keyboard.dismiss();
               router.push("/settings/voice");
               return false;
             },
@@ -780,11 +782,12 @@ export function ChatView({
       error: liveError,
       caption: liveCaption,
     };
+    const openSettings = () => router.push("/settings/voice");
     if (!liveAvailable && !liveOpen)
-      return { ...liveVoice(source, voiceName, t), available: true, start: () => router.push("/settings/voice") };
+      return { ...liveVoice(source, voiceName, t), available: true, start: openSettings };
     return {
       ...liveVoice(source, voiceName, t),
-      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : router.push("/settings/voice")),
+      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : openSettings()),
     };
   }, [
     liveAvailable,

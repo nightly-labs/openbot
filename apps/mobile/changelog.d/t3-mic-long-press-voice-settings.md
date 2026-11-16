@@ -5,4 +5,4 @@
 ### Changed
 
 - A build without voice support, such as Expo Go, shows the mic and the waveform button in the
-  composer too. A tap opens the voice settings, which say that voice is not available.
+  chat composer too. A tap opens the voice settings, which say that voice is not available.
