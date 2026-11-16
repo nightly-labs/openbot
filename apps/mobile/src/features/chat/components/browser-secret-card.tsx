@@ -315,6 +315,7 @@ function SecureComposerBar({
   keyboardType,
   autoComplete,
   maxLength,
+  submitOnly,
   bottomInset,
   liquidGlassAvailable,
   fallbackBackground,
@@ -327,13 +328,15 @@ function SecureComposerBar({
   /** The text of the empty field, when it is not the label. */
   placeholder?: string | undefined;
   value: string;
-  onChangeText: (text: string) => void;
+  onChangeText?: ((text: string) => void) | undefined;
   ready: boolean;
   pending: boolean;
   onSubmit: () => void;
   keyboardType: "default" | "number-pad";
   autoComplete: "off" | "one-time-code";
   maxLength: number;
+  /** When the masked field lives in the question card, the bar is only a Send button. */
+  submitOnly?: boolean | undefined;
 }) {
   const { t } = useText();
   const insets = useSafeAreaInsets();
@@ -356,33 +359,40 @@ function SecureComposerBar({
           overflow: "hidden",
           flexDirection: "row",
           alignItems: "center",
-          paddingLeft: 16,
+          paddingLeft: submitOnly ? 8 : 16,
           paddingRight: 4,
+          justifyContent: submitOnly ? "flex-end" : undefined,
         }}
       >
-        <TextInput
-          // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
-          nativeID="chat-composer-input"
-          accessibilityLabel={label}
-          placeholder={placeholder ?? label}
-          placeholderTextColor={String(muted)}
-          {...selectionColorProps(foreground)}
-          className="min-w-0 flex-1 font-sans text-foreground"
-          style={{ fontSize: 16 }}
-          secureTextEntry
-          autoCorrect={false}
-          autoCapitalize="none"
-          keyboardType={keyboardType}
-          autoComplete={autoComplete}
-          maxLength={maxLength}
-          value={value}
-          editable={!pending}
-          returnKeyType="send"
-          onSubmitEditing={() => {
-            if (ready) onSubmit();
-          }}
-          onChangeText={onChangeText}
-        />
+        {submitOnly ? (
+          <Typography type="body-sm" className="min-w-0 flex-1 text-text-secondary" numberOfLines={1}>
+            {placeholder ?? label}
+          </Typography>
+        ) : (
+          <TextInput
+            // The composer's ID: the chat's keyboard gesture follows the one field that is shown.
+            nativeID="chat-composer-input"
+            accessibilityLabel={label}
+            placeholder={placeholder ?? label}
+            placeholderTextColor={String(muted)}
+            {...selectionColorProps(foreground)}
+            className="min-w-0 flex-1 font-sans text-foreground"
+            style={{ fontSize: 16 }}
+            secureTextEntry
+            autoCorrect={false}
+            autoCapitalize="none"
+            keyboardType={keyboardType}
+            autoComplete={autoComplete}
+            maxLength={maxLength}
+            value={value}
+            editable={!pending}
+            returnKeyType="send"
+            onSubmitEditing={() => {
+              if (ready) onSubmit();
+            }}
+            onChangeText={onChangeText}
+          />
+        )}
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t("mobile.chat.browserSecret.submit")}
@@ -405,8 +415,8 @@ function SecureComposerBar({
 
 /**
  * Takes the place of the composer while the open question of a form asks for a private answer, such
- * as an API key, a password or a card number. The question card above keeps the title, Skip and
- * Cancel; this is its one field. The value is cleared when it is sent.
+ * as an API key, a password or a card number. The question card above keeps the title, the masked
+ * field, Skip and Cancel; this bar sends the answer. The value is cleared when it is sent.
  */
 export function QuestionSecretComposer({
   controller,
@@ -418,10 +428,10 @@ export function QuestionSecretComposer({
   const ready = !controller.disabled && Boolean(value.trim());
   return (
     <SecureComposerBar
+      submitOnly
       label={label}
-      placeholder={t("mobile.chat.question.privatePlaceholder")}
+      placeholder={t("mobile.chat.question.secretSendHint")}
       value={value}
-      onChangeText={controller.setDraft}
       ready={ready}
       pending={controller.pending}
       onSubmit={() => {

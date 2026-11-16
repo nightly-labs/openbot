@@ -872,7 +872,7 @@ export function ChatView({
     showBrowserRequests && !voiceOpen && !dictating && !attachments.menuOpen
       ? chatBrowserRequests.find(asksForSecret)
       : undefined;
-  // A private answer to a form question is typed there too, never in a second field beside the composer.
+  // A private answer to a form question is typed in the question card; the bar below only sends it.
   const secretQuestion =
     !secretRequest && !voiceOpen && !dictating && !attachments.menuOpen && questionForm?.question?.isSecret
       ? questionForm

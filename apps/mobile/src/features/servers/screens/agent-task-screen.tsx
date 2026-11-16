@@ -496,11 +496,11 @@ function AgentTaskChat({
   });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
-  // Dictation and the attachment card keep the composer until they close: replacing it would end them.
-  const keepsComposer = dictating || attachments.menuOpen;
-  const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
-  // A private answer to a form question is typed there too, never in a second field beside the composer.
-  const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
+    // Dictation and the attachment card keep the composer until they close: replacing it would end them.
+    const keepsComposer = dictating || attachments.menuOpen;
+    const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
+    // A private answer to a form question is typed in the question card; the bar below only sends it.
+    const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark),
