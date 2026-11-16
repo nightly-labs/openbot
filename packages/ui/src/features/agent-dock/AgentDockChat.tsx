@@ -457,6 +457,7 @@ export function AgentDockChat(props: {
                   onStart={() => voice().onStart()}
                   onCancel={() => voice().onCancel()}
                   onFinish={() => voice().onFinish()}
+                  onSend={submit}
                   send={sendButton()}
                 />
               )}

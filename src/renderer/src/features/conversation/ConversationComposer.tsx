@@ -833,6 +833,7 @@ export function ConversationComposer() {
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
+                  onSend={submitComposer}
                   send={<SendControl />}
                 />
               </Show>
