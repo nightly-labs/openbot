@@ -1092,6 +1092,32 @@ All notable changes to OpenBot will be documented here. The project follows
   picture can be missing after the page opens again.
 - Show each agent in the Dynamic Island with its own avatar colour and shape. Before, an agent with
   an exact colour showed the nearest preset colour, and every agent showed a round shape.
+- An image or video step in a workflow now runs with an empty description when a text or a picture
+  comes into it. Before, the Run button stayed off until you wrote a description. When no
+  description, text or picture comes in, the step stops and tells you what to add, and it does not
+  make an image from nothing. On a joined server, the server must also be on the new version.
+- An Agent step on the Workflows canvas gets the pictures and files of the Image and Asset steps that
+  connect to it, attached to its message. Before, the agent got only the text, so it could not see a
+  picture that the canvas showed as its input. For a workflow on a joined server, the server must also
+  be on the new version.
+- Show the real size and shape of an image that an agent makes. Before, the chat showed
+  "1024 × 1024" and a square frame until the image loaded, also when the image had another size.
+  After a restart, the image also keeps its prompt. On a joined server, the server must also be on
+  the new version.
+- When Cline says that the weekly Clinepass limit is reached, the agent's backup models answer the
+  turn. With no backup, the work waits until the reset that Cline names, and does not try again
+  each 15 minutes.
+- On Windows, a skill installs again when a security tool holds every new folder in the agent's skill
+  folder. Before, the install failed with "EPERM: operation not permitted, rename".
+- A ChatGPT agent that another agent makes can now wait quietly after its first message. Before, a
+  new agent that was told to wait for work showed "ChatGPT ended the turn with no answer", and its
+  creation looked like it had failed.
+- An OpenCode agent on a Z.ai GLM model that reads only text no longer fails each message with
+  "messages.content.type is invalid" after an image gets into the chat. OpenBot now says that the
+  model cannot read the image and starts a new session, so the next message works.
+- An OpenCode chat whose history has an image that OpenCode cannot send again now continues in a new
+  session with the chat history. Before, each later message failed at once with "Media strings must
+  be base64", and a channel showed the same failure again and again.
 
 ## [0.71.0] - 2026-11-14
 
