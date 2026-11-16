@@ -659,6 +659,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Oznacz wszystkie jako przeczytane",
   "mobile.agent.home.sort.title": "Sortuj czaty",
   "mobile.agent.home.sort.manual": "Ręcznie",
+  "mobile.agent.home.sort.recent": "Ostatnia aktywność",
   "mobile.agent.home.sort.unreadGroup": "Nieprzeczytane w grupie",
   "mobile.agent.home.sort.unreadFirst": "Nieprzeczytane najpierw w folderach",
   "mobile.agent.route.appearance": "Wygląd",

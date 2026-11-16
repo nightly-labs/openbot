@@ -591,6 +591,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.home.markAllRead": "Mark all as read",
   "mobile.agent.home.sort.title": "Sort chats",
   "mobile.agent.home.sort.manual": "Manual",
+  "mobile.agent.home.sort.recent": "Recent activity",
   "mobile.agent.home.sort.unreadGroup": "Unread in a group",
   "mobile.agent.home.sort.unreadFirst": "Unread first in folders",
   "mobile.agent.route.appearance": "Appearance",
