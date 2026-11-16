@@ -369,10 +369,13 @@ export async function routeAgents(
     const requestId = promptRequestId(body.requestId);
     requireRequestAgent(agents.agentIdForRequest(requestId));
     await runCauseEffect(
-      agents.respondToBrowserTakeover({
-        requestId,
-        decision: browserTakeoverDecision(body.decision),
-      }),
+      agents.respondToBrowserTakeover(
+        {
+          requestId,
+          decision: browserTakeoverDecision(body.decision),
+        },
+        true,
+      ),
     );
     return empty(204);
   }

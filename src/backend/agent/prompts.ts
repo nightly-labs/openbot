@@ -580,7 +580,7 @@ export function vaultPromptResult(
 
 /** Done on a phone or in a web browser: the card there cannot send a sign-in from the user's own device. */
 const TAKEOVER_SIGN_IN_MISSING_NEXT =
-  "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked again so that they can answer the card there.";
+  "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked once more so that they can answer the card there. If this result comes again, do not ask again: tell the user and end your turn.";
 
 /**
  * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
