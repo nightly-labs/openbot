@@ -2966,11 +2966,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     };
   }
 
-  /** The credits of the media services that a workflow step can spend now. A failed read has none. */
-  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (this: AgentService) {
+  /**
+   * The credits of the media services that a workflow step can spend now. A failed read has none.
+   * With `only`, it reads that service alone and the other one is null.
+   */
+  readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (
+    this: AgentService,
+    only?: keyof WorkflowMediaCredits,
+  ) {
     if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
-    const sunraSignIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    const higgsfieldSignIn = this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    const sunraSignIn = only === "higgsfield" ? null : this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
+    const higgsfieldSignIn = only === "sunra" ? null : this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
     const [sunra, higgsfield] = yield* Effect.all(
       [
         sunraSignIn

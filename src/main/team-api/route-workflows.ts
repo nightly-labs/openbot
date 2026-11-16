@@ -392,12 +392,13 @@ export async function routeWorkflows(
   // Each route answers the field of its own frozen capability only.
   if (path === WORKFLOWS_SUNRA_ROUTES.providers) return json(200, { sunra: workflows.mediaProviders().sunra });
   // The same members can read the credits: they spend them when they run a Sunra step.
-  if (path === WORKFLOWS_SUNRA_ROUTES.credits) return json(200, { sunra: (await run(workflows.mediaCredits())).sunra });
+  if (path === WORKFLOWS_SUNRA_ROUTES.credits)
+    return json(200, { sunra: (await run(workflows.mediaCredits("sunra"))).sunra });
   // The same for Higgsfield.
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.providers)
     return json(200, { higgsfield: workflows.mediaProviders().higgsfield });
   if (path === WORKFLOWS_HIGGSFIELD_ROUTES.credits)
-    return json(200, { higgsfield: (await run(workflows.mediaCredits())).higgsfield });
+    return json(200, { higgsfield: (await run(workflows.mediaCredits("higgsfield"))).higgsfield });
   if (!github) return "unmatched";
   switch (path) {
     case WORKFLOWS_GITHUB_ROUTES.catalog:

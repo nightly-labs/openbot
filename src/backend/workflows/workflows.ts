@@ -269,8 +269,8 @@ export interface WorkflowsDependencies {
   ) => Effect.Effect<string | "missing" | "type", { readonly cause: unknown }>;
   /** The media services beyond the agent providers that this host can use now. Absent: none. */
   mediaProviders?: () => WorkflowMediaProviders;
-  /** The credits of the media services that this host can spend now. Absent: none. */
-  mediaCredits?: () => Effect.Effect<WorkflowMediaCredits>;
+  /** The credits of the media services that this host can spend now; with `only`, of that one. Absent: none. */
+  mediaCredits?: (only?: keyof WorkflowMediaCredits) => Effect.Effect<WorkflowMediaCredits>;
   notify(notice: WorkflowNotice): void;
   /** Whether a messaging connection of this host is on. */
   connectionOn(connectionId: string): boolean;
@@ -416,8 +416,11 @@ interface WorkflowsShape {
   keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
   /** Whether this host can use Sunra and Higgsfield for an image step now. */
   mediaProviders(): WorkflowMediaProviders;
-  /** The credits that this host's Sunra and Higgsfield sign-ins can spend now. A failed read has none. */
-  mediaCredits(): Effect.Effect<WorkflowMediaCredits>;
+  /**
+   * The credits that this host's Sunra and Higgsfield sign-ins can spend now. A failed read has none.
+   * With `only`, it reads that service alone and the other one is null.
+   */
+  mediaCredits(only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
   stopStep(stepId: string): Effect.Effect<void, WorkflowFailed>;
@@ -1911,8 +1914,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
 
         const mediaProviders = (): WorkflowMediaProviders =>
           dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
-        const mediaCredits = (): Effect.Effect<WorkflowMediaCredits> =>
-          dependencies.mediaCredits?.() ?? Effect.succeed({ sunra: null, higgsfield: null });
+        const mediaCredits = (only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits> =>
+          dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null });
 
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
           return yield* locked(
