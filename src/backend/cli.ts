@@ -998,8 +998,9 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
     // An incomplete CLI of the user's runs over the copy only when the user chose it. It stays a choice.
     if (preferInstalled && (installedChosen || (asNew && !installed.incomplete))) {
-      const copyNewer = olderVersion(installed.version, resolved.version);
-      return { cli: installed, passedOver: copyNewer ? { source: "managed", version: resolved.version } : null };
+      // The copy stays a choice over an incomplete CLI, also when the copy is older.
+      const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
     }
     return { cli: resolved, passedOver: { source: "system", version: installed.version } };
   };
