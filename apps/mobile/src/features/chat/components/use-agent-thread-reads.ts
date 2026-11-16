@@ -170,16 +170,24 @@ export function useAgentThreadUnread(serverId: string, agentId: string): number 
 
 /**
  * The first unread message of one thread when its screen opens, where the NEW line stands, as in the
- * agent's chat. `undefined` while the host sends the marks for this visit: a mark that the phone kept
- * can be old. `null` when the person has read the thread, on a host without `agent-thread-reads-v1`,
- * offline, or when the read failed.
+ * agent's chat. `firstUnread` is `undefined` while the host sends the marks for this visit: a mark
+ * that the phone kept can be old. It is `null` when the person has read the thread, on a host without
+ * `agent-thread-reads-v1`, offline, for a draft (`taskId` null), or when the read failed or cannot
+ * start. `keptUnread` is false when the marks that the phone kept show the thread as read.
  */
-export function useThreadOpeningUnread(serverId: string, agentId: string, taskId: string): string | null | undefined {
+export function useThreadOpeningUnread(
+  serverId: string,
+  agentId: string,
+  taskId: string | null,
+): { firstUnread: string | null | undefined; keptUnread: boolean } {
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
-  const enabled = useThreadReadsEnabled(serverId);
+  const enabled = useThreadReadsEnabled(serverId) && taskId !== null;
   const reads = useQuery(threadReadsQuery(queryScope, workspace, serverId, agentId, enabled));
-  if (!enabled || reads.isError) return null;
-  if (reads.isFetching || !reads.data) return undefined;
-  return reads.data.find((read) => read.taskId === taskId)?.firstUnreadMessageId ?? null;
+  const read = reads.data?.find((entry) => entry.taskId === taskId);
+  const keptUnread = !reads.data || (read?.unreadCount ?? 0) > 0;
+  if (!enabled || reads.isError) return { firstUnread: null, keptUnread: false };
+  // A paused read, such as while the phone is offline, gives no marks for this visit.
+  if (reads.fetchStatus === "fetching") return { firstUnread: undefined, keptUnread };
+  return { firstUnread: read?.firstUnreadMessageId ?? null, keptUnread };
 }

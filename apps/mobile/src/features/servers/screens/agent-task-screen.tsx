@@ -42,6 +42,7 @@ import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
   type ChatBubbleMessage,
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
   withQuestionContext,
@@ -264,28 +265,39 @@ function AgentTaskChat({
   const [focus, setFocus] = useState(focusMessageId);
   // The NEW line of this visit, as in the agent's chat. The open thread reads itself, so the line
   // keeps the first unread message that the thread had when it opened.
-  const openingUnread = useThreadOpeningUnread(serverId, agentId, taskId);
+  const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
   const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
   // While the server connects or resumes, the host marks are not read yet, and the thread can show
   // the messages that the phone kept.
   const connecting = Boolean(server?.initialConnectionPending) || (online && server?.state !== "online");
-  if (unreadLine === null && openingUnread !== undefined && !connecting && (isDraft || conversation.data))
-    setUnreadLine({ messageId: openingUnread });
+  if (unreadLine === null && openingUnread.firstUnread !== undefined && !connecting && (isDraft || conversation.data))
+    setUnreadLine({ messageId: openingUnread.firstUnread });
   const unreadLineMessageId = unreadLine?.messageId ?? null;
-  // The line shows above the first of these messages that has a row.
+  // The line shows above the first of these messages that has a row. The set stays the same object
+  // while its ids stay, as the list asks: a streamed reply changes the messages on each chunk.
+  const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
   const unreadLineMessageIds = useMemo(() => {
     const entries = conversation.data?.messages ?? [];
     const start = unreadLineMessageId ? entries.findIndex((message) => message.id === unreadLineMessageId) : -1;
-    return start < 0 ? null : new Set(entries.slice(start).map((message) => message.id));
+    lastUnreadLineIds.current =
+      start < 0
+        ? null
+        : keptIdSet(
+            lastUnreadLineIds.current,
+            entries.slice(start).map((message) => message.id),
+          );
+    return lastUnreadLineIds.current;
   }, [unreadLineMessageId, conversation.data?.messages]);
   // The thread opens at the NEW line once, after a message that it opens at. A thread that showed
-  // before the line does not move to it later, under the reader.
+  // before the line does not move to it later, under the reader. While the marks of this visit load,
+  // the list waits only when the kept marks show the thread as unread, and not while the server
+  // connects or resumes: the thread then shows the messages that the phone kept.
   const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
   const opensAtUnread =
     focus === null &&
     unreadOpening === "pending" &&
     online &&
-    (unreadLine === null ? !isDraft : unreadLineMessageIds !== null);
+    (unreadLine === null ? !isDraft && !connecting && openingUnread.keptUnread : unreadLineMessageIds !== null);
   const clearFocus = useCallback(() => {
     setFocus(null);
     setUnreadOpening("done");
@@ -414,6 +426,12 @@ function AgentTaskChat({
     setFocus(null);
     setUnreadOpening("done");
   }, [focusMissing]);
+  // The list showed without the NEW line, such as at the latest message while the line's message
+  // was not loaded. A line that comes later does not move the list under the reader.
+  const shownWithoutFocus = motion.historyVisible && focus === null && !opensAtUnread;
+  useEffect(() => {
+    if (shownWithoutFocus) setUnreadOpening("done");
+  }, [shownWithoutFocus]);
   const closed = task?.state === "closed";
   const canSend = online && !closed && (!isDraft || enabled);
   const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
