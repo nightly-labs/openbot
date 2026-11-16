@@ -53,7 +53,8 @@ export function QueuedMessageEditScreen() {
     serverId: queue?.serverId ?? "",
     id: queue?.agentId ?? "",
   });
-  const keptText = dirty && text.trim() ? text : null;
+  // Only changed text: the agent already has the original, and the files go with the edit.
+  const keptText = edit && text !== edit.delivery.text && text.trim() ? text : null;
 
   // The host hold is taken once per visit. `busy` only turns on once the controller
   // starts the request, so track it here as well and keep the failure copy until then.

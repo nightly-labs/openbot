@@ -68,6 +68,8 @@ export class QueueControls {
   readonly #drain: DrainScheduler;
   readonly #routines: RoutineScheduler;
   readonly #hooks: QueueControlsHooks;
+  /** The wakes for the end of edit holds. `dispose` clears them, so none runs after a stop. */
+  readonly #holdWakes = new Set<ReturnType<typeof setTimeout>>();
 
   constructor(options: QueueControlsOptions) {
     this.#store = options.store;
@@ -101,7 +103,17 @@ export class QueueControls {
    * starts the queue then, also when no other change wakes the agent.
    */
   wakeAfterEditHold(agentId: string): void {
-    setTimeout(() => this.#drain.scheduleDrain(agentId), QUEUE_EDIT_HOLD_MS + 1_000).unref();
+    const timer = setTimeout(() => {
+      this.#holdWakes.delete(timer);
+      this.#drain.scheduleDrain(agentId);
+    }, QUEUE_EDIT_HOLD_MS + 1_000);
+    timer.unref();
+    this.#holdWakes.add(timer);
+  }
+
+  dispose(): void {
+    for (const timer of this.#holdWakes) clearTimeout(timer);
+    this.#holdWakes.clear();
   }
 
   readonly edit = Effect.fn("QueueControls.edit")(function* (

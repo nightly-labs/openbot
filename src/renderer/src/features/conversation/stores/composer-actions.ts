@@ -804,14 +804,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
       for (const attachment of deps.editingDraftBackup()?.attachments ?? []) {
         void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
       }
-      deps.setEditingAgentId(null);
-      deps.setEditingServerId(null);
-      deps.setEditingDeliveryId(null);
-      deps.setEditingEditId(null);
-      deps.setEditingPendingSave(null);
-      clearStoredQueueEdit();
-      deps.setEditingDraftBackup(null);
-      deps.setEditingOriginalAttachmentIds([]);
+      clearQueueEditState();
     }
     return true;
   }
