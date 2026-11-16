@@ -20,6 +20,9 @@
 // TradingView (#9209) blocks a sign-in page that returns to `127.0.0.1` or `localhost`. A joined
 // server's relayed sign-in for a client that opens `openbot://mcp-auth` must register and send that
 // link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
+// GitLab (#9372) answers 403 to the token of an account that may not use its MCP server, after the
+// sign-in and at each Test with the saved sign-in: the refusal must say that the server refused the
+// account, not "Check the API key", and must ask for neither a key nor a sign-in.
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
@@ -30,7 +33,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { McpOAuth, type McpOAuthRecord } from "../src/backend/mcp-oauth-provider";
-import { testMcpServer } from "../src/backend/mcp-probe";
+import { inspectMcpServer, testMcpServer } from "../src/backend/mcp-probe";
 
 const out = resolve(import.meta.dirname, "../.openbot-build/mcp-sign-in-client-refused-e2e");
 const ACCESS_TOKEN = "e2e-access-token";
@@ -63,6 +66,8 @@ interface FakeServer {
 interface Case {
   name: string;
   attempts: { toolCount: number; error: string | null }[];
+  /** A Test after the attempts, with the saved sign-in and no browser, as the Test button runs it. */
+  silentTest?: { error: string | null; needs: string | null };
   registrations: (string | null)[];
   registrationScopes: (string | null)[];
   /** The `scope` of each sign-in page that opened, in order. */
@@ -134,6 +139,8 @@ async function fakeServer(
   registrationRefused: RegistrationRefusal | null,
   scopes: ScopeMetadata = {},
   registrationForbidden: RegistrationForbidden | null = null,
+  /** GitLab: the token is valid, and the account may not use the server. */
+  accountRefused = false,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -219,6 +226,7 @@ async function fakeServer(
           { error: "unauthorized" },
           { "www-authenticate": `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource/mcp"` },
         );
+      if (accountRefused) return json(response, 403, { message: "403 Forbidden" });
       const message = rpcRequest.parse(JSON.parse(await body(request)));
       if (message.id === undefined) {
         response.writeHead(202).end();
@@ -291,6 +299,7 @@ async function runCase(
     registrationForbidden = null,
     storedClient = null,
     relayDeepLink,
+    accountRefused = false,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
@@ -304,9 +313,18 @@ async function runCase(
      * for none). The firewall blocks each page but the last, and the member cancels it.
      */
     relayDeepLink?: string | null;
+    /** The server refuses the signed-in account with 403, and a silent Test follows the attempts. */
+    accountRefused?: boolean;
   } = {},
 ): Promise<Case> {
-  const server = await fakeServer(authMethods, secretAccepted, registrationRefused, scopes, registrationForbidden);
+  const server = await fakeServer(
+    authMethods,
+    secretAccepted,
+    registrationRefused,
+    scopes,
+    registrationForbidden,
+    accountRefused,
+  );
   const records = new Map<string, McpOAuthRecord>();
   if (storedClient)
     records.set(server.url, {
@@ -361,9 +379,14 @@ async function runCase(
     const results: Case["attempts"] = [];
     for (attempt = 0; attempt < attempts; attempt++)
       results.push(await runCauseEffect(testMcpServer(httpConfig(server.url), 10_000, undefined, authority, "here")));
+    const silent = { accessToken: (url: string) => oauth.accessToken(url), signIn: () => null };
+    const silentTest = accountRefused
+      ? await runCauseEffect(inspectMcpServer(httpConfig(server.url), 10_000, undefined, silent, "here"))
+      : null;
     return {
       name,
       attempts: results,
+      ...(silentTest ? { silentTest: { error: silentTest.error, needs: silentTest.needs } } : {}),
       registrations: [...server.registrations],
       registrationScopes: [...server.registrationScopes],
       pageScopes: server.pagesOpened.map((page) => new URL(page).searchParams.get("scope")),
@@ -489,6 +512,20 @@ async function main(): Promise<void> {
     check(tessie, !tessie.storedClient, "a client is stored after a refused registration");
     check(tessie, !tessie.signedIn, "a token is stored after a refused registration");
     report.cases.push(tessie);
+
+    // GitLab refuses the signed-in account with 403, after the sign-in and at the Test that follows.
+    const accountRefused = sourceText("error.backend.mcpSignInAccountRefused");
+    const gitlab = await runCase("account-refused-after-sign-in", ["none"], 1, { accountRefused: true });
+    const [signInAttempt] = gitlab.attempts;
+    check(gitlab, signInAttempt?.error === accountRefused, `the sign-in reported: ${signInAttempt?.error}`);
+    check(gitlab, gitlab.signedIn, "no token is stored after the sign-in");
+    check(
+      gitlab,
+      gitlab.silentTest?.error === accountRefused,
+      `the Test with the saved sign-in reported: ${gitlab.silentTest?.error}`,
+    );
+    check(gitlab, gitlab.silentTest?.needs === null, `the Test asked for: ${gitlab.silentTest?.needs}`);
+    report.cases.push(gitlab);
 
     // Dropbox refuses `/mcp-auth` with 403. OpenBot registers the `/callback` form once more and
     // sends it on the page and in the token request, although the registration names no port.

@@ -236,12 +236,14 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     seen.challenge = next;
   };
   const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, signIn, seen.challenge, signInPlace, signedIn);
+    const accountRefused = refusesSignedInAccount(error, server, signedIn);
+    const described = describeProbeFailure(error, config, signIn, seen.challenge, signInPlace, accountRefused);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
       tools: [],
-      needs: signIn ? null : probeNeed(config, seen.challenge),
+      // Neither a key nor another press of Sign in changes a refused account.
+      needs: signIn || accountRefused ? null : probeNeed(config, seen.challenge),
     };
   };
   const found = (listed: ListedTools): McpProbeOutcome => ({
@@ -337,17 +339,17 @@ function describeProbeFailure(
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
-  /** The refusal came after the sign-in, so a 403 refuses the account the person has just signed in with. */
-  signedIn: boolean,
+  /** A 403 to OpenBot's own sign-in, see `refusesSignedInAccount`. */
+  accountRefused: boolean,
 ): string {
   if (signIn?.cancelled()) return sourceText("error.backend.mcpSignInCancelled");
   // With no metadata, the SDK registers at a guessed address, and a token server answers that with
   // a status such as Laravel's 419, or 401. The sign-in never existed; the key is what it wants.
   if (signIn?.signInServerMissing()) return BEARER_KEY;
   if (signIn && isRegistrationRefusal(error, signIn)) return REGISTRATION_REFUSED;
+  if (accountRefused) return sourceText("error.backend.mcpSignInAccountRefused");
   const status = httpStatus(error);
-  if (signIn && (status === 401 || (signedIn && status === 403)))
-    return sourceText("error.backend.mcpSignInNotAccepted");
+  if (signIn && status === 401) return sourceText("error.backend.mcpSignInNotAccepted");
   // The token endpoint refused the grant. Its status says nothing about the address the user typed.
   if (signIn?.exchangeFailed() && status !== null && status >= 400 && status < 500)
     return sourceText("error.backend.mcpSignInNotAccepted");
@@ -360,6 +362,18 @@ function describeProbeFailure(
     if (described) return described;
   }
   return describeMcpError(error, config);
+}
+
+/**
+ * Whether a 403 refuses the account of OpenBot's own sign-in: the one the person has just finished,
+ * or the saved one that a Test sends. The token was accepted as a sign-in, so the service refuses
+ * the account itself, not a key. GitLab answers so to a saved sign-in (#9372), and Adobe Analytics
+ * to an account with no access to an organization of its product (#9232). A key the user pasted
+ * into a header is theirs to fix, as before.
+ */
+function refusesSignedInAccount(error: unknown, server: UsableMcpServer, signedIn: boolean): boolean {
+  if (httpStatus(error) !== 403) return false;
+  return signedIn || (Boolean(server.authorization) && !hasCredentialHeader(server.config));
 }
 
 /**
