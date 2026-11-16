@@ -179,8 +179,9 @@ export interface AcpFlavor {
     mcpLoadFailure(text: string): { name: string; reason: string } | null;
     /**
      * The MCP tools whose parameter schema the agent refused in the session's last prompt, from the
-     * failure text, or from the agent's own log when the text names no cause. Each name is
-     * `mcp_<server>_<tool>`.
+     * failure text, or from the agent's own log when the text names no cause. When Google refused a
+     * tool, the text names only its fields, and the tools come from the schemas that the agent saved.
+     * Each name is `mcp_<server>_<tool>`.
      */
     refusedMcpTools?(text: string, argv: readonly string[], sessionId: string): string[];
     /** A failure text after which the agent no longer has the session, so the next prompt opens it again. */
