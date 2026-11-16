@@ -551,6 +551,9 @@ export function MessageBody(props: {
     const images = new Set(standaloneImageAttachments());
     return standaloneAttachments().filter((attachment) => !images.has(attachment));
   });
+  /* A full cache removes the oldest image. A shown image that lost its file this way shows as a card
+     and does not load again: a new load would remove the next image, and the downloads would not stop. */
+  const loadedImages = new Set<string>();
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
@@ -558,9 +561,14 @@ export function MessageBody(props: {
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
+        if (loadedImages.has(attachment.id)) {
+          unloaded(attachment);
+          continue;
+        }
         void source?.load(attachment, loadLimit(attachment)).then(
           (shown) => {
-            if (!shown) unloaded(attachment);
+            if (shown) loadedImages.add(attachment.id);
+            else unloaded(attachment);
           },
           () => unloaded(attachment),
         );
