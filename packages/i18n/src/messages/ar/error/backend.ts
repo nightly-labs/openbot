@@ -231,6 +231,8 @@ export const messages = {
     "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
     "لم يقبل خادم تسجيل الدخول OpenBot عند إكمال تسجيل الدخول. سجّل الدخول مرة أخرى: سيسجّل OpenBot لدى الخادم مرة أخرى.",
+  "error.backend.mcpSignInAppRefused":
+    "لم يقبل خادم تسجيل الدخول تطبيق تسجيل الدخول لهذا الخادم. تحقّق من Client ID وClient secret لتطبيق تسجيل الدخول، ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpCommandNotFound": "لم يتم العثور على الأمر: {command}",
   "error.backend.mcpRegistrationRefused":
     "لا يقبل خادم تسجيل الدخول OpenBot كتطبيق بعد. حسابك ليس السبب. استخدم طريقة أخرى للاتصال، مثل خادم MCP محلي.",

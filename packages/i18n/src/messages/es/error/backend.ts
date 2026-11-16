@@ -257,6 +257,8 @@ export const messages = {
     "El servidor rechazó la cuenta con la que iniciaste sesión. Comprueba que esa cuenta puede usar el servicio. Para usar otra cuenta, cierra sesión y vuelve a iniciar sesión.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
+  "error.backend.mcpSignInAppRefused":
+    "El servidor de inicio de sesión no aceptó la app de inicio de sesión de este servidor. Revisa el ID de cliente y el secreto de cliente de la app de inicio de sesión y vuelve a iniciar sesión.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
   "error.backend.mcpRegistrationRefused":
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
