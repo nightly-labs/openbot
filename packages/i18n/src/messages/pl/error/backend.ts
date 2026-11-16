@@ -270,6 +270,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
   "error.backend.mcpToolSchemaRefused":
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
