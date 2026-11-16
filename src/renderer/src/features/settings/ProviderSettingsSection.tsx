@@ -109,9 +109,11 @@ interface ProviderSettingsSectionProps {
   onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   /**
    * The endpoints are this computer's, so the form offers "Runs on" and the model limits. A joined
-   * server's host keeps both as they are: the Team API has neither.
+   * server's host keeps the model limits as they are: the Team API has none.
    */
   localEndpoints?: boolean | undefined;
+  /** A joined server's host with `custom-provider-harness-choice-v1`: the form offers "Runs on" too. */
+  customProviderHarnessChoice?: boolean | undefined;
   onSignInProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   /** Adds, names and removes the accounts of each provider that can hold more than one. */
   accountActions?: ProviderAccountActions | undefined;
@@ -149,9 +151,9 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     const endpoint = customProviderOfModel(choice?.preferredModel, customProviders());
     return endpoint && choice?.preferredProvider === harnessOf(endpoint) ? (choice.preferredModel ?? null) : null;
   };
-  /** "Runs on" is of this computer: a joined server's host keeps the harness of each endpoint. */
+  /** "Runs on": this computer, or a joined server's host that lets an admin choose the harness. */
   const harnesses = () =>
-    props.localEndpoints
+    props.localEndpoints || props.customProviderHarnessChoice
       ? CUSTOM_PROVIDER_HARNESSES.map((id) => {
           const option = props.store.providerOptions().find((item) => item.id === id);
           return { id, ready: servesCustomProvider(option), runtime: option?.runtimeStatus };
@@ -560,6 +562,8 @@ export interface HostProviderSettings {
   onDeleteCustomProvider?: ((id: string) => Promise<CustomProviderRestart>) | undefined;
   /** Without it the rows have no Edit. A joined server's host edits only with `custom-provider-edit-v1`. */
   onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
+  /** A joined server's host with `custom-provider-harness-choice-v1`: the endpoint form offers "Runs on". */
+  customProviderHarnessChoice?: boolean | undefined;
   providerKeys?: ProviderKeyApi | undefined;
   /** How each row signs in, from where the user connects. */
   connection?: ProviderConnectionApi | undefined;
@@ -677,6 +681,7 @@ export function HostProviderSettingsPanel(
         onDeleteCustomProvider={props.onDeleteCustomProvider}
         onUpdateCustomProvider={props.onUpdateCustomProvider}
         localEndpoints={props.hostName === undefined}
+        customProviderHarnessChoice={props.customProviderHarnessChoice}
         accountActions={props.accountActions}
         // With detection off there is no list, not an empty one.
         providerDetection={props.detectionSettings?.enabled === false ? undefined : props.providerDetection}
