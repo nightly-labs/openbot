@@ -2001,6 +2001,14 @@ export class AttentionRegistry {
       });
       return;
     }
+    // Nobody in an external chat sees the card, so the turn would wait, and hold the chat, until a restart (#10041).
+    if (this.#messagingThread(publicThreadId)) {
+      client.respond(request.id, {
+        success: false,
+        contentItems: [{ type: "inputText", text: MESSAGING_QUESTION_REFUSED }],
+      });
+      return;
+    }
     // A block with an automatic answer does not wait for the user.
     if (!auto && this.#messagingRequestTurn(agentId, turnId)) {
       client.respond(request.id, {
