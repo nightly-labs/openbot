@@ -7,13 +7,12 @@ import BookmarkPlus from "lucide-react-native/icons/bookmark-plus";
 import BookmarkX from "lucide-react-native/icons/bookmark-x";
 import CircleSlash from "lucide-react-native/icons/circle-slash";
 import Pencil from "lucide-react-native/icons/pencil";
-import { useCallback, useSyncExternalStore } from "react";
 import { View } from "react-native";
-import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
 import { useText } from "@/shared/lib/text";
 import { memoryChangesSummary } from "../components/chat-memory-changes";
 import { type SubagentColors, useSubagentColors } from "../components/chat-subagents";
+import { firstParam, useConversationMessage } from "../components/use-conversation-message";
 
 const NO_CHANGES: readonly ConversationMemoryChange[] = [];
 
@@ -37,13 +36,9 @@ function actionColor(action: ConversationMemoryChangeAction, colors: SubagentCol
   return colors.muted;
 }
 
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
 /**
  * The memory changes of one turn: what the agent saved, updated and forgot, and what another thread
- * changed first. The chat under the sheet keeps the conversation current, so the sheet only reads it.
+ * changed first.
  */
 export function MemoryChangesScreen() {
   const text = useText();
@@ -52,16 +47,7 @@ export function MemoryChangesScreen() {
   const params = useLocalSearchParams<{ agentId: string; messageId: string }>();
   const agentId = firstParam(params.agentId) ?? "";
   const messageId = firstParam(params.messageId) ?? "";
-  const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
-  const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agentId, notify),
-    [agentId, conversationStore],
-  );
-  const conversation = useSyncExternalStore(
-    subscribe,
-    useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
-  );
-  const changes = conversation?.messages.find((message) => message.id === messageId)?.memoryChanges ?? NO_CHANGES;
+  const changes = useConversationMessage(agentId, messageId)?.memoryChanges ?? NO_CHANGES;
   // One turn can change the same memory twice in the same way, so the key counts each repeat.
   const seen = new Map<string, number>();
   const keys = changes.map((change) => {

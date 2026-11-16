@@ -11,7 +11,6 @@ import Pencil from "lucide-react-native/icons/pencil";
 import Puzzle from "lucide-react-native/icons/puzzle";
 import Search from "lucide-react-native/icons/search";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { useCallback, useSyncExternalStore } from "react";
 import { View } from "react-native";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import { SheetScrollView } from "@/shared/components/sheet-scroll-view";
@@ -23,6 +22,7 @@ import {
   useSubagentColors,
   useSubagentGroupSummary,
 } from "../components/chat-subagents";
+import { firstParam, useConversationMessage } from "../components/use-conversation-message";
 import { GENERAL_AGENT_TYPE, SUBAGENT_STATE_LABELS, subagentDuration, subagentElapsedMs } from "../model/subagents";
 
 const STEP_ICONS: Record<ConversationSubagentStepKind, LucideIcon> = {
@@ -38,25 +38,9 @@ const STEP_ICONS: Record<ConversationSubagentStepKind, LucideIcon> = {
 
 const NO_SUBAGENTS: readonly ConversationSubagent[] = [];
 
-function firstParam(value: string | string[] | undefined): string | undefined {
-  return Array.isArray(value) ? value[0] : value;
-}
-
-/**
- * The subagents of one `subagents` message. The chat under the sheet keeps the conversation current,
- * so the sheet only reads it.
- */
+/** The subagents of one `subagents` message. */
 function useSubagents(agentId: string, messageId: string): readonly ConversationSubagent[] {
-  const conversationStore = useMobileWorkspaceSelector((current) => current.conversationStore);
-  const subscribe = useCallback(
-    (notify: () => void) => conversationStore.subscribe(agentId, notify),
-    [agentId, conversationStore],
-  );
-  const conversation = useSyncExternalStore(
-    subscribe,
-    useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
-  );
-  return conversation?.messages.find((message) => message.id === messageId)?.subagents ?? NO_SUBAGENTS;
+  return useConversationMessage(agentId, messageId)?.subagents ?? NO_SUBAGENTS;
 }
 
 /**
