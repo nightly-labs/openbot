@@ -1,4 +1,5 @@
 import { env, waitUntil } from "cloudflare:workers";
+import { FEEDBACK_REPOSITORY } from "@openbot/contracts/feedback";
 import { HOSTING_DEVELOPER_KEY_HEADER } from "@openbot/contracts/hosted-servers";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
@@ -240,7 +241,10 @@ export function requestFeedbackOwner(userId: string) {
 /** The private repository for withdrawn feedback issues, or null when this Worker has none. */
 export function requestFeedbackWithdrawnRepository(): string | null {
   const repository = requireWorkerBindings(env).FEEDBACK_WITHDRAWN_REPOSITORY?.trim();
-  return repository && /^[\w.-]+\/[\w.-]+$/u.test(repository) ? repository : null;
+  if (!repository || !/^[\w.-]+\/[\w.-]+$/u.test(repository)) return null;
+  // The installation token for a move covers repositories of one owner only.
+  const owner = (name: string) => name.split("/")[0]?.toLowerCase();
+  return owner(repository) === owner(FEEDBACK_REPOSITORY) ? repository : null;
 }
 
 /** A few withdrawals for each account and minute. Each one reads GitHub with the one app installation. */

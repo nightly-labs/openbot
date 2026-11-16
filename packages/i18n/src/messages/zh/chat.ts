@@ -499,6 +499,7 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot 现在无法删除报告。请稍后重试。",
   "chat.feedbackSent.removeLimited": "尝试次数过多。请等待一分钟后重试。",
   "chat.feedbackSent.removeNotFound": "OpenBot 在聊天中找不到此报告。",
+  "chat.feedbackSent.removeMoved": "OpenBot 无法删除此报告。它已移到 GitHub 上的其他位置。请让 OpenBot 团队删除它。",
   "chat.feedbackWithdrawn.title": "报告已删除",
   "chat.feedbackWithdrawn.badge": "已删除",
   "chat.feedbackWithdrawn.body": "你的报告已不在 GitHub 上。如需发送修正后的报告，请让助手发送。",

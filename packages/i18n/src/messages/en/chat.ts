@@ -503,6 +503,8 @@ export const messages = defineMessages("chat", {
   "chat.feedbackSent.removeUnavailable": "OpenBot cannot remove reports now. Try again later.",
   "chat.feedbackSent.removeLimited": "Too many tries. Wait one minute, then try again.",
   "chat.feedbackSent.removeNotFound": "OpenBot cannot find this report in the chat.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot cannot remove this report. It moved to another place on GitHub. Ask the OpenBot team to remove it.",
   "chat.feedbackWithdrawn.title": "Report removed",
   "chat.feedbackWithdrawn.badge": "Removed",
   "chat.feedbackWithdrawn.body": "Your report is not on GitHub anymore. To send a corrected report, ask the agent.",

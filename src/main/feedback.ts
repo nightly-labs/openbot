@@ -144,6 +144,8 @@ export function feedbackSender(auth: FeedbackAuth): AgentFeedback {
                 code === "feedback_unavailable"
               )
                 return Effect.succeed({ status: "unavailable" } as const);
+              // A maintainer moved the issue to another public repository: it is still public.
+              if (code === "feedback_moved") return Effect.succeed({ status: "moved" } as const);
               const limit = authApiRateLimit(error.cause);
               if (limit)
                 return Effect.succeed({ status: "limited", retryAfterSeconds: limit.retryAfterSeconds } as const);

@@ -603,6 +603,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot nie może teraz usuwać zgłoszeń. Spróbuj później.",
   "chat.feedbackSent.removeLimited": "Za dużo prób. Poczekaj minutę i spróbuj ponownie.",
   "chat.feedbackSent.removeNotFound": "OpenBot nie może znaleźć tego zgłoszenia w czacie.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot nie może usunąć tego zgłoszenia. Zostało przeniesione w inne miejsce na GitHubie. Poproś zespół OpenBot o jego usunięcie.",
   "chat.feedbackWithdrawn.title": "Zgłoszenie usunięte",
   "chat.feedbackWithdrawn.badge": "Usunięte",
   "chat.feedbackWithdrawn.body":

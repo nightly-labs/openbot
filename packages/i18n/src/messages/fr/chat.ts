@@ -507,6 +507,8 @@ export const messages = {
     "OpenBot ne peut pas supprimer de rapports pour le moment. Réessayez plus tard.",
   "chat.feedbackSent.removeLimited": "Trop de tentatives. Attendez une minute, puis réessayez.",
   "chat.feedbackSent.removeNotFound": "OpenBot ne trouve pas ce rapport dans la conversation.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot ne peut pas supprimer ce rapport. Il a été déplacé ailleurs sur GitHub. Demandez à l'équipe OpenBot de le supprimer.",
   "chat.feedbackWithdrawn.title": "Rapport supprimé",
   "chat.feedbackWithdrawn.badge": "Supprimé",
   "chat.feedbackWithdrawn.body":

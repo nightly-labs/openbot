@@ -516,6 +516,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot no puede eliminar informes ahora. Inténtalo más tarde.",
   "chat.feedbackSent.removeLimited": "Demasiados intentos. Espera un minuto y vuelve a intentarlo.",
   "chat.feedbackSent.removeNotFound": "OpenBot no encuentra este informe en el chat.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot no puede eliminar este informe. Se movió a otro lugar de GitHub. Pide al equipo de OpenBot que lo elimine.",
   "chat.feedbackWithdrawn.title": "Informe eliminado",
   "chat.feedbackWithdrawn.badge": "Eliminado",
   "chat.feedbackWithdrawn.body":

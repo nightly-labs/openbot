@@ -512,6 +512,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot şu anda rapor kaldıramıyor. Daha sonra tekrar deneyin.",
   "chat.feedbackSent.removeLimited": "Çok fazla deneme. Bir dakika bekleyip tekrar deneyin.",
   "chat.feedbackSent.removeNotFound": "OpenBot bu raporu sohbette bulamıyor.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot bu raporu kaldıramıyor. Rapor GitHub'da başka bir yere taşındı. OpenBot ekibinden kaldırmasını isteyin.",
   "chat.feedbackWithdrawn.title": "Rapor kaldırıldı",
   "chat.feedbackWithdrawn.badge": "Kaldırıldı",
   "chat.feedbackWithdrawn.body":

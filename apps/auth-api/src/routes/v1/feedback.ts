@@ -39,15 +39,17 @@ export const Route = createFileRoute("/v1/feedback")({
             // The mark lets this account take the report back later. See `/v1/feedback/withdraw`.
             const owner = yield* requestFeedbackOwner(user.id);
             const report = feedbackIssue(feedback);
-            const markedIssue = { ...report, body: yield* owner.mark(report.body) };
-            const markedComment = yield* owner.mark(feedbackComment(feedback));
             const day = yield* enforceFeedbackRateLimit(user.id);
-            const open = github.openIssue(FEEDBACK_REPOSITORY, markedIssue);
+            const open = owner
+              .mark(report.body)
+              .pipe(Effect.flatMap((body) => github.openIssue(FEEDBACK_REPOSITORY, { ...report, body })));
             // An issue that closed after the search gets a new issue: the user approved the report.
+            const sameAs = feedback.sameAs;
             const sent = yield* (
-              feedback.sameAs === null
+              sameAs === null
                 ? open.pipe(Effect.map((issue) => ({ issue, comment: false })))
-                : github.commentIssue(FEEDBACK_REPOSITORY, feedback.sameAs, markedComment).pipe(
+                : owner.mark(feedbackComment(feedback)).pipe(
+                    Effect.flatMap((comment) => github.commentIssue(FEEDBACK_REPOSITORY, sameAs, comment)),
                     Effect.map((issue) => ({ issue, comment: true })),
                     Effect.catchIf(
                       (error) => error.code === "issue_not_open",

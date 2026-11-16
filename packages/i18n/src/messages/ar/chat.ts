@@ -662,6 +662,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "لا يمكن لـ OpenBot إزالة البلاغات الآن. حاول لاحقًا.",
   "chat.feedbackSent.removeLimited": "محاولات كثيرة جدًا. انتظر دقيقة، ثم حاول مرة أخرى.",
   "chat.feedbackSent.removeNotFound": "لا يجد OpenBot هذا البلاغ في الدردشة.",
+  "chat.feedbackSent.removeMoved":
+    "لا يستطيع OpenBot إزالة هذا البلاغ. لقد نُقل إلى مكان آخر على GitHub. اطلب من فريق OpenBot إزالته.",
   "chat.feedbackWithdrawn.title": "أُزيل البلاغ",
   "chat.feedbackWithdrawn.badge": "أُزيل",
   "chat.feedbackWithdrawn.body": "لم يعد بلاغك على GitHub. لإرسال بلاغ مصحَّح، اطلب ذلك من الوكيل.",

@@ -1,6 +1,7 @@
 import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
 import type { ConversationMessage, ConversationSnapshot, WithdrawFeedbackInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
@@ -16,10 +17,18 @@ export interface FeedbackWithdrawalOptions {
   feedback: AgentFeedback | null;
 }
 
+/** A thank-you card: its thread, the task that shows it when it is in a task, and the message. */
+interface CardTarget {
+  threadId: string;
+  taskId: string | null;
+  message: ConversationMessage;
+}
+
 /** A withdrawal result, or `notFound` when the message is not a thank-you card of this host. */
 export type FeedbackCardWithdrawResult = FeedbackWithdrawResult | { readonly status: "notFound" };
 
 const FEEDBACK_WITHDRAWN_EVENT = "feedback.withdrawn";
+const logger = createOpenBotLogger("feedback-withdrawal");
 
 /** The title of a thank-you card, from the English text that the card was posted with. */
 function cardTitle(text: string): string {
@@ -54,27 +63,32 @@ export class FeedbackWithdrawal {
     const issue = target && feedbackSentIssue(target.message);
     if (!target || !issue) return { status: "notFound" };
     if (issue.withdrawn) return { status: "withdrawn" };
-    return yield* this.withdraw(input.agentId, target.threadId, issue.number, target.message);
+    return yield* this.withdraw(input.agentId, target.threadId, issue.number, target);
   });
 
   /**
    * Takes issue `number` off GitHub, then marks its cards in thread `threadId` of the agent as removed.
-   * The issue is off GitHub also when the card write fails, so that failure is only logged by the caller.
+   * The issue is off GitHub also when the card write fails, so that failure is only logged.
    */
   readonly withdraw = Effect.fn("FeedbackWithdrawal.withdraw")(function* (
     this: FeedbackWithdrawal,
     agentId: string,
     threadId: string,
     number: number,
-    card?: ConversationMessage,
-  ): Effect.fn.Return<FeedbackWithdrawResult, ToolOperationFailed | StoredStateFailure> {
+    card?: CardTarget,
+  ): Effect.fn.Return<FeedbackWithdrawResult, ToolOperationFailed> {
     if (!this.#feedback) return { status: "signedOut" };
     const result = yield* this.#feedback.withdraw(number);
-    if (result.status === "withdrawn") yield* storedSync(() => this.#markWithdrawn(agentId, threadId, number, card));
+    if (result.status === "withdrawn")
+      yield* storedSync(() => this.#markWithdrawn(agentId, threadId, number, card)).pipe(
+        Effect.catchTag("StoredStateFailure", ({ cause }) =>
+          Effect.sync(() => logger.warn("The card of a removed report was not updated.", { error: toLogValue(cause) })),
+        ),
+      );
     return result;
   });
 
-  #target(input: WithdrawFeedbackInput): { threadId: string; message: ConversationMessage } | null {
+  #target(input: WithdrawFeedbackInput): CardTarget | null {
     const agent = this.#store.list().find((candidate) => candidate.id === input.agentId);
     if (!agent) return null;
     let snapshot: ConversationSnapshot;
@@ -90,38 +104,51 @@ export class FeedbackWithdrawal {
     const message =
       snapshot.messages.find((candidate) => candidate.id === input.messageId) ??
       this.#store.database.readConversationMessages(agent.id, threadId, [input.messageId])[0];
-    return message ? { threadId, message } : null;
+    return message ? { threadId, taskId: input.taskId ?? null, message } : null;
   }
 
   /**
    * Changes each loaded thank-you card of the issue in the thread to a removed card, and publishes the
-   * chat. `card` is the card that the user removed; it can be older than the loaded messages.
+   * chat or the task. `card` is the card that the user removed; it can be older than the loaded messages.
    */
-  #markWithdrawn(agentId: string, threadId: string, number: number, card?: ConversationMessage): void {
-    const snapshot = structuredClone(this.#conversation.ensureSnapshot(agentId, threadId));
+  #markWithdrawn(agentId: string, threadId: string, number: number, card?: CardTarget): void {
+    const taskId = card?.taskId ?? null;
+    const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
+    // The agent can be on another chat now. Then the stored row of this thread gives the active turn.
+    const loaded = current.threadId === threadId;
+    const snapshot = structuredClone(current);
     const removed = (message: ConversationMessage): ConversationMessage => ({
       ...message,
       itemType: feedbackWithdrawnItemType(number),
       text: sourceText("status.agent.feedbackWithdrawn", { title: cardTitle(message.text) }),
     });
     const changed: ConversationMessage[] = [];
-    snapshot.messages = snapshot.messages.map((message) => {
-      const issue = feedbackSentIssue(message);
-      if (!issue || issue.withdrawn || issue.number !== number) return message;
-      const next = removed(message);
-      changed.push(next);
-      return next;
-    });
-    if (card && !changed.some((message) => message.id === card.id)) changed.push(removed(card));
+    if (loaded)
+      snapshot.messages = snapshot.messages.map((message) => {
+        const issue = feedbackSentIssue(message);
+        if (!issue || issue.withdrawn || issue.number !== number) return message;
+        const next = removed(message);
+        changed.push(next);
+        return next;
+      });
+    if (card && !changed.some((message) => message.id === card.message.id)) changed.push(removed(card.message));
     if (changed.length === 0) return;
-    snapshot.revision = this.#store.database.persistConversationChanges({
+    const revision = this.#store.database.persistConversationChanges({
       agentId,
       threadId,
-      activeTurnId: snapshot.activeTurnId,
+      activeTurnId: loaded
+        ? snapshot.activeTurnId
+        : this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 1).activeTurnId,
       changedMessages: changed,
       eventType: FEEDBACK_WITHDRAWN_EVENT,
       detail: {},
     });
+    if (taskId) {
+      this.#tasks.changed(agentId);
+      return;
+    }
+    if (!loaded) return;
+    snapshot.revision = revision;
     this.#conversation.setSnapshot(agentId, snapshot);
     this.#conversation.publishConversation(snapshot);
   }

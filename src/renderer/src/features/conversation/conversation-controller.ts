@@ -61,8 +61,18 @@ export interface FeedbackFix {
   number: number;
   /** The draft text before the request. */
   before: string;
-  /** The draft text just after the request. */
-  after: string;
+  /** The request line that Fix added to the draft. */
+  request: string;
+}
+
+/**
+ * The draft after Cancel: the request and the words after it go. The draft before the request comes
+ * back. When the user changed that part, only the request and what follows it go.
+ */
+function draftWithoutFix(text: string, fix: FeedbackFix): string {
+  if (text.startsWith(fix.before)) return fix.before;
+  const start = text.indexOf(fix.request);
+  return start === -1 ? text : text.slice(0, start).trimEnd();
 }
 
 interface ConversationResources {
@@ -397,18 +407,18 @@ export function createStableConversationState(
       setDrafts((current) => ({ ...current, [key]: next }));
       setFeedbackFixes((current) => ({
         ...current,
-        [key]: { number, before: draft.text, after: next.text },
+        [key]: { number, before: draft.text, request: prompt.trim() },
       }));
       setComposerFocusRequest((value) => value + 1);
     },
-    /** Cancel on the notice: the composer gets its text back, unless the user changed the request. */
+    /** Cancel on the notice: the request leaves the composer, so the report stays as it is. */
     cancelFeedbackFix(target: { serverId: string; agentId: string }) {
       const key = composerDraftKey(target);
       const fix = feedbackFixes()[key];
       if (!fix) return;
       setDrafts((current) => {
         const draft = current[key] ?? EMPTY_DRAFT;
-        return draft.text === fix.after ? { ...current, [key]: { ...draft, text: fix.before } } : current;
+        return { ...current, [key]: { ...draft, text: draftWithoutFix(draft.text, fix) } };
       });
       setFeedbackFixes(({ [key]: _cancelled, ...rest }) => rest);
       setComposerFocusRequest((value) => value + 1);

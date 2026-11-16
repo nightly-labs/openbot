@@ -208,7 +208,8 @@ export interface WithdrawFeedbackInput {
 
 /**
  * What became of a withdrawal: the report is off GitHub; nobody is signed in; another account sent it;
- * the account service cannot remove an issue now; too many tries; or the card is not a sent report.
+ * the account service cannot remove an issue now; too many tries; the card is not a sent report; or the
+ * issue moved to another public repository.
  */
 export const WITHDRAW_FEEDBACK_STATUSES = [
   "withdrawn",
@@ -217,6 +218,7 @@ export const WITHDRAW_FEEDBACK_STATUSES = [
   "unavailable",
   "limited",
   "notFound",
+  "moved",
 ] as const;
 export type WithdrawFeedbackStatus = (typeof WITHDRAW_FEEDBACK_STATUSES)[number];
 

@@ -502,6 +502,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "O OpenBot não pode remover relatos agora. Tente novamente mais tarde.",
   "chat.feedbackSent.removeLimited": "Tentativas demais. Aguarde um minuto e tente novamente.",
   "chat.feedbackSent.removeNotFound": "O OpenBot não encontra este relato no chat.",
+  "chat.feedbackSent.removeMoved":
+    "O OpenBot não pode remover este relato. Ele foi movido para outro lugar no GitHub. Peça à equipe do OpenBot para removê-lo.",
   "chat.feedbackWithdrawn.title": "Relato removido",
   "chat.feedbackWithdrawn.badge": "Removido",
   "chat.feedbackWithdrawn.body": "Seu relato não está mais no GitHub. Para enviar um relato corrigido, peça ao agente.",

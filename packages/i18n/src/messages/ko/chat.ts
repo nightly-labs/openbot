@@ -501,6 +501,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "지금은 OpenBot이 보고서를 삭제할 수 없어요. 나중에 다시 시도하세요.",
   "chat.feedbackSent.removeLimited": "시도 횟수가 너무 많아요. 1분 기다린 뒤 다시 시도하세요.",
   "chat.feedbackSent.removeNotFound": "OpenBot이 채팅에서 이 보고서를 찾을 수 없어요.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot이 이 보고서를 삭제할 수 없습니다. GitHub의 다른 위치로 옮겨졌습니다. OpenBot 팀에 삭제를 요청하세요.",
   "chat.feedbackWithdrawn.title": "보고서 삭제됨",
   "chat.feedbackWithdrawn.badge": "삭제됨",
   "chat.feedbackWithdrawn.body": "보고서가 더 이상 GitHub에 없어요. 수정한 보고서를 보내려면 에이전트에게 요청하세요.",

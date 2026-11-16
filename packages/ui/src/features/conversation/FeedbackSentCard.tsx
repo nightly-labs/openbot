@@ -11,6 +11,7 @@ const WITHDRAW_FAILURES = {
   unavailable: "chat.feedbackSent.removeUnavailable",
   limited: "chat.feedbackSent.removeLimited",
   notFound: "chat.feedbackSent.removeNotFound",
+  moved: "chat.feedbackSent.removeMoved",
 } as const satisfies Record<Exclude<WithdrawFeedbackStatus, "withdrawn">, AppTextKey>;
 
 type Step = "closed" | "choosing" | "confirming";

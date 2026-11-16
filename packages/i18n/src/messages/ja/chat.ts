@@ -489,6 +489,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot は現在レポートを削除できません。後でもう一度お試しください。",
   "chat.feedbackSent.removeLimited": "試行回数が多すぎます。1 分待ってから、もう一度お試しください。",
   "chat.feedbackSent.removeNotFound": "OpenBot はチャット内にこのレポートを見つけられません。",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot はこのレポートを削除できません。GitHub の別の場所に移動されました。OpenBot チームに削除を依頼してください。",
   "chat.feedbackWithdrawn.title": "レポートを削除しました",
   "chat.feedbackWithdrawn.badge": "削除済み",
   "chat.feedbackWithdrawn.body":

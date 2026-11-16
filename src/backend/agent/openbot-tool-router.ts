@@ -255,6 +255,7 @@ export type FeedbackWithdrawResult =
   | { readonly status: "signedOut" }
   | { readonly status: "notYours" }
   | { readonly status: "unavailable" }
+  | { readonly status: "moved" }
   | { readonly status: "limited"; readonly retryAfterSeconds: number | null };
 
 /**
@@ -1421,9 +1422,7 @@ export class OpenBotToolRouter {
         status: "declined",
         next: "The user selected Not now. The report is still on GitHub. Do not remove it another way.",
       });
-    const result = yield* withdrawal
-      .withdraw(senderAgentId, threadId, issue)
-      .pipe(Effect.catchTag("StoredStateFailure", ({ cause }) => Effect.fail(new ToolOperationFailed({ cause }))));
+    const result = yield* withdrawal.withdraw(senderAgentId, threadId, issue);
     switch (result.status) {
       case "withdrawn":
         return openBotToolResult({
@@ -1441,6 +1440,10 @@ export class OpenBotToolRouter {
       case "unavailable":
         return openBotToolFailure(
           "OpenBot cannot remove a whole issue now. Tell the user to try again later, or to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "moved":
+        return openBotToolFailure(
+          "The issue moved to another public repository, so OpenBot cannot remove the report. Tell the user to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
         );
       case "limited":
         return openBotToolFailure("Too many tries. Wait one minute, then try again once.");

@@ -514,6 +514,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot kan nu geen meldingen verwijderen. Probeer het later opnieuw.",
   "chat.feedbackSent.removeLimited": "Te veel pogingen. Wacht een minuut en probeer het dan opnieuw.",
   "chat.feedbackSent.removeNotFound": "OpenBot kan deze melding niet vinden in de chat.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot kan deze melding niet verwijderen. Hij is naar een andere plek op GitHub verplaatst. Vraag het OpenBot-team om hem te verwijderen.",
   "chat.feedbackWithdrawn.title": "Melding verwijderd",
   "chat.feedbackWithdrawn.badge": "Verwijderd",
   "chat.feedbackWithdrawn.body":

@@ -598,6 +598,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot сейчас не может удалять отчёты. Попробуйте позже.",
   "chat.feedbackSent.removeLimited": "Слишком много попыток. Подождите минуту и попробуйте снова.",
   "chat.feedbackSent.removeNotFound": "OpenBot не может найти этот отчёт в чате.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot не может удалить этот отчёт. Он перемещён в другое место на GitHub. Попросите команду OpenBot удалить его.",
   "chat.feedbackWithdrawn.title": "Отчёт удалён",
   "chat.feedbackWithdrawn.badge": "Удалён",
   "chat.feedbackWithdrawn.body":

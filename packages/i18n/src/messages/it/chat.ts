@@ -512,6 +512,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot non può rimuovere segnalazioni ora. Riprova più tardi.",
   "chat.feedbackSent.removeLimited": "Troppi tentativi. Attendi un minuto, poi riprova.",
   "chat.feedbackSent.removeNotFound": "OpenBot non trova questa segnalazione nella chat.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot non può rimuovere questa segnalazione. È stata spostata in un'altra posizione su GitHub. Chiedi al team di OpenBot di rimuoverla.",
   "chat.feedbackWithdrawn.title": "Segnalazione rimossa",
   "chat.feedbackWithdrawn.badge": "Rimossa",
   "chat.feedbackWithdrawn.body":

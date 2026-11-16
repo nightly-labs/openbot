@@ -125,6 +125,7 @@ const commentSchema = Schema.Struct({ id: Schema.Number });
 const authorSchema = Schema.NullOr(Schema.Struct({ login: Schema.String }));
 const feedbackIssueSchema = Schema.Struct({
   node_id: Schema.String,
+  repository_url: Schema.String,
   body: Schema.optional(Schema.NullOr(Schema.String)),
   pull_request: Schema.optional(Schema.Unknown),
   user: authorSchema,
@@ -321,7 +322,8 @@ export class GitHubInstallationTokens {
    * Takes a report of one account off the public repository. GitHub shows each earlier version of an
    * edited text to everyone, so an edit cannot remove words: an issue that the account opened moves to
    * `privateRepository`, with its history, and a comment of the account is deleted. `sentBy` decides
-   * which texts the account sent. An issue that moved or was deleted is `gone`.
+   * which texts the account sent. An issue that is not public anymore is `gone`. An issue that moved to
+   * another public repository is still public, so it fails with `feedback_moved`.
    */
   readonly withdrawFeedback = Effect.fn("GitHubInstallationTokens.withdrawFeedback")(function* (
     this: GitHubInstallationTokens,
@@ -331,15 +333,25 @@ export class GitHubInstallationTokens {
     privateRepository: string | null,
   ): Effect.fn.Return<WithdrawnFeedback, GitHubInstallationTokensError> {
     const token = yield* this.#repositoryToken(repository, WRITE_ISSUES);
-    // A moved issue answers with a redirect to its new place, which must not be read as this issue.
+    // A moved issue redirects to its new place. The token reads only this repository and public ones,
+    // so a deleted issue, or one that moved to a private repository, answers 404.
     const issue = yield* this.#send(
       `/repos/${repository}/issues/${number}`,
       token,
-      { method: "GET", redirect: "manual" },
+      { method: "GET" },
       feedbackIssueSchema,
-      [301, 404, 410],
+      [404, 410],
     );
     if (!issue) return "gone";
+    const inRepository = (name: string) => issue.repository_url.toLowerCase().endsWith(`/repos/${name.toLowerCase()}`);
+    if (!inRepository(repository)) {
+      if (privateRepository && inRepository(privateRepository)) return "gone";
+      return yield* new GitHubInstallationTokensError(
+        409,
+        "feedback_moved",
+        "The issue moved to another public repository.",
+      );
+    }
     if (issue.pull_request !== undefined) return yield* notSentBy();
     if (issue.user?.login === `${FEEDBACK_APP}[bot]` && (yield* sentBy(issue.body ?? ""))) {
       if (!privateRepository)

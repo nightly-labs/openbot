@@ -517,6 +517,8 @@ export const messages = {
   "chat.feedbackSent.removeUnavailable": "OpenBot לא יכול להסיר דיווחים כרגע. נסו שוב מאוחר יותר.",
   "chat.feedbackSent.removeLimited": "יותר מדי ניסיונות. המתינו דקה ונסו שוב.",
   "chat.feedbackSent.removeNotFound": "OpenBot לא מוצא את הדיווח הזה בצ'אט.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot לא יכול להסיר את הדיווח הזה. הוא הועבר למקום אחר ב-GitHub. בקשו מצוות OpenBot להסיר אותו.",
   "chat.feedbackWithdrawn.title": "הדיווח הוסר",
   "chat.feedbackWithdrawn.badge": "הוסר",
   "chat.feedbackWithdrawn.body": "הדיווח שלך כבר לא ב-GitHub. כדי לשלוח דיווח מתוקן, בקשו זאת מהסוכן.",
