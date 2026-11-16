@@ -918,7 +918,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Vincular de novo",
   "mobile.server.connectors.whatsapp.ownNumber": "Número pessoal",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Desative para um número só para o OpenBot.",
+    "Só o seu chat “Mensagem para você mesmo” e as pessoas que você permitir podem escrever. Outras pessoas não recebem resposta. Quando desativado, o OpenBot responde a pessoas desconhecidas com um código.",
   "mobile.server.connectors.whatsapp.workingMessage": "Mensagem “Trabalhando nisso…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "O OpenBot a envia enquanto o agente trabalha e depois a substitui pela resposta. Desative para enviar só a resposta.",
@@ -941,10 +941,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Número",
   "mobile.server.connectors.whatsapp.kindPersonal": "Meu número pessoal",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir.",
+    "O OpenBot responde só ao seu chat “Mensagem para você mesmo” e às pessoas que você permitir. Outras pessoas não recebem resposta.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Um número só para o OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Pessoas desconhecidas recebem um código para passar a você. Você as aprova aqui.",
+    "O OpenBot responde deste número a cada pessoa desconhecida com um código para passar a você. Você as aprova aqui.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Número de telefone",
   "mobile.server.connectors.whatsapp.phoneDescription": "Com o código do país, como +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Digite o número de telefone com o código do país.",

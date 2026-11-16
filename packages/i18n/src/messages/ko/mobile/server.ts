@@ -865,7 +865,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
   "mobile.server.connectors.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
@@ -887,10 +887,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "번호",
   "mobile.server.connectors.whatsapp.kindPersonal": "내 개인 번호",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 전용 번호",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "mobile.server.connectors.whatsapp.phoneLabel": "전화번호",
   "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123처럼 국가 코드를 포함해 주세요.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "국가 코드를 포함한 전화번호를 입력하세요.",

@@ -1008,7 +1008,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
@@ -1031,10 +1031,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Номер",
   "mobile.server.connectors.whatsapp.kindPersonal": "Мой личный номер",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили. Другие люди не получают ответа.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Номер только для OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+    "OpenBot отвечает с этого номера каждому незнакомому человеку кодом, который нужно передать вам. Вы одобряете их здесь.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Номер телефона",
   "mobile.server.connectors.whatsapp.phoneDescription": "С кодом страны, например +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Введите номер телефона с кодом страны.",

@@ -1213,7 +1213,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. יש לכבות עבור מספר ששייך רק ל-OpenBot.",
+    "רק הצ'אט ״הודעה לעצמך״ שלך והאנשים שאישרת יכולים לכתוב. אנשים אחרים לא מקבלים תשובה. כשהאפשרות כבויה, OpenBot משיב לאנשים לא מוכרים עם קוד.",
   "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
@@ -1235,10 +1235,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "מספר",
   "mobile.server.connectors.whatsapp.kindPersonal": "המספר האישי שלי",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת.",
+    "OpenBot עונה רק בצ'אט ״הודעה לעצמך״ שלך ולאנשים שאישרת. אנשים אחרים לא מקבלים תשובה.",
   "mobile.server.connectors.whatsapp.kindDedicated": "מספר ששייך רק ל-OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "אנשים לא מוכרים מקבלים קוד למסור לך. את האישור נותנים כאן.",
+    "OpenBot משיב מהמספר הזה לכל אדם לא מוכר עם קוד שיש למסור לך. את האישור נותנים כאן.",
   "mobile.server.connectors.whatsapp.phoneLabel": "מספר טלפון",
   "mobile.server.connectors.whatsapp.phoneDescription": "עם קידומת המדינה, למשל +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "יש להקליד את מספר הטלפון עם קידומת המדינה.",
