@@ -24,7 +24,13 @@ export function createWebAttachmentFiles(
   const pages = new Map<string, Promise<string>>();
   return {
     async download(id: string): Promise<void> {
-      save((await media.file(id)) ?? (await remote.download(id)));
+      const held = await media.file(id);
+      // As the host path, the saved file has no media type: a blob URL of an SVG could run on this origin.
+      save(
+        held
+          ? { name: held.name, blob: new Blob([held.blob], { type: "application/octet-stream" }) }
+          : await remote.download(id),
+      );
     },
     async preview(attachment: AttachmentSummary): Promise<FilePreview> {
       const held = await media.file(attachment.id);
