@@ -333,8 +333,11 @@ export function ComposerEditor(props: ComposerEditorProps) {
   /* The last answer. It stays while the user types on, so its rows do not blink for each letter. */
   const [threadMessageMatches, setThreadMessageMatches] = createSignal<ComposerThreadMessageMatch[]>([]);
   let threadSearchRequest = 0;
+  // A boolean, so that a new thread list (for example a task state change during a turn) does not
+  // start the search again.
+  const hasListedThreads = createMemo(() => threads().length > 0);
   createEffect(
-    () => ({ query: threadSearchQuery(), search: props.onSearchThreads, listed: threads().length > 0 }),
+    () => ({ query: threadSearchQuery(), search: props.onSearchThreads, listed: hasListedThreads() }),
     ({ query, search, listed }) => {
       const request = ++threadSearchRequest;
       // A thread that is not listed cannot be tagged, so with no listed thread nothing can show.

@@ -4,9 +4,9 @@
 // `bun scripts/composer-thread-search-e2e.ts --allow-mutations [--agent=<agent id>]`.
 //
 // It starts two side threads whose first message holds one new word. Thread A gets a title without
-// the word, and thread B a title with it. Then `@` and the first two letters of the word show no
-// "In messages" section; the full word shows B under "Threads" and A under "In messages", with the
-// matched text. A pick of the A row puts a chip of thread A in the draft. Each thread start sends one
+// the word, and thread B a title with it. Then `@` and the word shows B under "Threads" and A under
+// "In messages", with the matched text. With only two letters of the word, the "In messages" section
+// goes. A pick of the A row puts a chip of thread A in the draft. Each thread start sends one
 // short provider turn. Both threads are deleted at the end.
 // Writes .openbot-build/composer-thread-search-e2e/report.json and screenshots.
 import assert from "node:assert/strict";
@@ -124,16 +124,10 @@ try {
   await composer.waitFor({ timeout: UI_WAIT_MS });
   await composer.click();
 
-  // 1. Two letters: no message search.
   await composer.pressSequentially(`@${word.slice(0, 2)}`);
   await picker().waitFor({ timeout: UI_WAIT_MS });
-  // A negative check: wait longer than the 150 ms search delay, then read the list.
-  await page.waitForTimeout(600);
-  const shortSections = await pickerSections();
-  report.shortQuery = { sections: shortSections };
-  assert.ok(!shortSections.includes(messagesSection), "Two letters must not search messages.");
 
-  // 2. The full word: B matches by title, A by its message.
+  // 1. The full word: B matches by title, A by its message.
   await composer.pressSequentially(word.slice(2));
   await picker().getByText(messagesSection, { exact: true }).waitFor({ timeout: UI_WAIT_MS });
   const rows = await pickerRows();
@@ -148,6 +142,13 @@ try {
   assert.equal(rowB.length, 1, "Thread B must show once.");
   assert.equal(rowB[0]?.section, threadsSection);
   assert.ok(rows.filter((row) => row.section === messagesSection).length <= 5);
+
+  // 2. Under three letters, the message search stops and its section goes.
+  for (let index = 2; index < word.length; index += 1) await composer.press("Backspace");
+  await picker().getByText(messagesSection, { exact: true }).waitFor({ state: "detached", timeout: UI_WAIT_MS });
+  report.shortQuery = { sections: await pickerSections() };
+  await composer.pressSequentially(word.slice(2));
+  await picker().getByText(messagesSection, { exact: true }).waitFor({ timeout: UI_WAIT_MS });
 
   // 3. A pick puts the chip of thread A in the draft.
   await picker()
