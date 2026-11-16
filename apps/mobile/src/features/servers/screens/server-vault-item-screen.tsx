@@ -176,13 +176,19 @@ export function VaultItemForm({
     if (state) void showState.current(state);
   }, [leaving]);
   // An agent's request makes an item for every agent, as on the desktop; the user changes it later here.
-  const agentScope = vault.query.data?.agentScope === true && !request;
   const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
   const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
+  // As on the desktop, the choice shows only while the server's agents are loaded.
+  const agentScope = vault.query.data?.agentScope === true && !request && agents.length > 0;
   const openAgentPicker = useVaultAgentPicker((state) => state.open);
-  const input = vaultSaveInput(kind, saved?.id ?? null, draft, agentScope);
+  // The order of the ids does not matter. The save sends the agents only when they changed, so it
+  // does not undo a change that another device made to them.
+  const agentsKey = (value: string[] | null) => (value === null ? null : [...value].sort());
+  const agentsChanged = JSON.stringify(agentsKey(draft.agents)) !== JSON.stringify(agentsKey(initial.agents));
+  const input = vaultSaveInput(kind, saved?.id ?? null, draft, agentScope && agentsChanged);
   const example = vaultAddressExample(draft.country);
-  const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
+  const dirty =
+    agentsChanged || JSON.stringify({ ...draft, agents: null }) !== JSON.stringify({ ...initial, agents: null });
   const locked = action.isPending;
   const formId = useId();
 

@@ -32,14 +32,12 @@ export function ServerVaultAgentsScreen() {
     return words.every((word) => text.includes(word));
   });
   const allows = (agentId: string) => scope === null || scope.includes(agentId);
-  /** Turns `changed` on or off. An agent that this list does not show keeps its place. */
+  /** Turns `changed` on or off. An id of an agent that the server no longer has goes, as on the desktop. */
   const set = (changed: readonly { id: string }[], on: boolean) => {
     if (!changed.length) return;
     const ids = new Set(changed.map((agent) => agent.id));
     const chosen = agents.filter((agent) => (ids.has(agent.id) ? on : allows(agent.id))).map((agent) => agent.id);
-    const shown = new Set(agents.map((agent) => agent.id));
-    const kept = (scope ?? []).filter((id) => !shown.has(id));
-    const next = chosen.length === agents.length ? null : [...kept, ...chosen];
+    const next = chosen.length === agents.length ? null : chosen;
     setScope(next);
     request?.onChange(next);
   };

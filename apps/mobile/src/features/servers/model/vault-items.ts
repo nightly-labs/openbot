@@ -276,7 +276,7 @@ function whole(value: string): number | null {
   return /^\d{1,4}$/u.test(value.trim()) ? Number(value.trim()) : null;
 }
 
-/** The agent summary of an item that is for chosen agents: one agent's name, or "2 of 5 agents". */
+/** The agent summary of an item that is for chosen agents: one agent's name, or "2 of 5". */
 export function vaultAgentsSummary(
   scope: readonly string[],
   agents: readonly { id: string; name: string }[],

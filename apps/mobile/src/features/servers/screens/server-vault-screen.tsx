@@ -127,7 +127,9 @@ export function ServerVaultScreen() {
   const addedBy = (name: string | undefined) => (name ? t("mobile.server.vault.addedBy", { name }) : undefined);
   /** The row's detail, and the agents of an item that is for chosen agents (`vault-v4`). */
   const detail = (item: VaultItemSummary, text: string | undefined) =>
-    [text, item.agents && vaultAgentsSummary(item.agents, agents, t)].filter(Boolean).join(" · ") || undefined;
+    [text, item.agents && t("mobile.server.vault.agentsListed", { agents: vaultAgentsSummary(item.agents, agents, t) })]
+      .filter(Boolean)
+      .join(" · ") || undefined;
 
   const importCsv = async () => {
     setImportResult(null);
