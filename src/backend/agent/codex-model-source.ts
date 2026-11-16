@@ -28,7 +28,7 @@ export const CODEX_VARIABLE_PROVIDER = "openbot_environment";
  * Null for OpenAI's own list. An `openai_base_url` proxy and `CODEX_VARIABLE_PROVIDER` keep OpenAI's
  * list, so they are not a source.
  */
-export function codexModelSource(config: unknown): ProviderModelSource | null {
+function codexModelSource(config: unknown): ProviderModelSource | null {
   const providerId = getString(config, "model_provider")?.trim() || OPENAI_PROVIDER_ID;
   if (providerId !== OPENAI_PROVIDER_ID && providerId !== CODEX_VARIABLE_PROVIDER) {
     const name = getString(getRecord(getRecord(config, "model_providers"), providerId), "name")?.trim();
