@@ -200,6 +200,7 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
     return yield* notFound();
   });
 
+  /** The skill in a folder. A failure says why its `SKILL.md` is not a valid skill; null when there is no skill. */
   const readSkill = Effect.fn("GithubSkillSource.readSkill")(function* (
     address: GithubSkillAddress,
     files: TreeEntry[],
@@ -212,7 +213,7 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
     const bytes = yield* raw(address, address.path ? `${address.path}/SKILL.md` : "SKILL.md");
     const text = new TextDecoder("utf-8").decode(bytes);
     const metadata = yield* Effect.result(sync(() => inspectSkillMarkdown(text)));
-    if (Result.isFailure(metadata)) return null;
+    if (Result.isFailure(metadata)) return metadata.failure;
     const skill: GithubSkill = {
       id,
       path: address.path,
@@ -253,13 +254,16 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
         (path) => readSkill({ ...base, path }, files),
         { concurrency: CONCURRENCY },
       );
-      const found = skills.filter((skill): skill is GithubSkill => skill !== null);
+      const found = skills.filter(
+        (skill): skill is GithubSkill => skill !== null && !(skill instanceof GithubSkillFailure),
+      );
       if (!found.length)
-        return yield* failure(
-          sourceText("error.skill.githubNoSkills", {
-            folder: [`${link.owner}/${link.repo}`, resolved.path].filter(Boolean).join("/"),
-          }),
-        );
+        return yield* skills.find((skill) => skill instanceof GithubSkillFailure) ??
+          failure(
+            sourceText("error.skill.githubNoSkills", {
+              folder: [`${link.owner}/${link.repo}`, resolved.path].filter(Boolean).join("/"),
+            }),
+          );
       const source: GithubSkillSource = {
         owner: link.owner,
         repo: link.repo,
@@ -282,6 +286,7 @@ export function githubSkillSource(fetchImpl: GitHubFetch) {
           sourceText("error.skill.githubTooLarge", { repository: `${address.owner}/${address.repo}` }),
         );
       const skill = yield* readSkill(address, files);
+      if (skill instanceof GithubSkillFailure) return yield* skill;
       if (!skill)
         return yield* failure(
           sourceText("error.skill.githubNoSkills", {
