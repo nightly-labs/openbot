@@ -13,6 +13,7 @@ import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/br
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { hasVisibleToasts } from "@openbot/ui";
 import type { AgentMessage } from "@openbot/ui/data";
 import type { UsageLimitAskCardProps } from "@openbot/ui/features/conversation/BackupModels";
@@ -176,6 +177,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     loadOlderAgentMessages,
     loadLatestAgentMessages,
     searchAgentMessages,
+    searchAgentThreadMessages,
     setTeamTyping,
     presentPromptResolution,
   } = useConversation();
@@ -434,6 +436,13 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const deleteMessageAction = () => (messageDeleteSupported() ? deleteActiveAgentMessage : undefined);
   /** Pin and Unpin of the active server. A host without `message-pins-v1` has none; this computer always has. */
   const messagePinsAction = () => (activeServerSupportsCapability(MESSAGE_PINS_CAPABILITY) ? messagePins : undefined);
+  /** An older host does not name the thread of a search result, so its `@` list finds thread titles only. */
+  const searchThreadsAction = () =>
+    activeServerSupportsCapability(THREAD_MESSAGE_SEARCH_CAPABILITY) ? searchActiveAgentThreads : undefined;
+  function searchActiveAgentThreads(query: string) {
+    const agentId = activeAgent()?.id;
+    return agentId ? searchAgentThreadMessages(agentId, query) : Promise.resolve([]);
+  }
   const { t } = useText();
   const agentTasks = useAgentTasks();
   const agentThreads = useAgentThreads();
@@ -667,6 +676,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
             ? searchAgentMessages(activeAgent()?.id ?? "", query)
             : Promise.resolve({ messageIds: [], total: 0 })
         }
+        onSearchThreads={searchThreadsAction()}
         onOpenSearchMessage={async (messageId) => {
           const agentId = activeAgent()?.id;
           if (agentId) await openAgentMessage(agentId, messageId);

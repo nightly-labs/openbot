@@ -764,6 +764,7 @@ export function ConversationComposer() {
               onOpenQuote={openQuote}
               browserTabs={taggableBrowserTabs()}
               threads={taggableThreads()}
+              onSearchThreads={props.onSearchThreads}
               onOpenTag={openTaggedReference}
               onValueChange={(text) => {
                 updateCurrentDraft({ text });

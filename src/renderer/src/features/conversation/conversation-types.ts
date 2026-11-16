@@ -31,7 +31,7 @@ import type {
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
-import type { AgentMessage, AgentProfile } from "@openbot/ui/data";
+import type { AgentMessage, AgentProfile, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
 import type { AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
@@ -352,6 +352,8 @@ export interface ConversationProps {
   onLoadOlder?: (() => void) | undefined;
   onLoadLatest?: (() => Promise<void>) | undefined;
   onSearchMessages?: ((query: string) => Promise<{ messageIds: string[]; total: number }>) | undefined;
+  /** Finds side thread messages for the `@` list. Absent when the host cannot name the thread of a message. */
+  onSearchThreads?: ((query: string) => Promise<ComposerThreadMessageMatch[]>) | undefined;
   onOpenSearchMessage?: ((messageId: string) => Promise<void>) | undefined;
   onTypingChange: (agentId: string, typing: boolean) => void;
   onAnswerPrompt: (answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>;

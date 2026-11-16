@@ -83,6 +83,11 @@ export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
   };
 }
 
+/** The text that a message shows: an agent reply without its markers, a user message as it was written. */
+export function conversationMessageBody(message: ConversationMessage): string {
+  return message.author === "user" ? message.text : cleanAgentMessageText(message.text);
+}
+
 export function toAgentMessage(message: ConversationMessage, ownerAgentId?: string): AgentMessage {
   const exchangeSenderId = message.senderAgentId ?? message.exchange?.senderAgentId;
   const routineEvent = routineConversationEvent(message);
@@ -109,7 +114,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     id: message.id,
     ...(message.turnId === undefined ? {} : { turnId: message.turnId }),
     author: message.author === "user" ? "you" : "agent",
-    body: message.author === "user" ? message.text : cleanAgentMessageText(message.text),
+    body: conversationMessageBody(message),
     time: formatMessageTime(message.createdAt),
     createdAt: message.createdAt,
     streaming: message.status === "streaming",
