@@ -38,6 +38,8 @@ export interface BootRecoveryHooks {
   /** Whether this thread is a routine's side thread, where a turn can end quiet. */
   isRoutineThread(threadId: string): boolean;
   emitError(code: string, error: unknown, agentId?: string): void;
+  /** Shows a failed turn of the agent's own chat in the sidebar and the runtime work. */
+  turnFailed?(agentId: string, turnId: string): void;
 }
 
 export interface BootRecoveryOptions {
@@ -260,7 +262,7 @@ export class BootRecovery {
       const streaming = this.#store.database
         .readConversationRecoveryMessages(agent.id, threadId, recoveryTurnId)
         .filter((message) => message.turnId === recoveryTurnId && message.status === "streaming");
-      return { agent, threadId, streaming };
+      return { agent, threadId, turnId: recoveryTurnId, streaming };
     });
     // Only a provider that exited during this run leaves agent text streaming: a restart marks it
     // interrupted before this. The chat showed the first words of that text as a whole message, with
@@ -273,9 +275,11 @@ export class BootRecovery {
       : recovered;
     // A failed provider read keeps the conservative interrupted result; never replay side effects.
     yield* this.#mailbox.markTerminal(delivery.id, terminal, reason).pipe(toBootRecoveryFailed);
-    // The agent's own chat shows the error above its composer, as other failed turns do.
-    if (cut && target && target.threadId === target.agent.threadId)
+    // The agent's own chat shows the error above its composer and the failed turn, as other failed turns do.
+    if (cut && target && target.threadId === target.agent.threadId) {
       this.#hooks.emitError("agent_error", reason, target.agent.id);
+      if (target.turnId) this.#hooks.turnFailed?.(target.agent.id, target.turnId);
+    }
     yield* recoveryStep(() => {
       if (target) {
         const { agent, threadId } = target;

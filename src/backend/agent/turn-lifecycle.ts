@@ -564,6 +564,12 @@ export class TurnLifecycle {
     this.#itemTurns.set(itemId, turnId);
   }
 
+  /** A turn of the agent's own chat that failed outside its turn completion, as a provider exit. */
+  markFailedTurn(agentId: string, turnId: string): void {
+    this.#failedTurns.set(agentId, turnId);
+    this.#hooks.emitRuntimeSnapshot();
+  }
+
   acknowledgeFailedTurn(agentId: string, turnId: string): void {
     if (this.#failedTurns.get(agentId) !== turnId) return;
     this.#failedTurns.delete(agentId);
