@@ -90,6 +90,7 @@ import {
   approvalPermissions,
   browserTakeoverError,
   browserTakeoverResult,
+  browserTakeoverWaitingResult,
   commandText,
   declinedMcpElicitationText,
   detachedPromptResult,
@@ -431,6 +432,24 @@ interface PendingBrowserTakeover {
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
+  /** The provider's call got `browserTakeoverWaitingResult`, and the card waits for the next call (#9689). */
+  detached?: true;
+}
+
+/** The answer to a detached takeover, kept for the next call of its turn for the same tab (#9689). */
+interface HeldTakeoverResult {
+  threadId: string;
+  turnId: string;
+  tool: string;
+  result: DynamicToolResult;
+}
+
+function takeoverCall() {
+  const completion = Deferred.makeUnsafe<DynamicToolResult>();
+  const resolve = (result: DynamicToolResult) => {
+    Deferred.doneUnsafe(completion, Effect.succeed(result));
+  };
+  return { completion, resolve };
 }
 
 /**
@@ -595,6 +614,8 @@ export class AttentionRegistry {
   readonly #prompts = new Map<RequestId, PendingPrompt>();
   readonly #approvals = new Map<RequestId, PendingApproval>();
   readonly #takeovers = new Map<RequestId, PendingBrowserTakeover>();
+  /** By tab id. */
+  readonly #heldTakeoverResults = new Map<string, HeldTakeoverResult>();
 
   constructor(options: AttentionRegistryOptions) {
     this.#conversation = options.conversation;
@@ -1321,10 +1342,31 @@ export class AttentionRegistry {
       return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
     if (tab.ownerThreadId !== publicThreadId || tab.ownerAgentId !== agentId)
       return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
-    // A second request for a tab the user already holds would be answered by whichever card they
-    // happened to press, and resolving either one would hand control back while the other still waits.
-    if ([...this.#takeovers.values()].some((pending) => pending.request.tabId === tabId))
-      return browserTakeoverError(TAKEOVER_ALREADY_WAITING);
+    // The provider stopped the last call for this tab before the user finished (#9689).
+    const held = this.#heldTakeoverResults.get(tabId);
+    if (held) {
+      this.#heldTakeoverResults.delete(tabId);
+      if (held.threadId === threadId && held.turnId === turnId && held.tool === params.tool) return held.result;
+    }
+    const waiting = [...this.#takeovers].find(([, pending]) => pending.request.tabId === tabId);
+    if (waiting) {
+      const [waitingId, pending] = waiting;
+      // A second request for a tab the user already holds would be answered by whichever card they
+      // happened to press, and resolving either one would hand control back while the other still waits.
+      if (
+        !pending.detached ||
+        pending.params.threadId !== threadId ||
+        pending.params.turnId !== turnId ||
+        pending.params.tool !== params.tool
+      )
+        return browserTakeoverError(TAKEOVER_ALREADY_WAITING);
+      const call = takeoverCall();
+      pending.client = client;
+      pending.providerRequestId = request.id;
+      pending.resolve = call.resolve;
+      delete pending.detached;
+      return yield* this.#awaitBrowserTakeover(waitingId, pending, request, call.completion, Effect.void);
+    }
     // A secret can still come from the Vault, so that check comes after the fill.
     if (params.tool === "request_takeover" && this.#messagingRequestTurn(agentId, turnId))
       return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
@@ -1339,17 +1381,16 @@ export class AttentionRegistry {
       tabId,
       ...(params.tool === "request_takeover" && isOneOf(BROWSER_TAKEOVER_REASONS, reason) ? { reason } : {}),
     };
-    const completion = Deferred.makeUnsafe<DynamicToolResult>();
-    const resolve = (result: DynamicToolResult) => Deferred.doneUnsafe(completion, Effect.succeed(result));
+    const call = takeoverCall();
     const pending: PendingBrowserTakeover = {
       client,
       providerRequestId: request.id,
       params,
       request: takeover,
-      resolve,
+      resolve: call.resolve,
     };
     this.#takeovers.set(requestId, pending);
-    return yield* Effect.gen({ self: this }, function* () {
+    const show = Effect.gen({ self: this }, function* () {
       // The card is only shown once the tab has actually been handed over -- references invalidated,
       // diagnostics cleared, any recording stopped. Asking the user for control OpenBot then failed to
       // give them would leave the agent acting on the page underneath them.
@@ -1381,11 +1422,11 @@ export class AttentionRegistry {
           this.#takeovers.get(requestId) === pending
         ) {
           if (this.#messagingRequestTurn(agentId, turnId)) {
-            resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
+            pending.resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else if (pending.secret?.withCode) {
             // The card asks for one secret, so it cannot fill the password and the code together.
-            resolve(
+            pending.resolve(
               browserTakeoverError(
                 `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} Correct the call, or use request_takeover so that the user signs in.`,
               ),
@@ -1401,7 +1442,7 @@ export class AttentionRegistry {
         logger.warn("Unable to prepare browser takeover", { tool: params.tool, error: toLogValue(error) });
         if (this.#takeovers.get(requestId) === pending) {
           this.#takeovers.delete(requestId);
-          resolve(
+          pending.resolve(
             params.tool === "submit_secret" && error instanceof Error
               ? browserTakeoverError(error.message)
               : browserTakeoverError(),
@@ -1409,15 +1450,55 @@ export class AttentionRegistry {
           this.#emitRuntimeSnapshot();
         }
       }
-      return yield* Deferred.await(completion);
-    }).pipe(
+    });
+    return yield* this.#awaitBrowserTakeover(requestId, pending, request, call.completion, show);
+  }).bind(this);
+
+  /**
+   * Runs `show`, then waits for the user to finish the card. When the call ends first, the card
+   * closes, except a card that `#detachBrowserTakeover` keeps for the next call.
+   */
+  #awaitBrowserTakeover<E, R>(
+    requestId: RequestId,
+    pending: PendingBrowserTakeover,
+    request: AppServerRequest,
+    completion: Deferred.Deferred<DynamicToolResult>,
+    show: Effect.Effect<void, E, R>,
+  ): Effect.Effect<DynamicToolResult, E, R> {
+    const detach =
+      request.answerBeforeMs === undefined
+        ? undefined
+        : setTimeout(() => this.#detachBrowserTakeover(requestId, pending), request.answerBeforeMs);
+    return show.pipe(
+      Effect.andThen(Deferred.await(completion)),
       Effect.ensuring(
         Effect.sync(() => {
-          if (this.#takeovers.get(requestId) === pending) this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          clearTimeout(detach);
+          if (this.#takeovers.get(requestId) === pending && !pending.detached)
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
         }),
       ),
     );
-  }).bind(this);
+  }
+
+  /**
+   * The provider stops the call soon (#9689). The call gets `browserTakeoverWaitingResult`, and the card
+   * stays open for the next call for the same tab. A result before that call waits for it.
+   */
+  #detachBrowserTakeover(requestId: RequestId, pending: PendingBrowserTakeover): void {
+    if (this.#takeovers.get(requestId) !== pending || pending.detached) return;
+    const answerCall = pending.resolve;
+    const { threadId, turnId, tool } = pending.params;
+    const { tabId } = pending.request;
+    let held = false;
+    pending.detached = true;
+    pending.resolve = (result) => {
+      if (held) return;
+      held = true;
+      this.#heldTakeoverResults.set(tabId, { threadId, turnId, tool, result });
+    };
+    answerCall(browserTakeoverWaitingResult(tool, tabId));
+  }
 
   /**
    * Answers `list_vault_items`: the saved cards without their number or security code, and the saved
@@ -1851,14 +1932,15 @@ export class AttentionRegistry {
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
+    const detachAfterMs = request.detachAfterMs ?? request.answerBeforeMs;
     const target =
-      request.detachAfterMs === undefined || questions.some((question) => question.isSecret)
+      detachAfterMs === undefined || questions.some((question) => question.isSecret)
         ? null
         : this.#lateAnswerTarget(agentId, publicThreadId);
     if (target)
       pending.detach = {
         target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), request.detachAfterMs),
+        timer: setTimeout(() => this.#detachPrompt(request.id, pending), detachAfterMs),
       };
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
@@ -2119,6 +2201,9 @@ export class AttentionRegistry {
         this.#resolveBrowserTakeover(requestId, pending, "cancel");
       }
     }
+    for (const [tabId, held] of this.#heldTakeoverResults) {
+      if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(tabId);
+    }
   }
 
   /**
@@ -2206,7 +2291,8 @@ export class AttentionRegistry {
     }
     for (const [key, takeover] of this.#takeovers) {
       // Resolving emits its own runtime snapshot.
-      if (takeover.client === client && takeover.providerRequestId === requestId) {
+      // A detached takeover answered its call already, so a later cancel of that call does not reach it.
+      if (takeover.client === client && takeover.providerRequestId === requestId && !takeover.detached) {
         this.#resolveBrowserTakeover(key, takeover, "cancel");
       }
     }

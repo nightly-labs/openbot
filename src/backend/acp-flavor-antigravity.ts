@@ -419,6 +419,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"
   // is the CLI's answer for a tool that an own entry does not turn on (#7785).
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  // A probe of 1.5.9 sent `notifications/cancelled` for each OpenBot tool call after exactly 180 s,
+  // also with progress every 20 s, and also with `timeoutSeconds` in the session server entry. Only
+  // the CLI's own `mcp_config.json` changes it, which is the user's file (#9689).
+  mcpToolCallLimitMs: 180_000,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
