@@ -43,6 +43,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "יש יותר מדי כתובות או תיקיות.",
   "error.provider.credentialFileUnreadable": "לא ניתן לקרוא את קובץ פרטי ההזדהות של הספק.",
   "error.provider.credentialFileTooLarge": "קובץ פרטי ההזדהות של הספק גדול מדי.",
+  "error.provider.environmentNameInvalid": "{name} אינו שם משתנה תקין. השתמשו באותיות, ספרות ו-_, ואל תתחילו בספרה.",
+  "error.provider.environmentNameReserved": "OpenBot מגדיר את {name} לספק הזה. הסירו את המשתנה הזה.",
+  "error.provider.environmentNameDuplicate": "{name} מופיע ברשימה יותר מפעם אחת.",
+  "error.provider.environmentValueTooLong": "הערך של {name} ארוך מדי.",
+  "error.provider.environmentTooMany": "לספק יכולים להיות עד {limit} משתנים.",
+  "error.provider.environmentSecretsTooLarge": "הערכים הרגישים ארוכים מדי ביחד. שמרו ערכים קצרים יותר או פחות ערכים.",
   "error.provider.archiveSpecialFile": "ארכיון סביבת ההרצה מכיל קישור או קובץ מיוחד.",
   "error.provider.archiveUnsafePath": "ארכיון סביבת ההרצה מכיל נתיב לא בטוח.",
   "error.provider.runtimeSpecialFile": "סביבת ההרצה מכילה קישור או קובץ מיוחד.",
@@ -299,7 +305,7 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "לא ניתן לקרוא את הגרסה של Hermes Agent.",
   "error.provider.hermesSignIn": "יש להתחבר עם Nous Portal, או להריץ `hermes setup` בטרמינל, כדי להשתמש ב-Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בהגדרות השרת › MCP, ואז שלח את ההודעה שוב.",
+    "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בחנות, אפליקציות, ואז שלח את ההודעה שוב.",
   "error.provider.hermesRefused":
     "Hermes דחה את ההודעה הזו לפני שהתחילה. שלח אותה שוב. אם Hermes דוחה כל הודעה, הפעל מחדש את OpenBot במחשב שמריץ את הסוכן הזה.",
   "error.provider.copilotThinkingRejected":

@@ -252,6 +252,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInAccountRefused":
+    "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
     "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
@@ -282,9 +284,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
+    "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -354,6 +356,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "Alleen de eigenaar van de server of een beheerder kan deze actie kiezen.",
   "error.backend.approvalInactive": "Deze goedkeuring is niet meer actief.",
   "error.backend.approvalOwnerOnly": "Alleen de eigenaar van de server kan deze actie goedkeuren.",
+  "error.backend.feedbackNeedsPhone":
+    "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",

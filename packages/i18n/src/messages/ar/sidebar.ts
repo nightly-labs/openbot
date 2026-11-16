@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "تعليم الكل كمقروء",
   "sidebar.order.title": "ترتيب الدردشات",
   "sidebar.order.manual": "يدوي",
+  "sidebar.order.recent": "النشاط الأخير",
   "sidebar.order.unreadGroup": "غير المقروءة في مجموعة",
   "sidebar.order.unreadFirst": "غير المقروءة أولًا في المجلدات",
   "sidebar.topbar.openSettings": "فتح إعدادات {name}",

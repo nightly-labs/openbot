@@ -44,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Jest za dużo adresów lub folderów.",
   "error.provider.credentialFileUnreadable": "Nie można odczytać pliku danych logowania dostawcy.",
   "error.provider.credentialFileTooLarge": "Plik danych logowania dostawcy jest za duży.",
+  "error.provider.environmentNameInvalid":
+    "{name} nie jest poprawną nazwą zmiennej. Użyj liter, cyfr i _ i nie zaczynaj od cyfry.",
+  "error.provider.environmentNameReserved": "OpenBot ustawia {name} dla tego dostawcy. Usuń tę zmienną.",
+  "error.provider.environmentNameDuplicate": "{name} występuje na liście więcej niż raz.",
+  "error.provider.environmentValueTooLong": "Wartość {name} jest za długa.",
+  "error.provider.environmentTooMany": "Dostawca może mieć najwyżej {limit} zmiennych.",
+  "error.provider.environmentSecretsTooLarge":
+    "Poufne wartości są razem za długie. Zapisz krótsze wartości lub mniej wartości.",
   "error.provider.archiveSpecialFile": "Archiwum środowiska uruchomieniowego zawiera link lub plik specjalny.",
   "error.provider.archiveUnsafePath": "Archiwum środowiska uruchomieniowego zawiera niebezpieczną ścieżkę.",
   "error.provider.runtimeSpecialFile": "Środowisko uruchomieniowe zawiera link lub plik specjalny.",
@@ -315,7 +323,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Ustawienia serwera › MCP, a potem wyślij wiadomość ponownie.",
+    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Marketplace, Aplikacje, a potem wyślij wiadomość ponownie.",
   "error.provider.hermesRefused":
     "Hermes odrzucił tę wiadomość, zanim się zaczęła. Wyślij ją ponownie. Jeśli Hermes odrzuca każdą wiadomość, uruchom ponownie OpenBot na komputerze, na którym działa ten agent.",
   "error.provider.copilotThinkingRejected":

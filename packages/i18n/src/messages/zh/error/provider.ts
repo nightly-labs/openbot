@@ -39,6 +39,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "地址或文件夹数量过多。",
   "error.provider.credentialFileUnreadable": "服务商凭据文件无法读取。",
   "error.provider.credentialFileTooLarge": "服务商凭据文件过大。",
+  "error.provider.environmentNameInvalid": "{name} 不是有效的变量名。请使用字母、数字和 _，且不要以数字开头。",
+  "error.provider.environmentNameReserved": "OpenBot 会为此提供方设置 {name}。请移除此变量。",
+  "error.provider.environmentNameDuplicate": "{name} 在列表中出现了多次。",
+  "error.provider.environmentValueTooLong": "{name} 的值太长。",
+  "error.provider.environmentTooMany": "一个提供方最多可以有 {limit} 个变量。",
+  "error.provider.environmentSecretsTooLarge": "敏感值加起来太长。请保存更短或更少的值。",
   "error.provider.archiveSpecialFile": "运行时压缩包中包含链接或特殊文件。",
   "error.provider.archiveUnsafePath": "运行时压缩包中包含不安全的路径。",
   "error.provider.runtimeSpecialFile": "运行时中包含链接或特殊文件。",
@@ -283,7 +289,7 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.hermesTurnFailed":
-    "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 服务器设置 › MCP 中检查，然后重新发送消息。",
+    "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 市场、应用 中检查，然后重新发送消息。",
   "error.provider.hermesRefused":
     "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请在运行此智能体的计算机上重新启动 OpenBot。",
   "error.provider.copilotThinkingRejected":

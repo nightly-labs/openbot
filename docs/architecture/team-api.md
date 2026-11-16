@@ -423,6 +423,22 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `phone-feedback-v1` capability (protocol 9 only) adds
+`POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
+has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
+the name of the VPN or mesh network that is on, never an address) and `log`, the last redacted lines
+of its support log. An agent's bug report with the surface `Phone app` (`openbot.send_feedback`) waits on an
+approval whose notice is `status.agent.reportPhoneProblem`. This route answers that approval with
+"accept" and gives the phone's data to the report. The agent service refuses a plain "accept" of such
+an approval on each path (`POST /v1/respond/approval`, the local IPC), with
+`error.backend.feedbackNeedsPhone` and 403, and the approval keeps waiting; a decline works on each
+client. So no bug report about the phone app goes out without the phone's version, system and log,
+and the account Worker refuses one too (`feedback_needs_phone`), which also stops a host of an older
+version. The desktop and web cards of such a report have no Send and tell the user to send it from
+the phone app. `src/main/team-api/route-phone-feedback.ts` owns the authorization: `chat` on the
+agent of the request (else 403, or 404 for an agent the member cannot see), the owner only (else
+403), and 409 for a request that no longer waits or that is not such a report.
+
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
 new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
@@ -498,6 +514,16 @@ admins can use them (else 403); the wire codec refuses a size outside the range 
 applies to the Claude processes that start after it, and the host sends the provider status event, so
 open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
 Without the capability a client hides the row for that host.
+
+The optional `provider-environment-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/provider-environment` (`provider`: `claude`, `codex` or `antigravity`) and
+`POST /v1/admin/host/provider-environment/update` (`provider`, `variables`: at most 32 of `name`,
+`value` or `null`, `sensitive`). The update replaces the whole list; `value: null` keeps a stored
+sensitive value. A response has the variables with `stored`, and an empty `value` for a sensitive one.
+Only owners and admins can use them (else 403). The host refuses an invalid, reserved or repeated name,
+and a kept value that it does not have, with 400 and the reason.
+`src/main/team-api/route-provider-environment.ts` owns them. Without the capability a client hides the
+Environment section for that host.
 
 The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
 `POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,

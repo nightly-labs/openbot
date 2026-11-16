@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import { attachmentReferenceIds } from "@openbot/contracts/attachment-references";
 import type { AgentTask, QueueDelivery } from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -295,7 +295,9 @@ export function createThreadQueue(deps: ThreadQueueDeps) {
       editingDeliveryId: edit?.deliveryId ?? null,
       editBusy: busy(),
       onSteer:
-        agent && providerSteersTurns(agent.provider) ? (deliveryId) => actions.steer(task, deliveryId) : undefined,
+        agent && agentSteersTurns(agent, deps.props.modelOptions)
+          ? (deliveryId) => actions.steer(task, deliveryId)
+          : undefined,
       onCancel: (deliveryId) => actions.cancel(deliveryId),
       onEdit: (delivery) => void begin(task, delivery, key),
       onCancelEdit: () => void cancel(),

@@ -59,6 +59,7 @@ import { MEMORY_REVIEW_CAPABILITY } from "@openbot/contracts/team-protocol/memor
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "@openbot/contracts/team-protocol/password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDERS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v1";
 import { PUSH_NOTIFICATION_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/push-notification-threads-v1";
@@ -100,6 +101,7 @@ import {
   runTeamEffect,
 } from "@openbot/team-client";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
+import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
 import type {
@@ -129,6 +131,7 @@ import {
   respondToApproval,
   respondToBrowserSecret,
   respondToBrowserTakeover,
+  sendPhoneFeedback,
   type TeamApiRequest,
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
@@ -155,6 +158,7 @@ import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
 import { supportLog } from "@/features/support/model/support-log";
+import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
@@ -213,6 +217,7 @@ import { LiveWorkspaceStore } from "@/features/workspace/model/live-workspace-st
 import {
   dropApproval,
   InactiveRequestError,
+  type PendingApproval,
   reducePendingApprovals,
 } from "@/features/workspace/model/pending-approvals";
 import { type QueryScope, queryKeys } from "@/features/workspace/model/query-keys";
@@ -1399,11 +1404,27 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   );
   const foregroundRef = useRef(foreground);
   foregroundRef.current = foreground;
-  /** Sends an answer to a request that the host waits on. */
+  /**
+   * Sends an answer to a request that the host waits on. A Send of a bug report about the phone app
+   * goes with this phone's version, system, network and support log, as its card showed them: the
+   * host takes no other Send of it. Without a card that showed them, the phone sends a plain answer,
+   * which the host refuses with a message to open the chat.
+   */
   const sendApproval = useCallback(
-    async (serverId: string, input: RespondToApprovalInput) => {
+    async (serverId: string, input: RespondToApprovalInput, approval: PendingApproval) => {
+      const phone =
+        input.decision === "accept" &&
+        feedbackApproval(approval)?.phone === true &&
+        hasCapability(serverCapabilities.current, serverId, PHONE_FEEDBACK_CAPABILITY)
+          ? shownPhoneFeedback(approval)
+          : null;
       try {
-        await runTeamRequest(respondToApproval(teamApi(serverId), input));
+        await runTeamRequest(
+          phone
+            ? sendPhoneFeedback(teamApi(serverId), { requestId: input.requestId, phone })
+            : respondToApproval(teamApi(serverId), input),
+        );
+        forgetPhoneFeedback(approval);
       } catch (error) {
         // Another device answered first, or the turn ended. The request is gone on the host too.
         if (error instanceof InactiveRequestError)
@@ -1955,11 +1976,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       respondToApproval: async (serverId, input) => {
         const pending = liveState
           .get()
-          .approvalRequests[serverId]?.some((item) => String(item.requestId) === String(input.requestId));
+          .approvalRequests[serverId]?.find((item) => String(item.requestId) === String(input.requestId));
         if (!pending) throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
         if (!showsOnline(serversRef.current.find((server) => server.id === serverId)))
           throw new Error(currentText().t("mobile.workspace.error.approvalOffline"));
-        await sendApproval(serverId, input);
+        await sendApproval(serverId, input, pending);
       },
       readsWholeApprovals: (serverId) =>
         hasCapability(serverCapabilities.current, serverId, PENDING_APPROVAL_CAPABILITY),

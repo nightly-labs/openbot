@@ -44,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Hay demasiadas direcciones o carpetas.",
   "error.provider.credentialFileUnreadable": "El archivo de credenciales del proveedor no se puede leer.",
   "error.provider.credentialFileTooLarge": "El archivo de credenciales del proveedor es demasiado grande.",
+  "error.provider.environmentNameInvalid":
+    "{name} no es un nombre de variable válido. Usa letras, dígitos y _, y no empieces con un dígito.",
+  "error.provider.environmentNameReserved": "OpenBot define {name} para este proveedor. Quita esta variable.",
+  "error.provider.environmentNameDuplicate": "{name} aparece más de una vez en la lista.",
+  "error.provider.environmentValueTooLong": "El valor de {name} es demasiado largo.",
+  "error.provider.environmentTooMany": "Un proveedor puede tener como máximo {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "Los valores sensibles son demasiado largos en conjunto. Guarda valores más cortos o menos valores.",
   "error.provider.archiveSpecialFile": "El archivo del entorno de ejecución contiene un enlace o un archivo especial.",
   "error.provider.archiveUnsafePath": "El archivo del entorno de ejecución contiene una ruta no segura.",
   "error.provider.runtimeSpecialFile": "El entorno de ejecución contiene un enlace o un archivo especial.",
@@ -328,7 +336,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Inicia sesión con Nous Portal o ejecuta `hermes setup` en una terminal para usar Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes no pudo terminar este turno. Si su respuesta da un motivo, haz lo que indica. Si no, puede que un servidor MCP de este agente no esté disponible: revísalo en Ajustes del servidor › MCP y vuelve a enviar tu mensaje.",
+    "Hermes no pudo terminar este turno. Si su respuesta da un motivo, haz lo que indica. Si no, puede que un servidor MCP de este agente no esté disponible: revísalo en Marketplace, Apps, y vuelve a enviar tu mensaje.",
   "error.provider.hermesRefused":
     "Hermes rechazó este mensaje antes de empezar. Envíalo de nuevo. Si Hermes rechaza cada mensaje, reinicia OpenBot en el ordenador que ejecuta este agente.",
   "error.provider.copilotThinkingRejected":

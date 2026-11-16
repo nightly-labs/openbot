@@ -136,6 +136,7 @@ export const messages = {
   "error.team.claudeUserSetupUnsupported":
     "Diese Verbindung unterstützt den Schalter für die Claude-Code-Einrichtung nicht.",
   "error.team.claudeCompactWindowUnsupported": "Diese Verbindung unterstützt die Claude-Komprimierungsgröße nicht.",
+  "error.team.providerEnvironmentUnsupported": "Diese Verbindung unterstützt keine Anbietervariablen.",
   "error.team.modelVisibilityUnsupported": "Diese Verbindung unterstützt die Modellliste nicht.",
   "error.team.providerDefaultUnsupported": "Diese Verbindung unterstützt den Standardanbieter nicht.",
   "error.team.attachmentNameRequired": "Ein sicherer Anhangsname ist erforderlich.",
@@ -192,6 +193,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Diese Verbindung unterstützt die Server-Persönlichkeit nicht.",
   "error.team.agentWaitsUnsupported": "Offene Wartevorgänge werden von dieser Verbindung nicht unterstützt.",
   "error.team.pendingApprovalUnsupported": "Diese Verbindung kann keine vollständige Freigabe lesen.",
+  "error.team.phoneFeedbackUnsupported": "Diese Verbindung kann keinen Bericht aus der Telefon-App senden.",
   "error.team.messagePinsUnsupported": "Diese Verbindung unterstützt angeheftete Nachrichten nicht.",
   "error.team.queuedMessageThreadUnsupported":
     "Das Ausführen einer wartenden Nachricht als neuer Thread wird von dieser Verbindung nicht unterstützt.",

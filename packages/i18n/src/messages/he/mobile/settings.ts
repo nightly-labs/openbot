@@ -60,7 +60,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "לנקות את יומן התמיכה?",
   "mobile.settings.support.clearBody": "הפעולה מסירה את כל האירועים מהיומן בטלפון הזה.",
   "mobile.settings.support.logFooter":
-    "היומן נשאר בטלפון הזה, ו-OpenBot אינו שולח אותו. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
+    "היומן נשאר בטלפון הזה. OpenBot שולח שורות ממנו רק עם דיווח על באג באפליקציית הטלפון שנשלח על ידך, וכרטיס הדיווח מציג אותן קודם. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
   "mobile.settings.support.saveFailed": "לא ניתן לשמור את קובץ היומן. אפשר לנסות שוב.",
   "mobile.settings.support.sharingUnavailable": "שיתוף אינו זמין בטלפון הזה.",
   "mobile.settings.support.newestFirst": "מהחדש לישן.",
@@ -228,6 +228,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
+  "mobile.settings.conversations.swipeThreads": "שרשורים",
+  "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeFooter":
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. החלקה על הודעה עדיין עונה לה.",
+  "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
+  "mobile.settings.conversations.pullInfoFooter":
+    "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
   "mobile.settings.conversations.fullQualityPhotos": "שליחת תמונות באיכות מלאה",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "כשהאפשרות כבויה, האפליקציה שולחת עותק קטן יותר של כל תמונה, עד 2048 פיקסלים בצלע הארוכה. הוא מגיע מהר יותר בחיבור איטי. הפעילו אותה כדי לשלוח את התמונה המקורית.",

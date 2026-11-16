@@ -32,6 +32,8 @@ export const messages = defineMessages("status.agent", {
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
   "status.agent.reportProblem":
     "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
+  "status.agent.reportPhoneProblem":
+    "This becomes a public GitHub issue, with the app version, your system, and the version, system and support log of your phone. Your name is not shown.",
   "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
   "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
   "status.agent.feedbackSameAs": "Adds to issue #{issue}",
@@ -105,7 +107,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.mcpServerDisable": "Turn off the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerRemove": "Remove the MCP server {name} and its sign-in from every agent on this server.",
   "status.agent.mcpToolCall": "Run the tool {tool} of the MCP server {name}.",
-  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Server settings, MCP.",
+  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Marketplace, Apps, {name}.",
   "status.agent.uiBlockClosedByMessage": "Closed by a new message",
   "status.agent.vaultAdded": "Saved to Vault: {name}",
   "status.agent.vaultUpdated": "Changed in Vault: {name}",

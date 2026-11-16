@@ -44,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Слишком много адресов или папок.",
   "error.provider.credentialFileUnreadable": "Файл учётных данных провайдера не читается.",
   "error.provider.credentialFileTooLarge": "Файл учётных данных провайдера слишком большой.",
+  "error.provider.environmentNameInvalid":
+    "{name} — недопустимое имя переменной. Используйте буквы, цифры и _ и не начинайте с цифры.",
+  "error.provider.environmentNameReserved": "OpenBot задаёт {name} для этого провайдера. Удалите эту переменную.",
+  "error.provider.environmentNameDuplicate": "{name} встречается в списке больше одного раза.",
+  "error.provider.environmentValueTooLong": "Значение {name} слишком длинное.",
+  "error.provider.environmentTooMany": "У провайдера может быть не больше {limit} переменных.",
+  "error.provider.environmentSecretsTooLarge":
+    "Секретные значения вместе слишком длинные. Сохраните более короткие значения или меньше значений.",
   "error.provider.archiveSpecialFile": "Архив среды выполнения содержит ссылку или специальный файл.",
   "error.provider.archiveUnsafePath": "Архив среды выполнения содержит небезопасный путь.",
   "error.provider.runtimeSpecialFile": "Среда выполнения содержит ссылку или специальный файл.",
@@ -315,7 +323,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Войдите через Nous Portal или выполните `hermes setup` в терминале, чтобы использовать Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Настройки сервера › MCP и отправьте сообщение ещё раз.",
+    "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Каталог, Приложения и отправьте сообщение ещё раз.",
   "error.provider.hermesRefused":
     "Hermes отклонил это сообщение до начала работы. Отправьте его ещё раз. Если Hermes отклоняет каждое сообщение, перезапустите OpenBot на компьютере, где работает этот агент.",
   "error.provider.copilotThinkingRejected":

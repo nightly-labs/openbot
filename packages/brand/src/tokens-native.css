@@ -72,7 +72,6 @@
     --openbot-radius-grouped: 16px;
     --openbot-bg-chrome-glass: rgba(250, 250, 252, 0.94);
     --openbot-border-chrome-glass: rgba(20, 20, 20, 0.1);
-    --openbot-bg-chrome-blur: rgba(255, 255, 255, 0.55);
     /* File references: the same hues as dark, darker so the name reads on a light surface. */
     --openbot-file-blue: #1f6fd1;
     --openbot-file-blue-soft: rgba(31, 111, 209, 0.12);
@@ -144,7 +143,6 @@
     --openbot-radius-grouped: 16px;
     --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
     --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
-    --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
     --openbot-file-blue: #74b9ff;
     --openbot-file-blue-soft: rgba(116, 185, 255, 0.14);
     --openbot-file-yellow: #ff9412;

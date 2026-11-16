@@ -44,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Il y a trop d’adresses ou de dossiers.",
   "error.provider.credentialFileUnreadable": "Le fichier d’identifiants du fournisseur est illisible.",
   "error.provider.credentialFileTooLarge": "Le fichier d’identifiants du fournisseur est trop volumineux.",
+  "error.provider.environmentNameInvalid":
+    "{name} n’est pas un nom de variable valide. Utilisez des lettres, des chiffres et _, sans commencer par un chiffre.",
+  "error.provider.environmentNameReserved": "OpenBot définit {name} pour ce fournisseur. Retirez cette variable.",
+  "error.provider.environmentNameDuplicate": "{name} figure plus d’une fois dans la liste.",
+  "error.provider.environmentValueTooLong": "La valeur de {name} est trop longue.",
+  "error.provider.environmentTooMany": "Un fournisseur peut avoir au plus {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "Les valeurs sensibles sont trop longues au total. Enregistrez des valeurs plus courtes ou moins nombreuses.",
   "error.provider.archiveSpecialFile":
     "L’archive de l’environnement d’exécution contient un lien ou un fichier spécial.",
   "error.provider.archiveUnsafePath": "L’archive de l’environnement d’exécution contient un chemin non sûr.",
@@ -341,7 +349,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Réglages du serveur › MCP, puis renvoyez votre message.",
+    "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Marketplace, Apps, puis renvoyez votre message.",
   "error.provider.hermesRefused":
     "Hermes a refusé ce message avant de commencer. Renvoyez-le. Si Hermes refuse chaque message, redémarrez OpenBot sur l’ordinateur qui exécute cet agent.",
   "error.provider.copilotThinkingRejected":

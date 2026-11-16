@@ -141,6 +141,7 @@ export const messages = {
     "Questa connessione non supporta l’interruttore della configurazione di Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Questa connessione non supporta la dimensione di compattazione di Claude.",
+  "error.team.providerEnvironmentUnsupported": "Questa connessione non supporta le variabili del provider.",
   "error.team.modelVisibilityUnsupported": "Questa connessione non supporta l'elenco dei modelli.",
   "error.team.providerDefaultUnsupported": "Questa connessione non supporta il provider predefinito.",
   "error.team.attachmentNameRequired": "Serve un nome di allegato sicuro.",
@@ -195,6 +196,8 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
   "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
   "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
+  "error.team.phoneFeedbackUnsupported":
+    "Questa connessione non permette di inviare una segnalazione dall'app del telefono.",
   "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
   "error.team.queuedMessageThreadUnsupported":
     "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",

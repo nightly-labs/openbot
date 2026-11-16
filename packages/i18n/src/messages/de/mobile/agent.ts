@@ -615,6 +615,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Alle als gelesen markieren",
   "mobile.agent.home.sort.title": "Chats sortieren",
   "mobile.agent.home.sort.manual": "Manuell",
+  "mobile.agent.home.sort.recent": "Letzte Aktivität",
   "mobile.agent.home.sort.unreadGroup": "Ungelesen als Gruppe",
   "mobile.agent.home.sort.unreadFirst": "Ungelesen zuerst in Ordnern",
   "mobile.agent.route.appearance": "Aussehen",

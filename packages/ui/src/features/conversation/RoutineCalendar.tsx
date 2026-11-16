@@ -23,15 +23,21 @@ import {
   ChevronRight,
   CirclePause,
   IconButton,
+  Plus,
   Skeleton,
   SlidingTabs,
   X,
 } from "@openbot/ui";
 import { PageHeader, type PageHeaderFrame } from "@openbot/ui/features/window/PageHeader";
-import { createMemo, createStore, For, Match, Show, Switch, untrack } from "solid-js";
+import { createMemo, createSignal, createStore, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import {
+  type RoutineCalendarCreate,
+  RoutineCalendarCreateCard,
+  type RoutineCalendarSlot,
+} from "./RoutineCalendarCreateCard";
 import { RoutineCalendarEmpty } from "./RoutineCalendarEmpty";
 import { routineScheduleSummary } from "./routine-schedule-ui";
 
@@ -77,6 +83,11 @@ export interface RoutineCalendarProps {
   onRetry?: () => void;
   /** Starts a new routine for the agent. Without it, the empty calendar has no action. */
   onCreateRoutine?: (agentId: string) => void;
+  /**
+   * Creates a routine from a day: a right-click on a future day, a click on its empty part, or its
+   * "+". Without it, or with no agent, a day only opens its day view.
+   */
+  create?: RoutineCalendarCreate | undefined;
   /** A full-pane calendar has a way back. With it, the heading takes focus when the calendar opens. */
   onBack?: () => void;
   /** The host whose routines show, after the title. */
@@ -247,12 +258,85 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
     </Show>
   );
 
+  /** The day and time of the routine that the card makes, and where the card opens. */
+  const [slot, setSlot] = createSignal<RoutineCalendarSlot | null>(null);
+  const creates = () => props.create !== undefined && props.agents.length > 0;
+  const nowHour = () => calendarHourOf(props.now, props.timeZone);
+  /**
+   * A future day can get a routine; a past day and a day of the month next to it cannot. Today can
+   * until its last hour starts: no whole hour is left after it.
+   */
+  const opensDay = (day: CalendarDay) =>
+    creates() && (day > today() || (day === today() && nowHour() < 23)) && !outsideMonth(day);
+  /** Today: the next whole hour. Another day: 9 AM. A later hour of the day view keeps its own. */
+  const slotTime = (day: CalendarDay, hour?: number) => {
+    const next = day === today() ? nowHour() + 1 : 9;
+    const chosen = hour !== undefined && (day !== today() || hour > nowHour()) ? hour : next;
+    return `${String(chosen).padStart(2, "0")}:00`;
+  };
+  const openSlot = (day: CalendarDay, x: number, y: number, hour?: number) => {
+    if (!opensDay(day)) return false;
+    setSlot({ day, time: slotTime(day, hour), x, y });
+    return true;
+  };
+
+  /** The day under a pointer event, and the hour row of the day view under it. */
+  const slotTarget = (target: EventTarget | null) => {
+    if (!(target instanceof Element)) return null;
+    const cell = target.closest<HTMLElement>("li.routine-planner-day[data-day]");
+    if (cell?.dataset.day) return { day: cell.dataset.day, hour: undefined };
+    if (state.view !== "day" || !target.closest(".routine-planner-day-view")) return null;
+    const hour = target.closest<HTMLElement>(".routine-planner-hour[data-hour]")?.dataset.hour;
+    return { day: state.anchor, hour: hour === undefined ? undefined : Number(hour) };
+  };
+  let root: HTMLElement | undefined;
+  onSettled(() => {
+    const element = root;
+    if (!element) return;
+    // A right-click anywhere on a future day, also over its runs, replaces the browser menu.
+    const menu = (event: MouseEvent) => {
+      const found = slotTarget(event.target);
+      if (found && openSlot(found.day, event.clientX, event.clientY, found.hour)) event.preventDefault();
+    };
+    // A click on the calendar while the card is open only closes the card, so a draft is not replaced.
+    // The window sees the press before the card closes on it.
+    let closing = false;
+    const press = (event: PointerEvent) => {
+      if (event.button === 0)
+        closing = slot() !== null && event.target instanceof Node && element.contains(event.target);
+    };
+    // A click opens the card only on the empty part of a day: a run, the day and "+N more" keep theirs.
+    const click = (event: MouseEvent) => {
+      if (closing) {
+        closing = false;
+        return;
+      }
+      if (!(event.target instanceof Element) || event.target.closest("button, a, [role='button']")) return;
+      const found = slotTarget(event.target);
+      if (found) openSlot(found.day, event.clientX, event.clientY, found.hour);
+    };
+    window.addEventListener("pointerdown", press, true);
+    element.addEventListener("contextmenu", menu);
+    element.addEventListener("click", click);
+    return () => {
+      window.removeEventListener("pointerdown", press, true);
+      element.removeEventListener("contextmenu", menu);
+      element.removeEventListener("click", click);
+    };
+  });
+
   /** With no routine, there is nothing to move through: the calendar shows its pitch on a faint month. */
   const empty = () => (props.state ?? "ready") === "ready" && props.routines.length === 0;
   const emptyMonth = createMemo(() => daysFor(today(), "month"));
 
   return (
-    <section class="routine-planner" aria-labelledby="routine-planner-heading" data-view={state.view}>
+    <section
+      ref={root}
+      class="routine-planner"
+      aria-labelledby="routine-planner-heading"
+      data-view={state.view}
+      data-create={creates() ? "" : undefined}
+    >
       <div class="routine-planner-header">
         <PageHeader
           class="routine-planner-title"
@@ -369,6 +453,8 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
               fallback={
                 <RoutineCalendarDay
                   entries={entriesByDay().get(state.anchor) ?? []}
+                  opens={opensDay(state.anchor)}
+                  onAdd={(x, y) => openSlot(state.anchor, x, y)}
                   timeZone={props.timeZone}
                   timeText={timeText}
                   statusText={statusText}
@@ -389,8 +475,11 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                         <li
                           class="routine-planner-day"
                           aria-current={day === today() ? "date" : undefined}
+                          data-day={day}
                           data-past={day < today() ? "" : undefined}
                           data-outside={outsideMonth(day) ? "" : undefined}
+                          data-opens={opensDay(day) ? "" : undefined}
+                          data-slot={slot()?.day === day ? "" : undefined}
                         >
                           <h3 class="routine-planner-day-heading">
                             <Button
@@ -446,6 +535,20 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
                               {t("routine.calendar.more", { count: hidden() })}
                             </Button>
                           </Show>
+                          <Show when={opensDay(day)}>
+                            <IconButton
+                              variant="ghost"
+                              size="icon-xs"
+                              class="routine-planner-add"
+                              label={t("routine.calendar.newOn", { day: longDay(day) })}
+                              onClick={(event) => {
+                                const rect = event.currentTarget.getBoundingClientRect();
+                                openSlot(day, rect.right, rect.top);
+                              }}
+                            >
+                              <Plus aria-hidden="true" />
+                            </IconButton>
+                          </Show>
                         </li>
                       );
                     }}
@@ -478,12 +581,26 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
           </div>
         </Match>
       </Switch>
+      <Show when={props.create}>
+        {(create) => (
+          <RoutineCalendarCreateCard
+            slot={slot()}
+            agents={props.agents}
+            create={create()}
+            now={props.now}
+            onClose={() => setSlot(null)}
+          />
+        )}
+      </Show>
     </section>
   );
 }
 
 interface RoutineCalendarDayProps {
   entries: CalendarEntry[];
+  /** A right-click on the day, a click on its empty part, or its button opens the routine card. */
+  opens: boolean;
+  onAdd: (x: number, y: number) => void;
   timeZone: string;
   timeText: (at: string) => string;
   statusText: (status: RoutineCalendarStatus) => string;
@@ -505,11 +622,14 @@ function RoutineCalendarDay(props: RoutineCalendarDayProps) {
     return [...byHour.values()];
   });
   return (
-    <div class="routine-planner-day-view">
+    <div class="routine-planner-day-view" data-opens={props.opens ? "" : undefined}>
       <Show when={hours().length > 0} fallback={<p class="routine-planner-note">{t("routine.calendar.dayEmpty")}</p>}>
         <For each={hours()}>
           {(group) => (
-            <section class="routine-planner-hour">
+            <section
+              class="routine-planner-hour"
+              data-hour={calendarHourOf(new Date(group[0]?.run.at ?? 0), props.timeZone)}
+            >
               <h3>{format.date(new Date(group[0]?.run.at ?? 0), { hour: "numeric", timeZone: props.timeZone })}</h3>
               <ul class="routine-planner-entries">
                 <For each={group}>
@@ -527,6 +647,20 @@ function RoutineCalendarDay(props: RoutineCalendarDayProps) {
             </section>
           )}
         </For>
+      </Show>
+      <Show when={props.opens}>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="routine-planner-day-add"
+          onClick={(event) => {
+            const rect = event.currentTarget.getBoundingClientRect();
+            props.onAdd(rect.right, rect.top);
+          }}
+        >
+          <Plus aria-hidden="true" />
+          {t("routine.calendar.new")}
+        </Button>
       </Show>
     </div>
   );

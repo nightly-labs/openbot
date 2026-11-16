@@ -595,13 +595,53 @@ deletes a server's copy when the account no longer has that server. Sign-out and
 disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 5,000 events in the phone's system cache: app version,
-system and device model, app state changes, connection steps with server IDs, error text and error
+system and device model, app state changes, the route name of each screen that opens (such as
+`chat/[agentId]`, never an ID), the steps of the notification setup (the setting, the permission,
+whether the phone gave a push token and whether each server registered it, never the token), the
+notification, microphone and camera permissions, a range of free storage (such as `2-10 GB`), low
+memory warnings, the kind of network with the name of the VPN that is on
+(see below), connection steps with server IDs, error text and error
 codes, the types and counts of network candidates (such as "relay/udp", never an address), the
 desktop app version and protocol support of each server, the method, address without query, status
 and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
 does not record message text, files, request bodies or headers, and it masks tokens, keys and email
-addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
-clear it.
+addresses. **Settings → Support** shows it and lets you save the file or clear it. The app sends
+lines of the log in one case only: when you select **Send** on a bug report about the phone app
+(see [bug reports](#bug-reports-about-the-phone-app)). It sends no other part of the log, and never
+without that Send.
+
+#### Bug reports about the phone app
+
+When an agent offers a bug report about the phone app, only the phone app can send it. With **Send**,
+the phone adds to the report its system (iOS or Android), the app version with the build number and
+the update ID, the system version and the device model, its network and VPN, and at most 60 lines of
+the support log: the last warnings and errors, and the connection and app state events between them.
+A request that got an answer is not in these lines, and a console line is not: a library can write
+any value there.
+
+The network line is such as `Wi-Fi · VPN: Tailscale` or `Mobile data · no VPN found`. The app reads
+the kind of connection from the system. To find a VPN or a mesh network (Tailscale, ZeroTier and
+others), it reads the addresses of the phone's network interfaces on the phone: it makes a WebRTC
+connection object with no server and no other side, which sends nothing. No system gives the name of
+the VPN app, so the name comes from the address range of the VPN's tunnel, and "probably" marks a
+name that comes from a default range. The line has the name, and at most the first two numbers of a
+private range (`10.8.x.x`); it never has an address. The app reads this at its start, at each change
+of the network and when a report card opens, and it writes each change to the support log.
+
+These lines must not point to you. Tokens, keys and email addresses were masked when each line was
+written. For the report, the phone also masks:
+
+- each server ID, which becomes `server-1`, `server-2`;
+- each network address, which keeps only its kind (`[private-ip]`, `[shared-ip]`, `[public-ip]`,
+  `[ipv6]`);
+- each host name that is not an OpenBot service (`openbot.run`), which becomes `[host]`;
+- each record ID and hash, which becomes `[id]`, and the name of a user folder.
+
+The message of an error is free text, so it can still hold a word that these rules do not know. The
+card shows all of this text before you send it, and Send sends only the text that the card shows. The phone sends it to the server of the agent over
+the Team connection. The server masks secrets and these values again and sends the text with the
+report, as described under [Other network connections](#other-network-connections). It becomes part
+of the public GitHub issue. No report about the phone app is sent without this data.
 
 The mobile app asks an update server for a newer JavaScript bundle each time it starts, and when
 you come back to it, at most one time in 15 minutes. App versions after 1.4.8 ask OpenBot's server
@@ -739,12 +779,13 @@ removes the connection. Deleting an account removes its provider links and SCIM 
 
 ## Email delivery and infrastructure providers
 
-OpenBot sends sign-in, team invitation, and welcome messages through the configured SMTP provider. The
-provider receives the recipient address and the message content. A sign-in message contains the
+OpenBot sends sign-in, team invitation, and welcome messages from `no_reply@openbot.run` through the
+configured SMTP provider. A reply goes to `hello@openbot.run`. The provider receives the recipient address and the message content. A sign-in message contains the
 one-time code and its expiration time. A team invitation can contain the inviter address, team name,
 role, and invite URL. When the first cloud server plan of an account starts, a welcome message goes
 to the account address. It contains the plan name and the server name. License messages go to the
-account address from `licenses@openbot.run` through the same provider. When a license has its first
+account address from `no_reply@openbot.run` through the same provider, and a reply goes to
+`licenses@openbot.run`. When a license has its first
 payment, the message contains the license tier, the number of users, the list price when no discount
 applies, the currency, the billing period, and the date of the next payment. When a renewal payment fails, the message contains
 the license tier, the number of users, the amount due, the currency, the date of the next payment
@@ -1239,14 +1280,21 @@ Network traffic can also occur when:
   the agent runs in the desktop app, on a server or on a hosted server, and the agent's provider, CLI
   version, model and reasoning effort. It also sends up to 5 error lines of the chat from the last
   hour: the errors of failed tools other than shell commands, and of OpenBot tools. The card shows the
-  errors. OpenBot removes known secrets from the text and the errors before it shows them. The service opens it as a public
+  errors. OpenBot removes known secrets from the text and the errors before it shows them. A bug
+  report about the phone app also has the phone's system, app version, device, network with the name
+  of its VPN, and support log lines,
+  which the phone adds when the user sends the report there (see
+  [bug reports about the phone app](#bug-reports-about-the-phone-app)); the service refuses such a
+  report without them. The service opens it as a public
   issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
   the account. The service does not store or log the text. For the limit of a few issues each minute and
   10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the
   count, and deletes the earlier days of an account when the account sends again, or when the account
   is deleted. When the user is not signed in or the send fails, OpenBot gives a link to the GitHub
-  form with the same text instead, and nothing goes to the account service;
+  form with the same text instead, and nothing goes to the account service. For a report about the
+  phone app, the link is to the form for the phone app, with the phone's system, app version and
+  device when the phone sent them, and never with log lines;
 - the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
   code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
   of connected apps. OpenBot renews and revokes the token there, and reads the account email from
@@ -1379,6 +1427,17 @@ which Sunra account pays. While the Canvas page is open, the computer also asks 
 of that account, with Sunra's `get_balance` tool, which spends no credits. It shows the number only
 in the page rail, and each member of a joined server who can use workflows can see it. Sunra's own
 privacy policy covers what Sunra keeps.
+
+A step with a Higgsfield model uses the Higgsfield sign-in of that computer's Apps in the same way.
+The computer sends the prompt, the model, the size settings and the input pictures to Higgsfield's
+MCP server (`mcp.higgsfield.ai`): it puts each input picture in Higgsfield's upload storage first,
+then asks Higgsfield to make the file, and downloads the result only from Higgsfield's file hosts.
+Higgsfield keeps the file in the history of the signed-in Higgsfield account, and the credits of that
+account pay for it. OpenBot never spends an unlimited-generation allowance of that account. While the
+Canvas page is open, the computer also asks Higgsfield for the credits of that account, with
+Higgsfield's `balance` tool, which spends no credits. It shows the number only in the page rail, and
+each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
+covers what Higgsfield keeps.
 
 Deleting an agent keeps the workflows and their step history without the agent. Deleting a
 workflow deletes its versions, runs, steps, and receipts.
@@ -1912,6 +1971,17 @@ When you add or edit an endpoint, Load models sends the key and headers you type
 For a saved endpoint, OpenBot sends the stored key and headers only to the same origin as the saved
 address. Local detection can be turned off in Settings. Its switch, addresses, folders and hidden
 rows are in `openbot-provider-detection-v1.json` in the app profile.
+
+### Provider variables
+
+An owner or admin can give Claude, Codex and Gemini environment variables on each provider page in
+Server settings → Providers. When the variables name another address, such as a proxy like
+CLIProxyAPI, the model requests of that provider, with the conversation, attachments and tool results
+that they carry, go to that address and not to Anthropic, OpenAI or Google. What that address sends
+on is its own choice. Names and plain values are in `openbot-provider-environment-v1.json` in the app
+profile. A value marked sensitive is in the encrypted provider key file, goes only to that provider's
+processes, and is not in a screen, log, export, or diagnostics report. The commands that agents run
+can read the variables.
 
 ### Custom agents
 

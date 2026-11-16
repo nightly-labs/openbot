@@ -63,13 +63,12 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
   4 pt up, in 200 ms when the text of the big title reaches the bottom of the bar.
 - Android uses Material 3, not an iOS copy: a 28 dp bold title (a medium top app bar), the bar header
   blur described below (the surface solid under the bar and a 32 dp fade below it before Android 12),
-  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp glass circle on full screens, the plain icon in sheets.
-- Android has no Liquid Glass. The search field and the bar buttons use `useChromeGlass()`: the solid glass of the design (`--openbot-bg-chrome-glass`, 94-96%
-  opaque), a hairline edge, a soft shadow and the top light of `ChromeGlassSheen`. The home search
-  field has a real blur on Android 12 and later: the home content is in a `BlurTargetView`, and the
-  field draws a `BlurView` of it (radius 24) under the lighter `--openbot-bg-chrome-blur` fill. While
-  the results are open, the field shows the solid glass over the blur, because the results are not in
-  the target. iOS without Liquid Glass keeps the solid capsule.
+  a 22 dp regular small title on the 72 dp line, and 48 dp icon buttons with a round ripple: a 40 dp filled circle on full screens, the plain icon in sheets.
+- Android has no Liquid Glass. The search fields and the bar buttons are plain: the opaque HeroUI
+  `default` fill (`--openbot-bg-control`) of the chat composer and its buttons, with no edge, shadow,
+  sheen or blur. `GlassCapsule` and `useChromeGlass()` give them that fill. iOS without Liquid Glass
+  keeps the solid `default` capsule with a soft shadow for the search fields, and the solid glass of
+  the design (`--openbot-bg-chrome-glass`) for the bar buttons.
 - Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
   (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
   on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target

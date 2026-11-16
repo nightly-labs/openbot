@@ -44,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "주소나 폴더가 너무 많아요.",
   "error.provider.credentialFileUnreadable": "제공자 자격 증명 파일을 읽을 수 없어요.",
   "error.provider.credentialFileTooLarge": "제공자 자격 증명 파일이 너무 커요.",
+  "error.provider.environmentNameInvalid":
+    "{name}은(는) 올바른 변수 이름이 아니에요. 영문자, 숫자, _를 쓰고 숫자로 시작하지 마세요.",
+  "error.provider.environmentNameReserved": "OpenBot이 이 공급자의 {name}을(를) 설정해요. 이 변수를 제거하세요.",
+  "error.provider.environmentNameDuplicate": "{name}이(가) 목록에 두 번 이상 있어요.",
+  "error.provider.environmentValueTooLong": "{name}의 값이 너무 길어요.",
+  "error.provider.environmentTooMany": "공급자는 변수를 최대 {limit}개까지 가질 수 있어요.",
+  "error.provider.environmentSecretsTooLarge":
+    "민감한 값들을 합치면 너무 길어요. 더 짧게 하거나 개수를 줄여 저장하세요.",
   "error.provider.archiveSpecialFile": "런타임 아카이브에 링크 또는 특수 파일이 있어요.",
   "error.provider.archiveUnsafePath": "런타임 아카이브에 안전하지 않은 경로가 있어요.",
   "error.provider.runtimeSpecialFile": "런타임에 링크 또는 특수 파일이 있어요.",
@@ -318,7 +326,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.hermesTurnFailed":
-    "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 서버 설정 › MCP에서 확인한 다음 메시지를 다시 보내세요.",
+    "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 마켓플레이스, 앱에서 확인한 다음 메시지를 다시 보내세요.",
   "error.provider.hermesRefused":
     "Hermes가 시작하기 전에 이 메시지를 거부했습니다. 다시 보내세요. Hermes가 모든 메시지를 거부하면 이 에이전트를 실행하는 컴퓨터에서 OpenBot을 다시 시작하세요.",
   "error.provider.copilotThinkingRejected":

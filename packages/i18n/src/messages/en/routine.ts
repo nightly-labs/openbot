@@ -226,6 +226,10 @@ export const messages = defineMessages("routine", {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "Open {name}",
   "routine.calendar.completed": "Completed",
+  "routine.calendar.new": "New routine",
+  "routine.calendar.newOn": "New routine on {day}",
+  "routine.calendar.agent": "Agent",
+  "routine.calendar.agentChoice": "Agent: {name}",
 
   "routine.settings.loadFailed": "Could not load routines.",
   "routine.settings.loadRunsFailed": "Could not load run history.",

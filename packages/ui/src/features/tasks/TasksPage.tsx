@@ -7,12 +7,11 @@ import {
   taskSections,
   taskTone,
 } from "@openbot/team-client/agent-tasks";
-import { ArrowUp, Button, buttonVariants, ChevronDown, LoaderCircle, Mic, X } from "@openbot/ui";
+import { ArrowUp, Button, LoaderCircle, Mic, X } from "@openbot/ui";
 import { PanelResizer } from "@openbot/ui/components/PanelResizer";
-import { SwapLabel, type SwapMotion } from "@openbot/ui/components/SwapLabel";
 import type { AgentProfile } from "@openbot/ui/data";
 import { AgentAvatar } from "@openbot/ui/features/agents/AgentAvatar";
-import { AgentPicker } from "@openbot/ui/features/agents/AgentPicker";
+import { AgentSearchSelect, agentOf } from "@openbot/ui/features/agents/AgentSearchSelect";
 import { AgentTaskMark, type AgentTaskWait, agentTaskStatus } from "@openbot/ui/features/conversation/AgentTasks";
 import {
   ComposerAttachmentRow,
@@ -119,61 +118,6 @@ interface TasksPageProps {
   macWindowControls?: boolean | undefined;
 }
 
-const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
-
-/** The trigger motion of the header model switcher: mostly a blur, so the old and new name cross in place. */
-const AGENT_SWAP: SwapMotion = {
-  distance: 6,
-  blur: 6,
-  enter: { duration: 320, easing: "cubic-bezier(0.33, 1, 0.68, 1)" },
-  leave: { duration: 180, easing: "ease" },
-};
-
-/**
- * The agent of a task, as a menu with the agent's face and a search field. A task has one agent, so
- * the menu marks only the chosen agent.
- */
-function TaskAgentSelect(props: {
-  agents: AgentProfile[];
-  agentId: string;
-  /** The task title, when the select changes the agent of a task that is already sent. */
-  title?: string;
-  onChange: (agentId: string) => void;
-}) {
-  const { t } = useText();
-  const agent = () => agentOf(props.agents, props.agentId);
-  let shownId = untrack(() => props.agentId);
-  return (
-    <AgentPicker
-      agents={props.agents}
-      value={props.agentId}
-      onChange={props.onChange}
-      label={t("conversation.tasks.page.agents")}
-      triggerClass={`${buttonVariants({ variant: "ghost", size: "sm" })} tasks-page-agent`}
-      triggerLabel={
-        props.title === undefined
-          ? t("conversation.tasks.page.agent", { name: agent()?.name ?? props.agentId })
-          : t("conversation.tasks.page.reassign", { title: props.title, name: agent()?.name ?? props.agentId })
-      }
-    >
-      {/* Keyed by agent, so the face of a newly chosen agent springs in, as the model mark does. */}
-      <For each={[props.agentId]} keyed={(id) => id}>
-        {(id) => {
-          const entering = untrack(id) !== shownId;
-          shownId = untrack(id);
-          return (
-            <span class="tasks-page-agent-face" data-entering={entering ? "" : undefined}>
-              <AgentAvatar agent={agentOf(props.agents, id())} class="tasks-page-avatar" />
-            </span>
-          );
-        }}
-      </For>
-      <SwapLabel text={agent()?.name ?? props.agentId} motion={AGENT_SWAP} />
-      <ChevronDown class="tasks-page-agent-chevron" aria-hidden="true" />
-    </AgentPicker>
-  );
-}
-
 /**
  * The composer of the Tasks page: the conversation composer, and the agent selector in its toolbar.
  * Enter starts the task and Shift+Enter adds a line. The microphone dictates the task, as in a chat.
@@ -253,7 +197,14 @@ function TasksComposer(props: TasksPageProps) {
         </div>
         <div class="composer-toolbar">
           <div class="tasks-page-composer-agent">
-            <TaskAgentSelect agents={props.agents} agentId={props.agentId} onChange={props.onAgentChange} />
+            <AgentSearchSelect
+              agents={props.agents}
+              agentId={props.agentId}
+              label={t("conversation.tasks.page.agent", {
+                name: agentOf(props.agents, props.agentId)?.name ?? props.agentId,
+              })}
+              onChange={props.onAgentChange}
+            />
           </div>
           <div class="composer-primary-actions">
             <Show when={props.voice} fallback={send()}>
@@ -311,10 +262,13 @@ function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
           </span>
         }
       >
-        <TaskAgentSelect
+        <AgentSearchSelect
           agents={props.agents}
           agentId={props.took.task.agentId}
-          title={props.took.task.title}
+          label={t("conversation.tasks.page.reassign", {
+            title: props.took.task.title,
+            name: agent()?.name ?? props.took.task.agentId,
+          })}
           onChange={props.onTookAgentChange}
         />
       </Show>

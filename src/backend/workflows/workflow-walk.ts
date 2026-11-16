@@ -456,12 +456,12 @@ export function modelStepPrompt(system: string, prompt: string, input: string): 
 const TRANSPARENT_ASK = {
   codex: "Give it a transparent background: a cut-out PNG with clear pixels around the subject.",
   grok: "Put the subject on one flat, solid background colour, with no shadow, floor, gradient or texture, and keep a margin around the subject. Use pure green #00FF00, or pure magenta #FF00FF when the subject is green. Do not use that colour in the subject.",
-} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra">, string>;
+} as const satisfies Record<Exclude<WorkflowMediaProvider, "sunra" | "higgsfield">, string>;
 
 /**
  * The request of an image step: the frame and, for a video, its length and resolution, then the
- * description and the text that comes in. Sunra takes the frame, the length and the resolution as
- * fields of its tool, so its request is the description and the input only.
+ * description and the text that comes in. Sunra and Higgsfield take the frame, the length and the
+ * resolution as fields of their tools, so their request is the description and the input only.
  */
 export function mediaStepPrompt(
   fields: WorkflowFields,
@@ -471,7 +471,7 @@ export function mediaStepPrompt(
   provider: WorkflowMediaProvider,
 ): string {
   const ask =
-    provider === "sunra"
+    provider === "sunra" || provider === "higgsfield"
       ? ""
       : kind === "video"
         ? `Make one video of ${specs.duration} seconds at ${specs.resolution ?? "720p"}, aspect ratio ${specs.aspect}.`

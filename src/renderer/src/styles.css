@@ -41,6 +41,7 @@
 @import "@openbot/ui/features/servers/server-update-dialog.css";
 @import "@openbot/ui/styles/settings-panel.css";
 @import "@openbot/ui/styles/provider-code-login.css";
+@import "@openbot/ui/styles/scroll-edges.css";
 @import "@openbot/ui/features/conversation/conversation.css";
 @import "@openbot/ui/features/channels/channel-avatar.css";
 @import "./features/channels/channels.css";

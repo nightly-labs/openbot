@@ -15,11 +15,16 @@ import {
   FEEDBACK_SURFACES,
   type Feedback,
   type FeedbackFacts,
+  type FeedbackPhone,
   featureRequestFormUrl,
+  feedbackLacksPhone,
+  feedbackNeedsPhone,
   feedbackPreview,
   feedbackSentItemType,
+  mobileBugReportFormUrl,
   parseFeedback,
   type SimilarFeedbackIssue,
+  withFeedbackPhone,
 } from "@openbot/contracts/feedback";
 import {
   installServerCommand,
@@ -29,6 +34,7 @@ import {
 } from "@openbot/contracts/hosted-servers";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
+  AgentApproval,
   AgentModelChoice,
   AgentModelOption,
   AgentSummary,
@@ -58,7 +64,7 @@ import {
 import { isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { isUiBlockId, normalizeUiBlockSpec } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
+import { createOpenBotLogger, maskIdentifiers, redactText, registerSecretValue, toLogValue } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
@@ -68,6 +74,7 @@ import type { AgentStore } from "../agent-store";
 import type { AgentTasks } from "../agent-tasks/agent-tasks";
 import type { AgentWaits } from "../agent-waits/agent-waits";
 import { attachmentCall, attachmentFailure } from "../attachment-effects";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
 import type { ProviderSession } from "../database/provider-sessions";
@@ -153,6 +160,7 @@ import type { AgentPinRefusal, MessagePins } from "./message-pins";
 import {
   agentAccountSetup,
   agentReasoningEffort,
+  type ListedCustomEndpoint,
   listModelsPayload,
   modelList,
   type ProviderAccountRows,
@@ -305,6 +313,12 @@ export interface AgentServerClaims {
 
 const FEEDBACK_SIGNED_OUT_NEXT =
   "The user is not signed in to OpenBot, so OpenBot did not send it. Give the user this link to the same text on GitHub, to check and submit, or ask them to sign in and try again.";
+/**
+ * A link to the form for the phone app has no support log, and can have no phone data at all. The
+ * form requires the version and the device, and the repository closes a connection report with no log.
+ */
+const FEEDBACK_PHONE_FORM_NEXT =
+  " This is the form for the phone app. Tell the user to open the link on the phone, to complete the app version and the device when they are empty (Settings > About in the phone app), and to attach the support log (Settings > Support > Save log file).";
 
 /**
  * The account service takes a few reports from an account in a minute, and more in a UTC day. A send
@@ -324,6 +338,19 @@ function feedbackLimitedNext(limit: { readonly daily: boolean; readonly retryAft
     ? "this account sent the most reports that OpenBot takes in one day"
     : "this account sent too many reports in the last minute";
   return `OpenBot did not send it, because ${why}. It can send reports again ${wait}. Tell the user this in one sentence, and give them this link to the same text on GitHub, to check and submit. Do not call send_feedback again before then, and do not send it another way.`;
+}
+
+/** The phone's data, redacted and cut to the limits of a report. */
+function redactedPhone(phone: FeedbackPhone): FeedbackPhone {
+  return {
+    platform: phone.platform,
+    appVersion: redactText(phone.appVersion).slice(0, FEEDBACK_LIMITS.fact),
+    system: redactText(phone.system).slice(0, FEEDBACK_LIMITS.fact),
+    network: maskIdentifiers(redactText(phone.network)).slice(0, FEEDBACK_LIMITS.fact),
+    // The phone masks what points to the user. The host does it again, with its own rules, because
+    // the report is public and the phone app can be of an older version.
+    log: maskIdentifiers(redactText(phone.log)).slice(0, FEEDBACK_LIMITS.phoneLog),
+  };
 }
 
 /** The prefilled issue form, which the user submits in the browser. */
@@ -360,6 +387,8 @@ export interface OpenBotToolRouterHooks {
   providerAccounts: ProviderAccountRows;
   /** The provider rows of the settings page. */
   providerStatuses(): readonly ProviderStatusRow[];
+  /** The custom endpoints that the user saved, for `list_models`. */
+  customEndpoints(): readonly ListedCustomEndpoint[];
   preferredProvider(): AgentProvider;
   createAgent(
     input: CreateAgentInput,
@@ -386,7 +415,12 @@ export interface OpenBotToolRouterHooks {
    * Records a no-update tool call for the turn; null when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
    */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun: boolean): "quiet" | "shown" | null;
+  requestNoUpdate(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    channelRun: boolean,
+  ): "quiet" | "shown" | "unanswered" | null;
   /**
    * Records the reason a routine run failed for the turn; false when no routine run started the turn.
    * `channelRun` is a turn that owns a main task of a channel routine's request.
@@ -822,18 +856,21 @@ export class OpenBotToolRouter {
               if (result && client.running) client.respond(toolRequest.id, result);
               return;
             }
-            if (this.#attention.hasBrowserTakeoverForAgent(agentId)) {
+            const params = {
+              ...toolRequest.params,
+              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
+              ownerAgentId: agentId,
+            };
+            // The browser tools read the repaired arguments, such as `tab_id`, so this check does too.
+            const callArgs = repairBrowserToolInput(params.tool, params.arguments).value;
+            const callTabId = isRecord(callArgs) && isString(callArgs.tabId) ? callArgs.tabId : undefined;
+            if (this.#attention.browserTakeoverBlocks(agentId, params.threadId, callTabId)) {
               client.respond(toolRequest.id, {
                 success: false,
                 contentItems: [{ type: "inputText", text: "Browser tools are unavailable during user takeover." }],
               });
               return;
             }
-            const params = {
-              ...toolRequest.params,
-              threadId: this.#conversation.publicThreadId(agentId, toolRequest.params.threadId),
-              ownerAgentId: agentId,
-            };
             // While the user controls the tab, the call waits for the release and does not run.
             const userControl = (tabId: string) =>
               this.#browser.awaitUserControlRelease(tabId).pipe(Effect.as(browserUserControlResult()));
@@ -1245,7 +1282,7 @@ export class OpenBotToolRouter {
       name,
       path,
       apps,
-      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Server settings, MCP servers, edit the server, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
+      next: `The MCP app ${apps.join(", ")} does not read the Vault: it keeps its own ${name}, and this save does not change it. Do not say that the app is fixed. Tell the user to change the key in the app: for a Marketplace app, open Marketplace, open the app, and click Change key; for a server that the user added, open Marketplace, Apps, open the server, click Edit, and change ${name} in its environment variables. A member who cannot change it asks the server owner.`,
     });
   });
 
@@ -1340,12 +1377,18 @@ export class OpenBotToolRouter {
       problem: text(args.details),
       ...(isOneOf(FEATURE_REQUEST_TYPES, args.type) ? { type: args.type } : {}),
     };
-    const form = (next: string) =>
+    const surface = isOneOf(FEEDBACK_SURFACES, args.surface) ? args.surface : null;
+    // A bug in the phone app needs the phone's version, system and log, which only the phone has.
+    const phoneReport = feedbackNeedsPhone({ kind: idea ? "idea" : "bug", surface });
+    // The form for the phone app requires the version and the device, so a link has them too.
+    const form = (next: string, phone?: FeedbackPhone) =>
       feedbackForm(
         idea
           ? featureRequestFormUrl(feature)
-          : bugReportFormUrl(facts, { ...bug, provider, ...(providerVersion ? { providerVersion } : {}) }),
-        next,
+          : phoneReport
+            ? mobileBugReportFormUrl(bug, phone, facts)
+            : bugReportFormUrl(facts, { ...bug, provider, ...(providerVersion ? { providerVersion } : {}) }),
+        phoneReport ? `${next}${FEEDBACK_PHONE_FORM_NEXT}` : next,
       );
     const sender = this.#feedback;
     if (!sender || !facts.version || !facts.os)
@@ -1363,7 +1406,7 @@ export class OpenBotToolRouter {
       model: String(agent.model).slice(0, FEEDBACK_LIMITS.fact),
       effort: String(agent.reasoningEffort).slice(0, FEEDBACK_LIMITS.fact),
       host: facts.host ?? null,
-      surface: isOneOf(FEEDBACK_SURFACES, args.surface) ? args.surface : null,
+      surface,
       foundBy: args.found_by === "agent" ? "agent" : "user",
       recentErrors: this.#recentErrors(senderAgentId, params.threadId, params.turnId),
       sameAs,
@@ -1394,51 +1437,64 @@ export class OpenBotToolRouter {
         });
       }
     }
-    const decision = yield* this.#attention.awaitToolApproval(
-      client,
-      request,
-      {
-        requestId: request.id,
-        agentId: senderAgentId,
-        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-        turnId: params.turnId,
-        kind: "permissions",
-        command: feedbackPreview(feedback, {
-          recentErrors: sourceText("status.agent.feedbackRecentErrors"),
-          sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
-        }),
-        cwd: null,
-        reason: sourceText(idea ? "status.agent.sendIdea" : "status.agent.reportProblem"),
-        grantRoot: null,
-        permissions: null,
-      },
-      // The text goes out with the owner's account, and Full access does not answer for a public post.
-      { ownerOnly: true },
-    );
-    if (decision === "cancel")
+    const approval: AgentApproval = {
+      requestId: request.id,
+      agentId: senderAgentId,
+      threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+      turnId: params.turnId,
+      kind: "permissions",
+      command: feedbackPreview(feedback, {
+        recentErrors: sourceText("status.agent.feedbackRecentErrors"),
+        sameAs: (issue) => sourceText("status.agent.feedbackSameAs", { issue: String(issue) }),
+      }),
+      cwd: null,
+      // The notice marks the card on each client. The one for the phone app has no Send off the phone.
+      reason: sourceText(
+        idea ? "status.agent.sendIdea" : phoneReport ? "status.agent.reportPhoneProblem" : "status.agent.reportProblem",
+      ),
+      grantRoot: null,
+      permissions: null,
+    };
+    // The text goes out with the owner's account, and Full access does not answer for a public post.
+    // A report about the phone app waits for a Send on the phone, which brings the phone's data.
+    const answer = phoneReport
+      ? yield* this.#attention.awaitPhoneFeedbackApproval(client, request, approval)
+      : { decision: yield* this.#attention.awaitToolApproval(client, request, approval, { ownerOnly: true }) };
+    if (answer.decision === "cancel")
       return openBotToolResult({
         status: "cancelled",
-        next: "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
+        next: phoneReport
+          ? "Nobody sent the report from the phone app, so OpenBot did not send it. A report about the phone app goes out only from the phone, with its version, system and support log. Tell the user in one sentence to open this chat in the phone app and to select Send there when they want to report it. Do not send it another way."
+          : "Nobody answered the card, so OpenBot did not send it. Do not send it another way.",
       });
-    if (decision !== "accept")
+    if (answer.decision !== "accept")
       return openBotToolResult({
         status: "declined",
-        next: "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
+        next: phoneReport
+          ? "The user selected Not now. Do not send it another way, and do not offer it again for this problem. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
+          : "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
       });
-    const sent = yield* Effect.result(sender.send(feedback));
+    // The phone redacts its log when it writes each line. This is the last place before the text leaves.
+    const phone = "phone" in answer && answer.phone ? redactedPhone(answer.phone) : undefined;
+    const report = feedback.kind === "bug" && phone ? withFeedbackPhone(feedback, phone) : feedback;
+    // The approval gives no "accept" without the phone's data, so this guards a later change only.
+    if (feedbackLacksPhone(report))
+      return openBotToolFailure("The report has no data from the phone app, so OpenBot did not send it.");
+    const sent = yield* Effect.result(sender.send(report));
     if (Result.isFailure(sent)) {
       logger.warn("Feedback could not be sent.", { error: toLogValue(sent.failure.cause) });
       return form(
         "OpenBot could not send it. Give the user this link to the same text on GitHub, to check and submit.",
+        phone,
       );
     }
-    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT);
+    if (sent.success.status === "signedOut") return form(FEEDBACK_SIGNED_OUT_NEXT, phone);
     if (sent.success.status === "limited") {
       logger.warn("The account service limits feedback for this account.", {
         daily: sent.success.daily,
         retryAfterSeconds: sent.success.retryAfterSeconds,
       });
-      return form(feedbackLimitedNext(sent.success));
+      return form(feedbackLimitedNext(sent.success), phone);
     }
     const issue = sent.success;
     // The thank-you card in the chat links the issue. The issue is open also when the card fails.
@@ -1972,6 +2028,8 @@ export class OpenBotToolRouter {
             ?.activeTurnId ??
           null;
         const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
+        // A turn that waits for a person stays open, so status stays "working" and waitingFor says what it waits for.
+        const waitingFor = working ? this.#attention.waitsFor(agent.id) : [];
         // A restart loses the provider clock, so the newest message for the agent stands in for it.
         const lastActivity = deliveries.reduce(
           (latest, delivery) => Math.max(latest, Date.parse(delivery.createdAt) || 0),
@@ -1985,6 +2043,7 @@ export class OpenBotToolRouter {
           status: working ? "working" : queuedMessages > 0 ? "queued" : "ready",
           queuedMessages,
           ...(working && startedAt !== null ? { turnStartedAt: new Date(startedAt).toISOString() } : {}),
+          ...(waitingFor.length > 0 ? { waitingFor } : {}),
           ...(lastActivity > 0 ? { lastActivityAt: new Date(lastActivity).toISOString() } : {}),
           ...(openWaits.has(agent.id) ? { openWaits: openWaits.get(agent.id) } : {}),
         };
@@ -2008,6 +2067,7 @@ export class OpenBotToolRouter {
               { provider: agent.provider, model: agent.model },
               ...(agent.backupModels?.order ?? []),
             ]),
+          customEndpoints: this.#hooks.customEndpoints(),
         },
       );
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };
@@ -2061,7 +2121,12 @@ export class OpenBotToolRouter {
           : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
-          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+          "Use this tool only in a routine run, or for a teammate's message: an update that wants no answer, or a request after your reply to it.",
+        );
+      // A teammate's request ends quiet only after its result went back to that teammate (#7465).
+      if (outcome === "unanswered")
+        return openBotToolFailure(
+          "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
       return openBotToolResult(
         outcome === "quiet"
@@ -2093,7 +2158,9 @@ export class OpenBotToolRouter {
       params.tool,
       params.arguments,
       this.#sidebarLayout,
-      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      () => new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      // Archived channels too: the sidebar keeps their folder (`ChannelStore.ids`).
+      () => new Set(this.#channels.store.ids()),
     );
     if (sidebarResult) return sidebarResult;
 
@@ -2266,8 +2333,8 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. End your answer: tell the user to connect GitHub in Server settings, Connectors. This connection also signs in gh and git."
-            : "The card is in the chat. End your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly. You have no tools for it until then.",
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Server settings, Connectors, also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
       });
     }
 

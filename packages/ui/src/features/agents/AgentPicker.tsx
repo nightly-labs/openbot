@@ -7,6 +7,12 @@ import type { JSX } from "@solidjs/web";
 import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import { AgentAvatar } from "./AgentAvatar";
 
+/** What the menu shows of an agent: its name and its face. */
+export type AgentPickerAgent = Pick<
+  AgentProfile,
+  "id" | "name" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
+>;
+
 /** Lower case, no accents, and `_`, `/` and `-` as spaces: "cafe" finds "Café Orders". */
 const foldChar = (char: string) =>
   char
@@ -45,7 +51,7 @@ function findMatch(name: string, query: string): { at: number; rank: number } | 
 }
 
 /** Names that start with the query, or have a word that does, come before names that only contain it. */
-function matchAgents(agents: readonly AgentProfile[], query: string): AgentProfile[] {
+function matchAgents(agents: readonly AgentPickerAgent[], query: string): AgentPickerAgent[] {
   const text = foldName(query.trim()).folded;
   if (!text) return [...agents];
   return agents
@@ -100,7 +106,7 @@ function roomBelow(trigger: HTMLElement | undefined): boolean {
 }
 
 export interface AgentPickerProps {
-  agents: readonly AgentProfile[];
+  agents: readonly AgentPickerAgent[];
   /** The agent that the menu marks as the current one. A pick of that agent changes nothing. */
   value?: string | null | undefined;
   onChange: (agentId: string) => void;
@@ -142,7 +148,7 @@ export function AgentPicker(props: AgentPickerProps) {
   let input: HTMLInputElement | undefined;
   let panel: HTMLElement | undefined;
   let list: HTMLElement | undefined;
-  const choose = (option: AgentProfile) => {
+  const choose = (option: AgentPickerAgent) => {
     setOpen(false);
     if (option.id !== props.value) props.onChange(option.id);
   };
@@ -187,7 +193,7 @@ export function AgentPicker(props: AgentPickerProps) {
           aria-label={props.label}
         >
           <ContentExitMotion panel={() => panel} />
-          <Combobox.Root<AgentProfile>
+          <Combobox.Root<AgentPickerAgent>
             class="agent-picker"
             options={matches()}
             optionValue={(option) => optionKey(option.id)}

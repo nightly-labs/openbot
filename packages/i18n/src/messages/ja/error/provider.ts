@@ -46,6 +46,15 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "アドレスまたはフォルダーが多すぎます。",
   "error.provider.credentialFileUnreadable": "プロバイダーの認証情報ファイルを読み取れません。",
   "error.provider.credentialFileTooLarge": "プロバイダーの認証情報ファイルが大きすぎます。",
+  "error.provider.environmentNameInvalid":
+    "{name} は有効な変数名ではありません。英字、数字、_ を使い、数字で始めないでください。",
+  "error.provider.environmentNameReserved":
+    "OpenBot はこのプロバイダーの {name} を設定します。この変数を削除してください。",
+  "error.provider.environmentNameDuplicate": "{name} がリストに複数あります。",
+  "error.provider.environmentValueTooLong": "{name} の値が長すぎます。",
+  "error.provider.environmentTooMany": "プロバイダーの変数は最大 {limit} 個です。",
+  "error.provider.environmentSecretsTooLarge":
+    "機密の値が合計で長すぎます。短い値にするか、値を減らして保存してください。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
   "error.provider.archiveUnsafePath": "ランタイムのアーカイブに安全でないパスが含まれています。",
   "error.provider.runtimeSpecialFile": "ランタイムにリンクまたは特殊ファイルが含まれています。",
@@ -333,7 +342,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.hermesTurnFailed":
-    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。サーバーの設定 › MCP で確認してから、メッセージをもう一度送信してください。",
+    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
   "error.provider.hermesRefused":
     "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
   "error.provider.copilotThinkingRejected":

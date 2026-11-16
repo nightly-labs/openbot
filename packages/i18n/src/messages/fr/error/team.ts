@@ -149,6 +149,7 @@ export const messages = {
     "Cette connexion ne prend pas en charge l’option de configuration Claude Code.",
   "error.team.claudeCompactWindowUnsupported":
     "Cette connexion ne prend pas en charge la taille de compactage de Claude.",
+  "error.team.providerEnvironmentUnsupported": "Cette connexion ne prend pas en charge les variables de fournisseur.",
   "error.team.modelVisibilityUnsupported": "Cette connexion ne prend pas en charge la liste des modèles.",
   "error.team.providerDefaultUnsupported": "Cette connexion ne prend pas en charge le fournisseur par défaut.",
   "error.team.attachmentNameRequired": "Un nom de pièce jointe sûr est requis.",
@@ -205,6 +206,8 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Cette connexion ne prend pas en charge la personnalité du serveur.",
   "error.team.agentWaitsUnsupported": "Cette connexion ne prend pas en charge les attentes ouvertes.",
   "error.team.pendingApprovalUnsupported": "Cette connexion ne permet pas de lire une approbation complète.",
+  "error.team.phoneFeedbackUnsupported":
+    "Cette connexion ne permet pas d'envoyer un rapport depuis l'app du téléphone.",
   "error.team.messagePinsUnsupported": "Cette connexion ne prend pas en charge les messages épinglés.",
   "error.team.queuedMessageThreadUnsupported":
     "Cette connexion ne prend pas en charge l’exécution d’un message en file d’attente dans un nouveau fil.",

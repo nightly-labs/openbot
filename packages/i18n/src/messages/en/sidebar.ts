@@ -16,6 +16,7 @@ export const messages = defineMessages("sidebar", {
   "sidebar.markAllRead": "Mark all as read",
   "sidebar.order.title": "Sort chats",
   "sidebar.order.manual": "Manual",
+  "sidebar.order.recent": "Recent activity",
   "sidebar.order.unreadGroup": "Unread in a group",
   "sidebar.order.unreadFirst": "Unread first in folders",
   "sidebar.topbar.openSettings": "Open settings for {name}",

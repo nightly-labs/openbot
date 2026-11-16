@@ -157,6 +157,7 @@ export const messages = {
   "composer.picker.section.files": "Archivos",
   "composer.picker.section.tabs": "Pestañas del navegador",
   "composer.picker.section.threads": "Hilos",
+  "composer.picker.section.messages": "En mensajes",
   "composer.token.tab": "Pestaña del navegador {name}",
   "composer.token.thread": "Hilo {name}",
   "composer.token.unavailableTab": "Pestaña del navegador cerrada {name}",

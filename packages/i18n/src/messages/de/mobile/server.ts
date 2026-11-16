@@ -1174,6 +1174,22 @@ export const messages = {
   "mobile.server.providers.compactWindowTokens": "{size} Tokens",
   "mobile.server.providers.compactWindowLoadFailed":
     "Die Komprimierungsgröße dieses Servers konnte nicht geladen werden.",
+  "mobile.server.environment.row": "Variablen",
+  "mobile.server.environment.title": "Umgebung",
+  "mobile.server.environment.hint":
+    "API-Schlüssel, Basis-URLs und andere Einstellungen, die jeder {name}-Prozess erhält. Eine Änderung gilt, wenn die laufenden Durchgänge enden.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL sendet mit OPENAI_API_KEY als Schlüssel die Modellanfragen von ChatGPT an diese Adresse.",
+  "mobile.server.environment.shellNote": "Die Befehle, die Agenten ausführen, können diese Werte lesen.",
+  "mobile.server.environment.add": "Variable hinzufügen",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Wert",
+  "mobile.server.environment.saved": "Gespeichert",
+  "mobile.server.environment.sensitive": "Vertraulich",
+  "mobile.server.environment.remove": "Entfernen",
+  "mobile.server.environment.save": "Speichern",
+  "mobile.server.environment.loadFailed": "Die Variablen von {name} konnten nicht geladen werden.",
+  "mobile.server.environment.invalid": "Korrigiere zuerst die Namen.",
   "mobile.server.providers.disconnect": "Trennen",
   "mobile.server.providers.disconnectTitle": "{name} trennen?",
   "mobile.server.providers.disconnectBody":

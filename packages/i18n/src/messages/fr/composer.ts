@@ -161,6 +161,7 @@ export const messages = {
   "composer.picker.section.files": "Fichiers",
   "composer.picker.section.tabs": "Onglets du navigateur",
   "composer.picker.section.threads": "Fils",
+  "composer.picker.section.messages": "Dans les messages",
   "composer.token.tab": "Onglet du navigateur {name}",
   "composer.token.thread": "Fil {name}",
   "composer.token.unavailableTab": "Onglet du navigateur fermé {name}",

@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "지원 로그를 지울까요?",
   "mobile.settings.support.clearBody": "이 휴대전화의 로그에서 모든 이벤트가 삭제돼요.",
   "mobile.settings.support.logFooter":
-    "로그는 이 휴대전화에만 남고 OpenBot이 전송하지 않아요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
+    "로그는 이 휴대전화에 남아요. OpenBot은 직접 보내는 휴대폰 앱 버그 신고에만 로그의 일부 줄을 함께 보내고, 보내기 전에 신고 카드에 먼저 보여 줘요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
   "mobile.settings.support.saveFailed": "로그 파일을 저장할 수 없었어요. 다시 시도해 주세요.",
   "mobile.settings.support.sharingUnavailable": "이 휴대전화에서는 공유를 사용할 수 없어요.",
   "mobile.settings.support.newestFirst": "최신순이에요.",
@@ -231,6 +231,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "큰 파일 자동 다운로드",
   "mobile.settings.conversations.largeFilesFooter":
     "{small}보다 큰 이미지, 동영상, 오디오는 탭할 때만 다운로드돼요. 켜면 {large}까지 바로 다운로드해요. 모바일 데이터를 많이 쓸 수 있어요.",
+  "mobile.settings.conversations.swipeLeft": "에이전트 채팅에서 왼쪽으로 스와이프",
+  "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
+  "mobile.settings.conversations.swipeThreads": "스레드",
+  "mobile.settings.conversations.swipeBrowser": "브라우저",
+  "mobile.settings.conversations.swipeFooter":
+    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지 위에서 스와이프하면 계속 답장합니다.",
+  "mobile.settings.conversations.pullInfo": "위로 당겨 정보 보기",
+  "mobile.settings.conversations.pullInfoFooter":
+    "채팅, 채널 또는 스레드에서 최신 메시지 너머로 위로 당긴 뒤 놓으면 정보가 열립니다.",
   "mobile.settings.conversations.fullQualityPhotos": "사진을 원본 화질로 보내기",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "끄면 앱이 각 사진의 작은 사본(긴 쪽 최대 2048픽셀)을 보냅니다. 느린 연결에서도 더 빨리 도착합니다. 원본 사진을 보내려면 켜세요.",

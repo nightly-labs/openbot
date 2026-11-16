@@ -567,6 +567,7 @@ const AUTH_TEXT: Readonly<Record<string, AppTextKey>> = {
     "marketplace.plugin.obsidian.hint.apiKey",
   "Create a key at app.honcho.dev.": "marketplace.plugin.honcho.hint.apiKey",
   "Create a key on the Connect page of Hindsight Cloud.": "marketplace.plugin.hindsight.hint.apiKey",
+  "In Omnisend, open Store settings > API keys and create a key.": "marketplace.plugin.omnisend.hint.apiKey",
 };
 
 const english = translateFor("en");

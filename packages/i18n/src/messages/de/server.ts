@@ -259,9 +259,6 @@ export const messages = {
   "server.settings.membersDescription": "Veröffentliche diesen Server, lade Personen ein und verwalte den Zugriff.",
   "server.settings.desktopTitle": "Remotedesktop",
   "server.settings.desktopDescription": "Richte den Desktop dieses Servers ein oder verbinde dich damit.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Verbinde MCP-Server und wähle, welche die Agenten dieses Servers verwenden dürfen.",
   "server.settings.storageTitle": "Speicher",
   "server.settings.storageDescription":
     "Sieh nach, was OpenBot auf der Festplatte dieses Servers speichert, und gib Speicherplatz frei.",
@@ -306,7 +303,6 @@ export const messages = {
   "server.settings.copyFailedTitle": "Kopieren fehlgeschlagen",
   "server.settings.copyFailed": "OpenBot konnte diesen Wert nicht kopieren.",
   "server.settings.unavailableTitle": "Servereinstellungen nicht verfügbar",
-  "server.settings.unsavedMcpChanges": "Nicht gespeicherte MCP-Änderungen",
   "server.settings.reset": "Zurücksetzen",
   "server.settings.unsavedChanges": "Nicht gespeicherte Änderungen",
   "server.settings.changesNotSaved": "Änderungen nicht gespeichert",

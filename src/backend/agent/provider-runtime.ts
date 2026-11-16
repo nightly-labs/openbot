@@ -375,6 +375,8 @@ export interface ProviderHooks {
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   /** Runs after an account after the first listed its models, which `accountModels` now answers. */
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  /** Runs after a change to the accounts of a provider, such as an account that connected. */
+  onAccountsChanged?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -476,9 +478,9 @@ export class ProviderRuntime implements ProviderPort {
    * `#cli` holds only the CLI a client runs on, and a provider that is signed out has no client
    * although its binary is resolved and its version is on the row. Without this record that row
    * names no owner, and an unowned CLI is read as the managed copy: the user's own install would be
-   * offered a download instead of its own updater.
+   * offered a download instead of its own updater. `incomplete` goes on the row too (#9139).
    */
-  readonly #cliSources = new Map<AgentProvider, AgentCliInfo["source"]>();
+  readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
   /** The CLI the last resolution passed over, which the user can switch to (`chooseInstalledCli`). */
   readonly #passedOverClis = new Map<AgentProvider, { source: AgentCliInfo["source"]; version: string }>();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
@@ -767,7 +769,10 @@ export class ProviderRuntime implements ProviderPort {
             this.#consumeUsageReset(client).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          changed: () => this.#setStatus({}),
+          changed: () => {
+            this.#setStatus({});
+            this.#hooks.onAccountsChanged?.();
+          },
           // Forked: the hook can move agents, and the check that listed the models must not wait for that.
           modelsListed: (provider, accountId) =>
             (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
@@ -805,7 +810,8 @@ export class ProviderRuntime implements ProviderPort {
       ...status,
       providers: status.providers.map((row) => {
         if (this.#off.has(row.id)) return { id: row.id, state: "not-started", version: null, message: null, off: true };
-        const source = this.#cli.get(row.id)?.source ?? this.#cliSources.get(row.id);
+        const resolved = this.#cli.get(row.id) ?? this.#cliSources.get(row.id);
+        const source = resolved?.source ?? this.#cliSources.get(row.id)?.source;
         const passedOver = this.#passedOverClis.get(row.id);
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
@@ -816,6 +822,7 @@ export class ProviderRuntime implements ProviderPort {
             ? { state: "sign-in-required" as const, message: sourceText("error.provider.museAuthUnverified") }
             : {}),
           ...(source ? { cliSource: source } : {}),
+          ...(source === "system" && resolved?.incomplete ? { cliIncomplete: true } : {}),
           ...(passedOver && source && passedOver.source !== source ? { otherCliVersion: passedOver.version } : {}),
           ...(lastError ? { lastError: lastError.message, lastErrorAt: lastError.at } : {}),
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
@@ -947,7 +954,7 @@ export class ProviderRuntime implements ProviderPort {
         preferInstalled,
         this.#installedChosen.has(cliProvider),
       ).pipe(toProviderOperationFailed);
-      this.#cliSources.set(provider, cli.source);
+      this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
       else this.#passedOverClis.delete(provider);
       return cli;
@@ -3102,6 +3109,19 @@ export class ProviderRuntime implements ProviderPort {
   }).bind(this);
 
   /**
+   * A setting that each process of the provider reads at its start changed, such as the CLI proxy.
+   * The shared process restarts when its turns end, as for `restartProviderWhenIdle`, and an agent's
+   * own process, such as one of an account after the first, starts again before the agent's next turn.
+   */
+  readonly spawnSettingsChanged = Effect.fn("ProviderRuntime.spawnSettingsChanged")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    yield* providerStep(() => this.#countActivation(provider));
+    return yield* this.restartProviderWhenIdle(provider);
+  }).bind(this);
+
+  /**
    * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer. A launcher of
    * theirs, such as a script that picks Pi's settings folder, then runs again (#6327). Otherwise the
    * newer of the two runs, as before the choice. The provider restarts when its turns end. A provider
@@ -4299,7 +4319,7 @@ export class ProviderRuntime implements ProviderPort {
         return;
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
-      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
       // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
       // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed

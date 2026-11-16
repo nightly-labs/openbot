@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "Tümünü okundu işaretle",
   "sidebar.order.title": "Sohbetleri sırala",
   "sidebar.order.manual": "Elle",
+  "sidebar.order.recent": "Son etkinlik",
   "sidebar.order.unreadGroup": "Okunmamışlar bir grupta",
   "sidebar.order.unreadFirst": "Klasörlerde önce okunmamışlar",
   "sidebar.topbar.openSettings": "{name} için ayarları aç",

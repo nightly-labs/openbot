@@ -45,6 +45,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Er zijn te veel adressen of mappen.",
   "error.provider.credentialFileUnreadable": "Het bestand met inloggegevens van de aanbieder is onleesbaar.",
   "error.provider.credentialFileTooLarge": "Het bestand met inloggegevens van de aanbieder is te groot.",
+  "error.provider.environmentNameInvalid":
+    "{name} is geen geldige variabelenaam. Gebruik letters, cijfers en _, en begin niet met een cijfer.",
+  "error.provider.environmentNameReserved": "OpenBot stelt {name} in voor deze provider. Verwijder deze variabele.",
+  "error.provider.environmentNameDuplicate": "{name} staat meer dan één keer in de lijst.",
+  "error.provider.environmentValueTooLong": "De waarde van {name} is te lang.",
+  "error.provider.environmentTooMany": "Een provider kan hoogstens {limit} variabelen hebben.",
+  "error.provider.environmentSecretsTooLarge":
+    "De gevoelige waarden zijn samen te lang. Sla kortere of minder waarden op.",
   "error.provider.archiveSpecialFile": "Het runtime-archief bevat een link of speciaal bestand.",
   "error.provider.archiveUnsafePath": "Het runtime-archief bevat een onveilig pad.",
   "error.provider.runtimeSpecialFile": "De runtime bevat een link of speciaal bestand.",
@@ -321,7 +329,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Log in met Nous Portal of voer `hermes setup` uit in een terminal om Hermes te gebruiken.",
   "error.provider.hermesTurnFailed":
-    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Serverinstellingen › MCP en stuur je bericht opnieuw.",
+    "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
   "error.provider.hermesRefused":
     "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
   "error.provider.copilotThinkingRejected":

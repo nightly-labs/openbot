@@ -62,6 +62,11 @@ export interface AgentProviderStatus {
    */
   cliSource?: "system" | "managed";
   /**
+   * With `cliSource: "system"`: the user's CLI runs, but a part that some models need is missing,
+   * such as the code-mode host of a bare `codex` (#9139). OpenBot's copy, when downloaded, runs instead.
+   */
+  cliIncomplete?: boolean;
+  /**
    * The version of the other CLI the user can run instead (`chooseInstalledCli`): the one they
    * installed while OpenBot's copy runs, or OpenBot's newer copy while theirs runs by their choice.
    */
@@ -170,6 +175,7 @@ function isAgentProviderStatus(value: unknown): value is AgentProviderStatus {
     (value.signInPending === undefined || typeof value.signInPending === "boolean") &&
     (value.checkError === undefined || isNullableBoundedString(value.checkError, INPUT_LIMITS.messageText)) &&
     (value.cliSource === undefined || isBoundedString(value.cliSource, INPUT_LIMITS.identifier)) &&
+    (value.cliIncomplete === undefined || typeof value.cliIncomplete === "boolean") &&
     (value.otherCliVersion === undefined || isBoundedString(value.otherCliVersion, 160)) &&
     (value.off === undefined || typeof value.off === "boolean") &&
     (value.restartPending === undefined || typeof value.restartPending === "boolean") &&
@@ -240,7 +246,10 @@ export function isAccountUsageWindow(value: unknown): value is AccountUsageWindo
 export interface AccountUsageGroup {
   /** The provider's name for the group, such as "Gemini Models". */
   name: string;
-  /** The model names that the provider lists for the group, such as "Gemini Flash". */
+  /**
+   * The model names that the provider lists for the group, such as "Gemini Flash". A group with no list,
+   * such as "Gemini 4 Argon", has its own name when other groups list theirs.
+   */
   models: string[];
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;

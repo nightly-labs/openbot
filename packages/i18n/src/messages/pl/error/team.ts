@@ -127,6 +127,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.claudeUserSetupUnsupported": "To połączenie nie obsługuje przełącznika konfiguracji Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "To połączenie nie obsługuje rozmiaru kompaktowania Claude.",
+  "error.team.providerEnvironmentUnsupported": "To połączenie nie obsługuje zmiennych dostawcy.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
   "error.team.attachmentNameRequired": "Wymagana jest bezpieczna nazwa załącznika.",
@@ -179,6 +180,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "To połączenie nie obsługuje osobowości serwera.",
   "error.team.agentWaitsUnsupported": "To połączenie nie obsługuje otwartych oczekiwań.",
   "error.team.pendingApprovalUnsupported": "To połączenie nie pozwala odczytać całej prośby o zgodę.",
+  "error.team.phoneFeedbackUnsupported": "To połączenie nie pozwala wysłać zgłoszenia z aplikacji na telefon.",
   "error.team.messagePinsUnsupported": "To połączenie nie obsługuje przypiętych wiadomości.",
   "error.team.queuedMessageThreadUnsupported":
     "To połączenie nie obsługuje uruchamiania wiadomości z kolejki jako nowego wątku.",

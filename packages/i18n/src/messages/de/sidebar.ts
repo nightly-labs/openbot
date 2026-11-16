@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "Alle als gelesen markieren",
   "sidebar.order.title": "Chats sortieren",
   "sidebar.order.manual": "Manuell",
+  "sidebar.order.recent": "Letzte Aktivität",
   "sidebar.order.unreadGroup": "Ungelesen als Gruppe",
   "sidebar.order.unreadFirst": "Ungelesen zuerst in Ordnern",
   "sidebar.topbar.openSettings": "Einstellungen für {name} öffnen",
