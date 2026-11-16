@@ -164,7 +164,7 @@ function customEndpointModels(
   statuses: readonly ProviderStatusRow[],
   words: readonly string[],
 ): CustomEndpointModels[] {
-  return endpoints.map((endpoint) => {
+  return endpoints.flatMap((endpoint) => {
     const runner = providerLabel(endpoint.provider);
     // A provider that cannot run lists no model, also when the catalogue keeps some (#7866).
     const canRun = providerCanRun(endpoint.provider, statuses);
@@ -180,6 +180,8 @@ function customEndpointModels(
       message = `${runner} reads the last change of this endpoint after its current task stops.`;
     else if (own.length === 0)
       message = `${runner} lists no model of this endpoint. The user checks it in ${CUSTOM_PROVIDER_SETTINGS}.`;
+    // An endpoint with models but no match for the query is left out, so the agent does not read it as empty.
+    if (listed.length === 0 && message === undefined) return [];
     return {
       id: endpoint.id,
       name: endpoint.name,
@@ -302,8 +304,13 @@ export function listModelsPayload(
         ]
       : [],
   );
-  const endpoints = (request.customEndpoints ?? []).filter(
-    (endpoint) => request.provider === undefined || endpoint.provider === request.provider,
+  const endpoints = customEndpointModels(
+    (request.customEndpoints ?? []).filter(
+      (endpoint) => request.provider === undefined || endpoint.provider === request.provider,
+    ),
+    models,
+    statuses,
+    words,
   );
   return {
     preferredProvider,
@@ -311,10 +318,7 @@ export function listModelsPayload(
     ...(unavailableProviders.length > 0 ? { unavailableProviders } : {}),
     ...(endpoints.length > 0
       ? {
-          customProviders: {
-            settings: CUSTOM_PROVIDER_SETTINGS,
-            endpoints: customEndpointModels(endpoints, models, statuses, words),
-          },
+          customProviders: { settings: CUSTOM_PROVIDER_SETTINGS, endpoints },
         }
       : {}),
   };
