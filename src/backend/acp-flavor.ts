@@ -252,6 +252,13 @@ export interface AcpFlavor {
    * again. A command with `rawInput.IsDaemon` runs on by intent and does not keep the turn open.
    */
   wakesAfterPromptEnds?: true;
+  /**
+   * The tool calls after which the agent wakes its model by itself, such as subagents that run in the
+   * background and timers, as a pattern of the call's name. The agent reports no end of that work.
+   * With `wakesAfterPromptEnds`, it wakes with no prompt open, so OpenBot starts a turn with a wake
+   * prompt when `session/list` shows that the session changed after the turn.
+   */
+  selfWakeTools?: RegExp;
   /** Each answer message has its own `messageId`, so text of a new ID is a new message, not more text. */
   messagePerId?: true;
   /**

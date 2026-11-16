@@ -436,8 +436,19 @@ export const BACKGROUND_WAKE_NOTE = [
 ].join("\n");
 
 /**
+ * The prompt of the turn that OpenBot starts when an agent wakes up by itself, such as for a subagent
+ * or a timer (`AcpFlavor.selfWakeTools`). The chat does not show what the agent wrote by itself before
+ * it, so the answer to this prompt carries the result.
+ */
+export const SELF_WAKE_NOTE = [
+  BACKGROUND_WAKE_START,
+  "Work that you started in the background, such as a subagent or a timer, may have finished. The user did not see what you wrote after your last turn ended. If it finished, give its result and continue the task. If it still runs, or nothing changed since your last reply, end your turn without text.",
+  "</openbot_background_wake>",
+].join("\n");
+
+/**
  * Whether a user text block is one that `memoryContextUpdate`, `sectionTeammatesUpdate`,
- * `instructionsFileUpdate`, the turn style reminder, `steerNote` or `BACKGROUND_WAKE_NOTE` wrote,
+ * `instructionsFileUpdate`, the turn style reminder, `steerNote` or a background wake note wrote,
  * not text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {

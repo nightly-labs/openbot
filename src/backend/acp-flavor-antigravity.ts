@@ -492,6 +492,11 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the
   // wake-up. The idle release then stopped the process 5 minutes later (#8660).
   wakesAfterPromptEnds: true,
+  // 1.5.x starts subagents with `start_subagent` or `invoke_subagent` ("Running start_subagent",
+  // "Run invoke_subagent?"), and the call completes at once. 1.5.9 also runs `schedule`, a timer,
+  // although `sessionMeta` turns it off. The end of that work wakes the model with no prompt open, as
+  // for a command. Its results and approvals did not show (#8993).
+  selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it
