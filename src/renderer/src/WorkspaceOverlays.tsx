@@ -750,6 +750,9 @@ function ServerSettings() {
           endpoints.customProviders().every((provider) => provider.headerNames !== undefined);
         return editable ? endpoints.updateCustomProvider : undefined;
       },
+      get customProviderHarnessChoice() {
+        return !local && serverSupportsCapability(server, "custom-provider-harness-choice-v1");
+      },
       get providerKeys() {
         return providerRuntimeDownloadsAvailable() ? providerKeys() : undefined;
       },

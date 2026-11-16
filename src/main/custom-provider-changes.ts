@@ -46,6 +46,14 @@ export interface CustomProviderChanges {
    * settings, so the endpoint keeps its harness and each kept model id keeps its saved settings.
    */
   peerUpdate(input: UpdateCustomProviderInput): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
+  /**
+   * A joined admin's edit that names the harness (`custom-provider-harness-choice-v1`): as
+   * `peerUpdate`, and the endpoint moves to that harness, with the agents on each kept model.
+   */
+  peerHarnessUpdate(
+    input: UpdateCustomProviderInput,
+    harness: CustomProviderHarness,
+  ): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
   remove(id: string): Effect.Effect<CustomProviderResult, ProviderRuntimeFailure>;
 }
 
@@ -182,6 +190,7 @@ export function createCustomProviderChanges({
     // The saved settings are read inside the permit, so a change that waits for this one cannot
     // replace them between the read and the write.
     peerUpdate: (input) => serialize(() => update(withSavedModelSettings(input))),
+    peerHarnessUpdate: (input, harness) => serialize(() => update({ ...withSavedModelSettings(input), harness })),
     /**
      * Agents move off the endpoint's models *before* it is removed, so no agent is left naming a
      * model the restarted CLI does not list.
@@ -213,5 +222,11 @@ export function createCustomProviderChanges({
   };
 }
 
-/** What a joined admin may change through the Team API. An edit keeps the harness and model settings. */
-export type PeerCustomProviderChanges = Pick<CustomProviderChanges, "list" | "save" | "peerUpdate" | "remove">;
+/**
+ * What a joined admin may change through the Team API. An edit keeps the model settings, and keeps
+ * the harness unless it names one.
+ */
+export type PeerCustomProviderChanges = Pick<
+  CustomProviderChanges,
+  "list" | "save" | "peerUpdate" | "peerHarnessUpdate" | "remove"
+>;
