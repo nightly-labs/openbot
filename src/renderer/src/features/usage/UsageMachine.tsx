@@ -1,7 +1,7 @@
 import { hostedPlanMachineMetrics } from "@openbot/contracts/hosted-servers";
 import type { MachineMetrics, OpenBotDesktopApi } from "@openbot/contracts/ipc";
 import { MACHINE_RESOURCES_CAPABILITY } from "@openbot/contracts/team-protocol/machine-resources-v1";
-import { STORAGE_DISK_CAPABILITY } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import { STORAGE_USER_FILES_CAPABILITY } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { UsageMachineMeter } from "@openbot/ui/features/usage/UsageMachineMeter";
 import { createMemo, createSignal, Show, untrack } from "solid-js";
 import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
@@ -31,7 +31,7 @@ function machinePort(): MachinePort {
  * the window is visible, and at once when the window shows again.
  *
  * A hosted server shows its disk against the plan storage, as Server settings > Storage does: its VPS
- * disk is much larger than the plan. The meter waits for the size of the users' files of that host.
+ * disk is much larger than the plan. Until the size of the users' files comes, the disk shows as unknown.
  */
 export function UsageMachine(props: { serverId: string }) {
   const { servers } = useServers();
@@ -44,10 +44,13 @@ export function UsageMachine(props: { serverId: string }) {
       : null;
   });
   const storageGb = createMemo(() => hostedPlanStorageGb(server()));
-  /** The server whose users' files the meter reads, or null when the meter shows the whole disk. */
+  /**
+   * The server whose users' files the meter reads. Null on a server without a plan, and on a host that
+   * does not measure them: there the plan storage counts them from the free space.
+   */
   const userFilesTarget = createMemo(() => {
     const current = server();
-    return storageGb() !== null && current && serverSupportsCapability(current, STORAGE_DISK_CAPABILITY)
+    return storageGb() !== null && current && serverSupportsCapability(current, STORAGE_USER_FILES_CAPABILITY)
       ? target()
       : null;
   });
@@ -94,8 +97,11 @@ export function UsageMachine(props: { serverId: string }) {
       })
       .then(
         (disk) => disk?.userBytes ?? null,
-        // Without the value, the plan storage counts the files of the users from the free space.
-        () => null,
+        // A failed read keeps the last size. Without one, the plan storage counts them from the free space.
+        () => {
+          const last = untrack(userFiles);
+          return last?.serverId === serverId ? last.bytes : null;
+        },
       )
       .then((bytes) => {
         if (untrack(userFilesTarget) === serverId) setUserFiles({ serverId, bytes });
@@ -117,8 +123,12 @@ export function UsageMachine(props: { serverId: string }) {
     if (plan === null) return current;
     const files = userFiles();
     const read = files?.serverId === current.serverId ? files : null;
-    // The first answer can take some seconds; the whole VPS disk does not show before it.
-    if (userFilesTarget() !== null && !read) return null;
+    // The first answer can take some seconds. Until it comes, the disk is unknown and CPU and memory show.
+    if (userFilesTarget() !== null && !read)
+      return {
+        serverId: current.serverId,
+        metrics: { ...current.metrics, diskUsedBytes: null, diskFreeBytes: null, diskTotalBytes: null },
+      };
     return {
       serverId: current.serverId,
       metrics: hostedPlanMachineMetrics(current.metrics, plan, read?.bytes ?? null),

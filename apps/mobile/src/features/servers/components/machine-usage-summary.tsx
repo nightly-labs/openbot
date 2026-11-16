@@ -63,13 +63,17 @@ export function MachineUsageSummary({ serverId }: { serverId: string }) {
   const { available, query } = useMachineMetrics(serverId);
   const server = servers.find((item) => item.id === serverId);
   const planGb = server?.hosted === true ? (server.storageGb ?? null) : null;
-  // The size of the users' files; a failed read counts them from the free space.
+  // The size of the users' files. A failed read counts them from the free space.
   const disk = useServerDisk(serverId, available && planGb !== null);
   const reading = query.data;
   if (!available || !reading || query.isError) return null;
-  // The whole VPS disk does not show before the first answer.
-  if (planGb !== null && disk.isPending) return null;
-  const metrics = planGb === null ? reading : hostedPlanMachineMetrics(reading, planGb, disk.data?.userBytes ?? null);
+  // Until the first answer comes, the disk is unknown, so the whole VPS disk never shows.
+  const metrics =
+    planGb === null
+      ? reading
+      : disk.isPending
+        ? { ...reading, diskUsedBytes: null, diskFreeBytes: null, diskTotalBytes: null }
+        : hostedPlanMachineMetrics(reading, planGb, disk.data?.userBytes ?? null);
   if (METRIC_ORDER.every((metric) => machineMetricPercent(metrics, metric) === null)) return null;
   const openStorage = canReadServerStorage(serverId)
     ? () => {
