@@ -1818,6 +1818,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       }),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
+  /** The section on screen, so the rail marks Providers while it shows. */
+  const [serverSettingsShownSection, setServerSettingsShownSection] = createSignal<ServerSettingsSection | null>(null);
   /** The MCP row that a chat card asked to sign in to. Its Marketplace page starts the sign-in, as its Sign in button does. */
   const [mcpSignInRequest, setMcpSignInRequest] = createSignal<string | null>(null);
   // The request ends with the page, also when another page or a server switch closes it.
@@ -2810,12 +2812,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /**
    * The rail button of the page. The server settings and the pricing page open from the server menu, so no button is
-   * current.
+   * current, except Providers while its section shows.
    */
   const railPage = (): PageRailPage | null => {
     const current = page();
     if (current === "agents") return layout.sidebarView();
-    return current === "server-settings" || current === "pricing" ? null : current;
+    if (current === "server-settings") return serverSettingsShownSection() === "providers" ? "providers" : null;
+    return current === "pricing" ? null : current;
   };
   /** The settings page on screen, if any. */
   const settingsKind = (): SettingsKind | null =>
@@ -3443,6 +3446,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
+                        onSectionChange={setServerSettingsShownSection}
                         platform="darwin"
                         remoteDesktopSupported={false}
                         server={target()}

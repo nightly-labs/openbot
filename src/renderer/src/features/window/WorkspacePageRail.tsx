@@ -42,7 +42,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const { activeServer } = useServers();
   const platform = usePlatform();
   const serverActions = useServerActions();
-  const { openServerSettings } = useServerSettings();
+  const { openServerSettings, serverSettingsTarget, serverSettingsShownSection } = useServerSettings();
   /** macOS draws the window buttons in the top row of the rail. Windows and Linux show the logo there. */
   const logo = () => {
     const info = platform.appInfo();
@@ -84,7 +84,12 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const current = (): PageRailPage | null => {
     const page = windowPage.page();
     if (page === "agents") return layout.sidebarView();
-    return page === "server-settings" || page === "pricing" ? null : page;
+    if (page === "server-settings") {
+      const providers =
+        serverSettingsShownSection() === "providers" && serverSettingsTarget()?.id === activeServer()?.id;
+      return providers ? "providers" : null;
+    }
+    return page === "pricing" ? null : page;
   };
   return (
     <PageRail
