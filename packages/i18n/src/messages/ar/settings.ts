@@ -704,6 +704,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "يتعرّف Parakeet Unified على الإنجليزية فقط. لتحديد لغة، استخدم Whisper أو Cohere أو ElevenLabs.",
   "settings.voice.language.automatic": "تلقائي",
+  "settings.voice.pause.title": "التوقف قبل الإرسال",
+  "settings.voice.pause.description":
+    "في المحادثة الصوتية، يرسل OpenBot كلماتك عندما تتوقف عن الكلام لهذه المدة. اختر توقفًا أطول إذا كنت تتكلم ببطء أو تتوقف للتفكير. صوت Codex المباشر يحدد النهاية بنفسه.",
+  "settings.voice.pause.seconds": "{seconds} ث",
   "settings.voice.loadFailed": "تعذّرت قراءة نماذج الصوت.",
   "settings.voice.saveFailed": "تعذّر حفظ إعداد الصوت. حاول مرة أخرى.",
   "settings.voice.downloadFailed": "تعذّر بدء التنزيل. حاول مرة أخرى.",

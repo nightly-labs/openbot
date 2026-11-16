@@ -674,6 +674,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified herkent alleen Engels. Gebruik Whisper, Cohere of ElevenLabs om een taal in te stellen.",
   "settings.voice.language.automatic": "Automatisch",
+  "settings.voice.pause.title": "Pauze voor verzenden",
+  "settings.voice.pause.description":
+    "In een spraakgesprek verstuurt OpenBot je woorden als je zo lang niet spreekt. Kies een langere pauze als je langzaam spreekt of stopt om na te denken. Codex live spraak vindt het einde zelf.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Kan de spraakmodellen niet lezen.",
   "settings.voice.saveFailed": "Kan de spraakinstelling niet opslaan. Probeer het opnieuw.",
   "settings.voice.downloadFailed": "Kan de download niet starten. Probeer het opnieuw.",

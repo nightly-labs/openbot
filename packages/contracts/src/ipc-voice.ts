@@ -529,6 +529,14 @@ export type SpeechLanguage = (typeof SPEECH_LANGUAGES)[number];
 export const SPEECH_SPEEDS = [0.75, 1, 1.25, 1.5, 2] as const;
 export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
+/**
+ * How long the user can be quiet in a voice conversation before their words go to the agent, in
+ * milliseconds. The first one is the default, the same as the phone app's. A longer pause suits a slow
+ * speaker, or one who stops to think.
+ */
+export const VOICE_TURN_PAUSES = [1_500, 2_000, 3_000, 5_000] as const;
+export type VoiceTurnPause = (typeof VOICE_TURN_PAUSES)[number];
+
 /** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
 const SPEECH_SPEED_CYCLE: readonly SpeechSpeed[] = [
   ...SPEECH_SPEEDS.filter((speed) => speed >= 1),
@@ -560,6 +568,8 @@ export interface SpeechSettings {
   codexLive: boolean;
   /** The voice of Codex live voice. Null lets OpenAI choose. */
   codexLiveVoice: CodexLiveVoice | null;
+  /** The pause that ends a turn of a transcribed voice conversation. Codex live voice finds the end itself. */
+  turnPauseMs: VoiceTurnPause;
 }
 
 export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
@@ -571,6 +581,7 @@ export const DEFAULT_SPEECH_SETTINGS: SpeechSettings = {
   speed: 1,
   codexLive: false,
   codexLiveVoice: null,
+  turnPauseMs: VOICE_TURN_PAUSES[0],
 };
 
 /**
@@ -692,6 +703,10 @@ export function isCodexLiveVoice(value: unknown): value is CodexLiveVoice {
 
 export function isSpeechSpeed(value: unknown): value is SpeechSpeed {
   return isOneOf(SPEECH_SPEEDS, value);
+}
+
+export function isVoiceTurnPause(value: unknown): value is VoiceTurnPause {
+  return isOneOf(VOICE_TURN_PAUSES, value);
 }
 
 export function isSpeechLanguage(value: unknown): value is SpeechLanguage {

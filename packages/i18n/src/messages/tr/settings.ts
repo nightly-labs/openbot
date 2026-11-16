@@ -681,6 +681,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified yalnızca İngilizceyi tanır. Bir dil belirlemek için Whisper, Cohere veya ElevenLabs kullanın.",
   "settings.voice.language.automatic": "Otomatik",
+  "settings.voice.pause.title": "Göndermeden önce duraklama",
+  "settings.voice.pause.description":
+    "Sesli konuşmada, bu kadar süre konuşmadığınızda OpenBot sözlerinizi gönderir. Yavaş konuşuyorsanız veya düşünmek için duruyorsanız daha uzun bir duraklama seçin. Codex canlı ses sonu kendisi bulur.",
+  "settings.voice.pause.seconds": "{seconds} sn",
   "settings.voice.loadFailed": "Ses modelleri okunamadı.",
   "settings.voice.saveFailed": "Ses ayarı kaydedilemedi. Tekrar deneyin.",
   "settings.voice.downloadFailed": "İndirme başlatılamadı. Tekrar deneyin.",

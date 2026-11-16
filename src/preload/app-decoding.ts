@@ -103,6 +103,7 @@ import {
   isVoiceModelId,
   isVoiceServerProbe,
   isVoiceServerSettings,
+  isVoiceTurnPause,
   isXaiSpeechVoice,
   type LinkAccountStatus,
   type MobileConnectedDevice,
@@ -600,14 +601,15 @@ export function decodeSpeechModelStatus(value: unknown): SpeechModelStatus {
 
 export function decodeSpeechSettings(value: unknown): SpeechSettings {
   const settings = decodeRecord(value, "speech settings");
-  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice } = settings;
+  const { modelId, voice, elevenLabsVoice, xaiVoice, speed, codexLiveVoice, turnPauseMs } = settings;
   if (
     !isSpeechModelId(modelId) ||
     !isSpeechVoice(voice) ||
     !isElevenLabsSpeechVoice(elevenLabsVoice) ||
     !isXaiSpeechVoice(xaiVoice) ||
     !isSpeechSpeed(speed) ||
-    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice))
+    !(codexLiveVoice === null || isCodexLiveVoice(codexLiveVoice)) ||
+    !isVoiceTurnPause(turnPauseMs)
   )
     throw new Error("Invalid speech settings.");
   return {
@@ -619,6 +621,7 @@ export function decodeSpeechSettings(value: unknown): SpeechSettings {
     speed,
     codexLive: requiredBoolean(settings, "codexLive"),
     codexLiveVoice,
+    turnPauseMs,
   };
 }
 

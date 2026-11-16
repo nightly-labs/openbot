@@ -655,6 +655,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified 只能识别英语。要指定语言，请使用 Whisper、Cohere 或 ElevenLabs。",
   "settings.voice.language.automatic": "自动",
+  "settings.voice.pause.title": "发送前的停顿",
+  "settings.voice.pause.description":
+    "在语音对话中，如果你在这段时间内没有说话，OpenBot 会发送你的话。如果你说话较慢或会停下来思考，请选择更长的停顿。Codex 实时语音会自行判断结束。",
+  "settings.voice.pause.seconds": "{seconds} 秒",
   "settings.voice.loadFailed": "无法读取语音模型。",
   "settings.voice.saveFailed": "无法保存语音设置，请重试。",
   "settings.voice.downloadFailed": "无法开始下载，请重试。",
