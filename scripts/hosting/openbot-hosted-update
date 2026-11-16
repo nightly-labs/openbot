@@ -4,6 +4,9 @@
 #   openbot-hosted-update stage   openbot-update.timer. Downloads a newer release, checks it against
 #                                 the release manifest, copies it to /opt/OpenBot/staged, and installs
 #                                 the packages that it needs. OpenBot keeps running.
+#   openbot-hosted-update check   openbot-update.timer. Runs `stage`. When OpenBot stopped its start
+#                                 loop, it also runs `apply` and starts OpenBot, so a new release ends
+#                                 the loop with no restart of the server.
 #   openbot-hosted-update boot    openbot-update-apply.service, at boot before openbot.service. Runs
 #                                 `apply` when the disk of the server is complete. After a boat wake,
 #                                 boat restores the disk for some minutes, and OpenBot does not wait
@@ -49,6 +52,9 @@ BOAT_USER=user
 BOAT_PRE_STOP=/home/$BOAT_USER/.boat/pre-stop
 # boat does not save the paths in this file. It must be in the home of `user`.
 BOAT_IGNORE=/home/$BOAT_USER/.boatignore
+# OpenBot exits with this status when it stops its start loop (src/main/server-start-halt.ts), and
+# `RestartPreventExitStatus=` of openbot.service does not start it again.
+START_LOOP_STATUS=78
 # All that `install_hosting` reads from a release.
 RELEASE_FILES=(packages.txt openbot-hosted.apparmor openbot-boat-pre-stop "${HOSTED_FILES[@]}" "${UNITS[@]}")
 
@@ -203,6 +209,27 @@ stage_release() {
 
 recover() {
   rm -rf "$SCRATCH"/openbot-update.*
+}
+
+# Succeeds when OpenBot stopped its start loop and systemd does not start it again. Only the state
+# of the unit is read, never a file of the service user.
+start_loop_stopped() {
+  local state
+  state=$(systemctl show --property=ActiveState --value openbot.service 2>/dev/null) || return 1
+  case $state in inactive | failed) ;; *) return 1 ;; esac
+  [ "$(systemctl show --property=ExecMainStatus --value openbot.service 2>/dev/null)" = "$START_LOOP_STATUS" ]
+}
+
+# `stage`, and then `apply` and a start when OpenBot stopped its start loop. Only a new release
+# starts it: the same release would fail again. The release can also be one that an earlier `stage`
+# made before the loop. `stage` exits on a failure, as before.
+check() {
+  stage
+  if start_loop_stopped && [ -n "$(staged_version)" ]; then
+    echo "OpenBot stopped its start loop. Installing the staged release and starting OpenBot."
+    apply
+    systemctl start --no-block openbot.service
+  fi
 }
 
 set_state() {
@@ -519,7 +546,8 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   wait_for_restore
   case ${1:-} in
     stage) stage ;;
+    check) check ;;
     apply) apply ;;
-    *) fail "usage: $0 boot|stage|apply|request|trigger" ;;
+    *) fail "usage: $0 boot|stage|check|apply|request|trigger" ;;
   esac
 fi

@@ -24,6 +24,11 @@ ExecStart=/opt/OpenBot/hosted/openbot-hosted-server
 ExecStop=/opt/OpenBot/hosted/openbot-hosted-server --stop
 Restart=always
 RestartSec=10
+# OpenBot exits with 78 when it stops its start loop: a restart cannot help, or its start failed
+# three times in a row (src/main/server-start-halt.ts). It then stays stopped, and clients show it
+# offline, until a restart of the server, `openbot restart`, or an update: `openbot-hosted-update
+# check` installs a newer release and starts it. The next start tries once more.
+RestartPreventExitStatus=78
 TimeoutStopSec=60
 # Memory guards. The machine is small, and this unit holds OpenBot, its browser tabs and every agent
 # process. The OOM killer of the unit acts before the kernel's own, so the desktop, sshd and the boat

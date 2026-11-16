@@ -565,8 +565,8 @@ the same `HostedUpdateAdapter` with folders that the host mounts in `/var/lib/op
 The Linux build contains `scripts/hosting/` (without the TypeScript files) in `resources/hosting`.
 On a server, root runs `openbot-hosted-update`:
 
-1. `openbot-update.timer` runs `stage` 5 to 10 minutes after each start of the timer and then
-   about each 6 hours. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
+1. `openbot-update.timer` runs `check` 5 to 10 minutes after each start of the timer and then
+   about each 6 hours. `check` runs `stage`, and then the step that [Start loop](#start-loop) describes. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
    latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
    AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
    all hosting files, installs the packages in the `packages.txt` of that release, and copies it
@@ -612,6 +612,39 @@ migrated. `stage` stops when it cannot read the installed version, and `provisio
 installed version is newer. A staged release that is no longer the latest one, for example a
 withdrawn release, is removed at the next `stage` run. A server that starts before that run applies
 it. A release without all of its `resources/hosting` files cannot update a server.
+
+#### Start loop
+
+A server has no window for the recovery window of the desktop. A server whose start
+failed started again each 10 seconds, without an end, in earlier releases. Now main stops the loop
+(`src/main/server-start-halt.ts`):
+
+- at the first failure when a restart cannot help: the database is from a newer OpenBot
+  (`newer_database`), or a migration failed and rolled back (`migration_failed`);
+- for all other failures, at the start that follows 3 failed starts in a row of the same version
+  (`start_failed`). This is the count of the desktop recovery window (`start-attempts.ts`).
+
+Main then writes `openbot-start-halt-v1.json` in its user data folder and exits with 78. The file
+has the reason word, the app version and a time only. `openbot.service` has
+`RestartPreventExitStatus=78`, so systemd does not start it again. The journal shows the reason.
+
+The next start reads and removes the file, logs the reason, and tries once more. A failure of that
+start stops the loop again. These start OpenBot again:
+
+- a restart or a resume of the server, or `sudo openbot restart` or `start`;
+- `sudo openbot update`;
+- `check` of `openbot-update.timer`: when `openbot.service` is stopped with status 78 and a newer
+  release is staged, it runs `apply` and starts the service. It reads only the state of the unit
+  (`ActiveState`, `ExecMainStatus`), never a file of the service user.
+
+When OpenBot is not running, `openbot` commands that need the control socket say that the start
+loop stopped it, and name `openbot logs`, `sudo openbot update` and `sudo openbot restart`.
+
+A Docker container has no systemd. Its restart policy starts it again after exit 78 too, with the
+backoff of Docker. Each second start after a halt tries again.
+
+Not done yet: a safe mode that keeps a minimal Team API open while the start loop is stopped, so
+that the app can show the reason and the version to the owner.
 
 A server that has no updater, such as one made from a template before 0.26.0, needs one upgrade by
 hand. With a boat key that has command and file access: upload `scripts/hosting/` to

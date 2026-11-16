@@ -131,6 +131,14 @@ export class StartAttempts {
     return this.#record.consecutiveFailures >= START_FAILURE_LIMIT;
   }
 
+  /**
+   * True when this start failed and the next start would find a loop. A server then stops its
+   * start loop now (`server-start-halt.ts`), because it shows no recovery window.
+   */
+  get failureLimitReached(): boolean {
+    return this.#record.attempt?.state === "failed" && this.#record.consecutiveFailures + 1 >= START_FAILURE_LIMIT;
+  }
+
   summary(): StartAttemptsSummary {
     return {
       appVersion: this.#record.appVersion,
