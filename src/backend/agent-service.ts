@@ -1134,6 +1134,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ? Effect.void
             : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
+          this.#drain.providerResumed(provider);
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
           }

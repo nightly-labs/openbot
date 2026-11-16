@@ -39,6 +39,7 @@ import type { ProfileSave } from "./profile-save";
 import { isPlanLimitDiagnostic } from "./provider-diagnostics";
 import type { ProviderRuntime } from "./provider-runtime";
 import type { RoutineScheduler } from "./routine-scheduler";
+import { RoutineStartRetry } from "./routine-start-retry";
 import { sessionSettingsOverrides } from "./session-settings";
 import {
   isCodexCompactionRefusal,
@@ -255,6 +256,10 @@ export class DrainScheduler {
   readonly #startingDeliveries = new Map<AgentProvider, number>();
   readonly #scheduledDrains = new Set<string>();
   readonly #drainTasks = new Map<string, Deferred.Deferred<void, DeliveryStartFailed>>();
+  /** The routine runs whose provider did not start, and that wait to start again (#6751). */
+  readonly #startRetry = new RoutineStartRetry({
+    retry: (deliveryId, agentId, provider) => Effect.runFork(this.#retryRoutineStart(deliveryId, agentId, provider)),
+  });
 
   constructor(options: DrainSchedulerOptions) {
     this.#store = options.store;
@@ -401,6 +406,13 @@ export class DrainScheduler {
       this.#lanesOf(agentId).some((other) => other.taskId !== taskId && this.#laneRunning(other))
     )
       return "agent-client-changing";
+    // A routine run whose provider did not start waits for its next start. A message that comes in
+    // the meantime ends the wait: the lane starts again, as it did before the run waited.
+    if (this.#startRetry.agentWaits(agentId)) {
+      const head = this.#mailbox.nextQueued(agentId, taskId)?.delivery;
+      if (head && this.#startRetry.waiting(head.id) && this.#mailbox.laneQueuedIds(agentId, taskId).length === 1)
+        return "provider-start";
+    }
     // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
     // rather than fail (#4326). The provider runtime schedules the drain again when it is signed in.
     if (
@@ -581,10 +593,12 @@ export class DrainScheduler {
     for (const key of [...this.#turnModels.keys()]) if (ofAgent(key)) this.#turnModels.delete(key);
     this.#requeuedAtLimit.delete(agentId);
     this.#drainCalls.delete(agentId);
+    this.#startRetry.forgetAgent(agentId);
     this.retrySlotWaiters();
   }
 
   dispose(): void {
+    this.#startRetry.dispose();
     this.#drainingLanes.clear();
     this.#scheduledDrains.clear();
     this.#slotWaiters.clear();
@@ -798,6 +812,8 @@ export class DrainScheduler {
     // Released in the `finally` when no turn starts: a start that fails uses no provider memory.
     const releaseReservation = this.#memory.reserveTurn();
     let turnMayRun = false;
+    // The provider process, or its account check, did not start. Nothing reached the model.
+    let providerStartFailed = false;
     // The model this start asks for. The agent can move to another one while `turn/start` waits, and
     // a plan limit belongs to the model the provider refused.
     let requestedModel: string | null = null;
@@ -839,7 +855,15 @@ export class DrainScheduler {
       releaseRuntimeRefresh = this.#threads.holdRuntimeRefresh(agent.id, laneId !== null);
       const providerRunning = this.#providers.agentClientRunning(agent);
       const providerStartedAt = Date.now();
-      const client = yield* this.#providers.ensureAgentClient(agent).pipe(toDeliveryStartFailed);
+      const client = yield* this.#providers.ensureAgentClient(agent).pipe(
+        Effect.tapError(() =>
+          Effect.sync(() => {
+            providerStartFailed = true;
+          }),
+        ),
+        toDeliveryStartFailed,
+      );
+      this.#startRetry.forget(delivery.id);
       this.#hooks.deliveriesStarting(
         batch.map((item) => item.delivery.id),
         { pickedAt, providerStartMs: providerRunning ? null : Date.now() - providerStartedAt },
@@ -1156,6 +1180,24 @@ export class DrainScheduler {
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
             return;
           }
+          // The provider of a routine run did not start, such as with no internet connection. Nothing
+          // ran, so the run waits in the queue and starts again later, instead of failing until its
+          // next occurrence (#6751). A message behind it ends the wait, and the run fails as before.
+          if (providerStartFailed && recipient && this.#mayRetryStart(context, error, laneId)) {
+            const provider = providerForAgent(recipient);
+            if (this.#startRetry.schedule(delivery.id, delivery.recipientAgentId, provider)) {
+              for (const item of batch)
+                yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
+              this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+              logger.warn("A routine run waits for its provider to start.", {
+                agentId: delivery.recipientAgentId,
+                provider,
+                reason: this.#hooks.redactMcp(error instanceof Error ? error.message : String(error)),
+              });
+              return;
+            }
+          }
+          this.#startRetry.forget(delivery.id);
           if (isRequestTimeout(error, "turn/start")) {
             turnMayRun = true;
             this.#channels?.deliveryUncertain(delivery.id);
@@ -1265,6 +1307,55 @@ export class DrainScheduler {
         }),
       );
   }
+
+  /**
+   * Whether a routine run whose provider did not start can wait for a new start. Channel work and an
+   * external conversation fail at once, so that their channel or their sender hears of it. An expired
+   * sign-in waits for the user, not for time, and a run with a message behind it does not hold that
+   * message back.
+   */
+  #mayRetryStart(context: DeliveryContext, error: unknown, laneId: string | null): boolean {
+    const { delivery } = context;
+    return (
+      delivery.sender.kind === "routine" &&
+      !this.#channels?.store.assignmentForDelivery(delivery.id) &&
+      !this.#messaging?.ownsDelivery(delivery.id) &&
+      !(error instanceof ProviderSignInError) &&
+      classifyUserError(error) !== "auth" &&
+      this.#mailbox.laneQueuedIds(delivery.recipientAgentId, laneId).length === 0
+    );
+  }
+
+  /** The provider is available again: the routine runs that wait for it start now. */
+  providerResumed(provider: AgentProvider): void {
+    this.#startRetry.providerResumed(provider);
+  }
+
+  /**
+   * The wait of a routine run ended. With no provider running no queue drains, so the provider starts
+   * here, as Refresh starts it, also after OpenBot stopped starting it for failed starts in a row.
+   * While no provider runs, nothing else can start or fail the run, so it keeps waiting.
+   */
+  readonly #retryRoutineStart = Effect.fn("DrainScheduler.retryRoutineStart")(function* (
+    this: DrainScheduler,
+    deliveryId: string,
+    agentId: string,
+    provider: AgentProvider,
+  ) {
+    if (this.#hooks.isStopping()) return;
+    if (this.#mailbox.getDelivery(deliveryId)?.delivery.status !== "queued") {
+      this.#startRetry.forget(deliveryId);
+      return;
+    }
+    yield* this.#providers.refreshProvider(provider).pipe(Effect.ignore);
+    const available = this.#providers
+      .status()
+      .providers?.some((row) => row.id === provider && row.state === "available");
+    // A start that failed again waits again, without a second start from the drain at once.
+    if (!available && this.#startRetry.schedule(deliveryId, agentId, provider, !this.#providers.isReady())) return;
+    // The provider runs, or the run had all its waits and the drain fails it as before.
+    this.scheduleDrain(agentId);
+  });
 
   /**
    * Whether this delivery is a routine run with its own provider session: in the agent's own chat, or
