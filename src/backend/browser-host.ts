@@ -189,6 +189,7 @@ import {
   jsonStringFit,
   type ModelTextCut,
 } from "./model-text-limit";
+import { websiteMatchesOrigin } from "./password-vault";
 import { allowPinchZoom, blockPinchZoom } from "./pinch-zoom";
 import type { DynamicToolCallParams, DynamicToolResult } from "./protocol";
 import { isRecord } from "./protocol";
@@ -1720,13 +1721,7 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(
-                args.targets,
-                url.origin,
-                args.method === "password",
-                args.submission,
-                args.submitTarget,
-              ),
+              tab.engine.prepareSecret(args.targets, args.method === "password", args.submission, args.submitTarget),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1734,10 +1729,25 @@ export class BrowserHost {
           }),
         true,
       );
+      // A sign-in form in a frame, as Apple's, gets the secret of the frame's own origin. The frame must
+      // be on the page's site, so the card and the address bar name one site.
+      const fieldOrigin = entry.origin;
+      if (fieldOrigin !== url.origin && !websiteMatchesOrigin({ url: url.origin, autofill: "anywhere" }, fieldOrigin))
+        return yield* browserFailure(
+          new Error("The field target is in a frame of another site. Use browser takeover for this form."),
+        );
+      const requireIsolated = () => {
+        this.#requireIsolatedFromConnectedTabs(tab, url.origin);
+        if (fieldOrigin !== url.origin) this.#requireIsolatedFromConnectedTabs(tab, fieldOrigin);
+      };
+      yield* browserSync(requireIsolated);
       return {
         // Password cards do not use digits; keep public metadata within its released bounds.
-        request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
-        agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
+        request: { method: args.method, origin: fieldOrigin, digits: args.method === "password" ? 6 : args.digits },
+        // A script that the agent ran on the page can reach a frame of the page, as for a card fill.
+        agentScriptedOrigin:
+          this.#agentCodeReaches(tab, [url.origin]) ||
+          (yield* this.#agentCodeCanRead(tab, [fieldOrigin], entry.servedByWorker)),
         vaultFillable:
           args.method === "password"
             ? entry.fields.password
@@ -1754,7 +1764,7 @@ export class BrowserHost {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
-            yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
+            yield* browserSync(requireIsolated);
             // A saved authenticator code has the length of its key, which a page often does not state.
             // One field takes the whole code; digit fields keep their count.
             const length = vault && args.method === "authenticator" && args.targets.length === 1 ? "4,12" : args.digits;
