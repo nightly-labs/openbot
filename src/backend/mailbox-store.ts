@@ -61,6 +61,10 @@ import { recordRestartActivity } from "./restart-activity";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 /** How much of a delivery's error the note for a failed request quotes. */
 const FAILED_REQUEST_REASON_LIMIT = 2_000;
+/** The key of the note for a failed request (`answerFailedRequest`). Stored keys use it. */
+const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
+/** The key of the result that OpenBot relays when a requested turn ends. Stored keys use it. */
+export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
 /** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
@@ -2202,6 +2206,36 @@ export class MailboxStore {
   }
 
   /**
+   * Whether the recipient answered this teammate request with its own `send_message` reply in the turn
+   * that ran it (or an earlier turn of a run that resumed after a usage limit). The result that OpenBot
+   * relays when the turn ends and the note for a failed request do not count, and neither does a reply
+   * from a later turn, so the turn completion and a later history import decide the same.
+   */
+  hasOwnReplyFrom(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery?.turnId) return false;
+    const replies = new Set(
+      this.#state.messages
+        .filter(
+          (message) =>
+            message.sender.kind === "agent" &&
+            message.sender.agentId === delivery.recipientAgentId &&
+            message.replyToMessageId === delivery.messageId,
+        )
+        .map((message) => message.id),
+    );
+    if (replies.size === 0) return false;
+    const turnIds = new Set([delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
+    return Object.entries(this.#state.idempotency).some(
+      ([key, messageId]) =>
+        replies.has(messageId) &&
+        !key.startsWith(AUTO_RESULT_KEY_PREFIX) &&
+        !key.startsWith(FAILED_REQUEST_KEY_PREFIX) &&
+        turnIds.has(key.split(":").at(-2) ?? ""),
+    );
+  }
+
+  /**
    * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
@@ -2243,7 +2277,7 @@ export class MailboxStore {
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
       expectsReply: false,
-      idempotencyKey: `failed-request:${deliveryId}`,
+      idempotencyKey: `${FAILED_REQUEST_KEY_PREFIX}${deliveryId}`,
     });
     return requesterId;
   }, Effect.uninterruptible).bind(this);
