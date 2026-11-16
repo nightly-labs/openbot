@@ -10,8 +10,11 @@ import { z } from "zod";
 import type { LibraryFoldersStore } from "../library-folders-store";
 import type { MailboxStoredFile } from "../mailbox-store";
 
-/** What the agent tools use of the Library folders of this host. */
-export type AgentLibraryFolders = Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath">;
+/**
+ * What the agent tools use of the Library folders of this host. `delete_agent` uses `removeAgent`, as the
+ * app does after it deletes an agent.
+ */
+export type AgentLibraryFolders = Pick<LibraryFoldersStore, "getSnapshot" | "placeInPath" | "removeAgent">;
 
 /** A folder path, such as `Autumn campaign/Images`: each level with a name of the full length. */
 const FOLDER_PATH_CHARACTERS = LIBRARY_FOLDER_LIMITS.levels * (LIBRARY_FOLDER_LIMITS.name + 1) - 1;

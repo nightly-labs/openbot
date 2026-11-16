@@ -18,7 +18,8 @@ export const assignAgentSectionToolSchema = z
   })
   .strict();
 
-export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "withProfileAssignment">;
+/** `removeAgent` is for `delete_agent`, which removes a deleted agent from the sidebar as the app does. */
+export type AgentSidebar = Pick<SidebarLayoutStore, "getSnapshot" | "mutate" | "withProfileAssignment" | "removeAgent">;
 
 export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
   tool: string,

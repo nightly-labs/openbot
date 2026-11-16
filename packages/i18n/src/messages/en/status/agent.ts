@@ -48,6 +48,7 @@ export const messages = defineMessages("status.agent", {
   "status.agent.browserProfileOwn": "Give {agents} each a browser profile of its own. Their open tabs close.",
   "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
+  "status.agent.deleteAgents": "Delete {agents} with their chats and files. You cannot undo this.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
   "status.agent.linkCardFill":
     "Fill the one-time Link card {card} on {site}. You approved this payment in Link for {merchant}.",

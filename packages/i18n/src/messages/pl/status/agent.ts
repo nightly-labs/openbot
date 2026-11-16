@@ -50,6 +50,7 @@ export const messages = {
   "status.agent.feedbackSending": "Wysyłanie opinii do zespołu OpenBot…",
   "status.agent.workflowDelete":
     "Usuń przepływ pracy {title} razem z jego uruchomieniami i wersjami. Jego otwarte kroki zostaną zatrzymane.",
+  "status.agent.deleteAgents": "Usuń {agents} razem z ich czatami i plikami. Tej operacji nie można cofnąć.",
   "status.agent.screenCaptureProgress": "Prośba o przechwycenie ekranu…",
   "status.agent.screenCaptureReviewing": "Sprawdzanie przechwyconego ekranu…",
   "status.agent.browserOpening": "Otwieranie strony internetowej…",

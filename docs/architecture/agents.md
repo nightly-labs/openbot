@@ -967,6 +967,16 @@ Computer Use, or notifications setting in one call. Each agent gets the checks o
 and its own `updateAgent` write, in order. A failure for one agent does not stop or undo the others,
 and the result reports `ok` with the new settings, or the error, for each agent id. A provider or
 model that is not listed fails the whole call before any write.
+`openbot.delete_agent` deletes up to 20 other local agents in one call, with their chats and files,
+through the same steps as the app's Delete agent: `AgentService.deleteAgent`, then the sidebar and
+Library places. A deletion cannot be undone, so the tool asks the owner on one owner-only card
+that names the agents, also when the agent has Full access, and a member cannot answer it. Only a
+person's message can start it: a routine, a channel task, an external chat, another agent or a
+team member's message gets an error and no card. The Team API lets an admin delete an agent from
+the app; the tool is stricter and asks only the owner. The tool refuses the caller's own id and an
+unknown id, and checks before the card that each agent is idle. After an accept it deletes the
+agents one after the other and reports `ok` or the error for each id. `scripts/agent-delete-tool-e2e.ts`
+checks these rules.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
 user widens them again, and only the user moves an agent between Ask first and Full access, and changes local script runs. An agent changes MCP servers only with the MCP server tools, after the user's request and approval. A new agent gets

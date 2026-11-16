@@ -2029,6 +2029,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         updateAgent: (input, initiatingAgentId) =>
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
+        ensureAgentDeletable: (agentId) => this.ensureAgentDeletable(agentId).pipe(toToolOperationFailed),
+        // The same steps as the app's Delete agent and the Team API: the agent, then its sidebar and Library places.
+        deleteAgent: (agentId) =>
+          this.deleteAgent(agentId).pipe(
+            Effect.andThen(() => this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void),
+            Effect.andThen(() => this.#libraryFolders?.removeAgent(agentId) ?? Effect.void),
+            toToolOperationFailed,
+          ),
         enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
         redactMcp: (text) => this.#mcp.redact(text),

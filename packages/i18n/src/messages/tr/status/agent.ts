@@ -49,6 +49,7 @@ export const messages = {
   "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
+  "status.agent.deleteAgents": "{agents} ajanlarını sohbetleri ve dosyalarıyla birlikte silin. Bu işlem geri alınamaz.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",
   "status.agent.screenCaptureReviewing": "Ekran görüntüsü inceleniyor…",
   "status.agent.browserOpening": "Web sayfası açılıyor…",

@@ -49,6 +49,8 @@ export const messages = {
   "status.agent.feedbackSending": "Envoi de vos commentaires à l’équipe OpenBot…",
   "status.agent.workflowDelete":
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
+  "status.agent.deleteAgents":
+    "Supprimer {agents} avec leurs discussions et leurs fichiers. Cette action est irréversible.",
   "status.agent.screenCaptureProgress": "Demande de capture d’écran…",
   "status.agent.screenCaptureReviewing": "Analyse de la capture d’écran…",
   "status.agent.browserOpening": "Ouverture d’une page web…",
