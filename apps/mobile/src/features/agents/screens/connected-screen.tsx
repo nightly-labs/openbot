@@ -91,7 +91,6 @@ import {
 import { SplitPaneLayers, useSplitLayout } from "@/shared/components/adaptive-split";
 import { AndroidBlurTarget } from "@/shared/components/android-header-blur";
 import { useAppLoadingOverlay, useScreenLoadingLabel } from "@/shared/components/app-loading-overlay";
-import { ChromeGlassSheen } from "@/shared/components/chrome-glass-sheen";
 import { LargeTitle, LargeTitleBar, useLargeTitleScroll } from "@/shared/components/large-title";
 import { type MenuAction, MenuView } from "@/shared/components/menu-view";
 import { useChromeGlass } from "@/shared/lib/chrome-glass";
@@ -293,7 +292,7 @@ const HEADER_RIPPLE = { borderless: true, radius: 20 } as const;
 const PANE_BAR_HEIGHT = NATIVE_BAR_HEIGHT;
 
 /**
- * The glass behind a header button that the screen draws. Android has the solid glass of the design.
+ * The glass behind a header button that the screen draws. Android has the plain fill of the search field.
  * On iOS, the chat list pane draws its own bar, so its buttons take Liquid Glass as the native bar does.
  */
 function HeaderGlass({
@@ -309,7 +308,6 @@ function HeaderGlass({
   if (isAndroid) {
     return (
       <View className="size-10 items-center justify-center overflow-hidden rounded-full" style={glass}>
-        <ChromeGlassSheen />
         {children}
       </View>
     );
@@ -1098,7 +1096,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       {searchShows ? <HomeSearchResults search={search} barHeight={searchBarOffset} /> : null}
 
       {/* What's new covers home with the update block, so the field leaves while it shows. */}
-      {searchShows && !updateHeader.expanded ? <HomeSearchBar search={search} blurTarget={searchBlurTarget} /> : null}
+      {searchShows && !updateHeader.expanded ? <HomeSearchBar search={search} /> : null}
 
       {onboardingReady ? (
         // The flow fades out over the home, which comes in under it with its own reveal.
