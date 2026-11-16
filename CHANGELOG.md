@@ -1090,6 +1090,8 @@ All notable changes to OpenBot will be documented here. The project follows
   when you open the page again right after the upload. Workspace files still lists only pictures
   among the 2,000 largest stored files, so on a computer or server with more files a small new
   picture can be missing after the page opens again.
+- Show each agent in the Dynamic Island with its own avatar colour and shape. Before, an agent with
+  an exact colour showed the nearest preset colour, and every agent showed a round shape.
 
 ## [0.71.0] - 2026-11-14
 
