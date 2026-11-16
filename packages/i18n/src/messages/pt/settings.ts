@@ -640,6 +640,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Para muitos agentes e uso intenso do navegador.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Ditado",
+  "settings.voice.dictationKey.title": "Tecla de ditado",
+  "settings.voice.dictationKey.descriptionMac":
+    "Segure a tecla Option direita para falar e solte para parar. Ou pressione duas vezes para falar sem as mãos e mais uma vez para parar.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Segure a tecla Ctrl direita para falar e solte para parar. Ou pressione duas vezes para falar sem as mãos e mais uma vez para parar.",
   "settings.voice.model.parakeet.description": "Rápido. Detecta sozinho o idioma falado, em 25 idiomas europeus.",
   "settings.voice.model.parakeetUnified.description":
     "Rápido. Só inglês. Coloca pontuação, com menos erros que o Parakeet TDT.",

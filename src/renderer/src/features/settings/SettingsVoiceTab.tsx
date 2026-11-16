@@ -50,6 +50,8 @@ import {
 } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, Show } from "solid-js";
+import { setDictationKey, useDictationKey } from "../../dictation-key-preference";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import type { CodexLiveAccess } from "../speech/codex-live-access";
 import type { SettingsVoiceStore } from "./settings-voice-store";
 import {
@@ -397,6 +399,7 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
   };
 
   const [editingServer, setEditingServer] = createSignal(false);
+  const dictationKey = useDictationKey();
 
   const liveVoice = (): LiveVoiceChoice => speech().settings?.codexLiveVoice ?? "automatic";
   /** The voices' own names, which stay the same in each language. */
@@ -477,6 +480,17 @@ export function SettingsVoiceTab(props: SettingsVoiceTabProps) {
               </Select>
             </ItemActions>
           </Item>
+          <SwitchField
+            data-settings-row="settings.voice.dictationKey.title"
+            checked={dictationKey()}
+            onChange={setDictationKey}
+            label={t("settings.voice.dictationKey.title")}
+            description={t(
+              currentDevicePlatform() === "darwin"
+                ? "settings.voice.dictationKey.descriptionMac"
+                : "settings.voice.dictationKey.descriptionOther",
+            )}
+          />
         </ItemGroup>
       </SettingsSection>
 

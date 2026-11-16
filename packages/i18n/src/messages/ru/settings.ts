@@ -666,6 +666,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Для многих агентов и интенсивной работы в браузере.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Диктовка",
+  "settings.voice.dictationKey.title": "Клавиша диктовки",
+  "settings.voice.dictationKey.descriptionMac":
+    "Удерживайте правую клавишу Option, чтобы говорить, и отпустите, чтобы остановить. Или нажмите её дважды, чтобы говорить без рук, и ещё раз, чтобы остановить.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Удерживайте правую клавишу Ctrl, чтобы говорить, и отпустите, чтобы остановить. Или нажмите её дважды, чтобы говорить без рук, и ещё раз, чтобы остановить.",
   "settings.voice.model.parakeet.description": "Быстрая. Сама определяет язык речи, 25 европейских языков.",
   "settings.voice.model.parakeetUnified.description":
     "Быстрая. Только английский. Ставит знаки препинания, ошибок меньше, чем у Parakeet TDT.",

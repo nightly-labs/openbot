@@ -657,6 +657,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.summary": "Pour de nombreux agents et un usage intensif du navigateur.",
   // The Voice tab: dictation models and the dictation language.
   "settings.voice.dictation.section": "Dictée",
+  "settings.voice.dictationKey.title": "Touche de dictée",
+  "settings.voice.dictationKey.descriptionMac":
+    "Maintenez la touche Option de droite pour parler, puis relâchez-la pour arrêter. Ou appuyez deux fois pour parler sans les mains, puis une fois de plus pour arrêter.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Maintenez la touche Ctrl de droite pour parler, puis relâchez-la pour arrêter. Ou appuyez deux fois pour parler sans les mains, puis une fois de plus pour arrêter.",
   "settings.voice.model.parakeet.description": "Rapide. Détecte seul la langue parlée, parmi 25 langues européennes.",
   "settings.voice.model.parakeetUnified.description":
     "Rapide. Anglais uniquement. Met la ponctuation, avec moins d’erreurs que Parakeet TDT.",

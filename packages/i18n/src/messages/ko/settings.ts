@@ -624,6 +624,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "많은 에이전트와 무거운 브라우저 작업을 위한 요금제예요.",
   "settings.voice.dictation.section": "받아쓰기",
+  "settings.voice.dictationKey.title": "받아쓰기 키",
+  "settings.voice.dictationKey.descriptionMac":
+    "오른쪽 Option 키를 누르고 있는 동안 말하고, 떼면 멈춰요. 두 번 누르면 손을 떼고 말할 수 있고, 한 번 더 누르면 멈춰요.",
+  "settings.voice.dictationKey.descriptionOther":
+    "오른쪽 Ctrl 키를 누르고 있는 동안 말하고, 떼면 멈춰요. 두 번 누르면 손을 떼고 말할 수 있고, 한 번 더 누르면 멈춰요.",
   "settings.voice.model.parakeet.description": "빨라요. 유럽 언어 25개에서 말하는 언어를 스스로 찾아내요.",
   "settings.voice.model.parakeetUnified.description":
     "빨라요. 영어만 지원해요. 문장 부호를 쓰고, Parakeet TDT보다 오류가 적어요.",

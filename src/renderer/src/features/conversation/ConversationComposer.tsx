@@ -41,14 +41,21 @@ import { type OpenWaitItem, OpenWaits } from "@openbot/ui/features/conversation/
 import { SpeakingBar } from "@openbot/ui/features/conversation/SpeakingBar";
 import { ComposerVoiceControls } from "@openbot/ui/features/conversation/VoiceRecordingMorph";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, createStore, Loading, lazy, Show } from "solid-js";
+import { createEffect, createMemo, createSignal, createStore, Loading, lazy, onCleanup, Show } from "solid-js";
+import { dictationKeyCode, useDictationKey } from "../../dictation-key-preference";
 import { reportErrorBanner, reportNotification } from "../../error-reports";
-import { deviceSendShortcut, sendShortcutAriaKey, sendShortcutHintKey } from "../../send-shortcut-preference";
+import {
+  currentDevicePlatform,
+  deviceSendShortcut,
+  sendShortcutAriaKey,
+  sendShortcutHintKey,
+} from "../../send-shortcut-preference";
 import { speechReading } from "../speech/speech-playback";
 import { stopSpokenReply } from "../speech/speech-replies";
 import { copyComposerSelection, readComposerCopy } from "./composer-clipboard";
 import { createComposerResize } from "./composer-resize";
 import { useConversationViewScope } from "./conversation-scope";
+import { createDictationShortcut } from "./dictation-shortcut";
 import { currentConversationTarget } from "./stores/composer-store";
 
 // Module scope: the composer remounts on navigation, and a dismissed notice must stay dismissed.
@@ -223,6 +230,37 @@ export function ConversationComposer() {
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
+  // The microphone button goes away when the recording starts, so the focus stays nowhere and Enter does
+  // nothing. In the message box, Enter stops the recording and sends what was said.
+  createEffect(
+    () => voicePhase() === "recording" && !sideThreadOpen(),
+    (recording) => {
+      if (recording) setComposerFocusRequest((current) => current + 1);
+    },
+  );
+  const dictationKeyOn = useDictationKey();
+  const dictationShortcut = createDictationShortcut({
+    key: () =>
+      dictationKeyOn() && voiceAvailable() ? dictationKeyCode(props.platform ?? currentDevicePlatform()) : undefined,
+    phase: voicePhase,
+    // A modal dialog keeps its keys, and a side thread covers this chat.
+    canStart: () =>
+      Boolean(props.agent) && agentReady() && !sideThreadOpen() && !document.querySelector('[aria-modal="true"]'),
+    start: () => void startVoiceRecording(),
+    stop: stopVoiceRecording,
+  });
+  const dictationKeyDown = (event: KeyboardEvent) => dictationShortcut.keyDown(event);
+  const dictationKeyUp = (event: KeyboardEvent) => dictationShortcut.keyUp(event);
+  const dictationBlur = () => dictationShortcut.blur();
+  window.addEventListener("keydown", dictationKeyDown);
+  window.addEventListener("keyup", dictationKeyUp);
+  window.addEventListener("blur", dictationBlur);
+  onCleanup(() => {
+    window.removeEventListener("keydown", dictationKeyDown);
+    window.removeEventListener("keyup", dictationKeyUp);
+    window.removeEventListener("blur", dictationBlur);
+    dictationShortcut.dispose();
+  });
   /** The reply of this agent that is read aloud. The voice pill shows its own. */
   const speaking = () => {
     const reading = speechReading();

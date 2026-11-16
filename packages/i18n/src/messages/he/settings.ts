@@ -626,6 +626,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "להרבה סוכנים ולעבודת דפדפן כבדה.",
   "settings.voice.dictation.section": "הכתבה",
+  "settings.voice.dictationKey.title": "מקש הכתבה",
+  "settings.voice.dictationKey.descriptionMac":
+    "החזיקו את מקש Option הימני כדי לדבר, ושחררו כדי לעצור. או לחצו עליו פעמיים כדי לדבר בלי ידיים, ופעם נוספת כדי לעצור.",
+  "settings.voice.dictationKey.descriptionOther":
+    "החזיקו את מקש Ctrl הימני כדי לדבר, ושחררו כדי לעצור. או לחצו עליו פעמיים כדי לדבר בלי ידיים, ופעם נוספת כדי לעצור.",
   "settings.voice.model.parakeet.description": "מהיר. מזהה בעצמו את השפה המדוברת, ב-25 שפות אירופיות.",
   "settings.voice.model.parakeetUnified.description": "מהיר. אנגלית בלבד. כותב פיסוק, עם פחות שגיאות מ-Parakeet TDT.",
   "settings.voice.model.bark.description": "מהיר. אנגלית בלבד. כותב בעיקר באותיות קטנות, עם מעט פיסוק.",

@@ -640,6 +640,11 @@ export const messages = {
   "settings.hostedServers.plan.pro.name": "Pro",
   "settings.hostedServers.plan.pro.summary": "Per molti agenti e un uso intenso del browser.",
   "settings.voice.dictation.section": "Dettatura",
+  "settings.voice.dictationKey.title": "Tasto di dettatura",
+  "settings.voice.dictationKey.descriptionMac":
+    "Tieni premuto Opzione destro per parlare e rilascialo per fermarti. Oppure premilo due volte per parlare a mani libere e ancora una volta per fermarti.",
+  "settings.voice.dictationKey.descriptionOther":
+    "Tieni premuto Ctrl destro per parlare e rilascialo per fermarti. Oppure premilo due volte per parlare a mani libere e ancora una volta per fermarti.",
   "settings.voice.model.parakeet.description": "Veloce. Riconosce da solo la lingua parlata, in 25 lingue europee.",
   "settings.voice.model.parakeetUnified.description":
     "Veloce. Solo inglese. Mette la punteggiatura, con meno errori di Parakeet TDT.",
