@@ -89,7 +89,11 @@ export class WhatsAppTransport implements MessagingTransport {
       }),
       session.onUpsert(({ messages, type }) => {
         const upsertWindow = session.upsertWindow();
-        for (const message of messages) if (freshUpsert(type, message, upsertWindow)) this.#enqueue(message, true);
+        for (const message of messages) {
+          if (freshUpsert(type, message, upsertWindow)) this.#enqueue(message, true);
+          // History, or a message held too long to answer: it is only saved, so agents can still read it.
+          else if (type === "append") this.#enqueue(message, false, true);
+        }
       }),
     );
     store.prune();
@@ -126,9 +130,9 @@ export class WhatsAppTransport implements MessagingTransport {
     yield* this.#handle.session.stop();
   });
 
-  #enqueue(message: WAMessage, live: boolean): void {
+  #enqueue(message: WAMessage, live: boolean, historyOnly = false): void {
     this.#reading = this.#reading
-      .then(() => this.#read(message, live))
+      .then(() => this.#read(message, live, historyOnly))
       .catch((cause: unknown) => {
         // A failed read must not stop the reads after it.
         logger.warn("A WhatsApp message could not be read.", {
@@ -137,9 +141,12 @@ export class WhatsAppTransport implements MessagingTransport {
       });
   }
 
-  async #read(message: WAMessage, live: boolean): Promise<void> {
+  async #read(message: WAMessage, live: boolean, historyOnly: boolean): Promise<void> {
     const dedupKey = whatsAppDedupKey(message);
-    if (!dedupKey || this.#remember(dedupKey)) return;
+    if (!dedupKey) return;
+    // A message that is only saved is not marked as seen, so a later copy that can be answered is still
+    // read. A copy of a message that was read already is skipped: an old edit must not undo a newer one.
+    if (historyOnly ? this.#seen.has(dedupKey) : this.#remember(dedupKey)) return;
     const { session, store, chats } = this.#handle;
     let event: WhatsAppEvent | null;
     try {
@@ -156,6 +163,7 @@ export class WhatsAppTransport implements MessagingTransport {
           const pn = mapping ? await mapping.getPNForLID(lid).catch(() => null) : null;
           return pn ? (jidNormalizedUser(pn).split("@")[0]?.split(":")[0] ?? null) : null;
         },
+        historyOnly,
       });
     } catch (cause) {
       logger.warn("A WhatsApp message could not be read.", { cause: cause instanceof Error ? cause.name : "unknown" });

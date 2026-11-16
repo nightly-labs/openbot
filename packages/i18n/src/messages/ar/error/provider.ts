@@ -297,7 +297,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "سجّل الدخول باستخدام Nous Portal، أو شغّل `hermes setup` في نافذة طرفية، لاستخدام Hermes.",
   "error.provider.hermesTurnFailed":
-    "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في إعدادات الخادم › MCP، ثم أرسل رسالتك مرة أخرى.",
+    "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في المتجر، التطبيقات، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.hermesRefused":
     "رفض Hermes هذه الرسالة قبل أن تبدأ. أرسلها مرة أخرى. إذا رفض Hermes كل رسالة، فأعد تشغيل OpenBot على الكمبيوتر الذي يشغّل هذا الوكيل.",
   "error.provider.copilotThinkingRejected":

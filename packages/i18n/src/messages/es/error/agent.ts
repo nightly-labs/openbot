@@ -161,6 +161,8 @@ export const messages = {
     "«Solo espacio de trabajo» necesita el sandbox de Codex, que Codex no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Preguntar antes o Acceso completo en los ajustes del agente.",
   "error.agent.claudeSandboxUnavailable":
     "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador: {reason}. Elige Acceso completo u otro proveedor en los ajustes del agente.",
+  "error.agent.claudeSandboxBlocked":
+    "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Acceso completo u otro proveedor en los ajustes del agente.",
   "error.agent.screenCaptureOff":
     "La captura de pantalla está desactivada para este agente. El usuario puede activar el uso del equipo en los ajustes del agente.",
   "error.agent.screenCaptureUnavailable": "La captura de pantalla no está disponible en este equipo.",

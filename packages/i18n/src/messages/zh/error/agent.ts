@@ -133,6 +133,8 @@ export const messages = {
     "“仅工作区”需要 Codex 沙盒，但 Codex 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择先询问或完全访问。",
   "error.agent.claudeSandboxUnavailable":
     "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
+  "error.agent.claudeSandboxBlocked":
+    "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",
   "error.agent.screenCaptureUnavailable": "这台电脑不支持截屏。",
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
@@ -141,7 +143,7 @@ export const messages = {
   "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
-    "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",
+    "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“市场 → 应用 → {name}”中更改它的地址、命令、参数或传输方式。",
   "error.agent.mcpServerBuiltIn":
     "{name} 是 OpenBot 的一部分，MCP 工具无法测试、开启、关闭或移除它。用户在运行 OpenBot 的电脑上管理它：GitHub 连接在 市场、应用、GitHub，Computer Use 在 设置、Computer Use。",
   "error.agent.mcpServerUnknown": "没有名为 {name} 的 MCP 服务器。请调用 list_mcp_servers 查看名称。",

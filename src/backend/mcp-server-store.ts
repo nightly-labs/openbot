@@ -308,7 +308,7 @@ type ReportRow = (row: DynamicRecord, message: string, reason: string) => void;
  *
  * Startup reads this table, so one row must not stop the app (#3643). A list column that cannot be
  * read, or a column past a bound of `isMcpServerConfig`, is read as empty and the server as turned
- * off: the user still sees it in Server settings and corrects or removes it there. The row is not
+ * off: the user still sees it in the Marketplace and corrects or removes it there. The row is not
  * changed until the user saves it or turns it on. A row whose text cannot be read at all, or whose id
  * or name is past a bound, has nothing to show, and is left out.
  */
@@ -353,7 +353,7 @@ function readServer(row: DynamicRecord, report: ReportRow): StoredServer | null 
     return null;
   }
   // The renderer decodes the whole list with `isMcpServerConfig`, so a row past one of its bounds -
-  // from an earlier build or an import - would hide every server from Server settings. Each column
+  // from an earlier build or an import - would hide every server from the Marketplace. Each column
   // is checked alone; only the id and the name cannot be shown empty.
   const bare: McpServerConfig = {
     ...config,

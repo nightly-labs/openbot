@@ -257,9 +257,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
-    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح {name} في المتجر، التطبيقات، واختر تسجيل الدخول.",
   "error.backend.mcpServerFailedForProvider":
-    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
+    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح {name} في المتجر، التطبيقات، واختر اختبار الاتصال لمعرفة السبب.",
   "error.backend.mcpServerFailedInProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpServerTimedOutInProvider":

@@ -21,9 +21,14 @@ export interface MarketplaceCalls {
     | "cancelMcpSignIn"
     | "listMcpServers"
     | "listMcpSignIns"
+    | "mcpSignInApp"
     | "removeMcpServer"
+    | "removeMcpSignInApp"
     | "saveMcpServer"
+    | "saveMcpSignInApp"
+    | "setMcpServerEnabled"
     | "signInMcpServer"
+    | "signOutMcpServer"
     | "testMcpServer"
   >;
   /** Who gets each MCP server (`mcp-access-v1`). Absent: this client cannot change it. */

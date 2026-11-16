@@ -270,9 +270,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpToolSchemaRefused":
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open {name} in Marketplace, Apps, and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+    "{provider} could not start the MCP server {name}. Open {name} in Marketplace, Apps, and choose Test connection to see the cause.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -280,7 +280,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
-    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open the MCP settings and sign in to {name}, then ask the agent again.",
+    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open {name} in Marketplace, Apps, and sign in, then ask the agent again.",
   "error.backend.mcpServerRequestDeclined":
     "The MCP server {name} asked for something that OpenBot cannot show, so OpenBot declined it.",
   "error.backend.mcpRequestDeclined":

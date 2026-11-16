@@ -156,6 +156,9 @@ function outlivesTurn(pending: PendingPrompt): boolean {
   return pending.detached !== undefined || pending.subagent === true;
 }
 
+/** A person's action that a running turn waits for: an approval, an answer to a question, or a browser takeover. */
+export type AgentPersonWait = "approval" | "answer" | "browser";
+
 /** The chat that a new message reaches: a task of the agent, or its own chat without `taskId`. */
 export interface LateAnswerTarget {
   taskId?: string;
@@ -643,6 +646,19 @@ export class AttentionRegistry {
       [...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId) ||
       [...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)
     );
+  }
+
+  /**
+   * What the agent's running turn waits for from a person. A detached question is left out: no turn
+   * waits for its answer.
+   */
+  waitsFor(agentId: string): AgentPersonWait[] {
+    const kinds: AgentPersonWait[] = [];
+    if ([...this.#approvals.values()].some((pending) => pending.approval.agentId === agentId)) kinds.push("approval");
+    if ([...this.#prompts.values()].some((pending) => pending.agentId === agentId && pending.detached === undefined))
+      kinds.push("answer");
+    if ([...this.#takeovers.values()].some((pending) => pending.request.agentId === agentId)) kinds.push("browser");
+    return kinds;
   }
 
   /** Whether a question, an approval or a browser takeover of this turn waits, matched as `clearForTurn` does. */
