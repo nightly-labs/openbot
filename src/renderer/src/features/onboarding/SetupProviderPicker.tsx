@@ -7,6 +7,7 @@ import {
   type CustomProviderHarness,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  customProviderOfModel,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderHarness,
   isLocalOnlyProvider,
@@ -158,15 +159,8 @@ export function savedCustomModel(
   customProviders: readonly CustomProviderSummary[] | undefined,
 ): AgentModelId | null {
   if (!isCustomProviderHarness(provider) || !model) return null;
-  const endpoint = customEndpointOf(model, customProviders);
+  const endpoint = customProviderOfModel(model, customProviders ?? []);
   return endpoint && harnessOf(endpoint) === provider ? model : null;
-}
-
-function customEndpointOf(
-  model: AgentModelId | null,
-  customProviders: readonly CustomProviderSummary[] | undefined,
-): CustomProviderSummary | undefined {
-  return model ? (customProviders ?? []).find((endpoint) => model.startsWith(`${endpoint.id}/`)) : undefined;
 }
 
 function harnessOf(endpoint: CustomProviderSummary): CustomProviderHarness {
@@ -190,8 +184,8 @@ export function createSetupProviders(
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(initial?.provider ?? null);
   /**
    * Whether the user chose their own endpoints rather than a built-in provider. `selectedProvider`
-   * stays `opencode` beside it, because that is the provider setup records: which endpoint an agent
-   * uses is a model choice, which comes later than this step.
+   * is the provider that runs the endpoint of the custom model beside it (OpenCode or Pi), because
+   * that is the provider setup records: which endpoint an agent uses is a model choice.
    */
   const [customSelected, setCustomSelected] = createSignal(Boolean(untrack(() => initial?.customModel())));
   /**
@@ -335,7 +329,7 @@ export function createSetupProviders(
    * has a model, it is the one the form chooses first.
    */
   function customHarness(): CustomProviderHarness {
-    const endpoint = customEndpointOf(customModel() ?? firstSavedCustomModel(), props.customProviders);
+    const endpoint = customProviderOfModel(customModel() ?? firstSavedCustomModel(), props.customProviders ?? []);
     if (endpoint) return harnessOf(endpoint);
     return harnesses()?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
   }
@@ -407,8 +401,8 @@ export function createSetupProviders(
    * The endpoint the user just described is what they came here to use, so the step selects the
    * custom row rather than leaving the choice on whichever provider connected first, and its first
    * model becomes the one a new agent starts on. OpenCode and Pi name a custom model by its endpoint,
-   * so the id is composed here rather than looked up in a catalog they have yet to list. The saved
-   * list does not hold the new endpoint yet, so its provider comes from the form.
+   * so the id is composed here rather than looked up in a catalog they have yet to list. The provider
+   * that runs the endpoint comes from the form, so the choice does not wait for the saved list.
    */
   function selectSavedEndpoint(value: SaveCustomProviderInput): void {
     selectCustomProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
@@ -448,11 +442,12 @@ export function createSetupProviders(
     },
   );
 
+  /** A provider that runs the custom endpoints needs no account of its own, as in "Runs on". */
   const selectedProviderConnected = createMemo(() => {
     const selected = selectedProvider();
-    return Boolean(
-      selected && providerOptions().some((provider) => provider.id === selected && providerReady(provider)),
-    );
+    const option = selected ? providerOptions().find((provider) => provider.id === selected) : undefined;
+    if (!option) return false;
+    return customSelected() && isCustomProviderHarness(selected) ? servesCustomProvider(option) : providerReady(option);
   });
 
   createEffect(
