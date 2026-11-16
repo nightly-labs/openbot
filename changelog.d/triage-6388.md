@@ -5,5 +5,6 @@
   the parts that you choose; Cancel on the notice above the message box takes the request out again.
   Remove it takes the report off GitHub. Before, a sent report stayed public, also when it had private
   data in it.
-- Remove a report on a joined server too: the server takes it off GitHub with its own OpenBot
-  account. The server must also be on this version; on an older server, Remove asks the agent.
+- The owner of a joined server can remove a report too: the server takes it off GitHub with its own
+  OpenBot account. The server must also be on this version. For another member, or on an older
+  server, Remove asks the agent, and the owner approves it.
