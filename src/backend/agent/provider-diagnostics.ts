@@ -299,7 +299,8 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
  * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
  * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
- * Usage resets over a rolling 24-hour window" (#4869). A spent credit
+ * Usage resets over a rolling 24-hour window" (#4869). Cline names its plan between the window and
+ * "limit": "You have reached your weekly Clinepass limit. The limit resets in 8h 30m" (#10674). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -308,6 +309,7 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!spend\b)[\w-]+ limit\b/iu.test(message) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||

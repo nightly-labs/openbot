@@ -1517,7 +1517,11 @@ export class TurnLifecycle {
             isPlanLimitDiagnostic(message) ||
             (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+            // Cline names the wait in its text only: "The limit resets in 8h 30m" (#10674). With no
+            // reset, the hold lets one turn try again each 15 minutes.
+            const resetDelayMs = providerResetDelayMs(message);
+            const namedReset = resetDelayMs === null ? null : Math.ceil((Date.now() + resetDelayMs) / 1_000);
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? namedReset);
           }
           const context = {
             turnId: errorTurnId,
