@@ -19,6 +19,12 @@ const FORM_POLICY = `<meta http-equiv="Content-Security-Policy" content="form-ac
 const PAGE_ADDRESS = "about:blank";
 const ANDROID = Platform.OS === "android";
 
+/**
+ * Reports the height of the page root, as the desktop bootstrap measures it, each time it changes.
+ * One report goes in each animation frame at most, so a growing page does not lay out the chat on each change.
+ */
+const HEIGHT_REPORT = `(()=>{const root=document.documentElement;let last=-1,queued=false;const report=()=>{queued=false;const height=Math.ceil(root.getBoundingClientRect().height);if(height===last)return;last=height;window.ReactNativeWebView.postMessage(String(height));};const queue=()=>{if(queued)return;queued=true;requestAnimationFrame(report);};new ResizeObserver(queue).observe(root);report();})();true;`;
+
 function openWebLink(url: string): void {
   if (/^https?:/iu.test(url)) void Linking.openURL(url);
 }
@@ -29,8 +35,9 @@ function openWebLink(url: string): void {
  * `onHeight`, the view has no `onMessage` and injects no script, so react-native-webview adds no
  * message handler or JavaScript interface, and the page cannot call the app. With `onHeight`, only
  * in a chat, a script reports the height of the page root as desktop measures it, and the handler
- * takes nothing but a finite number: the page can change only its own height, inside the limits of
- * a desktop frame. Do not take other messages from a page. It loads from a
+ * takes nothing but a finite number. On Android a frame in the page can send one too. So the page
+ * and its frames can change only the height of this chat frame, inside the limits of a desktop
+ * frame. Do not take other messages from a page. It loads from a
  * string at `about:blank`, so it cannot read app files. On iOS, `incognito` keeps its storage in
  * memory. On Android, `incognito` clears the cookies and the cache of every web view of the app, so
  * the page gets no DOM storage and no cookies instead.
@@ -38,9 +45,6 @@ function openWebLink(url: string): void {
  * On the screen, the margin and the header space are padding of the page root: the page's own
  * background fills the space under the glass header and the home indicator.
  */
-/** Reports the height of the page root, as the desktop bootstrap measures it, each time it changes. */
-const HEIGHT_REPORT = `(()=>{const root=document.documentElement;let last=-1;const report=()=>{const height=Math.ceil(root.getBoundingClientRect().height);if(height===last)return;last=height;window.ReactNativeWebView.postMessage(String(height));};new ResizeObserver(report).observe(root);report();})();true;`;
-
 export function HtmlPageView({ source, title, mode, insets = { top: 0, bottom: 0 }, onHeight }: HtmlPageProps) {
   const { theme } = useUniwind();
   const appearance = theme === "dark" ? "dark" : "light";

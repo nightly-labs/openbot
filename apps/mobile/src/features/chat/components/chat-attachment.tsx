@@ -32,6 +32,12 @@ import { useHistoryShown } from "./use-history-shown";
 import { useListSettled } from "./use-list-settled";
 import { useMediaFile } from "./use-media-file";
 
+/**
+ * The last height that each visual page reported, by attachment, so a row that the chat list
+ * mounts again keeps its height and the chat does not move while the page loads again.
+ */
+const reportedVisualHeights = new Map<string, number>();
+
 // The width reserved while the shape is still unknown: a portrait phone photo.
 const UNKNOWN_RATIO = 3 / 4;
 
@@ -109,7 +115,11 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
   const historyShown = useHistoryShown();
   const full = useFullVisualPreference((state) => state.enabled);
   // The height that the page reports. Until then, the agent's height keeps the space.
-  const [reported, setReported] = useState<number | undefined>(undefined);
+  const [reported, setReported] = useState(() => reportedVisualHeights.get(attachment.id));
+  const report = (height: number) => {
+    reportedVisualHeights.set(attachment.id, height);
+    setReported(height);
+  };
   const pageHeight = full
     ? chatVisualFrameHeight(reported ?? props.visual?.height)
     : chatVisualFrameHeight(undefined, props.visual?.height);
@@ -148,7 +158,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("mobile.chat.attachment.preview", { name: attachment.name })}
-        // A cut page ends with the rounded corners of the other chat frames, not a straight edge.
+        // The page ends with the rounded corners of the other chat frames, not a straight edge where it is cut.
         style={{
           width: width - 80,
           maxWidth: "100%",
@@ -167,12 +177,7 @@ function ChatVisualAttachment(props: ChatAttachmentProps) {
         {/* The page takes no touches, so the chat scrolls over it and a tap opens it. */}
         <View pointerEvents="none" style={FILL}>
           {settled && historyShown ? (
-            <HtmlPage
-              source={page.source}
-              title={attachment.name}
-              mode="chat"
-              onHeight={full ? setReported : undefined}
-            />
+            <HtmlPage source={page.source} title={attachment.name} mode="chat" onHeight={full ? report : undefined} />
           ) : null}
         </View>
       </Pressable>

@@ -6,4 +6,4 @@
 
 ### Changed
 
-- A cut visual in the chat now has rounded bottom corners.
+- A visual in the chat now has rounded bottom corners, so a cut visual does not end with a straight edge.
