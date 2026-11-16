@@ -14,6 +14,7 @@ import { extname, join, relative, resolve } from "node:path";
 import { WebSocket as Socket, WebSocketServer } from "ws";
 import { withoutElectronRuntimeFlags } from "../electron-spawn-env";
 import {
+  DEBUGGING_PORT_FILE,
   DEVTOOLS_ENDPOINT_FILE,
   DEVTOOLS_PATH,
   isLiveProvider,
@@ -252,6 +253,8 @@ const app = spawn(
 writeFileSync(appPidFile, String(app.pid));
 // The config reads this file to find the DevTools socket of this provider's app.
 writeFileSync(join(profile, DEVTOOLS_ENDPOINT_FILE), `ws://${RENDERER_HOST}:${rendererPort}${DEVTOOLS_PATH}`);
+// The bench reads this port to reach the pages of the OpenBot browser.
+writeFileSync(join(profile, DEBUGGING_PORT_FILE), String(debuggingPort));
 
 // A hard stop: a soft stop can take a minute, because the app waits for services that this test
 // does not start. The test has its answer before the stop, and the profile holds no user data.
