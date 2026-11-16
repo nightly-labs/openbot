@@ -100,9 +100,11 @@ function useVideoPoster(key: string, uri: string | null) {
     const show = () => {
       if (!thumbnail) return;
       const next = { thumbnail, duration };
-      rememberPoster(key, next);
       if (active) setPoster(next);
-      if (lengthKnown) release();
+      // Only a poster with its final length is kept: a card that comes back reads the file again.
+      if (!lengthKnown) return;
+      rememberPoster(key, next);
+      release();
     };
     const takeFrame = () => {
       if (frameStarted || released) return;
