@@ -1,7 +1,7 @@
 // Runs the real sales ledger of the account server on a migrated SQLite database, with Stripe invoices
 // and a refund of a server plan and of a license. `processPending` must send the operator one message
 // for each paid invoice line, each failed payment and each refund, with the account email, the product,
-// the amount and the period, in the form of the purchase messages. A fact that stays pending after a
+// the amount without VAT and the period, in the form of the purchase messages. A fact that stays pending after a
 // failed FX lookup sends its message one time, in the run that ends it. An imported payment and a ledger
 // with no alert send no message.
 //
@@ -140,7 +140,10 @@ async function eachPaidInvoiceSendsOneMessage() {
       invoice("invoice.paid", "license", {
         subscription: "sub_license",
         currency: "pln",
-        amount_paid: 48000,
+        // 23% VAT on top of 480 zł. The message and the revenue count only 480 zł.
+        amount_paid: 59040,
+        total: 59040,
+        total_excluding_tax: 48000,
         billing_reason: "subscription_cycle",
       }),
       license,
@@ -158,9 +161,11 @@ async function eachPaidInvoiceSendsOneMessage() {
     .run(DAY, DAY);
   await run(sales.processPending());
   await run(sales.processPending());
-  check("the run that ends the fact sends its message one time", alerts.length === 3 && alerts[2] === LICENSE_PAID, [
-    ...alerts,
-  ]);
+  check(
+    "the run that ends the fact sends its message one time, with the amount without VAT",
+    alerts.length === 3 && alerts[2] === LICENSE_PAID,
+    [...alerts],
+  );
 
   await run(
     sales.webhook(
@@ -173,19 +178,22 @@ async function eachPaidInvoiceSendsOneMessage() {
             id: "re_license",
             status: "succeeded",
             payment_intent: "pi_license",
-            amount: 12000,
+            // A quarter of the payment, VAT included.
+            amount: 14760,
             currency: "pln",
           },
         },
       },
       license,
-      { invoiceId: "in_license", subscriptionId: "sub_license" },
+      { invoiceId: "in_license", subscriptionId: "sub_license", total: 59040, totalExcludingTax: 48000 },
     ),
   );
   await run(sales.processPending());
-  check("a refund sends one message with the refunded amount", alerts.length === 4 && alerts[3] === LICENSE_REFUNDED, [
-    ...alerts,
-  ]);
+  check(
+    "a refund sends one message with the refunded amount without VAT",
+    alerts.length === 4 && alerts[3] === LICENSE_REFUNDED,
+    [...alerts],
+  );
   check(
     "a message has the account email and no account ID or Stripe ID",
     alerts.every(

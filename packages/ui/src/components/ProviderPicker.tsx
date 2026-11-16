@@ -181,7 +181,7 @@ export interface ProviderPickerProps {
    */
   menuMount?: HTMLElement | undefined;
   onRefreshProviders?: (() => void | Promise<void>) | undefined;
-  /** Add row gated by OpenCode install; else offers install. */
+  /** Add row gated by the install of the provider that runs the endpoints; else offers install. */
   onAddCustomProvider?: (() => void) | undefined;
   /** Named endpoints share one row; endpoint pick is model pick. */
   customProviders?: readonly CustomProviderSummary[] | undefined;
@@ -202,7 +202,7 @@ export interface ProviderPickerProps {
   moreProviders?: readonly ProviderPickerOption[] | undefined;
   /** The custom provider row is in the "More providers" dialog, not in the list. */
   customInMore?: boolean;
-  /** The OpenCode option that runs the custom endpoints, when OpenCode is not a row of `options`. */
+  /** The provider option that runs the custom endpoints (OpenCode or Pi). Absent means OpenCode in `options`. */
   customEngine?: ProviderPickerOption | undefined;
   /**
    * The installed version goes on the line under the name when the row has no email and no
@@ -308,7 +308,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               {endpointCountLabel()}
             </Badge>
           </Show>
-          {/* Reports OpenCode state in shared words, without naming OpenCode. */}
+          {/* Reports the state of the provider that runs the endpoints, without naming it. */}
           <Show when={!customReady()}>
             <Badge
               class={`provider-picker-status provider-picker-status-${engine().state}`}
@@ -348,7 +348,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             {t("common.add")}
           </Button>
         </Show>
-        {/* Same OpenCode runtime fetch unblocks Add. Once Add shows, the OpenCode row keeps its own Retry. */}
+        {/* The same runtime fetch unblocks Add. Once Add shows, the provider's own row keeps its Retry. */}
         <Show
           when={(() => {
             if (!props.onDownloadProvider && !props.onCancelProviderDownload) return undefined;
@@ -372,9 +372,9 @@ export function ProviderPicker(props: ProviderPickerProps) {
               disabled={props.disabled || (props.refreshingProviders && !runtimeStoreAction(action()))}
               onClick={() => {
                 if (action() === "cancel") {
-                  void props.onCancelProviderDownload?.("opencode");
+                  void props.onCancelProviderDownload?.(engine().id);
                 } else {
-                  void props.onDownloadProvider?.("opencode");
+                  void props.onDownloadProvider?.(engine().id);
                 }
               }}
             >
@@ -386,7 +386,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
           when={
             !engine().runtimeStatus &&
             engine().state === "not-installed" &&
-            agentProviderDescriptor("opencode").installGuideLink !== null &&
+            agentProviderDescriptor(engine().id).installGuideLink !== null &&
             props.onInstallProvider
           }
         >
@@ -397,7 +397,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
             class="provider-picker-install"
             aria-label={t("provider.custom.installLabel")}
             disabled={props.disabled || props.refreshingProviders}
-            onClick={() => void props.onInstallProvider?.("opencode")}
+            onClick={() => void props.onInstallProvider?.(engine().id)}
           >
             {t("provider.action.install")}
           </Button>
@@ -491,6 +491,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 accountsOffered,
                 accountError,
                 addAccount,
+                accountCodeOffered,
+                addAccountWithCode,
                 installOffered,
                 signInOffered,
                 apiKeyOffered,
@@ -499,6 +501,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () =>
                 alternative() !== null ||
                 mainlandChinaSite() !== null ||
+                (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
                 diagnosticsOffered();
@@ -810,6 +813,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                     {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
+                              </Show>
+                              <Show when={accountCodeOffered() && !hasKeyAccounts(option().id)}>
+                                <DropdownMenu.Item onSelect={addAccountWithCode}>
+                                  <Smartphone aria-hidden="true" />
+                                  {t("provider.account.addWithCode")}
+                                </DropdownMenu.Item>
                               </Show>
                               <Show when={diagnosticsOffered()}>
                                 <DropdownMenu.Item

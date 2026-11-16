@@ -104,6 +104,9 @@ export type BillingSalesSynced = BillingSalesSyncedSubscription | BillingSalesSy
 export interface BillingSalesPayment {
   invoiceId: string;
   subscriptionId: string;
+  /** The invoice total with and without tax, to take VAT out of a refund. */
+  total?: number | null;
+  totalExcludingTax?: number | null;
 }
 
 /**
@@ -632,7 +635,9 @@ export class BillingSales {
     const currency =
       billingCurrency(stringValue(object.currency)) ?? synced?.currency ?? stored?.currency ?? license?.currency;
     const amountValue = event.type === "invoice.paid" ? object.amount_paid : object.amount_due;
-    const amount = isBillingAmount(amountValue) ? amountValue : null;
+    const amount = isBillingAmount(amountValue)
+      ? withoutTax(amountValue, object.total, object.total_excluding_tax)
+      : null;
     // A server order invoices the server and the license together. Each is its own sale line, with its
     // share of the amount from the invoice lines.
     const lines = license ? null : orderLicenseLines(object);
@@ -730,20 +735,21 @@ export class BillingSales {
     // A payment of a subscription that is not an OpenBot plan or license is not an OpenBot sale.
     if (!stored && !license) return;
     const syncedPlan = synced?.product === "license" ? null : synced;
+    const amount = withoutTax(reversal.amount, payment.total, payment.totalExcludingTax);
     const attributes: FactAttributes = stored
       ? {
           product: "server",
           plan: syncedPlan?.plan ?? stored.plan,
           interval: syncedPlan?.interval ?? stored.interval,
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         }
       : {
           product: "license",
           ...(license && isAnalyticsLicenseUsers(license.users) ? { users: license.users } : {}),
           interval: license?.interval ?? "month",
           ...(reversal.currency ? { currency: reversal.currency } : {}),
-          amount: reversal.amount,
+          amount,
         };
     const ownerId = synced?.userId ?? stored?.user_id ?? license?.userId ?? null;
     const prefix = reversal.type === "payment_refunded" || reversal.type === "refund_failed" ? "refund" : "dispute";
@@ -1124,6 +1130,16 @@ export function paymentReversal(event: StripeEvent): PaymentReversal | null {
     amount: object.amount,
     currency: billingCurrency(stringValue(object.currency)),
   };
+}
+
+/**
+ * The part of `amount` that is not tax. VAT goes on top of the price and is not revenue, so a payment or a
+ * refund counts the share of the invoice total without tax. An invoice with no tax keeps the amount.
+ */
+export function withoutTax(amount: number, total: unknown, totalExcludingTax: unknown): number {
+  if (!isBillingAmount(total) || total === 0 || !isBillingAmount(totalExcludingTax) || totalExcludingTax >= total)
+    return amount;
+  return Math.round((amount * totalExcludingTax) / total);
 }
 
 function isReversalFact(type: FactType): type is PaymentReversalType {

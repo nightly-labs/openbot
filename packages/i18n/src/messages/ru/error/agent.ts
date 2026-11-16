@@ -12,6 +12,12 @@ export const messages = {
     "Инструмент не запущен. В tool_call параметр arguments должен быть объектом JSON, а не текстом. Отправьте вызов снова, передав arguments как объект.",
   "error.agent.toolCallDiscoveryTool":
     "Инструмент не запущен. tool_call не может запускать openbot.tool_search и openbot.tool_describe. Вызовите их напрямую с теми же аргументами.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Инструмент не запущен. tool_call принимает только name и arguments. Передайте аргументы инструмента в arguments как объект и отправьте вызов снова.",
+  "error.agent.toolCallUnknownTool":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Возможно, полное имя — {name}. Если это так, отправьте вызов снова с этим именем.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",
@@ -155,6 +161,7 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "Снимки экрана не работают в диалогах Slack, Discord или Telegram, потому что их файлы получают другие люди.",
   "error.agent.screenCaptureDeclined": "Пользователь не разрешил этот снимок экрана. Ничего не снято.",
+  "error.agent.mcpToolDeclined": "Пользователь не разрешил этот вызов инструмента MCP. Инструмент не был запущен.",
   "error.agent.screenCaptureWindowMissing":
     "Это окно сейчас не открыто. Вызовите list_capture_sources, чтобы получить текущие ID окон.",
   "error.agent.screenCaptureDisplayMissing":

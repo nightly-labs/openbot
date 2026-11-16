@@ -625,6 +625,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-quota-failover
 
+      - name: Run the Gemini failing session E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-failing-session
+
       - name: Run the Gemini Windows zip E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-windows-zip
@@ -789,6 +793,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
+            .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
@@ -894,6 +899,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-steer
 
+      - name: Run the Devin steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:devin-steer
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
@@ -984,6 +993,7 @@ jobs:
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/antigravity-steer-e2e/
+            .openbot-build/devin-steer-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/opencode-steer-e2e/
             .openbot-build/grok-question-e2e/

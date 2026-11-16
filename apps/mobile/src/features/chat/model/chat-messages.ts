@@ -1040,3 +1040,9 @@ export function projectChannelMessages(
       return rows;
     });
 }
+
+/** `previous` when it holds exactly `ids`, else a new set of them. */
+export function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
+  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
+  return new Set(ids);
+}

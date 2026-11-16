@@ -91,6 +91,8 @@ const subscriptionSchema = Schema.Struct({
   trial_end: Schema.optional(Schema.NullOr(Schema.Int)),
   discounts: Schema.optional(Schema.NullOr(Schema.Array(expandable))),
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
+  /** Stripe Tax on the invoices. Subscriptions from before VAT collection have it off. */
+  automatic_tax: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
   default_payment_method: Schema.optional(Schema.NullOr(expandable)),
   items: Schema.Struct({
     data: Schema.Array(
@@ -118,6 +120,8 @@ const invoicePaymentListSchema = Schema.Struct({ data: Schema.Array(Schema.Struc
 const invoiceSchema = Schema.Struct({
   id: Schema.String,
   billing_reason: Schema.optional(Schema.NullOr(Schema.String)),
+  total: Schema.optional(Schema.NullOr(Schema.Number)),
+  total_excluding_tax: Schema.optional(Schema.NullOr(Schema.Number)),
   parent: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -380,7 +384,10 @@ export class StripeClient {
       payment_method_collection: "always",
       billing_address_collection: "auto",
       "phone_number_collection[enabled]": "false",
-      "automatic_tax[enabled]": "false",
+      // Stripe Tax adds VAT on top of the Price (`tax_behavior: exclusive`) where the account is
+      // registered: an individual in the EU pays it, and a company with an EU tax ID from another
+      // country pays no VAT (reverse charge). Outside the EU, no registration applies and the tax is 0.
+      "automatic_tax[enabled]": "true",
       "tax_id_collection[enabled]": "true",
       "tax_id_collection[required]": "never",
       // Stripe refuses tax ID collection for an existing customer without these two.
@@ -467,6 +474,11 @@ export class StripeClient {
       currency: BillingCurrency;
       anchorSeconds: number;
       trial?: boolean;
+      /**
+       * Stripe Tax on the invoices, as on the subscription that this one comes from. Sent only when true, so
+       * the retry of a split that started before Stripe Tax keeps the body of its idempotency key.
+       */
+      automaticTax: boolean;
       paymentMethodId: string | null;
       metadata: Readonly<Record<string, string>>;
     },
@@ -482,6 +494,7 @@ export class StripeClient {
         : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
       "expand[]": "items.data.price.currency_options",
     });
+    if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
@@ -539,15 +552,22 @@ export class StripeClient {
   }).bind(this);
 
   /**
-   * The invoice that a PaymentIntent paid, the subscription of that invoice and why Stripe made it. Null for
-   * a payment of no subscription invoice. From API version 2025-03-31 a charge does not name its invoice.
+   * The invoice that a PaymentIntent paid, the subscription of that invoice, why Stripe made it, and its
+   * total with and without tax. Null for a payment of no subscription invoice. From API version
+   * 2025-03-31 a charge does not name its invoice.
    */
 
   readonly getPaymentInvoice = Effect.fn("StripeClient.getPaymentInvoice")(function* (
     this: StripeClient,
     paymentIntentId: string,
   ): Effect.fn.Return<
-    { invoiceId: string; subscriptionId: string; billingReason: string | null } | null,
+    {
+      invoiceId: string;
+      subscriptionId: string;
+      billingReason: string | null;
+      total: number | null;
+      totalExcludingTax: number | null;
+    } | null,
     StripeRequestError | StripeTransportError
   > {
     const query = new URLSearchParams({
@@ -567,6 +587,8 @@ export class StripeClient {
       invoiceId,
       subscriptionId: typeof subscription === "string" ? subscription : subscription.id,
       billingReason: invoiceRecord.billing_reason ?? null,
+      total: invoiceRecord.total ?? null,
+      totalExcludingTax: invoiceRecord.total_excluding_tax ?? null,
     };
   }).bind(this);
 

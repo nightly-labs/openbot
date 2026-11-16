@@ -183,6 +183,7 @@ export const messages = {
   "mobile.chat.composer.send": "Enviar mensagem",
   "mobile.chat.composer.stop": "Parar {name}",
   "mobile.chat.composer.dictate": "Ditar mensagem",
+  "mobile.chat.composer.voiceSettings": "Ajustes de voz",
   "mobile.chat.composer.stopDictation": "Parar ditado",
   "mobile.chat.composer.mention": "Mencionar {name}",
   "mobile.chat.composer.skills": "Habilidades",
@@ -346,6 +347,8 @@ export const messages = {
     "Para compartilhar várias imagens, é necessário ter a versão mais recente do app.",
   "mobile.chat.video.play": "Reproduzir {name}",
   "mobile.chat.video.retry": "Recarregar vídeo",
+  "mobile.chat.video.downloaded": "{received} de {total}",
+  "mobile.chat.video.loading": "Carregando {name}",
   "mobile.chat.video.share": "Compartilhar {name}",
   "mobile.chat.video.save": "Salvar {name} em Fotos",
   "mobile.chat.video.photosPermission": "Permita que o OpenBot adicione fotos em Ajustes para salvar este vídeo.",
@@ -369,6 +372,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "Envie uma vez para {origin}. Este valor não é adicionado ao chat.",
   "mobile.chat.browserSecret.submitFailed":
     "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "O OpenBot não usou seu login salvo porque o agente escolheu o campo errado na página.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "O OpenBot não usou nenhum login salvo porque o agente não escolheu nenhum dos logins salvos para este site. Diga ao agente qual conta usar.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "O OpenBot não usou seu login salvo porque ele não tem senha para este site.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "O OpenBot não usou seu login salvo porque ele não tem chave do autenticador.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "O OpenBot não usou nenhum login salvo porque não conseguiu ler seu gerenciador de senhas.",
   "mobile.chat.browserSecret.submit": "Enviar",
   "mobile.chat.browserSecret.takeOver": "Assumir",
   "mobile.chat.starter.title": "No que vamos trabalhar primeiro?",
@@ -583,4 +598,25 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Desfazer",
   "mobile.chat.appSuggestion.notAllowed": "Só o proprietário do servidor ou um administrador pode conectar {name}.",
   "mobile.chat.appSuggestion.unavailable": "Este servidor não pode conectar {name}.",
+  "mobile.chat.context.label": "Contexto: {percent} usado",
+  "mobile.chat.context.labelEstimated": "Contexto: cerca de {percent} usado",
+  "mobile.chat.context.labelCompacting": "Compactando o contexto",
+  "mobile.chat.context.title": "Contexto",
+  "mobile.chat.context.percent": "{percent} usado",
+  "mobile.chat.context.tokens": "{used} de {total} tokens",
+  "mobile.chat.context.tokensEstimated": "Estimativa: {used} de {total} tokens",
+  "mobile.chat.context.breakdown": "O que ocupa o contexto",
+  "mobile.chat.context.category.systemPrompt": "Prompt do sistema",
+  "mobile.chat.context.category.memoryFiles": "Arquivos de memória",
+  "mobile.chat.context.category.tools": "Ferramentas",
+  "mobile.chat.context.category.skills": "Habilidades e subagentes",
+  "mobile.chat.context.category.toolResults": "Chamadas de ferramentas e resultados",
+  "mobile.chat.context.category.messages": "Mensagens",
+  "mobile.chat.context.category.other": "Outros",
+  "mobile.chat.context.category.free": "Espaço livre",
+  "mobile.chat.context.autoAt": "O contexto é compactado automaticamente em {percent}.",
+  "mobile.chat.context.nativeAuto": "O provedor gerencia a compactação automática.",
+  "mobile.chat.context.noAuto": "Este agente não compacta o contexto.",
+  "mobile.chat.context.lastCompaction": "Última compactação: {before} → {after} tokens",
+  "mobile.chat.context.unavailable": "Este chat não informa seu contexto agora.",
 } as const satisfies PartialTranslation<typeof source>;

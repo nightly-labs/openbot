@@ -8,6 +8,7 @@ import type {
   AgentRuntimeSnapshot,
   BrowserTab,
   BrowserTakeoverRequest,
+  BrowserVaultSkipReason,
   ConversationMessageSender,
   LocalBrowserSecretResponse,
   RespondToApprovalInput,
@@ -47,10 +48,11 @@ import type { AgentClient } from "../agent-client";
 import { type BrowserOperationError, browserFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
+import { repairBrowserToolInput } from "../browser-tool-input";
 import { type BrowserToolArguments, parseBrowserToolCall } from "../browser-tools";
 import { causeHelpers } from "../effect-boundary";
 import { LINK_CARD_ID_PREFIX, type LinkWallet } from "../link-wallet";
-import { type PasswordVault, type PasswordVaultError, websiteUrl } from "../password-vault";
+import { type PasswordVault, type PasswordVaultError, type VaultLogin, websiteUrl } from "../password-vault";
 import {
   type AppServerRequest,
   type DynamicToolCallParams,
@@ -220,6 +222,10 @@ const MESSAGING_REQUEST_CARD_REFUSED =
   "This request came from an external chat (Slack, Discord, Telegram or WhatsApp) through another agent, and nobody can answer a card here. Decide on your own and continue. When only the OpenBot user can unblock you, such as a sign-in, a key or a password, stop and say in your answer exactly what the OpenBot user must do in OpenBot.";
 
 /** The agent reads these, not the user. */
+const TAKEOVER_TAB_ID_MISSING = "Give tabId: the id of the tab, from open or list_tabs.";
+const TAKEOVER_TAB_OF_OTHER_CHAT =
+  "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
+const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
 const VAULT_LOGIN_ADD_FIELDS =
   "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
@@ -1030,8 +1036,9 @@ export class AttentionRegistry {
     }
     secret.cancel();
     delete pending.secret;
-    // The user finishes in the tab, so a later completion is theirs.
+    // The user finishes in the tab, so a later completion is theirs, and the card's vault reason ends.
     delete pending.vaultLoginId;
+    delete pending.request.vaultSkip;
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
@@ -1242,24 +1249,24 @@ export class AttentionRegistry {
     const params = request.params;
     const { threadId, turnId } = params;
     const agentId = this.#conversation.agentForThread(threadId);
-    const args = getRecord(params, "arguments");
-    const tabId = getString(args, "tabId");
     const publicThreadId = agentId ? this.#conversation.publicThreadId(agentId, threadId) : null;
-    const tab = tabId ? this.#browser.listTabs().find((candidate) => candidate.id === tabId) : undefined;
-    if (
-      !agentId ||
-      !turnId ||
-      !tabId ||
-      !publicThreadId ||
-      !tab ||
-      tab.ownerThreadId !== publicThreadId ||
-      tab.ownerAgentId !== agentId ||
-      // A second request for a tab the user already holds would be answered by whichever card they
-      // happened to press, and resolving either one would hand control back while the other still waits.
-      [...this.#takeovers.values()].some((pending) => pending.request.tabId === tabId)
-    ) {
-      return browserTakeoverError();
-    }
+    if (!agentId || !turnId || !publicThreadId) return browserTakeoverError();
+    // The repair of the other browser tools, so that `tab_id` or a wrapped call names the tab here too.
+    // The fields stay as lenient as before: a card shows for each call that showed one. Each refusal
+    // below says why, so the agent can correct the call.
+    const args = repairBrowserToolInput(params.tool, params.arguments).value;
+    const tabId = getString(args, "tabId");
+    if (!tabId) return browserTakeoverError(TAKEOVER_TAB_ID_MISSING);
+    const tab = this.#browser.listTabs().find((candidate) => candidate.id === tabId);
+    // A tab of another agent stays unknown, as in the tab list of the browser tools.
+    if (!tab || (tab.ownerAgentId !== agentId && tab.ownerThreadId !== publicThreadId))
+      return browserTakeoverError(sourceText("error.backend.browserTabNotFound"));
+    if (tab.ownerThreadId !== publicThreadId || tab.ownerAgentId !== agentId)
+      return browserTakeoverError(TAKEOVER_TAB_OF_OTHER_CHAT);
+    // A second request for a tab the user already holds would be answered by whichever card they
+    // happened to press, and resolving either one would hand control back while the other still waits.
+    if ([...this.#takeovers.values()].some((pending) => pending.request.tabId === tabId))
+      return browserTakeoverError(TAKEOVER_ALREADY_WAITING);
     // A secret can still come from the Vault, so that check comes after the fill.
     if (params.tool === "request_takeover" && this.#messagingRequestTurn(agentId, turnId))
       return browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED);
@@ -2059,13 +2066,17 @@ export class AttentionRegistry {
       // A detached question holds no call, so the turn reads the message, and the card stays.
       if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
       this.#routines.markRunningForTurn(turnId);
-      // The card shows as the user's own skip does.
+      // The card closes as the user's own skip does, and says why: the user did not press Skip (#7678).
+      const uiBlockState = pending.uiBlock
+        ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
+        : undefined;
+      if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
       this.#closePrompt(
         requestId,
         pending,
         userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
         { status: "cancelled" },
-        pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+        uiBlockState,
       );
       changed = true;
     }
@@ -2281,7 +2292,9 @@ export class AttentionRegistry {
   /**
    * Fills a password or authenticator request from the shared vault, without a card. True when the
    * request was answered this way. With no login for the site, or several and no `loginId`, the card
-   * opens as before. The value goes to the browser only; the agent gets the usual result.
+   * opens as before. The value goes to the browser only; the agent gets the usual result. When a saved
+   * login fits the site but is not filled, or the password manager cannot be read, the card gets
+   * `vaultSkip`, so the user sees why.
    */
   readonly #fillFromVault = Effect.fn("AttentionRegistry.fillFromVault")(function* (
     this: AttentionRegistry,
@@ -2294,17 +2307,32 @@ export class AttentionRegistry {
     const kind = request.method === "password" ? "password" : "totp";
     // The agent gets only the logins that the user lets it use.
     const { agentId } = pending.request;
-    const skip = (reason: string, note: string, loginId?: string) => {
+    /** `card` is the reason that the card shows. With no saved login for the site, asking is the usual step. */
+    const skip = (
+      reason: string,
+      note: string,
+      { loginId, card }: { loginId?: string; card?: BrowserVaultSkipReason } = {},
+    ) => {
       logger.info("Shared vault fill skipped", { origin: request.origin, method: request.method, loginId, reason });
       pending.vaultSkipped = `OpenBot did not fill a saved login: ${note}`;
+      if (card) pending.request.vaultSkip = card;
       return false;
     };
+    const parsed = yield* Effect.result(
+      attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments)),
+    );
+    const loginId =
+      Result.isSuccess(parsed) && parsed.success.tool === "submit_secret" ? parsed.success.args.loginId : undefined;
+    // Before a vault read, only a call that names a saved login gives the card a reason. A read here
+    // would delay the card by a password manager sync.
+    const namedCard = (card: BrowserVaultSkipReason) => (loginId ? { loginId, card } : {});
     // A script the agent ran that still runs in the page can read what is filled, and a field built
     // for something else can carry the value into a URL. In both cases the card lets the user decide.
     if (pending.secret?.agentScriptedOrigin !== false)
       return skip(
         "agent-scripted-origin",
         "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, and close or navigate each other tab where you ran evaluate on this site, before submit_secret.",
+        namedCard("agent-script"),
       );
     if (pending.secret.vaultFillable !== true)
       return skip(
@@ -2312,52 +2340,57 @@ export class AttentionRegistry {
         kind === "password"
           ? "the field target is not a password input."
           : 'the field targets are not code fields. A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.',
+        namedCard("field-kind"),
       );
+    const fits = (login: VaultLogin) => kind === "password" || login.hasOneTimePassword;
     const found = yield* Effect.result(
       Effect.gen(function* () {
-        const call = yield* attentionStep(() => parseBrowserToolCall("submit_secret", pending.params.arguments));
-        const loginId = call.tool === "submit_secret" ? call.args.loginId : undefined;
-        const candidates = loginId
-          ? []
-          : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(
-              (login) => kind === "password" || login.hasOneTimePassword,
-            );
+        if (Result.isFailure(parsed)) return yield* parsed.failure;
+        const candidates = loginId ? [] : ((yield* vault.loginsFor(request.origin, agentId)) ?? []).filter(fits);
         const chosen = loginId ?? (candidates.length === 1 ? candidates[0]?.id : undefined);
-        if (!chosen) return null;
+        if (!chosen) return { chosen: false as const, several: candidates.length > 1 };
         const secret = yield* vault.secretFor(chosen, request.origin, kind, agentId);
         // With no value, an id that list_logins does not give for this site is a wrong id, not a login
-        // with no password. When the list cannot be read, the reason stays as before.
+        // with no password. When the list cannot be read, the reason for the agent stays as before, and
+        // the card names none: the id can be wrong.
         const listed = secret || !loginId ? null : yield* Effect.result(vault.loginsFor(request.origin, agentId));
-        const unknown =
-          listed !== null &&
-          Result.isSuccess(listed) &&
-          !(listed.success ?? []).some((candidate) => candidate.id === loginId);
-        return { loginId: chosen, secret, unknown };
+        const sitesLogins = listed !== null && Result.isSuccess(listed) ? (listed.success ?? []) : null;
+        const unknown = sitesLogins !== null && !sitesLogins.some((candidate) => candidate.id === loginId);
+        return {
+          chosen: true as const,
+          loginId: chosen,
+          secret,
+          unknown,
+          listUnread: listed !== null && Result.isFailure(listed),
+          otherLogins: Boolean(sitesLogins?.some(fits)),
+        };
       }),
     );
     if (Result.isFailure(found)) {
       logger.warn("Unable to fill from the shared vault", { error: toLogValue(found.failure.cause) });
       pending.vaultSkipped = "OpenBot did not fill a saved login: the password manager could not be read.";
+      if (Result.isSuccess(parsed)) pending.request.vaultSkip = "vault-unreadable";
       return false;
     }
     const login = found.success;
     if (this.#takeovers.get(requestId) !== pending) return false;
-    if (!login)
+    if (!login.chosen)
       return skip(
         "no-login",
         "no saved login matches this site, or several match and the call has no loginId from list_logins.",
+        login.several ? { card: "login-choice" } : {},
       );
     if (login.unknown)
       return skip(
         "unknown-login",
         `no saved login for this site has the id ${login.loginId}. Call list_logins and give the id of a login exactly as list_logins shows it, with its prefix, for example openbot:.`,
-        login.loginId,
+        { loginId: login.loginId, ...(login.otherLogins ? { card: "login-choice" } : {}) },
       );
     if (!login.secret)
       return skip(
         "no-secret",
         `saved login ${login.loginId} has no ${kind === "password" ? "password" : "authenticator key"} for this site.`,
-        login.loginId,
+        { loginId: login.loginId, ...(login.listUnread ? {} : { card: "no-secret" }) },
       );
     pending.vaultLoginId = login.loginId;
     const submitted = yield* Effect.result(

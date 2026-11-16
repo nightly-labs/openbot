@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { getRecord, isRecord } from "./protocol";
+import { getRecord, getString, isRecord } from "./protocol";
 
 /**
  * Antigravity 1.3.0's `quota_exhausted_message`: a fixed header, then the reset time. The 1.5 CLI
@@ -38,6 +38,12 @@ const GEMINI_VERIFICATION_ANSWER =
  */
 const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
 /**
+ * The answer of the Antigravity CLI 1.5.6 and later when Google refuses a request until the user
+ * verifies the account: `CustomUserErrorMessageFromHTTPError` maps `VALIDATION_REQUIRED` to this fixed
+ * text, with no link, after the CLI's warning sign (#9508).
+ */
+const GEMINI_VERIFICATION_REQUIRED_ANSWER = /^\s*(?:\u26A0\uFE0F?\s*)?Verification Required\b/u;
+/**
  * The Antigravity CLI 1.5 sends a failed request as an answer that starts with a line break, a
  * warning sign and a space, such as "\n⚠ Agent Platform API has not been used in project ...", and
  * ends the turn as a success. A model's warning sign comes with the emoji selector (U+FE0F).
@@ -55,10 +61,11 @@ function geminiAccountLink(text: string): string | null {
 }
 /**
  * Antigravity's SDK error when a model step returns neither text nor a tool call, as when an agent
- * ends its turn silently after a tool call or on a message that asks for no reply (#4505).
+ * ends its turn silently after a tool call or on a message that asks for no reply (#4505). The
+ * Antigravity CLI 1.5 sends it as the answer "⚠ Model produced invalid output." (#7266).
  */
 const GEMINI_EMPTY_OUTPUT_FAILURE =
-  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b/iu;
+  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b|\bModel produced invalid output\b/iu;
 
 /**
  * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
@@ -137,7 +144,8 @@ const GEMINI_REQUEST_FAILURES = [
 function geminiTurnFailure(answer: string): string {
   const text = answer.replace(GEMINI_WARNING_ANSWER, "");
   // The account, not the request, is the problem: no key or model change helps.
-  if (geminiAccountLink(text) !== null) return sourceText("error.provider.geminiVerificationRequired");
+  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text))
+    return sourceText("error.provider.geminiVerificationRequired");
   // Google's API answer for a refused key. The key is the user's to fix, not the request.
   if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text)) return sourceText("error.provider.geminiKeyRefused");
   // The server's text names its harness and a WebSocket close code, which the user cannot act on.
@@ -225,6 +233,16 @@ const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
  * The 1.5.9 CLI answers with this line itself, and no longer with the short answer (#9568).
  */
 const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+/**
+ * Google's answer, in the CLI's log, for a tool schema that its `parameters` format refuses. It has one
+ * entry for each field, such as `GenerateContentRequest.tools[20].function_declarations[0].parameters
+ * .properties[tags].items: missing field` or `….properties[revisions].enum[3]: cannot be empty`. It
+ * names the tool only by its place in the request, which the log does not map to a name (#7482).
+ */
+const GOOGLE_REFUSED_FIELD =
+  /\bGenerateContentRequest\.tools\[(\d+\]\.function_declarations\[\d+)\]\.parameters((?:\.\w+(?:\[[^\]]*\])?)*): (missing field|cannot be empty)/gu;
+/** One step of the field path in `GOOGLE_REFUSED_FIELD`: a key, and a property name or an index. */
+const GOOGLE_FIELD_STEP = /\.(\w+)(?:\[([^\]]*)\])?/gu;
 /** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
 const GEMINI_LOG_RECENT_MS = 10 * 60_000;
 /** The end of a log that is read. The failure comes a few lines after the line of its prompt. */
@@ -242,19 +260,15 @@ function logTail(file: string, size: number): string {
 }
 
 /**
- * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
- * tool. An older CLI names it only in its log. Each session has a process, and so a log, of its own.
- * A session that opened again on a new process has an older log too, so only the newest log with a
- * prompt of the session counts. A log that cannot be read gives no tools: the turn then fails as
- * before.
+ * The CLI's own log after the last prompt of the session. Each session has a process, and so a log,
+ * of its own. A session that opened again on a new process has an older log too, so only the newest
+ * log with a prompt of the session counts. A log that cannot be read gives `null`: the turn then
+ * fails as before.
  */
-function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
-  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
-  if (answered.length > 0) return answered;
-  if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
+function antigravityLastPromptLog(argv: readonly string[], sessionId: string): string | null {
   const home = flagValue(argv, GEMINI_DIR_FLAG);
   const appData = flagValue(argv, APP_DATA_DIR_FLAG);
-  if (!home || !appData) return [];
+  if (!home || !appData) return null;
   const folder = join(home, appData, "log");
   const since = Date.now() - GEMINI_LOG_RECENT_MS;
   const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
@@ -273,7 +287,7 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
       })
       .sort((a, b) => b.mtimeMs - a.mtimeMs);
   } catch {
-    return [];
+    return null;
   }
   for (const { file, size } of logs) {
     let log: string;
@@ -283,9 +297,120 @@ function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessi
       continue;
     }
     const at = log.lastIndexOf(prompt);
-    if (at >= 0) return Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+    if (at >= 0) return log.slice(at);
   }
-  return [];
+  return null;
+}
+
+/**
+ * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
+ * tool. An older CLI names it only in its log. When Google refused a tool, the answer or the log names
+ * only its fields, and the tools come from the schemas that the CLI saved. A log that cannot be read
+ * gives no tools: the turn then fails as before.
+ */
+function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  if (answered.length > 0) return answered;
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData) return [];
+  const schemas = join(home, appData, "mcp");
+  const google = googleRefusedMcpTools(text, schemas);
+  if (google.length > 0 || !GEMINI_TERMINATED_ANSWER.test(text)) return google;
+  const log = antigravityLastPromptLog(argv, sessionId);
+  if (log === null) return [];
+  const named = Array.from(log.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  return named.length > 0 ? named : googleRefusedMcpTools(log, schemas);
+}
+
+/**
+ * The page where the user verifies the account that failed the turn. The CLI 1.5.6 and later sends
+ * only "Verification Required" as the answer, and keeps Google's 403 with its `validation_url` in its
+ * own log (#9508). A JSON encoder can write the `&`, `=` and `/` of the link as `\u0026`, `\u003d` and
+ * `\/`; Go's writes each `&` as `\u0026`. A body that is logged as a JSON string has one more
+ * backslash for each escape, and its quotes as `\"`.
+ */
+function antigravityAccountLink(text: string, argv: readonly string[], sessionId: string): string | null {
+  const link = geminiAccountLink(text);
+  if (link !== null || !GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return link;
+  const log = antigravityLastPromptLog(argv, sessionId);
+  if (log === null || !log.includes("VALIDATION_REQUIRED")) return null;
+  return geminiAccountLink(
+    log
+      .replace(/\\+u0026/gu, "&")
+      .replace(/\\+u003d/gu, "=")
+      .replace(/\\+\//gu, "/")
+      .replace(/\\+"/gu, '"'),
+  );
+}
+
+function folderNames(folder: string): string[] {
+  try {
+    return readdirSync(folder);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Whether `parameters` has the field that Google refused at `path`: a missing key, or an empty value.
+ * An index in a step reads an array, and a property name reads an object.
+ */
+function hasRefusedField(parameters: unknown, path: string, reason: string): boolean {
+  const steps = Array.from(path.matchAll(GOOGLE_FIELD_STEP), ([, key = "", index]) => ({
+    // Google names the fields of its `Schema` in snake case, such as `any_of`. The CLI saves JSON Schema.
+    key: key.replace(/_([a-z])/gu, (_, letter: string) => letter.toUpperCase()),
+    index,
+  }));
+  const last = steps.pop();
+  if (!last) return false;
+  const missing = reason === "missing field";
+  let node = parameters;
+  for (const { key, index } of missing ? steps : [...steps, last]) {
+    if (!isRecord(node)) return false;
+    const value = Object.hasOwn(node, key) ? node[key] : undefined;
+    if (index === undefined) node = value;
+    else if (Array.isArray(value)) node = /^\d+$/u.test(index) ? value[Number(index)] : undefined;
+    else node = isRecord(value) && Object.hasOwn(value, index) ? value[index] : undefined;
+  }
+  if (missing) {
+    if (last.index !== undefined || !isRecord(node) || Object.hasOwn(node, last.key)) return false;
+    // Google asks for `items` only in an array. A field of another type with the same name is not refused.
+    return last.key !== "items" || node.type === "array" || (Array.isArray(node.type) && node.type.includes("array"));
+  }
+  return node === "" || (Array.isArray(node) && node.length === 0);
+}
+
+/**
+ * The MCP tools that hold each field of a tool that Google refused, as `mcp_<server>_<tool>`. The CLI
+ * 1.5.6 saves the schema of each tool of a server that it starts in `<app data>/mcp/<server>/<tool>.json`.
+ * A tool must hold all refused fields that have the same place in the request. Such a tool fails on
+ * Gemini each time, so no tool that Google accepts matches. A file that cannot be read is skipped.
+ */
+function googleRefusedMcpTools(log: string, folder: string): string[] {
+  const refused = new Map<string, { path: string; reason: string }[]>();
+  for (const [, place = "", path = "", reason = ""] of log.matchAll(GOOGLE_REFUSED_FIELD))
+    refused.set(place, [...(refused.get(place) ?? []), { path, reason }]);
+  if (refused.size === 0) return [];
+  const tools: string[] = [];
+  // In name order, so that the same files give the same server to leave out first.
+  for (const server of folderNames(folder).sort()) {
+    for (const file of folderNames(join(folder, server))) {
+      if (!file.endsWith(".json")) continue;
+      let schema: unknown;
+      try {
+        schema = JSON.parse(readFileSync(join(folder, server, file), "utf8"));
+      } catch {
+        continue;
+      }
+      const parameters = isRecord(schema) ? schema.parameters : undefined;
+      const fails = [...refused.values()].some((fields) =>
+        fields.every(({ path, reason }) => hasRefusedField(parameters, path, reason)),
+      );
+      if (fails) tools.push(`mcp_${server}_${getString(schema, "name") ?? file.slice(0, -".json".length)}`);
+    }
+  }
+  return tools;
 }
 
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
@@ -329,7 +454,8 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     answerIsFailure: GEMINI_FAILURE_ANSWER,
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
     turnFailure: geminiTurnFailure,
-    accountLink: geminiAccountLink,
+    accountLink: antigravityAccountLink,
+    accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
     // Antigravity reports an exhausted quota as answer text and ends the turn as a success. Google
     // sends it only for a spent quota, which resets in days, not for a request-rate limit. The
     // server names no bucket, and the usage page of the plan can still show room.

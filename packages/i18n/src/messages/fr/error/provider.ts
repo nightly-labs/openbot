@@ -225,6 +225,8 @@ export const messages = {
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeServiceFailure":
     "OpenCode n’a pas pu terminer ce tour, car son service local a échoué. Réessayez. Si l’erreur continue, reconnectez OpenCode dans les réglages.",
   "error.provider.opencodeRateLimited":
@@ -296,6 +298,10 @@ export const messages = {
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
+  "error.provider.grokServiceFailure":
+    "Le service Grok est surchargé ou rencontre une erreur. Réessayez dans quelques minutes ou choisissez un autre modèle.",
+  "error.provider.grokConnectionFailed":
+    "Grok ne parvient pas à se connecter à son service. Vérifiez votre connexion internet, puis renvoyez le message.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Sur un hôte Windows, Gemini ouvre la page Google sur l’hôte lui-même. Connectez Gemini sur l’ordinateur hôte.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
@@ -345,6 +351,8 @@ export const messages = {
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.claudeApiKeyNoCredit":
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
+  "error.provider.claudeServiceBlocked":
+    "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.imageTooSmall":

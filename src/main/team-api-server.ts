@@ -84,6 +84,7 @@ import {
   BITWARDEN_CONNECTOR_CAPABILITY,
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   BROWSING_MEMORY_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_DELETE_CAPABILITY,
@@ -208,7 +209,9 @@ import {
 import { MCP_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { type OptionalTeamEvent, optionalTeamEvent } from "@openbot/contracts/team-protocol/optional-events";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -390,6 +393,7 @@ import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePendingApproval } from "./team-api/route-pending-approval";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
+  routeProviderAccountCode,
   routeProviderAccountKeys,
   routeProviderAccountModels,
   routeProviderAccountPool,
@@ -1209,6 +1213,7 @@ export class TeamApiServer {
       if ((await routeProviderAccountModels(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountPool(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderAccountKeys(context, this.#options.providerAccounts)) === "handled") return;
+      if ((await routeProviderAccountCode(context, this.#options.providerAccounts)) === "handled") return;
       if ((await routeProviderUsageReset(context, this.#options.providerUsageResets)) === "handled") return;
       if ((await routeUsageCredits(context, this.#options.agents, this.#options.providerAccounts)) === "handled")
         return;
@@ -1568,6 +1573,7 @@ export class TeamApiServer {
         preserveBrowserSecrets: capabilities.has("browser-secret-handoff"),
         // Only the V8 encoder reads them.
         browserSignIn: capabilities.has(BROWSER_SIGN_IN_CAPABILITY),
+        browserVaultSkip: capabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
@@ -2618,6 +2624,7 @@ export class TeamApiServer {
           if (capability === PROVIDER_ACCOUNT_MODELS_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_POOL_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_ACCOUNT_KEYS_CAPABILITY) return this.#options.providerAccounts !== undefined;
+          if (capability === PROVIDER_ACCOUNT_CODE_CAPABILITY) return this.#options.providerAccounts !== undefined;
           if (capability === PROVIDER_USAGE_RESET_CAPABILITY) return this.#options.providerUsageResets !== undefined;
           if (capability === PROVIDER_SIGN_OUT_CAPABILITY) return this.#options.providerSignOut !== undefined;
           if (capability === STORAGE_CAPABILITY) return this.#options.storage !== undefined;
@@ -2692,7 +2699,11 @@ export class TeamApiServer {
             capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
-          if (capability === CLAUDE_API_KEY_CAPABILITY || capability === CODEX_API_KEY_CAPABILITY)
+          if (
+            capability === CLAUDE_API_KEY_CAPABILITY ||
+            capability === CODEX_API_KEY_CAPABILITY ||
+            capability === MISTRAL_CODE_SIGN_IN_CAPABILITY
+          )
             return this.#options.admin?.providers !== undefined;
           if (capability === PROVIDERS_SIGN_IN_V3_CAPABILITY)
             return this.#options.admin?.providers?.pasteSignIn === true;

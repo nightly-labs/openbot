@@ -202,6 +202,8 @@ export const messages = defineMessages("error.provider", {
     'The endpoint "{provider}" needs an API key. Add the key in Server settings → Providers, then try again.',
   "error.provider.opencodeKeyExpired":
     "Your OpenCode API key expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go refused your saved API key. The key may have expired. Create a new key in OpenCode Console, paste it in the OpenCode settings, then try again.",
   "error.provider.opencodeServiceFailure":
     "OpenCode could not complete this turn because its local service failed. Try again. If the error continues, reconnect OpenCode in Settings.",
   "error.provider.opencodeRateLimited":
@@ -270,6 +272,10 @@ export const messages = defineMessages("error.provider", {
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini lost the connection to its agent and stopped. Send a message to continue.",
+  "error.provider.grokServiceFailure":
+    "The Grok service is busy or has an error. Try again in a few minutes, or choose another model.",
+  "error.provider.grokConnectionFailed":
+    "Grok cannot connect to its service. Check your internet connection, then send the message again.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "On a Windows host, Gemini opens the Google page on the host itself. Connect Gemini on the host computer.",
   "error.provider.cursorArchivePath": "The Cursor archive has an unexpected file.",
@@ -314,6 +320,8 @@ export const messages = defineMessages("error.provider", {
     "This chat became too long for Claude. OpenBot started a new Claude Code session with the chat history. Try again.",
   "error.provider.claudeApiKeyNoCredit":
     "The credit balance of the Anthropic API key is too low. A Claude plan does not pay for requests with an API key. Add credit in the Anthropic Console, or sign in to Claude in Settings and select the Claude account in the agent's model menu.",
+  "error.provider.claudeServiceBlocked":
+    "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooSmall":

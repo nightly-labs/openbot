@@ -184,6 +184,7 @@ export const messages = {
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
+  "mobile.chat.composer.voiceSettings": "音声設定",
   "mobile.chat.composer.stopDictation": "音声入力を停止",
   "mobile.chat.composer.mention": "{name} をメンション",
   "mobile.chat.composer.skills": "スキル",
@@ -345,6 +346,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "複数の画像を共有するには、アプリを最新版に更新してください。",
   "mobile.chat.video.play": "{name} を再生",
   "mobile.chat.video.retry": "動画を再試行",
+  "mobile.chat.video.downloaded": "{received} / {total}",
+  "mobile.chat.video.loading": "{name} を読み込み中",
   "mobile.chat.video.share": "{name} を共有",
   "mobile.chat.video.save": "{name} を写真に保存",
   "mobile.chat.video.photosPermission": "この動画を保存するには、設定で OpenBot に写真の追加を許可してください。",
@@ -369,6 +372,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "{origin} に一度だけ送信します。この値はチャットに追加されません。",
   "mobile.chat.browserSecret.submitFailed":
     "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "エージェントがこのサイトの保存済みログイン情報を選ばなかったため、OpenBot は保存したログイン情報を使いませんでした。どのアカウントを使うかエージェントに伝えてください。",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "このサイトのパスワードがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "認証アプリのキーがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "パスワードマネージャーを読み取れなかったため、OpenBot は保存したログイン情報を使いませんでした。",
   "mobile.chat.browserSecret.submit": "送信",
   "mobile.chat.browserSecret.takeOver": "操作を引き継ぐ",
   "mobile.chat.starter.title": "何から始めますか？",
@@ -574,4 +589,25 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "元に戻す",
   "mobile.chat.appSuggestion.notAllowed": "{name} を接続できるのはサーバーの所有者または管理者だけです。",
   "mobile.chat.appSuggestion.unavailable": "このサーバーは {name} を接続できません。",
+  "mobile.chat.context.label": "コンテキスト使用率 {percent}",
+  "mobile.chat.context.labelEstimated": "コンテキスト使用率 約 {percent}",
+  "mobile.chat.context.labelCompacting": "コンテキストを圧縮しています",
+  "mobile.chat.context.title": "コンテキスト",
+  "mobile.chat.context.percent": "{percent} 使用中",
+  "mobile.chat.context.tokens": "{used} / {total} トークン",
+  "mobile.chat.context.tokensEstimated": "推定: {used} / {total} トークン",
+  "mobile.chat.context.breakdown": "コンテキストの内訳",
+  "mobile.chat.context.category.systemPrompt": "システムプロンプト",
+  "mobile.chat.context.category.memoryFiles": "メモリファイル",
+  "mobile.chat.context.category.tools": "ツール",
+  "mobile.chat.context.category.skills": "スキルとサブエージェント",
+  "mobile.chat.context.category.toolResults": "ツール呼び出しと結果",
+  "mobile.chat.context.category.messages": "メッセージ",
+  "mobile.chat.context.category.other": "その他",
+  "mobile.chat.context.category.free": "空き",
+  "mobile.chat.context.autoAt": "コンテキストは {percent} で自動的に圧縮されます。",
+  "mobile.chat.context.nativeAuto": "自動圧縮はプロバイダーが管理します。",
+  "mobile.chat.context.noAuto": "このエージェントはコンテキストを圧縮しません。",
+  "mobile.chat.context.lastCompaction": "前回の圧縮: {before} → {after} トークン",
+  "mobile.chat.context.unavailable": "このチャットは現在コンテキストを報告していません。",
 } as const satisfies PartialTranslation<typeof source>;

@@ -102,7 +102,12 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import type {
+  RemoteDownloadWatch,
+  RemoteFileUpload,
+  RemoteLargeDownload,
+  RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -193,6 +198,7 @@ import {
   withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
+import { NO_CONTEXT_STATES, reduceContextStates } from "@/features/workspace/model/context-states";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import {
@@ -602,6 +608,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("unreadCounts", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("firstUnreadMessageIds", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("activityByServer", (current) => withoutKeys(current, serverIds));
+      liveState.update("contextByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("threadWaitsByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("turnLinesByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
@@ -723,11 +730,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       upload?: RemoteFileUpload,
       onUploadProgress?: (fraction: number) => void,
       largeDownload?: RemoteLargeDownload,
+      download?: RemoteDownloadWatch,
     ): Promise<T> => {
       if (serverId) await connectionWaits.whenConnected(serverId);
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload);
+      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload, download);
     },
     [connectionWaits],
   );
@@ -1667,6 +1675,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
+      liveState.update("contextByServer", (current) => {
+        const previous = current[serverId] ?? NO_CONTEXT_STATES;
+        const next = reduceContextStates(previous, event);
+        return next === previous ? current : { ...current, [serverId]: next };
+      });
       // What the chat leaves out: the waits of the side threads, which the home list shows on the agent.
       liveState.update("threadWaitsByServer", (current) => {
         const previous = current[serverId] ?? [];

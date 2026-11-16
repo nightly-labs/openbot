@@ -217,6 +217,8 @@ export const messages = {
     "El endpoint «{provider}» necesita una clave de API. Añade la clave en Ajustes del servidor → Proveedores y luego inténtalo de nuevo.",
   "error.provider.opencodeKeyExpired":
     "Tu clave de API de OpenCode caducó. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go rechazó tu clave de API guardada. Puede que la clave haya caducado. Crea una clave nueva en OpenCode Console, pégala en los ajustes de OpenCode y luego inténtalo de nuevo.",
   "error.provider.opencodeServiceFailure":
     "OpenCode no pudo completar este turno porque falló su servicio local. Inténtalo de nuevo. Si el error continúa, vuelve a conectar OpenCode en Ajustes.",
   "error.provider.opencodeRateLimited":
@@ -287,6 +289,10 @@ export const messages = {
     "Google no permite que Gemini funcione desde la ubicación de red del equipo que ejecuta este agente. Usa Gemini en otro equipo o elige otro proveedor para este agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini perdió la conexión con su agente y se detuvo. Envía un mensaje para continuar.",
+  "error.provider.grokServiceFailure":
+    "El servicio de Grok está ocupado o tiene un error. Vuelve a intentarlo en unos minutos o elige otro modelo.",
+  "error.provider.grokConnectionFailed":
+    "Grok no puede conectarse a su servicio. Comprueba tu conexión a internet y vuelve a enviar el mensaje.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "En un host con Windows, Gemini abre la página de Google en el propio host. Conecta Gemini en el equipo host.",
   "error.provider.cursorArchivePath": "El archivo de Cursor contiene un archivo inesperado.",
@@ -332,6 +338,8 @@ export const messages = {
     "Este chat se volvió demasiado largo para Claude. OpenBot inició una nueva sesión de Claude Code con el historial del chat. Inténtalo de nuevo.",
   "error.provider.claudeApiKeyNoCredit":
     "La clave de API de Anthropic no tiene crédito de API. Un plan de Claude no paga las solicitudes con una clave de API. Añade crédito en la Anthropic Console, o inicia sesión en Claude en Ajustes y selecciona la cuenta de Claude en el menú de modelos del agente.",
+  "error.provider.claudeServiceBlocked":
+    "El servicio de Claude bloqueó esta solicitud. Suele ser un problema breve de Claude, no de tu cuenta. Vuelve a enviar el mensaje en unos minutos.",
   "error.provider.foreignReasoning":
     "{provider} no aceptó el razonamiento anterior de este chat porque lo recibió otra cuenta o clave de API. OpenBot inició una nueva sesión de {provider} con el historial del chat. Inténtalo de nuevo.",
   "error.provider.imageTooSmall":

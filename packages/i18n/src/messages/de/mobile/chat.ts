@@ -185,6 +185,7 @@ export const messages = {
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
+  "mobile.chat.composer.voiceSettings": "Spracheinstellungen",
   "mobile.chat.composer.stopDictation": "Diktat beenden",
   "mobile.chat.composer.mention": "{name} erwähnen",
   "mobile.chat.composer.skills": "Fähigkeiten",
@@ -351,6 +352,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "Zum Teilen mehrerer Bilder wird die neueste Version der App benötigt.",
   "mobile.chat.video.play": "{name} abspielen",
   "mobile.chat.video.retry": "Video neu laden",
+  "mobile.chat.video.downloaded": "{received} von {total}",
+  "mobile.chat.video.loading": "{name} wird geladen",
   "mobile.chat.video.share": "{name} teilen",
   "mobile.chat.video.save": "{name} in Fotos sichern",
   "mobile.chat.video.photosPermission":
@@ -376,6 +379,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "Einmal an {origin} senden. Dieser Wert wird nicht zum Chat hinzugefügt.",
   "mobile.chat.browserSecret.submitFailed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent das falsche Feld auf der Seite gewählt hat.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil der Agent keine der für diese Website gespeicherten Zugangsdaten gewählt hat. Sag dem Agenten, welches Konto er verwenden soll.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie kein Passwort für diese Website enthalten.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie keinen Authenticator-Schlüssel enthalten.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil dein Passwort-Manager nicht gelesen werden konnte.",
   "mobile.chat.browserSecret.submit": "Senden",
   "mobile.chat.browserSecret.takeOver": "Übernehmen",
   "mobile.chat.starter.title": "Woran sollen wir zuerst arbeiten?",
@@ -597,4 +612,25 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Rückgängig",
   "mobile.chat.appSuggestion.notAllowed": "Nur der Serverbesitzer oder ein Admin kann {name} verbinden.",
   "mobile.chat.appSuggestion.unavailable": "Dieser Server kann {name} nicht verbinden.",
+  "mobile.chat.context.label": "Kontext zu {percent} voll",
+  "mobile.chat.context.labelEstimated": "Kontext zu etwa {percent} voll",
+  "mobile.chat.context.labelCompacting": "Kontext wird komprimiert",
+  "mobile.chat.context.title": "Kontext",
+  "mobile.chat.context.percent": "{percent} voll",
+  "mobile.chat.context.tokens": "{used} von {total} Tokens",
+  "mobile.chat.context.tokensEstimated": "Geschätzt: {used} von {total} Tokens",
+  "mobile.chat.context.breakdown": "Was den Kontext füllt",
+  "mobile.chat.context.category.systemPrompt": "Systemprompt",
+  "mobile.chat.context.category.memoryFiles": "Memory-Dateien",
+  "mobile.chat.context.category.tools": "Werkzeuge",
+  "mobile.chat.context.category.skills": "Fähigkeiten und Subagenten",
+  "mobile.chat.context.category.toolResults": "Werkzeugaufrufe und Ergebnisse",
+  "mobile.chat.context.category.messages": "Nachrichten",
+  "mobile.chat.context.category.other": "Sonstiges",
+  "mobile.chat.context.category.free": "Freier Platz",
+  "mobile.chat.context.autoAt": "Der Kontext wird bei {percent} automatisch komprimiert.",
+  "mobile.chat.context.nativeAuto": "Der Anbieter verwaltet die automatische Komprimierung.",
+  "mobile.chat.context.noAuto": "Dieser Agent komprimiert seinen Kontext nicht.",
+  "mobile.chat.context.lastCompaction": "Letzte Komprimierung: {before} → {after} Tokens",
+  "mobile.chat.context.unavailable": "Dieser Chat meldet seinen Kontext gerade nicht.",
 } as const satisfies PartialTranslation<typeof source>;

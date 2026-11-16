@@ -234,6 +234,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "تعذّرت إعادة الاتصال.",
   "provider.account.add": "إضافة حساب",
   "provider.account.addLabel": "إضافة حساب {name} آخر",
+  "provider.account.addWithCode": "إضافة حساب برمز",
   "provider.account.count": {
     zero: "لا حسابات",
     one: "حساب واحد",

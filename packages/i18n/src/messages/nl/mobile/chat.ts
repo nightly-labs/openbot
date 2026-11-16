@@ -177,6 +177,7 @@ export const messages = {
   "mobile.chat.composer.send": "Verstuur bericht",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dicteer bericht",
+  "mobile.chat.composer.voiceSettings": "Steminstellingen",
   "mobile.chat.composer.stopDictation": "Stop dicteren",
   "mobile.chat.composer.mention": "Noem {name}",
   "mobile.chat.composer.skills": "Vaardigheden",
@@ -313,6 +314,8 @@ export const messages = {
     "Voor het delen van meerdere afbeeldingen is de nieuwste versie van de app nodig.",
   "mobile.chat.video.play": "Speel {name} af",
   "mobile.chat.video.retry": "Laad video opnieuw",
+  "mobile.chat.video.downloaded": "{received} van {total}",
+  "mobile.chat.video.loading": "{name} laden",
   "mobile.chat.video.share": "Deel {name}",
   "mobile.chat.video.save": "Bewaar {name} in Foto’s",
   "mobile.chat.video.photosPermission":
@@ -338,6 +341,18 @@ export const messages = {
     "Eenmalig versturen naar {origin}. Deze waarde wordt niet aan de chat toegevoegd.",
   "mobile.chat.browserSecret.submitFailed":
     "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer opnieuw.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat de agent geen van de opgeslagen logins voor deze site heeft gekozen. Vertel de agent welk account hij moet gebruiken.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen wachtwoord voor deze site heeft.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen authenticatorsleutel heeft.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat je wachtwoordmanager niet gelezen kon worden.",
   "mobile.chat.browserSecret.submit": "Versturen",
   "mobile.chat.browserSecret.takeOver": "Overnemen",
   "mobile.chat.starter.title": "Waar zullen we eerst aan werken?",
@@ -564,4 +579,25 @@ export const messages = {
   "mobile.chat.appSuggestion.undo": "Ongedaan maken",
   "mobile.chat.appSuggestion.notAllowed": "Alleen de servereigenaar of een beheerder kan {name} verbinden.",
   "mobile.chat.appSuggestion.unavailable": "Deze server kan {name} niet verbinden.",
+  "mobile.chat.context.label": "Context {percent} vol",
+  "mobile.chat.context.labelEstimated": "Context ongeveer {percent} vol",
+  "mobile.chat.context.labelCompacting": "Context comprimeren",
+  "mobile.chat.context.title": "Context",
+  "mobile.chat.context.percent": "{percent} vol",
+  "mobile.chat.context.tokens": "{used} van {total} tokens",
+  "mobile.chat.context.tokensEstimated": "Geschat: {used} van {total} tokens",
+  "mobile.chat.context.breakdown": "Wat de context vult",
+  "mobile.chat.context.category.systemPrompt": "Systeemprompt",
+  "mobile.chat.context.category.memoryFiles": "Geheugenbestanden",
+  "mobile.chat.context.category.tools": "Tools",
+  "mobile.chat.context.category.skills": "Vaardigheden en subagents",
+  "mobile.chat.context.category.toolResults": "Toolaanroepen en resultaten",
+  "mobile.chat.context.category.messages": "Berichten",
+  "mobile.chat.context.category.other": "Overig",
+  "mobile.chat.context.category.free": "Vrije ruimte",
+  "mobile.chat.context.autoAt": "De context wordt automatisch gecomprimeerd bij {percent}.",
+  "mobile.chat.context.nativeAuto": "De aanbieder beheert het automatisch comprimeren.",
+  "mobile.chat.context.noAuto": "Deze agent comprimeert zijn context niet.",
+  "mobile.chat.context.lastCompaction": "Laatste compressie: {before} → {after} tokens",
+  "mobile.chat.context.unavailable": "Deze chat meldt zijn context nu niet.",
 } as const satisfies PartialTranslation<typeof source>;
