@@ -242,8 +242,8 @@ export type MessagingMentionResult = "none" | "started" | "skipped";
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
   queueChanged(agentId: string): void;
-  /** Whether a new message of the conversation in this thread waits for other work of the agent. */
-  busy(agentId: string, threadId: string): boolean;
+  /** Whether a new message of this conversation waits for other work of the agent. */
+  busy(agentId: string, linkId: string): boolean;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   /** Removes live provider state for an execution thread before its rows are deleted. */
   forgetThread(threadId: string): Effect.Effect<void, MessagingThreadFailed>;
@@ -750,7 +750,7 @@ export class MessagingThreads {
       (context) => this.#mailbox.messagingOrigin(context.delivery.id)?.authorId === input.origin.authorId,
     );
     if (pending.length >= AGENT_QUEUE_LIMIT || byAuthor.length >= AUTHOR_QUEUE_LIMIT) return { status: "busy", link };
-    const waiting = this.#hooks.busy(agentId, link.threadId);
+    const waiting = this.#hooks.busy(agentId, link.linkId);
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "user" },
@@ -892,10 +892,10 @@ export class MessagingThreads {
       case "conversation":
         if (event.snapshot.threadId === null) return false;
         this.#reportProgress(event.snapshot);
-        return this.takes(event.snapshot.threadId);
+        return this.#takes(event.snapshot.threadId);
       case "conversation-delta":
       case "turn-progress":
-        return this.takes(event.threadId);
+        return this.#takes(event.threadId);
       case "turn-started": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
@@ -956,12 +956,15 @@ export class MessagingThreads {
     }
   }
 
-  /**
-   * Whether an event of this thread is kept out of the app: a conversation thread that is no agent's
-   * own chat. Its turns run in the messaging lane, beside the agent's own chat.
-   */
-  takes(threadId: string): boolean {
+  /** Whether an event of this thread is kept out of the app: a conversation thread that is no agent's own chat. */
+  #takes(threadId: string): boolean {
     return this.store.linkForThread(threadId) !== null && !this.#hooks.ownChat(threadId);
+  }
+
+  /** Whether the turns of this thread run in the agent's messaging lane (`MailboxStore.inMessagingLane`). */
+  inMessagingLane(agentId: string, threadId: string): boolean {
+    const link = this.store.linkForThread(threadId);
+    return link !== null && !this.#hooks.ownChat(threadId) && this.#mailbox.inMessagingLane(agentId, link.linkId);
   }
 
   /**

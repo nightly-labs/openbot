@@ -366,7 +366,7 @@ export class DrainScheduler {
         messaging ===
           (snapshot.threadId !== null &&
             this.#conversation.isExecutionThread(snapshot.threadId) &&
-            this.#messaging?.takes(snapshot.threadId) === true),
+            this.#messaging?.inMessagingLane(agentId, snapshot.threadId) === true),
     );
   }
 
@@ -383,7 +383,7 @@ export class DrainScheduler {
       const publicThreadId = this.#conversation.publicThreadId(lane.agentId, externalThreadId);
       const threadChannelId = this.#conversation.channelForThread(publicThreadId);
       if (threadChannelId !== null) return threadChannelId === channelId;
-      if (this.#messaging?.takes(publicThreadId)) return lane.taskId === MESSAGING_LANE;
+      if (this.#messaging?.inMessagingLane(lane.agentId, publicThreadId)) return lane.taskId === MESSAGING_LANE;
       if (!this.#conversation.isTaskThread(publicThreadId)) return lane.taskId === null;
       return taskThreadId !== null && publicThreadId === taskThreadId;
     });
@@ -437,13 +437,8 @@ export class DrainScheduler {
     )
       return "sign-in";
     // A channel turn runs in its own lane, beside the agent's own chat. A provider that runs one turn
-    // at a time also holds the own chat and the external conversations for a channel assignment that
-    // has not started yet.
-    if (
-      (taskId === null || taskId === MESSAGING_LANE) &&
-      this.#tasks.oneTurnAtATime(agentId) &&
-      !(this.#channels?.mayDrain(agentId) ?? true)
-    )
+    // at a time also holds the own chat for a channel assignment that has not started yet.
+    if (taskId === null && this.#tasks.oneTurnAtATime(agentId) && !(this.#channels?.mayDrain(agentId) ?? true))
       return "channel";
     if (!this.#profileSave.mayDrain(agentId)) return "profile-save";
     if (!this.#duplication.mayDrain(agentId)) return "duplication";

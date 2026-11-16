@@ -276,7 +276,7 @@ export interface TurnHooks {
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
   /** Whether the turns of this public thread run in the lane of the agent's external conversations. */
-  inMessagingLane(threadId: string): boolean;
+  inMessagingLane(agentId: string, threadId: string): boolean;
   /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
   isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
@@ -762,7 +762,7 @@ export class TurnLifecycle {
     const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
     const channelId = this.#conversation.channelForThread(threadId);
     if (channelId !== null) return channelLane(channelId);
-    return this.#hooks.inMessagingLane(threadId) ? MESSAGING_LANE : null;
+    return this.#hooks.inMessagingLane(agentId, threadId) ? MESSAGING_LANE : null;
   }
 
   /**

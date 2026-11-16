@@ -305,8 +305,8 @@ export class MailboxStore {
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
   readonly #queueUpdates = new Set<string>();
-  /** External conversations whose thread is also an agent's own chat (#2120). They stay in that chat's lane. */
-  #ownChatLinks: ReadonlySet<string> = new Set();
+  /** Whether a message of this external conversation runs in the agent's messaging lane. */
+  #usesMessagingLane: (agentId: string, linkId: string) => boolean = () => true;
   /** When each edit began, or when this run found it, by delivery id. Only memory. */
   readonly #editHolds = new Map<string, { editId: string; startedAt: number }>();
   readonly #deliveryGate = new MailboxDeliveryGate();
@@ -977,15 +977,23 @@ export class MailboxStore {
       : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
     if (message?.taskId) return message.taskId;
     if (message?.channelId) return channelLane(message.channelId);
-    return message?.messaging && !this.#ownChatLinks.has(message.messaging.linkId) ? MESSAGING_LANE : null;
+    return message?.messaging && this.#usesMessagingLane(delivery.recipientAgentId, message.messaging.linkId)
+      ? MESSAGING_LANE
+      : null;
   }
 
   /**
-   * Names the external conversations whose thread is also an agent's own chat (#2120). Their turns run
-   * in that thread, so their messages stay in the own chat's lane, as before the messaging lane.
+   * Sets which external conversations run in the messaging lane. The others stay in the agent's own
+   * chat lane, as before the messaging lane: a conversation whose thread is also the agent's own chat
+   * (#2120), and each conversation of an agent whose provider runs one turn at a time.
    */
-  keepInOwnChatLane(linkIds: Iterable<string>): void {
-    this.#ownChatLinks = new Set(linkIds);
+  useMessagingLane(uses: (agentId: string, linkId: string) => boolean): void {
+    this.#usesMessagingLane = uses;
+  }
+
+  /** Whether a message of this external conversation runs in the agent's messaging lane. */
+  inMessagingLane(agentId: string, linkId: string): boolean {
+    return this.#usesMessagingLane(agentId, linkId);
   }
 
   /** The lane a delivery runs in, as {@link nextQueued} takes it. */

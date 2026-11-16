@@ -1564,8 +1564,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
-            this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
             this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
       usageLimited: (agentId) => this.#channelHeld(agentId),
       retry: (agentId) => this.#usageLimits.retry(agentId),
@@ -1663,14 +1661,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
-      // The external conversations have their own lane. On a provider that runs one turn at a time,
-      // any running turn of the agent holds it too. A conversation whose thread is also the agent's
-      // own chat (#2120) waits in the own chat's lane.
-      busy: (agentId, threadId) =>
-        this.messaging.takes(threadId)
+      // A conversation in the messaging lane waits for that lane only. The others wait in the own chat's lane.
+      busy: (agentId, linkId) =>
+        this.#mailbox.inMessagingLane(agentId, linkId)
           ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
-            (this.#tasks.oneTurnAtATime(agentId) && this.#conversation.anyWorkingSnapshot(agentId) !== undefined)
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0
           : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
@@ -1942,8 +1937,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ),
             ),
         taskForThread: (threadId) => this.#tasks.taskForThread(threadId),
-        // A conversation whose thread is also the agent's own chat (#2120) stays in the own chat's lane.
-        inMessagingLane: (threadId) => this.messaging.takes(threadId),
+        inMessagingLane: (agentId, threadId) => this.messaging.inMessagingLane(agentId, threadId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
@@ -5114,13 +5108,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
-      // Before any drain: these conversations keep the own chat's lane (#2120).
-      this.#mailbox.keepInOwnChatLane(
+      // Before any drain. A conversation whose thread is also the agent's own chat (#2120) runs its turns
+      // there, and a provider that runs one turn at a time keeps one queue: both keep the own chat's lane.
+      const ownChatLinks = new Set(
         this.#store.list().flatMap((agent) => {
           const link = agent.threadId ? this.messaging.store.linkForThread(agent.threadId) : null;
           return link ? [link.linkId] : [];
         }),
       );
+      this.#mailbox.useMessagingLane((agentId, linkId) => {
+        const provider = this.#store.providerOf(agentId);
+        return !ownChatLinks.has(linkId) && provider !== undefined && agentProviderDescriptor(provider).concurrentTurns;
+      });
       this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
