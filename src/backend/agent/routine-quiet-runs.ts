@@ -15,7 +15,7 @@ import { bridgedToolName, getString, type ThreadItem } from "../protocol";
  * answers in the user's language, and a phrase match in every language is a guess. The brackets make
  * it unlikely as the start or the whole of a real report.
  */
-const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
+export const ROUTINE_NO_UPDATE_MARKER = "[[no-update]]";
 
 /**
  * The quiet token of Hermes Agent cron jobs. The Hermes import copies job prompts as they are, and a
@@ -147,8 +147,11 @@ export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: s
     ),
   );
   if ([...answers].some((message) => !isTextAnswer(message))) return false;
-  for (const [index, message] of snapshot.messages.entries()) {
-    if (answers.has(message)) snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
+  for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
+    const message = snapshot.messages[index];
+    if (!message || !answers.has(message)) continue;
+    if (isNoUpdateAnswer(message.text)) snapshot.messages.splice(index, 1);
+    else snapshot.messages[index] = { ...message, itemType: ROUTINE_QUIET_ANSWER_ITEM_TYPE };
   }
   return true;
 }

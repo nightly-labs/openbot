@@ -166,7 +166,7 @@ import {
   widensAgentSettings,
 } from "./profile-tools";
 import { apiKeyFormSpec, browserUserControlResult } from "./prompts";
-import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
+import { ROUTINE_NO_UPDATE_MARKER, ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./routine-quiet-runs";
 import type { RoutineScheduler } from "./routine-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import {
@@ -1978,7 +1978,10 @@ export class OpenBotToolRouter {
         );
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
+          ? {
+              status: "quiet",
+              note: `This turn ends without a message or a notification. End your turn now without calling another tool. If your model requires text to end a turn, reply with ${ROUTINE_NO_UPDATE_MARKER} only.`,
+            }
           : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }

@@ -282,6 +282,7 @@
     "test:antigravity:login-path": "bun scripts/antigravity-login-path-e2e.ts",
     "test:antigravity-mcp-load-failure": "bun scripts/antigravity-mcp-load-failure-e2e.ts",
     "test:antigravity-expired-token": "bun scripts/antigravity-expired-token-e2e.ts",
+    "test:antigravity-quiet-turn": "bun scripts/antigravity-quiet-turn-e2e.ts",
     "test:claude-foreign-session": "bun scripts/claude-foreign-session-e2e.ts",
     "test:mcp-catalog": "bun scripts/mcp-catalog-smoke.ts",
     "test:mcp-oauth": "bun scripts/mcp-oauth-e2e.ts",
