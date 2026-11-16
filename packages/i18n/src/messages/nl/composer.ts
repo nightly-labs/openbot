@@ -118,6 +118,8 @@ export const messages = {
     "De agent heeft dit bericht al ontvangen, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
   "composer.queueEdit.deletedKept":
     "Dit bericht is verwijderd, dus je bewerking is beëindigd. Je wijzigingen staan nog in het berichtvak.",
+  "composer.queueEdit.endedKept":
+    "Deze bewerking is beëindigd voordat ze werd opgeslagen. Je wijzigingen staan nog in het berichtvak.",
   "composer.voice.prepareFailed": "Kan het spraakmodel niet voorbereiden. Probeer het opnieuw.",
   "composer.voice.noSpeechRecorded": "Er is geen spraak opgenomen.",
   "composer.voice.noSpeechDetected": "Er is geen spraak gedetecteerd.",

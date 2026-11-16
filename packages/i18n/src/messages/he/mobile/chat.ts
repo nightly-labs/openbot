@@ -545,6 +545,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "ההודעה בתור שומרת את הטקסט שכבר אצל הסוכן.",
   "mobile.chat.queue.discard": "ביטול שינויים",
   "mobile.chat.queue.alreadyReceived": "הסוכן כבר קיבל את ההודעה הזו, ולכן אי אפשר לשנות אותה.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "הסוכן כבר קיבל את ההודעה הזו, ולכן אי אפשר לשנות אותה. כשתסגרו את המסך הזה, הטקסט שלכם יעבור לתיבת ההודעה.",
   "mobile.chat.queue.holding": "מחזיק את ההודעה עבורך…",
   "mobile.chat.queue.holdFailed": "OpenBot לא הצליח להחזיק את ההודעה הזו לעריכה.",
   "mobile.chat.queue.messageLabel": "הודעה",

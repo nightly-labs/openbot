@@ -118,6 +118,7 @@ export const messages = {
     "エージェントはこのメッセージをすでに受け取ったため、編集は終了しました。変更内容はメッセージ欄に残っています。",
   "composer.queueEdit.deletedKept":
     "このメッセージは削除されたため、編集は終了しました。変更内容はメッセージ欄に残っています。",
+  "composer.queueEdit.endedKept": "この編集は保存される前に終了しました。変更内容はメッセージ欄に残っています。",
   "composer.voice.prepareFailed": "音声モデルを準備できませんでした。もう一度お試しください。",
   "composer.voice.noSpeechRecorded": "音声が録音されませんでした。",
   "composer.voice.noSpeechDetected": "音声が検出されませんでした。",

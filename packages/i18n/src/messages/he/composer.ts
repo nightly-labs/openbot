@@ -114,6 +114,7 @@ export const messages = {
   "composer.queueEdit.receivedKept":
     "הסוכן כבר קיבל את ההודעה הזו, ולכן העריכה הסתיימה. השינויים שלך עדיין בתיבת ההודעה.",
   "composer.queueEdit.deletedKept": "ההודעה הזו נמחקה, ולכן העריכה הסתיימה. השינויים שלך עדיין בתיבת ההודעה.",
+  "composer.queueEdit.endedKept": "העריכה הזו הסתיימה לפני שנשמרה. השינויים שלך עדיין בתיבת ההודעה.",
   "composer.voice.prepareFailed": "לא ניתן להכין את מודל הקול. יש לנסות שוב.",
   "composer.voice.noSpeechRecorded": "לא הוקלט דיבור.",
   "composer.voice.noSpeechDetected": "לא זוהה דיבור.",

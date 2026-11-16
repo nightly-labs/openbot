@@ -29,10 +29,12 @@ import { rememberAttachmentKinds } from "../attachment-analytics";
 import { type PastedComposerCopy, rememberComposerFile } from "../composer-clipboard";
 import {
   copyComposerDraft,
+  draftAfterEndedEdit,
   EMPTY_DRAFT,
   insertAtSelection,
   insertPastedText,
   QUEUE_EDIT_STORAGE_KEY,
+  queueEditChanged,
   type StoredQueueEdit,
 } from "../composer-draft";
 import { composerDraftKey } from "../conversation-keys";
@@ -584,49 +586,48 @@ export function createComposerActions(deps: ComposerActionsDeps) {
 
   /**
    * Ends the edit of a queued message that is no longer queued: it started, or somebody deleted it.
-   * The host has no hold to give back. Changes stay in the message box as a draft, after the draft
-   * from before the edit, so no typed text is lost; with no change, the box gets its draft from
-   * before the edit, as Cancel does. A notice says what happened.
+   * `ended` is that message, or null when the host refused a Save or Begin because the edit is over.
+   * The host has no hold to give back. Changes stay in the message box (`draftAfterEndedEdit`), and a
+   * note says what happened.
    */
-  function endQueuedMessageEdit(ended: QueueDelivery): void {
+  function endQueuedMessageEdit(ended: QueueDelivery | null): void {
     const agentId = deps.editingAgentId();
     const serverId = deps.editingServerId();
-    if (!agentId || !serverId || deps.editingDeliveryId() !== ended.id) return;
+    if (!agentId || !serverId || (ended && deps.editingDeliveryId() !== ended.id)) return;
     const target = { agentId, serverId };
-    const backup = deps.editingDraftBackup() ?? EMPTY_DRAFT;
     const draft = deps.drafts()[composerDraftKey(target)] ?? EMPTY_DRAFT;
-    const originalIds = new Set(deps.editingOriginalAttachmentIds());
-    // The files of the message belong to it. Only files added during the edit can go in a new message.
-    const added = draft.attachments.filter((attachment) => !originalIds.has(attachment.id));
+    // A refused Save discards the files that it sent, so they cannot stay in the box.
+    const gone = new Set(deps.editingPendingSave()?.attachmentDraftIds ?? []);
     const changed =
-      draft.text !== ended.text || added.length > 0 || draft.attachments.length !== ended.attachments.length;
-    let next = backup;
-    if (changed) {
-      const attachments = [...backup.attachments, ...added];
-      for (const attachment of attachments.slice(INPUT_LIMITS.attachments))
-        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
-      next = {
-        text: backup.text.trim() ? `${backup.text}\n\n${draft.text}` : draft.text,
-        attachments: attachments.slice(0, INPUT_LIMITS.attachments),
-        replyToMessageId: backup.text.trim() ? backup.replyToMessageId : draft.replyToMessageId,
-      };
-    } else {
-      for (const attachment of added)
-        void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
-    }
+      !ended ||
+      queueEditChanged(
+        draft,
+        ended.text,
+        ended.attachments.map((attachment) => attachment.id),
+      );
+    const { next, dropped } = draftAfterEndedEdit(
+      { ...draft, attachments: draft.attachments.filter((attachment) => !gone.has(attachment.id)) },
+      deps.editingDraftBackup() ?? EMPTY_DRAFT,
+      deps.editingOriginalAttachmentIds(),
+      changed,
+    );
+    for (const attachment of dropped)
+      void conversationRuntime(deps.props).agent.discardDraftAttachment(attachment.id, serverId);
     deps.setDrafts((current) => ({ ...current, [composerDraftKey(target)]: next }));
     clearQueueEditState();
-    const deleted = ended.status === "cancelled";
+    const deleted = ended?.status === "cancelled";
     // A delete with no change ends the edit with no notice, as before.
     if (deleted && !changed) deps.setComposerError(null, target);
     else
       deps.setComposerError(
         t(
-          deleted
-            ? "composer.queueEdit.deletedKept"
-            : changed
-              ? "composer.queueEdit.receivedKept"
-              : "composer.queueEdit.received",
+          !ended
+            ? "composer.queueEdit.endedKept"
+            : deleted
+              ? "composer.queueEdit.deletedKept"
+              : changed
+                ? "composer.queueEdit.receivedKept"
+                : "composer.queueEdit.received",
         ),
         target,
       );
@@ -715,6 +716,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         }
       } catch (error) {
         deps.setSubmitting(false);
+        // The host refuses a hold that is over: the message started, or another edit has it.
+        if (isQueueEditRejected(error) && deps.editingDeliveryId() === deliveryId) {
+          endQueuedMessageEdit(null);
+          return false;
+        }
         deps.setComposerError(
           errorMessage(error, t("composer.error.holdQueued")),
           {
@@ -769,14 +775,17 @@ export function createComposerActions(deps: ComposerActionsDeps) {
         });
       }
     } catch (error) {
-      deps.setComposerError(
-        errorMessage(error, t("composer.error.updateQueued")),
-        {
-          agentId,
-          serverId,
-        },
-        error,
-      );
+      // A Save that comes after the end of its edit cannot apply. Its text stays in the box.
+      if (editId && isQueueEditRejected(error) && deps.editingDeliveryId() === deliveryId) endQueuedMessageEdit(null);
+      else
+        deps.setComposerError(
+          errorMessage(error, t("composer.error.updateQueued")),
+          {
+            agentId,
+            serverId,
+          },
+          error,
+        );
     } finally {
       deps.setSubmitting(false);
     }

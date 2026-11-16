@@ -121,6 +121,8 @@ export const messages = {
     "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
   "composer.queueEdit.deletedKept":
     "Diese Nachricht wurde gelöscht. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.endedKept":
+    "Diese Bearbeitung wurde beendet, bevor sie gespeichert wurde. Deine Änderungen stehen noch im Nachrichtenfeld.",
   "composer.voice.prepareFailed": "Das Sprachmodell konnte nicht vorbereitet werden. Versuche es erneut.",
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",

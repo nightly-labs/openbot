@@ -667,6 +667,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "تحتفظ الرسالة في قائمة الانتظار بالنص الذي لدى الوكيل بالفعل.",
   "mobile.chat.queue.discard": "تجاهل",
   "mobile.chat.queue.alreadyReceived": "استلم الوكيل هذه الرسالة بالفعل، لذا لا يمكن تغييرها.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "تلقى الوكيل هذه الرسالة بالفعل، لذا لا يمكن تغييرها. عند إغلاق هذه الشاشة، ينتقل نصك إلى مربع الرسالة.",
   "mobile.chat.queue.holding": "جارٍ تعليق الرسالة من أجلك…",
   "mobile.chat.queue.holdFailed": "تعذّر على OpenBot تعليق هذه الرسالة لتعديلها.",
   "mobile.chat.queue.messageLabel": "الرسالة",

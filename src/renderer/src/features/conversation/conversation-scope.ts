@@ -1255,8 +1255,14 @@ export function createConversationViewScope(props: ConversationProps) {
       const deliveryId = currentEditingDeliveryId();
       if (submitting() || deliveryId === null || props.queue?.agentId !== props.agent?.id) return null;
       const delivery = props.queue?.deliveries.find((item) => item.id === deliveryId);
-      // A pending Save owns the outcome until the host answers it.
-      if (!delivery || delivery.status === "queued" || (delivery.status !== "cancelled" && editingPendingSave()))
+      // A pending Save owns the outcome until the host answers it. The host ends the edit of a
+      // message that leaves the queue, so a row that still shows the edit is not trusted to end it.
+      if (
+        !delivery ||
+        delivery.status === "queued" ||
+        delivery.editing ||
+        (delivery.status !== "cancelled" && editingPendingSave())
+      )
         return null;
       return delivery;
     },

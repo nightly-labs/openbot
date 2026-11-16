@@ -545,6 +545,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "A mensagem na fila mantém o texto que o agente já tem.",
   "mobile.chat.queue.discard": "Descartar",
   "mobile.chat.queue.alreadyReceived": "O agente já recebeu esta mensagem, então ela não pode ser alterada.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "O agente já recebeu esta mensagem, então ela não pode ser alterada. Ao fechar esta tela, seu texto vai para a caixa de mensagem.",
   "mobile.chat.queue.holding": "Retendo a mensagem para você…",
   "mobile.chat.queue.holdFailed": "O OpenBot não conseguiu reter esta mensagem para edição.",
   "mobile.chat.queue.messageLabel": "Mensagem",

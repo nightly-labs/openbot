@@ -110,6 +110,7 @@ export const messages = {
   "composer.queueEdit.received": "智能体已收到这条消息，因此你的编辑已结束。",
   "composer.queueEdit.receivedKept": "智能体已收到这条消息，因此你的编辑已结束。你的修改仍在消息框中。",
   "composer.queueEdit.deletedKept": "这条消息已被删除，因此你的编辑已结束。你的修改仍在消息框中。",
+  "composer.queueEdit.endedKept": "此编辑在保存前已结束。你的修改仍在消息框中。",
   "composer.voice.prepareFailed": "无法准备语音模型，请重试。",
   "composer.voice.noSpeechRecorded": "没有录到语音。",
   "composer.voice.noSpeechDetected": "未检测到语音。",

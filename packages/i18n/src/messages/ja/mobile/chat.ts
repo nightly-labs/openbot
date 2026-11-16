@@ -538,6 +538,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "キューのメッセージは、エージェントがすでに持っているテキストのままです。",
   "mobile.chat.queue.discard": "破棄",
   "mobile.chat.queue.alreadyReceived": "エージェントはすでにこのメッセージを受け取ったため、編集できません。",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "エージェントはすでにこのメッセージを受け取ったため、編集できません。この画面を閉じると、入力したテキストはメッセージ欄に移ります。",
   "mobile.chat.queue.holding": "メッセージを保留しています…",
   "mobile.chat.queue.holdFailed": "OpenBot は編集のためにこのメッセージを保留できませんでした。",
   "mobile.chat.queue.messageLabel": "メッセージ",

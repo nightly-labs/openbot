@@ -114,6 +114,7 @@ export const messages = defineMessages("composer", {
     "The agent already received this message, so your edit ended. Your changes are still in the message box.",
   "composer.queueEdit.deletedKept":
     "This message was deleted, so your edit ended. Your changes are still in the message box.",
+  "composer.queueEdit.endedKept": "This edit ended before it was saved. Your changes are still in the message box.",
   "composer.voice.prepareFailed": "Could not prepare the voice model. Try again.",
   "composer.voice.noSpeechRecorded": "No speech was recorded.",
   "composer.voice.noSpeechDetected": "No speech was detected.",

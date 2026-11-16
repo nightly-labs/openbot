@@ -119,6 +119,7 @@ export const messages = {
     "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
   "composer.queueEdit.deletedKept":
     "Bu mesaj silindi, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.endedKept": "Bu düzenleme kaydedilmeden önce sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
   "composer.voice.prepareFailed": "Ses modeli hazırlanamadı. Tekrar deneyin.",
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",

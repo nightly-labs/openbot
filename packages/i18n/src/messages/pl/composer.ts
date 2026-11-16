@@ -117,6 +117,7 @@ export const messages = {
     "Agent już otrzymał tę wiadomość, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
   "composer.queueEdit.deletedKept":
     "Ta wiadomość została usunięta, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.endedKept": "Ta edycja zakończyła się przed zapisaniem. Twoje zmiany nadal są w polu wiadomości.",
   "composer.voice.prepareFailed": "Nie udało się przygotować modelu głosowego. Spróbuj ponownie.",
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",

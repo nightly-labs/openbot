@@ -121,6 +121,8 @@ export const messages = {
     "L’agent a déjà reçu ce message, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
   "composer.queueEdit.deletedKept":
     "Ce message a été supprimé, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
+  "composer.queueEdit.endedKept":
+    "Cette modification s’est terminée avant d’être enregistrée. Vos changements sont toujours dans la zone de message.",
   "composer.voice.prepareFailed": "Impossible de préparer le modèle vocal. Réessayez.",
   "composer.voice.noSpeechRecorded": "Aucune parole n’a été enregistrée.",
   "composer.voice.noSpeechDetected": "Aucune parole n’a été détectée.",

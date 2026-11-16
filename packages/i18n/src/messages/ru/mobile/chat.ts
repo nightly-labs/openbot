@@ -632,6 +632,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "В очереди останется прежний текст сообщения.",
   "mobile.chat.queue.discard": "Отменить",
   "mobile.chat.queue.alreadyReceived": "Агент уже получил это сообщение, поэтому изменить его нельзя.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "Агент уже получил это сообщение, поэтому его нельзя изменить. Когда вы закроете этот экран, ваш текст попадёт в поле сообщения.",
   "mobile.chat.queue.holding": "Удерживаем сообщение для вас…",
   "mobile.chat.queue.holdFailed": "OpenBot не удалось удержать это сообщение для редактирования.",
   "mobile.chat.queue.messageLabel": "Сообщение",

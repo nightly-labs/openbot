@@ -114,6 +114,7 @@ export const messages = {
   "composer.queueEdit.receivedKept":
     "تلقى الوكيل هذه الرسالة بالفعل، لذا انتهى تعديلك. لا تزال تغييراتك في مربع الرسالة.",
   "composer.queueEdit.deletedKept": "حُذفت هذه الرسالة، لذا انتهى تعديلك. لا تزال تغييراتك في مربع الرسالة.",
+  "composer.queueEdit.endedKept": "انتهى هذا التعديل قبل حفظه. لا تزال تغييراتك في مربع الرسالة.",
   "composer.voice.prepareFailed": "تعذّر تجهيز النموذج الصوتي. حاول مرة أخرى.",
   "composer.voice.noSpeechRecorded": "لم يتم تسجيل أي كلام.",
   "composer.voice.noSpeechDetected": "لم يتم اكتشاف أي كلام.",

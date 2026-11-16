@@ -543,6 +543,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "Kuyruktaki mesaj, ajanın zaten sahip olduğu metni korur.",
   "mobile.chat.queue.discard": "At",
   "mobile.chat.queue.alreadyReceived": "Ajan bu mesajı zaten aldı, bu nedenle değiştirilemez.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "Ajan bu mesajı zaten aldı, bu yüzden değiştirilemez. Bu ekranı kapattığınızda metniniz mesaj kutusuna gider.",
   "mobile.chat.queue.holding": "Mesaj sizin için tutuluyor…",
   "mobile.chat.queue.holdFailed": "OpenBot bu mesajı düzenleme için tutamadı.",
   "mobile.chat.queue.messageLabel": "Mesaj",

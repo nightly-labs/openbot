@@ -118,6 +118,8 @@ export const messages = {
     "O agente já recebeu esta mensagem, então sua edição terminou. Suas alterações ainda estão na caixa de mensagem.",
   "composer.queueEdit.deletedKept":
     "Esta mensagem foi excluída, então sua edição terminou. Suas alterações ainda estão na caixa de mensagem.",
+  "composer.queueEdit.endedKept":
+    "Esta edição terminou antes de ser salva. Suas alterações ainda estão na caixa de mensagem.",
   "composer.voice.prepareFailed": "Não foi possível preparar o modelo de voz. Tente novamente.",
   "composer.voice.noSpeechRecorded": "Nenhuma fala foi gravada.",
   "composer.voice.noSpeechDetected": "Nenhuma fala foi detectada.",
