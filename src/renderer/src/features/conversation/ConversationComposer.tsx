@@ -540,7 +540,7 @@ export function ConversationComposer() {
                 onOpenAgent={props.onSelectAgent}
                 // A channel's rows are its sub-tasks, not queued replies.
                 onSteer={
-                  props.activeTurnId && !channel && steers() && !routineTurn() ? props.onSteerQueuedMessage : undefined
+                  props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
                 }
                 onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
               />
@@ -584,7 +584,11 @@ export function ConversationComposer() {
                       canSteer={Boolean(props.activeTurnId) && !steerRefused()}
                       onSteer={sendQueued()}
                       sendsNow={!steers()}
-                      routineRuns={routineTurn()}
+                      routineRuns={props.queue?.deliveries.some(
+                        (delivery) =>
+                          delivery.sender.kind === "routine" &&
+                          (delivery.status === "starting" || delivery.status === "running"),
+                      )}
                       onRunAsTask={props.threads?.onRunQueuedMessage}
                       onCancel={props.onCancelQueuedMessage}
                       onEdit={editQueuedMessage}

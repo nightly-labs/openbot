@@ -1,15 +1,10 @@
-import {
-  type AgentEvent,
-  type AgentTask,
-  type AgentTasksSnapshot,
-  type ConversationSnapshot,
-  routineRunsTurn,
-} from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentTask, AgentTasksSnapshot, ConversationSnapshot } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
+import { isRoutineSteerRefusal } from "../../routine-steer-refusal";
 import { createScopeGuard } from "../../scope-lifetime";
 import type { AgentTasksPort } from "./agent-tasks-port";
 
@@ -753,8 +748,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
       if (task?.activeTurnId !== expectedTurnId) return;
       // A message that left the queue is in the turn already.
       if (!task.queue?.some((delivery) => delivery.id === deliveryId)) return;
-      // A routine run takes no steer. The queue row says why the message waits.
-      if (routineRunsTurn(task.queue, expectedTurnId)) return;
+      // A routine run refuses the steer, and the queue row says why the message waits.
+      if (isRoutineSteerRefusal(error)) return;
       const { t, errorMessage } = currentText();
       actionToast.error(errorMessage(error, t("app.errorStatus.steer")));
     });

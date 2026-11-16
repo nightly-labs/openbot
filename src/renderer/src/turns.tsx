@@ -1,12 +1,11 @@
-import {
-  type AgentApproval,
-  type AgentContextState,
-  type AgentEvent,
-  type AgentModelChoice,
-  type AgentWaitsSnapshot,
-  type QueueSnapshot,
-  type RoutineFields,
-  routineRunsTurn,
+import type {
+  AgentApproval,
+  AgentContextState,
+  AgentEvent,
+  AgentModelChoice,
+  AgentWaitsSnapshot,
+  QueueSnapshot,
+  RoutineFields,
 } from "@openbot/contracts/ipc";
 import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
@@ -25,6 +24,7 @@ import type { TurnStepLines } from "./features/conversation/turn-step-lines";
 import { useDynamicIsland } from "./features/dynamic-island/dynamic-island-context";
 import { useServers } from "./features/servers/servers-context";
 import { queuedDeliveriesInOrder } from "./queue-reconciliation";
+import { isRoutineSteerRefusal } from "./routine-steer-refusal";
 import { createScopeGuard } from "./scope-lifetime";
 import { createSimpleContext } from "./simple-context";
 import { turnsPort } from "./turns-port";
@@ -482,8 +482,6 @@ const Turns = createSimpleContext({
       const agent = activeAgent();
       const turnId = agent ? activeTurns()[agent.id] : null;
       if (!agent || !turnId) return;
-      // A routine run takes no steer. The message waits for the next turn, as it does when the host refuses.
-      if (routineRunsTurn(queues()[agent.id]?.deliveries, turnId)) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
       void turnsPort()
@@ -497,8 +495,8 @@ const Turns = createSimpleContext({
           // sent while it works can take it first.
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
-          // A routine run that started meanwhile refuses the steer. The queue row says why the message waits.
-          if (routineRunsTurn(queues()[agent.id]?.deliveries, turnId)) return;
+          // A routine run refuses the steer, and the queue row says why the message waits.
+          if (isRoutineSteerRefusal(error)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
