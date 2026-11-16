@@ -26,6 +26,20 @@
   scrollbar-width: none;
 }
 
+/* The edge with more content fades. */
+.scroll-edges > .scroll-edges-view {
+  --scroll-edges-fade-size: var(--openbot-space-8);
+  --scroll-edges-fade-side: to right;
+
+  mask-image: linear-gradient(
+    var(--scroll-edges-fade-side),
+    transparent,
+    var(--openbot-text-primary) var(--scroll-edges-fade-start),
+    var(--openbot-text-primary) calc(100% - var(--scroll-edges-fade-end)),
+    transparent
+  );
+}
+
 /* The fade masks the scroll area and its outline too, so the frame shows the focus. */
 .scroll-edges-view:focus-visible {
   outline: none;
@@ -42,26 +56,32 @@
 }
 
 .scroll-edges[data-axis="y"] > .scroll-edges-view {
+  --scroll-edges-fade-side: to bottom;
+
   max-height: inherit;
   overflow-y: auto;
 }
 
+.scroll-edges[data-axis="x"]:dir(rtl) > .scroll-edges-view {
+  --scroll-edges-fade-side: to left;
+}
+
+/* Without scroll timelines, the edge state that the component measures sets the fade. */
+.scroll-edges:has(> .scroll-edges-edge[data-edge="start"][data-visible]) > .scroll-edges-view {
+  --scroll-edges-fade-start: var(--scroll-edges-fade-size);
+}
+
+.scroll-edges:has(> .scroll-edges-edge[data-edge="end"][data-visible]) > .scroll-edges-view {
+  --scroll-edges-fade-end: var(--scroll-edges-fade-size);
+}
+
 /*
- * The scroll position drives the two fades, with no script. An area that does not scroll has no
- * scroll range, so the animation does not run and no edge fades.
+ * With scroll timelines, the scroll position drives the two fades smoothly, and the animation
+ * overrides the rules above. An area that does not scroll has no scroll range, so the animation
+ * does not run and no edge fades.
  */
 @supports (animation-timeline: scroll()) {
   .scroll-edges > .scroll-edges-view {
-    --scroll-edges-fade-size: var(--openbot-space-8);
-    --scroll-edges-fade-side: to right;
-
-    mask-image: linear-gradient(
-      var(--scroll-edges-fade-side),
-      transparent,
-      var(--openbot-text-primary) var(--scroll-edges-fade-start),
-      var(--openbot-text-primary) calc(100% - var(--scroll-edges-fade-end)),
-      transparent
-    );
     animation:
       scroll-edges-fade-start linear both,
       scroll-edges-fade-end linear both;
@@ -72,13 +92,7 @@
   }
 
   .scroll-edges[data-axis="y"] > .scroll-edges-view {
-    --scroll-edges-fade-side: to bottom;
-
     animation-timeline: scroll(self block), scroll(self block);
-  }
-
-  .scroll-edges[data-axis="x"]:dir(rtl) > .scroll-edges-view {
-    --scroll-edges-fade-side: to left;
   }
 }
 

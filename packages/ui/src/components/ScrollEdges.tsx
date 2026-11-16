@@ -6,6 +6,8 @@ import { cx } from "../utils";
 
 export type ScrollEdgesAxis = "x" | "y";
 
+type ScrollEdgesState = { start: boolean; end: boolean; rtl: boolean; short: boolean; middle: number | null };
+
 /** Slack in pixels before an edge counts as reached, for sub-pixel scroll positions. */
 const EDGE_EPSILON = 1;
 
@@ -37,7 +39,14 @@ export function ScrollEdges(props: {
   const { t } = useText();
   const horizontal = untrack(() => props.axis) === "x";
   let view: HTMLElement | undefined;
-  const [state, setState] = createStore({ start: false, end: false, rtl: false, short: false, middle: 0 });
+  // The middle is null until the first measurement, so the CSS fallback centres the arrows.
+  const [state, setState] = createStore<ScrollEdgesState>({
+    start: false,
+    end: false,
+    rtl: false,
+    short: false,
+    middle: null,
+  });
 
   /** The offset of the scroll area: in a right-to-left area it counts down from zero. */
   const measureEdges = (element: HTMLElement) => {
@@ -53,43 +62,70 @@ export function ScrollEdges(props: {
     });
   };
 
+  // The arrows show only while the pointer is on the area or the area has the focus, so the middle
+  // is measured only then: at most once in each frame, against the ancestors that clip the area.
+  let hovered = false;
+  let focused = false;
+  let clips: HTMLElement[] | undefined;
+  let frame = 0;
+  const measureMiddle = () => {
+    frame = 0;
+    const element = view;
+    if (!element || !clips) return;
+    const middle = visibleMiddle(element, clips);
+    setState((draft) => {
+      draft.middle = middle;
+    });
+  };
+  const scheduleMiddle = () => {
+    if (!frame && clips) frame = requestAnimationFrame(measureMiddle);
+  };
+  const follow = () => {
+    const element = view;
+    if (!horizontal || !element) return;
+    if (hovered || focused) {
+      if (clips) return;
+      clips = clippingAncestors(element);
+      document.addEventListener("scroll", scheduleMiddle, { capture: true, passive: true });
+      measureMiddle();
+      return;
+    }
+    if (!clips) return;
+    document.removeEventListener("scroll", scheduleMiddle, { capture: true });
+    cancelAnimationFrame(frame);
+    frame = 0;
+    clips = undefined;
+  };
+  const setHovered = (value: boolean) => {
+    hovered = value;
+    follow();
+  };
+  const setFocused = (value: boolean) => {
+    focused = value;
+    follow();
+  };
+  onCleanup(() => {
+    hovered = false;
+    setFocused(false);
+  });
+
   onSettled(() => {
     const element = view;
     if (!element) return;
-    const measure = () => measureEdges(element);
+    const measure = () => {
+      measureEdges(element);
+      scheduleMiddle();
+    };
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     if (element.firstElementChild) observer.observe(element.firstElementChild);
     element.addEventListener("scroll", measure, { passive: true });
-    measure();
+    measureEdges(element);
     return () => {
       observer.disconnect();
       element.removeEventListener("scroll", measure);
     };
   });
-
-  // The arrows show only while the pointer is on the area, so the middle is measured only then.
-  let followMiddle: (() => void) | undefined;
-  const measureMiddle = () => {
-    const element = view;
-    if (!element || !horizontal) return;
-    const middle = visibleMiddle(element);
-    setState((draft) => {
-      draft.middle = middle;
-    });
-  };
-  const startFollowing = () => {
-    measureMiddle();
-    if (followMiddle) return;
-    followMiddle = measureMiddle;
-    document.addEventListener("scroll", followMiddle, { capture: true, passive: true });
-  };
-  const stopFollowing = () => {
-    if (!followMiddle) return;
-    document.removeEventListener("scroll", followMiddle, { capture: true });
-    followMiddle = undefined;
-  };
-  onCleanup(stopFollowing);
 
   const step = (direction: 1 | -1) => {
     const element = view;
@@ -151,10 +187,13 @@ export function ScrollEdges(props: {
     <div
       class={cx("scroll-edges", props.class)}
       data-axis={props.axis}
-      style={horizontal ? { "--scroll-edges-middle": `${state.middle}px` } : undefined}
-      onPointerEnter={startFollowing}
-      onPointerLeave={stopFollowing}
-      onFocusIn={measureMiddle}
+      style={state.middle === null ? undefined : { "--scroll-edges-middle": `${state.middle}px` }}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+      onFocusIn={() => setFocused(true)}
+      onFocusOut={(event) =>
+        setFocused(event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget))
+      }
     >
       <section
         class={cx("scroll-edges-view", props.viewClass)}
@@ -170,19 +209,25 @@ export function ScrollEdges(props: {
   );
 }
 
+/** The ancestors that clip the element: the chat scrolls the table up and down, so its box cuts the visible part. */
+function clippingAncestors(element: HTMLElement): HTMLElement[] {
+  const clips: HTMLElement[] = [];
+  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+    if (getComputedStyle(parent).overflowY !== "visible") clips.push(parent);
+  }
+  return clips;
+}
+
 /** The middle of the part of the element that is in view, measured from the element's top. */
-function visibleMiddle(element: HTMLElement): number {
+function visibleMiddle(element: HTMLElement, clips: HTMLElement[]): number {
   const box = element.getBoundingClientRect();
   if (box.height <= ARROW_HALF * 2) return box.height / 2;
   let top = Math.max(box.top, 0);
   let bottom = Math.min(box.bottom, window.innerHeight);
-  // The chat scrolls the table up and down, so its own box cuts the visible part too.
-  for (let parent = element.parentElement; parent; parent = parent.parentElement) {
-    const overflow = getComputedStyle(parent).overflowY;
-    if (overflow === "visible") continue;
-    const clip = parent.getBoundingClientRect();
-    top = Math.max(top, clip.top);
-    bottom = Math.min(bottom, clip.bottom);
+  for (const clip of clips) {
+    const rect = clip.getBoundingClientRect();
+    top = Math.max(top, rect.top);
+    bottom = Math.min(bottom, rect.bottom);
   }
   const middle = bottom > top ? (top + bottom) / 2 - box.top : box.height / 2;
   return Math.min(Math.max(middle, ARROW_HALF), box.height - ARROW_HALF);
