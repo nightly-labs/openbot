@@ -12,7 +12,8 @@ import { useChannels } from "../channels/channels-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
 import { serverHasStorage } from "../files/storage-usage";
 import { useServerActions } from "../servers/server-actions";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
+import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useUpdates } from "../updates/updates-context";
@@ -26,7 +27,7 @@ import { useWindowPage } from "./window-page-context";
 
 /**
  * The page rail of the desktop window. Agents, Routines, Workflows, Schedule, Usage, Library,
- * Marketplace and Settings change the page in the card. The menu of the open server is below Settings,
+ * Providers, Marketplace and Settings change the page in the card. The menu of the open server is below Settings,
  * so it shows on each page.
  */
 export function WorkspacePageRail(props: { hidden: boolean }) {
@@ -41,6 +42,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
   const { activeServer } = useServers();
   const platform = usePlatform();
   const serverActions = useServerActions();
+  const { openServerSettings } = useServerSettings();
   /** macOS draws the window buttons in the top row of the rail. Windows and Linux show the logo there. */
   const logo = () => {
     const info = platform.appInfo();
@@ -73,6 +75,12 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
     const server = activeServer();
     return !server || server.kind === "local" || serverSupportsCapability(server, AGENT_TASKS_CAPABILITY);
   };
+  /** Server Settings > Providers of this computer, or of a joined server that this account administers. */
+  const openProviders = () => {
+    const server = activeServer();
+    if (!server || !activeServerHasProviderSettings(server)) return undefined;
+    return (button: HTMLElement) => openServerSettings(server.id, button, "providers");
+  };
   const current = (): PageRailPage | null => {
     const page = windowPage.page();
     if (page === "agents") return layout.sidebarView();
@@ -102,6 +110,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onUsage={windowPage.openUsage}
       // An older joined server has no storage routes, so it has no Library.
       onLibrary={serverHasStorage(activeServer()) ? windowPage.openLibrary : undefined}
+      onProviders={openProviders()}
       onMarketplace={() => {
         windowPage.leavePricing();
         setSkillsMarketplaceOpen(true);

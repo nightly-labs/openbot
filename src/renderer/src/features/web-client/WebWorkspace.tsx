@@ -2944,6 +2944,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
               onWorkflows={workflowsRailAction()}
               onLibrary={libraryRailAction()}
+              onProviders={providerSettings() ? openProviderSettings : undefined}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
