@@ -697,7 +697,13 @@ try {
         await readUpTo("a live message after the wake");
         assert.equal(journaled(recent.key.id), true, "A message that WhatsApp held during the sleep was dropped.");
         assert.equal(journaled(old.key.id), false, "A message older than the held-message window was answered.");
-        return { history: false, recent: true, old: false };
+        // What is not answered is still saved, so an agent can read it with `messaging_history`.
+        const saved = new Set(
+          agents.messaging.history.recent(connectionId(agents), OWNER_JID, null, 200).map((entry) => entry.id),
+        );
+        assert.ok(saved.has(history.key.id ?? ""), "A message from the history of a new link was not saved.");
+        assert.ok(saved.has(old.key.id ?? ""), "A message older than the held-message window was not saved.");
+        return { history: false, recent: true, old: false, saved: true };
       },
     );
 
@@ -826,12 +832,29 @@ try {
           text: "@48600100200 summarize the release",
           mentions: [OWNER_JID],
         });
-        phone.current().receive([chatter, mention]);
+        // The owner writes in the group from the phone: saved for the history, never answered, also with a mention.
+        const ownerReply = message({
+          chat: GROUP,
+          fromMe: true,
+          text: "@48600100200 I can bring dessert",
+          mentions: [OWNER_JID],
+        });
+        phone.current().receive([chatter, ownerReply, mention]);
         await until(() => received(agents, GROUP, mention.key.id ?? ""), "the mention");
         assert.equal(
           received(agents, GROUP, chatter.key.id ?? ""),
           false,
           "A group message without a mention started work.",
+        );
+        assert.equal(
+          received(agents, GROUP, ownerReply.key.id ?? ""),
+          false,
+          "The owner's group message started work.",
+        );
+        const groupHistory = agents.messaging.history.recent(connectionId(agents), GROUP, null, 200);
+        assert.ok(
+          groupHistory.some((entry) => entry.id === ownerReply.key.id),
+          "The owner's message in an allowed group was not saved.",
         );
         const link = agents.messaging.store.linkByKey(connectionId(agents), GROUP, mention.key.id ?? "");
         assert.ok(link, "The mention did not start a conversation keyed by its message.");
