@@ -389,12 +389,8 @@ export class OnePasswordConnectorService implements PasswordVault {
         Effect.sync(() => {
           if (this.#connecting !== controller || controller.signal.aborted) return;
           logger.warn("Unable to connect 1Password", { cause: toLogValue(error) });
-          this.#error =
-            error instanceof OnePasswordConnectError
-              ? error.message
-              : sourceText("error.connector.onePasswordUnexpected", {
-                  detail: redactText(error instanceof Error ? error.message : String(error)),
-                });
+          // The new token is saved through the SDK, which can fail as a pasted token does.
+          this.#error = tokenConnectErrorText(error);
         }),
       ),
       Effect.ensuring(this.#finishConnecting(controller)),
