@@ -672,10 +672,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       }
       const appImage = this.#options.platform === "linux" ? this.#options.appImagePath : undefined;
       const appImageProblem = appImage ? yield* findAppImageInstallProblem(appImage) : null;
-      if (appImageProblem) {
-        logger.warn(`OpenBot update install refused: the AppImage ${appImageProblem}.`);
-        const key = appImageProblem === "is missing" ? "error.update.appImageMissing" : "error.update.appImageReadOnly";
-        return yield* new UpdateOperationFailure({ cause: new Error(sourceText(key)) });
+      if (appImageProblem === "missing") {
+        logger.warn("OpenBot update install refused: the AppImage file is missing.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageMissing")) });
+      }
+      if (appImageProblem === "readOnly") {
+        logger.warn("OpenBot update install refused: the AppImage folder is not writable.");
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.appImageReadOnly")) });
       }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
@@ -1048,18 +1051,18 @@ function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
  * the app quit with no message (#9779): a file that was moved, renamed or replaced while OpenBot ran,
  * or a folder that this user cannot write to. Checked first, the app stays open.
  */
-function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"is missing" | "folder is read-only" | null> {
+function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"missing" | "readOnly" | null> {
   return Effect.gen(function* () {
     const missing = yield* updateIO(() => stat(appImagePath)).pipe(
       Effect.as(false),
       Effect.catch(({ cause }) => Effect.succeed(isMissingPathError(cause))),
     );
-    if (missing) return "is missing";
+    if (missing) return "missing";
     const writable = yield* updateIO(() => access(dirname(appImagePath), constants.W_OK)).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );
-    return writable ? null : "folder is read-only";
+    return writable ? null : "readOnly";
   });
 }
 
