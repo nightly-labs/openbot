@@ -515,6 +515,16 @@ applies to the Claude processes that start after it, and the host sends the prov
 open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
 Without the capability a client hides the row for that host.
 
+The optional `provider-environment-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/provider-environment` (`provider`: `claude`, `codex` or `antigravity`) and
+`POST /v1/admin/host/provider-environment/update` (`provider`, `variables`: at most 32 of `name`,
+`value` or `null`, `sensitive`). The update replaces the whole list; `value: null` keeps a stored
+sensitive value. A response has the variables with `stored`, and an empty `value` for a sensitive one.
+Only owners and admins can use them (else 403). The host refuses an invalid, reserved or repeated name,
+and a kept value that it does not have, with 400 and the reason.
+`src/main/team-api/route-provider-environment.ts` owns them. Without the capability a client hides the
+Environment section for that host.
+
 The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
 `POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,
 `taskId`, `deliveryIds`). The list gives, in full, the waiting messages of each open side thread of

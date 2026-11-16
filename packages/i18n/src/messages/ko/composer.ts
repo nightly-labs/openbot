@@ -108,6 +108,12 @@ export const messages = {
   "composer.error.holdQueued": "수정을 위해 대기열 메시지를 보류할 수 없었어요.",
   "composer.error.cancelEdit": "대기열 수정을 취소할 수 없었어요. 다시 시도해 주세요.",
   "composer.error.updateQueued": "대기열 메시지를 업데이트할 수 없었어요. 다시 시도해 주세요.",
+  "composer.queueEdit.received": "에이전트가 이미 이 메시지를 받아서 편집이 끝났습니다.",
+  "composer.queueEdit.receivedKept":
+    "에이전트가 이미 이 메시지를 받아서 편집이 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
+  "composer.queueEdit.deletedKept":
+    "이 메시지가 삭제되어 편집이 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
+  "composer.queueEdit.endedKept": "이 편집은 저장되기 전에 끝났습니다. 변경한 내용은 메시지 입력란에 남아 있습니다.",
   "composer.voice.prepareFailed": "음성 모델을 준비할 수 없었어요. 다시 시도해 주세요.",
   "composer.voice.noSpeechRecorded": "녹음된 음성이 없어요.",
   "composer.voice.noSpeechDetected": "감지된 음성이 없어요.",

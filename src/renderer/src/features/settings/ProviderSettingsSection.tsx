@@ -54,6 +54,7 @@ import {
   type ProviderClaudeCompactWindow,
   type ProviderClaudeUserSetup,
   type ProviderDefaultChoice,
+  type ProviderEnvironmentControl,
   type ProviderModelVisibilityControl,
   type ProviderPromptCache,
   type ProviderSettingsDetail,
@@ -70,6 +71,7 @@ import {
   type ProviderClaudeCompactWindowSource,
 } from "./provider-claude-compact-window";
 import { createProviderClaudeUserSetup, type ProviderClaudeUserSetupSource } from "./provider-claude-user-setup";
+import { createProviderEnvironment, type ProviderEnvironmentSource } from "./provider-environment";
 import { createHostDefaultProvider, type HostDefaultProviderSource } from "./provider-host-default";
 import { createProviderModelVisibility, type ProviderModelVisibilitySource } from "./provider-model-visibility";
 import { createProviderPromptCache, type ProviderPromptCacheSource } from "./provider-prompt-cache";
@@ -133,6 +135,7 @@ interface ProviderSettingsSectionProps {
   promptCache?: ProviderPromptCache | undefined;
   claudeUserSetup?: ProviderClaudeUserSetup | undefined;
   claudeCompactWindow?: ProviderClaudeCompactWindow | undefined;
+  environment?: ((provider: AgentProviderId) => ProviderEnvironmentControl | undefined) | undefined;
   modelVisibility?: ((provider: AgentProviderId) => ProviderModelVisibilityControl) | undefined;
 }
 
@@ -312,6 +315,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         promptCache={props.promptCache}
         claudeUserSetup={props.claudeUserSetup}
         claudeCompactWindow={props.claudeCompactWindow}
+        environment={props.environment}
         modelVisibility={props.modelVisibility}
         footer={
           <>
@@ -600,6 +604,8 @@ export function HostProviderSettingsPanel(
     claudeUserSetup?: ProviderClaudeUserSetupSource | undefined;
     /** The Claude page's compaction size, for a host with `claude-compact-window-v1` that this account administers. */
     claudeCompactWindow?: ProviderClaudeCompactWindowSource | undefined;
+    /** The Environment section of each provider page, for a host with `provider-environment-v1` that this account administers. */
+    providerEnvironment?: ProviderEnvironmentSource | undefined;
     /** The Models section of each provider page, for a host with `model-visibility-v1` that this account administers. */
     modelVisibility?: ProviderModelVisibilitySource | undefined;
     /** The Default provider of a joined host with `provider-default-v1` that this account administers. */
@@ -621,6 +627,10 @@ export function HostProviderSettingsPanel(
   );
   const claudeCompactWindow = createProviderClaudeCompactWindow(
     () => props.claudeCompactWindow,
+    () => props.agentStatus,
+  );
+  const environment = createProviderEnvironment(
+    () => props.providerEnvironment,
     () => props.agentStatus,
   );
   const keys = createProviderKeyState({
@@ -695,6 +705,7 @@ export function HostProviderSettingsPanel(
         promptCache={promptCache()}
         claudeUserSetup={claudeUserSetup()}
         claudeCompactWindow={claudeCompactWindow()}
+        environment={environment()}
         modelVisibility={modelVisibility()}
         detectionSettings={
           <Show when={props.detectionSettings}>

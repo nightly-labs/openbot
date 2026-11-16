@@ -271,6 +271,14 @@ export interface CommittedChannelAttachments {
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
 
 /**
+ * How long a queue edit keeps its message from starting. The editor can close or lose its edit with no
+ * Save or Cancel, and a message that waits for that edit stops all of its lane (#7750). After this
+ * time the message starts with its original text, and the edit ends as cancelled. An edit from before
+ * a restart gets this time again from the start, so an editor that comes back with it can still save.
+ */
+export const QUEUE_EDIT_HOLD_MS = 10 * 60_000;
+
+/**
  * A lane id for the channel thread of one channel. A task id never starts with this control
  * character, so a lane id names a task or a channel without a second field.
  */
@@ -290,6 +298,8 @@ export class MailboxStore {
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
   readonly #queueUpdates = new Set<string>();
+  /** When each edit began, or when this run found it, by delivery id. Only memory. */
+  readonly #editHolds = new Map<string, { editId: string; startedAt: number }>();
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
@@ -342,11 +352,11 @@ export class MailboxStore {
         yield* this.#database.backupLegacyFile(this.#statePath);
         this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1", [], true);
       }
-      const activeEdits = new Set(
-        this.#state.deliveries
-          .filter((delivery) => delivery.status === "queued" && delivery.editId)
-          .map((delivery) => delivery.editId),
-      );
+      const startedAt = Date.now();
+      for (const delivery of this.#state.deliveries)
+        if (delivery.status === "queued" && delivery.editId)
+          this.#editHolds.set(delivery.id, { editId: delivery.editId, startedAt });
+      const activeEdits = new Set([...this.#editHolds.values()].map((hold) => hold.editId));
       const retainedDrafts = this.#state.drafts.filter(
         (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
       );
@@ -1830,7 +1840,24 @@ export class MailboxStore {
   }
 
   #mayStart(delivery: StoredDelivery): boolean {
-    return !delivery.editId && !this.#queueUpdates.has(delivery.id);
+    return !this.#isHeldByEdit(delivery) && !this.#queueUpdates.has(delivery.id);
+  }
+
+  /** The agents with a queued message that an edit holds now. */
+  agentsWithEditHolds(): string[] {
+    return [
+      ...new Set(
+        this.#state.deliveries
+          .filter((delivery) => delivery.status === "queued" && this.#isHeldByEdit(delivery))
+          .map((delivery) => delivery.recipientAgentId),
+      ),
+    ];
+  }
+
+  /** True while an edit that began, or that this run found, less than `QUEUE_EDIT_HOLD_MS` ago holds the message. */
+  #isHeldByEdit(delivery: StoredDelivery): boolean {
+    const hold = delivery.editId ? this.#editHolds.get(delivery.id) : undefined;
+    return hold !== undefined && hold.editId === delivery.editId && Date.now() - hold.startedAt < QUEUE_EDIT_HOLD_MS;
   }
 
   /**
@@ -2336,6 +2363,10 @@ export class MailboxStore {
     deliveryId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      // An edit that no longer holds its message ends here: the message starts with its original text.
+      if (delivery?.status === "queued" && delivery.editId && !this.#isHeldByEdit(delivery))
+        this.#finishCancellation(delivery, false);
       this.#assertQueueNotEditing(deliveryId);
       this.#clearSteerFallback(deliveryId);
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
@@ -2467,6 +2498,8 @@ export class MailboxStore {
       else delivery.editId = previous;
       throw error;
     }
+    // A Begin again from the same editor, as each Save sends, gives it the full time again.
+    this.#editHolds.set(delivery.id, { editId, startedAt: Date.now() });
   }
 
   retainQueueEditAttachments(agentId: string, deliveryId: string, editId: string, draftIds: string[]): void {
@@ -2569,6 +2602,7 @@ export class MailboxStore {
       });
       throw error;
     }
+    this.#editHolds.delete(delivery.id);
   }
 
   #assertQueueNotUpdating(deliveryId: string): void {

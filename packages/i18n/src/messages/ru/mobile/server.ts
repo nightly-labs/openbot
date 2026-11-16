@@ -1245,6 +1245,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "По умолчанию Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} токенов",
   "mobile.server.providers.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
+  "mobile.server.environment.row": "Переменные",
+  "mobile.server.environment.title": "Окружение",
+  "mobile.server.environment.hint":
+    "Ключи API, базовые адреса и другие настройки, которые получает каждый процесс {name}. Изменение действует, когда закончатся текущие ходы.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL с ключом OPENAI_API_KEY отправляет запросы ChatGPT к моделям по этому адресу.",
+  "mobile.server.environment.shellNote": "Команды, которые запускают агенты, могут читать эти значения.",
+  "mobile.server.environment.add": "Добавить переменную",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Значение",
+  "mobile.server.environment.saved": "Сохранено",
+  "mobile.server.environment.sensitive": "Секретная",
+  "mobile.server.environment.remove": "Удалить",
+  "mobile.server.environment.save": "Сохранить",
+  "mobile.server.environment.loadFailed": "Не удалось загрузить переменные {name}.",
+  "mobile.server.environment.invalid": "Сначала исправьте имена.",
   "mobile.server.providers.disconnect": "Отключить",
   "mobile.server.providers.disconnectTitle": "Отключить {name}?",
   "mobile.server.providers.disconnectBody":

@@ -66,6 +66,7 @@ import type {
   ProviderClaudeCompactWindowSource,
 } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
+import type { HostProviderEnvironmentOptions, ProviderEnvironmentSource } from "../settings/provider-environment";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
@@ -245,6 +246,11 @@ export interface ServerSettingsModalProps {
    */
   claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
   /**
+   * The provider pages show their Environment section only when a caller supplies this, and only for
+   * the local server or a remote host with `provider-environment-v1` that this member administers.
+   */
+  providerEnvironment?: HostProviderEnvironmentOptions | undefined;
+  /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
    */
@@ -284,6 +290,10 @@ export interface ServerSettingsModalProps {
   vault?: ServerVaultOptions | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
+  /** Counts the open requests, so a new request moves to its section also when the section did not change. */
+  initialSectionRequest?: number | undefined;
+  /** Gets the section on screen, so the rail can mark the page that it opened. */
+  onSectionChange?: ((section: ServerSettingsSection) => void) | undefined;
   /** Where the settings page shows, or nothing while the page is not on screen. */
   page: SettingsPagePlacement | undefined;
   /** The search of the settings page. The section list shows only the sections whose title or description holds it. */
@@ -405,6 +415,12 @@ const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const { t, errorMessage } = useText();
   const [section, setSection] = createSignal<Section>("general");
+  createEffect(
+    () => ({ shown: section(), notify: props.onSectionChange }),
+    ({ shown, notify }) => {
+      notify?.(shown);
+    },
+  );
   /** Set while a provider page is open, so the header reads `Providers › Codex`. */
   const [providerDetail, setProviderDetail] = createSignal<ProviderSettingsDetail | null>(null);
   /** Set while an import source is open, so the header reads `Import › Hermes Agent`. */
@@ -454,6 +470,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function claudeCompactWindowSource(): ProviderClaudeCompactWindowSource | undefined {
     const options = props.claudeCompactWindow;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-compact-window-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function providerEnvironmentSource(): ProviderEnvironmentSource | undefined {
+    const options = props.providerEnvironment;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "provider-environment-v1"))
       return undefined;
     return { ...options, serverId: props.server.id };
   }
@@ -715,9 +737,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
 
   /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
+  const requestedSection = createMemo(() => (props.open ? availableInitialSection() : null));
   createEffect(
-    () => (props.open ? availableInitialSection() : null),
-    (requested) => {
+    () => ({ requested: requestedSection(), request: props.initialSectionRequest }),
+    ({ requested }) => {
       if (requested) setSection(requested);
     },
   );
@@ -991,6 +1014,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   promptCache={promptCacheSource()}
                   claudeUserSetup={claudeUserSetupSource()}
                   claudeCompactWindow={claudeCompactWindowSource()}
+                  providerEnvironment={providerEnvironmentSource()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />

@@ -642,6 +642,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "Wiadomość w kolejce zachowa tekst, który agent już ma.",
   "mobile.chat.queue.discard": "Odrzuć",
   "mobile.chat.queue.alreadyReceived": "Agent już otrzymał tę wiadomość, więc nie można jej zmienić.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "Agent już otrzymał tę wiadomość, więc nie można jej zmienić. Gdy zamkniesz ten ekran, twój tekst trafi do pola wiadomości.",
   "mobile.chat.queue.holding": "Wstrzymywanie wiadomości…",
   "mobile.chat.queue.holdFailed": "Nie udało się wstrzymać tej wiadomości do edycji.",
   "mobile.chat.queue.messageLabel": "Wiadomość",

@@ -519,6 +519,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "Het bericht in de wachtrij houdt de tekst die de agent al heeft.",
   "mobile.chat.queue.discard": "Weggooien",
   "mobile.chat.queue.alreadyReceived": "De agent heeft dit bericht al ontvangen, dus je kunt het niet meer wijzigen.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "De agent heeft dit bericht al ontvangen, dus het kan niet meer worden gewijzigd. Als je dit scherm sluit, gaat je tekst naar het berichtvak.",
   "mobile.chat.queue.holding": "Bericht wordt voor je vastgehouden…",
   "mobile.chat.queue.holdFailed": "OpenBot kan dit bericht niet vasthouden om het te bewerken.",
   "mobile.chat.queue.messageLabel": "Bericht",

@@ -121,6 +121,7 @@ import {
   getHostModelVisibility,
   getHostPersonality,
   getHostPromptCacheTtl,
+  getHostProviderEnvironment,
   getHostReleaseStatus,
   getHostSkillLearning,
   getHostTimezone,
@@ -137,6 +138,7 @@ import {
   setHostModelVisibility,
   setHostPersonality,
   setHostPromptCacheTtl,
+  setHostProviderEnvironment,
   setHostSkillLearning,
   setHostTimezone,
   setHostUpdateSettings,
@@ -302,6 +304,7 @@ import {
 import { licenseContactUs, trackLicenseEvent } from "../settings/license-analytics";
 import type { HostClaudeCompactWindowCalls } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupCalls } from "../settings/provider-claude-user-setup";
+import type { HostProviderEnvironmentCalls } from "../settings/provider-environment";
 import type { HostModelVisibilityCalls } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
 import { createCommunityCardVisibility } from "../sidebar/community-card";
@@ -1353,6 +1356,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (id) void openHostPage(id, "library", button);
     };
   }
+  /** The Providers button of the page rail, only when this account manages the providers. Not a ternary prop. */
+  function providersRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!providerSettings()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (id) void openServerSettings(id, button, "providers");
+    };
+  }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
   function workflowsRailAction(): (() => void) | undefined {
     if (!workflowsSupported()) return undefined;
@@ -1734,6 +1745,16 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
         setHostClaudeCompactWindow(hostRequest(serverId), tokens).pipe(Effect.mapError((error) => error.cause)),
       ),
   };
+  const hostProviderEnvironmentCalls: HostProviderEnvironmentCalls = {
+    getProviderEnvironment: async (provider, serverId) =>
+      runTeamEffect(
+        getHostProviderEnvironment(hostRequest(serverId), provider).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    setProviderEnvironment: async (update, serverId) =>
+      runTeamEffect(
+        setHostProviderEnvironment(hostRequest(serverId), update).pipe(Effect.mapError((error) => error.cause)),
+      ),
+  };
   const hostModelVisibilityCalls: HostModelVisibilityCalls = {
     getModelVisibility: async (provider, serverId) =>
       runTeamEffect(
@@ -1819,6 +1840,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       }),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
+  /** Counts the open requests, so a second request for the shown section moves to it again. */
+  const [serverSettingsRequest, setServerSettingsRequest] = createSignal(0);
+  /** The section on screen, so the rail marks Providers while it shows. */
+  const [serverSettingsShownSection, setServerSettingsShownSection] = createSignal<ServerSettingsSection | null>(null);
   /** The MCP row that a chat card asked to sign in to. Its Marketplace page starts the sign-in, as its Sign in button does. */
   const [mcpSignInRequest, setMcpSignInRequest] = createSignal<string | null>(null);
   // The request ends with the page, also when another page or a server switch closes it.
@@ -1843,6 +1868,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (server()?.id !== serverId || workspace.state.status !== "online") return;
     }
     setServerSettingsSection(section);
+    setServerSettingsRequest((count) => count + 1);
     setMobilePane("conversation");
     setHostPage(null);
     setMarketplaceOpen(false);
@@ -2811,12 +2837,13 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   }
   /**
    * The rail button of the page. The server settings and the pricing page open from the server menu, so no button is
-   * current.
+   * current, except Providers while its section shows.
    */
   const railPage = (): PageRailPage | null => {
     const current = page();
     if (current === "agents") return layout.sidebarView();
-    return current === "server-settings" || current === "pricing" ? null : current;
+    if (current === "server-settings") return serverSettingsShownSection() === "providers" ? "providers" : null;
+    return current === "pricing" ? null : current;
   };
   /** The settings page on screen, if any. */
   const settingsKind = (): SettingsKind | null =>
@@ -2945,6 +2972,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
               onWorkflows={workflowsRailAction()}
               onLibrary={libraryRailAction()}
+              onProviders={providersRailAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
@@ -3444,6 +3472,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
+                        initialSectionRequest={serverSettingsRequest()}
+                        onSectionChange={setServerSettingsShownSection}
                         platform="darwin"
                         remoteDesktopSupported={false}
                         server={target()}
@@ -3506,6 +3536,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         hostPromptCacheTtl={{ calls: hostPromptCacheTtlCalls }}
                         claudeUserSetup={{ calls: hostClaudeUserSetupCalls }}
                         claudeCompactWindow={{ calls: hostClaudeCompactWindowCalls }}
+                        providerEnvironment={{ calls: hostProviderEnvironmentCalls }}
                         hostModelVisibility={{ calls: hostModelVisibilityCalls }}
                         hostDefaultProvider={{ calls: providerAdmin.hostDefaultProviderCalls }}
                         agentAccess={{ calls: hostAgentAccessCalls, listAgents: () => workspace.runtime.listAgents() }}

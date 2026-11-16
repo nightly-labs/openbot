@@ -116,6 +116,13 @@ export const messages = {
   "composer.error.cancelEdit": "Die Bearbeitung der Warteschlange konnte nicht abgebrochen werden. Versuche es erneut.",
   "composer.error.updateQueued":
     "Die Nachricht in der Warteschlange konnte nicht aktualisiert werden. Versuche es erneut.",
+  "composer.queueEdit.received": "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet.",
+  "composer.queueEdit.receivedKept":
+    "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.deletedKept":
+    "Diese Nachricht wurde gelöscht. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.endedKept":
+    "Diese Bearbeitung wurde beendet, bevor sie gespeichert wurde. Deine Änderungen stehen noch im Nachrichtenfeld.",
   "composer.voice.prepareFailed": "Das Sprachmodell konnte nicht vorbereitet werden. Versuche es erneut.",
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",

@@ -1113,6 +1113,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Standaard van Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
+  "mobile.server.environment.row": "Variabelen",
+  "mobile.server.environment.title": "Omgeving",
+  "mobile.server.environment.hint":
+    "API-sleutels, basis-URL’s en andere instellingen die elk {name}-proces krijgt. Een wijziging geldt als de lopende beurten klaar zijn.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL stuurt met OPENAI_API_KEY als sleutel de modelverzoeken van ChatGPT naar dat adres.",
+  "mobile.server.environment.shellNote": "De opdrachten die agents uitvoeren, kunnen deze waarden lezen.",
+  "mobile.server.environment.add": "Variabele toevoegen",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Waarde",
+  "mobile.server.environment.saved": "Opgeslagen",
+  "mobile.server.environment.sensitive": "Gevoelig",
+  "mobile.server.environment.remove": "Verwijderen",
+  "mobile.server.environment.save": "Opslaan",
+  "mobile.server.environment.loadFailed": "Kan de variabelen van {name} niet laden.",
+  "mobile.server.environment.invalid": "Verbeter eerst de namen.",
   "mobile.server.providers.disconnect": "Ontkoppelen",
   "mobile.server.providers.disconnectTitle": "{name} ontkoppelen?",
   "mobile.server.providers.disconnectBody":

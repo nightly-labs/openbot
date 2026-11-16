@@ -328,6 +328,11 @@ import {
   PROVIDER_DETECTION_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-detection-v1";
 import {
+  PROVIDER_ENVIRONMENT_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CODECS,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
+import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -451,6 +456,12 @@ import { MemoryReviewPreferenceStore } from "../src/main/memory-review-preferenc
 import type { PasswordManagerDriver } from "../src/main/password-managers/driver";
 import { PasswordManagersService } from "../src/main/password-managers/password-managers-service";
 import { ProviderAccountsHost } from "../src/main/provider-accounts-host";
+import { ProviderCredentialStore } from "../src/main/provider-credential-store";
+import {
+  createProviderEnvironmentPreferenceStore,
+  providerEnvironmentControl,
+  providerEnvironmentSecret,
+} from "../src/main/provider-environment-store";
 import { downloadTransferInParts, uploadTransferInParts } from "../src/main/remote-instance-transfer-chunks";
 import { RemoteRequestError } from "../src/main/remote-server-errors";
 import { RemoteWorkflowError } from "../src/main/remote-service-effects";
@@ -2009,6 +2020,14 @@ const connectors: TeamApiConnectors = {
 const vaultFile = join(root, "openbot-vault-v1.json");
 const vault = new VaultService({ store: new VaultStore(vaultFile, fakeCipher), canPersist: () => true });
 await Effect.runPromise(vault.load());
+// The real key file over the test folder, where the sensitive variables of a provider go.
+const providerCredentials = new ProviderCredentialStore(join(root, "provider-credentials.json"), fakeCipher);
+await Effect.runPromise(providerCredentials.load());
+const providerEnvironment = providerEnvironmentControl(
+  createProviderEnvironmentPreferenceStore(join(root, "provider-environment.json")),
+  providerCredentials,
+  (provider) => Effect.sync(() => record("providerEnvironmentChanged", provider)),
+);
 const VAULT_PASSWORD = "e2e-vault-password-7f3c";
 const VAULT_API_KEY = "e2e-vault-api-key-91d2";
 /** A two-step setup key as a site shows it: grouped and in lower case. The host saves it in upper case. */
@@ -2475,6 +2494,8 @@ try {
         createClaudeCompactWindowPreferenceStore(join(root, "claude-compact-window.json")),
         () => record("claudeCompactWindowChanged"),
       ),
+      // The real variables over files of the test folder; a change records the provider to restart.
+      providerEnvironment,
       // The host's scan: one model server, one agent, and a model list that echoes no key.
       providerDetection: {
         detection: {
@@ -7918,6 +7939,146 @@ try {
         isDeepStrictEqual(reset.body, { tokens: null }) &&
         callsOf("claudeCompactWindowChanged").length === 2,
       [summary(member), summary(memberRead), summary(noCapability), summary(reset)],
+    );
+  }
+
+  // ---- The environment variables of a provider of the host, from a joined server (provider-environment-v1) ----
+  {
+    const setup = { token: adaToken, protocol: TEAM_PROTOCOL_V9, capabilities: [PROVIDER_ENVIRONMENT_CAPABILITY] };
+    const secret = "proxy-secret-e2e-1";
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    const before = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, { ...setup, json: { provider: "claude" } });
+    const reserved = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "CLAUDE_CONFIG_DIR", value: "/tmp/x", sensitive: false }] },
+    });
+    const badName = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "2BAD", value: "x", sensitive: false }] },
+    });
+    const missing = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [{ name: "ANTHROPIC_AUTH_TOKEN", value: null, sensitive: true }] },
+    });
+    check(
+      "the host advertises provider-environment-v1 to protocol 9 only, starts with no variable, and refuses a reserved name, an invalid name and a kept value it does not have",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ENVIRONMENT_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ENVIRONMENT_CAPABILITY) &&
+        isDeepStrictEqual(before.body, { provider: "claude", variables: [] }) &&
+        errorIs(reserved, 400, sourceText("error.provider.environmentNameReserved", { name: "CLAUDE_CONFIG_DIR" })) &&
+        errorIs(badName, 400, sourceText("error.provider.environmentNameInvalid", { name: "2BAD" })) &&
+        errorIs(
+          missing,
+          400,
+          sourceText("error.provider.customAgentEnvValueMissing", { name: "ANTHROPIC_AUTH_TOKEN" }),
+        ) &&
+        callsOf("providerEnvironmentChanged").length === 0,
+      [summary(before), summary(reserved), summary(badName), summary(missing)],
+    );
+    const set = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "claude",
+        variables: [
+          { name: " ANTHROPIC_BASE_URL ", value: "http://127.0.0.1:8317", sensitive: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: secret, sensitive: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false },
+        ],
+      },
+    });
+    const savedFile = parseJson(readFileSync(join(root, "provider-environment.json"), "utf8"));
+    const keyFile = readFileSync(join(root, "provider-credentials.json"), "utf8");
+    check(
+      "an admin saves the variables: the host trims the names, keeps the sensitive value encrypted, never answers it, gives each process the values, and restarts the provider",
+      isDeepStrictEqual(set.body, {
+        provider: "claude",
+        variables: [
+          { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317", sensitive: false, stored: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: "", sensitive: true, stored: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false, stored: false },
+        ],
+      }) &&
+        PROVIDER_ENVIRONMENT_CODECS.get(PROVIDER_ENVIRONMENT_ROUTES.update)?.response(200, set.body) !== undefined &&
+        !JSON.stringify(set.body).includes(secret) &&
+        !JSON.stringify(savedFile).includes(secret) &&
+        !keyFile.includes(secret) &&
+        isDeepStrictEqual(providerEnvironment.resolve("claude"), {
+          ANTHROPIC_BASE_URL: "http://127.0.0.1:8317",
+          ANTHROPIC_AUTH_TOKEN: secret,
+          ANTHROPIC_API_KEY: "",
+        }) &&
+        isDeepStrictEqual(callsOf("providerEnvironmentChanged"), [["claude"]]),
+      [summary(set)],
+    );
+    const kept = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "claude",
+        variables: [
+          { name: "ANTHROPIC_BASE_URL", value: "http://127.0.0.1:8317", sensitive: false },
+          { name: "ANTHROPIC_AUTH_TOKEN", value: null, sensitive: true },
+          { name: "ANTHROPIC_API_KEY", value: "", sensitive: false },
+        ],
+      },
+    });
+    const otherProvider = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, {
+      ...setup,
+      json: { provider: "codex" },
+    });
+    check(
+      "a save that keeps the stored value changes nothing and restarts nothing, and another provider has its own list",
+      isDeepStrictEqual(kept.body, set.body) &&
+        providerEnvironment.resolve("claude").ANTHROPIC_AUTH_TOKEN === secret &&
+        callsOf("providerEnvironmentChanged").length === 1 &&
+        isDeepStrictEqual(otherProvider.body, { provider: "codex", variables: [] }),
+      [summary(kept), summary(otherProvider)],
+    );
+    const big = "x".repeat(8_000);
+    const tooLarge = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "codex",
+        variables: Array.from({ length: 8 }, (_, index) => ({ name: `BIG_${index}`, value: big, sensitive: true })),
+      },
+    });
+    check(
+      "the host refuses sensitive values that would make the key file too large to read, and keeps the saved values and names",
+      errorIs(tooLarge, 400, sourceText("error.provider.environmentSecretsTooLarge")) &&
+        providerCredentials.secret(providerEnvironmentSecret("claude", "ANTHROPIC_AUTH_TOKEN")) === secret &&
+        providerCredentials.secret(providerEnvironmentSecret("codex", "BIG_0")) === null &&
+        isDeepStrictEqual(providerEnvironment.get("codex"), { provider: "codex", variables: [] }),
+      [summary(tooLarge)],
+    );
+    const member = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      token: bobToken,
+      json: { provider: "claude", variables: [] },
+    });
+    const memberRead = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, {
+      ...setup,
+      token: bobToken,
+      json: { provider: "claude" },
+    });
+    const noCapability = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      json: { provider: "claude", variables: [] },
+    });
+    const removed = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: { provider: "claude", variables: [] },
+    });
+    check(
+      "a member cannot read or set the variables (403), a client without provider-environment-v1 gets 400, and an admin removes them with the sensitive value",
+      member.status === 403 &&
+        memberRead.status === 403 &&
+        errorIs(noCapability, 400, sourceText("error.team.providerEnvironmentUnsupported")) &&
+        isDeepStrictEqual(removed.body, { provider: "claude", variables: [] }) &&
+        providerCredentials.secret(providerEnvironmentSecret("claude", "ANTHROPIC_AUTH_TOKEN")) === null &&
+        isDeepStrictEqual(providerEnvironment.resolve("claude"), {}) &&
+        callsOf("providerEnvironmentChanged").length === 2,
+      [summary(member), summary(memberRead), summary(noCapability), summary(removed)],
     );
   }
 

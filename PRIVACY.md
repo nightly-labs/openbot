@@ -1972,6 +1972,17 @@ For a saved endpoint, OpenBot sends the stored key and headers only to the same 
 address. Local detection can be turned off in Settings. Its switch, addresses, folders and hidden
 rows are in `openbot-provider-detection-v1.json` in the app profile.
 
+### Provider variables
+
+An owner or admin can give Claude, Codex and Gemini environment variables on each provider page in
+Server settings → Providers. When the variables name another address, such as a proxy like
+CLIProxyAPI, the model requests of that provider, with the conversation, attachments and tool results
+that they carry, go to that address and not to Anthropic, OpenAI or Google. What that address sends
+on is its own choice. Names and plain values are in `openbot-provider-environment-v1.json` in the app
+profile. A value marked sensitive is in the encrypted provider key file, goes only to that provider's
+processes, and is not in a screen, log, export, or diagnostics report. The commands that agents run
+can read the variables.
+
 ### Custom agents
 
 A custom agent is an ACP program that you name. OpenBot starts it as a local process, and prompts, attachments, and tool results go to that process. What the program sends

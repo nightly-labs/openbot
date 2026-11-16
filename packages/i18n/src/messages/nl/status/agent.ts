@@ -54,6 +54,7 @@ export const messages = {
   "status.agent.browserProfileOwn": "Geef {agents} elk een eigen browserprofiel. Hun open tabbladen sluiten.",
   "status.agent.feedbackSending": "Je feedback wordt naar het OpenBot-team gestuurd…",
   "status.agent.workflowDelete": "Verwijder de workflow {title} met zijn runs en versies. Zijn open stappen stoppen.",
+  "status.agent.deleteAgents": "Verwijder {agents} met hun chats en bestanden. Je kunt dit niet ongedaan maken.",
   "status.agent.vaultCardFillFrames": "De kaartvelden staan in frames van {origins}.",
   "status.agent.screenCaptureProgress": "Vraagt om het scherm vast te leggen…",
   "status.agent.screenCaptureReviewing": "Bekijkt de schermopname…",
