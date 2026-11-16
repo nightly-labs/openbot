@@ -17,7 +17,7 @@ import type { AgentModelOption, UpdateAgentInput } from "@openbot/contracts/ipc"
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
-import { profileToolErrorMessage } from "../src/backend/agent/profile-tools";
+import { profileAgentToolErrorMessage } from "../src/backend/agent/profile-tools";
 import { openBotToolFailure } from "../src/backend/agent/routine-tools";
 import { ToolOperationFailed } from "../src/backend/agent/tool-operation";
 import { handleUpdateAgentsTool } from "../src/backend/agent/update-agents-tool";
@@ -108,7 +108,11 @@ try {
         { threadId: "t", turnId: "turn", callId: "c", namespace: "openbot", tool: "update_agents", arguments: args },
         coordinator.id,
         hooks,
-      ).pipe(Effect.catch((failure) => Effect.succeed(openBotToolFailure(profileToolErrorMessage(failure.cause))))),
+      ).pipe(
+        Effect.catch((failure) =>
+          Effect.succeed(openBotToolFailure(profileAgentToolErrorMessage("update_agents", failure.cause))),
+        ),
+      ),
     );
     const item = response.contentItems[0];
     assert.ok(item && item.type === "inputText", "The answer is text.");
@@ -224,7 +228,14 @@ try {
       assert.equal(typeof refusal.value.error, "string");
     }
     assert.match(String(refusals.repeated.value.error), /each agent id once/);
-    assert.match(String(refusals.unknownField.value.error), /Remove unsupported profile fields/);
+    // The refusal lists the fields that update_agents takes, never the field that the call sent (#10024).
+    const unknownField = String(refusals.unknownField.value.error);
+    assert.match(unknownField, /^Remove unsupported profile fields\. update_agents takes only: /);
+    assert.ok(
+      ["agentIds", "model", "notifications"].every((field) => unknownField.includes(field)),
+      "The refusal lists the fields that update_agents takes.",
+    );
+    assert.ok(!unknownField.includes("providerAccountId"), "The refusal does not name the field that the call sent.");
     return Object.fromEntries(Object.entries(refusals).map(([name, refusal]) => [name, refusal.value.error]));
   });
 

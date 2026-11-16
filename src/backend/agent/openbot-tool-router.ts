@@ -197,6 +197,7 @@ import {
   createAgentToolSchema,
   listModelsToolSchema,
   PROFILE_TOOL_NAMES,
+  profileAgentToolErrorMessage,
   profileToolErrorMessage,
   readAgentToolSchema,
   restrictionInput,
@@ -1060,7 +1061,7 @@ export class OpenBotToolRouter {
                 const message = this.#hooks.redactMcp(
                   CHANNEL_AGENT_TOOL_NAMES.has(tool)
                     ? channelAgentToolErrorMessage(tool, error)
-                    : profileToolErrorMessage(error),
+                    : profileAgentToolErrorMessage(tool, error),
                 );
                 if (!(error instanceof z.ZodError)) logger.warn("An OpenBot tool failed.", { tool, error: message });
                 return openBotToolFailure(message);
