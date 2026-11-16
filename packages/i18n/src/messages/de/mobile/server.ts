@@ -464,7 +464,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Keine Zeitzone passt zu dieser Suche.",
   "mobile.server.settings.timezoneMore": "Gib mehr vom Namen ein, um weitere Zeitzonen zu sehen.",
   "mobile.server.settings.timezoneDescription":
-    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt.",
+    "Neue Routinen verwenden diese Zeitzone, wenn die Nachricht die Zeitzone des Absenders nicht angibt. Auf einem Server verwendet auch der Browser sie nach dem nächsten Neustart.",
   "mobile.server.settings.timezoneLoading": "Zeitzone wird geladen…",
   "mobile.server.settings.timezoneLoadFailed": "Die Zeitzone des Servers konnte nicht geladen werden.",
   "mobile.server.settings.timezoneSaveFailed": "Die Zeitzone konnte nicht gespeichert werden. Versuche es erneut.",

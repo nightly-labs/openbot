@@ -936,6 +936,10 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+On a server, main sets `TZ` to the chosen zone before the app is ready (`applyServerTimezone`),
+because Chromium reads the zone of its pages only when a renderer starts: the agent browser, the
+agent processes and main use it after the next restart (#8935). "Automatic" still shows and uses the
+zone of the computer from before that change.
 
 `host-turn-limits-v1` reads and sets the turn limits of the host (`openbot-host-turn-limits-v1.json`).
 `turnLimit` is the most turns that run at the same time on the host; `null` is automatic: 2, 8 or 16 by

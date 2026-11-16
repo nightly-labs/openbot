@@ -32,6 +32,7 @@ import {
   shell,
   systemPreferences,
 } from "electron";
+import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -158,6 +159,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
@@ -315,6 +317,11 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
+const systemTimezone =
+  serverMode || hostedServer || localServerChild
+    ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
+    : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
@@ -1563,6 +1570,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        systemTimezone,
         previousUncleanExit,
         macHapticFeedback,
         teardown,

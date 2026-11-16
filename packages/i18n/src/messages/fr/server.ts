@@ -352,7 +352,7 @@ export const messages = {
     "Choisissez ce que les agents de ce serveur peuvent faire quand vous ne le définissez pas pour un agent.",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "server.settings.turnLimit": "Fils en même temps",

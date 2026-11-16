@@ -353,7 +353,7 @@ export const messages = {
     "Wybierz, co mogą robić agenci na tym serwerze, gdy nie ustawisz tego dla agenta.",
   "server.settings.timezone": "Strefa czasowa",
   "server.settings.timezoneDescription":
-    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
+    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "server.settings.timezoneAutomatic": "Automatycznie ({zone})",
   "server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
   "server.settings.turnLimit": "Wątki jednocześnie",
