@@ -6,6 +6,7 @@ import {
   canPreviewAttachment,
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type QueueSnapshot,
+  routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import {
   TEAM_ANY_FILE_ATTACHMENTS_CAPABILITY,
@@ -324,11 +325,16 @@ export function ConversationComposer() {
   const steers = () => !props.agent || agentSteersTurns(props.agent, props.modelOptions);
   /** Steer for a provider that can steer; else Send now, which stops the turn and runs the message next. */
   const sendQueued = () => (steers() ? props.onSteerQueuedMessage : props.onSendQueuedMessageNow);
+  /** The running turn is a routine run's, which takes no steer: a message waits for the next turn. */
+  const routineTurn = () => routineRunsTurn(props.queue?.deliveries, props.activeTurnId);
+  /** Send now stops a routine run as it stops any turn; only Steer is refused. */
+  const steerRefused = () => steers() && routineTurn();
   /** Tab sends the draft into the running turn, in place of Send and then Steer on its queue row. */
   const steerOnTab = () =>
     props.activeTurnId &&
     !channel &&
     sendQueued() &&
+    !steerRefused() &&
     !editingDeliveryId() &&
     composerHasContent() &&
     voicePhase() === "idle" &&
@@ -533,7 +539,9 @@ export function ConversationComposer() {
                 onDismiss={dismissAwaitingReplies}
                 onOpenAgent={props.onSelectAgent}
                 // A channel's rows are its sub-tasks, not queued replies.
-                onSteer={props.activeTurnId && !channel && steers() ? props.onSteerQueuedMessage : undefined}
+                onSteer={
+                  props.activeTurnId && !channel && steers() && !steerRefused() ? props.onSteerQueuedMessage : undefined
+                }
                 onStop={channel && !channel.readOnly() ? channel.stopAwaitingReply : undefined}
               />
             )}
@@ -573,7 +581,7 @@ export function ConversationComposer() {
                       agents={props.agents}
                       skills={installedSkills()}
                       editingDeliveryId={editingDeliveryId()}
-                      canSteer={Boolean(props.activeTurnId)}
+                      canSteer={Boolean(props.activeTurnId) && !steerRefused()}
                       onSteer={sendQueued()}
                       sendsNow={!steers()}
                       routineRuns={props.queue?.deliveries.some(

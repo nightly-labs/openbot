@@ -1,5 +1,10 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ConversationMessage, isQueuedAgentReply, type QueueDelivery } from "@openbot/contracts/ipc";
+import {
+  type ConversationMessage,
+  isQueuedAgentReply,
+  type QueueDelivery,
+  routineRunsTurn,
+} from "@openbot/contracts/ipc";
 import { isQueueEditRejected } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { type MobileTextKey, sourceText } from "@openbot/i18n/mobile";
 import { replaceEqualDeep, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -403,6 +408,8 @@ export function useChatQueue(
       online,
       activeTurnId,
       steers,
+      /** A routine run's turn takes no steer, so a queued message waits for the next turn. */
+      steerRefused: steers && routineRunsTurn(query.data?.deliveries, activeTurnId),
       begin,
       save,
       refresh,
@@ -445,7 +452,7 @@ export function useChatQueue(
         }),
       steer: (delivery: QueueDelivery) =>
         run(async () => {
-          if (!activeTurnId) return;
+          if (!activeTurnId || routineRunsTurn(query.data?.deliveries, activeTurnId)) return;
           await workspace().changeQueue(agentId, serverId, "steer", {
             deliveryId: delivery.id,
             expectedTurnId: activeTurnId,
