@@ -1892,9 +1892,20 @@ const uiBlockEarlierEpic: UiConfirmBlock = {
   ].join("\n"),
 };
 
+const uiBlockEpicScript: UiConfirmBlock = {
+  type: "confirm",
+  title: "Run the script that opens the epics?",
+  preview: [
+    "```sh",
+    'gh issue create --title "Sunday — reliability and finish" --label epic --body-file sunday-epic.md --milestone 0.71',
+    "```",
+  ].join("\n"),
+  actions: [{ id: "run", label: "Run", style: "primary" }],
+};
+
 /**
- * A table in a card preview makes the card as wide as an agent reply with a table, live and in the
- * history. A table wider than that scrolls sideways in the card.
+ * A table or code in a card preview makes the card as wide as an agent reply with a table, live and
+ * in the history. A table wider than that scrolls sideways in the card.
  */
 export const UiBlockWithTable: Story = {
   name: "Agent UI block with a table",
@@ -1925,6 +1936,26 @@ export const UiBlockWithTable: Story = {
           blockId: "saturday",
           spec: uiBlockEarlierEpic,
           state: { status: "answered", response: { actionId: "open" }, outcome: "Open the epic" },
+        },
+      },
+      {
+        id: "question-prompt:turn-ui-block-table-script:ui-block-script",
+        turnId: "turn-ui-block-table-script",
+        author: "agent",
+        body: "",
+        time: "10:02",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "ui-block-script",
+          questions: uiBlockFallbackQuestions(uiBlockEpicScript),
+          resolution: { status: "answered", responses: {} },
+        },
+        uiBlock: {
+          version: 1,
+          blockId: "script",
+          spec: uiBlockEpicScript,
+          state: { status: "answered", response: { actionId: "run" }, outcome: "Run" },
         },
       },
     ],

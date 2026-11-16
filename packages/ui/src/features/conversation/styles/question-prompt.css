@@ -410,11 +410,6 @@
   width: min(540px, 100%);
 }
 
-/* The card sets its own wide width for a table in its preview (ui-blocks.css). */
-.question-prompt-history-entry:has(.ui-block-preview .message-markdown-table-scroll) {
-  width: 100%;
-}
-
 @media (max-width: 520px) {
   .question-prompt-bubble.ui-bubble {
     width: 100%;
