@@ -1316,9 +1316,11 @@ export function createMarketplaceController(
     }
     analytics.track("team_action", { action, result: "succeeded", server_kind: mcpServerKind() });
     if (props.pluginServerId !== serverId) return next;
-    // A read in flight started before this change and would put the old rows back.
+    // A read in flight started before this change and would put the old rows back. The answer
+    // holds the whole list, so it ends that read: the rows count as read.
     serversRead += 1;
     setServers(next);
+    setServersReadFor(serverId);
     // A saved row can name an address the host is already signed in to.
     void readSignIns(serverId);
     return next;
