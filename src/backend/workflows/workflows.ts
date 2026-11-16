@@ -145,6 +145,7 @@ import {
 import { type WorkflowStore, WorkflowStoreError } from "./workflow-store";
 import { prepareWorkflowSchedules, type ScheduledWorkflowStart, workflowWebhookPayload } from "./workflow-triggers";
 import {
+  agentFileInputs,
   agentStepText,
   conditionAnswer,
   conditionPrompt,
@@ -247,6 +248,8 @@ export interface WorkflowsDependencies {
     run: { id: string; routineId: string; routineName: string; scheduledFor: string };
     agentId: string;
     text: string;
+    /** The files of the image and asset steps before an agent step, which the message carries. */
+    attachmentIds: readonly string[];
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
   /** Ends a delivery: cancels it while it waits, or interrupts the turn that answers it. */
@@ -498,6 +501,12 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             return;
           }
           const run = step.runId ? runs.run(step.runId) : null;
+          // The files of the image and asset steps before it: the run's newest files, or for a step that
+          // runs alone, the newest files of the workflow.
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const attachmentIds = graph
+            ? agentFileInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
+            : [];
           const sent = yield* dependencies
             .sendHandoff({
               run: {
@@ -508,6 +517,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               },
               agentId: step.agentId,
               text: step.input,
+              attachmentIds,
               idempotencyKey: `workflow-step:${step.id}`,
             })
             .pipe(Effect.exit);

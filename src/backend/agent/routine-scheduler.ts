@@ -1036,6 +1036,8 @@ export class RoutineScheduler implements RoutineDueSource {
       run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
       agentId: string;
       text: string;
+      /** Stored files that the message carries as copies, such as the pictures of a workflow's image steps. */
+      attachmentIds?: readonly string[];
       idempotencyKey: string;
     },
   ) {
@@ -1044,6 +1046,16 @@ export class RoutineScheduler implements RoutineDueSource {
       if (!found) throw new Error(sourceText("error.agent.unknown", { id: input.agentId }));
       return found;
     });
+    const sourcePaths: string[] = [];
+    for (const attachmentId of input.attachmentIds ?? []) {
+      const file = yield* this.#mailbox
+        .resolveAttachment(attachmentId)
+        .pipe(Effect.mapError((failure) => new RoutineOperationFailed({ cause: failure.cause })));
+      // A file deleted in Storage fails the step: the agent must not do the step without its picture.
+      if (!file)
+        return yield* new RoutineOperationFailed({ cause: new Error(sourceText("error.workflow.mediaInputMissing")) });
+      sourcePaths.push(file.path);
+    }
     const validateRecipient = yield* routineStep(() => this.#mailbox.prepareDelivery([agent.id]));
     yield* routineStep(validateRecipient);
     const receipt = yield* this.#mailbox
@@ -1058,6 +1070,7 @@ export class RoutineScheduler implements RoutineDueSource {
         recipientAgentIds: [agent.id],
         text: input.text,
         draftIds: [],
+        sourcePaths,
         replyToMessageId: null,
         idempotencyKey: input.idempotencyKey,
       })
