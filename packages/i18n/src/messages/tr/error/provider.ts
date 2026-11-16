@@ -477,6 +477,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
+  "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
   "error.provider.piStopped": "Pi çalışmıyor. Pi'yi bağlayıp tekrar deneyin.",
   "error.provider.piSessionMissing": "Pi oturum dosyası bu bilgisayarda yok.",
   "error.provider.piResumeCancelled": "Pi oturumu sürdürmeyi iptal etti. Tekrar deneyin.",

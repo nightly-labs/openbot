@@ -2205,6 +2205,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (method === "load" && isSessionNotFound(error, request.sessionId, this.#flavor)) {
         return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
       }
+      // A prompt that OpenBot stopped still runs in the session. Nothing ran, so the caller waits (#9938).
+      if (this.#flavor.sessionBusy?.(error)) return yield* providerFailure(new ProviderSessionBusyError(this.#label));
       recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
       if (!recovery) return yield* providerFailure(error);
       failure = error;
@@ -2538,15 +2540,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // opens the session again, because that replaces the thread that the replay writes to.
     if (thread.backgroundReplay) yield* Deferred.await(thread.backgroundReplay);
     if (thread.needsResume && !thread.activeTurn) {
-      yield* this.#reopenThread(thread).pipe(
-        Effect.catch((failure) =>
-          Effect.fail(
-            this.#flavor.sessionBusy?.(failure.cause)
-              ? providerFailure(new ProviderSessionBusyError(this.#label))
-              : failure,
-          ),
-        ),
-      );
+      yield* this.#reopenThread(thread);
       thread = yield* providerSync(() => this.#requireThread(threadId));
     }
     if (thread.activeTurn) return yield* providerFailure(this.#turnActiveError(thread.activeTurn));

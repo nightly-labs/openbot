@@ -468,6 +468,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI를 시작할 수 없었어요.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
+  "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
   "error.provider.piStopped": "Pi가 실행 중이 아니에요. Pi를 연결한 후 다시 시도해 주세요.",
   "error.provider.piSessionMissing": "이 컴퓨터에서 Pi 세션 파일을 사용할 수 없어요.",
   "error.provider.piResumeCancelled": "Pi가 세션 재개를 취소했어요. 다시 시도해 주세요.",

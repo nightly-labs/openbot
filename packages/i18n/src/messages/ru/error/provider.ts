@@ -468,6 +468,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "Не удалось запустить CLI {provider}.",
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
+  "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",

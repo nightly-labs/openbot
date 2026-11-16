@@ -170,7 +170,7 @@ export class ProviderTurnActiveError extends Error {
 export class ProviderSessionBusyError extends ProviderTurnActiveError {
   constructor(providerName: string) {
     super(providerName);
-    this.message = `${providerName} still runs a stopped prompt in this session.`;
+    this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
   }
 }
 
