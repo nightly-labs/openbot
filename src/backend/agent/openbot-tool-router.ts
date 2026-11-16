@@ -229,15 +229,15 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "save_api_key",
 ]);
 
-/**
- * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
- * interruption runs the operation's finalizers, which stop a browser action or a side Codex process.
- */
 /** A `#rrggbb` color from a tool call, in the lower case that a chat color uses. */
 function lowerCaseColor(color: string): AvatarColor {
   return `#${color.slice(1).toLowerCase()}`;
 }
 
+/**
+ * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
+ * interruption runs the operation's finalizers, which stop a browser action or a side Codex process.
+ */
 function requestAborted(signal: AbortSignal | undefined) {
   return Effect.callback<never>((resume) => {
     const abort = () => resume(Effect.interrupt);
@@ -2400,7 +2400,8 @@ export class OpenBotToolRouter {
   /**
    * `set_backdrop`: stores the page as an HTML attachment and adds a backdrop message. Each client of
    * the chat puts the newest one behind its window (`agent-backdrops.ts` in the renderer). A channel or
-   * external chat turn cannot use it: someone else's request would change the user's window.
+   * external chat turn cannot use it: someone else's request would change the user's window. A task
+   * thread cannot use it either: the clients do not watch it.
    */
   readonly #setBackdrop = Effect.fn("OpenBotToolRouter.setBackdrop")(function* (
     this: OpenBotToolRouter,
@@ -2413,6 +2414,10 @@ export class OpenBotToolRouter {
       this.#messaging.store.linkForThread(executionThreadId)
     ) {
       return openBotToolFailure("Only a turn in your own OpenBot chat can set the backdrop.");
+    }
+    // The clients watch the agent's own chat only, so a page from a task thread would not show.
+    if (this.#conversation.isTaskThread(executionThreadId)) {
+      return openBotToolFailure("Set the backdrop from your own chat, not from a task thread.");
     }
     const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
     if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));

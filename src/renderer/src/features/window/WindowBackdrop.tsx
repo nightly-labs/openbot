@@ -16,7 +16,7 @@ function dataUrl(backdrop: SavedBackdrop): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => (typeof reader.result === "string" ? resolve(reader.result) : reject(reader.error));
     reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(new Blob([new Uint8Array(backdrop.bytes)], { type: backdrop.mimeType }));
+    reader.readAsDataURL(backdrop.blob);
   });
 }
 
@@ -65,30 +65,43 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
     if (old !== page) releaseFilePreviewPage(old);
   };
   onCleanup(() => releaseFilePreviewPage(shownPage));
+  /**
+   * The version that shows now. At start the list of backdrops is not read yet, so the version has no
+   * time; when the list comes, the same backdrop does not load again.
+   */
+  let shownVersion: string | null = null;
 
   createEffect(customVersion, (version) => {
     const id = version === null ? null : customId();
     if (id === null) {
+      shownVersion = null;
       showCustom(null);
       return;
     }
+    if (version === shownVersion) return;
     let cancelled = false;
     const show = async () => {
       const backdrop = await readCustomBackdrop(id);
       if (cancelled) return;
       // A backdrop that is gone, such as one removed in another window, shows nothing.
       if (!backdrop) {
+        shownVersion = null;
         showCustom(null);
         return;
       }
+      const loaded = `${id}\0${backdrop.createdAt}`;
       if (backdrop.kind === "image") {
         const url = await dataUrl(backdrop);
-        if (!cancelled) showCustom({ source: { kind: "image", url }, name: backdrop.name, bubbles: null });
+        if (cancelled) return;
+        shownVersion = loaded;
+        showCustom({ source: { kind: "image", url }, name: backdrop.name, bubbles: null });
         return;
       }
-      const html = new TextDecoder().decode(backdrop.bytes);
+      const html = await backdrop.blob.text();
+      if (cancelled) return;
       const bubbles = chatBackdropBubbles(html);
       if (props.pages === "srcdoc") {
+        shownVersion = loaded;
         showCustom({ source: { kind: "page", html }, name: backdrop.name, bubbles });
         return;
       }
@@ -97,11 +110,14 @@ export function WindowBackdrop(props: { pages?: "desktop" | "srcdoc" }) {
         releaseFilePreviewPage(src ?? undefined);
         return;
       }
+      shownVersion = src === null ? null : loaded;
       if (src === null) showCustom(null);
       else showCustom({ source: { kind: "page", src }, name: backdrop.name, bubbles }, src);
     };
     show().catch(() => {
-      if (!cancelled) showCustom(null);
+      if (cancelled) return;
+      shownVersion = null;
+      showCustom(null);
     });
     return () => {
       cancelled = true;

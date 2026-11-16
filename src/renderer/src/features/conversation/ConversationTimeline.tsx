@@ -89,8 +89,6 @@ import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
  * one: its marker names the routine, and the instruction text stays in the routine settings.
  */
-/** The type of a message file. A host can send a file with no type, so its name gives it. */
-
 function markerOnlyMessage(message: AgentMessage): boolean {
   return Boolean(message.actionMarker);
 }

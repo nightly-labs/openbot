@@ -12,6 +12,7 @@ import { addCustomBackdrop, customBackdropKind } from "../../custom-backdrops";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { PENDING_SEND_ID_PREFIX } from "./stores/pending-send-store";
 
+/** The type of a message file. A host can send a file with no type, so its name gives it. */
 function attachmentMimeType(attachment: AttachmentSummary): string {
   return attachment.mimeType || attachmentMimeTypeForName(attachment.name);
 }
@@ -22,10 +23,6 @@ interface BackdropSource {
   bytes: () => Promise<Uint8Array>;
 }
 
-/**
- * The "Use as backdrop" item of a message menu, in the chat and in a thread. It returns the action of
- * a message, or undefined when the message has nothing that can go behind the window.
- */
 /** The browser client reads a host file through the connection; the desktop reads its file URL. */
 async function attachmentBytes(runtime: ConversationRuntime, attachment: AttachmentSummary): Promise<Uint8Array> {
   const preview = await runtime.previewAttachment?.(attachment);
@@ -62,6 +59,10 @@ export function watchAgentBackdrops(
   );
 }
 
+/**
+ * The "Use as backdrop" item of a message menu, in the chat and in a thread. It returns the action of
+ * a message, or undefined when the message has nothing that can go behind the window.
+ */
 export function useMessageBackdropAction(runtime: ConversationRuntime) {
   const { t } = useText();
 

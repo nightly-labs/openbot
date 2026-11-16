@@ -1,9 +1,9 @@
 import { chatBackdropPage } from "@openbot/contracts/chat-visual";
 import { toast } from "@openbot/ui";
-import { customBackdropChoice } from "@openbot/ui/features/conversation/chat-backdrop";
+import { type ChatBackdropChoice, customBackdropChoice } from "@openbot/ui/features/conversation/chat-backdrop";
 import { currentText } from "@openbot/ui/text";
 import { setChatBackdrop, useChatBackdrop } from "./chat-backdrop-preference";
-import { addCustomBackdrop } from "./custom-backdrops";
+import { addCustomBackdrop, readCustomBackdrop } from "./custom-backdrops";
 
 /**
  * The pages that an agent puts behind the window with `set_backdrop`. The host keeps each one as a
@@ -49,14 +49,33 @@ function agentSlot(agentId: string): string {
   return `agent-${agentId}`;
 }
 
-/** The message ids that this page puts behind the window now. A second update of the chat waits. */
-const applying = new Set<string>();
+/** The message ids that wait or run now. A second update of the chat does not add them again. */
+const pending = new Set<string>();
+/** The message ids whose page could not be read or kept. This page does not fetch them again. */
+const failed = new Set<string>();
+/** One page goes behind the window at a time, so an older page cannot replace a newer one. */
+let queue: Promise<void> = Promise.resolve();
 
 interface BackdropMessage<Attachment extends { mimeType: string }> {
   id: string;
   createdAt?: string | undefined;
   itemType?: string | null | undefined;
   attachments?: readonly Attachment[] | null | undefined;
+}
+
+/** The action that puts back the backdrop before the agent's page. */
+async function undoAction(slot: string, choice: ChatBackdropChoice): Promise<() => void> {
+  const previous = useChatBackdrop()();
+  if (previous !== choice) return () => setChatBackdrop(previous);
+  // The agent replaces its own page: keep the old page, so Undo can put it back in the slot.
+  const old = await readCustomBackdrop(slot);
+  if (!old) return () => setChatBackdrop(null);
+  const bytes = new Uint8Array(await old.blob.arrayBuffer());
+  return () => {
+    void addCustomBackdrop({ id: slot, name: old.name, mimeType: old.mimeType, bytes }).catch(() => {
+      setChatBackdrop(null);
+    });
+  };
 }
 
 /**
@@ -82,33 +101,31 @@ export function showNewAgentBackdrop<
     if (!attachment || !(time > mark) || (newest && newest.time >= time)) continue;
     newest = { message, attachment, time };
   }
-  if (!newest || applying.has(newest.message.id)) return;
+  if (!newest || pending.has(newest.message.id) || failed.has(newest.message.id)) return;
   const { message, attachment, time } = newest;
-  applying.add(message.id);
-  void (async () => {
+  pending.add(message.id);
+  queue = queue.then(async () => {
     const { t } = currentText();
     try {
-      const title = page.title(message);
-      const id = await addCustomBackdrop({
-        id: agentSlot(agentId),
-        name: title,
-        mimeType: attachment.mimeType,
-        bytes: await page.bytes(attachment),
-      });
-      // Another window or update of the chat can show it first.
+      // A newer page, from this or another window, went behind the window first.
       if (readMark() >= time) return;
+      const title = page.title(message);
+      const bytes = await page.bytes(attachment);
+      const slot = agentSlot(agentId);
+      const choice = customBackdropChoice(slot);
+      const undo = await undoAction(slot, choice);
+      if (readMark() >= time) return;
+      await addCustomBackdrop({ id: slot, name: title, mimeType: attachment.mimeType, bytes });
       writeMark(time);
-      const previous = useChatBackdrop()();
-      const choice = customBackdropChoice(id);
       setChatBackdrop(choice);
-      if (previous === choice) return;
       toast(t("chat.backdrop.agentSet", { name: title }), {
-        action: { label: t("chat.backdrop.undo"), onClick: () => setChatBackdrop(previous) },
+        action: { label: t("chat.backdrop.undo"), onClick: undo },
       });
     } catch {
-      // A page that cannot be read or kept does not change the backdrop, and a later update tries again.
+      // A page that cannot be read or kept does not change the backdrop.
+      failed.add(message.id);
     } finally {
-      applying.delete(message.id);
+      pending.delete(message.id);
     }
-  })();
+  });
 }

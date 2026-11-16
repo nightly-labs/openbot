@@ -1,6 +1,8 @@
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { customBackdropId } from "@openbot/ui/features/conversation/chat-backdrop";
 import { createSignal } from "solid-js";
+import { useChatBackdrop } from "./chat-backdrop-preference";
 
 /**
  * The backdrops that the user added on this device and browser: a picture or GIF, or an HTML page
@@ -19,9 +21,13 @@ export interface CustomBackdropSummary {
   createdAt: number;
 }
 
+/**
+ * The file is a `Blob`: the browser keeps it out of the record, so the list of backdrops does not load
+ * the bytes of each one.
+ */
 export interface CustomBackdrop extends CustomBackdropSummary {
   mimeType: string;
-  bytes: Uint8Array;
+  blob: Blob;
 }
 
 /** The pictures that a browser shows and animates. SVG stays out: a page can be made for that. */
@@ -88,7 +94,7 @@ function isCustomBackdrop(value: unknown): value is CustomBackdrop {
     typeof record.name === "string" &&
     (record.kind === "image" || record.kind === "page") &&
     typeof record.mimeType === "string" &&
-    record.bytes instanceof Uint8Array &&
+    record.blob instanceof Blob &&
     typeof record.createdAt === "number"
   );
 }
@@ -146,7 +152,8 @@ export async function readCustomBackdrop(id: string): Promise<CustomBackdrop | n
 
 /**
  * Keeps a file as a backdrop and answers its id. The caller checks the kind with
- * `customBackdropKind` first. When the device holds the most backdrops, the oldest goes.
+ * `customBackdropKind` first. When the device holds the most backdrops, the oldest goes, but never the
+ * backdrop that the window shows now.
  */
 export async function addCustomBackdrop(input: {
   name: string;
@@ -162,11 +169,14 @@ export async function addCustomBackdrop(input: {
     name: input.name.trim().slice(0, NAME_LIMIT) || input.mimeType,
     kind,
     mimeType: input.mimeType,
-    bytes: input.bytes,
+    blob: new Blob([new Uint8Array(input.bytes)], { type: input.mimeType }),
     createdAt: Date.now(),
   };
-  const saved = (await readAll()).filter(({ id }) => id !== backdrop.id);
-  const oldest = saved.slice(0, Math.max(0, saved.length + 1 - CUSTOM_BACKDROP_CAPACITY));
+  const current = useChatBackdrop()();
+  const shownId = current === null ? null : customBackdropId(current);
+  const others = (await readAll()).filter(({ id }) => id !== backdrop.id);
+  const overflow = Math.max(0, others.length + 1 - CUSTOM_BACKDROP_CAPACITY);
+  const oldest = others.filter(({ id }) => id !== shownId).slice(0, overflow);
   const writable = await store("readwrite");
   for (const old of oldest) writable.delete(old.id);
   await request(writable.put(backdrop));
