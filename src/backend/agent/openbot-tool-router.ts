@@ -147,6 +147,7 @@ import type { AgentPinRefusal, MessagePins } from "./message-pins";
 import {
   agentAccountSetup,
   agentReasoningEffort,
+  type ListedCustomEndpoint,
   listModelsPayload,
   modelList,
   type ProviderAccountRows,
@@ -354,6 +355,8 @@ export interface OpenBotToolRouterHooks {
   providerAccounts: ProviderAccountRows;
   /** The provider rows of the settings page. */
   providerStatuses(): readonly ProviderStatusRow[];
+  /** The custom endpoints that the user saved, for `list_models`. */
+  customEndpoints(): readonly ListedCustomEndpoint[];
   preferredProvider(): AgentProvider;
   createAgent(
     input: CreateAgentInput,
@@ -1996,6 +1999,7 @@ export class OpenBotToolRouter {
               { provider: agent.provider, model: agent.model },
               ...(agent.backupModels?.order ?? []),
             ]),
+          customEndpoints: this.#hooks.customEndpoints(),
         },
       );
       return { success: true, contentItems: [{ type: "inputText", text: redactText(JSON.stringify(payload)) }] };

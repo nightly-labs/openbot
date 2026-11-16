@@ -2012,6 +2012,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         agentModels: (choice) => this.#agentModels(choice),
         providerAccounts: (provider) => this.getStatus().providers?.find((row) => row.id === provider)?.accounts,
         providerStatuses: () => this.getStatus().providers ?? [],
+        customEndpoints: () =>
+          credentials.customProviders().map((endpoint) => {
+            const provider = endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+            return {
+              id: endpoint.id,
+              name: endpoint.name,
+              provider,
+              loading: this.#endpoints.waits(provider, endpoint.id),
+            };
+          }),
         preferredProvider: () => this.preferredProvider(),
         createAgent: (input, configure) =>
           this.createAgent(
