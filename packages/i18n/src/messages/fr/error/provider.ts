@@ -367,6 +367,8 @@ export const messages = {
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.codexHistoryItemMissing":
     "Codex n’a pas pu continuer cette conversation, car un élément manque dans son historique enregistré. OpenBot a ouvert une nouvelle session Codex avec l’historique de la conversation. Réessayez.",
+  "error.provider.codexRequestRefused":
+    "{provider} a refusé la requête de ce chat sans en donner la cause. Cela peut arriver dans un long chat avec beaucoup d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooSmall":
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop petite. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageTooLarge":
