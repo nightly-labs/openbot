@@ -157,6 +157,9 @@ interface WorkspacePathAccess {
   allowedRoots?: readonly string[];
 }
 
+/** A link that misses looks in at most this many work folders. */
+const WORK_FOLDER_LIMIT = 50;
+
 /** What the agent's tools touched in its threads: the files that it read or wrote, and the folders where it worked. */
 interface ToolHistory {
   fileHistory?: readonly string[];
@@ -273,7 +276,9 @@ const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(functio
   }
   // Last, the same path in the folders where the agent listed files or ran commands, such as
   // `build-app.md` after `ls /tmp/kskills`. Only when exactly one folder has it, as for added folders.
-  return yield* onlyMatch([...new Set(options.workFolders ?? [])], relativePaths, mayAccess);
+  // Only the newest folders, which include those of the current thread: each folder costs a lookup.
+  const workFolders = [...new Set([...(options.workFolders ?? [])].reverse())].slice(0, WORK_FOLDER_LIMIT);
+  return yield* onlyMatch(workFolders, relativePaths, mayAccess);
 });
 
 /** The one real file that a relative path names in the folders, or null when none or several have it. */

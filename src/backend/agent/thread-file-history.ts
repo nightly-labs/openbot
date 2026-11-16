@@ -35,23 +35,12 @@ const FOLDER_LIMIT = 50;
  */
 export function shellReadPaths(item: unknown): string[] {
   if (!isRecord(item) || getString(item, "status") !== "completed") return [];
-  if (item.type === "commandExecution") {
-    const cwd = getString(item, "cwd");
-    return getArray(item, "commandActions").flatMap((action) => {
-      const path = isRecord(action) && action.type === "read" ? getString(action, "path") : null;
-      if (!path) return [];
-      const expanded = expandHome(path);
-      return [isAbsolute(expanded) || !cwd ? expanded : join(cwd, expanded)];
-    });
-  }
+  if (item.type === "commandExecution") return actionPaths(item, ["read"]);
   if (item.type !== "toolCall" || getString(item, "name") !== "Bash") return [];
   // A remote command can hold several commands in quotes, so the whole line is checked before the split.
   const line = getString(item, "command") ?? "";
   if (REMOTE_COMMAND.test(line)) return [];
-  return shownFileCommands(line)
-    .flatMap(shellWords)
-    .map(expandHome)
-    .filter((path) => isAbsolute(path) && !GLOB.test(path));
+  return localPaths(shownFileCommands(line).flatMap(shellWords));
 }
 
 /**
@@ -64,28 +53,36 @@ export function shellWorkFolders(item: unknown): string[] {
   if (!isRecord(item) || getString(item, "status") !== "completed") return [];
   if (item.type === "commandExecution") {
     const cwd = getString(item, "cwd");
-    const listed = getArray(item, "commandActions").flatMap((action) => {
-      const path =
-        isRecord(action) && (action.type === "listFiles" || action.type === "search")
-          ? getString(action, "path")
-          : null;
-      if (!path) return [];
-      const expanded = expandHome(path);
-      return [isAbsolute(expanded) || !cwd ? expanded : join(cwd, expanded)];
-    });
-    return [...(cwd ? [cwd] : []), ...listed].filter((path) => isAbsolute(path));
+    return [...(cwd ? [cwd] : []), ...actionPaths(item, ["listFiles", "search"])].filter((path) => isAbsolute(path));
   }
   if (item.type !== "toolCall" || getString(item, "name") !== "Bash") return [];
   const line = getString(item, "command") ?? "";
   if (REMOTE_COMMAND.test(line)) return [];
-  return line
-    .split(COMMAND_SEPARATOR)
-    .flatMap((command) => {
+  return localPaths(
+    line.split(COMMAND_SEPARATOR).flatMap((command) => {
       const [name = "", ...operands] = shellWords(command.trim());
       return FOLDER_COMMANDS.has(name) ? operands.filter((operand) => !operand.startsWith("-")) : [];
-    })
-    .map(expandHome)
-    .filter((path) => isAbsolute(path) && !GLOB.test(path));
+    }),
+  );
+}
+
+/** The paths of the Codex command actions of these types. A relative path starts at the command's folder. */
+function actionPaths(item: unknown, types: readonly string[]): string[] {
+  const cwd = getString(item, "cwd");
+  return getArray(item, "commandActions").flatMap((action) => {
+    const path =
+      isRecord(action) && typeof action.type === "string" && types.includes(action.type)
+        ? getString(action, "path")
+        : null;
+    if (!path) return [];
+    const expanded = expandHome(path);
+    return [isAbsolute(expanded) || !cwd ? expanded : join(cwd, expanded)];
+  });
+}
+
+/** The shell words that name one absolute or home path. A glob names no one file. */
+function localPaths(words: readonly string[]): string[] {
+  return words.map(expandHome).filter((path) => isAbsolute(path) && !GLOB.test(path));
 }
 
 function expandHome(path: string): string {
