@@ -167,3 +167,19 @@ export function useAgentThreadUnread(serverId: string, agentId: string): number 
   }).data;
   return enabled ? (unread ?? 0) : 0;
 }
+
+/**
+ * The first unread message of one thread when its screen opens, where the NEW line stands, as in the
+ * agent's chat. `undefined` while the host sends the marks for this visit: a mark that the phone kept
+ * can be old. `null` when the person has read the thread, on a host without `agent-thread-reads-v1`,
+ * offline, or when the read failed.
+ */
+export function useThreadOpeningUnread(serverId: string, agentId: string, taskId: string): string | null | undefined {
+  const queryScope = useQueryScope();
+  const workspace = useMobileWorkspaceReader();
+  const enabled = useThreadReadsEnabled(serverId);
+  const reads = useQuery(threadReadsQuery(queryScope, workspace, serverId, agentId, enabled));
+  if (!enabled || reads.isError) return null;
+  if (reads.isFetching || !reads.data) return undefined;
+  return reads.data.find((read) => read.taskId === taskId)?.firstUnreadMessageId ?? null;
+}
