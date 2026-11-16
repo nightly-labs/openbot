@@ -282,6 +282,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Werk OpenBot bij op deze server om de naam en het logo hier te wijzigen.",
   "mobile.server.settings.identityOffline": "Maak verbinding met deze server om de naam en het logo te wijzigen.",
+  "mobile.server.settings.appearance": "Vorm en kleur",
+  "mobile.server.settings.appearanceShape": "Vorm",
+  "mobile.server.settings.appearanceShapeOption": "Vorm {number}",
+  "mobile.server.settings.appearanceColor": "Serverkleur",
+  "mobile.server.settings.appearanceAutomatic": "Automatisch",
+  "mobile.server.settings.appearanceReset": "Herstellen",
+  "mobile.server.settings.appearanceSaveFailed":
+    "De vorm en kleur van de server konden niet worden opgeslagen. Probeer het opnieuw.",
   "mobile.server.route.cropLogo": "Logo bijsnijden",
   "mobile.server.members.remove": "Lid verwijderen",
   "mobile.server.members.invitePeople": "Mensen uitnodigen",
@@ -744,6 +752,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de werkruimte en verbind hem opnieuw.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot op {host} kan geen Slack-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Deze werkruimte is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Slack. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij plaatst het antwoord in de thread.",
@@ -789,6 +799,8 @@ export const messages = {
     "OpenBot kan de opgeslagen tokens op {host} niet lezen. Ontkoppel de Discord-server en verbind hem opnieuw.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot op {host} kan geen Discord-gebeurtenissen ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Deze Discord-server is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Deze agent ontvangt elk verzoek uit Discord. Korte verzoeken beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in het kanaal.",
@@ -823,6 +835,8 @@ export const messages = {
     "OpenBot op {host} kan geen Telegram-berichten ontvangen. Log op {host} in, geef de server een naam in Serverinstellingen en houd OpenBot open.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot kan deze chat niet bereiken. Verbind opnieuw of ontkoppel de chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Deze chat is niet gekoppeld aan {host}. Tik op Opnieuw verbinden om hem te koppelen.",
   "mobile.server.connectors.telegram.retryAt": "Telegram vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Chat koppelen",
   "mobile.server.connectors.telegram.linkAnother": "Nog een chat koppelen",
@@ -863,6 +877,8 @@ export const messages = {
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot kan de opgeslagen sleutels van dit nummer niet lezen. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",

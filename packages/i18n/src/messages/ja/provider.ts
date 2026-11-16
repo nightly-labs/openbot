@@ -214,6 +214,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "再接続できませんでした。",
   "provider.account.add": "アカウントを追加",
   "provider.account.addLabel": "別の {name} アカウントを追加",
+  "provider.account.addWithCode": "コードでアカウントを追加",
   "provider.account.count": { other: "アカウント {count} 件" },
   "provider.account.numbered": "アカウント {number}",
   "provider.account.apiKey": "APIキー",

@@ -166,6 +166,12 @@ export interface ConversationProps {
   /** Whether the server on screen holds a sign-in for an MCP row, as Server settings last read it. */
   mcpSignedIn?: ((mcpServerId: string) => boolean) | undefined;
   /**
+   * Reads `mcpSignedIn` again from the server on screen. Called for each new Sign in card: the card
+   * shows Sign in or Continue from it, and a read from before the agent's test can still say that a
+   * sign-in the server has since refused is current (#6661).
+   */
+  refreshMcpSignIns?: (() => void) | undefined;
+  /**
    * The server list that an install command card watches until its new server is online. Absent where
    * this client cannot open a server; the card then stays a marker.
    */

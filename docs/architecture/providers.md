@@ -94,11 +94,12 @@ agent session through the core tools, a commit, and a hidden tool, checks each r
 `.openbot-build/pi-agent-smoke/report.json`.
 
 Codex adds its own base prompt, tools, and skill listing to each Codex request.
-`agent/codex-prompt-settings.ts` turns off `features.tool_suggest`, whose `request_plugin_install` waits
-for a plugin install that OpenBot cannot do, and the skills about the Codex app (`CODEX_UNFIT_SKILLS`).
-The thread value of `skills.config` replaces the whole list, so the user's own entries go first and OpenBot
-adds only the skills that no entry names. A feature counts as the user's only when a file layer of
-`config/read` sets it, because the merged `features` table also holds defaults. On Codex 0.166 and GPT-6
+`agent/codex-prompt-settings.ts` turns off `features.tool_suggest` and `features.recommended_plugins`,
+also when the user's `config.toml` turns them on: their `list_available_plugins_to_install` and
+`request_plugin_install` offer Codex plugins and ChatGPT apps that OpenBot cannot install, and the agent
+then tells the user about a prompt that never shows (#8515). It also turns off the skills about the Codex
+app (`CODEX_UNFIT_SKILLS`). The thread value of `skills.config` replaces the whole list, so the user's own
+entries go first and OpenBot adds only the skills that no entry names. On Codex 0.166 and GPT-6
 Luna these settings remove about 1,050 input tokens from each request: `request_plugin_install` about 430
 and the five skills about 620. Skill descriptions (about 2,950 tokens) and image generation (about 600)
 stay, as agent capabilities. `bun run bench:codex-prompt-settings` runs real turns and writes
@@ -137,6 +138,9 @@ Two deferred tools recover omitted text without model calls for search or summar
   Each excerpt is at most 400 characters. Its serialized tool result is at most 8,000 characters.
 - `history_read` returns recent messages, a named message, or a page before a returned cursor or
   a returned `messageId` of the same conversation.
+  A read of one visual reply by its `messageId` gives the page title and then the text of the page
+  (`visual-page-text.ts`); a page with no text outside its scripts gives its source. In a list, a
+  visual reply has only its title and a `page` hint.
   It returns ten messages by default and twenty maximum, within a 16,000-character serialized result.
   `nextOffset` continues a large message. With `includeWorkSteps`, `nextWorkStepsOffset` can be passed
   as `workStepsOffset` to continue a large or heavily escaped capture. Captures contain selected work
@@ -183,7 +187,7 @@ memory. `ThreadLifecycle` reads `memoryReview()` at each start and resume of a s
 measured the correction turn at about 20,000 input tokens in one request, against about 63,000 in
 five requests when the agent saved the memory itself.
 
-The number of turns is a setting of the server that runs the agents: Server settings > General >
+The number of turns is a setting of the server that runs the agents: Server settings > Memory >
 Memory review, with 10, 20 (the default) or 40 turns, or Off. An owner or admin of a joined server sets
 it through `memory-review-v1` (see [servers.md](servers.md)). Main owns
 `openbot-memory-review-v1.json` (`MemoryReviewPreferenceStore`) and passes
@@ -232,7 +236,7 @@ a new skill has a class-level name, and environment failures, claims that a tool
 errors that went away, tasks done once and attempts that never worked are not skills. The review
 suggests at most one skill, and only when a signal fired.
 
-Skill learning is a setting of the server that runs the agents: Server settings > General > Agents >
+Skill learning is a setting of the server that runs the agents: Server settings > Memory >
 Skill learning, with Automatic (the default), Ask first, or Off. An owner or admin of a joined server
 sets it through `skill-learning-v1` (see [servers.md](servers.md)). Main owns
 `openbot-skill-learning-v1.json` (`SkillLearningPreferenceStore`) and passes `skillLearning()` to
@@ -321,6 +325,10 @@ OpenBot unloads a session that has no turn, keeps its identity, and resumes it a
 
 - Claude closes the `claude` process of an idle thread, and each ACP client closes an idle session
   (`IdleThreadPool` in `src/backend/idle-thread-pool.ts`). The client opens it again from the session.
+  An Antigravity turn that ends while one of its tool calls still runs, such as a daemon command, holds
+  the session's process (`AcpThread.workHold`, #9551). No idle release closes it, and the provider
+  process stays, until the session does not change for 30 minutes, or for 4 hours at most. When memory
+  is low, `releaseQuietBackgroundThreads` closes a held session that did not change for 10 minutes.
 - One Codex app server holds every thread of its account, and stops the MCP servers of a thread only
   when it unloads that thread. `CodexIdleSessions` (`src/backend/agent/codex-idle-sessions.ts`)
   releases an agent session 5 minutes after its last turn ends. When a turn ends, it releases at once
@@ -617,6 +625,12 @@ streamed messages, permissions, tool bridging, and cancellation. `grok-client.ts
 login and billing hooks. The OpenCode driver starts `opencode acp` on the runtime OpenBot pins and
 downloads, or on a CLI the user installed. Profile clients deny tool permissions.
 
+OpenCode 2.x keeps the MCP servers of a session for its directory after `session/close`, so the
+stdio servers that each chat and subagent started stayed until OpenCode stopped (#9254). OpenBot
+starts each stdio server itself (`mcp-stdio-relay.ts`) and gives OpenCode a Streamable HTTP URL on
+127.0.0.1 with a bearer token. The sessions of one directory share the relay of each server, and the
+last of them to close stops it and its process group.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -734,6 +748,11 @@ A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
 maps that code to `error.provider.opencodeAuthRequired`, which names the provider from the model ID
 before its first `/` and lists the fixes: a Free model, a Go key, or `opencode auth login`.
+OpenCode 2.2.5 sends the same error, with no reason, when OpenCode Go refuses a key, such as an
+expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a saved key and an
+`opencode-go/` model the client's `savedKey` option makes the flavor show
+`error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
+same, and the text stays `error.provider.opencodeAuthRequired`.
 
 #### Turns of a background subagent or shell command
 
@@ -822,6 +841,13 @@ servers too. On Linux the CLI still opens the sign-in page with `xdg-open` (chec
 a new `antigravity-oauth-token` once, with an expired access token that the CLI refreshes, and writes
 the marker `openbot-token-imported`. An account whose `settings.json` names another sign-in method gets
 no copy. The old file stays, and after a sign-out the marker stops a second copy.
+
+When the CLI cannot open `settings.json`, it has no sign-in method and answers `authRequired`. A sign-in
+succeeds but cannot save the method, so the next process is refused again (#6200). On that answer
+OpenBot reads the file itself (`antigravitySettingsUnreadable`). Any failure except a missing file fails
+the start with a message that names the action: remove and add the account again, or, for the own
+sign-in, quit the other apps that use Gemini and open OpenBot again. The row is in error, not signed out,
+and keeps that message after the start limit, because a refresh cannot repair it (`#startStoppedMessage`).
 
 Sign in is an ACP `authenticate` call with `oauth-personal`, in a separate process
 (`src/backend/acp-sign-in.ts`). The CLI writes no sign-in link; it runs `open` (macOS) or `xdg-open`
@@ -924,6 +950,9 @@ also runs share another limit, so `accountUsageCoversModel` keeps them out of th
 A saved Gemini API key comes before the Google sign-in, so the provider
 status sets `apiKeyInUse`, and the API key section of the Gemini provider page says that the key,
 not the plan, serves the turns. The dock shows no Gemini row then, because it has no reading.
+A rate limit or quota refusal on the saved key says that the key reached it and that removing the
+key gives back the plan (`savedKeyLimitMessage`, `geminiSavedKeyLimitFailure`). A quota of 0 for the
+model, such as a free-tier key on Gemini 4 Argon (`limit: 0`), does not say to wait (#9517).
 
 A limit failure stays a turn error even though the descriptor sets `reportsUsage: true`, because
 many Gemini setups have no reading to explain it. `GEMINI_REQUEST_FAILURES` in
@@ -1044,6 +1073,10 @@ processes share. That process outlives OpenBot and is outside a Workspace only s
 Cline process, the sign-in included, gets `CLINE_SESSION_BACKEND_MODE=local` and
 `CLINE_NO_AUTO_UPDATE=1` (`CLINE_ENV` in `provider-drivers.ts`). Sign in is an ACP `authenticate`
 call with `cline`, as for Gemini. `CLINE_API_KEY` in the environment also signs the CLI in.
+`cline --acp` lists only the models of the session's provider, which is `cline` (Cline Credits)
+after that sign-in. `clineFreeModels` (`cline-free-models.ts`) adds the ClinePass and free models of
+Cline's public recommended-models list. Each one sets the session's `provider` option (`cline-pass`
+or `cline`) before the model, and a listed model sets the session's own provider back.
 `clineStatePaths` lets a confined process write `~/.cline/data` and protects the global settings,
 the MCP and connector settings, and the cron, task and connector databases there. The agents,
 skills, hooks and plugins in `~/.cline` and `~/Documents/Cline` stay read-only. Cline answers a lost
@@ -1133,9 +1166,14 @@ organization's managed configuration from Mistral is a higher layer, so it can t
 again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
 not confirmed in a run).
 
-Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+Vibe 3.1.0 lists the ACP auth method `browser-auth`. Sign in calls `authenticate` with it: the CLI
 opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
-has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+has no `127.0.0.1` callback and no device code (`localCodeSignIn: null`). A client that sets
+`_meta["browser-auth-delegated"]` at `initialize` also gets `browser-auth-delegated`: its `start`
+gives the page and opens no browser, and its `complete` polls Mistral until the user finishes there.
+That is the code sign-in of a joined server (`acp-delegated` in `provider-drivers.ts`): the host gives
+the page as a `link` on the released providers-v8 `codeLoginStart`, and a client offers it only on a
+host with `mistral-code-sign-in-v1`. The
 sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
 `$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
 `config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers
@@ -1323,6 +1361,22 @@ reply from 14,524 to 12,159 prompt tokens (−16%). A Hermes home outside `~/.he
 own runtime and rewrites the shared `hermes` launchers, so the bench uses a profile, which shares the
 user's runtime, and stops when the launchers change.
 
+Hermes hides all MCP tools behind its own `tool_search`, `tool_describe` and `tool_call`. In Hermes
+0.23.1, the default `tools.tool_search.enabled: auto` is the same as `on`, and a session cannot turn it
+off. Behind OpenBot's own search, the model had to find OpenBot's `tool_call` with the Hermes search,
+and the Hermes `tool_call` refused `openbot.channel_result` (#9312). So the Hermes flavors, also that of
+a custom `hermes` agent, set `catalogAsMcpTools`: `AcpClient` gives the bridge `withCatalogTools`,
+which adds each catalog tool to its namespace and removes OpenBot's `tool_search` and `tool_describe`.
+OpenBot's `tool_call` stays for the instructions that name it. Hermes names a tool
+`mcp__editor_openbot_<tag>__<tool>`, and the developer instructions give that form. A tool's guidance
+goes in the root `description` of its schema, which the Hermes `tool_describe` shows and its search
+does not read; in the tool description it moved results down. The tools that every agent has directly
+get it too, because OpenBot's `tool_describe` is not listed. The browser core guidance comes with the
+first browser result (`browserToolsPrimer`), as for the other providers. With the Hermes search off,
+the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun run test:hermes-catalog-tools`
+(`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
+checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:
@@ -1468,6 +1522,51 @@ After the answer `reset`, or `nothingToReset` (no limit of the account is spent)
 Settings > Providers shows **Reset usage** in the ⋯ menu of a connected account that has a credit.
 The confirmation names the credits left, and the answer shows under the accounts. A joined server
 uses the optional `provider-usage-reset-v1` routes (see [Admin capabilities](servers.md#admin-capabilities)).
+
+### Work on credits
+
+A ChatGPT plan can have credits: when a plan window is spent, Codex keeps taking turns and spends
+them (issues #4013 and #6046). The `rateLimits` snapshot of `account/rateLimits/read` holds
+`credits: { hasCredits, unlimited, balance }` for the `codex` bucket; a model's own bucket has `null`.
+`decodeRateLimitCredits` (`src/backend/protocol.ts`) keeps only whether credits remain
+(`hasCredits || unlimited`), and `normalizeAccountUsage` puts it in `AccountUsageLimit.creditsAvailable`.
+A full reading with `null` sets `false`. An `account/rateLimits/updated` push with `null` keeps the
+last value, as Codex's own view does. OpenBot does not show the balance, and it does not read
+`ordinaryUsageAllowed`: a turn still goes to Codex, and Codex decides if it uses credits.
+
+`spentUsageWindow` (`packages/team-client/src/plan-limits.ts`) gives `onCredits` for such an account.
+Then the composer shows **Using credits** in place of **Usage limit reached**, with the plan reset
+time, and the model picker and the iPhone agent screen do not mark the model as stopped. A notice
+closed while on credits shows again when the credits run out.
+
+The released usage routes and the `usage-changed` event of the Team API send only `id`, `primary` and
+`secondary`. A joined server reads the flag with the optional `usage-credits-v1` route (see
+[Admin capabilities](servers.md#admin-capabilities)) each time it reads usage, and `withUsageCredits`
+adds it. A limit from an event has no flag, so `keepUsageCredits` keeps the last one. When the flag of
+a client's own quota changes, `ProviderRuntime.#noteCredits` sends `usage-credits-changed`, an event
+with no data that only `usage-credits-v1` peers get, and the client reads the usage again. A host
+without the capability gives no flag, and the client shows **Usage limit reached** as before.
+
+### Account code sign-in
+
+An account after the first of Codex, Grok or Claude can also sign in with a code (`accountCodeSignIn` in the
+descriptor, `accounts.codeSignIn` in `provider-drivers.ts`). The browser sign-in of a second account
+is not always possible, for example when the browser stays signed in to the first account.
+`ProviderAccounts.connectWithCode` runs the CLI's device sign-in
+(`codex login --device-auth`, `grok login --device-auth`) in the home folder of the account and gives
+the page and the code; the person types the code on any device. The client reads
+`codeSignInStatus` until the sign-in ends. A new account whose sign-in fails, expires or is
+cancelled is removed. This computer always has it. A joined server offers it with
+`provider-account-code-v1` (start, submit, status, cancel; owner or admin), and the desktop and the web
+client hide "Add account with code" and "Log in with code" on a host that does not have it.
+
+Claude has a `paste` sign-in (`claude auth login --claudeai`): the page shows a code after the
+sign-in, the person pastes it into the dialog, and `ProviderAccounts.submitCode` types it into the
+CLI. The code is a credential: it goes to the CLI's stdin only, and no reply or log line has it. As
+for Claude's own sign-in, only a Linux computer can run it (`pasteCodeSignInSupported`), so the
+clients offer it for Claude only there: on this computer by its platform, and on a joined server by
+`providers-v3`, which only a host that can run a pasted code advertises. Mobile
+does not offer it yet: the phone signs an account in on the page that the host relays.
 
 ### Disconnect the own sign-in
 

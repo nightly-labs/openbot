@@ -1,4 +1,4 @@
-import { agentProviderDescriptor } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import type {
   ConversationMessageSender,
   QueueDelivery,
@@ -248,31 +248,33 @@ export class QueueControls {
 
   readonly steer = Effect.fn("QueueControls.steer")(function* (this: QueueControls, input: SteerQueuedMessageInput) {
     const agent = yield* this.#store.existing(input.agentId).pipe(toQueueOperationFailed);
-    const { client, session, snapshot, context, turnId, routineSession, publicThreadId } = yield* queueStep(() => {
-      const client = this.#providers.requireReadyClientForAgent(agent);
-      // A task message steers the task's turn, in the task's own provider session.
-      const taskThreadId = this.#hooks.taskThreadId(input.deliveryId);
-      const publicThreadId = taskThreadId ?? agent.threadId;
-      const routineSession = publicThreadId ? this.#conversation.routineSession(agent.id, publicThreadId) : undefined;
-      const session =
-        routineSession ??
-        (taskThreadId
-          ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)?.externalSessionId
-          : this.#store.activeProviderSession(agent.id)?.externalSessionId);
-      const snapshot = this.#conversation.ensureSnapshot(agent.id, taskThreadId ?? agent.threadId);
-      if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId)
-        throw new Error(sourceText("error.backend.steerTurnChanged"));
-      if (this.#hooks.channelAssignment(input.deliveryId))
-        throw new Error(sourceText("error.backend.useChannelTaskControls"));
-      const context = this.#mailbox.getDelivery(input.deliveryId);
-      if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued")
-        throw new Error(sourceText("error.backend.steerQueuedOnly"));
-      const turnId = snapshot.activeTurnId;
-      // Steering uses the running turn's endpoint even when the saved model has changed.
-      if (!this.#endpoints.serves(this.#drain.modelForTurn(agent.id, turnId) ?? agent.model, client.provider))
-        throw new Error(REMOVED_ENDPOINT_MESSAGE);
-      return { client, session, snapshot, context, turnId, routineSession, publicThreadId };
-    });
+    const { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel } = yield* queueStep(
+      () => {
+        const client = this.#providers.requireReadyClientForAgent(agent);
+        // A task message steers the task's turn, in the task's own provider session.
+        const taskThreadId = this.#hooks.taskThreadId(input.deliveryId);
+        const publicThreadId = taskThreadId ?? agent.threadId;
+        const routineSession = publicThreadId ? this.#conversation.routineSession(agent.id, publicThreadId) : undefined;
+        const session =
+          routineSession ??
+          (taskThreadId
+            ? this.#store.database.activeProviderSession(taskThreadId, agent.provider)?.externalSessionId
+            : this.#store.activeProviderSession(agent.id)?.externalSessionId);
+        const snapshot = this.#conversation.ensureSnapshot(agent.id, taskThreadId ?? agent.threadId);
+        if (!session || !snapshot.activeTurnId || snapshot.activeTurnId !== input.expectedTurnId)
+          throw new Error(sourceText("error.backend.steerTurnChanged"));
+        if (this.#hooks.channelAssignment(input.deliveryId))
+          throw new Error(sourceText("error.backend.useChannelTaskControls"));
+        const context = this.#mailbox.getDelivery(input.deliveryId);
+        if (!context || context.delivery.recipientAgentId !== agent.id || context.delivery.status !== "queued")
+          throw new Error(sourceText("error.backend.steerQueuedOnly"));
+        const turnId = snapshot.activeTurnId;
+        // Steering uses the running turn's endpoint even when the saved model has changed.
+        const turnModel = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
+        if (!this.#endpoints.serves(turnModel, client.provider)) throw new Error(REMOVED_ENDPOINT_MESSAGE);
+        return { client, session, snapshot, context, turnId, routineSession, publicThreadId, turnModel };
+      },
+    );
     // A routine run has its own session, which ends with the run. A message steered into it would not
     // stay in the session of its thread, so it waits for the next turn.
     if (routineSession) {
@@ -282,7 +284,8 @@ export class QueueControls {
         cause: new SteerUnsupportedError(sourceText("error.backend.steerRoutineRun")),
       });
     }
-    if (agentProviderDescriptor(providerForAgent(agent)).steer !== "native") {
+    // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
+    if (!agentSteersTurns({ provider: providerForAgent(agent), model: turnModel }, this.#endpoints.available())) {
       yield* this.#mailbox.markSteerFallback(input.deliveryId, "provider-unsupported").pipe(toQueueOperationFailed);
       this.#mailboxSync.emitQueue(agent.id);
       return yield* new QueueOperationFailed({ cause: new SteerUnsupportedError() });
@@ -306,6 +309,10 @@ export class QueueControls {
               routineRun:
                 context.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(input.deliveryId) : null,
               wokenWaits: context.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(input.deliveryId) : [],
+              routineTimezone:
+                context.delivery.sender.kind === "routine"
+                  ? this.#routines.timezoneForDelivery(input.deliveryId)
+                  : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
             }),

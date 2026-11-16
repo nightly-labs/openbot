@@ -91,6 +91,18 @@ export const messages = {
   "browser.secret.submitting": "Invio…",
   "browser.secret.takeOver": "Intervieni",
   "browser.secret.failed": "Non è stato possibile completare la richiesta. Controlla la connessione e riprova.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha eseguito uno script in questa pagina. Per usarle, chiedi all’agente di ricaricare la pagina e riprovare.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot non ha usato le tue credenziali salvate perché l’agente ha scelto il campo sbagliato nella pagina.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot non ha usato credenziali salvate perché l’agente non ha scelto nessuna delle credenziali salvate per questo sito. Di’ all’agente quale account usare.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una password per questo sito.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot non ha usato le tue credenziali salvate perché non contengono una chiave dell’autenticatore.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot non ha usato credenziali salvate perché non è riuscito a leggere il tuo gestore di password.",
   "browser.error.openAddress": "Impossibile aprire l'indirizzo in questa scheda.",
   "browser.error.channelNoBrowserMember": "Nessun membro può aprire una nuova scheda in questo canale.",
   "browser.error.closeTab": "Impossibile chiudere la scheda del browser.",

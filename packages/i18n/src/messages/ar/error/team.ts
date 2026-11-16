@@ -79,6 +79,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "لا يمكن لهذا الاتصال عرض حدود استخدام الوكلاء أو تغييرها.",
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",
   "error.team.providerDetectionUnsupported": "لا يمكن لهذا الاتصال العثور على خوادم النماذج والوكلاء على الخادم.",
+  "error.team.routineFlowStopUnsupported": "لا يمكن لهذا الاتصال إيقاف تشغيل مهمة دورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":

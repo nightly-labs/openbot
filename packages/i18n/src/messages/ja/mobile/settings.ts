@@ -127,6 +127,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",
   "mobile.settings.animations.title": "アニメーション",
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
@@ -232,6 +235,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.swipeLeft": "エージェントのチャットで左にスワイプ",
+  "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
+  "mobile.settings.conversations.swipeThreads": "スレッド",
+  "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeFooter":
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上のスワイプは引き続き返信です。",
+  "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
+  "mobile.settings.conversations.pullInfoFooter":
+    "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
   "mobile.settings.conversations.fullQualityPhotos": "写真を元の画質で送信",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "オフの場合、アプリは各写真の小さいコピー(長辺 最大 2048 ピクセル)を送信します。遅い接続でも早く届きます。元の写真を送信するにはオンにしてください。",

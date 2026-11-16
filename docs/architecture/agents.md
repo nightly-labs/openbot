@@ -78,6 +78,21 @@ of only quiet routine runs and teammate updates settles as above, also on the em
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update of the turn, which starts closed (`teammateUpdateAnswers`).
 
+A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
+for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
+`routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
+request always shows.
+
+A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
+or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
+desktop, the web client and the phone show no notification for it and play no completion sound
+(`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
+approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
+the same origin, because the agent sends the brief to itself, but it arrives as
+`thread-turn-completed`. The clients decide this from the released
+`origin` field, so it needs no capability and also applies with an older host. The host decides it
+for the phone push.
+
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
 capability a `quiet-turn-completed` event in place of `turn-completed`. The client transport changes
@@ -225,6 +240,12 @@ on a joined host.
   same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
   does not change. A `routine_report_failure` call in a handoff turn fails only that step, through its
   completed delivery's error, and the agents after it are skipped.
+- Stop (`RoutineFlows.stopRun`) ends a run that has not ended. `RoutineScheduler.stopRun` first records
+  the run as cancelled, so the end of its turn cannot change that, then cancels its queued delivery
+  and interrupts its turn, also in the routine's side thread. A turn that cannot be stopped does not
+  keep the run open. Then each running handoff step ends as cancelled and its turn stops, and each
+  agent that has not started is skipped. The canvas shows Stop in place of Run now while the run of the
+  routine in focus works; a joined host needs `routine-flow-stop-v1`.
 - A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
   carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
   runs a test through the events API, as the routine settings do. On a joined host only an owner or
@@ -304,7 +325,9 @@ changed, on this computer and on a joined host.
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
   word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
-  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  search covers a build, a run and a delete. The release notes call the Workflows board the Canvas, so
+  `canvas` or `canvases` also gives the six schemas, but keeps the other results: the word can also
+  mean the Routines canvas or a canvas on a web page. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
   (the agent id, prompt, rule or question), so the agent does not read the workflow again.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
@@ -676,12 +699,14 @@ a queued message waits is stored on the agent as `pendingRuntime`. The running w
 sessions. When the drain is about to start the next message and no work has started,
 `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
-queued change that fails on an idle agent, such as for a provider that is now off, is removed. An
-update that also changes other fields, a move to a backup model, a Team API request (its released
-protocol has no `pendingRuntime`), and the automatic usage-limit, provider-error and endpoint moves
-still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
-`error.agent.waitBeforeProviderChange`). A Team API model or effort change keeps the queued
-change, because the remote client cannot see it. The channel threads of the agent
+queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
+joined server's client queues the same change on `agent-pending-runtime-v1` (see
+[team-api.md](team-api.md)). An update that also changes other fields, a move to a backup model, a
+request on the released agent route (its released protocol has no `pendingRuntime`), and the
+automatic usage-limit, provider-error and endpoint moves still wait for idle work
+(`error.agent.waitForTasksBeforeProviderChange` / `error.agent.waitBeforeProviderChange`). A model or
+effort change on the released agent route keeps the queued change, because an older remote client
+cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
 turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`, and its server
 preferences keep the host turn limits.
@@ -784,17 +809,56 @@ with the `empty_answer` cause, as an ACP turn with no answer fails, unless the t
 (a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
 by the user. The error waits for the end
 of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
-error. With no backup, a turn that only teammate results started runs once more on the same model;
-the turn did no step, so it repeats nothing. A second empty run, or an empty turn from the person,
-shows the error. `scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+error. With no backup, a turn that only teammate results started runs once more on the same model.
+A thread turn does the same: a backup model runs it again, and with no backup it runs once more on
+the same model (#8503, #8406). So
+does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+`MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
+so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
+nothing. A second empty run, or an empty turn from the person, shows the error.
+A turn that a failed sign-in or a provider that does not answer ended after work started continues
+on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
+to switch without asking (#8406).
+
+Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
+answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
+narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
+this applies whether the turn did a step or not. A turn that did a step and wrote no such narration
+ends as before: its output can be a file or an image, or teammates or subagents still work for it. A
+teammate's such turn sends the note of its work (#8214). A channel turn keeps the rule above, since
+text after `channel_result` is a step there. Voice on the desktop does not read the answer again when
+it read that narration as a progress update.
+`scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
 
 A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
 running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
 Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
 exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
-"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
-modes.
+"queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
+own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
+(`steerAcpSession` in `src/backend/acp-session-steering.ts`). An OpenCode release before the
+extension does not report `_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
+waits in the queue. `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
+a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
+`steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
+reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
+queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
+so `AcpFlavor.promptRun` reports it once. `scripts/antigravity-steer-e2e.ts` and
+`scripts/devin-steer-e2e.ts` check these paths.
+
+A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
+agent process reports at `initialize` whether it steers, so the provider alone does not tell.
+`AcpAgentClient` adds `steersTurns` to its `model/list` answer, `CustomAcpAgentsClient` puts it on
+each model of that agent, and the catalog keeps it as `AgentModelOption.steersTurns`.
+`agentSteersTurns(runtime, models)` reads it for any listed model of the same custom agent, so a
+saved model that the list no longer has, or that model visibility hides, still counts: the host gates
+(`#steerWhenBusy`, `QueueControls.steer`) and the composer, the queue and the agent settings use it.
+A custom agent that does not steer keeps "Send now", and a steer stays in the queue with the reason.
+A remote client reads the steering models from `model-steering-v1`, because the released model list
+does not carry the flag. The route leaves out a model that the server's model picker hides.
+A host before it does not advertise the capability, so the client keeps "Send now" and the host queues the message. `scripts/custom-agent-steer-e2e.ts` checks the catalog,
+a steer, a `promptRequired` answer and an agent without the extension.
 
 A steered message joins work that the model already does, and a model that gets it as plain user
 text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block

@@ -349,6 +349,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "يمكن للمالك أو المسؤول فقط تغيير اسم الخادم وشعاره.",
   "mobile.server.settings.identityUnsupported": "حدّث OpenBot على هذا الخادم لتغيير اسمه وشعاره من هنا.",
   "mobile.server.settings.identityOffline": "اتصل بهذا الخادم لتغيير اسمه وشعاره.",
+  "mobile.server.settings.appearance": "الشكل واللون",
+  "mobile.server.settings.appearanceShape": "الشكل",
+  "mobile.server.settings.appearanceShapeOption": "الشكل {number}",
+  "mobile.server.settings.appearanceColor": "لون الخادم",
+  "mobile.server.settings.appearanceAutomatic": "تلقائي",
+  "mobile.server.settings.appearanceReset": "إعادة تعيين",
+  "mobile.server.settings.appearanceSaveFailed": "تعذّر حفظ شكل الخادم ولونه. أعد المحاولة.",
   "mobile.server.route.cropLogo": "قص الشعار",
   "mobile.server.members.remove": "إزالة العضو",
   "mobile.server.members.invitePeople": "دعوة أشخاص",
@@ -724,7 +731,7 @@ export const messages = {
   "mobile.server.vault.contacts": "معلومات الاتصال",
   "mobile.server.vault.apiKeys": "مفاتيح API",
   "mobile.server.vault.apiKeysFooter":
-    "يقرأ الوكلاء على {host} كل مفتاح من ملف خاص باسم متغيره. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
+    "يقرأ الوكلاء على {host} كل مفتاح من ملف باسم متغيره. يعمل كل الوكلاء كمستخدم النظام نفسه، لذا يمكن للوكيل أيضًا قراءة ملف مفتاح مخصص لوكلاء آخرين. تبقى المفاتيح على {host}. لا يستطيع هذا الهاتف عرضها.",
   "mobile.server.vault.empty": "لا عناصر",
   "mobile.server.vault.addLogin": "إضافة بيانات تسجيل دخول",
   "mobile.server.vault.addCard": "إضافة بطاقة",
@@ -1049,6 +1056,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال مساحة العمل، ثم اربطها مجددًا.",
   "mobile.server.connectors.slack.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Slack. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.slack.helpNotLinked": 'مساحة العمل هذه غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Slack. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، وينشر الإجابة في السلسلة.",
@@ -1099,6 +1107,7 @@ export const messages = {
     "لا يستطيع OpenBot قراءة الرموز المميزة المحفوظة على {host}. اقطع اتصال خادم Discord، ثم اربطه مجددًا.",
   "mobile.server.connectors.discord.helpRelay":
     "لا يستطيع OpenBot على {host} تلقي أحداث Discord. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
+  "mobile.server.connectors.discord.helpNotLinked": 'خادم Discord هذا غير مرتبط بـ {host}. اضغط "إعادة الاتصال" لربطه.',
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "يتلقى هذا الوكيل كل طلب من Discord. يرد على الطلبات القصيرة بنفسه، ويعطي العمل الآخر للوكيل المناسب، ويرد بالإجابة في القناة.",
@@ -1135,6 +1144,7 @@ export const messages = {
     "لا يستطيع OpenBot على {host} تلقي رسائل Telegram. على {host}، سجّل الدخول، وامنح الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "mobile.server.connectors.telegram.helpError":
     "لا يستطيع OpenBot الوصول إلى هذه الدردشة. أعد الاتصال، أو اقطع اتصال الدردشة.",
+  "mobile.server.connectors.telegram.helpNotLinked": 'هذه الدردشة غير مرتبطة بـ {host}. اضغط "إعادة الاتصال" لربطها.',
   "mobile.server.connectors.telegram.retryAt": "طلب Telegram من OpenBot الانتظار. سيعيد المحاولة في {time}.",
   "mobile.server.connectors.telegram.linkTitle": "ربط دردشة",
   "mobile.server.connectors.telegram.linkAnother": "ربط دردشة أخرى",
@@ -1180,6 +1190,8 @@ export const messages = {
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
   "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",

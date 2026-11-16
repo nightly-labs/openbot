@@ -66,6 +66,8 @@ import {
   decodeOptionalStorageDisk,
   decodeOptionalStorageUsage,
   decodePromptCacheTtlSetting,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderHostSignInStatus,
   decodeProviderModelVisibility,
   decodeProviderRelaySignInStatus,
@@ -899,6 +901,7 @@ const openbotApi: OpenBotDesktopApi = {
     connect: decodeRoutineFlowLink,
     disconnect: decodeVoid,
     updateLink: decodeRoutineFlowLink,
+    stopRun: decodeVoid,
   }),
   workflows: bridgeGroup(IPC_ENDPOINTS.workflows, {
     list: decodeWorkflowSummaries,
@@ -1111,6 +1114,7 @@ const openbotApi: OpenBotDesktopApi = {
   billing: bridgeGroup(IPC_ENDPOINTS.billing, {
     getState: decodeBillingState,
     openPortal: decodeVoid,
+    buyStorage: decodeBillingState,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,
@@ -1176,6 +1180,10 @@ const openbotApi: OpenBotDesktopApi = {
     accountSignInStatus: decodeProviderHostSignInStatus,
     cancelAccountSignIn: decodeVoid,
     connectAccountKey: decodeVoid,
+    startAccountCodeLogin: decodeProviderAccountCodeLoginStart,
+    submitAccountCodeLogin: decodeVoid,
+    accountCodeLoginStatus: decodeProviderAccountCodeLoginStatus,
+    cancelAccountCodeLogin: decodeVoid,
     renameAccount: decodeVoid,
     removeAccount: decodeVoid,
     setAccountPool: decodeVoid,

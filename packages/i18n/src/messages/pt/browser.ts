@@ -91,6 +91,17 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Assumir",
   "browser.secret.failed": "Não foi possível concluir a solicitação. Verifique a conexão e tente novamente.",
+  "browser.secret.vaultSkip.agentScript":
+    "O OpenBot não usou seu login salvo porque o agente executou um script nesta página. Para usá-lo, peça ao agente que recarregue a página e tente de novo.",
+  "browser.secret.vaultSkip.fieldKind":
+    "O OpenBot não usou seu login salvo porque o agente escolheu o campo errado na página.",
+  "browser.secret.vaultSkip.loginChoice":
+    "O OpenBot não usou nenhum login salvo porque o agente não escolheu nenhum dos logins salvos para este site. Diga ao agente qual conta usar.",
+  "browser.secret.vaultSkip.noPassword": "O OpenBot não usou seu login salvo porque ele não tem senha para este site.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "O OpenBot não usou seu login salvo porque ele não tem chave do autenticador.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "O OpenBot não usou nenhum login salvo porque não conseguiu ler seu gerenciador de senhas.",
   "browser.error.openAddress": "Não foi possível abrir o endereço nesta aba.",
   "browser.error.channelNoBrowserMember": "Nenhum membro pode abrir uma nova aba neste canal.",
   "browser.error.closeTab": "Não foi possível fechar a aba do navegador.",

@@ -20,6 +20,10 @@ export const messages = {
   "composer.update.manual": "Обновите {provider} на компьютере, где он запущен, чтобы продолжить.",
   "composer.update.pending": "Обновление…",
   "composer.update.action": "Обновить",
+  "composer.usageLimit.credits": "Вы исчерпали лимит тарифа {provider}. Теперь ваши агенты используют ваши кредиты.",
+  "composer.usageLimit.creditsResets":
+    "Вы исчерпали лимит тарифа {provider}. Ваши агенты используют ваши кредиты до сброса {reset}.",
+  "composer.usageLimit.creditsTitle": "Используются кредиты",
   "composer.usageLimit.resets": "Вы исчерпали весь лимит {provider}. Сброс {reset}.",
   "composer.usageLimit.selectModel": "Вы исчерпали весь лимит {provider}. Выберите другую модель, чтобы продолжить.",
   "composer.usageLimit.title": "Лимит использования исчерпан",

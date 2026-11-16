@@ -81,6 +81,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "Deze verbinding kan de gebruikslimieten van agents niet tonen of wijzigen.",
   "error.team.hermesImportUnsupported": "Deze verbinding kan geen Hermes-profielen van de server importeren.",
   "error.team.providerDetectionUnsupported": "Deze verbinding kan de modelservers en agents van de server niet vinden.",
+  "error.team.routineFlowStopUnsupported": "Deze verbinding kan een routine-uitvoering niet stoppen.",
   "error.team.sidebarFoldersUnsupported": "Deze verbinding ondersteunt geen mappen in mappen.",
   "error.team.libraryFoldersUnsupported": "Deze verbinding ondersteunt geen bibliotheekmappen.",
   "error.team.agentNotificationLevelsUnsupported":

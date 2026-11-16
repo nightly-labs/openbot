@@ -1,7 +1,7 @@
 import ExpoModulesCore
 import UIKit
 
-final class ThemeSnapshotException: Exception {
+final class ThemeSnapshotException: Exception, @unchecked Sendable {
   override var reason: String { "The window has no picture" }
 }
 

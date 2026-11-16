@@ -43,6 +43,7 @@ import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-ser
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -68,6 +69,7 @@ import { STORAGE_CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/storage
 import { STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
 import { STORAGE_USER_FILES_ROUTES } from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { VAULT_ROUTES } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_ROUTES } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_ROUTES } from "@openbot/contracts/team-protocol/vault-v3";
@@ -107,6 +109,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  MODEL_STEERING_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,
   PROVIDER_DEFAULT_ROUTES.settings,
@@ -176,6 +179,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CUSTOM_AGENTS_ROUTES.list,
   PROVIDERS_ADMIN_ROUTES.runtimesStatus,
   PROVIDERS_RUNTIMES_V2_ROUTES.runtimesStatus,
+  USAGE_CREDITS_ROUTES.list,
   // A focused app counts as use only for a limited time: `TeamApiServer` records it on its own.
   FOCUS_USE_ROUTES.ping,
   // Input on the computer of a desktop app keeps the member's phones quiet, not a hosted server running.

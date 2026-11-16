@@ -89,6 +89,10 @@ export const messages = {
     "Warte, bis die Arbeit in diesem Kanal endet, und lösche dann seinen Verlauf.",
   "error.backend.channelCompactUnavailable":
     "Kein Mitglied dieses Kanals kann seinen Kontext jetzt komprimieren. Ein Mitglied muss zuerst im Kanal antworten, und sein Anbieter muss das Komprimieren unterstützen.",
+  "error.backend.channelCompactNoSession":
+    "Die Mitglieder dieses Kanals haben noch keine Unterhaltung zum Komprimieren. Komprimiere ihn, nachdem ein Mitglied im Kanal geantwortet hat.",
+  "error.backend.channelCompactNotSupported":
+    "Kein Mitglied dieses Kanals kann auf Anfrage komprimieren. Mitglieder, die es unterstützen, komprimieren ihren Kontext automatisch, wenn er fast voll ist.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",
@@ -125,6 +129,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Der Vorgang für die Erinnerung ist fehlgeschlagen. Versuche es erneut.",
   "error.backend.memoryGone": "Diese Erinnerung existiert nicht mehr.",
   "error.backend.routineGone": "Diese Routine existiert nicht mehr.",
+  "error.backend.routineRunGone": "Dieser Routinelauf existiert nicht mehr.",
   "error.backend.turnNotStarted": "Der Anbieter hat diesen Durchlauf nicht gestartet.",
   "error.backend.routineResultConnectionOff":
     "Diese Messaging-Verbindung ist aus oder entfernt. Wähle einen anderen Ort.",
@@ -213,6 +218,8 @@ export const messages = {
   "error.backend.interruptSelf": "Ein Agent kann sich nicht selbst unterbrechen.",
   "error.backend.interruptOtherWork":
     "Dieser Agent arbeitet an einer Aufgabe, die nicht durch deine Nachricht gestartet wurde. Nur der Benutzer oder der Absender dieser Aufgabe kann ihn stoppen.",
+  "error.backend.interruptSharedWork":
+    "Der Durchgang dieses Agenten bearbeitet deine Nachricht und auch eine Nachricht des Benutzers oder eines anderen Agenten. Nur der Benutzer kann ihn stoppen, mit Agenten stoppen im Chat dieses Agenten.",
   "error.backend.interruptStarting":
     "Dieser Agent startet noch einen Durchlauf. Versuche es erneut, sobald der Durchlauf beginnt.",
   "error.backend.interruptNoSession":
@@ -283,12 +290,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
   "error.backend.mcpToolSchemaRefused":
     "Sein Tool {tool} hat ein Eingabeformat, das dieser Anbieter nicht lesen kann. Agenten mit anderen Anbietern erhalten den Server weiterhin.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} konnte den MCP-Server {name} nicht verwenden, weil der Server eine Anmeldung verlangt. Öffne die MCP-Einstellungen und wähle Anmelden.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} konnte den MCP-Server {name} nicht starten. Öffne die MCP-Einstellungen und wähle Verbindung testen, um die Ursache zu sehen.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten. Seine Werkzeuge stehen {provider} nicht zur Verfügung. {provider} startet den Server selbst, daher kann der Verbindungstest in OpenBot erfolgreich sein. Starte einen neuen Chat, um es erneut zu versuchen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} konnte den MCP-Server {name} nicht starten, weil der Server nicht rechtzeitig geantwortet hat. Starte einen neuen Chat, um es erneut zu versuchen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -381,6 +394,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "Der Proxy {name} antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxySignInRefused":
     "Der Proxy {name} hat die Anmeldung abgelehnt, daher wurde die Seite nicht geöffnet.",
+  "error.backend.browserSystemProxyFailed":
+    "Der Proxy in den Einstellungen des Computers, auf dem OpenBot läuft, antwortet nicht oder hat die Verbindung abgelehnt, daher wurde die Seite nicht geöffnet. Prüfe die Proxy-Einstellungen dieses Computers.",
   "error.backend.browserProxyComputerUnreachable":
     "Der Computer dieses Profils antwortet nicht, daher wurde die Seite nicht geöffnet.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -414,6 +429,8 @@ export const messages = {
     "Der Server hat mit {status} geantwortet. Prüfe den API-Schlüssel oder andere Zugangsdaten.",
   "error.backend.mcpServerHttpUrl":
     "Der Server hat mit {status} geantwortet. Prüfe die URL. Der Link ist möglicherweise falsch, abgelaufen oder gelöscht.",
+  "error.backend.mcpServerBearerKey":
+    "Dieser Server nutzt einen API-Schlüssel, keine Anmeldung. Setze unter Header den Schlüssel auf Authorization und den Wert auf Bearer, ein Leerzeichen und deinen API-Schlüssel.",
   "error.backend.mcpSignInAppUrl": "Die Anmelde-App braucht eine gültige Server-URL.",
   "error.backend.mcpSignInAppClientId": "Gib die Client-ID der Anmelde-App ein.",
   "error.backend.mcpSignInAppIssuerChanged":

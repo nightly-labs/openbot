@@ -131,6 +131,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",
+  "mobile.settings.appearance.fullVisuals": "Mostrar vistas visuales completas",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Un visual de un agente se muestra en el chat con toda su altura. Si está desactivado, un visual alto se recorta y puedes tocarlo para verlo entero.",
   "mobile.settings.animations.title": "Animaciones",
   "mobile.settings.animations.footer":
     "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
@@ -235,6 +238,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Descargar archivos grandes automáticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Las imágenes, los vídeos y el audio de más de {small} solo se descargan cuando los tocas. Activa esto para descargarlos al momento, hasta {large}. Puede usar muchos datos móviles.",
+  "mobile.settings.conversations.swipeLeft": "Deslizar a la izquierda en un chat",
+  "mobile.settings.conversations.swipeRight": "Deslizar a la derecha en un chat",
+  "mobile.settings.conversations.swipeThreads": "Hilos",
+  "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeFooter":
+    "Deslizar en sentido contrario a Atrás en el chat de un agente abre esto. Deslizar sobre un mensaje sigue respondiéndolo.",
+  "mobile.settings.conversations.pullInfo": "Deslizar arriba para ver info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Desliza hacia arriba más allá del último mensaje en un chat, canal o hilo y suelta para abrir su información.",
   "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos en calidad completa",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Si está desactivado, la app envía una copia más pequeña de cada foto, de hasta 2048 píxeles en el lado largo. Llega antes con una conexión lenta. Actívalo para enviar la foto original.",

@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider}가 제시간에 응답하지 않아 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpSignInLost":
     "{provider}의 로그인이 끊어져 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider}이(가) 메시지를 거부하여 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpSettingsTimedOut": "{provider}가 제시간에 응답하지 않았습니다. 잠시 후 다시 시도하세요.",
   "error.provider.acpPlanUsedUp":
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
   "error.provider.acpMcpNotLoaded":
@@ -205,6 +208,8 @@ export const messages = {
     '엔드포인트 "{provider}"에는 API 키가 필요해요. 서버 설정 → 제공자에서 키를 추가한 다음 다시 시도해 주세요.',
   "error.provider.opencodeKeyExpired":
     "OpenCode API 키가 만료되었어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go가 저장된 API 키를 거부했어요. 키가 만료되었을 수 있어요. OpenCode Console에서 새 키를 만들어 OpenCode 설정에 붙여넣은 후 다시 시도해 주세요.",
   "error.provider.opencodeServiceFailure":
     "로컬 서비스 오류로 OpenCode가 이 턴을 완료하지 못했어요. 다시 시도해 주세요. 오류가 계속되면 설정에서 OpenCode를 다시 연결하세요.",
   "error.provider.opencodeRateLimited":
@@ -214,13 +219,17 @@ export const messages = {
   "error.provider.opencodeInvalidUpload":
     "OpenCode의 모델 제공자가 올바르지 않은 업로드 요청이라고 알렸어요. 다른 모델을 선택해 계속하세요. 저장된 루틴을 다시 만들기 전에 확인하세요.\n{detail}",
   "error.provider.opencodeUnreadableContent":
-    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. 파일을 읽을 수 있는 모델을 선택한 후 메시지를 다시 보내세요.",
+    "이 모델은 이 채팅의 파일이나 이미지를 읽을 수 없어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 파일 없이 메시지를 다시 보내거나, 파일을 읽을 수 있는 모델을 선택하세요. 이 모델을 사용자 지정 제공자에 추가했다면 설정의 '입력'에서 '이미지'를 해제하세요.",
+  "error.provider.opencodeContextTooSmall":
+    "이 채팅이 모델의 컨텍스트 창에 맞지 않습니다. Ollama 또는 LM Studio에서 더 큰 컨텍스트 길이로 모델을 불러오고, OpenBot의 제공자 설정에 같은 창을 입력하세요. 또는 더 큰 모델을 선택하세요.",
   "error.provider.opencodeFreeLimit":
     "OpenCode 무료 모델이 사용 한도에 도달했어요. 모든 무료 모델이 이 한도를 함께 사용해요. 계속하려면 OpenCode 설정에 OpenCode Go 키를 붙여넣거나 다른 제공자의 모델을 선택하세요.",
   "error.provider.opencodeProviderFailed":
     "모델 제공자 쪽에서 오류가 났어요. 회원님의 연결 문제가 아니에요. 나중에 다시 시도하거나 다른 모델을 선택하세요.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "모델의 응답이 중간에 끊겼거나 올바르지 않았어요. 메시지를 다시 보내거나 다른 모델을 선택하세요.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode가 이 강도에서 이 모델의 추론을 읽지 못했습니다. 더 낮은 강도나 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.opencodeNetwork":
     "OpenCode가 모델 제공자에 연결할 수 없었어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결을 확인한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.codexStateBusy":
@@ -253,6 +262,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH의 Gemini 서버가 없거나 실행할 수 없어요. 경로를 고치거나 변수를 삭제한 다음 OpenBot을 다시 시작하세요.",
   "error.provider.antigravityVersionUnreadable": "Gemini 서버 버전을 읽을 수 없어요.",
   "error.provider.antigravitySignIn": "Gemini를 사용하려면 Google로 로그인하세요.",
+  "error.provider.antigravityModelAtCapacity":
+    "지금 Google에 이 Gemini 모델의 여유 용량이 없어요. 요금제 할당량 때문은 아니에요. 몇 분 후 다시 시도하거나 다른 모델을 선택해 주세요.\n{detail}",
   "error.provider.antigravityRateLimited":
     "속도 제한 또는 요금제 할당량에 도달해서 Gemini가 요청을 거부했어요. 몇 분 기다리거나 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -263,8 +274,14 @@ export const messages = {
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
+  "error.provider.grokServiceFailure":
+    "Grok 서비스가 혼잡하거나 오류가 있어요. 몇 분 후 다시 시도하거나 다른 모델을 선택해 주세요.",
+  "error.provider.grokConnectionFailed":
+    "Grok이 서비스에 연결할 수 없어요. 인터넷 연결을 확인한 다음 메시지를 다시 보내 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows 호스트에서는 Gemini가 Google 페이지를 호스트에서 직접 엽니다. 호스트 컴퓨터에서 Gemini를 연결하세요.",
   "error.provider.cursorArchivePath": "Cursor 아카이브에 예상하지 못한 파일이 있어요.",
@@ -302,6 +319,8 @@ export const messages = {
     "Hermes를 사용하려면 Nous Portal로 로그인하거나 터미널에서 `hermes setup`을 실행하세요.",
   "error.provider.hermesTurnFailed":
     "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 서버 설정 › MCP에서 확인한 다음 메시지를 다시 보내세요.",
+  "error.provider.hermesRefused":
+    "Hermes가 시작하기 전에 이 메시지를 거부했습니다. 다시 보내세요. Hermes가 모든 메시지를 거부하면 이 에이전트를 실행하는 컴퓨터에서 OpenBot을 다시 시작하세요.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot이 이 모델을 사용할 수 없습니다. 모델이 사고 설정을 받아들이지 않았습니다. 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",
@@ -309,6 +328,8 @@ export const messages = {
     "이 채팅이 Claude가 처리하기에 너무 길어졌어요. OpenBot이 채팅 기록으로 새 Claude Code 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API 키에 API 크레딧이 없어요. Claude 플랜은 API 키로 보낸 요청에 사용되지 않아요. Anthropic Console에서 크레딧을 추가하거나, 설정에서 Claude에 로그인한 다음 에이전트의 모델 메뉴에서 Claude 계정을 선택하세요.",
+  "error.provider.claudeServiceBlocked":
+    "Claude 서비스가 이 요청을 차단했어요. 보통 Claude 쪽의 일시적인 문제이며, 계정 문제가 아니에요. 몇 분 후에 메시지를 다시 보내세요.",
   "error.provider.foreignReasoning":
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.imageTooSmall":
@@ -317,8 +338,12 @@ export const messages = {
     "이미지가 너무 커서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageCountLimit":
     "이미지가 너무 많아서 모델이 이 채팅을 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
+  "error.provider.requestTooLarge":
+    "이 채팅이 너무 커져서 모델에 보낼 수 없습니다. 채팅의 이미지가 원인인 경우가 많습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.opencodeSessionRejected":
     "OpenCode가 원인을 알리지 않고 요청을 거부했어요. 긴 채팅이나 모델 변경 후에 발생할 수 있어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 다른 모델이나 낮은 강도를 선택하세요.",
+  "error.provider.opencodeCompactionFailed":
+    "모델이 이 긴 채팅을 요약하지 못해 컨텍스트 창에 공간을 만들지 못했어요. OpenBot이 채팅 기록으로 새 OpenCode 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 더 강력한 모델을 선택하세요.",
   "error.provider.museMcpStartupFault":
     "Muse가 MCP 서버를 시작하지 못해서 이 세션에서 MCP를 차단했어요. OpenBot이 채팅 기록으로 새 Muse 세션을 시작했어요. 다시 시도해 주세요. 오류가 계속되면 이 에이전트의 컴퓨터 제어 또는 실패한 MCP 서버를 끄세요.",
   "error.provider.claudeSessionMissing":
@@ -332,6 +357,8 @@ export const messages = {
     "Gemini가 브라우저에서 로그인 페이지를 열 수 없었어요. 기본 브라우저를 확인한 후 다시 연결하세요.",
   "error.provider.acpSignInFailed": "로그인이 완료되지 않았어요.",
   "error.provider.acpSignInFailedReason": "로그인이 완료되지 않았어요: {reason}",
+  "error.provider.acpSignInNetwork":
+    "로그인 중 제공업체 서버에 연결하지 못했어요. OpenBot을 실행하는 컴퓨터의 네트워크 연결과 DNS 설정을 확인한 다음 다시 시도하세요.",
   "error.provider.acpSignOutFailed": "로그아웃이 완료되지 않았어요.",
   "error.provider.acpSignOutFailedReason": "로그아웃이 완료되지 않았어요: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -339,12 +366,22 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "브라우저에서는 HTTPS 로그인 링크만 열 수 있어요.",
   "error.provider.geminiKeyRefused":
     "Gemini가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 연결하세요.",
+  "error.provider.geminiKeyRateLimited":
+    "저장된 Gemini API 키가 속도 제한 또는 할당량에 도달해서 Gemini가 요청을 거부했어요. 이 키는 Google 요금제 대신 사용돼요. 몇 분 기다리거나 다른 모델을 선택한 후 다시 시도해 주세요. Google 요금제를 사용하려면 설정에서 키를 제거하세요.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "저장된 Gemini API 키에는 이 모델의 할당량이 없어요. 이 키는 Google 요금제 대신 사용돼요. 다른 모델을 선택하거나, Google 요금제를 사용하려면 설정에서 키를 제거하세요.\n{detail}",
+  "error.provider.geminiAccountSettingsUnreadable":
+    "Gemini가 이 계정의 설정 파일을 열 수 없어서 로그인할 수 없어요. 이 계정을 제거한 후 다시 추가하세요.",
+  "error.provider.geminiSettingsUnreadable":
+    "Gemini가 이 컴퓨터에서 설정 파일을 열 수 없어서 로그인할 수 없어요. Gemini를 사용하는 다른 앱을 종료한 후 OpenBot을 종료하고 다시 여세요.",
   "error.provider.geminiVerificationRequired":
     "Gemini가 답하려면 Google에서 계정을 인증해야 해요. 브라우저에서 Google 계정을 인증한 후 메시지를 다시 보내세요.",
   "error.provider.keyProviderRefused":
     "{provider}가 저장된 API 키를 거부했어요. 설정에서 키를 교체하거나 제거한 후 다시 시도하세요.",
   "error.provider.keyProviderNoBalance":
     "저장된 API 키의 {provider} 계정에 잔액이 없어요. 계정에 크레딧을 추가한 후 다시 시도하세요.",
+  "error.provider.keyProviderLowCredit":
+    "저장된 API 키의 {provider} 계정에 이 모델의 응답에 필요한 크레딧이 부족해요. 계정에 크레딧을 추가하거나 다른 모델을 선택한 후 다시 시도하세요.",
   "error.provider.modelServiceRefused":
     "모델 서비스가 요청을 거부했어요. 다른 모델을 선택하거나 서비스에서 이 모델에 대한 접근 권한을 확인하세요.",
   "error.provider.modelServiceRefusedReason":
@@ -421,6 +458,8 @@ export const messages = {
   "error.provider.piSessionMissing": "이 컴퓨터에서 Pi 세션 파일을 사용할 수 없어요.",
   "error.provider.piResumeCancelled": "Pi가 세션 재개를 취소했어요. 다시 시도해 주세요.",
   "error.provider.piSessionIdentity": "Pi가 다른 세션을 반환했어요. 저장된 세션은 교체되지 않았어요.",
+  "error.provider.piExtensionFailed":
+    "확장 프로그램을 불러올 수 없어 Pi가 중지되었습니다. 이 확장 프로그램을 제거하거나 업데이트한 후 다시 시도하세요. {detail}",
   "error.provider.piModelInvalid": "제공자가 포함된 Pi 모델을 선택하세요.",
   "error.provider.piToolInvalid": "도구가 올바르지 않은 결과를 반환했어요.",
   "error.provider.piSignIn": "호스트 컴퓨터의 Pi에서 /login을 사용하세요. 로그인이 끝나면 Pi를 닫으세요.",

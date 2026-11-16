@@ -72,6 +72,20 @@ import { stopProcessTree } from "./windows-process-tree";
 const logger = createOpenBotLogger("provider-runtime");
 
 /**
+ * The models that a Pi profile generation found only with Pi's extensions, as `provider/id`. The next
+ * generation with such a model starts Pi with its extensions at once.
+ */
+const extensionModels = new Set<string>();
+
+/** The provider and the model id that Pi's `set_model` takes, or undefined for a model name that is not valid. */
+function piModelSelection(provider: string, model: string) {
+  if (provider !== "pi") return { provider, modelId: providerModelValue(model) };
+  const separator = model.indexOf("/");
+  if (separator < 1) return undefined;
+  return { provider: model.slice(0, separator), modelId: providerModelValue(model.slice(separator + 1)) };
+}
+
+/**
  * How long a turn may send nothing, with no tool call or compaction open and no question to the
  * user, before OpenBot ends it. A model request that never answers held the turn open with no
  * limit (#4304). Pi ends an idle model request itself after `httpIdleTimeoutMs` (5 minutes) and
@@ -266,6 +280,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   /**
    * Pi starts an API error with its HTTP status. A key provider's 401 and 402 point at the saved key.
+   * OpenRouter's 402 "can only afford N" means that the account has credit, but not for the output
+   * that the request asked for, so "no balance" is not true (#8578).
    * A 403 is the model service's refusal, not an OpenBot permission: the text keeps the service's
    * reason, which the generic permission sentence dropped (#6649).
    */
@@ -273,6 +289,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     if (message && this.provider !== "pi") {
       const provider = agentProviderName(this.provider);
       if (/^401\b/u.test(message)) return sourceText("error.provider.keyProviderRefused", { provider });
+      if (/^402\b/u.test(message) && /\bcan only afford\b/iu.test(message)) {
+        return sourceText("error.provider.keyProviderLowCredit", { provider });
+      }
       if (/^402\b/u.test(message)) return sourceText("error.provider.keyProviderNoBalance", { provider });
     }
     const refused = message === null ? null : /^403\b:?\s*([\s\S]*)$/u.exec(message);
@@ -666,7 +685,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       )
       .pipe(toProviderClientOperationError);
     this.#starting.add(rpc);
-    return yield* Effect.gen({ self: this }, function* () {
+    const model = getString(params, "model");
+    const selection = model ? piModelSelection(this.provider, model) : undefined;
+    const modelKey = selection ? `${selection.provider}/${selection.modelId}` : undefined;
+    const opened = yield* Effect.gen({ self: this }, function* () {
       const handoff = claudeMcpServers(
         yield* usableMcpServers(
           agentMcpServers(this.options.mcpServers?.(mcpAgentParam(params)) ?? [], computerUseParam(params)),
@@ -701,9 +723,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       // The key extension loads first, so that it removes the key from the environment before the
       // other extensions run.
       const args = keyExtension ? ["--extension", keyExtension.path] : [];
+      // A profile generation starts Pi without its extensions, unless the model comes from one (#8885).
+      // `--no-tools` also turns off the tools of the extensions.
+      const withExtensions = modelKey !== undefined && extensionModels.has(modelKey);
       args.push(
         ...(this.options.profileGeneration
-          ? ["--no-tools", "--no-extensions", "--no-mcp"]
+          ? ["--no-tools", ...(withExtensions ? [] : ["--no-extensions"]), "--no-mcp"]
           : ["--extension", extension.path]),
       );
       const instructions = getString(params, "developerInstructions");
@@ -727,6 +752,17 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
       const id = getString(state, "sessionFile");
       if (!id || (resume && id !== requestedId))
         return yield* providerFailure(new Error(sourceText("error.provider.piSessionIdentity")));
+      if (this.options.profileGeneration && selection && modelKey && !withExtensions) {
+        // Pi without its extensions does not know the models that an extension adds, and `set_model` fails.
+        const listed = yield* rpc.request({ type: "get_available_models" });
+        const known = getArray(listed, "models").some(
+          (item) => getString(item, "provider") === selection.provider && getString(item, "id") === selection.modelId,
+        );
+        if (!known) {
+          extensionModels.add(modelKey);
+          return null;
+        }
+      }
       if (!resume) {
         // Pi normally delays its first file write until a user message. Ask Pi to initialize
         // an exclusive empty file now, so idle release and restart can resume an empty thread.
@@ -782,6 +818,12 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
         }),
       ),
     );
+    if (opened) return opened;
+    // The model comes from an extension: Pi starts again with its extensions, after this process stops.
+    // When that start also fails, for example because the sign-in expired, the next generation checks again.
+    return yield* this.#open(params, resume, configured).pipe(
+      Effect.tapError(() => Effect.sync(() => modelKey && extensionModels.delete(modelKey))),
+    );
   });
 
   readonly #thread = Effect.fn("PiAgentClient.thread")(function* (
@@ -807,16 +849,10 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     params: unknown,
   ) {
     const model = getString(params, "model");
-    if (model && this.provider !== "pi") {
-      yield* thread.rpc.request({ type: "set_model", provider: this.provider, modelId: providerModelValue(model) });
-    } else if (model) {
-      const separator = model.indexOf("/");
-      if (separator < 1) return yield* providerFailure(new Error(sourceText("error.provider.piModelInvalid")));
-      yield* thread.rpc.request({
-        type: "set_model",
-        provider: model.slice(0, separator),
-        modelId: providerModelValue(model.slice(separator + 1)),
-      });
+    if (model) {
+      const selection = piModelSelection(this.provider, model);
+      if (!selection) return yield* providerFailure(new Error(sourceText("error.provider.piModelInvalid")));
+      yield* thread.rpc.request({ type: "set_model", ...selection });
     }
     const effort = getString(params, "effort") ?? getString(params, "reasoningEffort");
     if (effort) yield* thread.rpc.request({ type: "set_thinking_level", level: effort === "none" ? "off" : effort });

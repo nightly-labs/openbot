@@ -87,6 +87,10 @@ export const messages = {
     "Poczekaj, aż praca w tym kanale się zakończy, a potem usuń jego historię.",
   "error.backend.channelCompactUnavailable":
     "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
+  "error.backend.channelCompactNoSession":
+    "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
+  "error.backend.channelCompactNotSupported":
+    "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
@@ -120,6 +124,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Operacja na wspomnieniach nie powiodła się. Spróbuj ponownie.",
   "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
   "error.backend.routineGone": "Ta rutyna już nie istnieje.",
+  "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
@@ -200,6 +205,8 @@ export const messages = {
   "error.backend.interruptSelf": "Agent nie może przerwać samego siebie.",
   "error.backend.interruptOtherWork":
     "Ten agent pracuje nad zadaniem, którego nie rozpoczęła twoja wiadomość. Zatrzymać je może tylko użytkownik lub nadawca tego zadania.",
+  "error.backend.interruptSharedWork":
+    "Tura tego agenta obsługuje Twoją wiadomość, a także wiadomość od użytkownika lub innego agenta. Tylko użytkownik może ją zatrzymać, przyciskiem Zatrzymaj agenta w czacie tego agenta.",
   "error.backend.interruptStarting": "Ten agent wciąż rozpoczyna turę. Spróbuj ponownie, gdy tura się zacznie.",
   "error.backend.interruptNoSession":
     "OpenBot nie może przerwać tego agenta, ponieważ jego sesja dostawcy jest niedostępna.",
@@ -263,12 +270,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
   "error.backend.mcpToolSchemaRefused":
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz ustawienia MCP i wybierz Zaloguj się.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} nie może uruchomić serwera MCP {name}. Otwórz ustawienia MCP i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}. Jego narzędzia nie są dostępne dla {provider}. {provider} uruchamia serwer samodzielnie, więc test połączenia w OpenBot może się udać. Rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer nie odpowiedział na czas. Rozpocznij nowy czat, aby spróbować ponownie.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -357,6 +370,8 @@ export const messages = {
     "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
   "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserSystemProxyFailed":
+    "Proxy w ustawieniach komputera, na którym działa OpenBot, nie odpowiada lub odrzuciło połączenie, więc strona się nie otworzyła. Sprawdź ustawienia proxy tego komputera.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -387,6 +402,8 @@ export const messages = {
     "Serwer odpowiedział {status}. Sprawdź klucz API lub inne dane uwierzytelniające.",
   "error.backend.mcpServerHttpUrl":
     "Serwer odpowiedział {status}. Sprawdź URL. Link może być błędny, wygasły lub usunięty.",
+  "error.backend.mcpServerBearerKey":
+    "Ten serwer używa klucza API, a nie logowania. W Nagłówkach ustaw klucz na Authorization, a wartość na Bearer, spację i swój klucz API.",
   "error.backend.mcpSignInAppUrl": "Aplikacja logowania wymaga prawidłowego adresu URL serwera.",
   "error.backend.mcpSignInAppClientId": "Wpisz identyfikator klienta aplikacji logowania.",
   "error.backend.mcpSignInAppIssuerChanged":

@@ -527,13 +527,16 @@ export function MessageBody(props: {
      while the file arrives, so the chat does not grow when the image shows. An image that does not
      load shows as a card. */
   const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
+  /* A generated image is what the user asked to see, so it loads up to a larger limit than a thumbnail. */
+  const loadLimit = (attachment: AttachmentSummary) =>
+    props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
       !attachment.previewUrl &&
-      attachment.size <= source.thumbnailLimit &&
+      attachment.size <= (loadLimit(attachment) === "generated" ? source.generatedImageLimit : source.thumbnailLimit) &&
       !unloadedImages().has(attachment.id)
     );
   };
@@ -548,6 +551,9 @@ export function MessageBody(props: {
     const images = new Set(standaloneImageAttachments());
     return standaloneAttachments().filter((attachment) => !images.has(attachment));
   });
+  /* A full cache removes the oldest image. A shown image that lost its file this way shows as a card
+     and does not load again: a new load would remove the next image, and the downloads would not stop. */
+  const loadedImages = new Set<string>();
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
@@ -555,9 +561,14 @@ export function MessageBody(props: {
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
-        void source?.load(attachment).then(
+        if (loadedImages.has(attachment.id)) {
+          unloaded(attachment);
+          continue;
+        }
+        void source?.load(attachment, loadLimit(attachment)).then(
           (shown) => {
-            if (!shown) unloaded(attachment);
+            if (shown) loadedImages.add(attachment.id);
+            else unloaded(attachment);
           },
           () => unloaded(attachment),
         );

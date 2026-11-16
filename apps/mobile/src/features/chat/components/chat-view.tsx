@@ -26,10 +26,12 @@ import { useBrowserFeature } from "@/features/browser/components/use-browser-fea
 import { channelRecipient } from "@/features/channels/model/channel-draft";
 import type { ApprovalDecision } from "@/features/chat/components/chat-approval-card";
 import { ChatComposer, type MentionReference, type MentionSkill } from "@/features/chat/components/chat-composer";
+import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-button";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
+import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
@@ -45,6 +47,7 @@ import {
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -91,7 +94,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { useComposerDictation } from "./use-composer-dictation";
+import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -112,6 +115,8 @@ export interface ChatViewProps {
   canSend: boolean;
   /** A note in place of the composer that says why the person cannot write here. */
   notice?: string | null;
+  /** Lines above the composer that say why a request does not start, such as a busy channel member. */
+  statusNotes?: readonly string[];
   /** The chat only shows its history, such as a deleted channel: no replies, answers or browser steps. */
   readOnly?: boolean;
   activity?: MobileAgentActivity;
@@ -166,6 +171,8 @@ export interface ChatViewProps {
   activityAccessory?: ReactNode;
   /** The agent's threads, in the menu of the agent's name in the header. */
   threadMenu?: ChatThreadMenu;
+  /** How full the agent chat's context is, as a ring in the open composer. A channel has none. */
+  contextMeter?: ComposerContextMeter;
   /** This chat's thread. Browser requests of the agent's other threads, such as its tasks, do not show here. */
   threadId?: string | null;
   /** The threads of a channel's member agents, from a host with `channel-attention-v1`. */
@@ -197,9 +204,23 @@ export interface ChatViewProps {
   showLatestMessages?: () => Promise<void>;
   /** Leaves the chat, from the back button and the Android edge swipe. */
   onLeave: () => void;
+  /**
+   * Runs on a swipe away from Back over the messages: to the left, or to the right in a right-to-left
+   * layout. Null turns the swipe off, such as when the host cannot open the chosen screen.
+   */
+  onSwipeForward?: (() => void) | null;
+  /**
+   * Runs when the reader pulls past the latest message until the ring above the composer is full,
+   * and lets go. Null turns the pull off.
+   */
+  onPullPastEnd?: (() => void) | null;
 }
 
 const CHAT_BACK_EDGE_WIDTH = 24;
+/** The swipe away from Back opens its screen after this distance, or after a shorter fast flick. */
+const SWIPE_FORWARD_DISTANCE = 72;
+const SWIPE_FORWARD_FLICK_DISTANCE = 32;
+const SWIPE_FORWARD_FLICK_VELOCITY = 650;
 const NO_DELIVERIES: ChatQueueController["deliveries"] = [];
 /** A host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
@@ -258,6 +279,7 @@ export function ChatView({
   historyLoadFailed,
   canSend,
   notice = null,
+  statusNotes,
   readOnly = false,
   activity,
   activities,
@@ -282,6 +304,7 @@ export function ChatView({
   channelTurnSummaries,
   activityAccessory,
   threadMenu,
+  contextMeter,
   threadId = null,
   channelThreadIds = null,
   approvals,
@@ -300,6 +323,8 @@ export function ChatView({
   detached = false,
   showLatestMessages,
   onLeave: leaveConversation,
+  onSwipeForward = null,
+  onPullPastEnd = null,
 }: ChatViewProps) {
   const { t, errorMessage } = useText();
   const workspace = useMobileWorkspaceReader();
@@ -479,6 +504,23 @@ export function ChatView({
       if (thinkingAgentId) router.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
     },
     [thinkingAgentId],
+  );
+  const openMemoryChanges = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
+  const openSubagents = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({
+          pathname: "/subagent",
+          params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
+        });
+    },
+    [thinkingAgentId, target.serverId],
   );
   const queuedMessageIds = useMemo(
     () =>
@@ -672,6 +714,25 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
+  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
+  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
+  const voiceMissing = !speechNative;
+  const composerDictation = useMemo(
+    (): ComposerDictation =>
+      voiceMissing && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
+              Keyboard.dismiss();
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [voiceMissing, dictation],
+  );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
@@ -739,8 +800,11 @@ export function ChatView({
     caption: liveCaption,
   } = live;
   const voiceName = voiceAgent?.name ?? target.name;
+  // Only an agent chat or a channel has a live conversation; see `useLiveConversation`. A boolean, because
+  // both objects change with each message, and the memo below must not.
+  const liveVoiceMissing = voiceMissing && (conversation !== null || liveChannel !== null);
   const composerVoice = useMemo((): ComposerVoice | undefined => {
-    if (!liveAvailable && !liveOpen) return undefined;
+    if (!liveAvailable && !liveOpen && !liveVoiceMissing) return undefined;
     const source = {
       available: liveAvailable,
       open: liveOpen,
@@ -757,9 +821,12 @@ export function ChatView({
       error: liveError,
       caption: liveCaption,
     };
+    const openSettings = () => router.push("/settings/voice");
+    if (!liveAvailable && !liveOpen)
+      return { ...liveVoice(source, voiceName, t), available: true, start: openSettings };
     return {
       ...liveVoice(source, voiceName, t),
-      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : router.push("/settings/voice")),
+      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : openSettings()),
     };
   }, [
     liveAvailable,
@@ -778,6 +845,7 @@ export function ChatView({
     liveCaption,
     voiceName,
     usesGptLive,
+    liveVoiceMissing,
     t,
   ]);
   const voiceAgentId = voiceAgent?.id;
@@ -893,6 +961,58 @@ export function ChatView({
         }),
     [menuOpenValue, voiceOpenValue, leaveVoiceMode, leaveConversation],
   );
+
+  // The swipe away from Back keeps one gesture object, as the edge swipe does: the list and each
+  // message bubble attach to it. The action and whether it is on change without a new gesture.
+  // Off while text is selected in a message: a selection handle can move in the same direction.
+  const swipeForwardOn = useSharedValue(onSwipeForward !== null && !selection);
+  const swipeForwardAction = useRef(onSwipeForward);
+  const selecting = Boolean(selection);
+  useEffect(() => {
+    swipeForwardAction.current = onSwipeForward;
+    swipeForwardOn.set(onSwipeForward !== null && !selecting);
+  }, [onSwipeForward, selecting, swipeForwardOn]);
+  const swipeForward = useCallback(() => {
+    const action = swipeForwardAction.current;
+    if (!action) return;
+    void haptics.impact("soft");
+    action();
+  }, []);
+  const swipeForwardGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        // Off, or while the attachment card or the voice mode covers the chat: the touch goes to the
+        // list and to the back swipe at once.
+        .onTouchesDown((_event, manager) => {
+          if (!swipeForwardOn.get() || menuOpenValue.get() || voiceOpenValue.get()) manager.fail();
+        })
+        // Away from Back: to the left, or to the right in a right-to-left layout. A swipe toward Back
+        // fails it at once, so the iOS back swipe, which waits for it, starts with no delay.
+        .activeOffsetX(-24 * END_X)
+        .failOffsetX(8 * END_X)
+        .failOffsetY([-12, 12])
+        .onEnd((event) => {
+          const distance = -event.translationX * END_X;
+          const velocity = -event.velocityX * END_X;
+          if (
+            distance >= SWIPE_FORWARD_DISTANCE ||
+            (distance >= SWIPE_FORWARD_FLICK_DISTANCE && velocity >= SWIPE_FORWARD_FLICK_VELOCITY)
+          )
+            scheduleOnRN(swipeForward);
+        }),
+    [swipeForwardOn, menuOpenValue, voiceOpenValue, swipeForward],
+  );
+
+  // The pull past the latest message. Off while text is selected, or the attachment card or the voice
+  // mode covers the chat.
+  const pullPastEnd = useRef(onPullPastEnd);
+  pullPastEnd.current = onPullPastEnd;
+  const openPastEnd = useCallback(() => pullPastEnd.current?.(), []);
+  const endPull = useChatEndPull({
+    motion,
+    enabled: onPullPastEnd !== null && !selecting && !attachments.menuOpen && !voiceOpen && !dictating,
+    onOpen: openPastEnd,
+  });
 
   // Hold the turn the stop was asked for, not a flag: the host clears the turn
   // when the stop lands, and the next turn must not inherit a pending state.
@@ -1210,6 +1330,10 @@ export function ChatView({
               threadMenu={threadMenu}
             />
             <ChatMessageList
+              // Only an agent's chat has the swipe: it is off in a channel. Every chat has the pull.
+              swipeGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
+              pullGesture={endPull.gesture}
+              pullShift={endPull.shift}
               agents={serverAgents}
               rowsShown={rowsShown}
               target={target}
@@ -1237,6 +1361,8 @@ export function ChatView({
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}
               onOpenTurn={thinkingAgentId ? openTurn : undefined}
+              onOpenSubagents={thinkingAgentId ? openSubagents : undefined}
+              onOpenMemoryChanges={thinkingAgentId ? openMemoryChanges : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}
@@ -1290,6 +1416,9 @@ export function ChatView({
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
+              {onPullPastEnd !== null ? (
+                <ChatEndPullRing pull={endPull} target={target} leadAgentId={channelLeadAgentId} />
+              ) : null}
               {!voiceOpen && (detached || !atLatest) && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
                   <ChatGlassIconButton
@@ -1360,6 +1489,20 @@ export function ChatView({
                   {t("mobile.chat.outbox.saveFailed")}
                 </Typography.Paragraph>
               ) : null}
+              {notice
+                ? null
+                : statusNotes?.map((note) => (
+                    <Typography.Paragraph
+                      key={note}
+                      type="body-xs"
+                      numberOfLines={2}
+                      accessibilityLiveRegion="polite"
+                      className="bg-background py-1.5 text-text-secondary"
+                      style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                    >
+                      {note}
+                    </Typography.Paragraph>
+                  ))}
               {queue && !notice ? (
                 <ChatQueueButton
                   queue={queue}
@@ -1458,11 +1601,12 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
-                  dictation={dictation}
+                  dictation={composerDictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}
                   voiceAvatar={voiceAvatar}
+                  contextMeter={contextMeter}
                 />
               )}
             </Animated.View>
@@ -1478,6 +1622,7 @@ export function ChatView({
             anchor={attachments.menuAnchor}
             appActive={appActive}
             attachments={attachments}
+            context={contextMeter}
             fallbackBackground={fieldBackground}
             foreground={foreground}
             keyboardHeight={motion.keyboardHeight}

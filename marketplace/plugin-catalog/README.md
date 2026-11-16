@@ -306,3 +306,110 @@ Troubleshooting:
 - "Insufficient credits": the selected workspace has too few credits. Sunra gives free daily
   credits; top-ups are only for subscribers. See <https://sunra.ai/pricing>.
 - A video generation fails: video models need an active Sunra plan.
+
+## AppSignal
+
+The listing connects to AppSignal's own MCP server at `https://appsignal.com/api/mcp`
+(<https://docs.appsignal.com/mcp.html>). It answers 401 with a `Bearer` challenge. The
+authorization server (`https://appsignal.com`) has dynamic client registration with S256, so the
+user signs in through the browser and types no key (checked 2026-11-14). The resource metadata asks
+for `app:read app:write`.
+
+A sign-in gives all read and write tools of the account. AppSignal's MCP token can limit the
+applications and the tools, but the listing does not use it: the token is a second way in, and a
+listing has one flow. A user who wants that limit adds an MCP server with the same address and an
+`Authorization: Bearer <token>` header in the MCP servers settings.
+
+Not confirmed with an AppSignal account: whether the token answer has a refresh token. Without one,
+the user signs in again when the access token expires.
+
+Troubleshooting:
+
+- A tool returns no data: the app does not send that data to AppSignal. For example,
+  `get_log_lines` is empty when the app sends no logs.
+
+## Cloud 66
+
+The listing connects to Cloud 66's own MCP server at `https://app.cloud66.com/mcp`
+(<https://help.cloud66.com/sites/mcp/what-is-the-mcp-server/>). It answers 401 with a `Bearer`
+challenge. The authorization server (`https://app.cloud66.com/mcp/oauth`) has dynamic client
+registration with S256 (checked 2026-11-14). The resource metadata lists each scope, so the
+authorization request asks for all of them, and the user can clear some on the consent page. Tools
+outside the granted scopes are hidden. A scope cannot give more than the user's Cloud 66 role.
+
+The access token is valid for 7 days. A second sign-in of the same client revokes the first token.
+Each user can have 10 MCP sessions at a time.
+
+To delete an application or a deployment profile, or to add a cloud, Cloud 66 sends an elicitation
+over the open session. The agent shows a one-time Cloud 66 link, and the user confirms on that page
+in the browser (with 2FA for a delete). Cloud 66 does not document the elicitation mode. OpenBot
+shows a `form` request as a question card in the chat and declines a `url` request
+(`mcpElicitationQuestions` in `src/backend/agent/prompts.ts`). Cloud 66 supports only MCP
+`2025-06-18`, which has no `url` mode, so the request is probably a `form`. Not confirmed with a
+Cloud 66 account. A chat in Slack, Discord or Telegram cancels the request. When the request fails,
+the tool fails with "this tool requires an MCP client with elicitation support" or a decline; do
+the action in the Cloud 66 dashboard. The other tools do not need it.
+
+Troubleshooting:
+
+- `Missing required argument: account_id`: each tool except `list_accounts` needs an account.
+  Ask the agent to list the accounts first.
+- `Token missing scope: <resource>:<action>`: the user cleared that permission on the consent page.
+  Sign out, sign in, and select it.
+- HTTP 429 when the connection opens: the user has 10 open sessions. Wait for old sessions to end.
+- Deleting needs 2FA on the Cloud 66 account.
+
+## HighLevel
+
+The listing connects to HighLevel's MCP server at `https://services.leadconnectorhq.com/mcp` with a
+Private Integration token (<https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html>)
+in `Authorization: Bearer pit-…` and the sub-account ID in a `locationId` header. Some tools take
+`locationId` as an argument, and other tools have no location input.
+
+The listing has no browser sign-in (#7595). The server's metadata lists 154 scopes, and its
+authorization page refuses 8 of them ("Invalid scope(s): emails/templates.readonly, …"), so a
+sign-in with the published scope list never finishes. The per-client addresses in HighLevel's guide
+(`/mcp/anthropic/v2`, `/mcp/openai/v2`, `/mcp/cursor/v2`) list the same 8 scopes and refuse a client
+that they do not recognize (#7753). Add a `link` flow again only when a sign-in with the published
+scopes finishes.
+
+Troubleshooting:
+
+- A tool answers "Invalid Private Integration token": the token is wrong, was rotated, or belongs to
+  another sub-account. Create a new token and connect again.
+- HighLevel refuses one tool but not others: the token may not have the scope that the tool needs.
+  Edit the Private Integration in HighLevel and select that scope.
+
+## HubSpot
+
+The listing starts HubSpot's own local server, `@hubspot/mcp-server`
+(<https://www.npmjs.com/package/@hubspot/mcp-server>, MIT), through `npx`. The version is pinned
+because the server can write to the CRM. To update it, review the release, change the version in
+`args`, and increase the listing `version`. The server is in beta under HubSpot's Early Adopter
+Program terms.
+
+The server reads one token from `PRIVATE_APP_ACCESS_TOKEN` and sends it as a `Bearer` token to
+`https://api.hubspot.com`. HubSpot stopped the creation of new legacy private apps on 2026-10-26, so
+the connect dialog asks for a service key
+(<https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys>).
+Only a Super admin can create one. An existing private app token also works. Not confirmed with a
+HubSpot account: that the server accepts a service key. HubSpot documents service keys for REST API
+requests with a `Bearer` header, which is what the server sends.
+
+The tools search, read, create and update CRM objects, associations and properties, create and
+update notes and tasks, and read workflows. There are no delete tools. The scopes of the key limit
+the objects that agents can read and change.
+
+HubSpot's remote server, `https://mcp.hubspot.com/`, is not in the listing. Its authorization server
+has no registration endpoint and no client metadata document, and its token endpoint needs a client
+secret (`client_secret_post`), so the smoke refuses a `link` flow. A user who wants it creates an MCP
+connector in HubSpot (Development > MCP Connectors) with the callback URL
+`http://127.0.0.1:28417/mcp-auth`, adds `https://mcp.hubspot.com/` in the MCP servers settings, enters
+the connector in the Sign-in app section, and selects Sign in.
+
+Troubleshooting:
+
+- "HubSpot access token is required": the key is empty. Connect again and paste the key.
+- A tool answers 401: the key was rotated or deleted. Create a new key and connect again.
+- A tool answers 403: the key does not have the scope for that object. Edit the key in HubSpot and
+  add the scope.

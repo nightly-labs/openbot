@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "이 연결에서는 에이전트의 사용 한도를 표시하거나 변경할 수 없어요.",
   "error.team.hermesImportUnsupported": "이 연결에서는 서버의 Hermes 프로필을 가져올 수 없어요.",
   "error.team.providerDetectionUnsupported": "이 연결에서는 서버의 모델 서버와 에이전트를 찾을 수 없어요.",
+  "error.team.routineFlowStopUnsupported": "이 연결에서는 루틴 실행을 중지할 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.libraryFoldersUnsupported": "이 연결에서는 라이브러리 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":

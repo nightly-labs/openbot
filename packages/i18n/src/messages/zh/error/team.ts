@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "当前连接无法显示或更改助手的用量限制。",
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
+  "error.team.routineFlowStopUnsupported": "此连接无法停止自动化任务的运行。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
   "error.team.agentNotificationLevelsUnsupported":

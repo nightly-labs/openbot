@@ -136,6 +136,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
+  "mobile.settings.appearance.fullVisuals": "Pokazuj pełne podglądy wizualne",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Wizualizacja od agenta ma w czacie pełną wysokość. Gdy to jest wyłączone, wysoka wizualizacja jest przycięta. Dotknij jej, aby zobaczyć całość.",
   "mobile.settings.animations.title": "Animacje",
   "mobile.settings.animations.footer":
     "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
@@ -239,6 +242,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Automatycznie pobieraj duże pliki",
   "mobile.settings.conversations.largeFilesFooter":
     "Obrazy, filmy i dźwięki większe niż {small} pobierają się dopiero po stuknięciu. Włącz, aby pobierać je od razu, do {large}. Może to zużyć dużo danych komórkowych.",
+  "mobile.settings.conversations.swipeLeft": "Przesunięcie w lewo w czacie agenta",
+  "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
+  "mobile.settings.conversations.swipeThreads": "Wątki",
+  "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
+  "mobile.settings.conversations.swipeFooter":
+    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. Przesunięcie dymka wiadomości nadal na nią odpowiada.",
+  "mobile.settings.conversations.pullInfo": "Pociągnięcie w górę: informacje",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Pociągnij w górę za ostatnią wiadomość w czacie, kanale lub wątku i puść, aby otworzyć informacje.",
   "mobile.settings.conversations.fullQualityPhotos": "Wysyłaj zdjęcia w pełnej jakości",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Gdy to jest wyłączone, aplikacja wysyła mniejszą kopię każdego zdjęcia, do 2048 pikseli na dłuższym boku. Dociera szybciej przy wolnym połączeniu. Włącz, aby wysyłać oryginalne zdjęcie.",

@@ -1955,6 +1955,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       connectAccountKey: async (input) => {
         await api.connectProviderAccountKey(input);
       },
+      // The preview has no provider to finish a code sign-in: the code stays until the dialog closes.
+      startAccountCodeLogin: async ({ provider, accountId }) => {
+        const status = await api.connectProviderAccount({ provider, accountId });
+        const accounts = status.providers?.find((row) => row.id === provider)?.accounts ?? [];
+        return {
+          accountId: accountId ?? accounts.at(-1)?.id ?? "a0000000000000001",
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://example.com/device",
+            expiresAt: Date.now() + 15 * 60_000,
+          },
+        };
+      },
+      submitAccountCodeLogin: async () => undefined,
+      accountCodeLoginStatus: async () => ({ result: null }),
+      cancelAccountCodeLogin: async () => undefined,
       renameAccount: async (input) => {
         await api.renameProviderAccount(input);
       },
@@ -3677,7 +3694,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // Preview has one host, so every server's name and logo are this computer's.
     hostAdmin: {
       updateIdentity: async (input, serverId) => {
-        await mockTeam.host.updateIdentity(input);
+        const { appearance, ...identity } = input;
+        if (identity.serverName !== undefined || identity.logo !== undefined)
+          await mockTeam.host.updateIdentity(identity);
+        // The look belongs to the server that the admin changes, as on a joined host.
+        if (appearance !== undefined) mockTeam.setServerAppearance(serverId, appearance);
         const server = (await mockTeam.servers.list()).find((candidate) => candidate.id === serverId);
         if (!server) throw new Error("Server not found");
         return server;

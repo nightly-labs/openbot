@@ -4,9 +4,11 @@ import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
+import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
 import { ChatChannelWorkRow } from "@/features/channels/components/chat-channel-work-row";
 import { useChannelList } from "@/features/channels/components/use-channels";
 import { useAgentViewOnly } from "@/features/servers/model/use-server-roles";
+import { useChatPullPreference, useChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { useAgentActivity } from "@/features/workspace/components/use-agent-activity";
 import { useAgentFirstUnreadMessageId, useApprovalRequests } from "@/features/workspace/components/use-live-workspace";
 import {
@@ -19,6 +21,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { currentText, useText } from "@/shared/lib/text";
 import {
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
   withFailureReasons,
@@ -33,18 +36,13 @@ import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
+import { useComposerContextMeter } from "./use-context-usage";
 import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
 const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
-
-/** `previous` when it holds exactly `ids`, else a new set of them. */
-function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
-  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
-  return new Set(ids);
-}
 
 /** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({
@@ -109,6 +107,7 @@ export function MobileChatView({
   );
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
+  const contextMeter = useComposerContextMeter({ serverId: agent.serverId, agentId: agent.id });
   // The pins of the agent's own chat, on a host with `message-pins-v1`.
   const pins = useMessagePins(agent.serverId, agent.id);
   const pinnedMessageIds = useMemo(
@@ -403,6 +402,26 @@ export function MobileChatView({
     showsOnline(server) && !viewOnly,
     respondToPrompt,
   );
+  // The swipe away from Back opens the screen chosen in Settings, on top of this chat, so Back returns
+  // here. It is off while the host cannot open that screen, as the header hides the same action.
+  const swipeAction = useChatSwipePreference((state) => state.action);
+  const browserAllowed = useBrowserFeature();
+  const browserView = useMobileWorkspaceSelector((current) => current.browserViewSupport(agent.serverId).view);
+  const browserShown = browserAllowed && showsOnline(server) && browserView;
+  const threadsShown = threadMenu !== undefined;
+  const swipeForward = useMemo(() => {
+    const params = { agentId: agent.id, serverId: agent.serverId };
+    if (swipeAction === "threads")
+      return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
+    return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;
+  }, [swipeAction, threadsShown, browserShown, agent.id, agent.serverId]);
+  // A pull past the latest message opens the agent's info sheet on top of this chat, unless Settings
+  // turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId: agent.id, serverId: agent.serverId } }),
+    [agent.id, agent.serverId],
+  );
   const workActivity = workChannel ? liveActivity : undefined;
   // One element while its inputs stay, so a new render of this screen does not draw the list again.
   // The agent's threads are in the thread menu of the header, not in this chat.
@@ -445,6 +464,7 @@ export function MobileChatView({
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}
+      contextMeter={contextMeter}
       threadId={threadId}
       approvals={approvals}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}
@@ -464,6 +484,8 @@ export function MobileChatView({
       detached={detached}
       showLatestMessages={showLatestMessages}
       onLeave={onLeave}
+      onSwipeForward={swipeForward}
+      onPullPastEnd={pullOn ? openInfo : null}
     />
   );
 }

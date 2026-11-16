@@ -79,6 +79,7 @@ import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Sh
 import { ProviderAccountRenameField } from "../../components/ProviderAccountList";
 import type { ProviderPickerOption } from "../../components/ProviderPicker";
 import {
+  accountCodeSignInOffered,
   hasKeyAccounts,
   isApiKeyAccount,
   isProviderKeyAccount,
@@ -864,6 +865,23 @@ function AccountsSection(props: SectionProps) {
             <UserRoundPlus aria-hidden="true" />
             {t("provider.account.add")}
           </Button>
+          {/* The other way in for a new account, in a ⋯ menu as on the provider's own sign-in. */}
+          <Show when={!keyOffered() && props.row.accountCodeOffered()}>
+            <DropdownMenu.Root placement="bottom-end" gutter={4} modal={false}>
+              <MenuTrigger
+                label={t("provider.account.moreActions", { name: t("provider.account.add") })}
+                disabled={props.disabled || accounts().length >= MAX_PROVIDER_ACCOUNTS || adding()}
+              />
+              <DropdownMenu.Portal mount={props.menuMount ?? document.body}>
+                <DropdownMenu.Content>
+                  <DropdownMenu.Item onSelect={props.row.addAccountWithCode}>
+                    <Smartphone aria-hidden="true" />
+                    {t("provider.account.addWithCode")}
+                  </DropdownMenu.Item>
+                </DropdownMenu.Content>
+              </DropdownMenu.Portal>
+            </DropdownMenu.Root>
+          </Show>
         </Show>
       }
     >
@@ -1223,6 +1241,16 @@ function AccountRow(
               </Show>
               <Show when={own()}>
                 <AlternativeItem row={props.row} />
+              </Show>
+              <Show when={signInAgain() && accountCodeSignInOffered(props.option.id, props.accountActions)}>
+                <DropdownMenu.Item
+                  onSelect={() =>
+                    props.run(name(), () => props.accountActions?.connectWithCode?.(props.option.id, props.account.id))
+                  }
+                >
+                  <Smartphone aria-hidden="true" />
+                  {t("provider.action.signInWithCode")}
+                </DropdownMenu.Item>
               </Show>
               <Show when={apiKey()}>
                 <DropdownMenu.Item onSelect={() => void props.onSignInProvider?.(props.option.id)}>

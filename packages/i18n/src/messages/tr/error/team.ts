@@ -80,6 +80,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "Bu bağlantı ajanların kullanım sınırlarını gösteremez veya değiştiremez.",
   "error.team.hermesImportUnsupported": "Bu bağlantı sunucudan Hermes profillerini içe aktaramaz.",
   "error.team.providerDetectionUnsupported": "Bu bağlantı sunucunun model sunucularını ve ajanlarını bulamaz.",
+  "error.team.routineFlowStopUnsupported": "Bu bağlantı bir rutin çalıştırmasını durduramaz.",
   "error.team.sidebarFoldersUnsupported": "Klasör içinde klasör bu bağlantı tarafından desteklenmiyor.",
   "error.team.libraryFoldersUnsupported": "Kitaplık klasörleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.agentNotificationLevelsUnsupported":

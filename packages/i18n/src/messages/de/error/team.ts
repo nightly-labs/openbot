@@ -86,6 +86,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Diese Verbindung kann keine Hermes-Profile vom Server importieren.",
   "error.team.providerDetectionUnsupported":
     "Diese Verbindung kann die Modellserver und Agenten des Servers nicht finden.",
+  "error.team.routineFlowStopUnsupported": "Diese Verbindung kann keinen Routinelauf stoppen.",
   "error.team.sidebarFoldersUnsupported": "Diese Verbindung unterstützt keine Ordner in Ordnern.",
   "error.team.libraryFoldersUnsupported": "Diese Verbindung unterstützt keine Bibliotheksordner.",
   "error.team.agentNotificationLevelsUnsupported":

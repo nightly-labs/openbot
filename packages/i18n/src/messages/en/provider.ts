@@ -231,6 +231,7 @@ export const messages = defineMessages("provider", {
   "provider.openCodeKey.reconnectFailed": "Could not reconnect.",
   "provider.account.add": "Add account",
   "provider.account.addLabel": "Add another {name} account",
+  "provider.account.addWithCode": "Add account with code",
   "provider.account.count": { one: "{count} account", other: "{count} accounts" },
   "provider.account.numbered": "Account {number}",
   "provider.account.apiKey": "API key",

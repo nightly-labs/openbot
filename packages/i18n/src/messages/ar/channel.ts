@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "تبادل الأعضاء هذه المهمة فيما بينهم مرات كثيرة جدًا. توقفت لمنع تكرارها بلا نهاية.",
   "channel.conversation.noMembers": "أضف وكلاء في إعدادات القناة لبدء العمل.",
+  "channel.conversation.waitFull": "في الانتظار - يبدأ {name} عند انتهاء مهمة قيد التشغيل",
   "channel.conversation.archivedNotice": "قناة محذوفة. معاينة فقط.",
   "channel.composer.label": "رسالة إلى القناة",
   "channel.composer.placeholder": "راسل {name}",

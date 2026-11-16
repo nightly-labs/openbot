@@ -1,5 +1,10 @@
 import type { ExpressionId } from "@norbert_bodziony/bloub";
-import { agentProviderDescriptor, agentProviderName, foreignProvider } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderDescriptor,
+  agentProviderName,
+  agentSteersTurns,
+  foreignProvider,
+} from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentBackupModels,
@@ -189,6 +194,8 @@ export interface AgentSettingsPanelProps {
   width: number;
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
+  /** The width from the last drag. When the chat gets wider again, the panel goes back to it. */
+  preferredWidth?: (() => number) | undefined;
   /** Application-owned navigation and detail surfaces, in the existing panel layout. */
   links?: JSX.Element;
   detailOpen?: boolean;
@@ -952,7 +959,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return (
       provider !== undefined &&
       (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
-      agentProviderDescriptor(provider).steer !== "native"
+      // A custom agent steers when its model reports it (#4977).
+      !agentSteersTurns({ provider, model: draft.runtime.model }, props.modelOptions)
     );
   };
 
@@ -1035,6 +1043,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={props.width}
       maxWidth={props.maxWidth}
       onResize={props.onResize}
+      preferredWidth={props.preferredWidth}
     >
       <Show when={!props.detailOpen}>
         <Show

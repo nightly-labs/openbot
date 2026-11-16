@@ -4,7 +4,8 @@
 // message on its current model, and fails it with the CLI's report of an Anthropic overload (529)
 // when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
 // Checks:
-//   1. A turn that wrote text before the error does not move: it fails with its error, as before.
+//   1. A turn that wrote text before the error continues on the backup model, and a thread turn
+//      moves to it too (#8406). These run after check 5.
 //   2. An agent with no backup models fails with its error, as before.
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
 //      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
@@ -13,6 +14,8 @@
 // Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
 // ready backup on the same model when its limit ends (#6660).
 // A spent credit balance moves to a backup with a note that names the spent model and what to do (#7965).
+// A message runs again after its Claude process closed and resumed the saved session, and a message
+// whose uuid the saved session holds runs with a new uuid (#9270).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -122,7 +125,7 @@ const turn = (message) => {
   const fails = failing.includes(model);
   const input = JSON.stringify(message);
   const acts = input.includes("act-then-fail");
-  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input }) + "\\n");
+  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
   if ((input.includes("usage-work") || input.includes("usage-chain") || input.includes("usage-exhausted")) &&
       (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted"))) {
     if (!input.includes("usage-chain-empty")) assistant("Checkpoint saved. Only the final step remains.");
@@ -146,6 +149,14 @@ const turn = (message) => {
 };
 // As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
 const taken = new Set();
+// Claude Code also skips a uuid that the saved session holds with a reply after it, such as the error
+// reply of a refused turn, and only reports it completed (#9270). This stand-in reads each message
+// of the saved session as answered. "session-holds" acts as a message that an earlier run of
+// OpenBot sent, so the session holds its first uuid. "session-skips" is skipped with each uuid.
+const saved = new Set(previous.map((row) => row.uuid));
+let heldOnce = false;
+const lifecycle = (uuid, state) =>
+  process.stdout.write(JSON.stringify({ type: "command_lifecycle", command_uuid: uuid, state, uuid: randomUUID(), session_id: sessionId }) + "\\n");
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -162,7 +173,15 @@ process.stdin.on("data", (chunk) => {
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
     } else if (message.type === "user" && !taken.has(message.uuid)) {
       taken.add(message.uuid);
+      const held = !heldOnce && line.includes("session-holds");
+      if (held) heldOnce = true;
+      if (held || saved.has(message.uuid) || line.includes("session-skips")) {
+        lifecycle(message.uuid, "completed");
+        continue;
+      }
+      lifecycle(message.uuid, "started");
       turn(message);
+      lifecycle(message.uuid, "completed");
     }
   }
 });
@@ -286,6 +305,7 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   /** The provider thread of the last turn that started. */
   lastThread: string | null = null;
   readonly toolAnswers = new Map<RequestId, unknown>();
+  readonly #started = new Set<string>();
 
   constructor(cli: ClaudeCliInfo) {
     super();
@@ -341,6 +361,15 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
             ],
           }),
         );
+      case "turn/start": {
+        const messageId = isDynamicRecord(params) ? params.clientUserMessageId : undefined;
+        const again = typeof messageId === "string" && this.#started.has(messageId);
+        if (typeof messageId === "string") this.#started.add(messageId);
+        if (!again || !closeBeforeRunAgain) return this.#real.request(method, params, decoder, timeoutMs);
+        return this.#real
+          .releaseIdleThreads()
+          .pipe(Effect.andThen(this.#real.request(method, params, decoder, timeoutMs)));
+      }
       default:
         return this.#real.request(method, params, decoder, timeoutMs);
     }
@@ -413,7 +442,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function turns(): { model: string; failed: boolean; input: string }[] {
+function turns(): { model: string; failed: boolean; input: string; pid: number }[] {
   try {
     return readFileSync(turnLog, "utf8")
       .split("\n")
@@ -425,6 +454,9 @@ function turns(): { model: string; failed: boolean; input: string }[] {
 }
 
 const failing = (models: string[]) => writeFileSync(failingFile, JSON.stringify(models));
+
+/** Closes the idle Claude processes before a message runs again, as the 5-minute idle close does (#9270). */
+let closeBeforeRunAgain = false;
 
 function readLog<T>(path: string): T[] {
   try {
@@ -635,15 +667,6 @@ try {
   );
   failing([PRIMARY]);
 
-  await check("a turn that wrote text does not move", async () => {
-    const since = events.length;
-    const outcome = await send(mover.id, "act-then-fail");
-    assert.equal(outcome.status, "failed", "The turn fails.");
-    assert.equal(agentOf(mover.id).model, PRIMARY, "The agent stays on its own model.");
-    assert.ok(errorsFor(mover.id, since).length > 0, "The error shows.");
-    return outcome;
-  });
-
   await check("an agent with no backup models fails as before", async () => {
     const since = events.length;
     const outcome = await send(stayer.id, "work");
@@ -708,6 +731,96 @@ try {
     const notes = await markers(mover.id, MODEL_SWITCH_ITEM_TYPES["provider-error-ended"]);
     assert.deepEqual(notes, [sourceText("status.agent.modelReturnedAfterError", { model: modelName(PRIMARY) })]);
     return { notes };
+  });
+
+  // A new agent for each check, made while no model fails. The restart ends the hold on the own model.
+  const withBackup = async (name: string) => {
+    const agent = await create(name);
+    await waitFor(`the first turn of ${name} to end`, () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    return agent;
+  };
+
+  await check("a turn that wrote text continues on the backup model", async () => {
+    const continuer = await withBackup("Continuer");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(continuer.id, "act-then-fail");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+      "The message ran on the own model, then on the backup.",
+    );
+    assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
+    assert.equal(agentOf(continuer.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(continuer.id, since), [], "No error shows for the moved turn.");
+    const shown = (await runCauseEffect(service.readConversation(continuer.id))).messages
+      .filter((message) => message.text.trim())
+      .slice(-4)
+      .map((message) => message.text);
+    assert.deepEqual(
+      shown,
+      [
+        "act-then-fail",
+        "Partial answer.",
+        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
+        "Done.",
+      ],
+      "The chat shows the stopped text, the switch and then the backup's answer.",
+    );
+    failing([]);
+    await restart();
+    return { ran: ran.map((turn) => turn.model), shown };
+  });
+
+  await check("a thread turn moves to the backup model", async () => {
+    const threader = await withBackup("Threader");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "work" }));
+    await waitFor("the thread to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The thread ran on the own model, then on the backup.");
+    assert.equal(agentOf(threader.id).model, BACKUP, "The agent is on the backup model.");
+    failing([]);
+    await restart();
+    return { taskId: task.id, ran };
+  });
+
+  await check("a thread turn that wrote text continues on the backup model", async () => {
+    const threader = await withBackup("Weaver");
+    failing([PRIMARY]);
+    const before = turns().length;
+    const task = await runCauseEffect(service.startTask({ agentId: threader.id, text: "act-then-fail" }));
+    await waitFor("the thread with work to complete on the backup", () =>
+      service.readTask(threader.id, task.id).messages.some((message) => message.text === "Done."),
+    );
+    const order = () =>
+      service
+        .readTask(threader.id, task.id)
+        .messages.filter((message) => message.author !== "system" && message.text.trim())
+        .map((message) => message.text);
+    const expected = ["act-then-fail", "Partial answer.", "Done."];
+    assert.deepEqual(order(), expected, "The thread shows the stopped text, then the backup's answer.");
+    assert.ok(turns().slice(before).at(-1)?.input.includes("Continue the unfinished task"));
+    failing([]);
+    await restart();
+    assert.deepEqual(order(), expected, "The thread keeps the order after a restart.");
+    return { taskId: task.id, order: order() };
   });
 
   await check("a usage limit after partial work continues on the backup", async () => {
@@ -1074,6 +1187,61 @@ try {
       return outcome;
     });
   }
+
+  await check("a message runs again after its Claude process closed", async () => {
+    await restart();
+    const agent = await create("Reopened");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    failing([PRIMARY]);
+    closeBeforeRunAgain = true;
+    const before = turns().length;
+    const outcome = await send(agent.id, "work after close");
+    closeBeforeRunAgain = false;
+    failing([]);
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+    );
+    assert.notEqual(ran[0]?.pid, ran[1]?.pid, "The message ran again in a new process that resumed the session.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return { ran };
+  });
+
+  await check("a message whose uuid the saved session holds runs with a new uuid", async () => {
+    const agent = await create("Holder");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-holds");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, before + 1, "The message runs once.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return outcome;
+  });
+
+  await check("a message that Claude skips with each uuid fails with a reason", async () => {
+    const agent = await create("Skipper");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-skips");
+    assert.equal(outcome.status, "failed", "The turn ends.");
+    assert.equal(outcome.error, sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+    assert.equal(turns().length, before, "The message did not run.");
+    return outcome;
+  });
 
   report.passed = true;
 } catch (error) {

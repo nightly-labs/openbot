@@ -91,6 +91,18 @@ export const messages = {
   "browser.secret.submitting": "Enviando…",
   "browser.secret.takeOver": "Intervenir",
   "browser.secret.failed": "No se pudo completar la solicitud. Comprueba la conexión e inténtalo de nuevo.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente eligió un campo incorrecto en la página.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot no usó ningún inicio de sesión guardado porque el agente no eligió ninguno de los guardados para este sitio. Dile al agente qué cuenta debe usar.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene contraseña para este sitio.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene clave de autenticador.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot no usó ningún inicio de sesión guardado porque no pudo leer tu gestor de contraseñas.",
   "browser.error.openAddress": "No se pudo abrir la dirección en esta pestaña.",
   "browser.error.channelNoBrowserMember": "Ningún miembro puede abrir una pestaña nueva en este canal.",
   "browser.error.closeTab": "No se pudo cerrar la pestaña del navegador.",

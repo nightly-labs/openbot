@@ -7,6 +7,7 @@ import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
@@ -54,8 +55,17 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * user's country: `opencode run` shows "This model is not available in your country". A free model
  * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
  * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
+ *
+ * OpenCode 2.2.5 also answers this way for an OpenCode Go key that the service refuses, such as an
+ * expired key. Only OpenCode's log has the reason, so a user with a saved key was told to add a key
+ * (#9095). OpenBot sends its saved key only to OpenCode Go.
  */
-function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
+function openCodeAuthRequired(
+  error: unknown,
+  model: string | null,
+  endpoint: AcpCustomEndpoint | null,
+  savedKey: boolean,
+): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
     return sourceText(
@@ -64,6 +74,7 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
     );
   if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
     return sourceText("error.provider.opencodeFreeModelRefused");
+  if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -71,13 +82,14 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
 }
 
 /**
- * A request that the model refused for a file, image or audio part in the chat. OpenCode 2.1.1
- * sends a part when the model catalog lists its kind, or when the part has a kind it does not know,
- * such as an MCP resource. Each gateway words the refusal differently; OpenCode itself refuses a
- * kind that the protocol cannot carry.
+ * A request that is larger than the model's context window, also after OpenCode 2.2.6 compacted the
+ * chat. OpenCode names its own failure `compaction.failed` ("cannot be reduced further") or
+ * `compaction.unavailable` ("Nothing to compact yet", when only the first exchange is there); a model
+ * server's refusal comes as its own text: LM Studio, llama.cpp, and OpenAI-compatible servers. A local
+ * server often loads a model with a window smaller than the agent's instructions and tools (#6195).
  */
-const OPENCODE_UNREADABLE_CONTENT =
-  /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
+const OPENCODE_CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -127,16 +139,26 @@ function openCodeRequestFailure(
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
   if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
     return redact(reason);
-  // The part stays in the session, so each turn on this model fails until the user picks another.
-  // The provider's text says nothing more to the user; it goes to the log.
-  if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
+  // The part stays in the session, so the turn reads the provider's text to start a new session.
+  if (isUnreadableContentDiagnostic(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
-    return sourceText("error.provider.opencodeUnreadableContent");
+    return redact(reason);
   }
   // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
   // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
   if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
     return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 stops the turn when a model starts a second reasoning block before the first ends.
+  // A route such as Vercel AI Gateway's does this at a higher effort; a send again fails the same way (#8621).
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
+  // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
+  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+    log(`OpenCode request does not fit the model's context window: ${reason}`);
+    return sourceText("error.provider.opencodeContextTooSmall");
+  }
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
@@ -188,8 +210,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))
@@ -235,6 +257,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
+  // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
+  relayStdioMcpServers: true,
   // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
   // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
   childSessionUpdates: true,

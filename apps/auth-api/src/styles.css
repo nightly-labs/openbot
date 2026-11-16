@@ -6,6 +6,7 @@
 @import "@openbot/brand/tokens-light.css";
 @import "@openbot/ui/stagger.css";
 @import "@openbot/ui/styles/sr-only.css";
+@import "@openbot/ui/styles/scroll-edges.css";
 
 /* Arial with the size and line metrics of Inter. Until Inter loads, the text takes the same space,
    so the hero does not move when the font changes. Inter is wider than the system font, and on a
@@ -34,6 +35,14 @@
   --openbot-font-sans:
     "Inter Variable", "Inter Variable Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic",
     sans-serif;
+  /* The site keeps the type scale that it was designed for. The app made its three small steps 1px
+   * larger, in @openbot/brand/tokens.css. */
+  --openbot-text-sm: 12px;
+  --openbot-text-md: 13px;
+  --openbot-text-lg: 14px;
+  --openbot-leading-sm: 16px;
+  --openbot-leading-md: 18px;
+  --openbot-leading-lg: 20px;
   --pulse-dur: 1000ms;
   --pulse-count: 1;
   --pulse-min: 0.5;

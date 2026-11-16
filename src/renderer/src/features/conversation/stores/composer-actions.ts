@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
@@ -862,9 +862,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (onScreen()) deps.followSentMessage();
     // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
     // An earlier send that has not failed is about to start a turn, so this one waits behind it.
+    // A host that steers puts the message in the running turn, which the chat shows, so it stays there.
     const queued =
       onScreen() &&
       !deps.props.channel &&
+      !hostSteers() &&
       (Boolean(deps.props.activeTurnId) ||
         deps.orderedQueuedDeliveries().length > 0 ||
         deps.pendingSends.list(target).some((send) => send.state !== "failed"));
@@ -982,9 +984,17 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
   function agentSteers(): boolean {
-    return !deps.props.agent || providerSteersTurns(deps.props.agent.provider);
+    return !deps.props.agent || agentSteersTurns(deps.props.agent, deps.props.modelOptions);
+  }
+
+  /** The host steers each message sent while this agent works. Not known for a joined server until it answers. */
+  function hostSteers(): boolean {
+    return agentSteers() && (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
   }
 
   /**
@@ -994,9 +1004,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
    */
   function steerComposer(): void {
     if (deps.attachmentBusy() || deps.uploadFailed() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
-    const hostSteers =
-      agentSteers() && (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
-    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers);
+    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers());
   }
 
   /** An instruction about selected text is a reply to that message. A failure shows on its row. */

@@ -341,8 +341,6 @@ export const messages = {
   "chat.video.pause": "暂停视频",
   "chat.video.position": "视频位置",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "下载视频",
-  "chat.video.open": "打开视频",
   "chat.video.mute": "将视频静音",
   "chat.video.unmute": "取消视频静音",
   "chat.message.you": "你",
