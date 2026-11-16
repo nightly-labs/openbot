@@ -19,6 +19,7 @@ import {
   Mic,
   Popover,
   Search,
+  SlidingTabs,
   X,
 } from "@openbot/ui";
 import { createScrollFades } from "@openbot/ui/components/createScrollFades";
@@ -142,6 +143,8 @@ interface TasksPageProps {
   sendShortcut?: SendShortcut | undefined;
   /** The window draws the macOS window controls over the image viewer's top start corner. */
   macWindowControls?: boolean | undefined;
+  /** How the page first shows the tasks. The switch above the tasks changes it. The list by default. */
+  defaultLayout?: TasksLayout | undefined;
 }
 
 const agentOf = (agents: readonly AgentProfile[], agentId: string) => agents.find((agent) => agent.id === agentId);
@@ -594,6 +597,47 @@ function TaskTookLine(props: TasksPageProps & { took: TasksTook }) {
   );
 }
 
+/** One task on the board: its mark and title, then its agent and state under them. */
+function TaskCard(props: {
+  task: AgentTask;
+  agent: AgentProfile | undefined;
+  selected: boolean;
+  wait: AgentTaskWait;
+  onOpen: () => void;
+}) {
+  const { t } = useText();
+  const status = () => agentTaskStatus(props.task, t, props.wait);
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      class="tasks-board-card"
+      data-selected={props.selected ? "" : undefined}
+      aria-label={t("conversation.tasks.page.row", {
+        title: props.task.title,
+        agent: props.agent?.name ?? props.task.agentId,
+        status: status(),
+      })}
+      aria-pressed={props.selected ? "true" : "false"}
+      onClick={() => props.onOpen()}
+    >
+      <span class="tasks-board-card-head">
+        <AgentTaskMark task={props.task} decorative />
+        <span class="tasks-board-card-title" title={props.task.title}>
+          {props.task.title}
+        </span>
+      </span>
+      <span class="tasks-board-card-foot">
+        <AgentAvatar agent={props.agent} class="tasks-page-avatar" />
+        <span class="tasks-board-card-agent">{props.agent?.name ?? props.task.agentId}</span>
+        <span class="tasks-page-status" data-tone={props.wait ? "attention" : taskTone(props.task)}>
+          {status()}
+        </span>
+      </span>
+    </Button>
+  );
+}
+
 /** One task in the list: its mark, title and state, and the face of its agent at the end. */
 function TaskRow(props: {
   task: AgentTask;
@@ -639,63 +683,105 @@ const SECTION_TITLE = {
   closed: "conversation.threads.archived",
 } as const satisfies Record<TasksSectionId, AppTextKey>;
 
-/** The tasks by what they need, each section with its heading. The archived tasks are faded. */
-function TasksList(props: TasksPageProps) {
+/** How the page shows the tasks: one list by section, or a board with a column for each section. */
+export type TasksLayout = "list" | "board";
+
+/**
+ * The tasks by what they need, each section with its heading. The archived tasks are faded. On the
+ * board, each section is a column of cards, and a column with no task stays, so the columns do not move.
+ */
+function TasksList(props: TasksPageProps & { layout: TasksLayout }) {
   const { t } = useText();
   const ids = createUniqueId();
   const [view, setView] = createStore({ showAllClosed: false });
   const waitOf = (task: AgentTask) => props.waitOf?.(task);
   const sections = () => taskSections(props.tasks, view.showAllClosed, undefined, (task) => waitOf(task) !== undefined);
+  const board = () => props.layout === "board";
   return (
-    <For each={sections()} keyed={(section) => section.id}>
-      {(section) => (
-        <Show when={section().tasks.length > 0}>
-          <section
-            class="tasks-page-section"
-            data-closed={section().id === "closed" ? "" : undefined}
-            aria-labelledby={`${ids}-${section().id}`}
-          >
-            <h3 id={`${ids}-${section().id}`} class="tasks-page-section-heading">
-              <span>{t(SECTION_TITLE[section().id])}</span>
-              <span class="tasks-page-count">{section().count}</span>
-            </h3>
-            <ul class="tasks-page-list">
-              <For each={section().tasks} keyed={(task) => task.id}>
-                {(task) => (
-                  <li data-arrived={props.took?.task.id === task().id ? "" : undefined}>
-                    <TaskRow
-                      task={task()}
-                      agent={agentOf(props.agents, task().agentId)}
-                      selected={props.selectedId === task().id}
-                      wait={waitOf(task())}
-                      onOpen={() => props.onSelect(props.selectedId === task().id ? null : task().id)}
-                    />
-                  </li>
-                )}
-              </For>
-            </ul>
-            <Show when={section().id === "closed" && section().count > TASKS_CLOSED_SHOWN}>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class="tasks-page-show-all"
-                aria-expanded={view.showAllClosed ? "true" : "false"}
-                onClick={() =>
-                  setView((draft) => {
-                    draft.showAllClosed = !draft.showAllClosed;
-                  })
-                }
-              >
-                {view.showAllClosed
-                  ? t("conversation.tasks.showLess")
-                  : t("conversation.tasks.showAll", { count: section().count })}
-              </Button>
-            </Show>
-          </section>
-        </Show>
-      )}
-    </For>
+    <div class={board() ? "tasks-board" : "tasks-page-sections"}>
+      <For each={sections()} keyed={(section) => section.id}>
+        {(section) => (
+          <Show when={board() || section().tasks.length > 0}>
+            <section
+              class={["tasks-page-section", { "tasks-board-column": board() }]}
+              data-closed={section().id === "closed" ? "" : undefined}
+              aria-labelledby={`${ids}-${section().id}`}
+            >
+              <h3 id={`${ids}-${section().id}`} class="tasks-page-section-heading">
+                <span>{t(SECTION_TITLE[section().id])}</span>
+                <span class="tasks-page-count">{section().count}</span>
+              </h3>
+              <ul class={board() ? "tasks-board-list" : "tasks-page-list"}>
+                <For each={section().tasks} keyed={(task) => task.id}>
+                  {(task) => {
+                    const item = {
+                      get task() {
+                        return task();
+                      },
+                      get agent() {
+                        return agentOf(props.agents, task().agentId);
+                      },
+                      get selected() {
+                        return props.selectedId === task().id;
+                      },
+                      get wait() {
+                        return waitOf(task());
+                      },
+                      onOpen: () => props.onSelect(props.selectedId === task().id ? null : task().id),
+                    };
+                    return (
+                      <li data-arrived={props.took?.task.id === task().id ? "" : undefined}>
+                        <Show when={board()} fallback={<TaskRow {...item} />}>
+                          <TaskCard {...item} />
+                        </Show>
+                      </li>
+                    );
+                  }}
+                </For>
+              </ul>
+              <Show when={section().id === "closed" && section().count > TASKS_CLOSED_SHOWN}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  class="tasks-page-show-all"
+                  aria-expanded={view.showAllClosed ? "true" : "false"}
+                  onClick={() =>
+                    setView((draft) => {
+                      draft.showAllClosed = !draft.showAllClosed;
+                    })
+                  }
+                >
+                  {view.showAllClosed
+                    ? t("conversation.tasks.showLess")
+                    : t("conversation.tasks.showAll", { count: section().count })}
+                </Button>
+              </Show>
+            </section>
+          </Show>
+        )}
+      </For>
+    </div>
+  );
+}
+
+/** The switch between the list and the board, at the end of the row above the tasks. */
+function TasksLayoutSwitch(props: { layout: TasksLayout; onChange: (layout: TasksLayout) => void }) {
+  const { t } = useText();
+  return (
+    <div class="tasks-page-layout">
+      <SlidingTabs.Root
+        value={props.layout}
+        onChange={(value) => {
+          if (value === "list" || value === "board") props.onChange(value);
+        }}
+      >
+        <SlidingTabs.List aria-label={t("conversation.tasks.layout.label")}>
+          <SlidingTabs.Trigger value="list">{t("conversation.tasks.layout.list")}</SlidingTabs.Trigger>
+          <SlidingTabs.Trigger value="board">{t("conversation.tasks.layout.board")}</SlidingTabs.Trigger>
+        </SlidingTabs.List>
+      </SlidingTabs.Root>
+    </div>
   );
 }
 
@@ -854,8 +940,14 @@ export function TasksPage(props: TasksPageProps) {
   const headingId = createUniqueId();
   // The first start adds a task that waits, so the page shows the list as soon as the user sends.
   const empty = () => props.loaded === true && props.tasks.length === 0;
+  const [layout, setLayout] = createSignal<TasksLayout>(untrack(() => props.defaultLayout ?? "list"));
   return (
-    <section class="tasks-page" aria-labelledby={headingId} data-empty={empty() ? "" : undefined}>
+    <section
+      class="tasks-page"
+      aria-labelledby={headingId}
+      data-empty={empty() ? "" : undefined}
+      data-layout={layout()}
+    >
       <div class="tasks-page-scroll">
         <div class="tasks-page-column">
           <PageHeader
@@ -873,7 +965,10 @@ export function TasksPage(props: TasksPageProps) {
           <div class="tasks-page-took-slot" aria-live="polite">
             <Show when={props.took}>{(took) => <TaskTookLine {...props} took={took()} />}</Show>
           </div>
-          <TasksList {...props} />
+          <Show when={props.tasks.length > 0}>
+            <TasksLayoutSwitch layout={layout()} onChange={setLayout} />
+          </Show>
+          <TasksList {...props} layout={layout()} />
           <Show when={empty()}>
             <TasksEmptyBoard agents={props.agents} />
           </Show>
