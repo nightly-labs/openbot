@@ -17,6 +17,7 @@ import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
+import { writeUpdateHandover } from "./update-install-guard";
 import type { OpenBotSiblingInstance, SiblingScanFailed } from "./update-sibling-instances";
 
 const logger = createOpenBotLogger("update");
@@ -135,6 +136,8 @@ interface UpdateServiceOptions {
   appBundlePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
+  /** macOS: the record that keeps a launch during the install from cancelling it (`update-install-guard.ts`). */
+  handoverPath?: string | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
   updaterCacheDirectory?: string | undefined;
   initialCheckDelayMs?: number;
@@ -224,6 +227,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
+      | "handoverPath"
       | "logDirectory"
       | "shipItDirectory"
       | "updaterCacheDirectory"
@@ -687,6 +691,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
           // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
           // from `autoRunAppAfterInstall`, which is also `true`.
+          if (this.#options.platform === "darwin" && this.#options.handoverPath) {
+            yield* writeUpdateHandover(this.#options.handoverPath, this.#options.currentVersion, Date.now()).pipe(
+              Effect.catch((error) =>
+                Effect.sync(() => logger.warn("The update handover record was not saved.", toLogValue(error))),
+              ),
+            );
+          }
           yield* updateSync(() => this.#updater.quitAndInstall(true, true));
           this.#armPhaseTimer();
         }),

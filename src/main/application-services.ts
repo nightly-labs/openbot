@@ -429,6 +429,7 @@ import { TeamWebRtcClientTransport } from "./team-webrtc-client-transport";
 import type { TeardownRegistry } from "./teardown-registry";
 import { THEME_PALETTE_DIRECTORY } from "./theme-palette-files";
 import { TraceFile } from "./trace-file";
+import { macShipItDirectory, UPDATE_HANDOVER_FILE } from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE, writeUpdatePreference } from "./update-preference-store";
 import { checkRestartReadiness, type RestartReadiness } from "./update-readiness";
 import {
@@ -4328,7 +4329,8 @@ export async function createApplicationServices({
     // Squirrel.Mac only. The path is meaningless under a Linux or Windows home directory.
     ...(process.platform === "darwin"
       ? {
-          shipItDirectory: join(homedir(), "Library", "Caches", "app.openbot.desktop.ShipIt"),
+          shipItDirectory: macShipItDirectory(),
+          handoverPath: join(app.getPath("userData"), UPDATE_HANDOVER_FILE),
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
         }
       : {}),
