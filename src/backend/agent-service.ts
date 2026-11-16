@@ -1664,11 +1664,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       // The external conversations have their own lane. On a provider that runs one turn at a time,
-      // any running turn of the agent holds it too.
-      busy: (agentId) =>
-        this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-        this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
-        (this.#tasks.oneTurnAtATime(agentId) && this.#conversation.anyWorkingSnapshot(agentId) !== undefined),
+      // any running turn of the agent holds it too. A conversation whose thread is also the agent's
+      // own chat (#2120) waits in the own chat's lane.
+      busy: (agentId, threadId) =>
+        this.messaging.takes(threadId)
+          ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
+            (this.#tasks.oneTurnAtATime(agentId) && this.#conversation.anyWorkingSnapshot(agentId) !== undefined)
+          : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
@@ -1939,12 +1942,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ),
             ),
         taskForThread: (threadId) => this.#tasks.taskForThread(threadId),
-        // A conversation whose thread is also the agent's own chat (#2120) is in that lane only while
-        // its delivery starts there: the scheduler runs one of the two lanes of that thread at a time.
-        inMessagingLane: (agentId, threadId) =>
-          this.messaging.takes(threadId) ||
-          (this.messaging.store.linkForThread(threadId) !== null &&
-            this.#mailbox.startingDeliveryForAgent(agentId, MESSAGING_LANE) !== null),
+        // A conversation whose thread is also the agent's own chat (#2120) stays in the own chat's lane.
+        inMessagingLane: (threadId) => this.messaging.takes(threadId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
@@ -5115,6 +5114,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
+      // Before any drain: these conversations keep the own chat's lane (#2120).
+      this.#mailbox.keepInOwnChatLane(
+        this.#store.list().flatMap((agent) => {
+          const link = agent.threadId ? this.messaging.store.linkForThread(agent.threadId) : null;
+          return link ? [link.linkId] : [];
+        }),
+      );
       this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));

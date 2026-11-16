@@ -354,26 +354,20 @@ export class DrainScheduler {
   }
 
   /**
-   * Whether a turn runs in the agent's own chat (`messaging` false) or in one of its external
-   * conversations. A conversation whose thread is also the agent's own chat (#2120) counts for both.
+   * Whether a turn runs in the agent's own chat (`messaging` false) or in the thread of one of its
+   * external conversations. The agent's own chat is no execution thread, so it needs no link query.
    */
   #ownThreadTurnActive(agentId: string, messaging: boolean): boolean {
     return [...this.#conversation.activeSnapshots()].some(
       ([id, snapshot]) =>
         id === agentId &&
         Boolean(snapshot.activeTurnId) &&
-        snapshot.threadId !== null &&
         !this.#conversation.isSideThread(snapshot.threadId) &&
-        (messaging
-          ? this.#messaging?.store.linkForThread(snapshot.threadId) != null
-          : !this.#messaging?.takes(snapshot.threadId)),
+        messaging ===
+          (snapshot.threadId !== null &&
+            this.#conversation.isExecutionThread(snapshot.threadId) &&
+            this.#messaging?.takes(snapshot.threadId) === true),
     );
-  }
-
-  /** Whether one of the agent's external conversations runs in the agent's own chat thread (#2120). */
-  #sharesOwnChat(agentId: string): boolean {
-    const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId;
-    return Boolean(threadId && this.#messaging?.store.linkForThread(threadId));
   }
 
   /**
@@ -401,16 +395,6 @@ export class DrainScheduler {
     if (this.#hooks.isDeleting(agentId)) return "deleting";
     if (this.#settingsHolds.has(agentId)) return "session-settings";
     if (this.#laneTurnActive(lane)) return "active-turn";
-    // A conversation that runs in the agent's own chat thread: that thread runs one turn at a time.
-    // The cheap checks first: the last one reads the database.
-    if (taskId === null || taskId === MESSAGING_LANE) {
-      const other = taskId === null ? messagingLane(agentId) : mainLane(agentId);
-      if (
-        (this.#laneRunning(other) || (taskId === MESSAGING_LANE && this.#compactionHolds(other))) &&
-        this.#sharesOwnChat(agentId)
-      )
-        return "own-chat";
-    }
     if (this.#providerTurnHolds.has(laneKey(lane))) return "provider-turn";
     // The provider has one turn of the agent at a time, so each lane waits for the turn of any other.
     if (

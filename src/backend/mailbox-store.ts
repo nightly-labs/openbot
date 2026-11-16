@@ -305,6 +305,8 @@ export class MailboxStore {
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
   readonly #queueUpdates = new Set<string>();
+  /** External conversations whose thread is also an agent's own chat (#2120). They stay in that chat's lane. */
+  #ownChatLinks: ReadonlySet<string> = new Set();
   /** When each edit began, or when this run found it, by delivery id. Only memory. */
   readonly #editHolds = new Map<string, { editId: string; startedAt: number }>();
   readonly #deliveryGate = new MailboxDeliveryGate();
@@ -975,7 +977,15 @@ export class MailboxStore {
       : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
     if (message?.taskId) return message.taskId;
     if (message?.channelId) return channelLane(message.channelId);
-    return message?.messaging ? MESSAGING_LANE : null;
+    return message?.messaging && !this.#ownChatLinks.has(message.messaging.linkId) ? MESSAGING_LANE : null;
+  }
+
+  /**
+   * Names the external conversations whose thread is also an agent's own chat (#2120). Their turns run
+   * in that thread, so their messages stay in the own chat's lane, as before the messaging lane.
+   */
+  keepInOwnChatLane(linkIds: Iterable<string>): void {
+    this.#ownChatLinks = new Set(linkIds);
   }
 
   /** The lane a delivery runs in, as {@link nextQueued} takes it. */

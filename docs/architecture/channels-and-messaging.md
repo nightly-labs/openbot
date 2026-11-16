@@ -724,7 +724,8 @@ transport for its events. `messaging-types.ts` is the seam; the core never reads
   turn posts to Slack as a follow-up. These deliveries run in one lane of the agent,
   `MESSAGING_LANE`, beside its own chat: a turn of the own chat, such as one that waits on a card,
   does not hold external messages (#9890). The external conversations still run one turn at a time.
-  A conversation whose thread is also the agent's own chat (#2120) and that chat wait for each other.
+  A conversation whose thread is also the agent's own chat (#2120) keeps that chat's lane
+  (`MailboxStore.keepInOwnChatLane`).
   `DrainScheduler` asks `MessagingThreads.prepare` for the thread and the prompt, which frames the text as external input and adds earlier messages of the thread
   and the connection's facts, rebuilt each turn, so a new fact needs no provider-thread reload.
   `MessagingService.#receive` names each user mention (`InboundMessage.mentionedUserIds`) with the

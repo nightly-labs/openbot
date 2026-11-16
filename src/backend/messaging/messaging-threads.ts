@@ -242,7 +242,8 @@ export type MessagingMentionResult = "none" | "started" | "skipped";
 export interface MessagingThreadsHooks {
   schedule(agentId: string): void;
   queueChanged(agentId: string): void;
-  busy(agentId: string): boolean;
+  /** Whether a new message of the conversation in this thread waits for other work of the agent. */
+  busy(agentId: string, threadId: string): boolean;
   interrupt(agentId: string, turnId: string, threadId: string): Effect.Effect<void, MessagingThreadFailed>;
   /** Removes live provider state for an execution thread before its rows are deleted. */
   forgetThread(threadId: string): Effect.Effect<void, MessagingThreadFailed>;
@@ -749,7 +750,7 @@ export class MessagingThreads {
       (context) => this.#mailbox.messagingOrigin(context.delivery.id)?.authorId === input.origin.authorId,
     );
     if (pending.length >= AGENT_QUEUE_LIMIT || byAuthor.length >= AUTHOR_QUEUE_LIMIT) return { status: "busy", link };
-    const waiting = this.#hooks.busy(agentId);
+    const waiting = this.#hooks.busy(agentId, link.threadId);
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "user" },
