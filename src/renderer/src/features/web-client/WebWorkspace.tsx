@@ -1826,6 +1826,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       }),
   };
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
+  /** Counts the open requests, so a second request for the shown section moves to it again. */
+  const [serverSettingsRequest, setServerSettingsRequest] = createSignal(0);
   /** The section on screen, so the rail marks Providers while it shows. */
   const [serverSettingsShownSection, setServerSettingsShownSection] = createSignal<ServerSettingsSection | null>(null);
   /** The MCP row that a chat card asked to sign in to. Its Marketplace page starts the sign-in, as its Sign in button does. */
@@ -1852,6 +1854,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (server()?.id !== serverId || workspace.state.status !== "online") return;
     }
     setServerSettingsSection(section);
+    setServerSettingsRequest((count) => count + 1);
     setMobilePane("conversation");
     setHostPage(null);
     setMarketplaceOpen(false);
@@ -3454,6 +3457,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         onFirstSectionOpened={() => setServerSettingsQuery("")}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
+                        initialSectionRequest={serverSettingsRequest()}
                         onSectionChange={setServerSettingsShownSection}
                         platform="darwin"
                         remoteDesktopSupported={false}

@@ -284,6 +284,8 @@ export interface ServerSettingsModalProps {
   vault?: ServerVaultOptions | undefined;
   /** The section to show when the dialog opens. Updates shows General when the server has no Updates section. */
   initialSection?: ServerSettingsSection | null;
+  /** Counts the open requests, so a new request moves to its section also when the section did not change. */
+  initialSectionRequest?: number | undefined;
   /** Gets the section on screen, so the rail can mark the page that it opened. */
   onSectionChange?: ((section: ServerSettingsSection) => void) | undefined;
   /** Where the settings page shows, or nothing while the page is not on screen. */
@@ -723,9 +725,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   );
 
   /** An opener that names a section of the same server moves to it; the effect above covers a new server. */
+  const requestedSection = createMemo(() => (props.open ? availableInitialSection() : null));
   createEffect(
-    () => (props.open ? availableInitialSection() : null),
-    (requested) => {
+    () => ({ requested: requestedSection(), request: props.initialSectionRequest }),
+    ({ requested }) => {
       if (requested) setSection(requested);
     },
   );
