@@ -474,7 +474,10 @@ export class StripeClient {
       currency: BillingCurrency;
       anchorSeconds: number;
       trial?: boolean;
-      /** Stripe Tax on the invoices, as on the subscription that this one comes from. */
+      /**
+       * Stripe Tax on the invoices, as on the subscription that this one comes from. Sent only when true, so
+       * the retry of a split that started before Stripe Tax keeps the body of its idempotency key.
+       */
       automaticTax: boolean;
       paymentMethodId: string | null;
       metadata: Readonly<Record<string, string>>;
@@ -489,9 +492,9 @@ export class StripeClient {
       ...(input.trial
         ? { trial_end: String(input.anchorSeconds) }
         : { billing_cycle_anchor: String(input.anchorSeconds), proration_behavior: "none" }),
-      "automatic_tax[enabled]": String(input.automaticTax),
       "expand[]": "items.data.price.currency_options",
     });
+    if (input.automaticTax) body.set("automatic_tax[enabled]", "true");
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
