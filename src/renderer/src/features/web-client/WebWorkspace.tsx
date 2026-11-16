@@ -50,6 +50,7 @@ import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/a
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -1301,7 +1302,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     canAdminister: () => serverRoleCanAdminister(server()),
     hostTab: () =>
       workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
-      workspace.state.capabilities.includes("browser-view"),
+      workspace.state.capabilities.includes(TEAM_BROWSER_VIEW_CAPABILITY),
   });
   // The host's connectors, for an owner or admin. The web client has no computer of its own.
   const connectorTarget = createMemo(() => remoteAdminServer(server(), CONNECTORS_CAPABILITY));

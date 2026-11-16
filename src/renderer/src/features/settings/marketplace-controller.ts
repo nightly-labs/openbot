@@ -2056,6 +2056,12 @@ export function createMarketplaceController(
     testPluginApp,
     signInPluginApp,
     signInRelayed: relayed,
+    /** The host tab of a sign-in whose page only the joined server can reach, while it waits. */
+    signInHostPage: () => {
+      const current = hostTabbed();
+      const view = props.pluginHostView;
+      return current && view ? { runtime: view.runtime, tabId: current.tabId, clipboard: view.clipboard } : null;
+    },
     openSignInRelay,
     pasteSignInRelay,
     cancelSignIn,
