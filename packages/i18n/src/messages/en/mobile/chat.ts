@@ -318,6 +318,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.imageGallery.shareNeedsUpdate": "Sharing many images needs the latest version of the app.",
   "mobile.chat.video.play": "Play {name}",
   "mobile.chat.video.retry": "Retry video",
+  "mobile.chat.video.downloaded": "{received} of {total}",
+  "mobile.chat.video.loading": "Loading {name}",
   "mobile.chat.video.share": "Share {name}",
   "mobile.chat.video.save": "Save {name} to Photos",
   "mobile.chat.video.photosPermission": "Allow OpenBot to add photos in Settings to save this video.",

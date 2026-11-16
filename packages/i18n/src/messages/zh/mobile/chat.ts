@@ -310,6 +310,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "分享多张图片需要最新版本的应用。",
   "mobile.chat.video.play": "播放 {name}",
   "mobile.chat.video.retry": "重试视频",
+  "mobile.chat.video.downloaded": "{received} / {total}",
+  "mobile.chat.video.loading": "正在加载 {name}",
   "mobile.chat.video.share": "分享 {name}",
   "mobile.chat.video.save": "把 {name} 保存到照片",
   "mobile.chat.video.photosPermission": "请在系统设置中允许 OpenBot 添加照片，以保存该视频。",

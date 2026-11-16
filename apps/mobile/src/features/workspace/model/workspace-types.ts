@@ -199,7 +199,7 @@ import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/c
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
+import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -1206,6 +1206,8 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     attachmentId: string,
     largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file as they arrive. The size is the attachment's size. */
+    progress?: RemoteDownloadWatch,
   ) => Promise<RemoteFileUpload>;
   /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member

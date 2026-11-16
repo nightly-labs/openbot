@@ -102,7 +102,12 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import type {
+  RemoteDownloadWatch,
+  RemoteFileUpload,
+  RemoteLargeDownload,
+  RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -723,11 +728,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       upload?: RemoteFileUpload,
       onUploadProgress?: (fraction: number) => void,
       largeDownload?: RemoteLargeDownload,
+      download?: RemoteDownloadWatch,
     ): Promise<T> => {
       if (serverId) await connectionWaits.whenConnected(serverId);
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload);
+      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload, download);
     },
     [connectionWaits],
   );

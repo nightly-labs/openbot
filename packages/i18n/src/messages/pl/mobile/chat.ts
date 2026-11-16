@@ -347,6 +347,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "Udostępnianie wielu obrazów wymaga najnowszej wersji aplikacji.",
   "mobile.chat.video.play": "Odtwórz: {name}",
   "mobile.chat.video.retry": "Wczytaj film",
+  "mobile.chat.video.downloaded": "{received} z {total}",
+  "mobile.chat.video.loading": "Wczytywanie {name}",
   "mobile.chat.video.share": "Udostępnij: {name}",
   "mobile.chat.video.save": "Zapisz {name} w Zdjęciach",
   "mobile.chat.video.photosPermission": "Zezwól OpenBot na dodawanie zdjęć w Ustawieniach, aby zapisać ten film.",

@@ -323,6 +323,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "複数の画像を共有するには、アプリを最新版に更新してください。",
   "mobile.chat.video.play": "{name} を再生",
   "mobile.chat.video.retry": "動画を再試行",
+  "mobile.chat.video.downloaded": "{received} / {total}",
+  "mobile.chat.video.loading": "{name} を読み込み中",
   "mobile.chat.video.share": "{name} を共有",
   "mobile.chat.video.save": "{name} を写真に保存",
   "mobile.chat.video.photosPermission": "この動画を保存するには、設定で OpenBot に写真の追加を許可してください。",

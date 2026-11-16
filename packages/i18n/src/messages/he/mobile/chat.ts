@@ -321,6 +321,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "שיתוף של תמונות רבות דורש את הגרסה האחרונה של האפליקציה.",
   "mobile.chat.video.play": "הפעלת {name}",
   "mobile.chat.video.retry": "ניסיון חוזר לסרטון",
+  "mobile.chat.video.downloaded": "{received} מתוך {total}",
+  "mobile.chat.video.loading": "טוען את {name}",
   "mobile.chat.video.share": "שיתוף {name}",
   "mobile.chat.video.save": "שמירת {name} בתמונות",
   "mobile.chat.video.photosPermission": "יש לאפשר ל-OpenBot להוסיף תמונות בהגדרות כדי לשמור את הסרטון הזה.",
