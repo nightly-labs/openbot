@@ -77,6 +77,7 @@ const ROW_STAGGER = 0.1;
 
 function AttachmentOption({
   accessibilityLabel,
+  busy,
   disabled,
   foreground,
   glyph,
@@ -89,6 +90,8 @@ function AttachmentOption({
 }: {
   /** For a row whose visible text does not say all of it, such as the Context row. */
   accessibilityLabel?: string;
+  /** True while the row's value is being worked on, such as a compaction. */
+  busy?: boolean;
   disabled: boolean;
   foreground: ViewStyle["backgroundColor"];
   /** Drawn in place of `icon`. */
@@ -123,7 +126,7 @@ function AttachmentOption({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel ?? label}
-          accessibilityState={{ disabled }}
+          accessibilityState={{ disabled, busy }}
           disabled={disabled}
           pressRetentionOffset={12}
           style={{
@@ -478,7 +481,7 @@ export function ChatAttachmentPanel({
                   className="bg-separator"
                   style={{
                     height: StyleSheet.hairlineWidth,
-                    marginVertical: (DIVIDER_SPACE - 1) / 2,
+                    marginVertical: (DIVIDER_SPACE - StyleSheet.hairlineWidth) / 2,
                     marginHorizontal: ROW_PADDING,
                   }}
                 />
@@ -487,6 +490,7 @@ export function ChatAttachmentPanel({
                   glyph={<ComposerContextRing meter={context} />}
                   label={labels.context}
                   accessibilityLabel={context.label}
+                  busy={context.compacting}
                   value={contextValue}
                   foreground={foreground}
                   progress={progress}
