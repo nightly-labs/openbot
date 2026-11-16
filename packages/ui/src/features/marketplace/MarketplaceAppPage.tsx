@@ -391,7 +391,8 @@ function ConnectionRow(props: { scope: MarketplaceScope; app: PluginApp; entry: 
   /** Why this account cannot connect the app here. The reason replaces how the app connects. */
   const reason = () => {
     // Also for a held app: it stays on the host, but it does not run there.
-    if (pluginNeedsMac(model(), props.app.plugin)) return t("marketplace.app.blocked.mac", { name: props.entry.name });
+    if (pluginNeedsMac(model(), { apps: [props.entry] }))
+      return t("marketplace.app.blocked.mac", { name: props.entry.name });
     const blocked = connection().held ? undefined : model().appsBlocked?.();
     if (blocked?.reason === "update") return t("marketplace.app.blocked.update", { host: blocked.host });
     if (blocked?.reason === "member")
