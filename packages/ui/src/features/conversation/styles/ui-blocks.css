@@ -7,6 +7,21 @@
   max-width: 100%;
 }
 
+/*
+ * A table or code in the preview uses the wide width of an agent reply (messages.css), so the columns
+ * do not break each line while the chat row has free space. The width is fixed, not the width of the
+ * table: the content is the size container of the narrow layout below, so it cannot ask for width. A
+ * wider table scrolls sideways in the card. The history entry around an answered card has the 540px
+ * limit too, so it lets the card set its own width.
+ */
+.ui-block-card.ui-bubble:has(.ui-block-preview :is(.message-markdown-table-scroll, .message-code-block)) {
+  width: var(--message-wide-bubble-width);
+}
+
+.question-prompt-history-entry:has(.ui-block-preview :is(.message-markdown-table-scroll, .message-code-block)) {
+  width: 100%;
+}
+
 /* The card has a fixed width, so its content can be a size container for the narrow layout below. */
 .ui-block-card > .ui-block-content {
   container: ui-block / inline-size;
