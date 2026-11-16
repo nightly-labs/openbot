@@ -183,9 +183,14 @@ export function chatBackdropRequesters(html: string): string[] {
   return ids.length > 0 ? ids : [SIGNED_OUT_CHANNEL_MEMBER_ID];
 }
 
-/** Puts the requesters first in the page, and removes each tag of that name that the agent wrote. */
+/**
+ * Puts the requesters first in the page, and removes each tag of that name that the agent wrote. The
+ * removal repeats until no tag is left: one pass can join the parts of a nested tag into a new tag.
+ */
 export function withChatBackdropRequesters(html: string, ids: readonly string[]): string {
-  const page = html.replace(new RegExp(REQUESTERS_META_SOURCE, "giu"), "");
+  const tags = new RegExp(REQUESTERS_META_SOURCE, "giu");
+  let page = html;
+  for (let next = page.replace(tags, ""); next !== page; next = page.replace(tags, "")) page = next;
   const content = ids.filter(isRequesterId).join(" ") || SIGNED_OUT_CHANNEL_MEMBER_ID;
   return withLeadingMeta(page, `<meta name="${REQUESTERS_META_NAME}" content="${content}">`);
 }
