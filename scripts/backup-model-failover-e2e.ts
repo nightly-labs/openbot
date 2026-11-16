@@ -628,8 +628,16 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       quietRoutineDelivery: () => false,
     }),
   );
-  assert.ok(imported.turns > 0, "The provider's saved transcript was read and imported.");
+  // The boot backfill of the last restart runs in the background and can import the newest turns
+  // first. Then this import finds no new turn, so the backfill's complete import also counts.
+  assert.ok(
+    imported.turns > 0 || database.providerHistoryImport(session.id)?.state === "complete",
+    "The provider's saved transcript was read and imported.",
+  );
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
+  // Each request to this agent has its own text, so a copy from either import shows here.
+  const texts = users().map((message) => message.text);
+  assert.equal(new Set(texts).size, texts.length, "History import adds no second copy of a user request.");
 }
 
 try {
