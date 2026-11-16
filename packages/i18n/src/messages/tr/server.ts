@@ -157,9 +157,6 @@ export const messages = {
   "server.upgrade.description":
     "{server} üzerinde az boş alan kaldı. Ajanlarınızın kesintisiz çalışmaya devam etmesi için planınızı yükseltin.",
   "server.upgrade.used": "{total} alanın {used} kadarı kullanılıyor",
-  "server.upgrade.current": "{plan} (şu anki)",
-  "server.upgrade.price": "Fiyat",
-  "server.upgrade.action": "{plan} planına yükselt",
   "server.hosted.progressTitle": "{name} kuruluyor",
   // Kurulum tarayıcıdaki Stripe sayfasında ilk ödemeyi bekler.
   "server.hosted.paymentTitle": "Ödemeyi tarayıcınızda tamamlayın",
@@ -335,6 +332,13 @@ export const messages = {
   "server.settings.editLogo": "Sunucu logosunu düzenle",
   "server.settings.addLogo": "Sunucu logosu ekle",
   "server.settings.removeLogo": "Sunucu logosunu kaldır",
+  "server.settings.appearance": "Şekil ve renk",
+  "server.settings.appearanceShapes": "Sunucu şekilleri",
+  "server.settings.appearanceShapeOption": "Şekil {number}",
+  "server.settings.appearanceColors": "Sunucu rengi",
+  "server.settings.appearanceAutoColor": "Otomatik sunucu rengi",
+  "server.settings.appearanceColorOption": "{color} sunucu rengi",
+  "server.settings.appearanceReset": "Şekli ve rengi sıfırla",
   "server.settings.access": "Erişim",
   "server.companySignIn.desktopOnly": "Çoklu oturum açmayı OpenBot masaüstü uygulamasında ayarlayın.",
   "server.settings.publish": "Bu sunucuyu yayımla",

@@ -93,7 +93,10 @@ export interface ServerModeOptions {
     | "logout"
     | "createMobileConnect"
   >;
-  host: Pick<HostService, "getStatus" | "configure" | "start" | "updateIdentity" | "getMobileConnectHost">;
+  host: Pick<
+    HostService,
+    "getStatus" | "configure" | "start" | "updateIdentity" | "getMobileConnectHost" | "refreshRegistration"
+  >;
   /** The memory guard, so that `status` shows the memory ceiling and the turn limit. */
   memory: (Pick<ServerMemory, "level" | "sample"> & { turnLimit(): number | "unlimited" }) | null;
   onError: (message: string, error: unknown) => void;

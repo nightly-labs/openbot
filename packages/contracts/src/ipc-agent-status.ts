@@ -501,6 +501,11 @@ export interface SubmitProviderCodeLoginInput {
   code: string;
 }
 
+/** As `SubmitProviderCodeLoginInput`, for the `paste` sign-in of one account of a provider. */
+export interface SubmitProviderAccountCodeLoginInput extends SubmitProviderCodeLoginInput {
+  accountId: string;
+}
+
 /**
  * Whether a key is stored. `unreadable` is a key file OpenBot could not decrypt or parse: the
  * provider then runs with no key, and the file stays on disk until the user replaces or removes it.
@@ -553,6 +558,20 @@ export type ProviderCodeLoginStart =
       expiresAt: number;
     }
   | { kind: "connected" };
+
+/**
+ * A started code sign-in of one account of a provider. `accountId` is the account that signs in: a
+ * new one when the request named none. Its status and its cancel name it.
+ */
+export interface ProviderAccountCodeLoginStart {
+  accountId: string;
+  start: ProviderCodeLoginStart;
+}
+
+/** The code sign-in of one account of a provider: `result` is `null` while it goes on. */
+export interface ProviderAccountCodeLoginStatus {
+  result: { error: string | null } | null;
+}
 
 /**
  * A sign-in that a joined server's host runs in its own browser (`provider-host-sign-in-v1`). `tabId`

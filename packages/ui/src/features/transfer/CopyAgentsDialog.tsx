@@ -1,5 +1,6 @@
 import { agentProviderName } from "@openbot/contracts/agent-providers";
 import type { InstanceTransferAgent, InstanceTransferResult } from "@openbot/contracts/ipc";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import {
   ArrowRight,
   Button,
@@ -25,6 +26,7 @@ export interface CopyAgentsServer {
   id: string;
   name: string;
   logoUrl: string | null;
+  appearance?: ServerAppearance | null | undefined;
 }
 
 export type CopyAgentsPhase = "idle" | "copying" | "done";
@@ -279,7 +281,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
 function ServerName(props: { server: CopyAgentsServer }) {
   return (
     <span class="copy-agents-server">
-      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} />
+      <ServerLogo serverId={props.server.id} url={props.server.logoUrl} appearance={props.server.appearance} />
       <span class="copy-agents-server-name">{props.server.name}</span>
     </span>
   );

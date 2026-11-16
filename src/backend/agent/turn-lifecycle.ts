@@ -124,6 +124,8 @@ const ENDED_TURN_LIMIT = 256;
  * with no update, until the stall watch fails the finished run (#8629).
  */
 const QUIET_END_MS = 30_000;
+/** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
+const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
@@ -441,6 +443,8 @@ export class TurnLifecycle {
   readonly #quietEndTimers = new Map<string, NodeJS.Timeout>();
   /** Quiet turns that OpenBot stopped after their no-update call. Their `interrupted` end completes them. */
   readonly #quietStops = new Set<string>();
+  /** Quiet turns that called the no-update tool again after it told them to end (#9375). */
+  readonly #quietRepeats = new Set<string>();
   /** Running turns whose agent reported that its routine run failed, with the reason. The completion takes it. */
   readonly #reportedFailures = new Map<string, string>();
   /**
@@ -585,6 +589,7 @@ export class TurnLifecycle {
     for (const timer of this.#quietEndTimers.values()) clearTimeout(timer);
     this.#quietEndTimers.clear();
     this.#quietStops.clear();
+    this.#quietRepeats.clear();
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
@@ -693,8 +698,10 @@ export class TurnLifecycle {
 
   /**
    * Whether a completed turn may continue its plan: it served only the user's or the agent's own
-   * messages, the user did not stop it, its last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no question,
-   * approval or takeover, and no other message waits in its lane.
+   * messages, or teammates' answers to the agent's own requests (#9392), the user did not stop it, its
+   * last line asks nothing but whether to continue and does not say it waits, opened no wait and holds no
+   * question, approval or takeover, and no other message waits in its lane. A turn with a teammate's
+   * request or update does not continue, so the end of the turn sends the result to that teammate.
    */
   #planContinues(
     agentId: string,
@@ -709,7 +716,8 @@ export class TurnLifecycle {
         ({ delivery, channelId }) =>
           channelId === undefined &&
           (delivery.sender.kind === "user" ||
-            (delivery.sender.kind === "agent" && delivery.sender.agentId === agentId)),
+            (delivery.sender.kind === "agent" &&
+              (delivery.sender.agentId === agentId || this.#mailbox.answersRequestOf(agentId, delivery.messageId)))),
       )
     )
       return false;
@@ -857,7 +865,9 @@ export class TurnLifecycle {
       this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
-    const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+    // The agent's own chat is cached under its own thread id, not the provider's. With the provider's
+    // id, the changes below went to a fresh copy that the turn end read again from SQLite (#9422).
+    const snapshot = this.#conversation.ensureSnapshot(agentId, this.#conversation.publicThreadId(agentId, threadId));
     const { messages } = snapshot;
     if (
       messages.some(
@@ -1581,9 +1591,19 @@ export class TurnLifecycle {
    * Stops a quiet turn that sends nothing for `QUIET_END_MS` after its no-update call, and its end
    * completes it. An open tool step, an open approval or question, or a provider event of the turn,
    * such as thinking, keeps the turn. A Stop of the user and a reported failure keep their own end.
+   * A second no-update call shows that the model does not end its turn: Kimi called the tool again
+   * every 2 s for an hour, and each call reset the silence (#9375). OpenBot then ends the turn when no
+   * tool step, approval or question is open, without the silence.
    */
   #armQuietEnd(agentId: string, turnId: string): void {
-    if (this.#quietEndTimers.has(turnId)) return;
+    const armed = this.#quietEndTimers.get(turnId);
+    if (armed) {
+      if (this.#quietRepeats.has(turnId)) return;
+      this.#quietRepeats.add(turnId);
+      clearTimeout(armed);
+    }
+    const repeated = armed !== undefined;
+    const quietFor = repeated ? 0 : QUIET_END_MS;
     const calledAt = Date.now();
     const check = () => {
       this.#quietEndTimers.delete(turnId);
@@ -1597,19 +1617,20 @@ export class TurnLifecycle {
         return;
       const silentFor = Date.now() - Math.max(calledAt, running.lastEventAt);
       if (running.openTools.size > 0 || this.#attention.hasAttentionForTurn(threadId, turnId)) {
-        wait(QUIET_END_MS);
+        wait(repeated ? QUIET_REPEAT_POLL_MS : QUIET_END_MS);
         return;
       }
-      if (silentFor < QUIET_END_MS) {
-        wait(QUIET_END_MS - silentFor);
+      if (silentFor < quietFor) {
+        wait(quietFor - silentFor);
         return;
       }
       this.#quietStops.add(turnId);
-      logger.info("A quiet turn sent nothing after its no-update call; OpenBot ends it.", {
-        agentId,
-        turnId,
-        provider: client.provider,
-      });
+      logger.info(
+        repeated
+          ? "A quiet turn called the no-update tool again; OpenBot ends it."
+          : "A quiet turn sent nothing after its no-update call; OpenBot ends it.",
+        { agentId, turnId, provider: client.provider },
+      );
       Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
     };
     const wait = (ms: number) => {
@@ -1617,7 +1638,7 @@ export class TurnLifecycle {
       timer.unref?.();
       this.#quietEndTimers.set(turnId, timer);
     };
-    wait(QUIET_END_MS);
+    wait(quietFor);
   }
 
   #clearQuietEnd(turnId: string): void {
@@ -1625,6 +1646,7 @@ export class TurnLifecycle {
     if (timer) clearTimeout(timer);
     this.#quietEndTimers.delete(turnId);
     this.#quietStops.delete(turnId);
+    this.#quietRepeats.delete(turnId);
   }
 
   /** Whether the channel shows the answers of this running channel routine turn as steps (#7166). */
@@ -1756,7 +1778,9 @@ export class TurnLifecycle {
       // channel turn would then end on the agent's own chat, so its task kept running (#6596).
       const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
       this.#browser.endControl(publicThreadId, turnId);
-      const snapshot = this.#conversation.ensureSnapshot(agentId, threadId);
+      // With the provider's id, the agent's own chat was read again from SQLite, and lost the answer
+      // that `#holdCodexNoAnswer` made from the turn's narration (#9422).
+      const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
       // A routine run in its own session ends in the chat's snapshot, where a later turn can still
       // run, such as one the provider started itself. That turn stays active. Cleared, the queue saw an
       // idle chat and asked the busy provider for a turn again and again. An id of a turn that no
@@ -1967,10 +1991,11 @@ export class TurnLifecycle {
       const failure = refusedFailure ?? reportedError;
       if (refused) {
         yield* this.#hooks.dropRefusedSession(agentId, threadId);
-        const taskId = taskTurn ? this.#taskForThread(agentId, threadId) : null;
-        if (taskId !== null && failure !== undefined) {
+        // The task was read before the drop, which unbinds the provider thread. Read after it, the
+        // thread showed its failure with no reason, and the reason went to the agent's own chat (#9219).
+        if (laneTaskId !== null && failure !== undefined) {
           this.#hooks.emitFailure?.({ code: "agent_error", agentId, causeCode: classifyFailure(failure) });
-          this.#hooks.taskFailed(taskId, failure);
+          this.#hooks.taskFailed(laneTaskId, failure);
         } else this.#hooks.emitError("agent_error", failure, agentId);
       }
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {

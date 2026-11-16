@@ -47,6 +47,7 @@ import {
   type RemoteMemberRole,
   type RemoteTicketClaims,
 } from "@openbot/contracts/signal-protocol/ticket";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { referenceFrom, safeReference } from "@openbot/user-errors";
@@ -1355,6 +1356,28 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
           body: Buffer.from(image.bytes),
         },
         (value) => requiredString(decodeRecord(value, "remote host logo"), "logoKey"),
+      );
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Copies the server plush look (`host-appearance-v1`) to the host list. `null` clears it. */
+  readonly updateRemoteHostAppearance = Effect.fn("CentralAuth.updateRemoteHostAppearance")(
+    function* (
+      this: CentralAuthManager,
+      hostId: string,
+      appearance: ServerAppearance | null,
+    ): Effect.fn.Return<void, CentralAuthOperationError, CentralAuthTransport> {
+      yield* this.#authorizedRequestEffect(
+        `/v2/remote/hosts/${encodeURIComponent(hostId)}/appearance`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ appearance }),
+        },
+        (value) => {
+          decodeRecord(value, "remote host appearance");
+        },
       );
     },
     (operation) => this.#owned(operation),

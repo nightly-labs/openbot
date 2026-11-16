@@ -3,6 +3,7 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -113,6 +114,11 @@ export interface ServerSettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
+  /**
+   * Saves the plush look that the server shows with no logo; null gives the automatic look. The
+   * picker shows only where a caller supplies this.
+   */
+  onSaveAppearance?: ((appearance: ServerAppearance | null) => Promise<void>) | undefined;
   onSetPublished: (published: boolean) => Promise<void>;
   /**
    * Changes the key of the server on this computer, and paired devices follow it. The Server key
@@ -177,6 +183,9 @@ export interface ServerSettingsModalProps {
   /** Opens the MCP form for a new server once the section shows. */
   mcpAddRequest?: boolean | undefined;
   onMcpAddRequestHandled?: (() => void) | undefined;
+  /** A row whose form the MCP section opens as soon as its list holds it. */
+  mcpEditRequest?: string | null | undefined;
+  onMcpEditRequestHandled?: (() => void) | undefined;
   /**
    * Fired when the MCP section becomes visible. The list is read then, not when the dialog opens,
    * because most visits to this dialog never reach that section.
@@ -1059,6 +1068,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                 onSignInRequestHandled={props.onMcpSignInRequestHandled}
                 addRequest={props.mcpAddRequest}
                 onAddRequestHandled={props.onMcpAddRequestHandled}
+                editRequest={props.mcpEditRequest}
+                onEditRequestHandled={props.onMcpEditRequestHandled}
               />
             </Tabs.Content>
           )}

@@ -279,6 +279,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "ここで名前とロゴを変更するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.settings.identityOffline": "名前とロゴを変更するには、このサーバーに接続してください。",
+  "mobile.server.settings.appearance": "形と色",
+  "mobile.server.settings.appearanceShape": "形",
+  "mobile.server.settings.appearanceShapeOption": "形 {number}",
+  "mobile.server.settings.appearanceColor": "サーバーの色",
+  "mobile.server.settings.appearanceAutomatic": "自動",
+  "mobile.server.settings.appearanceReset": "リセット",
+  "mobile.server.settings.appearanceSaveFailed": "サーバーの形と色を保存できませんでした。もう一度お試しください。",
   "mobile.server.route.cropLogo": "ロゴを切り抜く",
   "mobile.server.members.remove": "メンバーを削除",
   "mobile.server.members.invitePeople": "ユーザーを招待",
@@ -869,6 +876,8 @@ export const messages = {
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot はこの番号の保存済みキーを読み取れません。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
   "mobile.server.connectors.whatsapp.linkAgain": "再リンク",
   "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",

@@ -38,6 +38,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Créer une commande à usage unique qui installe OpenBot sur un autre ordinateur comme serveur {name} et le connecte à ton compte. L'agent l'exécute là-bas.",
   "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",
+  "status.agent.browserProfileNamed":
+    "Déplacer {agents} vers le profil de navigateur {profile}. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileNew":
+    "Créer le nouveau profil de navigateur {profile} et y déplacer {agents}. Il n'a aucune connexion. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileShared":
+    "Déplacer {agents} vers le profil de navigateur partagé. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileOwn":
+    "Donner à {agents} un profil de navigateur propre à chacun. Leurs onglets ouverts se ferment.",
   "status.agent.feedbackSending": "Envoi de vos commentaires à l’équipe OpenBot…",
   "status.agent.workflowDelete":
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
@@ -88,6 +96,7 @@ export const messages = {
   "status.agent.memoryChanges": "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés.",
   "status.agent.memoryChangesWithConflicts":
     "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés, {notChanged} non modifiés, car un autre fil les a modifiés avant.",
+  "status.agent.mcpToolCall": "Exécuter l’outil {tool} du serveur MCP {name}.",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.compactionContinues":

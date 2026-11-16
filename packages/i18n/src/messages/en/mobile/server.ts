@@ -385,6 +385,13 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.identityNotAllowed": "Only an owner or admin can change the server name and logo.",
   "mobile.server.settings.identityUnsupported": "Update OpenBot on this server to change its name and logo here.",
   "mobile.server.settings.identityOffline": "Connect to this server to change its name and logo.",
+  "mobile.server.settings.appearance": "Shape and color",
+  "mobile.server.settings.appearanceShape": "Shape",
+  "mobile.server.settings.appearanceShapeOption": "Shape {number}",
+  "mobile.server.settings.appearanceColor": "Server color",
+  "mobile.server.settings.appearanceAutomatic": "Automatic",
+  "mobile.server.settings.appearanceReset": "Reset",
+  "mobile.server.settings.appearanceSaveFailed": "Could not save the server shape and color. Try again.",
   "mobile.server.route.cropLogo": "Crop logo",
   "mobile.server.members.remove": "Remove member",
   "mobile.server.members.invitePeople": "Invite people",
@@ -1157,6 +1164,8 @@ export const messages = defineMessages("mobile.server", {
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot cannot read the saved keys of this number. Link the number again.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Link again",
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",

@@ -221,7 +221,7 @@ const Turns = createSimpleContext({
       },
     );
 
-    function loadWaits(agentId: string, serverId: string): void {
+    function loadWaits(agentId: string): void {
       const request = (waitSnapshotRequests.get(agentId) ?? 0) + 1;
       waitSnapshotRequests.set(agentId, request);
       void turnsPort()
@@ -230,16 +230,16 @@ const Turns = createSimpleContext({
           if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
           setWaits((current) => ({ ...current, [agentId]: snapshot }));
         })
-        .catch((error) => {
-          if (!scopeIsCurrent() || waitSnapshotRequests.get(agentId) !== request) return;
-          appendUiError(agentId, error, currentText().t("app.errorStatus.waitsLoad"), serverId);
-        });
+        // As in `loadQueue`: this background read can time out on a joined server while the agent
+        // works. Keep the last waits; the next load (a new phase, agent or server) or a local
+        // `waits-changed` event updates them. A failed cancel still reports an error.
+        .catch(() => undefined);
     }
 
     createEffect(
       () => ({ agentId: activeAgentId(), agentPhase: agentStatus().phase, serverId: activeServerId() }),
-      ({ agentId, serverId }) => {
-        if (agentId) loadWaits(agentId, serverId);
+      ({ agentId }) => {
+        if (agentId) loadWaits(agentId);
       },
     );
 
@@ -438,7 +438,7 @@ const Turns = createSimpleContext({
       void turnsPort()
         .agent.cancelWait({ agentId: agent.id, waitId })
         // A joined server sends no event when a wait closes, so the list is read again.
-        .then(() => loadWaits(agent.id, serverId))
+        .then(() => loadWaits(agent.id))
         .catch((error) => appendUiError(agent.id, error, currentText().t("app.errorStatus.waitCancel"), serverId));
     }
 

@@ -278,9 +278,12 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    invoice of the PaymentIntent (`GET /v1/invoice_payments`). A refund or dispute of a payment that
    is not an OpenBot plan invoice changes nothing. A refund that fails after it succeeded does not
    start the plan again.
-8. **Plan change.** In the Customer Portal an upgrade is charged at once, and a downgrade or a
-   shorter interval starts at the next period. The Worker copies the new plan, interval and currency
-   to the server. boat changes the machine of a sandbox only on a resume (`type`), so the Worker
+8. **Plan change.** The Customer Portal has no plan change (`subscription_update` is off), so only an
+   operator changes a plan, in the Stripe Dashboard. A portal request with `flow: "update"` from an
+   older app opens the Portal home. The owner of a server on a VPS can buy more storage: see
+   [Storage tiers](#storage-tiers). When an operator changes a plan, an upgrade is charged at once, and
+   a downgrade or a shorter interval starts at the next period. The Worker copies the new plan,
+   interval and currency to the server. boat changes the machine of a sandbox only on a resume (`type`), so the Worker
    stops a running server (boat saves the disk) and resumes it on the machine of the new plan. The
    server is offline for this time, so the Worker waits until the server has no use: no activity
    report for 7 minutes (a server in use reports each 5 minutes). A server that stops for no use,
@@ -1597,6 +1600,55 @@ Not confirmed for Leaseweb:
 - why the start after `detachIso` took 173 seconds;
 - WebRTC with a rule set that also filters incoming connections.
 
+### Storage tiers
+
+The owner of a server on a VPS of the operator (`hosted_servers.operator_host` is set) can buy one of
+two larger storage tiers. A boat sandbox has no tiers. A tier never goes down, and the owner can buy
+tier 2 from tier 0 or tier 1. Tier 2 is the whole disk of the plan's VPS.
+
+| Plan | Tier 0 (plan) | Tier 1 | Tier 2 | Add-on a month, tier 1 / tier 2 (EUR) |
+| --- | --- | --- | --- | --- |
+| Starter | 25 GB | 50 GB | 100 GB | 10 / 20 |
+| Standard | 75 GB | 125 GB | 200 GB | 20 / 40 |
+| Pro | 150 GB | 200 GB | 300 GB | 20 / 45 |
+
+The sizes and prices are in `packages/contracts/src/billing.ts` (`STORAGE_TIER_GB`,
+`storageTierListPrices`). A year is 12 months less 20%. USD is EUR times 1.2, PLN times 4 and BRL
+times 6.
+
+- **Stripe.** Each tier is a second item on the plan subscription: a Price of the Product
+  `openbot_storage_<plan>` with the lookup key `openbot_storage_<plan>_<tier>_<interval>` and the
+  metadata `openbot_kind: storage`. `bun run api:stripe:bootstrap` makes them. The Worker also knows
+  an old Price by its metadata after the bootstrap moved a lookup key.
+- **Purchase.** `POST /v1/me/billing/storage` (desktop) or `/api/browser/v1/me/billing/storage`
+  (browser) with `{subscriptionId, tier}`. The Worker checks in D1 and in Stripe that the plan is
+  active (not trialing: a trial invoices 0 for the change), does not end, belongs to the user and to a server with an operator host, and
+  has a lower tier. Then it adds or changes the storage item with `proration_behavior=always_invoice`
+  and `payment_behavior=error_if_incomplete`: Stripe charges the prorated add-on now, and refuses the
+  change when the payment fails. The answer is the full billing state (200). Errors:
+  `400 invalid_billing_request`, `409 storage_unavailable`, and `402 storage_payment_failed` (nothing
+  changed). The Stripe idempotency key has the subscription, the old Price, the payment method of
+  the subscription and a 1-minute window, but not the new Price. A double click is one change, and two
+  purchases at the same time (for example on two devices) cannot each add a storage item: Stripe
+  refuses the second with `idempotency_error`, and the Worker answers `409 storage_unavailable`. A
+  retry of a different tier with the same card waits for the next window.
+- **Server.** The sync after the purchase, and each subscription webhook, copies the tier of the
+  subscription to `hosted_servers.storage_tier` (migration `0057`). The server list, the hosting
+  list, the host list and the billing state send the storage of the tier. The host reads its storage
+  at its next start. Nothing changes the disk: each tier fits in the disk of the plan's VPS. A
+  server on a smaller VPS than its plan (a Pro server on a VPS 2) must move before it can use tier 2.
+- **Amounts.** The billing state `amount` is the plan item and the storage item. `storageUpgrades`
+  lists the tiers above the current tier, only for an active plan that does not end. Its
+  `amount` is the plan amount and the add-on list price of that tier. After a tier 1 purchase the
+  plan amount is the current amount less the list price of tier 1, so a tier 1 Price from before a
+  price change gives an approximate amount for tier 2.
+- **Revenue.** MRR, the sales facts and the snapshots count each item that is not a license as server
+  revenue, so the add-on is in them.
+
+The bootstrap of the storage Prices and the `storage-tier` scenario of `scripts/stripe-flows-e2e.ts`
+ran against a local Worker and Stripe test mode. That the Portal sets a new payment method on the subscription, which
+gives a retry a new idempotency key at once, is not confirmed.
+
 ### Reuse a pool machine
 
 A pool machine has one server at a time. When the server ends, the machine gets a new operating
@@ -1695,8 +1747,49 @@ sends the operator one message:
 | A purchase takes a machine and leaves 0 or 1 free machines of that product in that location | `Pool <location> <product>: <n> free machines left.` | Buy and `prepare` machines. |
 | A server starts on boat: no ready machine, the pool query failed, or its pool machine did not start it | `A <plan> server (<currency>, <server ID prefix>) starts on boat: <reason>.` | `move` it when a machine is ready. `leaseweb-pool.ts boat` lists it. |
 | A pool start is lost (no sign-in in 4 minutes) | `A <plan> server (<server ID prefix>) did not start on pool machine <host ID>. Prepare the machine again.` | `prepare --reinstall` the machine. |
+| A server plan starts (a new subscription) | ``New server plan for `<email>`: <plan>, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| A license starts (a new subscription) | ``New license for `<email>`: <tier>, <n> users, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| The owner cancels the renewal of a server plan or a license | ``Cancelled renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. It ends on <date>.`` | None. |
+| The owner resumes that renewal | ``Resumed renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>.`` | None. |
+| A server plan or a license ends | ``Ended <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. Reason: <cancelled or not paid>.`` | None. |
 
-A message has no account, email or name. The boat message goes out only after the Worker stores the
+A purchase message (the last 5 rows) and a payment message (below) have the email of the account, on a
+developer decision, so keep the webhook in a private channel. A pool message has no account, email or
+name.
+
+The same webhook also gets one payment message for each invoice line of a server plan or a license
+that is paid or that fails, and for each refund and dispute:
+
+| Event | Message |
+| --- | --- |
+| A paid invoice line | ``Paid server plan for `<email>`: <plan>, <amount> (<currency>), 1 <month or year> period. <First purchase, Renewal or Adjustment>.`` |
+| A failed payment | ``Failed payment of the <server plan or license> for `<email>`: <product>, <amount> (<currency>), 1 <month or year> period. Reason: <Stripe reason>.`` |
+| A refund | ``Refunded <server plan or license> for `<email>`: <product>, <amount> (<currency>), 1 <month or year> period.`` |
+| A refund that failed after it was counted | ``Failed refund of the <server plan or license> for `<email>`: ...`` |
+| A dispute, and a lost dispute | ``Disputed payment of the <server plan or license> for `<email>`: ...``, ``Lost dispute of the <server plan or license> for `<email>`: ...`` |
+
+The product of a license is its number of users, such as `5 users`. The amount is the amount of the
+payment, the refund or the dispute. An adjustment is a plan change or a manual invoice. The sales
+ledger sends the message (`BillingSales.processPending`, in the cron of each 5 minutes), in the run that
+puts the fact in the OpenPanel ledger, so the message comes at most some minutes after the payment and
+one time. It needs `OPENPANEL_CLIENT_ID` and `OPENPANEL_CLIENT_SECRET` too. An imported payment, a $0 paid
+invoice (a trial start or a $0 proration) and a checkout step send no message. An account that is gone shows as `an unknown account`.
+`bun run test:billing-sale-alert` checks the messages. Thus a first purchase sends a `New` message and
+a `Paid` message.
+
+The amount of a purchase message is the list
+amount of one period, before a discount. A license at the bundle price adds `bundle price`, and a
+subscription that starts with a trial adds `It starts with a free trial.` Each new subscription sends
+one start message, and each ended subscription one end message: a claim in `billing_webhook_events`
+(`openbot_purchase:<subscription ID>`, `openbot_purchase_end:<subscription ID>`) stops a second one.
+A cancel or resume message goes out with the sync that stores the change, so a repeated event sends
+nothing. A cancel date that Stripe has for the subscription (`cancel_at`) is the date of the cancel
+message. One sync sends one message: a cancel that Stripe stores together with a change of plan or
+users sends no cancel message. A change of plan or users sends no purchase message. A server
+order with a license sends two messages, one for each subscription. A subscription that ends after its
+owner cancelled the renewal sends the cancel message and, later, the end message. A deleted server, a
+full refund and a dispute end the plan at once. The reason is `not paid` when the last payment of the
+plan had failed, and `cancelled` in each other case. The boat message goes out only after the Worker stores the
 boat start, so a lost race, a retry of a boat attempt, or a pool change whose answer was lost sends
 nothing. A failed send logs one line and is not sent again. Without the secret there are no messages.
 The encrypted `apps/auth-api/.env.production` holds the URL, and `bun run api:deploy` sets it. The CI
@@ -1706,7 +1799,8 @@ deploy keeps the value that the Worker has. To set only the secret:
 cd apps/auth-api && bunx wrangler secret put HOSTED_POOL_ALERT_WEBHOOK_URL
 ```
 
-`bun run test:hosted-pool-assignment` checks the messages.
+`bun run test:hosted-pool-assignment` checks the pool messages, and `bun run test:purchase-alert` checks
+the purchase messages.
 
 ## Not confirmed
 

@@ -65,6 +65,12 @@ export const messages = {
   "settings.chatColor.red": "Rouge",
   "settings.chatColor.green": "Vert",
   "settings.chatColor.blue": "Bleu",
+  "settings.bubbleStyle.title": "Vos bulles",
+  "settings.bubbleStyle.description":
+    "Dans une discussion avec un agent, vos bulles prennent la couleur de l'agent. Vous seul la voyez.",
+  "settings.bubbleStyle.solid": "Plein",
+  "settings.bubbleStyle.tint": "Teinte",
+  "settings.bubbleStyle.classic": "Classique",
   // The Settings window, General tab.
   "settings.appBehavior.title": "Comportement de l’application",
   "settings.conversations.title": "Conversations",

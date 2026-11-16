@@ -32,6 +32,7 @@ import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isRequestBodyLimitDiagnostic,
   isUnreadableContentDiagnostic,
 } from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
@@ -212,6 +213,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
     return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+  if (isRequestBodyLimitDiagnostic(message))
+    return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
   if (provider === "opencode" && isUnreadableContentDiagnostic(message))
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");

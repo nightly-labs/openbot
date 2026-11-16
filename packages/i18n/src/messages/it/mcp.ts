@@ -151,6 +151,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Accedi su {page} nel browser e completa l'accesso lì. {host} vede l'accesso da solo.",
   "mcp.signIn.relayOpen": "Apri la pagina di accesso",
+  "mcp.signIn.relayCopy": "Copia link",
   "mcp.signIn.relayPasteHint": "Se il browser non torna a OpenBot, copia l'indirizzo che mostra e incollalo qui.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot non può ottenere l'accesso dal browser da solo. Quando hai finito, copia l'indirizzo che mostra il browser e incollalo qui.",

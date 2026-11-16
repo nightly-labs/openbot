@@ -361,6 +361,8 @@ export const messages = {
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "connector.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "connector.whatsapp.helpKeysUnreadable":
+    "OpenBot はこの番号の保存済みキーを読み取れません。番号をもう一度リンクしてください。",
   "connector.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
   "connector.whatsapp.pause": "一時停止",
   "connector.whatsapp.resume": "再開",

@@ -33,6 +33,7 @@ import {
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
+import { ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -44,6 +45,7 @@ import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
@@ -694,6 +696,7 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -948,8 +951,14 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
+                  // In an agent chat, Settings › Appearance › Your bubbles can give them the agent's color.
                   if (current?.author === "you")
-                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
+                    return ownMessageAuthor({
+                      name: t("chat.message.you"),
+                      style: channel ? "classic" : bubbleStyle(),
+                      agent: props.agent,
+                      chatColor: ownChatColor(),
+                    });
                   if (channel && current) return channel.author(current);
                   // The profile gives the row the agent's color, for the name and the bubble tint.
                   return {

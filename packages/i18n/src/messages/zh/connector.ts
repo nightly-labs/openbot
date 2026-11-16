@@ -357,6 +357,7 @@ export const messages = {
   "connector.whatsapp.helpLoggedOut": "WhatsApp 已把这台电脑从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpLoggedOutHost": "WhatsApp 已把这台服务器从已关联的设备中移除。请重新关联该号码。",
   "connector.whatsapp.helpError": "OpenBot 无法通过该号码连接 WhatsApp。请重新连接，或断开该号码。",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot 无法读取该号码已保存的密钥。请重新关联该号码。",
   "connector.whatsapp.retryAt": "WhatsApp 要求 OpenBot 等待，将于 {time} 重试。",
   "connector.whatsapp.pause": "暂停",
   "connector.whatsapp.resume": "恢复",

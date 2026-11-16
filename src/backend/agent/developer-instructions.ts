@@ -155,12 +155,17 @@ export interface DeveloperInstructionOptions {
    * some compositors, and its refusal names build features, which an agent repeated to the user (#9127).
    */
   computerUseOnWayland?: boolean;
+  /**
+   * The Computer Use driver refuses keys and clicks on this Wayland desktop, such as KDE Plasma. The
+   * agent retried each refusal and showed the user the driver's error codes (#9703).
+   */
+  computerUseInputRefused?: boolean;
   /** The agent gets an http MCP server, which can need a sign-in that the provider cannot do. */
   httpMcpServers?: boolean;
   /**
    * The user's MCP servers whose tools the provider can defer. A code-mode-only Codex model gets them
    * in `exec`, and no request names them, so the instructions do (#4468). OpenCode 2.2.7 puts them
-   * in `execute`, behind its own `search(...)` (#7097).
+   * in `execute`, behind its own `search(...)` (#7097). Antigravity 1.5 leaves some out (#7427).
    */
   deferredMcpServers?: readonly string[];
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
@@ -501,16 +506,20 @@ export function developerInstructions(
     `openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools.${
       // Codex makes the `openbot` namespace direct-only (`CODEX_DIRECT_ONLY_NAMESPACES`), so `exec`
       // leaves it out of `ALL_TOOLS`; a model that looked only there said the browser was gone (#5036).
+      // Codex 0.167 and later keeps no more than 8 MiB of image data URL from one `exec`, and `view_image`
+      // gives the whole file, so a phone photo did not reach the model (#9522).
       agent.provider === "codex"
-        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly."
+        ? " In exec, ALL_TOOLS does not list the openbot and openbot_browser tools; call them directly. For a local photo, call openbot.read_image: view_image in exec drops a file over 6 MB."
         : // OpenCode Code Mode puts only the direct tools under `tools.openbot`. A model that read
           // `openbot.create_agent` called `tools.openbot.create_agent`, which OpenCode refuses (#6309).
           agent.provider === "opencode"
           ? ` In execute, tools.openbot and tools.openbot_browser have only your listed tools; run each other tool as tools.openbot.tool_call({ name: "openbot.create_agent", arguments: {…} }), never as tools.openbot.create_agent or tools.openbot_browser.click.${
               // A JavaScript string drops a single backslash, so `"C:\Users\…"` reached the
-              // attachment check as `C:Users…` and was not found (#8635).
+              // attachment check as `C:Users…` and was not found (#8635). OpenCode refuses a PowerShell
+              // command with a curly quote or an en or em dash before it runs, as `invalid-structure`;
+              // the agent sent the same text again and again (#9211).
               process.platform === "win32"
-                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash."
+                ? " In execute, write Windows paths with forward slashes, such as C:/Users/…: JavaScript drops a single backslash. In shell commands, use only straight quotes and plain hyphens: OpenCode refuses a command with a curly quote or an en or em dash (invalid-structure). Write such a character as $([char]0x2013) inside double quotes, or read the text from a file."
                 : ""
             }`
           : // Grok CLI 1.0.77 gives MCP tools to the model only through its `search_tool` and
@@ -556,7 +565,11 @@ export function developerInstructions(
           // with openbot.tool_search found none and said that they were not enabled (#7097).
           agent.provider === "opencode"
             ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Their tools are only in execute, and openbot.tool_search does not find them. When a tool of one is not listed there, find it with search(...) inside execute and call the path that it returns.`
-            : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
+            : // Antigravity 1.5 leaves the tools over its schema budget out of the tool list and of
+              // <mcp_servers>, with no call_mcp_tool for them, and the agent said they were not enabled (#7427).
+              agent.provider === "antigravity"
+              ? `Your MCP servers: ${options.deferredMcpServers.join(", ")}. Some of their tools can be missing from your tool list and from <mcp_servers>. Each tool has its schema in <appDataDir>/mcp/<server>/<tool>.json. Run a missing tool with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.`
+              : `Your MCP servers: ${options.deferredMcpServers.join(", ")}. When a tool of one is not in your tool list, find it with tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.`,
         ]
       : []),
     ...(options.httpMcpServers
@@ -628,7 +641,7 @@ export function developerInstructions(
     agentComputerUseEnabled(agent) && options.computerUseNotReady
       ? `Computer Use is on for you, but it is not ready on this ${options.serverHost ? "server" : "computer"} now, so you have no ${COMPUTER_USE_MCP_SERVER_NAME} tools; do not search for them or use another desktop-control plugin. When a task needs a desktop application outside the embedded browser, say in one plain sentence that Computer Use is not ready${options.serverHost ? " on this server, so you cannot do that step" : ", and that the user can open Settings, then Computer Use, where OpenBot starts it or shows what is missing; it works from their next message"}.`
       : agentComputerUseEnabled(agent)
-        ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never Codex Computer Use, the Sky computer use service, or another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read skill://cua-driver/SKILL.md before the first GUI action of a conversation.`
+        ? `Use ${COMPUTER_USE_MCP_SERVER_NAME} for every GUI task outside the embedded browser, never Codex Computer Use, the Sky computer use service, or another desktop-control plugin: they show no OpenBot cursor and can fight this one for the pointer.${options.agentCursorDrawn ? " OpenBot draws your cursor at each point that you click, scroll or move_cursor to in another app, also when the driver refuses its own cursor overlay." : ""}${options.computerUseOnWayland ? " On this Wayland desktop, video recording can be unavailable: when start_recording with record_video true answers video_active false and does not ask you to install ffmpeg, call stop_recording and do not try video again; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot record video on this desktop, and offer screenshots instead." : ""}${options.computerUseInputRefused ? " On this desktop, OpenBot cannot send keys or clicks to other apps. Where a window offers an accessibility action, such as set_value on a text field, use it. When typing, a key or a click is refused, do not retry it and do not change its delivery mode; tell the user in one plain sentence, without the driver's reason, that OpenBot cannot type or click in apps on this desktop, and say that you can still read windows and take screenshots." : ""} After each action, read its structuredContent, or its JSON copy at the end of the result text: refused or suspected_noop means that the action did not happen, so do not report it as done; unverifiable means read the window again and report what you saw; a delivery.mode of foreground took the screen from the user. browser_consent_required means that OpenBot cannot use the user's own browser profiles: do not call browser_prepare; say so in one plain sentence and continue in openbot_browser, with request_takeover for a sign-in. Select a window by its title and size, never the first match: most windows are small empty helpers. Pixel coordinates apply only to the main display; on another display, use the element token, or the element_index with the window_id and snapshot_id of the same read. Take the shortest path and do not repeat reads; use query or include_screenshot false when you only need an element. Read skill://cua-driver/SKILL.md before the first GUI action of a conversation.`
         : options.computerUseInOwnChat
           ? "This conversation runs next to your own chat, and only your own chat uses Computer Use. Here, do not control desktop applications outside the embedded browser or use another desktop-control plugin; when the task needs one, say so, so that the user can continue that step in your own chat."
           : "The user turned Computer Use off for you. Do not control desktop applications outside the embedded browser or use a desktop-control plugin. Delegate such work to a teammate with Computer Use on (openbot.read_agent shows it); when none has it, say that the user can turn it on in your settings.",

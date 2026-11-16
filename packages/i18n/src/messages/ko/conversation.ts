@@ -129,7 +129,6 @@ export const messages = {
   "conversation.voice.phase.thinking": "생각 중",
   "conversation.voice.phase.speaking": "말하는 중",
   "conversation.voice.phase.offline": "연결되지 않음",
-  "conversation.voice.speakNow": "지금 말씀하세요",
   "conversation.voice.mute": "마이크 음소거",
   "conversation.voice.interrupt": "끼어들기",
   "conversation.voice.start": "음성 대화 시작",

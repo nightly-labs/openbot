@@ -37,6 +37,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
+  "status.agent.browserProfileNamed":
+    "העבר את {agents} לפרופיל הדפדפן {profile}. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileNew":
+    "צור את פרופיל הדפדפן החדש {profile} והעבר אליו את {agents}. אין בו התחברויות. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileShared":
+    "העבר את {agents} לפרופיל הדפדפן המשותף. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileOwn": "תן לכל אחד מ-{agents} פרופיל דפדפן משלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",
@@ -95,6 +102,7 @@ export const messages = {
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
+  "status.agent.mcpToolCall": "הפעלת הכלי {tool} של שרת MCP {name}.",
   "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",

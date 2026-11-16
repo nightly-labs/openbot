@@ -370,6 +370,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxyChanged": "This proxy changed after you opened it. Look at it again, then try again.",
   "error.backend.browserProxyUnreachable": "The proxy {name} does not answer, so the page did not open.",
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
+  "error.backend.browserSystemProxyFailed":
+    "The proxy in the settings of the computer that runs OpenBot does not answer or refused the connection, so the page did not open. Check the proxy settings of that computer.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
   "error.backend.browserProxyComputerLocalAddress":

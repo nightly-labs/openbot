@@ -1,11 +1,12 @@
 manifestVersion: 1
-id: openbot
+id: __APP_ID__
 storage:
   dataRoot: data
 category: ai
 name: OpenBot
 version: "__VERSION__"
 tagline: A server for your AI agents
+icon: https://openbot.run/icon-512x512.png
 description: >-
   OpenBot runs your AI agents on your Umbrel. Each agent has its own workspace, conversation and
   memory, and keeps working when your computer is off.

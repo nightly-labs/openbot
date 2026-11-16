@@ -284,6 +284,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Atualize o OpenBot neste servidor para alterar o nome e o logotipo aqui.",
   "mobile.server.settings.identityOffline": "Conecte-se a este servidor para alterar o nome e o logotipo.",
+  "mobile.server.settings.appearance": "Forma e cor",
+  "mobile.server.settings.appearanceShape": "Forma",
+  "mobile.server.settings.appearanceShapeOption": "Forma {number}",
+  "mobile.server.settings.appearanceColor": "Cor do servidor",
+  "mobile.server.settings.appearanceAutomatic": "Automática",
+  "mobile.server.settings.appearanceReset": "Redefinir",
+  "mobile.server.settings.appearanceSaveFailed":
+    "Não foi possível salvar a forma e a cor do servidor. Tente novamente.",
   "mobile.server.route.cropLogo": "Recortar logotipo",
   "mobile.server.members.remove": "Remover membro",
   "mobile.server.members.invitePeople": "Convidar pessoas",
@@ -903,6 +911,8 @@ export const messages = {
     "O WhatsApp removeu este servidor dos dispositivos conectados. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.helpError":
     "O OpenBot não consegue acessar o WhatsApp neste número. Reconecte ou desconecte o número.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "O OpenBot não consegue ler as chaves salvas deste número. Vincule o número novamente.",
   "mobile.server.connectors.whatsapp.retryAt":
     "O WhatsApp pediu para o OpenBot aguardar. Ele tentará novamente às {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Vincular de novo",

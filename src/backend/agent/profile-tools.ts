@@ -59,7 +59,7 @@ export const createAgentToolSchema = z
     provider: z
       .enum(AGENT_PROVIDERS)
       .describe(
-        "Provider for the new agent. Omit provider and model to give it your own provider and model. See list_models.",
+        "Provider for the new agent. Omit provider and model for your provider, model and account. See list_models.",
       )
       .optional(),
     model: z
@@ -207,6 +207,7 @@ export const PROFILE_TOOL_NAMES: ReadonlySet<string> = new Set([
   "create_agent",
   "update_profile",
   "update_agents",
+  "set_browser_profile",
 ]);
 
 /**

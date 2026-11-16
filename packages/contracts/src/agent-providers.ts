@@ -128,6 +128,15 @@ export interface AgentProviderDescriptor {
    */
   readonly accountSignIn?: "key";
   /**
+   * An account after the first can also sign in with a code: the provider's CLI gives a page, and
+   * the person finishes on any device. `device`: a code or a link that the page confirms by itself.
+   * `paste`: a code that the person copies back, which only a computer where
+   * `pasteCodeSignInSupported` can run. It mirrors `accounts.codeSignIn` of the driver in
+   * `src/backend/provider-drivers.ts`; keep the two in step. A joined server's host runs it only
+   * with `provider-account-code-v1`.
+   */
+  readonly accountCodeSignIn?: "device" | "paste";
+  /**
    * Where the provider's sign-in page ends. `callback`: the page sends the browser to an address on
    * the computer that started it, so a browser tab elsewhere must paste that address back. `page`:
    * the user finishes on the page and the provider sees it by itself, so any browser can run it.
@@ -172,10 +181,11 @@ export interface AgentProviderDescriptor {
   readonly workspaceEnforcement: "tool-sandbox" | "command-sandbox" | "confined-process";
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
-   * step (Grok through its `x.ai/interject` ACP extension, Antigravity through a second
-   * `session/prompt`). `deferred`: the protocol has no steer
-   * request (ACP), so the message can wait until the turn ends. Only a `native` provider steers a
-   * message sent in `steer` mode; the others queue it.
+   * step (Grok through its `x.ai/interject` ACP extension, OpenCode through its `_session/steering`
+   * ACP extension, Antigravity through a second `session/prompt`). `deferred`: the protocol has no
+   * steer request (ACP), so the message can wait until the turn ends. Only a `native` provider steers
+   * a message sent in `steer` mode; the others queue it. A `native` CLI of a release before its
+   * steer request refuses the message, which then waits in the queue.
    */
   readonly steer: "native" | "deferred";
   /**
@@ -225,6 +235,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "chatgpt",
     pickerOrder: 1,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -248,6 +259,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "claude",
     pickerOrder: 0,
     localCodeSignIn: "paste",
+    accountCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
@@ -271,6 +283,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "grok",
     pickerOrder: 2,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -301,7 +314,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md"],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: true,
     approvalsInFullAccess: true,

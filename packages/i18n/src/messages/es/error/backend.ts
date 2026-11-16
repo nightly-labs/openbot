@@ -374,6 +374,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "El proxy {name} no responde, así que la página no se abrió.",
   "error.backend.browserProxySignInRefused":
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
+  "error.backend.browserSystemProxyFailed":
+    "El proxy de la configuración del ordenador que ejecuta OpenBot no responde o rechazó la conexión, así que la página no se abrió. Revisa la configuración de proxy de ese ordenador.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
   "error.backend.browserProxyComputerLocalAddress":

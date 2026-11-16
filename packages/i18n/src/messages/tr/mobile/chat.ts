@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",
   "mobile.chat.composer.dictate": "Mesajı sesle yaz",
+  "mobile.chat.composer.voiceSettings": "Ses ayarları",
   "mobile.chat.composer.stopDictation": "Dikteyi durdur",
   "mobile.chat.composer.mention": "{name} ajanından bahset",
   "mobile.chat.composer.skills": "Beceriler",

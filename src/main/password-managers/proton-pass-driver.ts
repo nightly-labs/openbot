@@ -21,7 +21,7 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, registerSecretValue, toLogValue } from "@openbot/logging";
-import { Effect, Exit, Schema, Scope, Semaphore } from "effect";
+import { Effect, Exit, Result, Schema, Scope, Semaphore } from "effect";
 import { causeHelpers } from "../../backend/effect-boundary";
 import {
   PASSWORD_MANAGER_BRANDS,
@@ -512,22 +512,29 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
     kind: "password" | "totp",
   ): Effect.fn.Return<string | null, PasswordVaultError> {
     if (!this.connected()) return null;
-    const logins = yield* this.#logins().pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
-    const login = logins.get(id);
-    if (!login || !matchesOrigin(login, origin) || (kind === "totp" && !login.hasTotp)) return null;
-    const item = `pass://${login.shareId}/${login.itemId}`;
-    const value = yield* (
-      kind === "password"
-        ? this.#agentCall(["item", "view", item, "--output", "json"]).pipe(
-            Effect.flatMap((output) =>
-              Effect.try({
-                try: () => loginPassword(JSON.parse(output)),
-                catch: () => fail(sourceText("error.connector.protonPassFailed")),
-              }),
-            ),
-          )
-        : this.#agentCall(["item", "view", `${item}/totp?totp=code`]).pipe(Effect.map((output) => output.trim()))
-    ).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
+    const value = yield* Effect.gen({ self: this }, function* () {
+      const login = (yield* this.#logins()).get(id);
+      if (!login || !matchesOrigin(login, origin) || (kind === "totp" && !login.hasTotp)) return null;
+      const item = `pass://${login.shareId}/${login.itemId}`;
+      const read = yield* Effect.result(
+        kind === "password"
+          ? this.#agentCall(["item", "view", item, "--output", "json"]).pipe(
+              Effect.flatMap((output) =>
+                Effect.try({
+                  try: () => loginPassword(JSON.parse(output)),
+                  catch: () => fail(sourceText("error.connector.protonPassFailed")),
+                }),
+              ),
+            )
+          : this.#agentCall(["item", "view", `${item}/totp?totp=code`]).pipe(Effect.map((output) => output.trim())),
+      );
+      if (Result.isSuccess(read)) return read.success;
+      // The list can be 10 minutes old, and a login that moved to another vault has a new id. The id
+      // holds the vault and the item, so a login that is still in the new list did not move: its
+      // failure stays. A moved login gives null, and the fill tells the agent to list the logins again.
+      if ((yield* this.#logins(true)).has(id)) return yield* read.failure;
+      return null;
+    }).pipe(Effect.mapError(({ cause }) => new PasswordVaultError({ cause })));
     if (!value) return null;
     registerSecretValue(value, { allowShort: true });
     return value;
@@ -803,12 +810,12 @@ export class ProtonPassDriver implements PasswordManagerDriver, PasswordVault {
     );
   }
 
-  /** The index of the shared logins, read again when it is older than 10 minutes. */
-  #logins(): Effect.Effect<Map<string, IndexedLogin>, PasswordManagerError> {
+  /** The index of the shared logins, read again when it is older than 10 minutes, or at once with `refresh`. */
+  #logins(refresh = false): Effect.Effect<Map<string, IndexedLogin>, PasswordManagerError> {
     return this.#indexing.withPermit(
       Effect.gen({ self: this }, function* () {
         const current = this.#index;
-        if (current && this.#now() - current.readAt < INDEX_MS) return current.logins;
+        if (!refresh && current && this.#now() - current.readAt < INDEX_MS) return current.logins;
         // `item list` reads one vault, and no default vault is set: each vault that the key reads is listed.
         const vaultOutput = yield* this.#agentCall(["vault", "list", "--output", "json"]);
         const shareIds = yield* Effect.try({

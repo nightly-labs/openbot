@@ -82,6 +82,8 @@ export interface DeliveryPromptSources {
   /** The conversation the delivery joins. A user reply quotes the message it answers from it. */
   snapshot: ConversationSnapshot;
   routineRun: Pick<RoutineRun, "kind" | "source" | "agentId"> | null;
+  /** The zone of a routine delivery's routine. The run time is also given on its clock. */
+  routineTimezone?: string | undefined;
   /** The open waits that a routine run wakes. The run continues their requests. */
   wokenWaits?: readonly AgentWait[];
   /** The prompt a channel task or an external message sends in place of the delivery text. */
@@ -254,6 +256,36 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * The run time on the routine's clock. `Scheduled for` is in UTC, so without this line an agent takes
+ * the UTC date as today: a 23:30 run in America/Sao_Paulo is the next day in UTC (#9276).
+ */
+function routineLocalTime(scheduledFor: string, timeZone: string | undefined): string[] {
+  const date = new Date(scheduledFor);
+  if (!timeZone || Number.isNaN(date.getTime())) return [];
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      weekday: "long",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZoneName: "longOffset",
+    }).formatToParts(date);
+  } catch {
+    return [];
+  }
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((one) => one.type === type)?.value ?? "";
+  const local = `${part("weekday")}, ${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")}`;
+  return [
+    `Local time of this run: ${local} in ${timeZone} (${part("timeZoneName")}). Read dates such as today on this clock.`,
+  ];
+}
+
+/**
  * The provider input for one delivery. A new turn and a steer into the running turn both send it,
  * so a teammate's message is framed as collaborator input on either path.
  */
@@ -346,6 +378,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       `Routine name: ${delivery.sender.routineName}`,
       `Run type: ${runKind}`,
       `Scheduled for: ${delivery.sender.scheduledFor}`,
+      ...routineLocalTime(delivery.sender.scheduledFor, sources.routineTimezone),
       "The routine already exists, and its schedule is already configured.",
       ...(canPause
         ? [

@@ -325,6 +325,14 @@ const AWAKE_TAB_GRACE_MS = 2 * 60_000;
 const IDLE_UNLOAD_NOTE =
   "Note: this tab was not used for some time, so its page was unloaded to free memory and loaded again from its address. Scripts that you injected, page variables, form input and the tab history from before are gone. Set them up again if you need them. An idle tab unloads sooner when several other tabs are open: close the tabs that you no longer need.";
 /**
+ * What the agent reads on a call on a tab that its own page closed (`window.close()`). Without it the
+ * agent reads only "Unknown browser tab", and thinks that the browser loses its tabs (#9713).
+ */
+const PAGE_CLOSED_TAB_ERROR = (tabId: string) =>
+  `Browser tab ${tabId} is closed: the page in it closed its own tab (a script of the site called window.close()). The browser did not fail. Open the address again if you need the page. A site that closes its tab each time does not let an automated browser use it.`;
+/** How many self-closed tabs `#pageClosedTabs` remembers. */
+const PAGE_CLOSED_TAB_LIMIT = 32;
+/**
  * The page load errors that say the proxy of the tab did not answer or refused it, and why, with
  * their Chromium codes. A failed load can give only the code, with no name.
  */
@@ -685,6 +693,11 @@ export class BrowserHost {
   #persistLock = Semaphore.makeUnsafe(1);
   readonly #scope = Scope.makeUnsafe();
   #destroying: Deferred.Deferred<void, BrowserOperationError> | null = null;
+  /** The owners of the last agent tabs whose own page closed them, by tab id. See `PAGE_CLOSED_TAB_ERROR`. */
+  readonly #pageClosedTabs = new Map<
+    string,
+    { ownerThreadId: string | null; ownerAgentId: string | null; sharedThreadIds: ReadonlySet<string> }
+  >();
   /** Whether the machine is too low on memory for one more tab. Only a server has a reading. */
   readonly #memoryLow: () => boolean;
   readonly #idleTabSweep: NodeJS.Timeout;
@@ -1559,8 +1572,9 @@ export class BrowserHost {
     if (this.#tabs.get(tabId) !== tab || !current || !sameUserControlHolder(current, holder))
       return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     this.#teachRecordings.set(tabId, { holder: current, startedAt: Date.now(), steps: [] });
-    const place = stepPlace(tab.contents.getURL());
-    const title = stepText(tab.contents.getTitle());
+    // A page can put a typed card value or password in its title or address.
+    const place = stepPlace(tab.engine.scrubText(tab.contents.getURL()));
+    const title = stepText(tab.engine.scrubText(tab.contents.getTitle()));
     if (place) this.#recordTeachStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
   }).bind(this);
 
@@ -1751,6 +1765,7 @@ export class BrowserHost {
             protection.running = true;
             this.#syncAttachedView();
             let kept = false;
+            let shown = false;
             let leaked = false;
             // A blocked navigation ends the wait for one, so the user gets the tab at once.
             let stopWaiting = () => {};
@@ -1795,8 +1810,9 @@ export class BrowserHost {
                       });
                     }
                     if (!protection.replaced) {
-                      // A reload would restart a single-page sign-in at its first step. Keep the
-                      // document when its fields are empty and nothing a snapshot reads shows the value.
+                      // A reload would restart a single-page sign-in at its first step, or close the
+                      // dialog that holds it. Keep the document. When the page still shows the value,
+                      // snapshots hide it and no image of the tab is taken until it navigates.
                       const cleared = yield* boundEngineOperation(
                         tab,
                         entry.clear(secret),
@@ -1804,7 +1820,11 @@ export class BrowserHost {
                         "Authentication field cleanup timed out.",
                         keepQueueBlocked,
                       ).pipe(Effect.catch(() => Effect.succeed(false)));
-                      if (cleared && !protection.replaced) kept = true;
+                      if (!protection.replaced && (cleared || !leaked)) {
+                        entry.hide(secret, !cleared);
+                        kept = true;
+                        shown = !cleared;
+                      }
                     }
                     if (!protection.replaced && !kept) {
                       // Load with GET rather than replaying a possible form POST. Keep capture
@@ -1832,6 +1852,7 @@ export class BrowserHost {
                     this.#syncAttachedView();
                   } else if (kept) {
                     tab.secretDocument = true;
+                    if (shown) tab.secretShown = true;
                     tab.secret = undefined;
                     this.#syncAttachedView();
                   }
@@ -1887,10 +1908,14 @@ export class BrowserHost {
       );
   }
 
-  /** A filled card shows on the page, so no image of the tab leaves the host until it navigates. */
+  /** A filled card or a typed password shows on the page, so no image of the tab leaves the host until it navigates. */
   #requireNoFilledCard(tab: BrowserHostTab, action: string): void {
     if (tab.filledCard)
       throw new Error(`${action} is unavailable while the page shows a filled card. Use snapshots until it navigates.`);
+    if (tab.secretShown)
+      throw new Error(
+        `${action} is unavailable while the page can show a password or code that OpenBot typed. Use snapshots until it navigates.`,
+      );
   }
 
   #cacheTainted(target: Session): Set<string> {
@@ -2062,6 +2087,15 @@ export class BrowserHost {
           if (current.secret !== protection) return;
           yield* untilStopped(current, reloadWithGet(current));
         }),
+      true,
+    );
+  }
+
+  /** Loads a kept page that can show a typed password again, so a person on another computer can see the tab. */
+  #reloadShownSecret(tab: BrowserHostTab) {
+    return this.#enqueue(
+      tab.id,
+      (current) => (current.secretShown ? untilStopped(current, reloadWithGet(current)) : Effect.void),
       true,
     );
   }
@@ -2324,6 +2358,8 @@ export class BrowserHost {
     const protection = tab.secret;
     if (protection?.submitted && !protection.running && this.#takeoverTabIds.has(tabId))
       yield* this.#reloadProtected(tab, protection).pipe(Effect.ignore);
+    else if (tab.secretShown && (this.#takeoverTabIds.has(tabId) || this.#userControlTabIds.has(tabId)))
+      yield* this.#reloadShownSecret(tab).pipe(Effect.ignore);
     if (tab.secret?.submitted)
       return yield* browserFailure(new Error(sourceText("error.backend.browserViewProtected")));
     yield* browserSync(() => this.#requireNoFilledCard(tab, "Browser view"));
@@ -2358,7 +2394,8 @@ export class BrowserHost {
           ...(viewport ? { viewport } : {}),
         },
         (frame) => {
-          if (!tab.secret?.submitted && !tab.filledCard && tab.captureGeneration === generation) onFrame(frame);
+          if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
+            onFrame(frame);
         },
         (error) => {
           tab.viewInvalidations.delete(invalidate);
@@ -2478,7 +2515,7 @@ export class BrowserHost {
               undefined,
               (read) =>
                 Effect.gen(function* () {
-                  const recommended = mode === "auto" && read.recommendImage && !tab.filledCard;
+                  const recommended = mode === "auto" && read.recommendImage && !tab.filledCard && !tab.secretShown;
                   // A screenshot or snapshot image just before this one shows the same page.
                   const imageCurrent = hasCurrentImage(tab);
                   if (mode !== "always" && (!recommended || imageCurrent)) {
@@ -3459,7 +3496,15 @@ export class BrowserHost {
   #proxyLoadFailure(tab: BrowserHostTab, failure: BrowserOperationError): BrowserOperationError {
     const proxy = this.#tabProxy(tab);
     const proxyError = proxyErrorInText(String(failure.cause));
-    if (proxy === null || proxyError === undefined) return failure;
+    if (proxyError === undefined) return failure;
+    if (proxy === null) {
+      // A tab without a profile proxy uses the proxy settings of the computer, such as `HTTPS_PROXY` on a
+      // server. Chromium gives only a failed tunnel when that proxy refuses its sign-in, so one message covers
+      // both. A profile whose new proxy did not apply has no entry and keeps the rules of its old proxy.
+      const computerProxy =
+        tab.tabSession?.kind !== "profile" || this.#appliedProxies.has(browserTabPartition(tab.tabSession));
+      return computerProxy ? browserFailure(new Error(sourceText("error.backend.browserSystemProxyFailed"))) : failure;
+    }
     if (proxy.kind === "computer")
       return browserFailure(
         new Error(
@@ -3705,6 +3750,8 @@ export class BrowserHost {
     contents.on("close", () => {
       // `#closeRenderer` closes the old contents of a tab that stays open.
       if (tab.contents !== contents) return;
+      // `close` removes the tab before it closes the contents, so a tab that is still here closes by its own page.
+      if (!tab.closing && !this.#destroying && this.#tabs.get(tab.id) === tab) this.#notePageClosedTab(tab);
       tab.closing = true;
       tab.focusedAtPageClose = contents.isFocused();
     });
@@ -3925,6 +3972,7 @@ export class BrowserHost {
       this.#releaseScriptedDocument(tab);
       if (tab.secretDocument) {
         tab.secretDocument = false;
+        tab.secretShown = false;
         contents.navigationHistory.clear();
       }
       // The next document has no card in its fields. History would bring the filled page back.
@@ -4429,6 +4477,11 @@ export class BrowserHost {
   /** `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`. */
   #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
+    if (!tab) {
+      const closed = this.#pageClosedTabs.get(tabId);
+      if (closed && this.#canUseToolTab(params, { ...closed, id: tabId }))
+        throw new Error(PAGE_CLOSED_TAB_ERROR(tabId));
+    }
     if (!tab || !this.#canUseToolTab(params, tab)) throw new Error(`Unknown browser tab: ${tabId}`);
     // The user holds this tab. `AgentService` already refuses an agent's browser tools while its own
     // takeover is outstanding, but that check is agent-wide and only covers callers that go through
@@ -4456,11 +4509,27 @@ export class BrowserHost {
    * The owner thread can use its tab. Another thread of the same agent can use it after a person shared
    * it with that thread. A tab with no owner agent is never shared.
    */
-  #canUseToolTab(params: DynamicToolCallParams, tab: BrowserTab): boolean {
+  #canUseToolTab(
+    params: DynamicToolCallParams,
+    tab: Pick<BrowserTab, "id" | "ownerThreadId" | "ownerAgentId"> & { sharedThreadIds?: ReadonlySet<string> },
+  ): boolean {
     const ownerAgentId = params.ownerAgentId ?? null;
     if (tab.ownerThreadId === params.threadId) return tab.ownerAgentId === null || tab.ownerAgentId === ownerAgentId;
     if (tab.ownerAgentId === null || tab.ownerAgentId !== ownerAgentId) return false;
-    return this.#tabs.get(tab.id)?.sharedThreadIds?.has(params.threadId) ?? false;
+    return (tab.sharedThreadIds ?? this.#tabs.get(tab.id)?.sharedThreadIds)?.has(params.threadId) ?? false;
+  }
+
+  /** Only an agent's tab is kept: a person sees their tab close. The oldest record goes first. */
+  #notePageClosedTab(tab: BrowserHostTab): void {
+    if (tab.ownerThreadId === null && tab.ownerAgentId === null) return;
+    logger.info("A page closed its own browser tab.", { tabId: tab.id, host: logUrlHost(tab.requestedUrl) });
+    this.#pageClosedTabs.set(tab.id, {
+      ownerThreadId: tab.ownerThreadId,
+      ownerAgentId: tab.ownerAgentId,
+      sharedThreadIds: new Set(tab.sharedThreadIds),
+    });
+    const oldest = this.#pageClosedTabs.keys().next().value;
+    if (this.#pageClosedTabs.size > PAGE_CLOSED_TAB_LIMIT && oldest !== undefined) this.#pageClosedTabs.delete(oldest);
   }
 
   /**
@@ -4596,9 +4665,9 @@ export class BrowserHost {
     const contents = tab.contents;
     const records = () => this.#teachRecordings.has(tab.id) || this.#userBrowsingAgent(tab) !== null;
     const recordPage = () => {
-      const place = records() ? stepPlace(contents.getURL()) : null;
+      const place = records() ? stepPlace(tab.engine.scrubText(contents.getURL())) : null;
       if (!place) return;
-      const title = stepText(contents.getTitle());
+      const title = stepText(tab.engine.scrubText(contents.getTitle()));
       this.#recordUserStep(tab, { kind: "page", ...place, ...(title ? { title } : {}) });
     };
     contents.on("did-finish-load", recordPage);
@@ -4610,11 +4679,17 @@ export class BrowserHost {
       if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
       const { x, y } = input;
       if (typeof x !== "number" || typeof y !== "number" || !records()) return;
-      const place = stepPlace(contents.getURL());
+      const place = stepPlace(tab.engine.scrubText(contents.getURL()));
       if (!place) return;
       void readClickTarget(contents, x, y).then((target) => {
         // The tab can change hands while the page answers.
-        if (target) this.#recordUserStep(tab, { kind: "click", ...place, ...target });
+        if (target)
+          this.#recordUserStep(tab, {
+            kind: "click",
+            ...place,
+            ...target,
+            ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
+          });
       });
     });
   }

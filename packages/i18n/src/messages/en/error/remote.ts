@@ -23,6 +23,8 @@ export const messages = defineMessages("error.remote", {
   "error.remote.testActive": "A remote desktop test is active. Try again when it ends.",
   "error.remote.screenRecordingDenied":
     "The host has not allowed OpenBot to record its screen. Grant screen recording on the host, then try again.",
+  "error.remote.windowsSessionDisconnected":
+    "The Windows session on the host is disconnected, so it has no screen to share. Sign in to Windows at the screen of the host, then try again.",
   "error.remote.teamSessionExpired": "The team session has expired.",
   "error.remote.finishTestBeforeSwitch": "Finish the remote desktop test before switching displays.",
   "error.remote.displayNotFound": "Remote display not found.",

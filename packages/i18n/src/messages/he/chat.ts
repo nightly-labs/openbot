@@ -358,8 +358,6 @@ export const messages = {
   "chat.video.pause": "השהיית הסרטון",
   "chat.video.position": "מיקום בסרטון",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "הורדת הסרטון",
-  "chat.video.open": "פתיחת הסרטון",
   "chat.video.mute": "השתקת הסרטון",
   "chat.video.unmute": "ביטול השתקת הסרטון",
   "chat.message.you": "אני",

@@ -74,6 +74,42 @@ export function planStorageGb(plan: BillingPlanId, onOperatorHost: boolean): num
   return BILLING_PLANS.find((candidate) => candidate.id === plan)?.storageGb ?? 0;
 }
 
+/**
+ * A storage tier of a hosted server on a VPS of the operator: 0 is the plan storage, and 1 and 2 are
+ * larger disks that the owner buys as a Stripe add-on. A tier never goes down, and a boat sandbox has none.
+ */
+export type BillingStorageTier = 0 | 1 | 2;
+/** A tier that the owner can buy. */
+export type BillingStorageUpgradeTier = Exclude<BillingStorageTier, 0>;
+export const BILLING_STORAGE_UPGRADE_TIERS: readonly BillingStorageUpgradeTier[] = [1, 2];
+
+/**
+ * The storage in GB of tiers 1 and 2 of each plan. Tier 2 is the whole disk of the plan's VPS: VPS 1
+ * 100 GB, VPS 2 200 GB, VPS 3 300 GB. The free space that clients show is never more than the disk has
+ * (`hostedPlanDisk`), so the system part of the disk is shown as used.
+ */
+const STORAGE_TIER_GB: Readonly<Record<BillingPlanId, readonly [number, number]>> = {
+  starter: [50, 100],
+  standard: [125, 200],
+  pro: [200, 300],
+};
+
+/** A stored storage tier. A value that is not a tier is 0, the plan storage. */
+export function storageTierOf(value: unknown): BillingStorageTier {
+  return value === 1 || value === 2 ? value : 0;
+}
+
+/** The storage in GB of `plan` at `tier` on a VPS of the operator. */
+export function storageTierGb(plan: BillingPlanId, tier: BillingStorageTier): number {
+  if (tier === 0) return OPERATOR_HOST_STORAGE_GB[plan];
+  return STORAGE_TIER_GB[plan][tier === 1 ? 0 : 1];
+}
+
+/** The storage in GB of a hosted server. A storage tier counts only on a VPS of the operator. */
+export function hostedPlanStorageGb(plan: BillingPlanId, onOperatorHost: boolean, tier: BillingStorageTier): number {
+  return onOperatorHost ? storageTierGb(plan, tier) : planStorageGb(plan, false);
+}
+
 /** A storage value of the account server: a whole number of GB, 1 or more. */
 export function isStorageGb(value: unknown): value is number {
   return isNumber(value) && Number.isSafeInteger(value) && value >= 1;
@@ -91,18 +127,6 @@ interface ServerStorage {
  */
 export function serverStorageGb(server: ServerStorage): number {
   return server.storageGb ?? planStorageGb(server.plan, false);
-}
-
-/**
- * The storage in GB of the same server after a change to `nextPlan`. A plan change keeps the machine.
- * Starter has the same storage on both machines, so its storage does not show the machine. Then this
- * gives the smaller storage of `nextPlan`.
- */
-export function serverStorageGbAfter(server: ServerStorage, nextPlan: BillingPlanId): number {
-  const onOperatorHost =
-    server.storageGb === OPERATOR_HOST_STORAGE_GB[server.plan] &&
-    server.storageGb !== planStorageGb(server.plan, false);
-  return planStorageGb(nextPlan, onOperatorHost);
 }
 
 /**
@@ -138,6 +162,43 @@ export function billingListPrices(plan: BillingPlanId, interval: BillingInterval
   return { eur: year(monthly.eur), usd: year(monthly.usd), pln: year(monthly.pln), brl: year(monthly.brl) };
 }
 
+/**
+ * The monthly price of the storage add-on of each tier, in minor units, on top of the plan price. Tier 1
+ * is €0.40 for each GB above the plan; tier 2 costs less for each GB, so the larger disk is the better
+ * buy. USD is EUR times 1.2, PLN times 4 and BRL times 6, as for the plans. Each amount divides by 5.
+ */
+const STORAGE_TIER_MONTHLY_PRICES: Readonly<
+  Record<BillingPlanId, readonly [Readonly<Record<BillingCurrency, number>>, Readonly<Record<BillingCurrency, number>>]>
+> = {
+  starter: [
+    { eur: 1000, usd: 1200, pln: 4000, brl: 6000 },
+    { eur: 2000, usd: 2400, pln: 8000, brl: 12000 },
+  ],
+  standard: [
+    { eur: 2000, usd: 2400, pln: 8000, brl: 12000 },
+    { eur: 4000, usd: 4800, pln: 16000, brl: 24000 },
+  ],
+  pro: [
+    { eur: 2000, usd: 2400, pln: 8000, brl: 12000 },
+    { eur: 4500, usd: 5400, pln: 18000, brl: 27000 },
+  ],
+};
+
+/**
+ * The list price of the storage add-on of one tier for one interval, in minor units. A year is 12 months
+ * less 20%, as for the plans. `scripts/stripe-bootstrap.ts` sets the Stripe Prices to these amounts.
+ */
+export function storageTierListPrices(
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+): Record<BillingCurrency, number> {
+  const monthly = STORAGE_TIER_MONTHLY_PRICES[plan][tier === 1 ? 0 : 1];
+  if (interval === "month") return { ...monthly };
+  const year = (amount: number) => (amount * 12 * 4) / 5;
+  return { eur: year(monthly.eur), usd: year(monthly.usd), pln: year(monthly.pln), brl: year(monthly.brl) };
+}
+
 /** The active member limit of a server with this plan, or with no plan. */
 export function memberLimitForPlan(plan: BillingPlanId | null): number {
   return BILLING_PLANS.find((candidate) => candidate.id === plan)?.memberLimit ?? DEFAULT_TEAM_MEMBER_LIMIT;
@@ -157,6 +218,58 @@ export const BILLING_METADATA = { userId: "openbot_user_id", serverId: "openbot_
 /** The Stripe Price lookup key for one plan and interval. `stripe-bootstrap.ts` creates these keys. */
 export function billingLookupKey(plan: BillingPlanId, interval: BillingInterval): string {
   return `openbot_${plan}_${interval}`;
+}
+
+/**
+ * The Stripe Price lookup key of the storage add-on of one plan, tier and interval. It does not match
+ * `parseBillingLookupKey`, so an add-on item is never read as the plan of a subscription.
+ */
+export function storageTierLookupKey(
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+): string {
+  return `openbot_storage_${plan}_${tier}_${interval}`;
+}
+
+/** Returns null for a lookup key that does not name a storage add-on. */
+export function parseStorageTierLookupKey(
+  value: unknown,
+): { plan: BillingPlanId; tier: BillingStorageUpgradeTier; interval: BillingInterval } | null {
+  if (!isString(value)) return null;
+  const match = /^openbot_storage_([a-z]+)_([12])_([a-z]+)$/u.exec(value);
+  if (!match) return null;
+  const [, plan, tier, interval] = match;
+  if (!isOneOf(BILLING_PLAN_IDS, plan) || !isOneOf(BILLING_INTERVALS, interval)) return null;
+  return { plan, tier: tier === "1" ? 1 : 2, interval };
+}
+
+/**
+ * The metadata of a storage add-on Price. `stripe-bootstrap.ts` moves a lookup key to a new Price when an
+ * amount changes, and a current subscription keeps the old Price, so the metadata still names the tier.
+ */
+export function storageTierPriceMetadata(
+  plan: BillingPlanId,
+  tier: BillingStorageUpgradeTier,
+  interval: BillingInterval,
+): Record<string, string> {
+  return {
+    openbot_kind: "storage",
+    openbot_plan: plan,
+    openbot_storage_tier: String(tier),
+    openbot_interval: interval,
+  };
+}
+
+/** The plan, tier and interval of a storage add-on Price, from its lookup key or its metadata. Null for another Price. */
+export function parseStorageTierPrice(price: {
+  lookup_key: string | null;
+  metadata: Readonly<Record<string, string>>;
+}): { plan: BillingPlanId; tier: BillingStorageUpgradeTier; interval: BillingInterval } | null {
+  const fromKey = parseStorageTierLookupKey(price.lookup_key);
+  if (fromKey || price.metadata.openbot_kind !== "storage") return fromKey;
+  const { openbot_plan: plan, openbot_storage_tier: tier, openbot_interval: interval } = price.metadata;
+  return parseStorageTierLookupKey(`openbot_storage_${plan}_${tier}_${interval}`);
 }
 
 /** Returns null for a lookup key that does not name a plan and interval. */
@@ -181,8 +294,8 @@ export interface BillingServerPlan {
   interval: BillingInterval;
   currency: BillingCurrency;
   /**
-   * The list price of one period in the minor unit of `currency` (cents), before discounts and tax.
-   * Null when Stripe gave no fixed amount.
+   * The list price of one period in the minor unit of `currency` (cents), before discounts and tax: the
+   * plan and its storage add-on. Null when Stripe gave no fixed amount.
    */
   amount: number | null;
   status: BillingSubscriptionStatus;
@@ -191,6 +304,23 @@ export interface BillingServerPlan {
   cancelAtPeriodEnd: boolean;
   /** The storage of the server in GB. An account server from before this field sends none: see `serverStorageGb`. */
   storageGb?: number;
+  /**
+   * The storage tiers that the owner can buy now, smallest first. Empty or absent when there is none: a
+   * boat sandbox, the largest tier, a plan that ends or does not renew, or an account server from before
+   * storage tiers.
+   */
+  storageUpgrades?: BillingStorageUpgrade[];
+}
+
+/** A larger disk that the owner of a server can buy. */
+export interface BillingStorageUpgrade {
+  tier: BillingStorageUpgradeTier;
+  storageGb: number;
+  /**
+   * The list price of one period after the change, in the minor unit of the plan's currency: the plan and
+   * the add-on of this tier. Null when Stripe gave no fixed amount.
+   */
+  amount: number | null;
 }
 
 export interface BillingState {
@@ -204,7 +334,8 @@ export interface BillingState {
 /**
  * The Customer Portal page to open:
  * - `manage`: the payment method, the invoices and all plans of the account.
- * - `update`: change the plan of one server.
+ * - `update`: sent by clients from before storage tiers to change a plan. A plan does not change now, so
+ *   the account server opens the `manage` page.
  * - `cancel`: cancel the plan of one server at the end of its period.
  */
 export type BillingPortalRequest = { flow: "manage" } | { flow: "update" | "cancel"; subscriptionId: string };
@@ -225,6 +356,40 @@ export function isBillingAmount(value: unknown): value is number {
 }
 
 const SUBSCRIPTION_ID_PATTERN = /^sub_[A-Za-z0-9]{1,250}$/u;
+
+/** A request to buy a storage tier for the server of one subscription. */
+export interface BillingStorageRequest {
+  subscriptionId: string;
+  tier: BillingStorageUpgradeTier;
+}
+
+/** Returns null for a value that is not a storage request. */
+export function parseBillingStorageRequest(value: unknown): BillingStorageRequest | null {
+  if (
+    !isDynamicRecord(value) ||
+    !isString(value.subscriptionId) ||
+    !SUBSCRIPTION_ID_PATTERN.test(value.subscriptionId) ||
+    !isOneOf(BILLING_STORAGE_UPGRADE_TIERS, value.tier)
+  ) {
+    return null;
+  }
+  return { subscriptionId: value.subscriptionId, tier: value.tier };
+}
+
+function parseStorageUpgrades(value: readonly unknown[]): BillingStorageUpgrade[] {
+  const upgrades: BillingStorageUpgrade[] = [];
+  for (const item of value) {
+    if (
+      isDynamicRecord(item) &&
+      isOneOf(BILLING_STORAGE_UPGRADE_TIERS, item.tier) &&
+      isStorageGb(item.storageGb) &&
+      (item.amount === null || isBillingAmount(item.amount))
+    ) {
+      upgrades.push({ tier: item.tier, storageGb: item.storageGb, amount: item.amount });
+    }
+  }
+  return upgrades;
+}
 
 function parseBillingServerPlan(value: unknown): BillingServerPlan | null {
   if (
@@ -255,6 +420,8 @@ function parseBillingServerPlan(value: unknown): BillingServerPlan | null {
     cancelAtPeriodEnd: value.cancelAtPeriodEnd,
     // A value that this app cannot read is left out, so the plan still shows with the storage of its table.
     ...(isStorageGb(value.storageGb) ? { storageGb: value.storageGb } : {}),
+    // An older account server sends no upgrades; the plan then has none.
+    ...(Array.isArray(value.storageUpgrades) ? { storageUpgrades: parseStorageUpgrades(value.storageUpgrades) } : {}),
   };
 }
 

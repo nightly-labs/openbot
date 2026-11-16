@@ -402,6 +402,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "רק בעלים או מנהל יכולים לשנות את שם השרת והלוגו.",
   "mobile.server.settings.identityUnsupported": "יש לעדכן את OpenBot בשרת הזה כדי לשנות כאן את השם והלוגו שלו.",
   "mobile.server.settings.identityOffline": "יש להתחבר לשרת הזה כדי לשנות את השם והלוגו שלו.",
+  "mobile.server.settings.appearance": "צורה וצבע",
+  "mobile.server.settings.appearanceShape": "צורה",
+  "mobile.server.settings.appearanceShapeOption": "צורה {number}",
+  "mobile.server.settings.appearanceColor": "צבע השרת",
+  "mobile.server.settings.appearanceAutomatic": "אוטומטי",
+  "mobile.server.settings.appearanceReset": "איפוס",
+  "mobile.server.settings.appearanceSaveFailed": "לא ניתן לשמור את הצורה והצבע של השרת. אפשר לנסות שוב.",
   "mobile.server.route.cropLogo": "חיתוך הלוגו",
   "mobile.server.members.remove": "הסרת חבר",
   "mobile.server.members.invitePeople": "הזמנת אנשים",
@@ -1189,6 +1196,8 @@ export const messages = {
     "WhatsApp הסיר את השרת הזה ממכשירים מקושרים. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot לא מצליח להגיע ל-WhatsApp במספר הזה. אפשר לחבר מחדש, או לנתק את המספר.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot לא מצליח לקרוא את המפתחות השמורים של המספר הזה. יש לקשר את המספר שוב.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp ביקש מ-OpenBot להמתין. הוא ינסה שוב בשעה {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "קישור מחדש",
   "mobile.server.connectors.whatsapp.ownNumber": "מספר אישי",

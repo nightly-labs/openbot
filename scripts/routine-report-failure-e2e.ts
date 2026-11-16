@@ -85,7 +85,8 @@ const replyCalls = (...items: FakeCall[]) => `<<REPLY${JSON.stringify(items)}REP
  * `PROVIDER-FAIL` ends the turn failed with an error and no answer. `EMPTY-ANSWER` does the same with
  * the `empty_answer` cause, as Grok does when the model sends only its reasoning. `QUIET-HANG` sends
  * nothing after its calls until a `turn/interrupt`, as Grok does while it tries such a reply again
- * (#8629). An input with
+ * (#8629). `QUIET-LOOP` calls \`routine_no_update\` again after each result until a \`turn/interrupt\`, as
+ * Kimi does (#9375). An input with
  * `TEAMMATE-QUIET` and no calls calls `routine_no_update`. A turn that reads a teammate's answer
  * makes the calls in `<<REPLY[...]REPLY>>` when its input names them.
  */
@@ -102,6 +103,8 @@ let threads = 0;
 let turns = 0;
 /** Tool request id -> the turn that waits for its result. */
 const waiting = new Map();
+/** Turn id -> each turn that calls \`routine_no_update\` again until it is stopped. */
+const looping = new Map();
 process.stdout.on("error", (error) => {
   if (error.code === "EPIPE") process.exit(0);
   throw error;
@@ -124,6 +127,12 @@ const finish = (turn) => {
   write({ method: "turn/completed", params: { threadId, turn: { id: turnId, status: "completed" } } });
 };
 const callNext = (turn) => {
+  if (turn.stopped) return;
+  if (turn.quietLoop && turn.calls.length === 0) {
+    looping.set(turn.turnId, turn);
+    turn.calls.push({ tool: "routine_no_update", arguments: {} });
+    if (turn.loops++ > 0) return setTimeout(() => callNext(turn), 200);
+  }
   const call = turn.calls.shift();
   if (!call) return setTimeout(() => finish(turn), 20);
   const id = "tool-" + turn.turnId + "-" + turn.calls.length;
@@ -164,10 +173,12 @@ const answer = (message) => {
       const next = /<<NEXT([\\s\\S]*?)NEXT>>/.exec(task);
       const turnCalls = named ? JSON.parse(named[1]) : task.includes("TEAMMATE-QUIET") ? [{ tool: "routine_no_update", arguments: {} }] : [];
       const reply = next ? "Relay report <<CALLS" + next[1] + "CALLS>>" : turnCalls.length ? ${JSON.stringify(FAILED_ANSWER)} : "All good.";
-      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG") });
+      return callNext({ threadId: params.threadId, turnId, calls: turnCalls, reply, providerFail: task.includes("PROVIDER-FAIL"), emptyAnswer: task.includes("EMPTY-ANSWER"), quietHang: task.includes("QUIET-HANG"), quietLoop: task.includes("QUIET-LOOP"), loops: 0 });
     }
     case "turn/interrupt": {
       log({ method: "turn/interrupt", threadId: params.threadId, turnId: params.turnId });
+      const loop = looping.get(params.turnId);
+      if (loop) loop.stopped = true;
       write({ id: message.id, result: {} });
       return write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: params.turnId, status: "interrupted" } } });
     }
@@ -399,6 +410,7 @@ try {
   const quietOk = createRoutine(checker.id, "Quiet ok", `Check quietly. ${calls(noUpdate)}`);
   const quietEmpty = createRoutine(checker.id, "Quiet empty", `Check quietly. EMPTY-ANSWER ${calls(noUpdate)}`);
   const quietHang = createRoutine(checker.id, "Quiet hang", `Check quietly. QUIET-HANG ${calls(noUpdate)}`);
+  const quietLoop = createRoutine(checker.id, "Quiet loop", "Check quietly. QUIET-LOOP");
   const empty = createRoutine(checker.id, "Empty check", "Check the logs. EMPTY-ANSWER");
   const failedThenQuiet = createRoutine(
     checker.id,
@@ -618,6 +630,28 @@ try {
       quietHangRun.delivery.status === "completed" &&
       fakeEntries().some((entry) => entry.method === "turn/interrupt" && entry.turnId === quietHangRun.delivery.turnId),
     quietHangRun.run,
+  );
+  // Kimi calls routine_no_update again every 2 s, so its turn is never silent; OpenBot ends it at the
+  // second call, not after the 30 s of silence (#9375).
+  const quietLoopStarted = Date.now();
+  const quietLoopRun = await settledRun(
+    "Quiet loop",
+    await runCauseEffect(
+      agents.runRoutineFromAutomation({ agentId: checker.id, routineId: quietLoop.id, payload: "" }),
+    ),
+    20_000,
+  );
+  const quietLoopCalls = toolResults(quietLoopRun.delivery.turnId, "routine_no_update");
+  pass(
+    "A script run that calls routine_no_update again ends as succeeded at once, with no error",
+    quietLoopRun.run.status === "succeeded" &&
+      !quietLoopRun.run.error &&
+      quietLoopRun.delivery.status === "completed" &&
+      quietLoopCalls.length >= 2 &&
+      quietLoopCalls.every((call) => call.result?.contentItems.some((item) => item.text.includes('"quiet"'))) &&
+      Date.now() - quietLoopStarted < 15_000 &&
+      fakeEntries().some((entry) => entry.method === "turn/interrupt" && entry.turnId === quietLoopRun.delivery.turnId),
+    { run: quietLoopRun.run, calls: quietLoopCalls.length, ms: Date.now() - quietLoopStarted },
   );
   const emptyRun = await settledRun(
     "Empty check",

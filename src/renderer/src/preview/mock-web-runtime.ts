@@ -77,8 +77,8 @@ export function mockWebRuntimeFor(mock: MockOpenBotControls, events: WebRuntimeE
         limit: 50,
         anchor: before ? { type: "before", cursor: before } : { type: "latest" },
       }),
-    conversationAround: (agentId, messageId) =>
-      agent.readConversationPage({ agentId, limit: 50, anchor: { type: "around", messageId } }),
+    conversationAround: (agentId, messageId, limit = 50) =>
+      agent.readConversationPage({ agentId, limit, anchor: { type: "around", messageId } }),
     markRead: (agentId, throughMessageId) => agent.markConversationRead({ agentId, throughMessageId }),
     markUnreadFrom: (agentId, fromMessageId) => agent.markConversationUnread({ agentId, fromMessageId }),
     conversationReads: () => agent.listConversationReads(),

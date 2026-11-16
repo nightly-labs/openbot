@@ -76,6 +76,11 @@ export interface AppServerRequest {
    * question that waits longer than this answers the call first and stays open (#6230).
    */
   detachAfterMs?: number;
+  /**
+   * In process only, never on the wire. A Codex subagent sent it, and OpenBot runs it in the chat and
+   * turn of the parent agent. Its call still waits in the subagent's own turn (#9727).
+   */
+  subagent?: true;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */

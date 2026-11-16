@@ -349,6 +349,13 @@ export const messages = {
   "mobile.server.settings.identityNotAllowed": "يمكن للمالك أو المسؤول فقط تغيير اسم الخادم وشعاره.",
   "mobile.server.settings.identityUnsupported": "حدّث OpenBot على هذا الخادم لتغيير اسمه وشعاره من هنا.",
   "mobile.server.settings.identityOffline": "اتصل بهذا الخادم لتغيير اسمه وشعاره.",
+  "mobile.server.settings.appearance": "الشكل واللون",
+  "mobile.server.settings.appearanceShape": "الشكل",
+  "mobile.server.settings.appearanceShapeOption": "الشكل {number}",
+  "mobile.server.settings.appearanceColor": "لون الخادم",
+  "mobile.server.settings.appearanceAutomatic": "تلقائي",
+  "mobile.server.settings.appearanceReset": "إعادة تعيين",
+  "mobile.server.settings.appearanceSaveFailed": "تعذّر حفظ شكل الخادم ولونه. أعد المحاولة.",
   "mobile.server.route.cropLogo": "قص الشعار",
   "mobile.server.members.remove": "إزالة العضو",
   "mobile.server.members.invitePeople": "دعوة أشخاص",
@@ -1183,6 +1190,8 @@ export const messages = {
     "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "mobile.server.connectors.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
   "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",

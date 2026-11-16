@@ -5,7 +5,8 @@ version: "3.7"
 services:
   app_proxy:
     environment:
-      APP_HOST: openbot_server_1
+      # <app id>_<service>_1, the container name that Umbrel gives the service.
+      APP_HOST: __APP_ID___server_1
       # The setup page of the container (src/main/server-setup-page.ts). Umbrel's login protects it.
       APP_PORT: 8080
 
