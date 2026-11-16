@@ -464,6 +464,8 @@ interface ActiveTurn {
   billingFailed: boolean;
   /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
   retrying: boolean;
+  /** The chat already told the user in this turn that the sandbox cannot start a command (#9909). */
+  sandboxBlockedWarned: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
   /**
@@ -1735,6 +1737,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       balanceSpent: false,
       billingFailed: false,
       retrying: false,
+      sandboxBlockedWarned: false,
       unprompted,
       prompt: null,
       promptStarted: false,
@@ -2151,6 +2154,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (!call) continue;
         turn.toolCalls.delete(toolCallId);
         this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError ? text : null);
+        if (
+          isError &&
+          call.name === "Bash" &&
+          runtime.config.workspaceOnly &&
+          !turn.sandboxBlockedWarned &&
+          CLAUDE_SANDBOX_BLOCKED.test(text)
+        ) {
+          turn.sandboxBlockedWarned = true;
+          queryLogger.warn("The Claude sandbox cannot start the agent's commands.");
+          this.emit("notification", {
+            method: "warning",
+            params: { threadId: runtime.id, turnId: turn.id, message: sourceText("error.agent.claudeSandboxBlocked") },
+          });
+        }
       }
       return;
     }
@@ -3032,6 +3049,16 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
  * Claude Code 2.1.309 is behind a feature gate (#4094).
  */
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
+
+/**
+ * The start of a Bash command that the Claude sandbox could not set up, because the host does not
+ * let it make a user namespace with capabilities. Claude's `apply-seccomp` helper stops before the
+ * command runs, for example with `apply-seccomp: write /proc/self/setgroups (nested userns is
+ * capability-restricted; caller must provide CAP_SYS_ADMIN): Permission denied` under Ubuntu's
+ * AppArmor profile `bwrap-userns-restrict` (Claude Code 2.1.323, #9909). The CLI's own start-up check
+ * passes on such a host, so the turn continues and the user saw only failed commands.
+ */
+const CLAUDE_SANDBOX_BLOCKED = /^apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)/mu;
 
 /**
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the

@@ -151,6 +151,8 @@ export const messages = defineMessages("error.agent", {
     "Workspace only needs the Codex sandbox, which Codex cannot start on this computer, so the agent's commands fail. Choose Ask first or Full access in the agent settings.",
   "error.agent.claudeSandboxUnavailable":
     "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
+  "error.agent.claudeSandboxBlocked":
+    "Workspace only needs the Claude sandbox, which Claude cannot start on this computer, so the agent's commands fail. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
     "Screen capture is off for this agent. The user can turn on Computer Use in the agent settings.",
   "error.agent.screenCaptureUnavailable": "Screen capture is not available on this computer.",

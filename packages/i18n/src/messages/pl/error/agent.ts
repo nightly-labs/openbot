@@ -153,6 +153,8 @@ export const messages = {
     "Tryb „Tylko obszar roboczy” wymaga piaskownicy Codex, której Codex nie może uruchomić na tym komputerze, więc polecenia agenta kończą się błędem. Wybierz „Najpierw pytaj” lub „Pełny dostęp” w ustawieniach agenta.",
   "error.agent.claudeSandboxUnavailable":
     "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze: {reason}. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
+  "error.agent.claudeSandboxBlocked":
+    "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze, więc polecenia agenta kończą się błędem. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
   "error.agent.screenCaptureOff":
     "Przechwytywanie ekranu jest wyłączone dla tego agenta. Użytkownik może włączyć Sterowanie komputerem w ustawieniach agenta.",
   "error.agent.screenCaptureUnavailable": "Przechwytywanie ekranu nie jest dostępne na tym komputerze.",

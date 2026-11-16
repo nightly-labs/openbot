@@ -313,7 +313,8 @@ installs the packages in `packages.txt`, copies the release to `/opt/OpenBot/app
 scripts, the AppArmor profile and the units. It writes `self` to `/opt/OpenBot/hosted/mode` and
 links `/usr/local/bin/openbot`.
 
-On Ubuntu 26.04, the install also adds one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
+When Ubuntu's `bwrap-userns-restrict` profile is loaded (the default on Ubuntu 26.04), the install
+and each start of OpenBot add one rule to `/etc/apparmor.d/local/bwrap-userns-restrict`:
 `priority=1 allow pix /** -> &bwrap,`. The Ubuntu profile of `/usr/bin/bwrap` removes all
 capabilities from the programs that `bwrap` starts, and the Claude sandbox ("Workspace only") needs
 `CAP_SYS_ADMIN` there. With the rule, those programs keep the profile of `bwrap`, for all users of
