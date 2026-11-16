@@ -176,6 +176,7 @@ export const messages = {
   "mobile.chat.composer.send": "إرسال الرسالة",
   "mobile.chat.composer.stop": "إيقاف {name}",
   "mobile.chat.composer.dictate": "إملاء رسالة",
+  "mobile.chat.composer.voiceSettings": "إعدادات الصوت",
   "mobile.chat.composer.stopDictation": "إيقاف الإملاء",
   "mobile.chat.composer.mention": "الإشارة إلى {name}",
   "mobile.chat.composer.skills": "المهارات",

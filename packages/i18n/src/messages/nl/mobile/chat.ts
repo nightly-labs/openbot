@@ -154,6 +154,7 @@ export const messages = {
   "mobile.chat.composer.send": "Verstuur bericht",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dicteer bericht",
+  "mobile.chat.composer.voiceSettings": "Steminstellingen",
   "mobile.chat.composer.stopDictation": "Stop dicteren",
   "mobile.chat.composer.mention": "Noem {name}",
   "mobile.chat.composer.skills": "Vaardigheden",
