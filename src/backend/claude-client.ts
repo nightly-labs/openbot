@@ -1907,6 +1907,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const error = runtime.stderr.addTo(caught);
       const activeTurn = runtime.activeTurn;
       if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
+      // A query with no sandbox for its Workspace only setting fails on its own thread, not on Claude:
+      // the other agents keep their queries, and the stop does not count as a failed start (#9925).
+      // The close waits for this consumer, so it runs in the client's scope.
+      if (CLAUDE_SANDBOX_UNAVAILABLE.test(String(error))) {
+        queryLogger.warn("Claude cannot start its sandbox for a Workspace only thread.", {
+          threadId: runtime.id,
+          error: redactText(String(error)),
+        });
+        yield* runtime.config.persistSession
+          ? this.#threads.releaseNow(runtime)
+          : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
+        return;
+      }
       this.#fail(error instanceof Error ? error : new Error(String(error)));
     }
   });
