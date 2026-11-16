@@ -3021,13 +3021,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   // ACP cannot identify final text while streaming. A later step boundary assigns its phase.
   // Antigravity also publishes provisional answer text because its prompt can wait on background work.
-  #completeMessage(thread: AcpThread, turn: AcpTurn, phase: "commentary" | "final_answer"): void {
+  #completeMessage(
+    thread: AcpThread,
+    turn: AcpTurn,
+    phase: "commentary" | "final_answer",
+    failureReport = false,
+  ): void {
     if (phase === "final_answer") {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
     }
     if (!turn.text) return;
-    const item = { id: turn.itemId, type: "agentMessage", phase, text: turn.text } satisfies ThreadItem;
+    const item = {
+      id: turn.itemId,
+      type: "agentMessage",
+      phase,
+      text: turn.text,
+      ...(failureReport ? { failureReport: true } : {}),
+    } satisfies ThreadItem;
     turn.messages.push(item);
     this.emit("notification", { method: "item/completed", params: { threadId: thread.id, turnId: turn.id, item } });
     turn.text = "";
@@ -3567,9 +3578,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // A turn that started no subagent sends no change, so its thread entry is removed here.
     if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
     this.#dropStreamedCopy(turn);
-    // The end of the answer can hold the reason of the failure (`AcpFlavor.failureCause`).
+    // The answer of a failed turn can be the agent's report of the failure, with its reason
+    // (`AcpFlavor.failureCause`, `AcpFlavor.failureReport`).
     const answer = turn.text;
-    this.#completeMessage(thread, turn, "final_answer");
+    const failureReport = status === "failed" && this.#flavor.failureReport?.test(answer) === true;
+    this.#completeMessage(thread, turn, "final_answer", failureReport);
     if (status === "failed" && error) {
       const detail = this.#redact(failureText(error));
       const message =

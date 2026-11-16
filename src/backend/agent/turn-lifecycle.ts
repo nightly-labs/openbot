@@ -2692,11 +2692,13 @@ function noResultNote(
 
 /**
  * Whether running the turn again would repeat this item: a tool step, or answer text. Thinking and
- * the provider's echo of the user's message are not repeated work.
+ * the provider's echo of the user's message are not repeated work. Nor is an agent's own report of
+ * the failure that it sent as answer text (`AcpFlavor.failureReport`, #8293).
  */
-function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown; failureReport?: unknown }): boolean {
   if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
   if (item.type !== "agentMessage") return true;
+  if (item.failureReport === true) return false;
   return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
 }
 

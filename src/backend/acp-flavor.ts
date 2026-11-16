@@ -83,6 +83,11 @@ export interface AcpFlavor {
    */
   failureCause?(error: unknown, answer: string): CauseCode | null;
   /**
+   * The whole answer text of a failed turn that is the agent's own report of the failure, not text
+   * of the model. The turn did not start to answer, so a backup model can take it.
+   */
+  failureReport?: RegExp;
+  /**
    * The message of a turn that ended with no answer text, or `null` when that turn succeeds.
    * Absent: such a turn succeeds.
    */
@@ -414,23 +419,26 @@ const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
   timeout: "timeout",
 };
 
-/** The provider's own error in the failure summary of Hermes Agent: its last "Provider said:" line. */
-const HERMES_PROVIDER_SAID = /^[\s\S]*\n\nProvider said: ([^\n]+)/u;
+/**
+ * The failure summary of Hermes Agent: one paragraph of Hermes, then the provider's own error. Text
+ * of the model before it does not match, so a turn that started to answer keeps its cause.
+ */
+const HERMES_FAILURE_SUMMARY = /^\s*[^\n]+\n\nProvider said: ([^\n]+)/u;
 
 /**
  * The cause of a Hermes turn that failed with only `admitted_turn_failed`: a backup model did not
  * take a turn that a usage limit failed (#8293). A newer Hermes names the cause in
  * `data.failure_reason`, with its summary in `data.message`. Hermes Agent 0.23.1 sends the summary
- * only as the end of the answer text. The "Provider said:" line of the summary decides, so answer
- * text of the model does not. A failure with no such line, such as an MCP server that did not
- * connect, keeps its cause.
+ * only as the answer text, which then counted as an answer, so the turn did not run again
+ * (`AcpFlavor.failureReport`). The "Provider said:" line of the summary decides. A failure with no
+ * summary, such as an MCP server that did not connect, keeps its cause.
  */
 function hermesFailureCause(error: unknown, answer: string): CauseCode | null {
   if (!isRecord(error) || !isRecord(error.data) || error.data.details !== "admitted_turn_failed") return null;
   const { failure_reason: reason, message } = error.data;
   const named = typeof reason === "string" ? HERMES_FAILURE_REASONS[reason] : undefined;
   if (named) return named;
-  const said = HERMES_PROVIDER_SAID.exec(typeof message === "string" && message ? message : answer)?.[1];
+  const said = HERMES_FAILURE_SUMMARY.exec(typeof message === "string" && message ? message : answer)?.[1];
   const cause = said ? classifyFailure(said) : "unknown";
   return cause === "unknown" ? null : cause;
 }
@@ -464,6 +472,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   subagentTools: ["delegate_task"],
   turnFailure: hermesTurnFailure,
   failureCause: hermesFailureCause,
+  failureReport: HERMES_FAILURE_SUMMARY,
 };
 
 /**
@@ -591,6 +600,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
     failureCause: hermesFailureCause,
+    failureReport: HERMES_FAILURE_SUMMARY,
   },
 };
 
