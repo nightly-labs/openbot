@@ -78,17 +78,10 @@ function useVideoPoster(key: string, uri: string | null) {
     const player = createVideoPlayer(uri);
     player.muted = true;
     let released = false;
-    let started = false;
-    let frame: Promise<VideoThumbnail> | null = null;
-    // Android reads the frame from the file, not from the player, so it can start before the player loads.
-    const firstFrame = () =>
-      (frame ??= player
-        // An array, not one number: Android converts only an array to its list of times.
-        .generateThumbnailsAsync([0], { maxWidth: POSTER_PIXELS, maxHeight: POSTER_PIXELS })
-        .then(([thumbnail]) => {
-          if (!thumbnail) throw new Error("The video has no frame.");
-          return thumbnail;
-        }));
+    let frameStarted = false;
+    let lengthKnown = false;
+    let thumbnail: VideoThumbnail | null = null;
+    let duration: number | null = null;
     const release = () => {
       if (released) return;
       released = true;
@@ -103,32 +96,50 @@ function useVideoPoster(key: string, uri: string | null) {
       if (active) setMissing(true);
       release();
     };
-    const finish = (duration: number | null) => {
-      if (started || released) return;
-      started = true;
-      clearTimeout(timer);
-      void firstFrame()
-        .then((thumbnail) => {
-          const next = { thumbnail, duration };
-          rememberPoster(key, next);
-          if (active) setPoster(next);
-          release();
+    // The frame shows as soon as it is ready. The length joins it when the player gives it.
+    const show = () => {
+      if (!thumbnail) return;
+      const next = { thumbnail, duration };
+      rememberPoster(key, next);
+      if (active) setPoster(next);
+      if (lengthKnown) release();
+    };
+    const takeFrame = () => {
+      if (frameStarted || released) return;
+      frameStarted = true;
+      player
+        // An array, not one number: Android converts only an array to its list of times.
+        .generateThumbnailsAsync([0], { maxWidth: POSTER_PIXELS, maxHeight: POSTER_PIXELS })
+        .then(([frame]) => {
+          if (!frame) throw new Error("The video has no frame.");
+          thumbnail = frame;
+          show();
         })
         .catch((error: unknown) => fail(`no frame (${error instanceof Error ? error.message : "unknown error"})`));
     };
-    if (Platform.OS === "android") void firstFrame().catch(() => undefined);
+    /** The length in seconds, or 0 when the player gives none. */
+    const setLength = (seconds: number) => {
+      if (lengthKnown || released) return;
+      lengthKnown = true;
+      clearTimeout(timer);
+      duration = seconds > 0 ? seconds : null;
+      if (thumbnail) show();
+      else takeFrame();
+    };
+    // Android reads the frame from the file, not from the player, so it starts before the player loads.
+    if (Platform.OS === "android") takeFrame();
     // A file the device cannot decode gives no `sourceLoad`, only an error status.
     const status = player.addListener("statusChange", ({ status: next }) => {
       // On Android the frame still comes from the file, without the length.
       if (next === "error") {
-        if (Platform.OS === "android") finish(null);
+        if (Platform.OS === "android") setLength(0);
         else fail("the player cannot read the file");
-      } else if (next === "readyToPlay") finish(player.duration > 0 ? player.duration : null);
+      } else if (next === "readyToPlay") setLength(player.duration);
     });
-    const loaded = player.addListener("sourceLoad", ({ duration }) => finish(duration > 0 ? duration : null));
-    // A player with no view can stay unloaded on Android. The frame then still comes from the file, without the length.
+    const loaded = player.addListener("sourceLoad", (event) => setLength(event.duration));
+    // A player with no view can stay unloaded on Android. The frame then shows without the length.
     const timer = setTimeout(() => {
-      if (Platform.OS === "android") finish(null);
+      if (Platform.OS === "android") setLength(0);
       else fail(`the player did not load in ${POSTER_WAIT_MS} ms`);
     }, POSTER_WAIT_MS);
     return () => {
