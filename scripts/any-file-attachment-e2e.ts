@@ -110,6 +110,13 @@ async function run() {
       // same container and stays an image.
       { name: "IMG_0002.jpeg", mimeType: "image/jpeg", bytes: heif, kind: "file", stored: "application/octet-stream" },
       { name: "photo.avif", mimeType: "image/avif", bytes: avif, kind: "image", stored: "image/avif" },
+      {
+        name: "late-brand.avif",
+        mimeType: "image/avif",
+        bytes: ftyp("mif1", "miaf", "MA1B", "MA1A", "mif1", "avif"),
+        kind: "image",
+        stored: "image/avif",
+      },
     ];
     const uploaded = await Effect.runPromise(
       files.prepareDrafts(

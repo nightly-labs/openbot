@@ -743,8 +743,9 @@ function attachmentMetadata(
 }
 
 /** HEIF brands of a still photo. AVIF uses the same container and stays an image. */
-const HEIF_BRANDS = new Set(["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1"]);
-const HEIF_HEADER_BYTES = 32;
+const HEIF_BRANDS = new Set(["heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "mif2", "msf1"]);
+/** Enough for the `ftyp` box of a photo, so an AVIF brand late in the list is also found. */
+const HEIF_HEADER_BYTES = 64;
 
 /** Whether the first bytes are a HEIF photo: an `ftyp` box with a HEIF brand and no AVIF brand. */
 function isHeifImage(header: Uint8Array): boolean {
