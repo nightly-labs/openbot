@@ -762,10 +762,11 @@ export function ChatView({
     caption: liveCaption,
   } = live;
   const voiceName = voiceAgent?.name ?? target.name;
+  // Only an agent chat or a channel has a live conversation; see `useLiveConversation`. A boolean, because
+  // both objects change with each message, and the memo below must not.
+  const liveVoiceMissing = voiceMissing && (conversation !== null || liveChannel !== null);
   const composerVoice = useMemo((): ComposerVoice | undefined => {
-    // Only an agent chat or a channel has a live conversation; see `useLiveConversation`.
-    const missing = voiceMissing && (conversation !== null || liveChannel !== null);
-    if (!liveAvailable && !liveOpen && !missing) return undefined;
+    if (!liveAvailable && !liveOpen && !liveVoiceMissing) return undefined;
     const source = {
       available: liveAvailable,
       open: liveOpen,
@@ -806,9 +807,7 @@ export function ChatView({
     liveCaption,
     voiceName,
     usesGptLive,
-    voiceMissing,
-    conversation,
-    liveChannel,
+    liveVoiceMissing,
     t,
   ]);
   const voiceAgentId = voiceAgent?.id;
