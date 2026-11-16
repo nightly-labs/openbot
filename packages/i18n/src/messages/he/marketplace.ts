@@ -161,6 +161,7 @@ export const messages = {
     "ב-{host} פועלת גרסה ישנה של OpenBot שלא יכולה לחבר אפליקציות. עדכנו את OpenBot ב-{host}, או בקשו מהבעלים לעדכן אותה.",
   "marketplace.app.blocked.member":
     "רק בעלים או מנהל של {host} יכולים לחבר שם אפליקציות. בקשו מאחד מהם לחבר את {name}, או לעדכן את OpenBot ב-{host} כדי שחברים יוכלו לחבר אפליקציות.",
+  "marketplace.app.blocked.mac": "{name} פועל רק ב-Mac שמריץ את OpenBot.",
   "marketplace.app.connectAgain": "חיבור מחדש",
   "marketplace.app.automation.askOnInstall": "בקשת גישה מ-macOS בהתקנה",
   "marketplace.app.automation.title": "גישה לאפליקציות של Apple",

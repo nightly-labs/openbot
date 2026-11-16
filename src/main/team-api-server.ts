@@ -207,6 +207,7 @@ import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
 import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import { LIBRARY_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   type MachineAlertEvent,
@@ -2701,6 +2702,8 @@ export class TeamApiServer {
           if (capability === MODEL_STEERING_CAPABILITY) return this.#options.admin?.agentHost !== undefined;
           // A limit, not a feature: only a host that refuses Workspace only for these providers has it.
           if (capability === WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY) return !canConfineProcesses();
+          // A limit too: a host that is not a Mac cannot run an app that drives Apple apps.
+          if (capability === MAC_APPS_LIMIT_CAPABILITY) return process.platform !== "darwin";
           if (
             capability === BROWSER_PROFILES_CAPABILITY ||
             capability === BROWSER_PROFILES_EVENTS_CAPABILITY ||

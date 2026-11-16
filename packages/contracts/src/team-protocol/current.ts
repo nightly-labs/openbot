@@ -113,6 +113,7 @@ import { LIBRARY_FOLDERS_CAPABILITY } from "./library-folders-v1";
 import { LIVE_ACTIVITY_PUSH_CAPABILITY } from "./live-activity-push-v1";
 import { LIVE_VOICE_CAPABILITY } from "./live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY } from "./local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "./mac-apps-limit-v1";
 import { MACHINE_RESOURCES_CAPABILITY } from "./machine-resources-v1";
 import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
@@ -364,6 +365,7 @@ export {
   LIBRARY_FOLDERS_EVENTS_CAPABILITY,
   LIVE_ACTIVITY_PUSH_CAPABILITY,
   LOCAL_SERVERS_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
   MACHINE_RESOURCES_CAPABILITY,
   MCP_ACCESS_CAPABILITY,
   MCP_MANY_SERVERS_CAPABILITY,
@@ -695,6 +697,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CRM_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -944,7 +947,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
     capability !== CRM_CAPABILITY &&
     capability !== SETTING_LINK_MARKERS_CAPABILITY &&
-    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+    capability !== MAC_APPS_LIMIT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1070,6 +1074,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CRM_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  MAC_APPS_LIMIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1278,6 +1283,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
       capability !== CRM_CAPABILITY &&
       capability !== SETTING_LINK_MARKERS_CAPABILITY &&
-      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+      capability !== MAC_APPS_LIMIT_CAPABILITY,
   );
 }

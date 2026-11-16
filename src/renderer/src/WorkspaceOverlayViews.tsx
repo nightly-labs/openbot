@@ -1,5 +1,6 @@
 import type { AddedAgent, McpSignInState, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
@@ -86,7 +87,10 @@ export function MarketplaceOverlay(props: {
   calls?: MarketplaceCalls | undefined;
   /** The live view of `server`'s browser. Absent: this computer's bridge. */
   browserRuntime?: BrowserViewRuntime | undefined;
-  /** This computer runs macOS. The web client leaves it out: it cannot ask macOS for anything. */
+  /**
+   * This computer runs macOS; false on another system, absent while it is not known. The web client
+   * leaves it out: it cannot ask macOS for anything.
+   */
   macOS?: boolean | undefined;
   /**
    * One sentence about the managed runtime that starts a STDIO server, for the computer whose
@@ -141,6 +145,12 @@ export function MarketplaceOverlay(props: {
           open={true}
           calls={props.calls}
           macOS={props.macOS}
+          // This computer, or a joined server that says it is not a Mac (`mac-apps-limit-v1`).
+          macAppsUnavailable={
+            props.server?.kind === "remote"
+              ? serverSupportsCapability(props.server, MAC_APPS_LIMIT_CAPABILITY)
+              : props.macOS === false
+          }
           connectors={props.connectors}
           agents={manage() ? props.agents : []}
           activeAgentId={manage() ? props.activeAgentId : ""}

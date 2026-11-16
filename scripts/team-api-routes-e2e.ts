@@ -290,6 +290,7 @@ import {
   liveVoiceEvent,
 } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { LOCAL_SERVERS_CAPABILITY, LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-servers-v1";
+import { MAC_APPS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/mac-apps-limit-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
   MACHINE_RESOURCES_ROUTES,
@@ -3456,6 +3457,13 @@ try {
       list(field(hiddenWorkV9.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY) ===
         !canConfineProcesses() &&
         !list(field(hiddenWorkV8.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises mac-apps-limit to a protocol 9 peer only when it is not a Mac",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY) ===
+        (process.platform !== "darwin") &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY),
       { platform: process.platform, v9: summary(hiddenWorkV9) },
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });

@@ -166,6 +166,7 @@ export const messages = defineMessages("marketplace", {
     "{host} runs an older OpenBot version that cannot connect apps. Update OpenBot on {host}, or ask its owner to update it.",
   "marketplace.app.blocked.member":
     "Only an owner or admin of {host} can connect apps there. Ask one of them to connect {name}, or to update OpenBot on {host} so that members can connect apps.",
+  "marketplace.app.blocked.mac": "{name} works only on a Mac that runs OpenBot.",
   "marketplace.app.connectAgain": "Connect again",
   "marketplace.app.automation.askOnInstall": "Ask macOS for access at install",
   "marketplace.app.automation.title": "Access to Apple apps",
