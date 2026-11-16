@@ -8,8 +8,9 @@
 // create_agent accepts a model that the short list leaves out, that the
 // account and the backup models are written and read back, that an unknown account or model is a tool
 // failure that changes nothing, that a reset returns both to their defaults, that a model that only the
-// second account lists is listed and accepted for that account only (#6109), and that a delete stops the
-// process that the agent runs on with the second account.
+// second account lists is listed and accepted for that account only (#6109), that a delete stops the
+// process that the agent runs on with the second account, and that list_models names a saved custom
+// endpoint, where the user changes it and why it lists no model, without its base URL or key (#6471).
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -54,6 +55,7 @@ const { ProviderAccountStore } = await import("../src/backend/agent/provider-acc
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
+const { NO_PROVIDER_CREDENTIALS } = await import("../src/backend/provider-drivers");
 
 const CALL_MARK = "PROFILE-CALL";
 const MODEL = "gpt-6-luna";
@@ -68,6 +70,16 @@ const CATALOG = [
   { model: OTHER_MODEL, displayName: "GPT-6 Sol" },
 ];
 const ACCOUNT_CATALOG = [...CATALOG, { model: ACCOUNT_MODEL, displayName: "GPT-6.1 Sol" }];
+/** A saved custom endpoint. OpenCode, which runs it, is off, so it lists no model. */
+const ENDPOINT = {
+  id: "gateway",
+  name: "Gateway",
+  baseUrl: "http://127.0.0.1:9/v1",
+  apiKey: "sk-endpoint-secret-6471",
+  models: [{ id: "chat-model", name: "Chat Model" }],
+  headers: [],
+  harness: "opencode",
+} as const;
 
 /**
  * A Codex app-server with the methods that the service calls. A turn whose input has
@@ -192,6 +204,10 @@ interface ProfileToolBody {
   providerAccountId?: string;
   backupModels?: { automatic: boolean; order: ChoiceBody[] } | null;
   usageLimitReturn?: unknown;
+  customProviders?: {
+    settings: string;
+    endpoints: { id: string; name: string; provider: string; models: string[]; message?: string }[];
+  };
   /** update_agents: the number of agents that changed. */
   updated?: number;
 }
@@ -271,6 +287,7 @@ const agents = new AgentService({
   providerAccounts: accounts,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
+  credentials: { ...NO_PROVIDER_CREDENTIALS, customProviders: () => [ENDPOINT] },
 });
 
 const idle = (agentId: string) =>
@@ -369,6 +386,32 @@ try {
       !listed.text.includes(accountsRoot) &&
       !listed.text.includes(home),
     listed.text,
+  );
+  pass(
+    "A list_models call for another provider leaves the custom endpoints out",
+    listed.body?.customProviders === undefined,
+    listed.text,
+  );
+
+  // 1b. With no provider, list_models names the saved endpoint, where the user changes it, and why it
+  // lists no model now. The agent no longer tells the user that OpenBot cannot use such an API (#6471).
+  const listedAll = await callTool("list all models", coordinator.id, "list_models");
+  const endpointRow = listedAll.body?.customProviders?.endpoints[0];
+  pass(
+    "list_models names the saved custom endpoint and where the user changes it",
+    listedAll.body?.customProviders?.settings === "Server settings > Providers > Custom provider" &&
+      listedAll.body.customProviders.endpoints.length === 1 &&
+      endpointRow?.id === ENDPOINT.id &&
+      endpointRow.name === ENDPOINT.name &&
+      endpointRow.provider === "opencode" &&
+      endpointRow.models.length === 0 &&
+      endpointRow.message?.startsWith("OpenCode runs this endpoint and cannot run now.") === true,
+    listedAll.text,
+  );
+  pass(
+    "list_models has no base URL or key of a custom endpoint",
+    !listedAll.text.includes(ENDPOINT.baseUrl) && !listedAll.text.includes(ENDPOINT.apiKey),
+    listedAll.text,
   );
 
   // 2. update_profile sets the account and the backup models. Equal choices are kept once, and the
