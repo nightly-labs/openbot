@@ -61,10 +61,7 @@ export function createEmailCodeDelivery(
 ): EmailCodeDelivery | null {
   const senders = readEmailSenders(bindings);
   if (senders) {
-    return {
-      send: (message) =>
-        deliver(analytics, "sign_in_code", senders, withInboxReply(senders, prepareEmailCode(message))),
-    };
+    return { send: (message) => deliver(analytics, "sign_in_code", senders, prepareEmailCode(message)) };
   }
 
   const webhookUrl = bindings.EMAIL_DELIVERY_WEBHOOK_URL?.trim();
@@ -96,12 +93,7 @@ export function createTeamInviteEmailDelivery(
   analytics: AccountAnalytics,
 ): TeamInviteEmailDelivery | null {
   const senders = readEmailSenders(bindings);
-  return senders
-    ? {
-        send: (message) =>
-          deliver(analytics, "team_invite", senders, withInboxReply(senders, prepareTeamInvite(message))),
-      }
-    : null;
+  return senders ? { send: (message) => deliver(analytics, "team_invite", senders, prepareTeamInvite(message)) } : null;
 }
 
 export function createContactMessageDelivery(
@@ -121,12 +113,7 @@ export function createWelcomeEmailDelivery(
   analytics: AccountAnalytics,
 ): WelcomeEmailDelivery | null {
   const senders = readEmailSenders(bindings);
-  return senders
-    ? {
-        send: (message) =>
-          deliver(analytics, "welcome", senders, withInboxReply(senders, prepareWelcomeEmail(message))),
-      }
-    : null;
+  return senders ? { send: (message) => deliver(analytics, "welcome", senders, prepareWelcomeEmail(message)) } : null;
 }
 
 /**
@@ -146,10 +133,7 @@ export function createLicenseEmailDelivery(
     smtp: { ...senders.smtp, from },
     inbox: bindings.EMAIL_LICENSE_REPLY_TO?.trim() || from,
   };
-  return {
-    send: (message) =>
-      deliver(analytics, "license", licenseSenders, withInboxReply(licenseSenders, prepareLicenseEmail(message))),
-  };
+  return { send: (message) => deliver(analytics, "license", licenseSenders, prepareLicenseEmail(message)) };
 }
 
 /**
@@ -171,7 +155,7 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
     analytics.track(null, { name: "email_sent", kind, result: "failed" });
     return yield* prepared.failure;
   }
-  const message = prepared.success;
+  const message = withInboxReply(senders, prepared.success);
   const startedAt = Date.now();
   const smtp = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
   if (Result.isSuccess(smtp)) return;
@@ -285,13 +269,13 @@ function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null 
   return { smtp, fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
 }
 
-/** Sends a reply to the team's inbox when the sender is another address, such as a no-reply one. */
-function withInboxReply<E>(
-  senders: EmailSenders,
-  prepare: Effect.Effect<PreparedEmailMessage, E>,
-): Effect.Effect<PreparedEmailMessage, E> {
-  if (senders.inbox === senders.smtp.from) return prepare;
-  return Effect.map(prepare, (message) => ({ ...message, replyTo: senders.inbox }));
+/**
+ * Sends a reply to the team's inbox when the sender is another address, such as a no-reply one. A
+ * message with its own reply address, such as a contact form message, keeps it.
+ */
+function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {
+  if (message.replyTo || senders.inbox === senders.smtp.from) return message;
+  return { ...message, replyTo: senders.inbox };
 }
 
 function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null {

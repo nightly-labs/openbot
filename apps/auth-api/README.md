@@ -167,8 +167,10 @@ EMAIL_LICENSE_REPLY_TO=licenses@openbot.run
 
 Sign-in codes, invitations and welcome emails go from `EMAIL_FROM`, the `no_reply@openbot.run`
 mailbox, with `EMAIL_REPLY_TO` in `Reply-To`, so a reply goes to the team's inbox. An empty
-`EMAIL_REPLY_TO` uses `EMAIL_FROM` and adds no `Reply-To`. `EMAIL_SMTP_PASSWORD` is the app password of
-the `EMAIL_SMTP_USERNAME` mailbox.
+`EMAIL_REPLY_TO` uses `EMAIL_FROM` and adds no `Reply-To`. `EMAIL_SMTP_PASSWORD` is the password of
+the `EMAIL_SMTP_USERNAME` mailbox. The CI deploy reads it from the `EMAIL_SMTP_PASSWORD` secret of the
+`cloudflare-production` GitHub Environment, not from `.env.production`: when the mailbox changes,
+change both, at the time of the merge.
 
 License emails (the first payment, a failed renewal payment, and the end of a license) go from
 `EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
