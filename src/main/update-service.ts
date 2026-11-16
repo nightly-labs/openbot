@@ -688,9 +688,6 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           if (this.#checkRequest) yield* Deferred.await(this.#checkRequest).pipe(Effect.catch(() => Effect.void));
           if (this.#installGeneration !== generation) return;
           this.#installHandedOver = true;
-          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
-          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
-          // from `autoRunAppAfterInstall`, which is also `true`.
           if (this.#options.platform === "darwin" && this.#options.handoverPath) {
             yield* writeUpdateHandover(this.#options.handoverPath, this.#options.currentVersion, Date.now()).pipe(
               Effect.catch((error) =>
@@ -698,6 +695,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
               ),
             );
           }
+          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
+          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
+          // from `autoRunAppAfterInstall`, which is also `true`.
           yield* updateSync(() => this.#updater.quitAndInstall(true, true));
           this.#armPhaseTimer();
         }),

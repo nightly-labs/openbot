@@ -19,9 +19,10 @@ import { Effect, Option, Schema } from "effect";
 export const UPDATE_HANDOVER_FILE = "update-handover.json";
 const SHIPIT_JOB_LABEL = "app.openbot.desktop.ShipIt";
 /** Squirrel stages the ZIP before the quit (up to `UPDATE_INSTALL_TIMEOUT_MS`), then ShipIt runs. A backstop only. */
-const HANDOVER_MAX_AGE_MS = 15 * 60 * 1_000;
+const HANDOVER_MAX_AGE_MS = 10 * 60 * 1_000;
 const LOG_TAIL_BYTES = 64 * 1024;
-// Lines that Squirrel.Mac's ShipIt-main.m writes to its standard error.
+// Lines that Squirrel.Mac's ShipIt-main.m writes to its standard error. "and launching:" comes before
+// ShipIt opens the app, and its `atexit` block writes "ShipIt quitting".
 const SHIPIT_INSTALL_REQUEST = "Detected this as an install request";
 const SHIPIT_LAUNCHING_APP = "and launching:";
 const SHIPIT_QUITTING = "ShipIt quitting";
@@ -34,63 +35,66 @@ export function macShipItDirectory(): string {
 const UpdateHandover = Schema.Struct({ fromVersion: Schema.String, startedAt: Schema.Number });
 const decodeHandover = Schema.decodeUnknownOption(Schema.fromJsonString(UpdateHandover));
 
-export const writeUpdateHandover = (path: string, fromVersion: string, startedAt: number) =>
-  Effect.try(() => writeFileSync(path, JSON.stringify({ fromVersion, startedAt }), { mode: 0o600 }));
+export const writeUpdateHandover = Effect.fn("writeUpdateHandover")(function* (
+  path: string,
+  fromVersion: string,
+  startedAt: number,
+) {
+  yield* Effect.try(() => writeFileSync(path, JSON.stringify({ fromVersion, startedAt }), { mode: 0o600 }));
+});
 
-/** Synchronous: it runs before the single-instance lock, and a launch that it stops must end at once. */
-export function shipItInstallInProgress(options: {
+/**
+ * Synchronous I/O: it runs before the single-instance lock, and a launch that it stops must end at once.
+ * A record of this version that is still young stays, also when ShipIt has not started yet, so a later
+ * launch in the same install is still stopped. Any other record is removed.
+ */
+export const shipItInstallInProgress = Effect.fn("shipItInstallInProgress")(function* (options: {
   userDataPath: string;
   shipItDirectory: string;
   currentVersion: string;
   now: number;
-}): boolean {
+}) {
   const recordPath = join(options.userDataPath, UPDATE_HANDOVER_FILE);
-  const record = Effect.runSync(
-    Effect.try(() => readFileSync(recordPath, "utf8")).pipe(
-      Effect.map(decodeHandover),
-      Effect.orElseSucceed(() => Option.none<typeof UpdateHandover.Type>()),
-    ),
+  const record = yield* Effect.try(() => readFileSync(recordPath, "utf8")).pipe(
+    Effect.map(decodeHandover),
+    Effect.orElseSucceed(() => Option.none<typeof UpdateHandover.Type>()),
   );
-  const inProgress =
+  const current =
     Option.isSome(record) &&
     record.value.fromVersion === options.currentVersion &&
     options.now >= record.value.startedAt &&
-    options.now - record.value.startedAt < HANDOVER_MAX_AGE_MS &&
-    shipItLogShowsInstall(join(options.shipItDirectory, "ShipIt_stderr.log"), record.value.startedAt) &&
-    shipItJobRuns();
-  if (!inProgress) Effect.runSync(Effect.try(() => rmSync(recordPath, { force: true })).pipe(Effect.ignore));
-  return inProgress;
-}
+    options.now - record.value.startedAt < HANDOVER_MAX_AGE_MS;
+  if (!current) {
+    yield* Effect.try(() => rmSync(recordPath, { force: true })).pipe(Effect.ignore);
+    return false;
+  }
+  const logPath = join(options.shipItDirectory, "ShipIt_stderr.log");
+  return (yield* shipItLogShowsInstall(logPath, record.value.startedAt)) && (yield* shipItJobRuns());
+});
 
 /** The last ShipIt run wrote to its log after the handover, and has not opened the app or quit since. */
-function shipItLogShowsInstall(logPath: string, handoverAt: number): boolean {
-  return Effect.runSync(
-    Effect.try(() => {
-      const { mtimeMs, size } = statSync(logPath);
-      if (mtimeMs < handoverAt) return false;
-      const length = Math.min(size, LOG_TAIL_BYTES);
-      const buffer = Buffer.alloc(length);
-      const fd = openSync(logPath, "r");
-      try {
-        readSync(fd, buffer, 0, length, size - length);
-      } finally {
-        closeSync(fd);
-      }
-      const tail = buffer.toString("utf8");
-      const start = tail.lastIndexOf(SHIPIT_INSTALL_REQUEST);
-      if (start === -1) return false;
-      const run = tail.slice(start);
-      return !run.includes(SHIPIT_LAUNCHING_APP) && !run.includes(SHIPIT_QUITTING);
-    }).pipe(Effect.orElseSucceed(() => false)),
-  );
-}
+const shipItLogShowsInstall = (logPath: string, handoverAt: number) =>
+  Effect.try(() => {
+    const { mtimeMs, size } = statSync(logPath);
+    if (mtimeMs < handoverAt) return false;
+    const length = Math.min(size, LOG_TAIL_BYTES);
+    const buffer = Buffer.alloc(length);
+    const fd = openSync(logPath, "r");
+    try {
+      readSync(fd, buffer, 0, length, size - length);
+    } finally {
+      closeSync(fd);
+    }
+    const tail = buffer.toString("utf8");
+    const start = tail.lastIndexOf(SHIPIT_INSTALL_REQUEST);
+    if (start === -1) return false;
+    const run = tail.slice(start);
+    return !run.includes(SHIPIT_LAUNCHING_APP) && !run.includes(SHIPIT_QUITTING);
+  }).pipe(Effect.orElseSucceed(() => false));
 
 /** A ShipIt that stopped without its last log line, for example at a restart of the Mac, has no process. */
-function shipItJobRuns(): boolean {
-  return Effect.runSync(
-    Effect.try(() => {
-      const result = spawnSync("/bin/launchctl", ["list", SHIPIT_JOB_LABEL], { encoding: "utf8", timeout: 2_000 });
-      return result.status === 0 && /"PID" = \d+;/u.test(result.stdout);
-    }).pipe(Effect.orElseSucceed(() => false)),
-  );
-}
+const shipItJobRuns = () =>
+  Effect.try(() => {
+    const result = spawnSync("/bin/launchctl", ["list", SHIPIT_JOB_LABEL], { encoding: "utf8", timeout: 2_000 });
+    return result.status === 0 && /"PID" = \d+;/u.test(result.stdout);
+  }).pipe(Effect.orElseSucceed(() => false));

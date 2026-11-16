@@ -342,12 +342,14 @@ if (
   process.platform === "darwin" &&
   app.isPackaged &&
   !(serverMode || hostedServer || localServerChildEnvironment) &&
-  shipItInstallInProgress({
-    userDataPath: app.getPath("userData"),
-    shipItDirectory: macShipItDirectory(),
-    currentVersion: app.getVersion(),
-    now: Date.now(),
-  })
+  Effect.runSync(
+    shipItInstallInProgress({
+      userDataPath: app.getPath("userData"),
+      shipItDirectory: macShipItDirectory(),
+      currentVersion: app.getVersion(),
+      now: Date.now(),
+    }),
+  )
 )
   process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
