@@ -101,6 +101,13 @@ export interface DeliveryPromptSources {
    * session. That session closed with the run, so the answer gives the task again (#6457).
    */
   answeredRoutine?: AnsweredRoutine | null;
+  /**
+   * A steer that the provider shows to its model as a message from the user, next to the result of
+   * the running tool. Claude Code does this. With the header and rules of a teammate prompt, Claude
+   * Haiku took the message for text in the tool result and ignored it, mostly when two came in one
+   * result. A teammate message then goes in plain words (`userFramedTeammateText`).
+   */
+  steerFramedAsUser?: boolean;
 }
 
 /** A routine run's name and task, for the answer to a request that the run sent. */
@@ -183,6 +190,8 @@ const ROUTINE_TASK_START = "--- routine task ---";
 const ROUTINE_TASK_END = "--- end of routine task ---";
 const ATTACHED_FILES_HEADER = "\n\nAttached local files:\n";
 const NO_ANSWER_FROM = "No answer comes from ";
+const RESULT_FORMAT =
+  "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.";
 const NO_ANSWER_REASON = ": the request to them ended before they answered. Do not wait for them.";
 /** The first words of a provider handoff. */
 export const HANDOFF_START = "Continue this OpenBot conversation.";
@@ -257,6 +266,39 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
   return messages;
 }
 
+/**
+ * A teammate message in a steer that the provider frames as the user's (`steerFramedAsUser`). It
+ * has no header or `Message ID` line: the steer's uuid is the delivery ID, so the history import
+ * finds the delivery without `teammatePrompts`. The developer instructions still say that a teammate
+ * message is collaborator input. An answer to a routine run's request keeps the full prompt, which
+ * gives the routine task.
+ */
+function userFramedTeammateText(
+  delivery: QueueDelivery,
+  senderAgentId: string,
+  agentNames: ReadonlyMap<string, string>,
+  displayText: string,
+): string {
+  const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
+  const teammate = `Your teammate ${senderName} (${senderAgentId})`;
+  if (delivery.replyToMessageId)
+    return [
+      `${teammate} answered your message through OpenBot:`,
+      displayText,
+      "Give the result to the user naturally, starting with the teammate's name. Send the teammate no acknowledgement; when the status is partial or blocked, finish or follow up the open part yourself.",
+    ].join("\n");
+  if (delivery.expectsReply === false)
+    return [
+      `${teammate} sent you this message through OpenBot. It needs no answer: send no reply or acknowledgement.`,
+      displayText,
+    ].join("\n");
+  return [
+    `${teammate} sent you this request through OpenBot:`,
+    displayText,
+    `Do it, then send the result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false. ${RESULT_FORMAT}`,
+  ].join("\n");
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -329,6 +371,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
+  } else if (
+    delivery.sender.kind === "agent" &&
+    sources.steerFramedAsUser &&
+    !(delivery.replyToMessageId && sources.answeredRoutine)
+  ) {
+    text = userFramedTeammateText(delivery, delivery.sender.agentId, agentNames, displayText);
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
@@ -350,7 +398,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : [
             `Finish the whole request, then send a concise result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false.`,
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
-            "Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>. When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.",
+            `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
           ];
     text = [

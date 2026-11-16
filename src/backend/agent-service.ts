@@ -1134,6 +1134,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             ? Effect.void
             : this.#endpoints.moveAccountAgentsOffUnlistedModels(provider, accountId),
         onProviderResumed: (provider) => {
+          this.#drain.providerResumed(provider);
           for (const agent of this.#store.list()) {
             if (providerForAgent(agent) === provider) this.#drain.scheduleDrain(agent.id);
           }
@@ -2073,6 +2074,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     ),
                   )
               : undefined,
+            undefined,
+            undefined,
+            false,
+            // agentSetup: another agent wrote the first message, so its turn can end with no answer.
+            true,
           ).pipe(toToolOperationFailed),
         updateAgent: (input, initiatingAgentId) =>
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
@@ -2502,6 +2508,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
     agentId: string;
     text: string;
+    /** Stored files that the message carries, such as the pictures of a workflow's image steps. */
+    sourcePaths?: readonly string[];
     idempotencyKey: string;
   }): Effect.Effect<string, AgentLifecycleFailed> {
     return this.#routines
@@ -3328,6 +3336,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     profileOperationId?: string,
     sender?: ConversationMessageSender,
     welcome = false,
+    // Another agent made this agent with `create_agent`, so the first turn can end with no answer.
+    agentSetup = false,
   ) {
     const initialMessage = yield* lifecycleStep("validate initial message", () => {
       const text = input.initialMessage.trim();
@@ -3360,6 +3370,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           undefined,
           undefined,
           welcome,
+          agentSetup,
         );
         return this.#store.list().find((candidate) => candidate.id === agent.id) ?? agent;
       }).pipe(
@@ -6706,6 +6717,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     timezone: string | undefined,
     idempotencyKey?: string,
     welcome = false,
+    agentSetup = false,
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6748,6 +6760,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         replyToMessageId: input.replyToMessageId ?? null,
         ...(idempotencyKey ? { idempotencyKey } : {}),
         ...(welcome ? { welcome } : {}),
+        ...(agentSetup ? { agentSetup } : {}),
       })
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause })),
@@ -6891,20 +6904,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * An answer, a requested result or a notice from another agent follows the recipient's
-   * busy-message mode, as a message from the user does. A request does not: it waits for a turn of
-   * its own in each mode (`MailboxStore.chatTurnSteer`). Only a message for the recipient's own chat
-   * can go into its running turn. The person did not send it, so a message that cannot steer waits
-   * with no reason on its row. With `wait`, the sender learns if the message joined the running
-   * turn, or why it waits (#6475).
+   * A message from another agent, a request included, follows the recipient's busy-message mode, as
+   * a message from the user does (`MailboxStore.joinsChatTurn`). Only a message for the recipient's
+   * own chat can go into its running turn. The person did not send it, so a message that cannot
+   * steer waits with no reason on its row. With `wait`, the sender learns if the message joined the
+   * running turn, or why it waits (#6475).
    */
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.list().find((item) => item.id === recipientAgentId);
     // A recipient with no loaded chat runs no turn, so its page is not read for this.
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    const steer = this.#mailbox.chatTurnSteer(deliveryId);
-    if (!agent || !snapshot || !steer) return Effect.succeed(null);
-    if (steer === "own-turn") return Effect.succeed(this.#turnToSteer(agent.id, null, snapshot) ? "own-turn" : null);
+    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 

@@ -227,6 +227,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const resolution = untrack(browserTakeoverResolution);
     if (resolution && resolution.messageMarker !== messageMarker) setBrowserTakeoverResolution(null);
   });
+  /**
+   * The tab that the takeover card opened in the full view. The view covers the chat, so when the step on
+   * that tab ends there, the chat shows again with the page beside it (#9979). A view that the user opened
+   * on their own stays open.
+   */
+  let takeoverFullViewTabId: string | null = null;
+  createEffect(
+    () => deps.panels.activeRightPanel() === "browser-expanded",
+    (expanded) => {
+      if (!expanded) takeoverFullViewTabId = null;
+    },
+  );
   const respondToBrowserTakeover = async (decision: "complete" | "cancel") => {
     const request = deps.props.browserTakeover;
     if (!request) return false;
@@ -254,6 +266,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         : undefined,
     );
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
+    // The user can be on another tab of the full view by now. Then that page stays.
+    if (
+      completed &&
+      takeoverFullViewTabId === request.tabId &&
+      activeBrowserTab()?.id === request.tabId &&
+      deps.panels.activeRightPanel() === "browser-expanded"
+    )
+      deps.panels.setActiveRightPanel("browser");
     return completed;
   };
   // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
@@ -288,6 +308,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (browserTabs().some((entry) => entry.id === tab.id)) {
       if (deps.props.activeBrowserTabId !== tab.id) activateBrowserTab(tab.id);
       deps.panels.setActiveRightPanel("browser-expanded");
+      takeoverFullViewTabId = tab.id;
       return;
     }
     // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat

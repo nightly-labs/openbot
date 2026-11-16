@@ -559,6 +559,7 @@ const windowHolder = createMainWindowHolder();
 
 // Destructured so every `service.on("event", forwardX)` registration below reads as it always has.
 const {
+  closeChatNotifications,
   forwardAgentEvent,
   forwardWorkflowNotice,
   forwardBrowserDisplayState,
@@ -1169,6 +1170,7 @@ function registerIpcHandlers({
       }),
       openExternal: openLink,
       modelVisibility,
+      closeChatNotifications,
     }),
     ...browserIpcHandlers({ browserPictureInPicture, browser, remoteServers, browserView, localSignIn }),
   });

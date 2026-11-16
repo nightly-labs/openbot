@@ -160,6 +160,8 @@ export const messages = {
   "provider.picker.selectEffort": "选择强度",
   "provider.picker.custom": "自定义",
   "provider.picker.cliReady": "{cli} 已就绪",
+  "provider.picker.modelSourceProvider": "使用 {cli} 设置中的 {name}",
+  "provider.picker.modelSourceCatalog": "使用 {cli} 设置中的模型列表",
   "provider.status.signInRequired": "需要登录",
   "provider.model.free": "免费",
   "provider.model.new": "新",

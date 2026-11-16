@@ -22,6 +22,7 @@ import type {
   HostedServerSleep,
   HostedServerStart,
   MemberChatColorEntry,
+  ProviderModelSourceEntry,
   QueueSnapshot,
   RespondToApprovalInput,
   RespondToPromptInput,
@@ -30,7 +31,7 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { canAdministerServer, openExchangesOutside } from "@openbot/contracts/ipc";
+import { canAdministerServer, openExchangesOutside, withModelSources } from "@openbot/contracts/ipc";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
@@ -451,6 +452,31 @@ export function createWebWorkspace(
       );
     }
   }
+  /**
+   * The last status event and model sources of the open host. A released status event carries no
+   * source (#9956), so each one goes out with the last sources of that host, and the sources are read
+   * again after it. A changed source sends the status again.
+   */
+  let hostStatus: AgentStatus | null = null;
+  let hostSources: { hostId: string | null; sources: ProviderModelSourceEntry[] } = { hostId: null, sources: [] };
+  let sourceRead = 0;
+  function applyHostStatus(status: AgentStatus): void {
+    hostStatus = status;
+    const current = hostId;
+    hooks.onStatus?.(withModelSources(status, hostSources.hostId === current ? hostSources.sources : []));
+    if (!runtime.modelSources) return;
+    const read = ++sourceRead;
+    runtime
+      .modelSources()
+      .then((sources) => {
+        if (disposed || read !== sourceRead || current !== hostId || !hostStatus) return;
+        const previous = hostSources.hostId === current ? hostSources.sources : [];
+        hostSources = { hostId: current, sources };
+        if (JSON.stringify(previous) !== JSON.stringify(sources))
+          hooks.onStatus?.(withModelSources(hostStatus, sources));
+      })
+      .catch(() => undefined);
+  }
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -582,7 +608,7 @@ export function createWebWorkspace(
           });
         // The host sends it at connect and after each change (`host-appearance-v1`).
         if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
-        if (event.type === "status") hooks.onStatus?.(event.status);
+        if (event.type === "status") applyHostStatus(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
@@ -904,6 +905,7 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
   const turnId = existing.turnId ?? imported.turnId;
+  const imageGeneration = mergeImageGenerationInfo(existing.imageGeneration, imported.imageGeneration);
   return {
     ...existing,
     ...imported,
@@ -916,6 +918,7 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.delivery === undefined && existing.delivery ? { delivery: existing.delivery } : {}),
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
+    ...(imageGeneration ? { imageGeneration } : {}),
   };
 }
 

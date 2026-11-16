@@ -218,6 +218,19 @@ function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): b
 }
 
 /**
+ * OpenCode 2.2.5 to 2.3.0 can keep a media part of the chat as a local file or as text that is not
+ * image data, and then refuses to build each later request of the session, its compaction too. Each
+ * later turn failed in milliseconds, and a channel showed thousands of failures (#9994). Only a new
+ * session, given the OpenBot transcript, recovers.
+ */
+function isUnsendableOpenCodeMedia(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "opencode" &&
+    /\bMedia strings must be base64\b|\bLocal file references must be read with Media\.file\b/i.test(message)
+  );
+}
+
+/**
  * Muse stores a failed MCP startup audit in the session, and `session/resume` cannot clear it. Each
  * later turn of that session fails in milliseconds, even after the failed server is removed
  * (#2369). Only a new session, given the OpenBot transcript, recovers.
@@ -259,7 +272,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
     return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
-  if (isImageUnreadableDiagnostic(message))
+  if (isImageUnreadableDiagnostic(message) || isUnsendableOpenCodeMedia(provider, message))
     return sourceText("error.provider.imageUnreadable", { provider: providerLabel(provider) });
   if (isRequestBodyLimitDiagnostic(message))
     return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });

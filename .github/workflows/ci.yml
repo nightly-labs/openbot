@@ -989,6 +989,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:cline-free-models
 
+      - name: Run the Cline plan limit failover E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:cline-plan-limit-failover
+
       - name: Run the recorded provider transcripts E2E test
         if: ${{ !cancelled() }}
         run: bun run test:provider-transcript-replay
@@ -1033,6 +1037,7 @@ jobs:
             .openbot-build/cursor-stream-closed-e2e/
             .openbot-build/cursor-model-set-e2e/
             .openbot-build/cline-free-models-e2e/
+            .openbot-build/cline-plan-limit-failover-e2e/
             .openbot-build/provider-transcript-replay-e2e/
           if-no-files-found: ignore
 

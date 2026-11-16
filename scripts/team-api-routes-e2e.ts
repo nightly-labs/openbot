@@ -342,6 +342,10 @@ import {
   PROVIDER_ENVIRONMENT_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import {
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USAGE_RESET_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
@@ -832,6 +836,9 @@ const ACCOUNT_KEY = "key_e2e_accepted";
 let antigravityPool: ProviderAccountPool | undefined;
 /** The account whose code sign-in runs on the fake host. */
 let codeSignInAccount: string | null = null;
+/** The status that the agents fake gives, while a case sets one. Unset, the status read fails. */
+let agentStatus: AgentStatus | null = null;
+
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -1099,6 +1106,7 @@ const fakeAgents: TeamApiAgents = {
   preferredProvider: () => "claude",
   newAgentProvider: () => "claude",
   getStatus: () => {
+    if (agentStatus) return agentStatus;
     throw new Error(`The status backend failed with ${FAKE_SECRET}.`);
   },
   listAgents: () => agents,
@@ -5404,6 +5412,77 @@ try {
         isDeepStrictEqual(steering.body, { models: [{ provider: "acp", id: "steering-agent/default" }] }),
       summary(steering),
     );
+  }
+
+  // ---- Model sources (provider-model-source-v1) ----
+  {
+    const sourceCapabilities = [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, PROVIDER_MODEL_SOURCE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-model-source-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_MODEL_SOURCE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_MODEL_SOURCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY],
+    });
+    check(
+      "the model sources route without the capability gets 400 providerModelSourceUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providerModelSourceUnsupported")),
+      summary(unsupported),
+    );
+    // Codex runs on Ollama by its settings, OpenCode lists a model file, and Claude has its own list.
+    agentStatus = {
+      ...NO_STATUS,
+      providers: [
+        {
+          id: "codex",
+          state: "available",
+          version: "0.169.0",
+          message: null,
+          modelSource: { kind: "provider", name: "Ollama" },
+        },
+        { id: "claude", state: "available", version: "2.1.0", message: null },
+        { id: "opencode", state: "available", version: "2.3.0", message: null, modelSource: { kind: "catalog" } },
+      ],
+    };
+    try {
+      const sources = await call("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {
+        token: bobToken,
+        json: {},
+        capabilities: sourceCapabilities,
+      });
+      const expected = {
+        sources: [
+          { provider: "codex", source: { kind: "provider", name: "Ollama" } },
+          { provider: "opencode", source: { kind: "catalog" } },
+        ],
+      };
+      check(
+        "a member reads where each provider's models come from, only for the providers that give a source",
+        sources.status === 200 && isDeepStrictEqual(sources.body, expected),
+        summary(sources),
+      );
+      // A released client reads the status with no source: only this capability gives it.
+      const released = await call("GET", TEAM_API_ROUTES.agents.status, {
+        token: bobToken,
+        capabilities: sourceCapabilities,
+      });
+      check(
+        "the released status does not carry modelSource",
+        released.status === 200 &&
+          list(field(released.body, "providers")).length === 3 &&
+          list(field(released.body, "providers")).every((row) => field(row, "modelSource") === undefined),
+        summary(released),
+      );
+    } finally {
+      agentStatus = null;
+    }
   }
 
   // ---- Compact now (context-compact-v1) ----

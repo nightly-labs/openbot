@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "./input-limits";
-import { type AvatarHue, isAvatarHue } from "./ipc-agent-identity";
+import { type AvatarColor, type AvatarHue, isAvatarColor, isAvatarHue } from "./ipc-agent-identity";
 import type { AgentApprovalKind, AgentApprovalPermissions } from "./ipc-approvals";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "./runtime-values";
 
@@ -77,6 +77,8 @@ export interface DynamicIslandAgentIdentity {
   name: string;
   avatarSeed: string;
   avatarHue: AvatarHue | null;
+  /** The exact colour. `avatarHue` is then only its nearest hue, so the island must draw this one. */
+  avatarColor?: AvatarColor | null;
   avatarUrl: string | null;
 }
 
@@ -318,6 +320,7 @@ function isAgentIdentity(value: unknown): value is DynamicIslandAgentIdentity {
     isShortString(value.name, 120) &&
     isShortString(value.avatarSeed, 160) &&
     (value.avatarHue === null || isAvatarHue(value.avatarHue)) &&
+    (value.avatarColor === undefined || value.avatarColor === null || isAvatarColor(value.avatarColor)) &&
     (value.avatarUrl === null || isShortString(value.avatarUrl, 2_048))
   );
 }
