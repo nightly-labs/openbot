@@ -1452,6 +1452,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           });
         else yield* this.#steerByPrompt(thread, turn, blocks);
         turn.lastActivityAt = Date.now();
+        // A steer can start a new model request, and its first retry gets the whole limit again.
+        turn.modelRetries = 0;
         return yield* providerSync(() => decoder({ turnId: turn.id }));
       }
       case "turn/interrupt": {

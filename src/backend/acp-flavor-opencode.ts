@@ -1,4 +1,4 @@
-import { RequestError } from "@agentclientprotocol/sdk";
+import { RequestError, type SessionUpdate } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
@@ -13,6 +13,21 @@ import {
 import { isRecord } from "./protocol";
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
+/**
+ * OpenCode 2.2.5 to 2.3.0 wait 300 s for a model's response headers, the stall limit, then retry.
+ * They report each retry as `_meta["opencode/retry"]` on a `session_info_update`, and a failed
+ * retried attempt as the same key with null (#9941). Only a retry after a timeout counts here. A
+ * retry after a rate limit, a provider failure or a lost network comes sooner, and each such notice
+ * keeps the turn open, as any update does.
+ */
+function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return false;
+  if (!("opencode/retry" in update._meta)) return false;
+  const retry = update._meta["opencode/retry"];
+  if (retry === null) return true;
+  return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
+}
+
 function isOpenCodeStarting(error: unknown): boolean {
   return (
     error instanceof RequestError &&
@@ -252,11 +267,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
   // added one more copy of the instructions to a long chat (#7171).
   reopenKeepsPrompts: true,
-  // OpenCode 2.2.7 waits 300 s for a model's response headers, the stall limit, then retries. It
-  // reports each retry as `_meta["opencode/retry"]` on a `session_info_update`, and a failed retried
-  // attempt as the same key with null (#9941).
-  modelRetryUpdate: (update) =>
-    update.sessionUpdate === "session_info_update" && isRecord(update._meta) && "opencode/retry" in update._meta,
+  modelRetryUpdate: isOpenCodeTimeoutRetry,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A

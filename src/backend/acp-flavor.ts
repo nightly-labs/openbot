@@ -286,9 +286,9 @@ export interface AcpFlavor {
    */
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
   /**
-   * Whether a session update reports a retry of a model request: a retry that the agent schedules, or
-   * the end of a retried attempt. The agent waits for a model as long as OpenBot's stall limit, then
-   * retries, so OpenBot waited exactly as long and ended each such turn as the retry started (#9941).
+   * Whether a session update reports a retry of a model request that timed out: a retry that the agent
+   * schedules, or the end of a retried attempt. The agent waits for a model as long as OpenBot's stall
+   * limit, then retries, so OpenBot waited exactly as long and ended each such turn as the retry started (#9941).
    * For such an agent OpenBot waits `ACP_MODEL_RETRY_GRACE` times the limit, and only the first retry
    * notice after the last output counts as activity: one retry gets the whole limit, not all of them.
    */

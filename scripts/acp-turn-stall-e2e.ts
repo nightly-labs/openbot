@@ -3,8 +3,8 @@
 // agent (`provider-fakes/agents/stall.ts`) and a short stall limit:
 // - a silent prompt fails with the stall message, and the next turn opens the session again;
 // - OpenCode retries a model request after a wait as long as the stall limit: a turn whose retry
-//   notice comes just after that limit goes on, and one whose retries get no answer fails without
-//   waiting for each retry (#9941);
+//   notice comes just after that limit goes on, one whose timeout retries get no answer fails without
+//   waiting for each retry, and rate limit retries keep a turn open (#9941);
 // - a stall on a custom endpoint's model names the endpoint, not OpenCode (#3234);
 // - a custom endpoint with a longer limit of its own is not ended at the agent's limit (#3823);
 // - an open tool call longer than the limit is not a stall;
@@ -34,8 +34,12 @@ const STALL_MS = 1_500;
 const TOOL_MS = STALL_MS * 3;
 const CHUNK_GAP_MS = 500;
 const FIRST_UPDATE_MS = 1_000;
+/** The stall limit of the retry cases: long enough for a margin of 400 ms around each notice. */
+const RETRY_STALL_MS = 4_000;
 /** OpenCode's wait before a model retry, just over the plain stall limit, as OpenBot measures it. */
-const RETRY_MS = STALL_MS * 1.1;
+const RETRY_MS = RETRY_STALL_MS * 1.1;
+/** The time between rate limit retries: shorter than the limit, so each notice keeps the turn open. */
+const RATE_RETRY_MS = RETRY_STALL_MS * 0.75;
 
 interface LogEntry {
   event: string;
@@ -49,6 +53,7 @@ interface Report {
   afterStall?: { status: string | null; sessionRestored: boolean };
   retry?: { status: string | null; reply: string; elapsedMs: number };
   retryForever?: { status: string | null; error: string | null; elapsedMs: number };
+  rateLimitRetry?: { status: string | null; reply: string; elapsedMs: number };
   endpointStall?: { status: string | null; error: string | null };
   slowEndpoint?: { status: string | null; reply: string; elapsedMs: number };
   tool?: { status: string | null; elapsedMs: number };
@@ -74,6 +79,7 @@ async function open(
   env: Readonly<Record<string, string>> = {},
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null,
   firstUpdateMs?: number,
+  turnStallMs = STALL_MS,
 ): Promise<AgentClient> {
   const executable = join(root, provider, "bin", provider);
   await installFakeAgent(executable, "stall", {
@@ -88,7 +94,7 @@ async function open(
     argv: ["acp"],
     env: {},
     signInMessage: "Sign in to the fake agent.",
-    turnStallMs: STALL_MS,
+    turnStallMs,
     ...(customEndpoint ? { customEndpoint } : {}),
     ...(firstUpdateMs ? { firstUpdateMs } : {}),
   });
@@ -152,11 +158,19 @@ try {
 
   // OpenCode retries a model that did not answer after a wait as long as the stall limit. The turn
   // waits for that retry, and the retried model's answer completes it.
-  const retrying = await open("opencode", OPENCODE_ACP_FLAVOR, join(root, "retry.jsonl"), {
-    FAKE_RETRY_MS: String(RETRY_MS),
-  });
+  const retrying = await open(
+    "opencode",
+    OPENCODE_ACP_FLAVOR,
+    join(root, "retry.jsonl"),
+    { FAKE_RETRY_MS: String(RETRY_MS), FAKE_RATE_RETRY_MS: String(RATE_RETRY_MS) },
+    undefined,
+    undefined,
+    RETRY_STALL_MS,
+  );
   const retryThread = await startThread(retrying, { cwd: workspace });
-  const retried = await timed(() => runTurn(retrying, retryThread, { text: "retry-once", timeoutMs: STALL_MS * 10 }));
+  const retried = await timed(() =>
+    runTurn(retrying, retryThread, { text: "retry-once", timeoutMs: RETRY_STALL_MS * 10 }),
+  );
   report.retry = { status: retried.value.status, reply: retried.value.reply, elapsedMs: retried.elapsedMs };
   assert.equal(retried.value.status, "completed", "A turn whose model retry comes after the plain limit goes on.");
   assert.equal(retried.value.reply, "ok", "The retried model's answer is the turn's answer.");
@@ -164,7 +178,7 @@ try {
 
   // Retries that never get an answer fail the turn after the first retry's limit, not after the last retry.
   const forever = await timed(() =>
-    runTurn(retrying, retryThread, { text: "retry-forever", timeoutMs: STALL_MS * 20 }),
+    runTurn(retrying, retryThread, { text: "retry-forever", timeoutMs: RETRY_STALL_MS * 20 }),
   );
   report.retryForever = { status: forever.value.status, error: forever.value.error, elapsedMs: forever.elapsedMs };
   assert.equal(forever.value.status, "failed", "Retries with no answer fail the turn.");
@@ -175,6 +189,22 @@ try {
   );
   assert.ok(forever.elapsedMs >= RETRY_MS * 2, "The first retry got the whole limit.");
   assert.ok(forever.elapsedMs < RETRY_MS * 4, "Later retries did not keep the turn open.");
+
+  // Retries after a rate limit come sooner than the limit, and each one keeps the turn open as before.
+  const rateLimited = await timed(() =>
+    runTurn(retrying, retryThread, { text: "retry-rate-limit", timeoutMs: RETRY_STALL_MS * 10 }),
+  );
+  report.rateLimitRetry = {
+    status: rateLimited.value.status,
+    reply: rateLimited.value.reply,
+    elapsedMs: rateLimited.elapsedMs,
+  };
+  assert.equal(rateLimited.value.status, "completed", "Rate limit retries keep the turn open.");
+  assert.equal(rateLimited.value.reply, "ok", "The answer after the rate limit retries is the turn's answer.");
+  assert.ok(
+    rateLimited.elapsedMs >= RATE_RETRY_MS + RETRY_STALL_MS * 1.2,
+    "The turn went on after the first retry's limit.",
+  );
 
   // OpenCode serves a custom endpoint, and the user knows that turn by the endpoint's name. The fake
   // agent's one model stands for an endpoint model here.

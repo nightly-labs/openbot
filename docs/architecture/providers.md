@@ -799,9 +799,10 @@ times for a timeout. It reports each retry as a `session_info_update` with
 `_meta["opencode/retry"]`, and a failed retried attempt as the same key with null. OpenBot ended
 the turn as stalled at the moment when the retry started (#9941). `modelRetryUpdate` of
 `OPENCODE_ACP_FLAVOR` makes OpenBot wait 1.2 times the limit, so the retry notice comes first. Only
-the first retry notice after other output counts as activity: a model that also does not answer
-the retry fails the turn after about 11 minutes, with the stall message, and not after all four
-attempts with OpenCode's raw error text.
+the first timeout retry notice after other output or a steer counts as activity: a model that also
+does not answer the retry fails the turn after about 11 minutes, with the stall message, and not
+after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
+failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
 
 #### Text of two steps
 
