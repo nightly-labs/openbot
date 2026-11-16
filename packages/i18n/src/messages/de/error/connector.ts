@@ -25,6 +25,10 @@ export const messages = {
     "Dein 1Password-Konto erlaubt dir nicht, den geteilten Tresor oder ein Dienstkonto zu erstellen. Bitte einen Inhaber oder Administrator des Kontos um diese Berechtigung, oder bitte ihn um ein Dienstkonto-Token und klicke auf „Token verwenden“.",
   "error.connector.onePasswordUnexpected": "1Password hat eine unerwartete Antwort gesendet: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password hat das Dienstkonto-Token nicht akzeptiert.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot konnte keine Verbindung zu 1Password herstellen. Prüfe die Internetverbindung und versuche es erneut.",
+  "error.connector.onePasswordRateLimited":
+    "1Password hat zu viele Anfragen erhalten. Warte ein paar Minuten und versuche es erneut.",
   "error.connector.onePasswordNoVault":
     "Das Dienstkonto kann keinen Tresor lesen. Gib ihm Zugriff auf einen Tresor und versuche es erneut.",
   "error.connector.onePasswordFileUnreadable": "Die 1Password-Verbindungsdatei ist nicht lesbar.",

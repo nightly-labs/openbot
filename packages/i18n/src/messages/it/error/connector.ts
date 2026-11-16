@@ -25,6 +25,9 @@ export const messages = {
     "Il tuo account 1Password non ti permette di creare il vault condiviso o un service account. Chiedi questo permesso a un proprietario o a un amministratore dell'account, oppure chiedigli un token del service account e fai clic su «Usa token».",
   "error.connector.onePasswordUnexpected": "1Password ha inviato una risposta inattesa: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password non ha accettato il token del service account.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot non è riuscito a connettersi a 1Password. Controlla la connessione a internet e riprova.",
+  "error.connector.onePasswordRateLimited": "1Password ha ricevuto troppe richieste. Attendi qualche minuto e riprova.",
   "error.connector.onePasswordNoVault":
     "Il service account non può leggere nessun vault. Dagli accesso a un vault e riprova.",
   "error.connector.onePasswordFileUnreadable": "Il file di connessione a 1Password non è leggibile.",

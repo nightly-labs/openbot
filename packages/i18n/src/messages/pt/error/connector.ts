@@ -25,6 +25,10 @@ export const messages = {
     "Sua conta do 1Password não permite que você crie o cofre compartilhado nem uma conta de serviço. Peça essa permissão a um proprietário ou administrador da conta, ou peça um token de conta de serviço e clique em “Usar token”.",
   "error.connector.onePasswordUnexpected": "O 1Password enviou uma resposta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "O 1Password não aceitou o token da conta de serviço.",
+  "error.connector.onePasswordUnreachable":
+    "O OpenBot não conseguiu se conectar ao 1Password. Verifique a conexão com a internet e tente novamente.",
+  "error.connector.onePasswordRateLimited":
+    "O 1Password recebeu solicitações demais. Aguarde alguns minutos e tente novamente.",
   "error.connector.onePasswordNoVault":
     "A conta de serviço não consegue ler nenhum cofre. Dê acesso a um cofre e tente novamente.",
   "error.connector.onePasswordFileUnreadable": "O arquivo de conexão com o 1Password não pode ser lido.",
