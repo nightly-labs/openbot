@@ -770,6 +770,28 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="subagent"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="memory-changes"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="settings"
         options={{
           contentStyle: { backgroundColor: sheetBackground },

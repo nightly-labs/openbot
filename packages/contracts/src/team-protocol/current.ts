@@ -114,6 +114,7 @@ import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { TEAM_MEMORY_CHANGES_CAPABILITY } from "./memory-changes-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
@@ -407,6 +408,7 @@ export {
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -656,6 +658,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -891,7 +894,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
     capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
     capability !== HOST_APPEARANCE_CAPABILITY &&
-    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+    capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+    capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1003,6 +1007,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1197,6 +1202,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_PENDING_RUNTIME_CAPABILITY &&
       capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
       capability !== HOST_APPEARANCE_CAPABILITY &&
-      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+      capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
+      capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
   );
 }

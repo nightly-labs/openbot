@@ -483,6 +483,19 @@ export function ChatView({
     },
     [thinkingAgentId],
   );
+  const openMemoryChanges = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
+  const openSubagents = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId) router.push({ pathname: "/subagent", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
   const queuedMessageIds = useMemo(
     () =>
       new Set(
@@ -1240,6 +1253,8 @@ export function ChatView({
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}
               onOpenTurn={thinkingAgentId ? openTurn : undefined}
+              onOpenSubagents={thinkingAgentId ? openSubagents : undefined}
+              onOpenMemoryChanges={thinkingAgentId ? openMemoryChanges : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}

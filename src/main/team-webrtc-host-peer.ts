@@ -22,6 +22,7 @@ import {
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -817,6 +818,7 @@ export class TeamWebRtcHostPeer {
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
             videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
             usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
             agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
           };
@@ -916,6 +918,7 @@ export class TeamWebRtcHostPeer {
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
                 videoGeneration: this.#peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+                memoryChanges: this.#peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
               }),
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))
