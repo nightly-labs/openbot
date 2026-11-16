@@ -269,6 +269,10 @@ export const messages = defineMessages("error.backend", {
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
