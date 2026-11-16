@@ -48,15 +48,19 @@ export function ServerTasksScreen() {
   const title = agent ? t("mobile.server.threads.agentTitle", { name: agent.name }) : t("mobile.app.route.threads");
   const canStart = Boolean(server) && online && supported && agents.length > 0;
 
+  // One agent's page opens from that agent's chat, with its thread menu or its swipe. A thread from it
+  // takes the place of the page, so Back from the thread returns to the agent's chat, as a thread from
+  // the menu does. The page of all agents stays under the thread.
+  const show = agentId ? router.replace : router.push;
   // One agent's page starts a thread with that agent, as its thread menu does: its first message
   // starts it. The page of all agents asks which agent starts it.
   const newTask = () => {
     void haptics.impact("soft");
-    if (agentId) router.push({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: DRAFT_THREAD_ID } });
+    if (agentId) show({ pathname: "/task/[taskId]", params: { serverId, agentId, taskId: DRAFT_THREAD_ID } });
     else router.push({ pathname: "/new-task", params: { serverId } });
   };
   const open = (task: AgentTask) =>
-    router.push({ pathname: "/task/[taskId]", params: { serverId, agentId: task.agentId, taskId: task.id } });
+    show({ pathname: "/task/[taskId]", params: { serverId, agentId: task.agentId, taskId: task.id } });
 
   const note = !server
     ? t("mobile.server.unavailable")

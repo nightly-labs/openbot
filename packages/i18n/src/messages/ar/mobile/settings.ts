@@ -240,6 +240,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "تنزيل الملفات الكبيرة تلقائيًا",
   "mobile.settings.conversations.largeFilesFooter":
     "الصور والفيديوهات والملفات الصوتية الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيلها مباشرةً حتى {large}. قد يستهلك هذا الكثير من بيانات الجوال.",
+  "mobile.settings.conversations.swipeLeft": "السحب لليسار في محادثة وكيل",
+  "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
+  "mobile.settings.conversations.swipeThreads": "السلاسل",
+  "mobile.settings.conversations.swipeBrowser": "المتصفح",
+  "mobile.settings.conversations.swipeFooter":
+    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب على رسالة لا يزال يرد عليها.",
+  "mobile.settings.conversations.pullInfo": "السحب لأعلى للمعلومات",
+  "mobile.settings.conversations.pullInfoFooter":
+    "اسحب لأعلى بعد آخر رسالة في محادثة أو قناة أو سلسلة ثم أفلت لفتح معلوماتها.",
   "mobile.settings.conversations.fullQualityPhotos": "إرسال الصور بالجودة الكاملة",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "عند إيقاف هذا الخيار، يرسل التطبيق نسخة أصغر من كل صورة، حتى 2048 بكسل في الضلع الأطول. تصل أسرع على اتصال بطيء. فعّل هذا الخيار لإرسال الصورة الأصلية.",

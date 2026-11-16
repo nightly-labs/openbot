@@ -581,6 +581,8 @@ export const messages = {
   "mobile.chat.threads.new": "Nowy wątek",
   "mobile.chat.threads.all": "Wszystkie wątki",
   "mobile.chat.threads.agentInfo": "Informacje o agencie",
+  "mobile.chat.pullInfo.agent": "Informacje o agencie",
+  "mobile.chat.pullInfo.channel": "Informacje o kanale",
   "mobile.chat.threads.draftNote": "Pierwsza wiadomość rozpoczyna nowy wątek. Główny czat z {name} się nie zmienia.",
   "mobile.chat.threads.draftPlaceholder": "Nowy wątek z {name}",
   "mobile.chat.threads.rename": "Zmień nazwę",

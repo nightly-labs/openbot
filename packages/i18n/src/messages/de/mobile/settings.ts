@@ -236,6 +236,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
+  "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
+  "mobile.settings.conversations.swipeThreads": "Threads",
+  "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeFooter":
+    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Ein Wischen auf einer Nachricht antwortet weiter darauf.",
+  "mobile.settings.conversations.pullInfo": "Nach oben ziehen für Info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Ziehe in einem Chat, Kanal oder Thread über die letzte Nachricht hinaus nach oben und lass los, um die Info zu öffnen.",
   "mobile.settings.conversations.fullQualityPhotos": "Fotos in voller Qualität senden",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Wenn dies aus ist, sendet die App eine kleinere Kopie jedes Fotos, bis zu 2048 Pixel an der langen Seite. Sie kommt bei einer langsamen Verbindung schneller an. Schalte dies ein, um das Originalfoto zu senden.",

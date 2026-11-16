@@ -530,6 +530,8 @@ export const messages = {
   "mobile.chat.threads.new": "Yeni mesaj dizisi",
   "mobile.chat.threads.all": "Tüm mesaj dizileri",
   "mobile.chat.threads.agentInfo": "Ajan bilgisi",
+  "mobile.chat.pullInfo.agent": "Ajan bilgisi",
+  "mobile.chat.pullInfo.channel": "Kanal bilgisi",
   "mobile.chat.threads.draftNote": "İlk mesajınız yeni bir mesaj dizisi başlatır. {name} ile ana sohbet değişmez.",
   "mobile.chat.threads.draftPlaceholder": "{name} ile yeni mesaj dizisi",
   "mobile.chat.threads.rename": "Yeniden adlandır",

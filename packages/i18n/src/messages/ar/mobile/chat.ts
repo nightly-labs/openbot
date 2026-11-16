@@ -594,6 +594,8 @@ export const messages = {
   "mobile.chat.threads.new": "سلسلة جديدة",
   "mobile.chat.threads.all": "كل السلاسل",
   "mobile.chat.threads.agentInfo": "معلومات الوكيل",
+  "mobile.chat.pullInfo.agent": "معلومات الوكيل",
+  "mobile.chat.pullInfo.channel": "معلومات القناة",
   "mobile.chat.threads.draftNote": "تبدأ رسالتك الأولى سلسلة جديدة. لا تتغير الدردشة الرئيسية مع {name}.",
   "mobile.chat.threads.draftPlaceholder": "سلسلة جديدة مع {name}",
   "mobile.chat.threads.rename": "إعادة التسمية",

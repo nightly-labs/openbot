@@ -228,6 +228,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "큰 파일 자동 다운로드",
   "mobile.settings.conversations.largeFilesFooter":
     "{small}보다 큰 이미지, 동영상, 오디오는 탭할 때만 다운로드돼요. 켜면 {large}까지 바로 다운로드해요. 모바일 데이터를 많이 쓸 수 있어요.",
+  "mobile.settings.conversations.swipeLeft": "에이전트 채팅에서 왼쪽으로 스와이프",
+  "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
+  "mobile.settings.conversations.swipeThreads": "스레드",
+  "mobile.settings.conversations.swipeBrowser": "브라우저",
+  "mobile.settings.conversations.swipeFooter":
+    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지 위에서 스와이프하면 계속 답장합니다.",
+  "mobile.settings.conversations.pullInfo": "위로 당겨 정보 보기",
+  "mobile.settings.conversations.pullInfoFooter":
+    "채팅, 채널 또는 스레드에서 최신 메시지 너머로 위로 당긴 뒤 놓으면 정보가 열립니다.",
   "mobile.settings.conversations.fullQualityPhotos": "사진을 원본 화질로 보내기",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "끄면 앱이 각 사진의 작은 사본(긴 쪽 최대 2048픽셀)을 보냅니다. 느린 연결에서도 더 빨리 도착합니다. 원본 사진을 보내려면 켜세요.",

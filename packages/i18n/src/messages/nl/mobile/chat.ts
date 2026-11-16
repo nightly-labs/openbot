@@ -502,6 +502,8 @@ export const messages = {
   "mobile.chat.threads.new": "Nieuwe thread",
   "mobile.chat.threads.all": "Alle threads",
   "mobile.chat.threads.agentInfo": "Agentinfo",
+  "mobile.chat.pullInfo.agent": "Agentinfo",
+  "mobile.chat.pullInfo.channel": "Kanaalinfo",
   "mobile.chat.threads.draftNote": "Je eerste bericht start een nieuwe thread. De hoofdchat met {name} verandert niet.",
   "mobile.chat.threads.draftPlaceholder": "Nieuwe thread met {name}",
   "mobile.chat.threads.rename": "Hernoemen",

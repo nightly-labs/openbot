@@ -517,6 +517,8 @@ export const messages = {
   "mobile.chat.threads.new": "새 스레드",
   "mobile.chat.threads.all": "모든 스레드",
   "mobile.chat.threads.agentInfo": "에이전트 정보",
+  "mobile.chat.pullInfo.agent": "에이전트 정보",
+  "mobile.chat.pullInfo.channel": "채널 정보",
   "mobile.chat.threads.draftNote": "첫 메시지로 새 스레드가 시작됩니다. {name}와의 메인 채팅은 바뀌지 않습니다.",
   "mobile.chat.threads.draftPlaceholder": "{name}와 새 스레드",
   "mobile.chat.threads.rename": "이름 변경",

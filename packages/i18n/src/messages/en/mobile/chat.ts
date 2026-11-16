@@ -522,6 +522,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.threads.new": "New thread",
   "mobile.chat.threads.all": "All threads",
   "mobile.chat.threads.agentInfo": "Agent info",
+  "mobile.chat.pullInfo.agent": "Agent info",
+  "mobile.chat.pullInfo.channel": "Channel info",
   "mobile.chat.threads.draftNote": "Your first message starts a new thread. The main chat with {name} does not change.",
   "mobile.chat.threads.draftPlaceholder": "New thread with {name}",
   "mobile.chat.threads.rename": "Rename",

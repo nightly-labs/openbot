@@ -532,6 +532,8 @@ export const messages = {
   "mobile.chat.threads.new": "Novo tópico",
   "mobile.chat.threads.all": "Todos os tópicos",
   "mobile.chat.threads.agentInfo": "Info do agente",
+  "mobile.chat.pullInfo.agent": "Info do agente",
+  "mobile.chat.pullInfo.channel": "Info do canal",
   "mobile.chat.threads.draftNote": "Sua primeira mensagem inicia um novo tópico. O chat principal com {name} não muda.",
   "mobile.chat.threads.draftPlaceholder": "Novo tópico com {name}",
   "mobile.chat.threads.rename": "Renomear",

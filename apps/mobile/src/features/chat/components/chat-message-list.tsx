@@ -33,11 +33,13 @@ import {
   type ViewInstance,
   type ViewStyle,
 } from "react-native";
+import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
   FadeInDown,
   Keyframe,
   ReduceMotion,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
@@ -109,6 +111,7 @@ import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } fro
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
+import { type ChatListGesture, type ChatSwipeGesture, ChatSwipeGestureContext } from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
 import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
@@ -257,6 +260,20 @@ function ChatBubble({
 
 interface ChatMessageListProps {
   target: ChatTarget;
+  /**
+   * The swipe away from Back of an agent's chat. A bubble that replies with a swipe in the same
+   * direction blocks it.
+   */
+  swipeGesture?: ChatSwipeGesture;
+  /**
+   * The gesture of the whole list, with the swipe in it. Keep it for the life of the list: a change
+   * mounts the list again.
+   */
+  listGesture?: ChatListGesture;
+  /** Android: how far the pull past the latest message moves the list up, as iOS bounces it. */
+  pullShift?: SharedValue<number>;
+  /** Android: the pan of the pull past the latest message. A hook gesture, on its own detector. */
+  pullGesture?: PanGesture;
   /** False while the chat opens on Android: the list has only its latest rows until the chat is in place. */
   rowsShown: boolean;
   /** Something covers the list, such as the voice mode, so screen readers skip it. */
@@ -1394,6 +1411,10 @@ export const ChatMessageList = memo(function ChatMessageList({
   focusMessageId = null,
   focusUnread = false,
   onFocusPlaced,
+  swipeGesture,
+  listGesture,
+  pullShift,
+  pullGesture,
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
@@ -1584,7 +1605,10 @@ export const ChatMessageList = memo(function ChatMessageList({
       tailIndex >= 0 ? { anchorIndex: tailIndex, anchorOffset: header, onReady: motion.onAnchorReady } : undefined,
     [tailIndex, header, motion.onAnchorReady],
   );
-  const sharedValues = useMemo(() => ({ scrollOffset: motion.scrollOffset }), [motion.scrollOffset]);
+  const sharedValues = useMemo(
+    () => ({ scrollOffset: motion.scrollOffset, isAtEnd: motion.atEnd }),
+    [motion.scrollOffset, motion.atEnd],
+  );
   const screen = useWindowDimensions();
   const columnWidth = useColumnWidth();
   const insets = useSafeAreaInsets();
@@ -2111,11 +2135,12 @@ export const ChatMessageList = memo(function ChatMessageList({
     </>
   );
 
-  return (
+  const pullStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -(pullShift?.get() ?? 0) }] }));
+  const body = (
     <Animated.View
       onTouchStart={selectingMessageId ? onTouchStart : undefined}
       onTouchEnd={selectingMessageId ? onTouchEnd : undefined}
-      style={[{ flex: 1 }, historyState === "ready" ? motion.historyStyle : undefined]}
+      style={[{ flex: 1 }, historyState === "ready" ? motion.historyStyle : undefined, pullStyle]}
       accessibilityElementsHidden={accessibilityHidden || (historyState === "ready" && !motion.historyVisible)}
       importantForAccessibility={
         !accessibilityHidden && (historyState !== "ready" || motion.historyVisible) ? "auto" : "no-hide-descendants"
@@ -2128,9 +2153,11 @@ export const ChatMessageList = memo(function ChatMessageList({
             <RoutineGroupsContext value={routineGroupsState}>
               <KeptOpenContext value={replySession.keptOpen}>
                 <RowContext value={rowContext}>
-                  <ListHeaderContext value={listHeader}>
-                    <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                  </ListHeaderContext>
+                  <ChatSwipeGestureContext value={swipeGesture ?? null}>
+                    <ListHeaderContext value={listHeader}>
+                      <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                    </ListHeaderContext>
+                  </ChatSwipeGestureContext>
                 </RowContext>
               </KeptOpenContext>
             </RoutineGroupsContext>
@@ -2139,5 +2166,15 @@ export const ChatMessageList = memo(function ChatMessageList({
       </ChatImageViewerProvider>
       {messageFiles.sheet}
     </Animated.View>
+  );
+  // The pull is a hook gesture and the swipe an older one: each has its own detector. The detector of
+  // a hook gesture takes no space of its own.
+  const pulled = pullGesture ? <GestureDetector gesture={pullGesture}>{body}</GestureDetector> : body;
+  return listGesture ? (
+    <GestureDetector gesture={listGesture}>
+      <View style={{ flex: 1 }}>{pulled}</View>
+    </GestureDetector>
+  ) : (
+    pulled
   );
 }, sameListProps);
