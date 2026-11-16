@@ -273,6 +273,7 @@ import {
   type WebHostState,
   type WebHostTabMessage,
 } from "./web-host-lock";
+import { closeWebChatNotifications } from "./web-notifications";
 
 /**
  * The host controls of the connected host. The host answers the Team API routes, and the account
@@ -1329,6 +1330,9 @@ export function createWebWorkspaceRuntime(
         };
       },
       async channelCommand(command) {
+        // A read comes only while the user looks at the channel, so its notifications are done.
+        if (command.type === "read" && lockedHostId)
+          closeWebChatNotifications(lockedHostId, { channelId: command.channelId });
         const channel = await channels.channelCommand(command);
         if (command.type === "send") removeCompletedDrafts(command.attachmentDraftIds);
         return withChannelPicture(channel);
@@ -1427,6 +1431,8 @@ export function createWebWorkspaceRuntime(
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
+      // As for a channel: the user looks at the chat.
+      if (lockedHostId) closeWebChatNotifications(lockedHostId, { agentId: id });
       const value = await request("POST", TEAM_API_ROUTES.agent.conversationRead(id), { throughMessageId });
       if (!isConversationReadState(value)) throw new Error(currentText().t("error.remote.invalidData"));
       return value;

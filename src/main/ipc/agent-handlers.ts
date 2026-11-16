@@ -174,6 +174,7 @@ import type { AgentService } from "../../backend/agent-service";
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { canConfineProcesses } from "../../backend/process-confinement";
 import type { SidebarLayoutStore } from "../../backend/sidebar-layout-store";
+import type { NotificationChat } from "../desktop-notifications";
 import type { HostService } from "../host-service";
 import type { LibraryFoldersService } from "../library-folders-service";
 import { runMessageDelete } from "../message-delete-refusal";
@@ -329,6 +330,8 @@ export interface AgentIpcDependencies {
   openExternal: (url: string) => Promise<void>;
   /** The models that the model picker shows. Only the local list is filtered here; a host filters its own. */
   modelVisibility: Pick<ModelVisibility, "picker">;
+  /** Closes the shown notifications of a chat. A read comes only while the user looks at the chat. */
+  closeChatNotifications: (serverId: string, chat: NotificationChat) => void;
 }
 
 export function agentIpcHandlers({
@@ -342,6 +345,7 @@ export function agentIpcHandlers({
   messageLinks,
   openExternal,
   modelVisibility,
+  closeChatNotifications,
 }: AgentIpcDependencies): Pick<IpcGroupHandlers, "agent"> {
   const remoteTaskRequest = <T>(serverId: string, path: string, decoder: ResponseDecoder<T>, body: RemoteTaskBody) => {
     if (!remoteServers.supportsCapability(serverId, AGENT_TASKS_CAPABILITY)) taskRemoteUnsupported();
@@ -671,11 +675,16 @@ export function agentIpcHandlers({
           ),
       }),
       channelCommand: scopedHandler(parseChannelCommand, {
-        local: (input) => runCauseEffect(service.channels.command(input, host.channelActor())),
-        remote: (input, serverId) =>
-          runCauseEffect(
+        local: (input) => {
+          if (input.type === "read") closeChatNotifications(LOCAL_SERVER_ID, { channelId: input.channelId });
+          return runCauseEffect(service.channels.command(input, host.channelActor()));
+        },
+        remote: (input, serverId) => {
+          if (input.type === "read") closeChatNotifications(serverId, { channelId: input.channelId });
+          return runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.command, decodeChannel, { method: "POST", body: input }),
-          ),
+          );
+        },
       }),
       deleteChannel: scopedHandler(parseChannelId, {
         local: (channelId) => runCauseEffect(service.deleteChannel(channelId)),
@@ -1134,8 +1143,14 @@ export function agentIpcHandlers({
         remote: (serverId) => runCauseEffect(remoteServers.listAgentConversationReads(serverId)),
       }),
       markConversationRead: scopedHandler(parseMarkConversationRead, {
-        local: (parsed) => runCauseEffect(host.markAgentConversationRead(parsed)),
-        remote: (parsed, serverId) => runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId)),
+        local: (parsed) => {
+          closeChatNotifications(LOCAL_SERVER_ID, { agentId: parsed.agentId });
+          return runCauseEffect(host.markAgentConversationRead(parsed));
+        },
+        remote: (parsed, serverId) => {
+          closeChatNotifications(serverId, { agentId: parsed.agentId });
+          return runCauseEffect(remoteServers.markAgentConversationRead(parsed, serverId));
+        },
       }),
       markConversationUnread: scopedHandler(parseMarkConversationUnread, {
         local: (parsed) => runCauseEffect(host.markAgentConversationUnread(parsed)),
