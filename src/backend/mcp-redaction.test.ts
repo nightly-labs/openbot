@@ -36,6 +36,14 @@ describe("redactMcpRecord", () => {
     expect(redacted).not.toContain("abcd1234efgh");
     expect(redacted).not.toContain("sig_part");
   });
+
+  // The record is the agent's own chat: the user must read the address (#9988), not its secrets.
+  it("keeps an email address and still redacts secrets", () => {
+    const record = { item: { type: "agentMessage", text: "Sign in as admin@example.com. password=hunter2" } };
+    expect(redactMcpRecord(record, [])).toEqual({
+      item: { type: "agentMessage", text: "Sign in as admin@example.com. password=[redacted]" },
+    });
+  });
 });
 
 // The Computer Use server inherits HOME, USER and TMPDIR. Masking HOME broke each Shared file link
