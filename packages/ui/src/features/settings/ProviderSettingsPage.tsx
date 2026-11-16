@@ -2078,6 +2078,8 @@ function EnvironmentSection(props: {
   const rowsOf = (environment: ProviderEnvironment | null): EnvironmentRow[] =>
     (environment?.variables ?? []).map((variable) => ({ ...variable, id: nextId++ }));
   const [draft, setDraft] = createSignal<EnvironmentRow[]>([]);
+  /** What the draft was last set to from the host: a change of the user is a difference from it. */
+  const [baseline, setBaseline] = createSignal<string>("[]");
   const [leaving, setLeaving] = createSignal<ReadonlySet<number>>(new Set());
   const [saved, setSaved] = createSignal(false);
   const removeButtons = new Map<number, HTMLButtonElement>();
@@ -2085,8 +2087,14 @@ function EnvironmentSection(props: {
   const snapshot = (rows: readonly Omit<EnvironmentRow, "id">[]) =>
     JSON.stringify(rows.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
   const kept = () => draft().filter((row) => !leaving().has(row.id));
-  // Compared with what the host keeps now, so Discard after a new answer leaves no change.
-  const dirty = () => snapshot(kept()) !== snapshot(props.control.value?.variables ?? []);
+  const dirty = () => snapshot(kept()) !== baseline();
+  /** Sets the draft to what the host keeps now. */
+  const reset = (environment: ProviderEnvironment | null) => {
+    const rows = rowsOf(environment);
+    setLeaving(new Set<number>());
+    setDraft(rows);
+    setBaseline(snapshot(rows));
+  };
   // An answer of the host starts the draft again from what the host keeps, but not while the user has
   // a change: each status event reads the variables again, also while the user types. The answer to a
   // save of this page does start it again.
@@ -2095,9 +2103,7 @@ function EnvironmentSection(props: {
     (environment) => {
       const keep = untrack(() => dirty() && !(saved() && !props.control.error));
       if (keep) return;
-      const rows = rowsOf(environment);
-      setLeaving(new Set<number>());
-      setDraft(rows);
+      reset(environment);
     },
   );
   const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);
@@ -2291,11 +2297,8 @@ function EnvironmentSection(props: {
                   variant="ghost"
                   size="sm"
                   disabled={props.control.pending}
-                  onClick={() => {
-                    const rows = rowsOf(props.control.value);
-                    setLeaving(new Set<number>());
-                    setDraft(rows);
-                  }}
+                  // The host's answers that came during the change show now.
+                  onClick={() => reset(props.control.value)}
                 >
                   {t("provider.settings.environmentDiscard")}
                 </Button>
