@@ -1001,7 +1001,9 @@ export class TurnLifecycle {
     const continuations = new Map<string, UsageLimitContinuation>();
     for (const [earlier, lines] of reports)
       for (const context of this.#mailbox.completedDeliveriesOfTurn(agentId, earlier)) {
-        if (context.channelId !== undefined) continue;
+        // A channel assigns its own task again. A routine run stays completed: a held limit can cancel
+        // a queued run of a routine set to skip, which would show this finished run as cancelled.
+        if (context.channelId !== undefined || context.delivery.sender.kind === "routine") continue;
         deliveries.push(context);
         continuations.set(context.delivery.id, {
           turnId: earlier,
