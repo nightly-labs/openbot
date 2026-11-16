@@ -439,7 +439,7 @@ export function createWebConversationRuntime(
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
         });
     },
-    // A member who can chat with the agent can press Remove; the host checks the level.
+    // Only the owner can press Remove (the timeline checks the role); the host checks it again.
     get withdrawFeedback() {
       if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
       return async (input: { agentId: string; messageId: string }) =>
