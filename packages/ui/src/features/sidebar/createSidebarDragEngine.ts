@@ -288,14 +288,15 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
+  function pointerIsAtDragOrigin(point: SidebarDragPoint): boolean {
+    if (!dragOrigin) return false;
+    return Math.hypot(point.clientX - dragOrigin.clientX, point.clientY - dragOrigin.clientY) < DRAG_AIM_DISTANCE_PX;
+  }
+
   function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
     const session = dragSession;
-    if (dragOrigin) {
-      const distance = Math.hypot(point.clientX - dragOrigin.clientX, point.clientY - dragOrigin.clientY);
-      if (distance < DRAG_AIM_DISTANCE_PX) return null;
-      dragOrigin = null;
-    }
-    return session ? sidebarDropTargetAt(sidebarDragWorld(session), point) : null;
+    if (!session || pointerIsAtDragOrigin(point)) return null;
+    return sidebarDropTargetAt(sidebarDragWorld(session), point);
   }
 
   /**
@@ -407,6 +408,8 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       dragScrollSpeed = 0;
       return;
     }
+    // The list moved under the pointer, so the pointer now aims at another row.
+    dragOrigin = null;
     applySidebarDropTarget(resolveSidebarDropTarget(dragPoint));
     scrollFades.measure();
     dragScrollFrame = requestAnimationFrame(runSidebarDragAutoScroll);
@@ -449,6 +452,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       });
     }
     const point = { clientX: event.clientX, clientY: event.clientY };
+    if (!pointerIsAtDragOrigin(point)) dragOrigin = null;
     if (pointInRect(point, dragGeometry.list)) {
       event.preventDefault();
       if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
