@@ -981,7 +981,7 @@ There is no separate prompt-generation button or review dialog.
 
 Agents can organize teammates and channels into sidebar sections through `list_sections`,
 `create_section`, `rename_section`, `delete_section`, and `assign_agent_section`. Assignment takes an
-`agentId` or a `channelId` (a channel id passed as `agentId` also works), and accepts a null section
+agent or channel id as `agentId` (the store files both under one key), and accepts a null section
 to ungroup it; deleting a section also ungroups its agents and channels without deleting them. These tools
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.

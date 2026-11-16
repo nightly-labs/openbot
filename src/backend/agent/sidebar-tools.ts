@@ -6,17 +6,15 @@ import type { SidebarLayoutStore } from "../sidebar-layout-store";
 import { openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 
-const chatId = z.string().min(1).max(INPUT_LIMITS.identifier);
-const sectionId = chatId;
+const sectionId = z.string().min(1).max(INPUT_LIMITS.identifier);
 const name = z.string().trim().min(1).max(INPUT_LIMITS.sidebarSectionName);
 export const createSectionToolSchema = z.object({ name }).strict();
 export const renameSectionToolSchema = z.object({ sectionId, name }).strict();
 export const deleteSectionToolSchema = z.object({ sectionId }).strict();
-/** One of `agentId` and `channelId`: the sidebar files a channel in a folder as it does an agent. */
+/** `agentId` also takes a channel id: the sidebar files a channel in a folder as it does an agent. */
 export const assignAgentSectionToolSchema = z
   .object({
-    agentId: chatId.optional(),
-    channelId: chatId.optional(),
+    agentId: z.string().min(1).max(INPUT_LIMITS.identifier),
     sectionId: sectionId.nullable(),
   })
   .strict();
@@ -45,18 +43,12 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
       action = { type: "delete", ...(yield* toolStep(() => deleteSectionToolSchema.parse(args))) };
       break;
     case "assign_agent_section": {
-      const { agentId, channelId, sectionId } = yield* toolStep(() => assignAgentSectionToolSchema.parse(args));
-      const id = channelId ?? agentId;
-      if (id === undefined || (agentId !== undefined && channelId !== undefined))
-        return openBotToolFailure("Pass one of agentId and channelId.");
-      if (channelId !== undefined && !channelIds().has(channelId))
-        return openBotToolFailure("Unknown channel. Use a channel id from openbot.list_channels.");
-      // A channel id passed as agentId is accepted too: agents tried that before channelId existed.
-      if (agentId !== undefined && !agentIds().has(agentId) && !channelIds().has(agentId))
+      const assignment = yield* toolStep(() => assignAgentSectionToolSchema.parse(args));
+      if (!agentIds().has(assignment.agentId) && !channelIds().has(assignment.agentId))
         return openBotToolFailure(
-          "Unknown agent. Use an agent id from openbot.list_agents, or a channel id from openbot.list_channels as channelId.",
+          "Unknown agent or channel. Use an id from openbot.list_agents or openbot.list_channels.",
         );
-      action = { type: "assign", agentId: id, sectionId };
+      action = { type: "assign", ...assignment };
       break;
     }
     default:
