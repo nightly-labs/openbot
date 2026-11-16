@@ -39,6 +39,7 @@ import { appendVoiceTranscript } from "../../voice-recording";
 import { serverSupportsCapability } from "../servers/server-capabilities";
 import { codexLiveAccess } from "../speech/codex-live-access";
 import { createAttachmentImportSounds } from "./attachment-import-sounds";
+import { createChangeMarkerActions } from "./change-marker-actions";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
 import { agentConversationKey, composerDraftKey } from "./conversation-keys";
@@ -355,6 +356,10 @@ export function createConversationViewScope(props: ConversationProps) {
     revealSidebarFile,
     clearSidebarFilePreview,
   } = panels;
+  const changeMarkerActions = createChangeMarkerActions(props, Boolean(channel), {
+    skill: openSkillSettings,
+    instructions: openInstructionsSettings,
+  });
   const sideQuestions = createSideQuestionStore({
     props,
     questions: sideQuestionStates,
@@ -2834,6 +2839,7 @@ export function createConversationViewScope(props: ConversationProps) {
     openSkillSettings,
     instructionsSettingsRequest,
     openInstructionsSettings,
+    changeMarkerActions,
     agentSettingRowRequest,
     openAgentSettingRow,
     handleAgentSettingRowRequest,

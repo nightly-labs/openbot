@@ -72,6 +72,7 @@ export function ConversationThread() {
     copyMessage,
     copiedMessageId,
     branchThread,
+    changeMarkerActions,
   } = useConversationViewScope();
   const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const { t, errorMessage } = useText();
@@ -312,6 +313,7 @@ export function ConversationThread() {
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onSelectAgent={props.onSelectAgent}
+            changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}
