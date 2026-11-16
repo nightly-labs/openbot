@@ -71,6 +71,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   type DiagnosticOrigin,
+  ProviderSessionBusyError,
   ProviderTurnActiveError,
 } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion } from "./cli";
@@ -2537,7 +2538,15 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // opens the session again, because that replaces the thread that the replay writes to.
     if (thread.backgroundReplay) yield* Deferred.await(thread.backgroundReplay);
     if (thread.needsResume && !thread.activeTurn) {
-      yield* this.#reopenThread(thread);
+      yield* this.#reopenThread(thread).pipe(
+        Effect.catch((failure) =>
+          Effect.fail(
+            this.#flavor.sessionBusy?.(failure.cause)
+              ? providerFailure(new ProviderSessionBusyError(this.#label))
+              : failure,
+          ),
+        ),
+      );
       thread = yield* providerSync(() => this.#requireThread(threadId));
     }
     if (thread.activeTurn) return yield* providerFailure(this.#turnActiveError(thread.activeTurn));

@@ -10,7 +10,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
-import { type AgentProvider, ProviderTurnActiveError } from "../agent-client";
+import { type AgentProvider, ProviderSessionBusyError, ProviderTurnActiveError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { incomingAgentExchange } from "../conversation-snapshots";
@@ -61,6 +61,8 @@ const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
+/** How long messages wait before they try again a session that the provider refused as busy. */
+const PROVIDER_SESSION_BUSY_RETRY_MS = 15_000;
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -1154,6 +1156,13 @@ export class DrainScheduler {
               this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            // No turn end tells when the stopped prompt ends, so the messages try again later (#9938).
+            if (error instanceof ProviderSessionBusyError)
+              yield* Effect.forkDetach(
+                Effect.sync(() => this.scheduleDrain(delivery.recipientAgentId)).pipe(
+                  Effect.delay(PROVIDER_SESSION_BUSY_RETRY_MS),
+                ),
+              );
             return;
           }
           if (isRequestTimeout(error, "turn/start")) {
