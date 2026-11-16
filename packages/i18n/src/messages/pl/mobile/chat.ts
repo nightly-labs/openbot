@@ -613,6 +613,7 @@ export const messages = {
   "mobile.chat.queue.position": "Pozycja {position} · {date}",
   "mobile.chat.queue.attachments": "Załączniki",
   "mobile.chat.queue.steer": "Pokieruj",
+  "mobile.chat.queue.sendNow": "Wyślij teraz",
   "mobile.chat.queue.more": {
     one: "Jeszcze {count}",
     few: "Jeszcze {count}",
@@ -622,6 +623,7 @@ export const messages = {
   "mobile.chat.queue.nextLabel": "Następna wiadomość w kolejce: {text}. Pokaż wiadomości w kolejce",
   "mobile.chat.queue.editNext": "Edytuj następną wiadomość w kolejce",
   "mobile.chat.queue.steerNext": "Pokieruj następną wiadomością w kolejce",
+  "mobile.chat.queue.sendNowNext": "Zatrzymaj agenta i wyślij teraz następną wiadomość z kolejki",
   "mobile.chat.queue.deleteNext": "Usuń następną wiadomość w kolejce",
   "mobile.chat.queue.moveFirst": "Przenieś na początek",
   "mobile.chat.queue.deleteTitle": "Usunąć wiadomość z kolejki?",
@@ -629,6 +631,7 @@ export const messages = {
   "mobile.chat.queue.keep": "Zachowaj",
   "mobile.chat.queue.editedElsewhere": "Inne urządzenie edytuje tę wiadomość.",
   "mobile.chat.queue.steerNeedsTurn": "Pokierowanie wymaga trwającej tury.",
+  "mobile.chat.queue.sendNowNeedsTurn": "Wysłanie teraz wymaga trwającej tury.",
   "mobile.chat.queue.stillHoldingTitle": "Wiadomość jest nadal wstrzymana",
   "mobile.chat.queue.stillHoldingMessage":
     "Nie udało się zwolnić tej wiadomości, więc agent nadal na nią czeka. Spróbuj ponownie, gdy telefon ponownie się połączy.",

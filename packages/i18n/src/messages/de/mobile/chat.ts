@@ -535,11 +535,13 @@ export const messages = {
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",
+  "mobile.chat.queue.sendNow": "Jetzt senden",
   "mobile.chat.queue.more": { one: "{count} weitere", other: "{count} weitere" },
   "mobile.chat.queue.nextLabel":
     "Nächste Nachricht in der Warteschlange: {text}. Nachrichten in der Warteschlange anzeigen",
   "mobile.chat.queue.editNext": "Nächste Nachricht in der Warteschlange bearbeiten",
   "mobile.chat.queue.steerNext": "Nächste Nachricht in der Warteschlange steuern",
+  "mobile.chat.queue.sendNowNext": "Agent stoppen und nächste Nachricht in der Warteschlange jetzt senden",
   "mobile.chat.queue.deleteNext": "Nächste Nachricht in der Warteschlange löschen",
   "mobile.chat.queue.moveFirst": "An erste Stelle verschieben",
   "mobile.chat.queue.deleteTitle": "Nachricht aus der Warteschlange löschen?",
@@ -547,6 +549,7 @@ export const messages = {
   "mobile.chat.queue.keep": "Behalten",
   "mobile.chat.queue.editedElsewhere": "Ein anderes Gerät bearbeitet diese Nachricht.",
   "mobile.chat.queue.steerNeedsTurn": "Steuern braucht einen laufenden Durchlauf.",
+  "mobile.chat.queue.sendNowNeedsTurn": "Jetzt senden braucht einen laufenden Durchlauf.",
   "mobile.chat.queue.stillHoldingTitle": "Nachricht wird noch angehalten",
   "mobile.chat.queue.stillHoldingMessage":
     "OpenBot konnte diese Nachricht nicht freigeben, daher wartet der Agent weiter auf sie. Versuche es erneut, sobald das Telefon wieder verbunden ist.",

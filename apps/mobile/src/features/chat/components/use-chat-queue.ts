@@ -46,6 +46,8 @@ export function useChatQueue(
   serverId: string,
   online: boolean,
   activeTurnId: string | null,
+  /** False for an agent that cannot take a message into its running turn: it offers Send now, not Steer. */
+  steers: boolean,
   /** The loaded conversation. Its outgoing exchanges name the teammates the agent waits for. */
   messages: readonly ConversationMessage[] = EMPTY_MESSAGES,
 ) {
@@ -65,6 +67,9 @@ export function useChatQueue(
     retry: false,
   });
   const [error, setError] = useState<string | null>(null);
+  // Send now reads the turn after the reorder: a turn that ended meanwhile has nothing to stop.
+  const activeTurnRef = useRef(activeTurnId);
+  activeTurnRef.current = activeTurnId;
   const [restored] = useState(() => {
     try {
       return { edit: decodeQueueEditDraft(SecureStore.getItem(storageKey)), error: null };
@@ -390,6 +395,7 @@ export function useChatQueue(
       canEdit: canEditQueue,
       online,
       activeTurnId,
+      steers,
       begin,
       save,
       refresh,
@@ -438,6 +444,21 @@ export function useChatQueue(
             expectedTurnId: activeTurnId,
           });
         }),
+      // As on desktop: the message goes first, and the running turn stops, so the message runs next.
+      sendNow: (delivery: QueueDelivery) =>
+        run(async () => {
+          const turnId = activeTurnId;
+          if (!turnId) return;
+          const waiting = orderedQueue(query.data?.deliveries ?? []);
+          // An edited message keeps its place, and the queue starts nothing while it is first.
+          if (waiting[0]?.editing && waiting[0].id !== delivery.id) return;
+          if (waiting[0]?.id !== delivery.id)
+            await workspace().changeQueue(agentId, serverId, "reorder", {
+              deliveryIds: [delivery.id, ...waiting.filter((item) => item.id !== delivery.id).map((item) => item.id)],
+            });
+          if (activeTurnRef.current !== turnId) return;
+          await workspace().interruptTurn(agentId, turnId, serverId);
+        }),
       moveFirst: (delivery: QueueDelivery) =>
         run(async () => {
           // The host checks the order against every queued delivery, so the answers the sheet does
@@ -468,6 +489,7 @@ export function useChatQueue(
       canEditQueue,
       online,
       activeTurnId,
+      steers,
       begin,
       save,
       refresh,

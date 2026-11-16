@@ -85,14 +85,17 @@ export function QueuedMessageActionsScreen() {
             <Typography>{t("common.edit")}</Typography>
           </SettingsRow>
         )}
-        <SettingsRow
-          leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
-          disclosure={false}
-          disabled={locked || editedElsewhere || !queue.activeTurnId}
-          onPress={() => finish(queue.steer(delivery))}
-        >
-          <Typography>{t("mobile.chat.queue.steer")}</Typography>
-        </SettingsRow>
+        {/* As on desktop, an agent that cannot steer offers Send now. An answer has no Send now. */}
+        {queue.steers || !reply ? (
+          <SettingsRow
+            leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
+            disclosure={false}
+            disabled={locked || editedElsewhere || !queue.activeTurnId}
+            onPress={() => finish(queue.steers ? queue.steer(delivery) : queue.sendNow(delivery))}
+          >
+            <Typography>{t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}</Typography>
+          </SettingsRow>
+        ) : null}
         {reply ? null : (
           <SettingsRow
             leading={<ArrowUpToLine color={foreground} size={22} />}
@@ -124,7 +127,11 @@ export function QueuedMessageActionsScreen() {
       )}
 
       {editedElsewhere ? <SettingsNote>{t("mobile.chat.queue.editedElsewhere")}</SettingsNote> : null}
-      {queue.activeTurnId ? null : <SettingsNote>{t("mobile.chat.queue.steerNeedsTurn")}</SettingsNote>}
+      {queue.activeTurnId ? null : (
+        <SettingsNote>
+          {t(queue.steers ? "mobile.chat.queue.steerNeedsTurn" : "mobile.chat.queue.sendNowNeedsTurn")}
+        </SettingsNote>
+      )}
       {queue.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
           {queue.error}
