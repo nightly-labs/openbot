@@ -12,14 +12,16 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { Children, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { Children, type ReactNode, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { VaultTwoStepSection } from "@/features/servers/components/vault-two-step-section";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
+import { useVaultAgentPicker } from "@/features/servers/model/vault-agent-picker";
 import {
   type VaultDraft,
   vaultAddressExample,
+  vaultAgentsSummary,
   vaultCardTitle,
   vaultContactTitle,
   vaultCountryOptions,
@@ -34,7 +36,10 @@ import {
   SettingsSection,
 } from "@/features/settings/components/settings-content";
 import { SettingsPicker } from "@/features/settings/components/settings-controls";
-import { useMobileWorkspaceActions } from "@/features/workspace/context/mobile-workspace-context";
+import {
+  useMobileWorkspaceActions,
+  useMobileWorkspaceSelector,
+} from "@/features/workspace/context/mobile-workspace-context";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
@@ -65,7 +70,7 @@ function FieldRow({ children }: { children: ReactNode }) {
 }
 
 type FieldProps = Partial<Omit<SheetFormFieldProps, "label" | "value" | "onChangeText">>;
-type TextKey = Exclude<keyof VaultDraft, "fillSites" | "twoStepKey">;
+type TextKey = Exclude<keyof VaultDraft, "fillSites" | "twoStepKey" | "agents">;
 
 function isKind(value: string | undefined): value is VaultItemKind {
   return KINDS.some((kind) => kind === value);
@@ -170,7 +175,12 @@ export function VaultItemForm({
     removedState.current = null;
     if (state) void showState.current(state);
   }, [leaving]);
-  const input = vaultSaveInput(kind, saved?.id ?? null, draft);
+  // An agent's request makes an item for every agent, as on the desktop; the user changes it later here.
+  const agentScope = vault.query.data?.agentScope === true && !request;
+  const allAgents = useMobileWorkspaceSelector((workspace) => workspace.agents);
+  const agents = useMemo(() => allAgents.filter((agent) => agent.serverId === serverId), [allAgents, serverId]);
+  const openAgentPicker = useVaultAgentPicker((state) => state.open);
+  const input = vaultSaveInput(kind, saved?.id ?? null, draft, agentScope);
   const example = vaultAddressExample(draft.country);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const locked = action.isPending;
@@ -518,6 +528,26 @@ export function VaultItemForm({
               <Typography.Paragraph numberOfLines={1}>{site}</Typography.Paragraph>
             </SettingsRow>
           ))}
+        </SettingsSection>
+      ) : null}
+      {agentScope ? (
+        <SettingsSection footer={draft.agents?.length === 0 ? t("mobile.server.vault.agentsNone") : undefined}>
+          <SettingsRow
+            value={
+              draft.agents === null ? t("mobile.server.vault.agentsAll") : vaultAgentsSummary(draft.agents, agents, t)
+            }
+            disabled={locked}
+            onPress={() => {
+              openAgentPicker({
+                serverId,
+                agents: draft.agents,
+                onChange: (next) => edit({ agents: next }),
+              });
+              router.push({ pathname: "/server-settings/vault-item-agents" });
+            }}
+          >
+            <Typography.Paragraph>{t("mobile.server.vault.agents")}</Typography.Paragraph>
+          </SettingsRow>
         </SettingsSection>
       ) : null}
       {saved ? (

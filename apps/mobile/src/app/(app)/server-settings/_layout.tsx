@@ -75,6 +75,7 @@ export default function ServerSettingsLayout() {
       <Stack.Screen name="vault" options={{ title: t("mobile.server.route.vault") }} />
       {/* The page names its item. */}
       <Stack.Screen name="vault-item" options={{ title: t("mobile.server.route.vault") }} />
+      <Stack.Screen name="vault-item-agents" options={{ title: t("mobile.server.vault.agents") }} />
       <Stack.Screen name="vault-two-step" options={{ title: t("mobile.server.vault.twoStep.setupTitle") }} />
       <Stack.Screen name="vault-two-step-scan" options={{ title: t("mobile.server.vault.twoStep.scan") }} />
       <Stack.Screen name="vault-two-step-check" options={{ title: t("mobile.server.vault.twoStep.checkTitle") }} />
