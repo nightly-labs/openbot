@@ -152,6 +152,8 @@ const QUIET_END_MAX_MS = 2 * 60_000;
 const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+/** The time added to a reset that a provider's text names, which rounds down to the minute. */
+const TEXT_RESET_MARGIN_MS = 60_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
@@ -159,9 +161,6 @@ const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
  * A model that gave only its reasoning and no answer can answer on another model (#6594). As for each
  * cause, a turn that ran a tool step does not run again, so the tool does not run two times.
  */
-/** The time added to a reset that a provider's text names, which rounds down to the minute. */
-const TEXT_RESET_MARGIN_MS = 60_000;
-
 const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "billing",
   "usage_limit",
