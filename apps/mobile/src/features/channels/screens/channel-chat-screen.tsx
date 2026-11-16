@@ -1,6 +1,6 @@
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChatView } from "@/features/chat/components/chat-view";
 import { useLeaveChat } from "@/features/chat/components/use-leave-chat";
@@ -9,6 +9,7 @@ import { useQuestionPrompt } from "@/features/chat/components/use-question-promp
 import { projectChannelMessages } from "@/features/chat/model/chat-messages";
 import { type TurnStepsSummary, unansweredChannelTurnSummaries } from "@/features/chat/model/turn-thinking";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
+import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
 import { useMobileWorkspaceSelector } from "@/features/workspace/context/mobile-workspace-context";
 import type { MobileAgentActivity, MobileAgentWaitReason } from "@/features/workspace/model/agent-activity";
@@ -235,6 +236,13 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
     }),
     [channelId, serverId, name, members, channel?.icon, channel?.imageUrl],
   );
+  // A pull past the latest message opens the channel's info sheet on top of this chat, unless
+  // Settings turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/channel-info/[channelId]", params: { channelId, serverId } }),
+    [channelId, serverId],
+  );
   return (
     <ChatView
       target={target}
@@ -273,6 +281,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
       channelLeadAgentId={channel?.leadAgentId ?? null}
       channelTurnSummaries={turnSummaries}
       onLeave={leaveChat}
+      onPullPastEnd={pullOn ? openInfo : null}
     />
   );
 }

@@ -544,6 +544,8 @@ export const messages = {
   "mobile.chat.threads.new": "新话题",
   "mobile.chat.threads.all": "全部话题",
   "mobile.chat.threads.agentInfo": "助手信息",
+  "mobile.chat.pullInfo.agent": "助手信息",
+  "mobile.chat.pullInfo.channel": "频道信息",
   "mobile.chat.threads.draftNote": "你的第一条消息会开始一个新话题。与 {name} 的主聊天不会改变。",
   "mobile.chat.threads.draftPlaceholder": "与 {name} 的新话题",
   "mobile.chat.threads.rename": "重命名",

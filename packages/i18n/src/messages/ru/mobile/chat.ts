@@ -659,6 +659,8 @@ export const messages = {
   "mobile.chat.threads.new": "Новая ветка",
   "mobile.chat.threads.all": "Все ветки",
   "mobile.chat.threads.agentInfo": "Об агенте",
+  "mobile.chat.pullInfo.agent": "Об агенте",
+  "mobile.chat.pullInfo.channel": "О канале",
   "mobile.chat.threads.draftNote": "Первое сообщение начнёт новую ветку. Основной чат с {name} не изменится.",
   "mobile.chat.threads.draftPlaceholder": "Новая ветка с {name}",
   "mobile.chat.threads.rename": "Переименовать",

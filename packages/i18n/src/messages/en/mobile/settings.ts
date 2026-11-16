@@ -230,6 +230,15 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.largeFiles": "Download large files automatically",
   "mobile.settings.conversations.largeFilesFooter":
     "Images, videos and audio larger than {small} download only when you tap them. Turn this on to download them at once, up to {large}. This can use a lot of mobile data.",
+  "mobile.settings.conversations.swipeLeft": "Swipe left in an agent chat",
+  "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
+  "mobile.settings.conversations.swipeThreads": "Threads",
+  "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeFooter":
+    "A swipe away from Back in an agent's chat opens this. A swipe on a message still replies to it.",
+  "mobile.settings.conversations.pullInfo": "Pull up for info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Pull up past the latest message in a chat, a channel or a thread, and release, to open its info.",
   "mobile.settings.conversations.fullQualityPhotos": "Send photos at full quality",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "When this is off, the app sends a smaller copy of each photo, up to 2048 pixels on the long side. It arrives faster on a slow connection. Turn this on to send the original photo.",

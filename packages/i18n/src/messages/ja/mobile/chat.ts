@@ -559,6 +559,8 @@ export const messages = {
   "mobile.chat.threads.new": "新しいスレッド",
   "mobile.chat.threads.all": "すべてのスレッド",
   "mobile.chat.threads.agentInfo": "エージェント情報",
+  "mobile.chat.pullInfo.agent": "エージェント情報",
+  "mobile.chat.pullInfo.channel": "チャンネル情報",
   "mobile.chat.threads.draftNote":
     "最初のメッセージで新しいスレッドが始まります。{name} とのメインチャットは変わりません。",
   "mobile.chat.threads.draftPlaceholder": "{name} との新しいスレッド",
