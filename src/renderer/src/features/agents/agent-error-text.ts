@@ -1,6 +1,38 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
+import { matchingSourceKeys } from "@openbot/i18n";
 import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
+
+/** The notices of a turn whose provider retries a request. They say what the turn does now. */
+const RETRY_NOTICE_KEYS: ReadonlySet<string> = new Set([
+  "error.backend.providerRetrying",
+  "error.backend.providerRetryingLargeContext",
+  "error.backend.providerModelAtCapacity",
+]);
+
+/**
+ * The retry notices that a chat banner shows now, by banner key. The host sends the English text, so
+ * a client of any language and of a joined server reads the key from it. The end of the agent's turn
+ * removes the notice: the provider then answered or failed, and a failure sends its own error. Kept,
+ * the notice said that ChatGPT failed under a reply that had arrived (#10526).
+ */
+export function createRetryNotices() {
+  const shown = new Map<string, string>();
+  return {
+    /** Records the banner that an agent error set. `readable` is the text that the banner shows. */
+    noteError(key: string, message: string, readable: string): void {
+      if (matchingSourceKeys(message.trim()).some((sourceKey) => RETRY_NOTICE_KEYS.has(sourceKey)))
+        shown.set(key, readable);
+      else shown.delete(key);
+    },
+    /** The banner text to remove when the turn ends, or null when the banner is not a retry notice. */
+    takeAtTurnEnd(key: string): string | null {
+      const readable = shown.get(key) ?? null;
+      shown.delete(key);
+      return readable;
+    },
+  };
+}
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
 const ERROR_DESCRIPTION_LIMIT = 300;
