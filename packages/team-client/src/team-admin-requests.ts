@@ -40,6 +40,9 @@ import {
   isWhatsAppGroupList,
   isWhatsAppWorkingMessageList,
   type MessagingWorkspaceInput,
+  type ProviderEnvironment,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
   type RemoveWhatsAppSenderInput,
   type ResetAgentSessionSettingInput,
   type ServerAuditLog,
@@ -95,6 +98,10 @@ import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-re
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
 import { PROVIDER_DEFAULT_ROUTES } from "@openbot/contracts/team-protocol/provider-default-v1";
+import {
+  decodeProviderEnvironmentResponse,
+  PROVIDER_ENVIRONMENT_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-environment-v1";
 import type { PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -1038,6 +1045,29 @@ export function setHostClaudeCompactWindow(
 ): Effect.Effect<ClaudeCompactWindowSetting, TeamAdminRequestError> {
   return adminCall(() =>
     request("POST", CLAUDE_COMPACT_WINDOW_ROUTES.update, decodeClaudeCompactWindowResponse, { tokens }),
+  );
+}
+
+/** `provider-environment-v1`: the variables of one provider of the host. A sensitive value has an empty `value`. */
+export function getHostProviderEnvironment(
+  request: TeamApiRequest,
+  provider: ProviderEnvironmentProvider,
+): Effect.Effect<ProviderEnvironment, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ENVIRONMENT_ROUTES.settings, decodeProviderEnvironmentResponse, { provider }),
+  );
+}
+
+/** `provider-environment-v1`: replaces the variables of one provider. `value: null` keeps a stored sensitive value. */
+export function setHostProviderEnvironment(
+  request: TeamApiRequest,
+  update: ProviderEnvironmentUpdate,
+): Effect.Effect<ProviderEnvironment, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ENVIRONMENT_ROUTES.update, decodeProviderEnvironmentResponse, {
+      provider: update.provider,
+      variables: update.variables.map(({ name, value, sensitive }) => ({ name, value, sensitive })),
+    }),
   );
 }
 

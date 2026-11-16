@@ -5150,6 +5150,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /** See `ProviderRuntime.spawnSettingsChanged`. */
+  providerSpawnSettingsChanged(provider: AgentProvider): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
+    return this.#providers
+      .spawnSettingsChanged(provider)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "providerSpawnSettingsChanged", cause: failure.cause }),
+        ),
+      );
+  }
+
   /** See `ProviderRuntime.restartProviderWhenIdle`. */
   restartProvider(provider: AgentProvider): Effect.Effect<AgentStatus, AgentLifecycleFailed> {
     return this.#providers

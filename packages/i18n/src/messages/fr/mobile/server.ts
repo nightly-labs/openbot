@@ -1153,6 +1153,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Défaut de Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} jetons",
   "mobile.server.providers.compactWindowLoadFailed": "Impossible de charger la taille de compactage de ce serveur.",
+  "mobile.server.environment.row": "Variables",
+  "mobile.server.environment.title": "Environnement",
+  "mobile.server.environment.hint":
+    "Clés d’API, URL de base et autres réglages que reçoit chaque processus {name}. Un changement s’applique à la fin des tours en cours.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, avec OPENAI_API_KEY comme clé, envoie les requêtes de modèle de ChatGPT à cette adresse.",
+  "mobile.server.environment.shellNote": "Les commandes que lancent les agents peuvent lire ces valeurs.",
+  "mobile.server.environment.add": "Ajouter une variable",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Valeur",
+  "mobile.server.environment.saved": "Enregistrée",
+  "mobile.server.environment.sensitive": "Sensible",
+  "mobile.server.environment.remove": "Retirer",
+  "mobile.server.environment.save": "Enregistrer",
+  "mobile.server.environment.loadFailed": "Impossible de charger les variables de {name}.",
+  "mobile.server.environment.invalid": "Corrigez d’abord les noms.",
   "mobile.server.providers.disconnect": "Déconnecter",
   "mobile.server.providers.disconnectTitle": "Déconnecter {name} ?",
   "mobile.server.providers.disconnectBody":

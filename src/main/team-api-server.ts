@@ -219,6 +219,7 @@ import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protoc
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "@openbot/contracts/team-protocol/provider-detection-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_USE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-use-v1";
 import { PROVIDERS_V8_CAPABILITY } from "@openbot/contracts/team-protocol/providers-v8";
 import {
@@ -407,6 +408,7 @@ import {
 } from "./team-api/route-provider-accounts";
 import { routeProviderDefault } from "./team-api/route-provider-default";
 import { routeProviderDetection } from "./team-api/route-provider-detection";
+import { routeProviderEnvironment } from "./team-api/route-provider-environment";
 import { routeProviderHostSignIn } from "./team-api/route-provider-host-sign-in";
 import { routeProviderSignOut } from "./team-api/route-provider-sign-out";
 import { routeProviderUsageReset } from "./team-api/route-provider-usage-reset";
@@ -1331,6 +1333,7 @@ export class TeamApiServer {
       if ((await routePromptCacheTtl(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeUserSetup(context, this.#options.admin)) === "handled") return;
       if ((await routeClaudeCompactWindow(context, this.#options.admin)) === "handled") return;
+      if ((await routeProviderEnvironment(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDetection(context, this.#options.admin)) === "handled") return;
       if ((await routeModelVisibility(context, this.#options.admin)) === "handled") return;
       if ((await routeProviderDefault(context, this.#options.admin)) === "handled") return;
@@ -2735,6 +2738,8 @@ export class TeamApiServer {
           if (capability === CLAUDE_USER_SETUP_CAPABILITY) return this.#options.admin?.claudeUserSetup !== undefined;
           if (capability === CLAUDE_COMPACT_WINDOW_CAPABILITY)
             return this.#options.admin?.claudeCompactWindow !== undefined;
+          if (capability === PROVIDER_ENVIRONMENT_CAPABILITY)
+            return this.#options.admin?.providerEnvironment !== undefined;
           if (capability === PROVIDER_DETECTION_CAPABILITY) return this.#options.admin?.providerDetection !== undefined;
           if (capability === MODEL_VISIBILITY_CAPABILITY) return this.#options.admin?.modelVisibility !== undefined;
           if (capability === PROVIDER_DEFAULT_CAPABILITY) return this.#options.admin?.defaultProvider !== undefined;

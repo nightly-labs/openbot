@@ -472,6 +472,11 @@ import type {
   ProviderDetectionSettings,
 } from "./ipc-provider-detection";
 import type {
+  ProviderEnvironment,
+  ProviderEnvironmentProvider,
+  ProviderEnvironmentUpdate,
+} from "./ipc-provider-environment";
+import type {
   AcknowledgeFailedTurnInput,
   BusyMessageModePreference,
   CancelQueuedMessageInput,
@@ -1477,6 +1482,14 @@ export const IPC_ENDPOINTS = {
     ),
     setClaudeCompactWindow: scopedRequest<number | null, ClaudeCompactWindowSetting, "required">()(
       "host-admin:set-claude-compact-window",
+    ),
+    // The environment variables that each process of one provider of the server starts with
+    // (`provider-environment-v1`). A sensitive value goes to the host only. An owner or admin sets them.
+    getProviderEnvironment: scopedRequest<ProviderEnvironmentProvider, ProviderEnvironment, "required">()(
+      "host-admin:get-provider-environment",
+    ),
+    setProviderEnvironment: scopedRequest<ProviderEnvironmentUpdate, ProviderEnvironment, "required">()(
+      "host-admin:set-provider-environment",
     ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(

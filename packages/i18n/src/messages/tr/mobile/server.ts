@@ -1140,6 +1140,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code varsayılanı",
   "mobile.server.providers.compactWindowTokens": "{size} token",
   "mobile.server.providers.compactWindowLoadFailed": "Bu sunucunun sıkıştırma boyutu yüklenemedi.",
+  "mobile.server.environment.row": "Değişkenler",
+  "mobile.server.environment.title": "Ortam",
+  "mobile.server.environment.hint":
+    "Her {name} sürecinin aldığı API anahtarları, temel URL’ler ve diğer ayarlar. Bir değişiklik, süren turlar bitince geçerli olur.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, anahtar olarak OPENAI_API_KEY ile ChatGPT’nin model isteklerini bu adrese gönderir.",
+  "mobile.server.environment.shellNote": "Ajanların çalıştırdığı komutlar bu değerleri okuyabilir.",
+  "mobile.server.environment.add": "Değişken ekle",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Değer",
+  "mobile.server.environment.saved": "Kayıtlı",
+  "mobile.server.environment.sensitive": "Gizli",
+  "mobile.server.environment.remove": "Kaldır",
+  "mobile.server.environment.save": "Kaydet",
+  "mobile.server.environment.loadFailed": "{name} değişkenleri yüklenemedi.",
+  "mobile.server.environment.invalid": "Önce adları düzeltin.",
   "mobile.server.providers.disconnect": "Bağlantıyı kes",
   "mobile.server.providers.disconnectTitle": "{name} bağlantısı kesilsin mi?",
   "mobile.server.providers.disconnectBody":

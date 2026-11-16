@@ -1450,6 +1450,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "الافتراضي في Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} رمز",
   "mobile.server.providers.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "mobile.server.environment.row": "المتغيرات",
+  "mobile.server.environment.title": "البيئة",
+  "mobile.server.environment.hint":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "mobile.server.environment.codexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "mobile.server.environment.shellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "mobile.server.environment.add": "إضافة متغير",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "القيمة",
+  "mobile.server.environment.saved": "محفوظة",
+  "mobile.server.environment.sensitive": "حساس",
+  "mobile.server.environment.remove": "إزالة",
+  "mobile.server.environment.save": "حفظ",
+  "mobile.server.environment.loadFailed": "تعذّر تحميل متغيرات {name}.",
+  "mobile.server.environment.invalid": "صحّح الأسماء أولًا.",
   "mobile.server.providers.disconnect": "قطع الاتصال",
   "mobile.server.providers.disconnectTitle": "هل تريد قطع اتصال {name}؟",
   "mobile.server.providers.disconnectBody":

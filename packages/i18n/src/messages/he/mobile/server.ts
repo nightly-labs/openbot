@@ -1450,6 +1450,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "ברירת המחדל של Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} טוקנים",
   "mobile.server.providers.compactWindowLoadFailed": "לא ניתן לטעון את גודל הכיווץ של השרת הזה.",
+  "mobile.server.environment.row": "משתנים",
+  "mobile.server.environment.title": "סביבה",
+  "mobile.server.environment.hint":
+    "מפתחות API, כתובות בסיס והגדרות אחרות שכל תהליך של {name} מקבל. שינוי חל כשהתורות הנוכחיים מסתיימים.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, עם OPENAI_API_KEY כמפתח שלו, שולח את בקשות המודל של ChatGPT לכתובת הזו.",
+  "mobile.server.environment.shellNote": "הפקודות שסוכנים מריצים יכולות לקרוא את הערכים האלה.",
+  "mobile.server.environment.add": "הוספת משתנה",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "ערך",
+  "mobile.server.environment.saved": "נשמר",
+  "mobile.server.environment.sensitive": "רגיש",
+  "mobile.server.environment.remove": "הסרה",
+  "mobile.server.environment.save": "שמירה",
+  "mobile.server.environment.loadFailed": "לא ניתן לטעון את המשתנים של {name}.",
+  "mobile.server.environment.invalid": "תקנו קודם את השמות.",
   "mobile.server.providers.disconnect": "ניתוק",
   "mobile.server.providers.disconnectTitle": "לנתק את {name}?",
   "mobile.server.providers.disconnectBody":

@@ -3109,6 +3109,19 @@ export class ProviderRuntime implements ProviderPort {
   }).bind(this);
 
   /**
+   * A setting that each process of the provider reads at its start changed, such as the CLI proxy.
+   * The shared process restarts when its turns end, as for `restartProviderWhenIdle`, and an agent's
+   * own process, such as one of an account after the first, starts again before the agent's next turn.
+   */
+  readonly spawnSettingsChanged = Effect.fn("ProviderRuntime.spawnSettingsChanged")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    yield* providerStep(() => this.#countActivation(provider));
+    return yield* this.restartProviderWhenIdle(provider);
+  }).bind(this);
+
+  /**
    * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer. A launcher of
    * theirs, such as a script that picks Pi's settings folder, then runs again (#6327). Otherwise the
    * newer of the two runs, as before the choice. The provider restarts when its turns end. A provider
