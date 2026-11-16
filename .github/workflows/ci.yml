@@ -905,6 +905,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-database-host-start
 
+      - name: Run the versioned JSON stores E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:versioned-json-stores
+
       - name: Run the ACP instructions once E2E test
         if: ${{ !cancelled() }}
         run: bun run test:acp-instructions-once
@@ -1016,6 +1020,7 @@ jobs:
             .openbot-build/copilot-mcp-relay-e2e/
             .openbot-build/acp-turn-stall-e2e/
             .openbot-build/agent-database-host-start-e2e/
+            .openbot-build/versioned-json-stores-e2e/
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/antigravity-steer-e2e/
