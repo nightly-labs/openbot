@@ -166,7 +166,7 @@ export function AgentDockHost() {
 
 /** The seats, the agents, the channels and the chats of one server's dock, and what its actions change. */
 function createServerDock(serverId: string, options: { readWhenHidden: boolean }) {
-  const { agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent } = useAgents();
+  const { agentList, userHiddenAgentIds, agentStatus, modelOptions, updateAgent, appendUiError } = useAgents();
   const { conversations, markAgentMessagesRead, loadLatestAgentMessages, clearRecentReply, presentPromptResolution } =
     useConversation();
   const { workingTurns, agentStates, agentMoods } = createAgentActivity();
@@ -695,8 +695,12 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     waitForReset(agentId: string): void {
       usageLimitAsk(agentId)?.onWait();
     },
-    /** Marks the failed send of a usage-limit card, so the card shows again. */
-    failBackupSend(agentId: string): void {
+    /**
+     * Marks the failed send of a usage-limit card of the dock window, so the card shows again. That card
+     * cannot show the error, so the error goes in the agent's chat, as for the other answers.
+     */
+    failBackupSend(agentId: string, error: unknown): void {
+      if (!disposed) appendUiError(agentId, error, t("chat.usageLimit.failed"), serverId);
       failed(answerKey("usage-limit", agentId, usageLimitAsk(agentId)?.resetsAt ?? ""));
     },
     /** The same send as in the channel view of the main window. A retry keeps the operation of the failed send. */
@@ -767,7 +771,7 @@ function WindowAgentDock(props: { serverId: string }) {
       }
       onOpenInMain={(seat) => (seat.kind === "channel" ? void channels.open(seat.id) : selectAgent(seat.id))}
       onOpenWindow={(agentId) => void appPort().openChatWindow({ serverId: props.serverId, agentId })}
-      answers={() => answers}
+      answers={answers}
       voice={voice}
       agents={dock.agents()}
       onSelectAgent={(agentId) => selectAgent(agentId)}
@@ -904,7 +908,7 @@ function ScreenAgentDock(props: { serverId: string }) {
         case "usage-limit-send":
           void dock
             .sendOnBackup(action.agentId, action.optionKey, action.remember)
-            .catch(() => dock.failBackupSend(action.agentId));
+            .catch((error: unknown) => dock.failBackupSend(action.agentId, error));
           return;
         case "usage-limit-wait":
           dock.waitForReset(action.agentId);

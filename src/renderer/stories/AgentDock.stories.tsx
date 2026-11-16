@@ -488,7 +488,7 @@ function AgentDockStory(props: {
           return { messageId: id };
         }}
         onOpenInMain={() => undefined}
-        answers={() => answers}
+        answers={answers}
         agents={AGENTS}
       />
       <Show when={props.edgeStrip}>

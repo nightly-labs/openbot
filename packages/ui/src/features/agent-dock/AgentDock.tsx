@@ -233,10 +233,10 @@ export interface AgentDockProps {
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
   /**
-   * How the chat of a seat answers the requests that the agent waits for. Without it, the chat shows
-   * the wait bar, which opens the main window.
+   * How the chats answer the requests that the agents wait for. Without it, a chat shows the wait bar,
+   * which opens the main window.
    */
-  answers?: ((seat: AgentDockSeatRef) => AgentDockChatAnswers) | undefined;
+  answers?: AgentDockChatAnswers | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
   /** Turns the dock off. The right-click menus of the dock show the item only when it is set. */
@@ -805,11 +805,6 @@ export function AgentDock(props: AgentDockProps) {
       onFinish: () => voice.onFinish(),
       onSend: () => voice.onSend(),
     };
-  }
-
-  /** How the chat of a seat answers requests, or none when the app does not answer them in the dock. */
-  function answersFor(id: string): AgentDockChatAnswers | undefined {
-    return props.answers?.(refOfKey(id));
   }
 
   /** The chat menu's "Open in new window" action, or none for a channel or when the app cannot open one. */
@@ -1516,7 +1511,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
-                    answers={answersFor(id)}
+                    answers={props.answers}
                   />
                 )}
               </Show>

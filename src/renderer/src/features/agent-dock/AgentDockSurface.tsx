@@ -450,7 +450,7 @@ export function AgentDockSurface() {
             onOpenWindow={(agentId) =>
               void perform({ type: "open-window", serverId: server, agentId }).catch(() => undefined)
             }
-            answers={() => answersFor(server)}
+            answers={answersFor(server)}
             agents={agents()}
             onSelectAgent={(agentId) =>
               void perform({ type: "open-agent", serverId: server, agentId }).catch(() => undefined)
