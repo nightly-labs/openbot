@@ -70,6 +70,9 @@ process.stdin.on("data", (chunk) => {
   if (!line) continue;
     const message = JSON.parse(line);
     const params = message.params || {};
+    // A notification, such as "initialized", carries no id and takes no answer: writing
+    // {result:{}} for it is not a JSON-RPC message, and the client refuses the whole stream.
+    if (message.id === undefined) continue;
     if (message.method === "initialize") write({ id: message.id, result: {} });
     else if (message.method === "account/read") write({ id: message.id, result: { account: { type: "chatgpt", email: "codex@example.com" } } });
     else if (message.method === "account/rateLimits/read") write({ id: message.id, result: { rateLimits: { limitId: "codex", primary: null, secondary: null }, rateLimitsByLimitId: null } });
@@ -88,19 +91,17 @@ process.stdin.on("data", (chunk) => {
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       const match = text.match(/<<ARGS(.+)ARGS>>/);
       if (match) {
-        const args = JSON.parse(match[1]);
+        const { __tool, ...args } = JSON.parse(match[1]);
         const callId = "call-" + turnId;
-        write({ method: "item/tool/call", params: { threadId: params.threadId, turnId, item: { id: callId, tool: args.__tool, arguments: args, status: "inProgress" } } });
+        write({ id: callId, method: "item/tool/call", params: { threadId: params.threadId, turnId, callId, namespace: "openbot", tool: "tool_call", arguments: { name: "openbot." + __tool, arguments: args } } });
         waiting.set(callId, { threadId: params.threadId, turnId, callId, tool: args.__tool });
       } else finish(params.threadId, turnId);
-    } else if (message.method === "item/tool/result") {
-      const pending = waiting.get(params.callId);
-      if (pending) {
-        waiting.delete(params.callId);
-        log({ turnId: pending.turnId, result: params.result });
-        finish(pending.threadId, pending.turnId);
-      }
-      write({ id: message.id, result: {} });
+    } else if (message.id !== undefined && waiting.has(message.id)) {
+      // The client answers the item/tool/call request by its id; that answer closes the turn.
+      const pending = waiting.get(message.id);
+      waiting.delete(message.id);
+      log({ turnId: pending.turnId, result: message.result });
+      finish(pending.threadId, pending.turnId);
     } else write({ id: message.id, result: {} });
   }
 });
@@ -168,6 +169,8 @@ interface Report {
   error?: string;
 }
 const report: Report = { passed: false, checks: [] };
+/** Set as soon as the service exists, so the finally block can always stop the provider process. */
+let stopService: (() => Promise<void>) | undefined;
 
 type PreviewToolArgs = z.infer<typeof previewAgentImportToolSchema>;
 type ApplyToolArgs = z.infer<typeof applyAgentImportToolSchema>;
@@ -332,6 +335,7 @@ try {
     offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
     agentImportTools: () => agentImportHolder.current,
   });
+  stopService = () => runCauseEffect(service.stop());
   await runCauseEffect(service.initialize());
 
   const approvals: { requestId: string | number; reason: string | null }[] = [];
@@ -355,10 +359,17 @@ try {
       description: "Runs import tools in the e2e.",
       avatarSeed: "coordinator",
       avatarHue: null,
-      initialMessage: "",
+      // createAgent refuses an empty initial message, and the chat turn it starts has to end
+      // before the first import call, or the two deliveries share one chat queue.
+      initialMessage: "Hello.",
       provider: "codex",
       model: MODEL,
     }),
+  );
+  await waitFor("the coordinator chat turn to end", () =>
+    service
+      .listQueue(coordinator.id)
+      .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status)),
   );
 
   const alphaZip = await buildZip("alpha", "Alpha");
@@ -403,6 +414,9 @@ try {
   report.error = error instanceof Error ? error.message : String(error);
   throw error;
 } finally {
+  // Without stopping the service the provider process stays open and the script never exits,
+  // which reads as a hang instead of the pass or fail the checks decided.
+  await stopService?.().catch(() => {});
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
