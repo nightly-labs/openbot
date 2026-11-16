@@ -135,14 +135,18 @@
   white-space: pre-wrap;
 }
 
-/* A taller window shows more of a chart or a screenshot. */
 .message-markdown-image {
   display: block;
   width: auto;
   max-width: 100%;
-  max-height: clamp(360px, 55vh, 640px);
+  max-height: 360px;
   border-radius: var(--openbot-radius-md);
   object-fit: contain;
+}
+
+/* In an agent reply, a taller window shows more of a chart or a screenshot. */
+.message-entry-agent .message-content-blocks .message-markdown-image {
+  max-height: clamp(360px, 55vh, 640px);
 }
 
 /* The image opens in the image viewer. The button keeps the image's own size. */
