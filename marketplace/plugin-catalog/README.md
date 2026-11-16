@@ -133,23 +133,31 @@ Troubleshooting:
 ## Omnisend
 
 The listing connects to Omnisend's own MCP server at `https://mcp.omnisend.com/mcp`
-(<https://api-docs.omnisend.com/reference/mcp-server>). The server uses OAuth with
-dynamic client registration, so the user signs in through the browser and types
-no key. The user selects the access level on Omnisend's consent screen. The
-account needs the Owner, Admin, Manager or Partner role.
+(<https://api-docs.omnisend.com/reference/mcp-server>) with an Omnisend API key in an
+`X-Api-Key` header. The user creates the key at
+<https://app.omnisend.com/integrations/api-keys>.
+
+The listing has no browser sign-in (#7722, #9372). Omnisend's documentation names only OAuth
+with dynamic client registration, but the registration endpoint accepts only the client
+names that Omnisend approved and answers OpenBot with 400 `invalid_client_metadata`
+("unknown application: OpenBot"). `/v2/mcp` names the same metadata. The server's 401
+challenge asks for "Authorization or X-Api-Key", and a tool call with a wrong key returns
+the Omnisend API's own 401, so the server passes the key to the API. No Omnisend document
+says that an API key works for MCP, and the listing was not tested with a real key. Add a
+`link` flow again when Omnisend registers OpenBot.
 
 The server shows four tools: `search`, `tool_schema`, `tool_documentation` and
 `execute`. The agent finds an Omnisend operation with `search` and runs it with
-`execute`. With write access, the operations include sending and deleting
-campaigns, automations and segments.
+`execute`. The operations include sending and deleting campaigns, automations and
+segments, when the key allows them.
 
 Troubleshooting:
 
-- A write fails with "Permission denied": the user granted read-only access.
-  Disconnect and sign in again with write access.
-- The account has more than one brand: one connection works on one brand.
-  Omnisend's guide adds a separate server for each brand with a `?brand=` query
-  parameter; add it in the MCP servers settings and select Sign in.
+- A tool answers "downstream returned 401": the key is wrong or was deleted. Create a
+  new key and connect again. The connection test does not find a wrong key: the server
+  lists its tools with any key and checks the key only when `execute` runs.
+- The account has more than one brand: one key works on one brand. Add a separate
+  server for each brand, with the key of that brand, in the MCP servers settings.
 
 ## Honcho
 
@@ -413,3 +421,24 @@ Troubleshooting:
 - A tool answers 401: the key was rotated or deleted. Create a new key and connect again.
 - A tool answers 403: the key does not have the scope for that object. Edit the key in HubSpot and
   add the scope.
+
+## Tessie
+
+The listing connects to Tessie's MCP server at `https://mcp.tessie.com`
+(<https://developer.tessie.com/reference/mcp>) with a Tessie access token in
+`Authorization: Bearer …`. The user creates the token in Tessie's Developer Settings
+(<https://dash.tessie.com/settings/developer>). This is what Tessie's guide gives for
+agents other than Claude, ChatGPT and Grok.
+
+The listing has no browser sign-in (#9372). The authorization server
+`https://auth.tessie.com` lists a registration endpoint, but it registers only the
+clients that match its templates. It answers OpenBot with 400 `invalid_client_metadata`
+("No dynamic client registration template matched this request."). Add a `link` flow
+again only when a registration for OpenBot succeeds.
+
+The token can read the vehicles and send commands, such as unlock and remote start.
+
+Troubleshooting:
+
+- Connect shows "The server answered 401": the token is wrong or was deleted. Create a
+  new token and connect again.
