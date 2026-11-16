@@ -94,6 +94,7 @@ async function createRecoveryUpdater(
     ...(typeof process.getuid === "function" ? { currentUid: process.getuid() } : {}),
     platform: process.platform,
     logDirectory: join(app.getPath("userData"), "logs", "update"),
+    appImagePath: process.env.APPIMAGE?.trim() || undefined,
     updaterCacheDirectory: electronUpdaterCacheDirectory(),
   });
 }

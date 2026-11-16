@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { constants } from "node:fs";
 import { access, appendFile, mkdir, readdir, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import type {
   IdleRestart,
   ScheduledUpdateRestart,
@@ -133,6 +133,8 @@ interface UpdateServiceOptions {
   platform?: NodeJS.Platform;
   /** macOS: the application bundle that Squirrel.Mac replaces. */
   appBundlePath?: string | undefined;
+  /** Linux: the AppImage file that electron-updater replaces (`APPIMAGE`). */
+  appImagePath?: string | undefined;
   logDirectory?: string;
   shipItDirectory?: string | undefined;
   /** electron-updater's cache directory, named by `updaterCacheDirName` in `app-update.yml`. */
@@ -221,6 +223,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     Pick<
       UpdateServiceOptions,
       | "appBundlePath"
+      | "appImagePath"
       | "beforeInstall"
       | "checkSiblingInstances"
       | "currentUid"
@@ -667,6 +670,13 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         logger.warn("OpenBot update install refused: the application runs from a read-only volume.");
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.readOnlyLocation")) });
       }
+      const appImage = this.#options.platform === "linux" ? this.#options.appImagePath : undefined;
+      const appImageProblem = appImage ? yield* findAppImageInstallProblem(appImage) : null;
+      if (appImageProblem) {
+        logger.warn(`OpenBot update install refused: the AppImage ${appImageProblem}.`);
+        const key = appImageProblem === "is missing" ? "error.update.appImageMissing" : "error.update.appImageReadOnly";
+        return yield* new UpdateOperationFailure({ cause: new Error(sourceText(key)) });
+      }
       if (this.#managedByHost) return yield* new UpdateOperationFailure({ cause: new Error(MANAGED_HOST_MESSAGE) });
       if (!this.#canInstall() || this.#installStarted)
         return yield* new UpdateOperationFailure({ cause: new Error(sourceText("error.update.notReady")) });
@@ -1030,6 +1040,33 @@ function isOnReadOnlyVolume(bundlePath: string): Effect.Effect<boolean> {
       Effect.succeed(typeof cause === "object" && cause !== null && "code" in cause && cause.code === "EROFS"),
     ),
   );
+}
+
+/**
+ * electron-updater deletes the AppImage file that `APPIMAGE` names and moves the download into its
+ * folder. It finds a problem with either only inside `quitAndInstall`, after shutdown preparation, so
+ * the app quit with no message (#9779): a file that was moved, renamed or replaced while OpenBot ran,
+ * or a folder that this user cannot write to. Checked first, the app stays open.
+ */
+function findAppImageInstallProblem(appImagePath: string): Effect.Effect<"is missing" | "folder is read-only" | null> {
+  return Effect.gen(function* () {
+    const missing = yield* updateIO(() => stat(appImagePath)).pipe(
+      Effect.as(false),
+      Effect.catch(({ cause }) => Effect.succeed(isMissingPathError(cause))),
+    );
+    if (missing) return "is missing";
+    const writable = yield* updateIO(() => access(dirname(appImagePath), constants.W_OK)).pipe(
+      Effect.as(true),
+      Effect.catch(() => Effect.succeed(false)),
+    );
+    return writable ? null : "folder is read-only";
+  });
+}
+
+/** A path that does not exist, or that has a file where a folder must be. */
+function isMissingPathError(cause: unknown): boolean {
+  const code = typeof cause === "object" && cause !== null && "code" in cause ? cause.code : undefined;
+  return code === "ENOENT" || code === "ENOTDIR";
 }
 
 function errorMessage(code: UpdateFailureCode) {
