@@ -102,6 +102,8 @@ export const messages = {
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
   "error.agent.toolLoopStopped":
     "{provider} a répété de nombreuses fois une étape en échec, donc OpenBot a arrêté ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.answerCutOff":
+    "L’agent s’est arrêté avant de terminer sa réponse, donc la réponse n’est pas complète. Renvoyez le message.",
   "error.agent.compactionConnectionLost":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet, puis envoyez un message pour continuer.",
   "error.agent.compactionLoopStopped":

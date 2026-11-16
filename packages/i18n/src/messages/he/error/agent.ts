@@ -85,6 +85,7 @@ export const messages = {
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
   "error.agent.toolLoopStopped":
     "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
+  "error.agent.answerCutOff": "הסוכן נעצר לפני שסיים את התשובה שלו, ולכן התשובה אינה מלאה. שלחו את ההודעה שוב.",
   "error.agent.compactionConnectionLost":
     "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו, ולכן המשימה נעצרה. יש לבדוק את חיבור האינטרנט ולשלוח הודעה כדי להמשיך.",
   "error.agent.compactionLoopStopped":

@@ -79,6 +79,7 @@ export const messages = {
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.toolLoopStopped":
     "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.answerCutOff": "智能体在完成回答之前停止了，因此回答不完整。请重新发送消息。",
   "error.agent.compactionConnectionLost":
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
   "error.agent.compactionLoopStopped":

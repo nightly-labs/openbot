@@ -102,6 +102,8 @@ export const messages = {
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
   "error.agent.toolLoopStopped":
     "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
+  "error.agent.answerCutOff":
+    "De agent stopte voordat het antwoord klaar was, dus het antwoord is niet volledig. Stuur het bericht opnieuw.",
   "error.agent.compactionConnectionLost":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
   "error.agent.compactionLoopStopped":
