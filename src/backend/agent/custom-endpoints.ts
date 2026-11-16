@@ -39,7 +39,7 @@ export interface CustomEndpointsHooks {
   preference(): ProviderPreference;
 }
 
-export interface SavedEndpoint {
+interface SavedEndpoint {
   readonly harness: CustomProviderHarness;
   /** The saved models, as the harness lists them: `<endpoint id>/<model id>`, encoded where Pi encodes it. */
   readonly models: readonly string[];
