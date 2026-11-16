@@ -3,8 +3,6 @@ import { ScrollView, type ScrollViewProps } from "react-native";
 import { type Gesture, ScrollView as GestureScrollView } from "react-native-gesture-handler";
 
 export type ChatSwipeGesture = ReturnType<typeof Gesture.Pan>;
-/** The older gesture of the message list: the swipe away from Back. */
-export type ChatListGesture = ReturnType<typeof Gesture.Pan>;
 
 /**
  * The swipe away from Back over the messages of an agent's chat. A message bubble that replies with a

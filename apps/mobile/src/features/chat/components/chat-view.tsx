@@ -1284,7 +1284,6 @@ export function ChatView({
             <ChatMessageList
               // Only an agent's chat has the swipe: it is off in a channel. Every chat has the pull.
               swipeGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
-              listGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
               pullGesture={endPull.gesture}
               pullShift={endPull.shift}
               agents={serverAgents}
