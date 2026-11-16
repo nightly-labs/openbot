@@ -59,8 +59,7 @@ function assetsFor(board: WfnBoard, filter: AssetFilter): readonly StoredFileRow
   const available = libraryFiles(board).filter((file) => file.status === "available");
   if (filter === "images") return available.filter((file) => file.previewKind === "image");
   if (filter === "files") return available.filter((file) => file.previewKind !== "image");
-  // A host sends its Library largest first, so Recent puts the newest first itself.
-  return [...available].sort((left, right) => right.createdAt.localeCompare(left.createdAt)).slice(0, 9);
+  return available.slice(0, 9);
 }
 
 function fileExtension(name: string): string {

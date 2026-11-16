@@ -2623,15 +2623,12 @@ export async function createApplicationServices({
         ),
       mediaProviders: () => service.workflowMediaProviders(),
       mediaCredits: (only) => service.workflowMediaCredits(only),
-      // A kept picture is new in the Library, so the next scan must not answer from before it.
+      // A kept picture is new in the Library, so the next scan must not answer from before it. A failure
+      // after the file is stored also clears the scan.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(
-          Effect.tap((kept) =>
-            Effect.sync(() => {
-              if (typeof kept !== "string") storageUsage.invalidate();
-            }),
-          ),
           Effect.map((kept) => (typeof kept === "string" ? kept : kept.id)),
+          Effect.ensuring(Effect.sync(() => storageUsage.invalidate())),
         ),
       notify: forwardWorkflowNotice,
       connectionOn: (connectionId) => service.messaging.store.connection(connectionId)?.enabled === true,
