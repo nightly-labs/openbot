@@ -1331,6 +1331,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                       providerFailure(new TimeoutError(`${this.#label} request timed out: account/rateLimits/read`)),
                     ),
                 }),
+                // Grok CLI 1.0.77 fails `_x.ai/billing` with "Internal error" and its reason, such as
+                // "Failed to fetch billing data: …", in `data`. The usage log reads only the message (#10006).
+                Effect.mapError((failure) => providerFailure(this.#withFailureDetail(failure.cause))),
               )
             : { rateLimits: null, rateLimitsByLimitId: null };
           return yield* providerSync(() => decoder(response));
