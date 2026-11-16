@@ -231,6 +231,8 @@ export const messages = {
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
+  "error.backend.mcpSignInAppRefused":
+    "שרת ההתחברות לא קיבל את אפליקציית ההתחברות של השרת הזה. יש לבדוק את ה-Client ID ואת ה-Client secret של אפליקציית ההתחברות, ואז להתחבר שוב.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",

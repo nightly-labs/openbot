@@ -258,6 +258,8 @@ export const messages = {
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
+  "error.backend.mcpSignInAppRefused":
+    "サインインサーバーがこのサーバーのサインインアプリを受け付けませんでした。サインインアプリのクライアント ID とクライアントシークレットを確認してから、もう一度サインインしてください。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
