@@ -256,7 +256,9 @@ export function stripeSource(options: StripeSourceOptions): CrmSourceAdapter {
           const currency = invoice.currency.toUpperCase();
           const removed = invoice.status === "void";
           const found = yield* customerOf(invoice.customer);
-          const customer = found ?? (removed && typeof invoice.customer === "string" ? { id: invoice.customer } : null);
+          // A voided invoice of a deleted customer still removes its open payment: the ref is enough.
+          const ref = typeof invoice.customer === "string" ? invoice.customer : (invoice.customer?.id ?? null);
+          const customer = found ?? (removed && ref !== null ? { id: ref } : null);
           if (customer === null) return null;
           const paid = invoice.status === "paid";
           const subscription = invoice.parent?.subscription_details?.subscription;

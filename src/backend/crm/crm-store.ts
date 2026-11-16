@@ -1171,9 +1171,13 @@ export class CrmWrite {
       this.#db
         .prepare("UPDATE crm_plans SET amount_minor = ?, updated_at = ? WHERE plan_id = ?")
         .run(patch.amountMinor, this.#at, planId);
+      // Only an open payment that still has the plan amount follows it. A split part or a changed amount stays.
       this.#db
-        .prepare("UPDATE crm_payments SET amount_minor = ?, updated_at = ? WHERE plan_id = ? AND paid_at IS NULL")
-        .run(patch.amountMinor, this.#at, planId);
+        .prepare(
+          `UPDATE crm_payments SET amount_minor = ?, updated_at = ?
+           WHERE plan_id = ? AND paid_at IS NULL AND amount_minor = ?`,
+        )
+        .run(patch.amountMinor, this.#at, planId, plan.amountMinor);
       changed("amountMinor", plan.amountMinor, patch.amountMinor);
     }
     if (patch.every !== undefined && patch.every !== plan.every) {

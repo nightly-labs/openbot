@@ -333,6 +333,8 @@ class SourceSync {
     if (existing === null && !active) return;
     if (plan.every === null) {
       if (existing === null) this.#skips.interval += 1;
+      // The CRM cannot show the new interval, but it still shows that the plan ended.
+      else this.#planEnd(existing, plan.endsOn, cut(plan.name, CRM_LIMITS.label));
       return;
     }
     const customerId = this.#owner(plan.customer, plan.currency, active);
@@ -378,6 +380,9 @@ class SourceSync {
     const planId = requiredStringColumn(existing, "plan_id");
     const owner = requiredStringColumn(existing, "customer_id");
     this.#own("crm_plans", "plan_id", planId);
+    // Remove the old end first: the CHECK ends_on >= starts_on refuses a new start after the old end.
+    if (existing.ends_on !== plan.endsOn && existing.ends_on !== null)
+      this.#db.prepare("UPDATE crm_plans SET ends_on = NULL WHERE plan_id = ?").run(planId);
     const before = existing.name;
     const changes = [
       ["name", "name", existing.name, name],
@@ -396,11 +401,18 @@ class SourceSync {
         currency: plan.currency,
       });
     }
-    if (existing.ends_on !== plan.endsOn) {
-      this.#update("crm_plans", "plan_id", planId, "ends_on", plan.endsOn);
-      if (plan.endsOn !== null)
-        this.#record(owner, "plan-ended", { plan: name, endsOn: plan.endsOn, removedPayments: 0 });
-    }
+    this.#planEnd(existing, plan.endsOn, name);
+  }
+
+  #planEnd(existing: DynamicRecord, endsOn: string | null, name: string): void {
+    if (existing.ends_on === endsOn) return;
+    this.#update("crm_plans", "plan_id", requiredStringColumn(existing, "plan_id"), "ends_on", endsOn);
+    if (endsOn !== null)
+      this.#record(requiredStringColumn(existing, "customer_id"), "plan-ended", {
+        plan: name,
+        endsOn,
+        removedPayments: 0,
+      });
   }
 
   payment(payment: SourcePayment): void {

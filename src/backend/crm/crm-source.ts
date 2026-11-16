@@ -120,6 +120,8 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
         }
         const result = yield* found.open(key).pipe(
           Effect.flatMap((session) => pull(sourceId, session)),
+          // A database error in a batch is a defect. The source shows the error, and the next sync tries again.
+          Effect.catchDefect(() => Effect.fail("defect" as const)),
           Effect.result,
         );
         const syncedAt = now().toISOString();
@@ -131,8 +133,9 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
               : sources.setState(sourceId, { state: "error", errorCode: "stripe" }),
         );
       }).pipe(
-        // A missing source was disconnected during the wait.
+        // A missing source was disconnected during the wait. A defect must not stop the poll.
         Effect.catch(() => Effect.void),
+        Effect.catchDefect(() => Effect.void),
         Effect.ensuring(Effect.sync(changed)),
       ),
     );
@@ -167,12 +170,17 @@ export const makeCrmSources = Effect.fn("makeCrmSources")(function* (options: {
         return yield* new CrmError({ code: "refused", message: sourceText("error.crm.invalidChange") });
       const key = input.key.trim();
       const account = yield* found.check(key).pipe(Effect.mapError(failure));
-      if (store.sources().some((source) => source.kind === input.kind))
-        return yield* new CrmError({ code: "refused", message: sourceText("error.crm.sourceConnected") });
-      yield* dependencies.keys.set(input.kind, key);
-      const source = yield* attempt(() =>
-        sources.insert({ kind: input.kind, ...account, keyHint: key.slice(-4) }),
-      ).pipe(Effect.tapError(() => dependencies.keys.set(input.kind, null).pipe(Effect.ignore)));
+      // One connect at a time: a second connect must not replace or clear the key of the first.
+      const source = yield* lock.withPermit(
+        Effect.gen(function* () {
+          if (store.sources().some((source) => source.kind === input.kind))
+            return yield* new CrmError({ code: "refused", message: sourceText("error.crm.sourceConnected") });
+          yield* dependencies.keys.set(input.kind, key);
+          return yield* attempt(() => sources.insert({ kind: input.kind, ...account, keyHint: key.slice(-4) })).pipe(
+            Effect.onError(() => dependencies.keys.set(input.kind, null).pipe(Effect.ignore)),
+          );
+        }),
+      );
       yield* Effect.sync(changed);
       yield* start(source.id);
       return { ok: true, id: source.id } satisfies CrmApplyResult;

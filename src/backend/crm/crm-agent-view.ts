@@ -64,7 +64,8 @@ function activityParts(kind: string, field: unknown): CrmPrivateField[] {
 const PART_KEYS: { [Part in CrmPrivateField]?: readonly string[] } = {
   amounts: ["amountMinor"],
   dates: ["dueOn", "paidAt", "startsOn", "endsOn"],
-  plans: ["plan"],
+  // A payment label can be the plan name, and the entry does not say if the payment had a plan.
+  plans: ["plan", "label"],
 };
 
 function hiddenList(hidden: Hidden): CrmPrivateField[] {
@@ -185,7 +186,9 @@ function formatCrmAmount(minor: number, currency: string): string {
 
 /** Minor units of decimal text such as "129", "129.5" or "129.50 EUR". */
 function parseCrmAmount(text: string, currency: string): number {
-  const match = /^(\d+)(?:\.(\d+))?(?:\s+([A-Za-z]{3}))?$/u.exec(text.trim().replaceAll(",", ""));
+  // A comma groups thousands only ("1,290.50"). "129,50" is refused, not read as 12950.
+  const plain = text.trim().replace(/^\d{1,3}(?:,\d{3})+(?=\.|\s|$)/u, (whole) => whole.replaceAll(",", ""));
+  const match = /^(\d+)(?:\.(\d+))?(?:\s+([A-Za-z]{3}))?$/u.exec(plain);
   const whole = match?.[1];
   if (!match || whole === undefined || (match[3] !== undefined && match[3].toUpperCase() !== currency))
     throw crmRefused("error.crm.amountInvalid");
@@ -289,7 +292,8 @@ export class CrmAgentView {
       id: payment.id,
       number: payment.number,
       customer: { id: payment.customerId, name: this.#name(payment.customerName, payment.customerNumber, hidden) },
-      label: payment.label,
+      // A plan payment has the plan name as its label.
+      label: hidden.has("plans") && payment.planId !== null ? null : payment.label,
       amount: hidden.has("amounts") ? null : formatCrmAmount(payment.amountMinor, payment.currency),
       dueOn: hidden.has("dates") ? null : payment.dueOn,
       paidAt: hidden.has("dates") ? null : payment.paidAt,
@@ -308,6 +312,8 @@ export class CrmAgentView {
       details.to = CRM_HIDDEN;
     }
     for (const part of hidden) for (const key of PART_KEYS[part] ?? []) delete details[key];
+    // The id of a link is the Stripe customer id.
+    if (activity.kind === "customer-linked" && hidden.has("stripeCustomerId")) delete details.id;
     const currency = details.currency;
     if (isString(currency)) {
       for (const key of ["amountMinor", ...(field === "amountMinor" ? ["from", "to"] : [])]) {
