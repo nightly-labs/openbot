@@ -130,15 +130,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "Een visual van een agent staat op volle hoogte in de chat. Als dit uit staat, wordt een hoge visual afgekapt. Tik erop om alles te zien.",
   "mobile.settings.animations.title": "Animaties",
-  "mobile.settings.animations.footer":
-    "Zet Animaties uit om beweging in de hele app te beperken. Als Beperk beweging aanstaat in de instellingen van je telefoon, beperkt de app ook beweging. De animaties hieronder blijven dan uit.",
-  "mobile.settings.animations.all": "Animaties",
+  "mobile.settings.animations.fullMotion": "Volledige beweging",
+  "mobile.settings.animations.reduced": "Beperkt",
+  "mobile.settings.animations.motionFooter":
+    "Beperkt vermindert beweging in de hele app en houdt de animaties hieronder uit. Als Beperk beweging aan staat in de instellingen van je telefoon, vermindert de app ook beweging.",
   "mobile.settings.animations.agentFaces": "Geanimeerde agentgezichten",
   "mobile.settings.animations.agentFacesFooter":
     "Agentavatars bewegen hun gezicht terwijl de agents werken en rusten. Als dit uitstaat, blijven de gezichten stil en zweven de figuren op het welkomstscherm en het lege startscherm niet meer.",
-  "mobile.settings.animations.composerResize": "Compact berichtveld",
-  "mobile.settings.animations.composerResizeFooter":
-    "Het berichtveld wordt een kleine balk zolang het toetsenbord dicht is. Als dit uitstaat, blijft het veld op volledige grootte.",
   "mobile.settings.animations.textReveal": "Antwoorden animeren",
   "mobile.settings.animations.textRevealFooter":
     "Een antwoord verschijnt woord voor woord en de ballon groeit vloeiend mee. Als dit uitstaat, wordt de tekst getoond zodra die binnenkomt.",
@@ -232,6 +230,14 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Grote bestanden automatisch downloaden",
   "mobile.settings.conversations.largeFilesFooter":
     "Afbeeldingen, video’s en audio groter dan {small} worden pas gedownload als je erop tikt. Zet dit aan om ze meteen te downloaden, tot {large}. Dit kan veel mobiele data gebruiken.",
+  "mobile.settings.conversations.messageField": "Berichtveld",
+  "mobile.settings.conversations.compact": "Compact",
+  "mobile.settings.conversations.fullSize": "Volledige grootte",
+  "mobile.settings.conversations.compactFooter":
+    "Compact maakt het berichtveld een kleine balk zolang het toetsenbord dicht is.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Beweging is beperkt in Animaties of in de instellingen van je telefoon, dus het berichtveld blijft volledig groot.",
+  "mobile.settings.conversations.media": "Foto's en bestanden",
   "mobile.settings.conversations.swipeLeft": "Naar links vegen in een agentchat",
   "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
   "mobile.settings.conversations.swipeThreads": "Threads",

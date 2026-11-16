@@ -143,15 +143,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "يظهر العرض المرئي من الوكيل في الدردشة بارتفاعه الكامل. عند إيقاف هذا الخيار، يُقص العرض الطويل، ويمكنك النقر عليه لرؤيته كاملًا.",
   "mobile.settings.animations.title": "الحركات",
-  "mobile.settings.animations.footer":
-    "أوقف «الحركات» لتقليل الحركة في التطبيق كله. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا، وتبقى الحركات أدناه متوقفة.",
-  "mobile.settings.animations.all": "الحركات",
+  "mobile.settings.animations.fullMotion": "حركة كاملة",
+  "mobile.settings.animations.reduced": "مخفّضة",
+  "mobile.settings.animations.motionFooter":
+    "يقلّل خيار «مخفّضة» الحركة في التطبيق كله ويُبقي الرسوم المتحركة أدناه متوقفة. عند تشغيل «تقليل الحركة» في إعدادات هاتفك، يقلّل التطبيق الحركة أيضًا.",
   "mobile.settings.animations.agentFaces": "وجوه الوكلاء المتحركة",
   "mobile.settings.animations.agentFacesFooter":
     "تحرّك الصور الرمزية للوكلاء وجوهها أثناء عمل الوكلاء وراحتهم. عند إيقاف هذا، تبقى الوجوه ثابتة، وتتوقف الشخصيات في شاشة الترحيب والشاشة الرئيسية الفارغة عن الطفو.",
-  "mobile.settings.animations.composerResize": "حقل رسالة مضغوط",
-  "mobile.settings.animations.composerResizeFooter":
-    "يصبح حقل الرسالة شريطًا صغيرًا عندما تكون لوحة المفاتيح مغلقة. عند إيقاف هذا، يبقى الحقل بحجمه الكامل.",
   "mobile.settings.animations.textReveal": "تحريك الردود",
   "mobile.settings.animations.textRevealFooter":
     "يُكتب الرد كلمةً كلمة، وتكبر فقاعته بسلاسة. عند إيقاف هذا، يظهر النص كما يصل.",
@@ -243,6 +241,13 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "تنزيل الملفات الكبيرة تلقائيًا",
   "mobile.settings.conversations.largeFilesFooter":
     "الصور والفيديوهات والملفات الصوتية الأكبر من {small} لا تُنزَّل إلا عند الضغط عليها. فعّل هذا الخيار لتنزيلها مباشرةً حتى {large}. قد يستهلك هذا الكثير من بيانات الجوال.",
+  "mobile.settings.conversations.messageField": "حقل الرسالة",
+  "mobile.settings.conversations.compact": "مضغوط",
+  "mobile.settings.conversations.fullSize": "الحجم الكامل",
+  "mobile.settings.conversations.compactFooter": "يجعل «مضغوط» حقل الرسالة شريطًا صغيرًا عندما تكون لوحة المفاتيح مغلقة.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "الحركة مخفّضة في الرسوم المتحركة أو في إعدادات هاتفك، لذا يبقى حقل الرسالة بحجمه الكامل.",
+  "mobile.settings.conversations.media": "الصور والملفات",
   "mobile.settings.conversations.swipeLeft": "السحب لليسار في محادثة وكيل",
   "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
   "mobile.settings.conversations.swipeThreads": "السلاسل",

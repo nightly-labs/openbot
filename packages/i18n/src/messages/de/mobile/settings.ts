@@ -135,15 +135,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "Ein Visual eines Agenten erscheint im Chat in voller Höhe. Wenn dies aus ist, wird ein hohes Visual abgeschnitten. Tippe darauf, um alles zu sehen.",
   "mobile.settings.animations.title": "Animationen",
-  "mobile.settings.animations.footer":
-    "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
-  "mobile.settings.animations.all": "Animationen",
+  "mobile.settings.animations.fullMotion": "Volle Bewegung",
+  "mobile.settings.animations.reduced": "Reduziert",
+  "mobile.settings.animations.motionFooter":
+    "Reduziert verringert die Bewegung in der ganzen App und hält die Animationen unten aus. Wenn „Bewegung reduzieren“ in den Telefoneinstellungen an ist, reduziert die App die Bewegung ebenfalls.",
   "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
   "mobile.settings.animations.agentFacesFooter":
     "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still, und die Figuren auf dem Willkommensbildschirm und dem leeren Startbildschirm schweben nicht mehr.",
-  "mobile.settings.animations.composerResize": "Kompaktes Nachrichtenfeld",
-  "mobile.settings.animations.composerResizeFooter":
-    "Das Nachrichtenfeld wird zu einer kleinen Leiste, solange die Tastatur geschlossen ist. Wenn dies aus ist, bleibt das Feld in voller Größe.",
   "mobile.settings.animations.textReveal": "Antworten animieren",
   "mobile.settings.animations.textRevealFooter":
     "Eine Antwort erscheint Wort für Wort, und ihre Sprechblase wächst sanft mit. Wenn dies aus ist, wird der Text angezeigt, sobald er ankommt.",
@@ -239,6 +237,14 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.messageField": "Nachrichtenfeld",
+  "mobile.settings.conversations.compact": "Kompakt",
+  "mobile.settings.conversations.fullSize": "Volle Größe",
+  "mobile.settings.conversations.compactFooter":
+    "Kompakt macht das Nachrichtenfeld zu einer kleinen Leiste, solange die Tastatur geschlossen ist.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Bewegung ist unter Animationen oder in den Telefoneinstellungen reduziert, daher bleibt das Nachrichtenfeld in voller Größe.",
+  "mobile.settings.conversations.media": "Fotos und Dateien",
   "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
   "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
   "mobile.settings.conversations.swipeThreads": "Threads",

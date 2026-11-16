@@ -132,15 +132,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "Un visuel d’un agent s’affiche dans le chat sur toute sa hauteur. Si cette option est désactivée, un visuel haut est coupé ; touchez-le pour le voir en entier.",
   "mobile.settings.animations.title": "Animations",
-  "mobile.settings.animations.footer":
-    "Désactivez « Animations » pour réduire les mouvements dans toute l’app. Quand « Réduire les animations » est activé dans les réglages du téléphone, l’app réduit aussi les mouvements. Les animations ci-dessous restent alors désactivées.",
-  "mobile.settings.animations.all": "Animations",
+  "mobile.settings.animations.fullMotion": "Mouvement complet",
+  "mobile.settings.animations.reduced": "Réduit",
+  "mobile.settings.animations.motionFooter":
+    "Réduit diminue les animations dans toute l’app et garde les animations ci-dessous désactivées. Si Réduire les animations est activé dans les réglages du téléphone, l’app réduit aussi les animations.",
   "mobile.settings.animations.agentFaces": "Visages animés des agents",
   "mobile.settings.animations.agentFacesFooter":
     "Les avatars des agents bougent leur visage pendant que les agents travaillent et se reposent. Désactivé, les visages restent immobiles et les personnages de l’écran d’accueil et de l’accueil vide ne flottent plus.",
-  "mobile.settings.animations.composerResize": "Champ de message compact",
-  "mobile.settings.animations.composerResizeFooter":
-    "Le champ de message devient une petite barre quand le clavier est fermé. Désactivé, le champ garde sa taille complète.",
   "mobile.settings.animations.textReveal": "Animer les réponses",
   "mobile.settings.animations.textRevealFooter":
     "Une réponse s’écrit mot par mot, et sa bulle grandit en douceur. Désactivé, le texte s’affiche dès son arrivée.",
@@ -235,6 +233,14 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Télécharger les gros fichiers automatiquement",
   "mobile.settings.conversations.largeFilesFooter":
     "Les images, vidéos et fichiers audio de plus de {small} ne se téléchargent que lorsque vous les touchez. Activez cette option pour les télécharger directement, jusqu’à {large}. Cela peut utiliser beaucoup de données mobiles.",
+  "mobile.settings.conversations.messageField": "Champ de message",
+  "mobile.settings.conversations.compact": "Compact",
+  "mobile.settings.conversations.fullSize": "Taille complète",
+  "mobile.settings.conversations.compactFooter":
+    "Compact transforme le champ de message en petite barre tant que le clavier est fermé.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Les animations sont réduites dans Animations ou dans les réglages du téléphone : le champ de message garde sa taille complète.",
+  "mobile.settings.conversations.media": "Photos et fichiers",
   "mobile.settings.conversations.swipeLeft": "Balayer à gauche dans un chat",
   "mobile.settings.conversations.swipeRight": "Balayer à droite dans un chat",
   "mobile.settings.conversations.swipeThreads": "Fils",

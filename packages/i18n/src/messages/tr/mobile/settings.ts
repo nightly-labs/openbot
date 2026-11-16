@@ -130,15 +130,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "Bir ajanın görseli sohbette tam yüksekliğiyle görünür. Bu kapalıyken uzun bir görsel kesilir; tamamını görmek için ona dokunun.",
   "mobile.settings.animations.title": "Animasyonlar",
-  "mobile.settings.animations.footer":
-    "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",
-  "mobile.settings.animations.all": "Animasyonlar",
+  "mobile.settings.animations.fullMotion": "Tam hareket",
+  "mobile.settings.animations.reduced": "Azaltılmış",
+  "mobile.settings.animations.motionFooter":
+    "Azaltılmış, tüm uygulamada hareketi azaltır ve aşağıdaki animasyonları kapalı tutar. Telefon ayarlarınızda Hareketi Azalt açıksa uygulama da hareketi azaltır.",
   "mobile.settings.animations.agentFaces": "Hareketli ajan yüzleri",
   "mobile.settings.animations.agentFacesFooter":
     "Ajanlar çalışırken ve dinlenirken avatarlarının yüzleri hareket eder. Kapalıyken yüzler sabit kalır, karşılama ekranındaki ve boş ana ekrandaki karakterler de süzülmeyi bırakır.",
-  "mobile.settings.animations.composerResize": "Kompakt mesaj alanı",
-  "mobile.settings.animations.composerResizeFooter":
-    "Klavye kapalıyken mesaj alanı küçük bir çubuğa dönüşür. Kapalıyken alan tam boyutunda kalır.",
   "mobile.settings.animations.textReveal": "Yanıtları canlandır",
   "mobile.settings.animations.textRevealFooter":
     "Yanıt kelime kelime yazılır ve balonu yumuşakça büyür. Kapalıyken metin geldiği anda görünür.",
@@ -232,6 +230,13 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Büyük dosyaları otomatik indir",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} üzerindeki görseller, videolar ve sesler yalnızca dokunduğunuzda iner. {large} boyutuna kadar hemen indirmek için bunu açın. Bu çok mobil veri kullanabilir.",
+  "mobile.settings.conversations.messageField": "Mesaj alanı",
+  "mobile.settings.conversations.compact": "Kompakt",
+  "mobile.settings.conversations.fullSize": "Tam boyut",
+  "mobile.settings.conversations.compactFooter": "Kompakt, klavye kapalıyken mesaj alanını küçük bir çubuk yapar.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Hareket, Animasyonlar'da veya telefon ayarlarında azaltıldığı için mesaj alanı tam boyutta kalır.",
+  "mobile.settings.conversations.media": "Fotoğraflar ve dosyalar",
   "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",

@@ -128,15 +128,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "תצוגה חזותית של סוכן מוצגת בצ׳אט בגובה המלא שלה. כשהאפשרות כבויה, תצוגה גבוהה נחתכת, ואפשר להקיש עליה כדי לראות את כולה.",
   "mobile.settings.animations.title": "אנימציות",
-  "mobile.settings.animations.footer":
-    "כיבוי אנימציות מפחית תנועה בכל האפליקציה. כשהפחתת תנועה מופעלת בהגדרות הטלפון, האפליקציה גם מפחיתה תנועה. האנימציות שלהלן נשארות אז כבויות.",
-  "mobile.settings.animations.all": "אנימציות",
+  "mobile.settings.animations.fullMotion": "תנועה מלאה",
+  "mobile.settings.animations.reduced": "מופחתת",
+  "mobile.settings.animations.motionFooter":
+    "האפשרות „מופחתת“ מפחיתה תנועה בכל האפליקציה ומשאירה את האנימציות שלמטה כבויות. כשהפחתת תנועה מופעלת בהגדרות הטלפון, גם האפליקציה מפחיתה תנועה.",
   "mobile.settings.animations.agentFaces": "פרצופי סוכנים מונפשים",
   "mobile.settings.animations.agentFacesFooter":
     "תמונות הסוכנים מזיזות את הפרצוף בזמן שהסוכנים עובדים ונחים. כשהאפשרות כבויה, הפרצופים נשארים במקום, והדמויות במסכי הפתיחה והבית הריקים מפסיקות לרחף.",
-  "mobile.settings.animations.composerResize": "שדה הודעה קומפקטי",
-  "mobile.settings.animations.composerResizeFooter":
-    "שדה ההודעה הופך לסרגל קטן כשהמקלדת סגורה. כשהאפשרות כבויה, השדה נשאר בגודל מלא.",
   "mobile.settings.animations.textReveal": "אנימציה לתשובות",
   "mobile.settings.animations.textRevealFooter":
     "תשובה נכתבת מילה אחר מילה, והבועה שלה גדלה בצורה חלקה. כשהאפשרות כבויה, הטקסט מוצג כפי שהוא מגיע.",
@@ -228,6 +226,13 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "הורדה אוטומטית של קבצים גדולים",
   "mobile.settings.conversations.largeFilesFooter":
     "תמונות, סרטונים וקובצי שמע גדולים מ-{small} יורדו רק אחרי הקשה עליהם. אפשר להפעיל כדי להוריד אותם מיד, עד {large}. הפעולה עשויה לצרוך הרבה נתונים סלולריים.",
+  "mobile.settings.conversations.messageField": "שדה ההודעה",
+  "mobile.settings.conversations.compact": "קומפקטי",
+  "mobile.settings.conversations.fullSize": "גודל מלא",
+  "mobile.settings.conversations.compactFooter": "„קומפקטי“ הופך את שדה ההודעה לפס קטן כשהמקלדת סגורה.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "התנועה מופחתת באנימציות או בהגדרות הטלפון, ולכן שדה ההודעה נשאר בגודל מלא.",
+  "mobile.settings.conversations.media": "תמונות וקבצים",
   "mobile.settings.conversations.swipeLeft": "החלקה שמאלה בצ׳אט של סוכן",
   "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
   "mobile.settings.conversations.swipeThreads": "שרשורים",

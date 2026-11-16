@@ -132,15 +132,13 @@ export const messages = {
   "mobile.settings.appearance.fullVisualsFooter":
     "Um visual de um agente aparece no chat com a altura inteira. Quando isto está desligado, um visual alto é cortado, e você toca nele para ver tudo.",
   "mobile.settings.animations.title": "Animações",
-  "mobile.settings.animations.footer":
-    "Desative Animações para reduzir o movimento em todo o app. Quando Reduzir Movimento está ativado nas configurações do celular, o app também reduz o movimento. As animações abaixo ficam desativadas.",
-  "mobile.settings.animations.all": "Animações",
+  "mobile.settings.animations.fullMotion": "Movimento completo",
+  "mobile.settings.animations.reduced": "Reduzido",
+  "mobile.settings.animations.motionFooter":
+    "Reduzido diminui o movimento em todo o app e mantém as animações abaixo desligadas. Quando Reduzir Movimento está ativado nos ajustes do celular, o app também reduz o movimento.",
   "mobile.settings.animations.agentFaces": "Rostos animados dos agentes",
   "mobile.settings.animations.agentFacesFooter":
     "Os avatares dos agentes mexem o rosto enquanto os agentes trabalham e descansam. Quando desativado, os rostos ficam parados e os personagens da tela de boas-vindas e da tela inicial vazia param de flutuar.",
-  "mobile.settings.animations.composerResize": "Campo de mensagem compacto",
-  "mobile.settings.animations.composerResizeFooter":
-    "O campo de mensagem vira uma barra pequena enquanto o teclado está fechado. Quando desativado, o campo fica no tamanho completo.",
   "mobile.settings.animations.textReveal": "Animar respostas",
   "mobile.settings.animations.textRevealFooter":
     "Uma resposta aparece palavra por palavra, e o balão cresce suavemente. Quando desativado, o texto aparece assim que chega.",
@@ -235,6 +233,14 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
+  "mobile.settings.conversations.messageField": "Campo de mensagem",
+  "mobile.settings.conversations.compact": "Compacto",
+  "mobile.settings.conversations.fullSize": "Tamanho completo",
+  "mobile.settings.conversations.compactFooter":
+    "Compacto deixa o campo de mensagem como uma barra pequena enquanto o teclado está fechado.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "O movimento está reduzido em Animações ou nos ajustes do celular, então o campo de mensagem fica no tamanho completo.",
+  "mobile.settings.conversations.media": "Fotos e arquivos",
   "mobile.settings.conversations.swipeLeft": "Deslizar para a esquerda no chat",
   "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
   "mobile.settings.conversations.swipeThreads": "Tópicos",
