@@ -25,6 +25,8 @@ lxterminal
 pcmanfm
 hsetroot
 fonts-dejavu-core
+# The emoji of the pages that the agent browser opens. Without an emoji font, each emoji is an empty box.
+fonts-noto-color-emoji
 # The Codex sandbox. Without it on PATH, Codex uses its bundled copy and reports an error.
 bubblewrap
 # The Claude sandbox needs bubblewrap and socat. Without socat, each turn of a Claude agent with
