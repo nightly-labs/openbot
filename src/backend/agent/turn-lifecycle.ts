@@ -2281,8 +2281,9 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
         }
-        // A failed turn sends no result, so the agent that asked gets the failure as its answer.
-        if (!continuation && terminal === "failed") {
+        // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
+        // ends a request steered into the turn too, so its sender gets a note and does not wait.
+        if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
         }
         // The requester holds the answers of the other teammates until each request has ended, so
@@ -2716,6 +2717,12 @@ export class TurnLifecycle {
     )
       return;
 
+    // A request steered into a turn for other work has no answer of its own: the turn's answer is for
+    // the person or another request. Its sender gets a note instead of that answer.
+    if (this.#mailbox.steeredIntoOtherWork(delivery.delivery.id)) {
+      yield* this.#answerFailedRequest(agentId, delivery.delivery.id);
+      return;
+    }
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;

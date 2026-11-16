@@ -1947,6 +1947,15 @@ export class MailboxStore {
     return delivery ? this.#context(delivery) : null;
   }
 
+  /**
+   * Whether the delivery steered into a turn that does other work. A steer that the provider answered
+   * in a turn of its own (`moveSteerToTurn`) has that turn's ID, which is the delivery's ID.
+   */
+  steeredIntoOtherWork(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    return delivery?.steeredAt !== undefined && delivery.turnId !== delivery.id;
+  }
+
   findDeliveryByTurn(turnId: string): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => candidate.turnId === turnId);
     return delivery ? this.#context(delivery) : null;
@@ -2267,6 +2276,9 @@ export class MailboxStore {
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which
    * `markTerminal` redacted. Returns the agent to wake, or null when no note is due.
+   *
+   * A request steered into a turn for other work gets a note too when that turn ends with no reply to
+   * it: the person stopped the turn, or the turn's answer is for the person, not for the request.
    */
   answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
     this: MailboxStore,
@@ -2276,7 +2288,13 @@ export class MailboxStore {
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
-    if (delivery?.status !== "failed" || request?.sender.kind !== "agent" || request.channelId) return null;
+    const outcome =
+      delivery?.status === "failed" ||
+      (this.steeredIntoOtherWork(deliveryId) &&
+        (delivery?.status === "interrupted" || delivery?.status === "completed"))
+        ? delivery.status
+        : null;
+    if (!delivery || !outcome || request?.sender.kind !== "agent" || request.channelId) return null;
     const teammateId = delivery.recipientAgentId;
     const requesterId = request.sender.agentId;
     const originAgentId = this.chainOriginAgentId(request.id);
@@ -2297,9 +2315,15 @@ export class MailboxStore {
       recipientAgentIds: [requesterId],
       text: [
         "Status: blocked",
-        `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`,
+        outcome === "failed"
+          ? `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`
+          : outcome === "interrupted"
+            ? "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and the user stopped that turn before the teammate answered."
+            : "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended with no reply to it.",
         "Evidence: none",
-        "Unblock: The user must fix the cause, then ask for the request again.",
+        outcome === "failed"
+          ? "Unblock: The user must fix the cause, then ask for the request again."
+          : "Unblock: Send the request again if you still need the result.",
       ].join("\n"),
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
