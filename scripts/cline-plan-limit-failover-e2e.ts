@@ -7,7 +7,7 @@
 //   1. Set to switch without asking, with a ready backup: the message runs again on the backup, the
 //      agent moves to it, and no error shows.
 //   2. With no backup: the message waits in the queue, and the limit holds the agent until the reset
-//      that Cline names, 8 h 30 min.
+//      that Cline names, 8 h 30 min, and one minute more.
 // `bun run test:cline-plan-limit-failover`. Writes .openbot-build/cline-plan-limit-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,7 +29,8 @@ const logPath = join(root, "cline.jsonl");
 const SPENT_FAILOVER = "cline-pass/glm-5.3";
 const SPENT_WAIT = "cline-pass/kimi-k3";
 const BACKUP = "anthropic/claude-sonnet-5.5";
-const RESET_MS = (8 * 60 + 30) * 60_000;
+// Cline's "8h 30m", and the minute that OpenBot adds because the text rounds down.
+const RESET_MS = (8 * 60 + 31) * 60_000;
 
 // Before the service modules load: the stores read the home folder.
 process.env.HOME = home;
@@ -237,7 +238,7 @@ try {
     assert.ok(limit.resetsAt !== null, `${name}: the limit has a reset time`);
     assert.ok(
       Math.abs(limit.resetsAt * 1_000 - sentAt - RESET_MS) < 60_000,
-      `${name}: the limit resets in 8 h 30 min, not in ${result.resetsInMs} ms`,
+      `${name}: the limit resets in 8 h 31 min, not in ${result.resetsInMs} ms`,
     );
     assert.equal(result.model, SPENT_WAIT, `${name}: the agent stays on its model`);
     assert.equal(result.errors, 0, `${name}: work that waits for the reset shows no error`);
