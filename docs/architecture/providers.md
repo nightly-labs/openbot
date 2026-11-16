@@ -21,6 +21,12 @@ Claude gets a refused call of these tools (`accepted: false`) as a failed call, 
 for an answer after it. The other providers keep the refusal as a result. Other threads do not get
 these tools, so their requests do not grow.
 
+Every Claude session also names `routine_no_update` in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Its `quiet`
+result tells the agent to end the turn with no text. Without it, the CLI asked again, and after a
+teammate's request the agent wrote its result once more in the user's chat (#7465). Each other result
+of the tool (`shown`, or a refusal) reaches Claude as a failed call, so the CLI still asks for the
+answer that someone waits for.
+
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or
 one `query` string, because models often send one string. Up to three strong results, an exact name or

@@ -84,6 +84,7 @@ import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
@@ -334,6 +335,7 @@ export {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
   FOCUS_USE_CAPABILITY,
@@ -675,6 +677,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -917,7 +920,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
     capability !== PHONE_FEEDBACK_CAPABILITY &&
-    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1036,6 +1040,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1237,6 +1242,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
       capability !== PHONE_FEEDBACK_CAPABILITY &&
-      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   );
 }

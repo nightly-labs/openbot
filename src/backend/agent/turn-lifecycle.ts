@@ -21,6 +21,7 @@ import {
   isAgentContextCategories,
   latestTurnAnswer,
   PLAN_CONTINUATION_ITEM_TYPE,
+  type QueueDelivery,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
@@ -34,7 +35,13 @@ import type { BrowserOperationError } from "../browser-effects";
 import type { BrowserDynamicToolHooks } from "../browser-tool-actions";
 import { newAssistantMessage, normalizeCompletionStatus } from "../conversation-snapshots";
 import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
-import { channelLane, type DeliveryContext, type MailboxStore, type UsageLimitContinuation } from "../mailbox-store";
+import {
+  AUTO_RESULT_KEY_PREFIX,
+  channelLane,
+  type DeliveryContext,
+  type MailboxStore,
+  type UsageLimitContinuation,
+} from "../mailbox-store";
 import {
   type AppServerNotification,
   type DynamicToolCallParams,
@@ -74,8 +81,11 @@ import {
   answeredRequestId,
   isNoUpdateAnswer,
   quietTeammateDelivery,
+  quietTeammateTurnDelivery,
   settleQuietChannelTurn,
   settleQuietRoutineTurn,
+  teammateRequest,
+  textAnswersOnly,
 } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
@@ -897,7 +907,7 @@ export class TurnLifecycle {
       deliveries.length === 0 ||
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
-      deliveries.every(({ delivery }) => quietTeammateDelivery(delivery)) ||
+      deliveries.every(({ delivery }) => this.#quietTeammateTurnDelivery(delivery)) ||
       this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
     )
       return false;
@@ -1634,14 +1644,21 @@ export class TurnLifecycle {
   }
 
   /**
-   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs and
-   * teammate updates, so its completion keeps the text answers as quiet answers; `shown` when a
-   * person waits for the answer, as in a Test run; null when neither a routine run, a teammate
-   * update nor a teammate's answer to a quiet routine run (`#continuesQuietRun`) started the turn. The completion decides again, because a message can join the turn after
-   * the call. `channelRun` is a turn that owns a main task of a channel routine's request: the channel
-   * then posts no message for the turn (#7166).
+   * Records a call to the no-update tool. `quiet` when the turn runs only quiet routine runs,
+   * teammate updates and answered teammate requests, so its completion keeps the text answers as quiet
+   * answers; `unanswered` when a teammate's request still waits for its `send_message` reply; `shown`
+   * when a person waits for the answer, as in a Test run; null when no routine run, teammate update,
+   * teammate request or teammate's answer to a quiet routine run (`#continuesQuietRun`) started the
+   * turn. The completion decides again, because a message can join the turn after the call and the
+   * reply can come after it. `channelRun` is a turn that owns a main task of a channel routine's
+   * request: the channel then posts no message for the turn (#7166).
    */
-  requestNoUpdate(agentId: string, threadId: string, turnId: string, channelRun = false): "quiet" | "shown" | null {
+  requestNoUpdate(
+    agentId: string,
+    threadId: string,
+    turnId: string,
+    channelRun = false,
+  ): "quiet" | "shown" | "unanswered" | null {
     if (channelRun) {
       this.#quietChannelTurns.add(turnId);
       if (this.#reportedFailures.has(turnId)) return "shown";
@@ -1652,16 +1669,24 @@ export class TurnLifecycle {
     if (
       !deliveries.some(
         ({ delivery }) =>
-          delivery.sender.kind === "routine" || quietTeammateDelivery(delivery) || this.#continuesQuietRun(delivery),
+          delivery.sender.kind === "routine" ||
+          quietTeammateDelivery(delivery) ||
+          teammateRequest(delivery) ||
+          this.#continuesQuietRun(delivery),
       )
     )
       return null;
+    // Also before the reply: the history import counts each call, so the completion must too.
     this.#noUpdateTurns.add(turnId);
     // A failed run is never quiet, so its answer must still be written.
     if (this.#reportedFailures.has(turnId)) return "shown";
-    if (!this.#quietRoutineTurn(agentId, threadId, deliveries, true)) return "shown";
-    this.#armQuietEnd(agentId, turnId);
-    return "quiet";
+    if (this.#quietRoutineTurn(agentId, threadId, deliveries, true)) {
+      this.#armQuietEnd(agentId, turnId);
+      return "quiet";
+    }
+    // Only when the reply is all that the turn misses: a turn that cannot end quiet for another
+    // reason, such as a person's message or a task thread, shows its answer anyway.
+    return this.#quietRoutineTurn(agentId, threadId, deliveries, true, true) ? "unanswered" : "shown";
   }
 
   /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
@@ -1765,16 +1790,18 @@ export class TurnLifecycle {
   }
 
   /**
-   * Only a turn that runs nothing but quiet routine runs and teammate updates, in the agent's own
-   * chat or in a routine's side thread: not in a channel, a messaging thread or another task. After
-   * a call to the no-update tool (`noUpdateCalled`), a teammate's answer to a quiet routine run counts
-   * too (`#continuesQuietRun`).
+   * Only a turn that runs nothing but quiet routine runs, teammate updates and answered teammate
+   * requests, in the agent's own chat or in a routine's side thread: not in a channel, a messaging
+   * thread or another task. After a call to the no-update tool (`noUpdateCalled`), a teammate's
+   * answer to a quiet routine run counts too (`#continuesQuietRun`). With `assumeAnswered`, a teammate
+   * request counts before its reply.
    */
   #quietRoutineTurn(
     agentId: string,
     threadId: string | null,
     deliveries: readonly DeliveryContext[],
     noUpdateCalled = false,
+    assumeAnswered = false,
   ): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
@@ -1783,7 +1810,8 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
-          quietTeammateDelivery(delivery) ||
+          (assumeAnswered && teammateRequest(delivery)) ||
+          this.#quietTeammateTurnDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
           (noUpdateCalled && this.#continuesQuietRun(delivery)),
       )
@@ -1795,6 +1823,11 @@ export class TurnLifecycle {
     const requestId = answeredRequestId(delivery);
     const run = requestId ? this.#mailbox.routineDeliveryOfRequest(delivery.recipientAgentId, requestId) : null;
     return run !== null && this.#hooks.quietRoutineDelivery(run.delivery.id);
+  }
+
+  /** A teammate's update, or a request that the agent answered with its own reply (#7465). */
+  #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
+    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
   }
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
@@ -2144,15 +2177,20 @@ export class TurnLifecycle {
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
-      // Only a turn that ran nothing but scheduled, script or webhook runs and teammate updates: a
-      // person who wrote in the same turn, or who started a Test run, waits for the answer. The owner
+      // Only a turn that ran nothing but scheduled, script or webhook runs, teammate updates and
+      // answered teammate requests: a person who wrote in the same turn, or who started a Test run,
+      // waits for the answer. The owner
       // of a channel routine's request that called the no-update tool is quiet too. A failed run is
       // never quiet.
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
         (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled)
-          ? settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled)
+          ? settleQuietRoutineTurn(
+              snapshot,
+              turnId,
+              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
+            )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
       if (!quiet) this.#quietChannelTurns.delete(turnId);
@@ -2678,7 +2716,7 @@ export class TurnLifecycle {
         // The requested result, not a new request. The chain-origin guard above already stops a
         // second relay; this is what tells the recipient it owes no acknowledgement for one.
         expectsReply: false,
-        idempotencyKey: `auto-result:${turnId}:${messageId}`,
+        idempotencyKey: `${AUTO_RESULT_KEY_PREFIX}${turnId}:${messageId}`,
       })
       .pipe(toTurnOperationFailed);
     const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
@@ -3046,6 +3084,20 @@ export class TurnLifecycle {
       ...(error ? { error } : {}),
     });
   }
+}
+
+/**
+ * A quiet turn of teammate requests only, each answered with the agent's own reply (the caller
+ * checks that), and only text in the chat: that text repeats the reply, so the turn is quiet as
+ * after the no-update tool. Claude often does not load that tool, so the turn does not depend on
+ * the model (#7465). A file, an image or a question keeps the whole turn visible.
+ */
+function answeredRequestTurn(
+  deliveries: readonly DeliveryContext[],
+  snapshot: ConversationSnapshot,
+  turnId: string,
+): boolean {
+  return deliveries.every(({ delivery }) => teammateRequest(delivery)) && textAnswersOnly(snapshot, turnId);
 }
 
 /**
