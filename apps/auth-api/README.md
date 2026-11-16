@@ -158,15 +158,23 @@ exercise real delivery locally, put a full set in the ignored `.dev.vars` file:
 ```dotenv
 EMAIL_SMTP_HOST=mail.privateemail.com
 EMAIL_SMTP_PORT=465
-EMAIL_SMTP_USERNAME=hello@openbot.run
+EMAIL_SMTP_USERNAME=no_reply@openbot.run
 EMAIL_SMTP_PASSWORD=<PRIVATE_EMAIL_APP_PASSWORD>
-EMAIL_FROM=hello@openbot.run
-EMAIL_LICENSE_FROM=licenses@openbot.run
+EMAIL_FROM=no_reply@openbot.run
+EMAIL_REPLY_TO=hello@openbot.run
+EMAIL_LICENSE_REPLY_TO=licenses@openbot.run
 ```
+
+Sign-in codes, invitations and welcome emails go from `EMAIL_FROM`, the `no_reply@openbot.run`
+mailbox, with `EMAIL_REPLY_TO` in `Reply-To`, so a reply goes to the team's inbox. An empty
+`EMAIL_REPLY_TO` uses `EMAIL_FROM` and adds no `Reply-To`. `EMAIL_SMTP_PASSWORD` is the app password of
+the `EMAIL_SMTP_USERNAME` mailbox.
 
 License emails (the first payment, a failed renewal payment, and the end of a license) go from
 `EMAIL_LICENSE_FROM`. The SMTP account must be allowed to send as that address: on Private Email,
-make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`.
+make it an alias of the `EMAIL_SMTP_USERNAME` mailbox. An empty value uses `EMAIL_FROM`, as production
+does. A reply goes to `EMAIL_LICENSE_REPLY_TO` (`licenses@openbot.run` in production), or to the
+license sender when it is empty.
 
 `bun run env:set:smtp` encrypts the app password into `.env.production` only.
 
@@ -254,7 +262,7 @@ onboard `openbot.run` in the Cloudflare dashboard under Email Sending, and keep
 Workers have no fallback.
 
 The contact form on `/contact` posts to `/v1/contact`. The Worker sends each message to
-`EMAIL_FROM` through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
+`EMAIL_REPLY_TO` (or `EMAIL_FROM` when it is empty) through SMTP, with the visitor's address in `Reply-To`, and stores nothing.
 The D1 counter of sign-in allows 3 messages for each IP address and 15 in total in each 15-minute
 window, so the form cannot spend the quota that sign-in codes need. A Cloudflare rate-limit binding
 counts in each location separately, so it cannot hold a total. Without SMTP the route answers 503
