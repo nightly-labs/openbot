@@ -6,18 +6,11 @@ import {
 } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
+import { bytesToBase64 } from "./base64";
 import { FileTransferError, fileTransferError, MOBILE_ATTACHMENT_BYTES } from "./file-upload";
 
 function transferFailure(message: string): FileTransferError {
   return new FileTransferError({ message });
-}
-
-/** Base64 of bytes. Built in slices, as `String.fromCharCode` takes a limited number of arguments. */
-function base64Of(bytes: Uint8Array): string {
-  const parts: string[] = [];
-  for (let offset = 0; offset < bytes.length; offset += 8192)
-    parts.push(String.fromCharCode(...bytes.subarray(offset, offset + 8192)));
-  return btoa(parts.join(""));
 }
 
 interface Download {
@@ -160,11 +153,15 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         return yield* transferFailure("The host sent an invalid attachment chunk.");
       entry.received += chunk.bytes.length;
       entry.hash.update(chunk.bytes);
-      const pending = new Uint8Array(entry.carry.length + chunk.bytes.length);
-      pending.set(entry.carry);
-      pending.set(chunk.bytes, entry.carry.length);
+      // A chunk joins the carry of the chunk before only when there is one, so a usual chunk is not copied.
+      let pending = chunk.bytes;
+      if (entry.carry.length > 0) {
+        pending = new Uint8Array(entry.carry.length + chunk.bytes.length);
+        pending.set(entry.carry);
+        pending.set(chunk.bytes, entry.carry.length);
+      }
       const whole = pending.length - (pending.length % 3);
-      entry.base64.push(base64Of(pending.subarray(0, whole)));
+      entry.base64.push(bytesToBase64(pending.subarray(0, whole)));
       entry.carry = pending.slice(whole);
       if (chunk.bytes.length > 0) touch(chunk.transferId);
       report(chunk.transferId, entry.received, entry.size);
@@ -256,7 +253,7 @@ export function createRemoteFileReceiver<E, R>(send: (data: string) => Effect.Ef
         fail(frame.transferId, sourceText("error.remote.downloadDamaged"));
         return yield* transferFailure(sourceText("error.remote.downloadDamaged"));
       }
-      if (entry.carry.length > 0) entry.base64.push(base64Of(entry.carry));
+      if (entry.carry.length > 0) entry.base64.push(bytesToBase64(entry.carry));
       entry.carry = new Uint8Array(0);
       entry.complete = true;
       touch(frame.transferId);

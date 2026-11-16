@@ -86,7 +86,7 @@ export function writeMediaFile(file: File, base64: string): Promise<void> {
   return write;
 }
 
-/** The bytes that have arrived of each host file that downloads now. A file is here from the start of its download. */
+/** The bytes that have arrived of each host file that downloads now. A file is here from when the host opens it. */
 const useDownloadedBytes = create<{ bytes: ReadonlyMap<string, number> }>(() => ({ bytes: new Map() }));
 
 const downloadKey = (serverId: string, attachmentId: string) => `${serverId}\n${attachmentId}`;
@@ -130,18 +130,22 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
       const file = mediaFile(serverId, attachment);
       if (file.exists && file.size === attachment.size) return file.uri;
       const key = downloadKey(serverId, attachment.id);
-      setDownloadedBytes(key, 0);
       // The time of each step, in the support log: the bytes, the hand-over from the peer page, the write.
       const started = Date.now();
       let arrived: number | null = null;
       try {
-        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment), {
-          size: attachment.size,
-          onProgress: (received, total) => {
-            if (received >= total) arrived ??= Date.now();
-            setDownloadedBytes(key, received);
-          },
-        });
+        // An empty file has no progress to show.
+        const progress =
+          attachment.size > 0
+            ? {
+                size: attachment.size,
+                onProgress: (received: number, total: number) => {
+                  if (received >= total) arrived ??= Date.now();
+                  setDownloadedBytes(key, received);
+                },
+              }
+            : undefined;
+        const data = await downloadAttachment(serverId, attachment.id, largeDownloadOf(attachment), progress);
         const handedOver = Date.now();
         file.parentDirectory.create({ intermediates: true, idempotent: true });
         await writeMediaFile(file, data.base64);
@@ -153,7 +157,7 @@ export function useMediaFile(serverId: string, attachment: AttachmentSummary, en
         );
         return file.uri;
       } finally {
-        // The card keeps the last count until the file is on the phone.
+        // The query gives the file a moment later; the card keeps its last count until then.
         setDownloadedBytes(key, null);
       }
     },

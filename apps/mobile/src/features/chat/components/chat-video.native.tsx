@@ -106,6 +106,7 @@ function useVideoPoster(key: string, uri: string | null) {
     const finish = (duration: number | null) => {
       if (started || released) return;
       started = true;
+      clearTimeout(timer);
       void firstFrame()
         .then((thumbnail) => {
           const next = { thumbnail, duration };
@@ -193,10 +194,16 @@ export function ChatVideoAttachment({
   const frame = attachmentFrame(poster?.thumbnail ?? knownImageDimensions(attachment.id), maxWidth, unknownRatio);
   const failed = Boolean(query.error);
   const reducedMotion = useReducedMotion();
-  const received = useMediaDownloadedBytes(serverId, attachment.id);
-  // A file that is already on the phone shows no download line.
-  const [downloads] = useState(() => !uri);
-  const loading = !uri && !failed;
+  const live = useMediaDownloadedBytes(serverId, attachment.id);
+  // The count clears when the download ends, a moment before the query gives the file. The card keeps
+  // the last count until then, so it does not go back to 0%.
+  const [lastReceived, setLastReceived] = useState<number | null>(null);
+  if (live !== null && live !== lastReceived) setLastReceived(live);
+  const received = live ?? (uri || failed ? null : lastReceived);
+  // The download view shows only once the host sends the file: a file already on the phone, or one
+  // that waits for another download, shows the play button.
+  const downloads = lastReceived !== null;
+  const loading = !uri && !failed && received !== null;
   const progress = uri ? 1 : received !== null && attachment.size > 0 ? Math.min(1, received / attachment.size) : 0;
   const percent = Math.floor(progress * 100);
   // Every byte is on the phone; the file is still handed over and written. A spinner, not a frozen 100%.
