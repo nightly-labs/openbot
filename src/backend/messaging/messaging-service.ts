@@ -472,7 +472,7 @@ export class MessagingService {
     yield* whatsapp.setOwnNumber(workspaceId, ownNumber).pipe(toMessagingOperationFailed);
   }).bind(this);
 
-  /** Turns the status reactions of one WhatsApp number on or off. A request that runs keeps its 👀. */
+  /** Turns the status reactions of one WhatsApp number on or off. A request that runs loses its 👀 at its end. */
   readonly setWhatsAppStatusReactions = Effect.fn("MessagingService.setWhatsAppStatusReactions")(function* (
     this: MessagingService,
     workspaceId: string,
@@ -574,15 +574,16 @@ export class MessagingService {
     reaction: StatusReaction,
     on: boolean,
   ): Effect.Effect<void> {
-    // Only a WhatsApp number stores this value, so another platform always reads true here.
-    if (this.#whatsapp?.statusReactions(live.record.connectionId) === false) return Effect.void;
+    // Only a WhatsApp number stores this value, so another platform always reads true here. A removal
+    // still goes out, so a 👀 from before the setting went off does not stay on the message.
+    if (on && this.#whatsapp?.statusReactions(live.record.connectionId) === false) return Effect.void;
     return live.adapter.react(target, messageId, reaction, on).pipe(Effect.catch(() => Effect.void));
   }
 
   /**
    * True for a chat where a post shows as the owner's own message: another person's chat on the
-   * owner's personal WhatsApp number. A request that fails or stops there leaves only its reaction,
-   * and the owner sees the failure in OpenBot. The owner did not write a notice to that person.
+   * owner's personal WhatsApp number. A request that fails or stops there leaves only its reaction
+   * (none with status reactions off), and the owner sees the failure in OpenBot. The owner did not write a notice to that person.
    */
   #quietEnd(connectionId: string, target: MessageTarget): boolean {
     return this.#whatsapp?.postsAsOwner(connectionId, target.platformChannelId) === true;
