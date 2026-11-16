@@ -586,6 +586,8 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
+  // Its name has `set`, and the page reads as a change of the window, not of a file.
+  if (openBot === "set_backdrop") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
   // Its name has `send`, a word of the agent words below.
   if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");

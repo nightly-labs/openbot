@@ -26,6 +26,7 @@ import { installQuickActions, resetQuickActions } from "@/features/quick-actions
 import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadChatBackground } from "@/features/settings/model/chat-background";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
@@ -228,6 +229,7 @@ export default function RootLayout() {
       void loadLargeFilePreference().catch(() => undefined);
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
+      void loadChatBackground().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);

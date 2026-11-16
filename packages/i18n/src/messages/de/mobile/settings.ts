@@ -128,6 +128,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Helligkeit",
   "mobile.settings.appearance.messageColorFooter":
     "Mit Agentenfarbe verwenden deine Nachrichten in einem Agentenchat die Farbe dieses Agenten. Mit eigener Farbe verwenden deine Nachrichten in allen Chats die gewählte Farbe. Die Textfarbe passt sich an, damit der Text lesbar bleibt.",
+  "mobile.settings.appearance.chatBackground": "Chathintergrund",
+  "mobile.settings.appearance.chatBackgroundDefault": "Standard",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Jedes Design behält seine eigene Farbe. Eine Farbe, die Text schwer lesbar macht, wird dunkler oder heller.",
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",

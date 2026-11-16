@@ -74,6 +74,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { McpSignInChatCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
 import { createMessageImageFiles } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
@@ -88,6 +89,8 @@ import { createTurnSteps, SUBAGENT_SPAN_PREFIX } from "./turn-steps";
  * A message that renders only an action marker, with no bubble of its own. A routine instruction is
  * one: its marker names the routine, and the instruction text stays in the routine settings.
  */
+/** The type of a message file. A host can send a file with no type, so its name gives it. */
+
 function markerOnlyMessage(message: AgentMessage): boolean {
   return Boolean(message.actionMarker);
 }
@@ -361,6 +364,12 @@ export function ConversationTimeline() {
   );
 
   const runtime = conversationRuntime(props);
+  const backdropAction = useMessageBackdropAction(runtime);
+  watchAgentBackdrops(
+    runtime,
+    () => props.agent?.id,
+    () => props.messages,
+  );
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
   const localInstructions = agentInstructionsCalls();
@@ -1499,6 +1508,7 @@ export function ConversationTimeline() {
                   onBranch: branchAction(message() ?? initialMessage),
                   branchDisabled: Boolean(props.activeTurnId),
                   pin: pinAction(message() ?? initialMessage),
+                  onUseAsBackdrop: backdropAction(message() ?? initialMessage),
                   onDelete: deleteAction(message() ?? initialMessage),
                 });
                 /*

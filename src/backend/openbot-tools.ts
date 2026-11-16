@@ -106,6 +106,20 @@ export const htmlRenderToolSchema = z.object({
     ),
 });
 
+const backdropBubbleColor = z.string().regex(/^#[0-9a-fA-F]{6}$/u, "Use a #rrggbb color.");
+
+export const setBackdropToolSchema = z.object({
+  html: z.string().min(1).max(CHAT_VISUAL_HTML_LIMIT).describe("A complete, self-contained HTML document."),
+  title: z.string().trim().min(1).max(CHAT_VISUAL_TITLE_LIMIT).describe("A short name for the scene."),
+  bubbles: z
+    .object({
+      yours: backdropBubbleColor.optional().describe("The color of the user's own chat bubbles."),
+      agents: backdropBubbleColor.optional().describe("The color of the agents' chat bubbles."),
+    })
+    .optional()
+    .describe("Chat bubble colors that match the scene. They show only while this backdrop shows."),
+});
+
 const CHAT_VISUAL_PREVIEW_MIN_WIDTH = 240;
 const CHAT_VISUAL_PREVIEW_MAX_WIDTH = 1_600;
 /** The width of the reply column in a desktop chat. */
@@ -331,6 +345,11 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     name: "html_render",
     description: `Show a finished HTML page (chart, table, diagram, collage, mockup) in this conversation, above your final text reply; call it before you write that reply. The user already sees the page, so the reply must not announce it or restate it: add only what the page does not say. In a channel, each member who reads the channel sees it. OpenBot fits the frame to the page height. A height lower than the page caps the frame, and the rest scrolls in it. ${VISUAL_PAGE_RULES} ${VISUAL_PAGE_ACTIONS}`,
     shape: htmlRenderToolSchema.shape,
+  },
+  {
+    name: "set_backdrop",
+    description: `Put an HTML page behind the user's whole OpenBot window, as a full-screen animated scene or picture. Use it when the user asks you to set, change or animate the backdrop; do not use it unasked. To change the scene later, call it again with the whole new page: it replaces the page that you set before. The page runs in the same sandbox as an html_render page and gets no clicks or keys, so do not build controls. Fill the whole frame (html and body at 100% width and height, or a fixed full-screen canvas that follows resize). Keep the center calm and dark or plain, because the chat shows over it, and do not draw text. Use requestAnimationFrame for motion, and stop motion when prefers-reduced-motion is set. For a full theme, give bubbles colors that match the scene: yours colors the user's bubbles, and agents colors the bubbles of your replies. A new backdrop shows on each device that shows this chat and replaces what the user chose; the user can undo it. Your reply must not repeat the page.`,
+    shape: setBackdropToolSchema.shape,
   },
   {
     name: "list_capture_sources",

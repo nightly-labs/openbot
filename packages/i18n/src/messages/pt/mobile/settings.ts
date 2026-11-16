@@ -125,6 +125,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.chatBackground": "Fundo do chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Padrão",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Cada tema mantém a sua própria cor. Uma cor que dificulta a leitura do texto fica mais escura ou mais clara.",
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",

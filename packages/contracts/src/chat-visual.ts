@@ -1,4 +1,5 @@
 import { INPUT_LIMITS } from "./input-limits";
+import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
@@ -83,6 +84,75 @@ export function chatVisualReply<Attachment extends { mimeType: string }>(message
   if (!attachment || !isChatVisualMimeType(attachment.mimeType)) return null;
   const height = message.itemType.slice(CHAT_VISUAL_ITEM_TYPE_PREFIX.length);
   return /^\d{1,4}$/u.test(height) ? { attachment, height: clampHeight(Number(height)) } : { attachment };
+}
+
+/**
+ * The `itemType` of a message whose page an agent put behind the window with `set_backdrop`. The
+ * message text is the page title, and its one attachment is the page. A client shows the newest one
+ * behind its window once. A client that does not know the type shows the title and the HTML file.
+ */
+export const CHAT_BACKDROP_ITEM_TYPE = "window-backdrop";
+
+/** The page of a backdrop message, or null for any other message. */
+export function chatBackdropPage<Attachment extends { mimeType: string }>(message: {
+  itemType?: string | null | undefined;
+  attachments?: readonly Attachment[] | null | undefined;
+}): Attachment | null {
+  if (message.itemType !== CHAT_BACKDROP_ITEM_TYPE) return null;
+  const attachment = message.attachments?.length === 1 ? message.attachments[0] : undefined;
+  return attachment && isChatVisualMimeType(attachment.mimeType) ? attachment : null;
+}
+
+/**
+ * The chat bubble colors that a backdrop page brings: the reader's own bubbles (`yours`) and the
+ * agents' bubbles (`agents`), each `#rrggbb` in lower case. They show only while that page is the
+ * backdrop, so a new backdrop or Undo takes them away with the scene.
+ */
+export interface ChatBackdropBubbles {
+  yours?: AvatarColor;
+  agents?: AvatarColor;
+}
+
+/**
+ * The page keeps its bubble colors in one tag, `<meta name="openbot-bubbles" content="yours=#rrggbb;
+ * agents=#rrggbb">`, so they go with the page file to each client, to a joined server's clients and
+ * into the saved backdrop with no other field.
+ */
+const BUBBLES_META_NAME = "openbot-bubbles";
+const BUBBLES_META_PATTERN = /<meta\b[^>]*\bname\s*=\s*["']openbot-bubbles["'][^>]*>/iu;
+const META_CONTENT_PATTERN = /\bcontent\s*=\s*(?:"([^"]*)"|'([^']*)')/iu;
+const DOCTYPE_PATTERN = /^\s*<!doctype\b[^>]*>/iu;
+
+/** The bubble colors of a backdrop page, or null when it has none. Unknown or bad values are left out. */
+export function chatBackdropBubbles(html: string): ChatBackdropBubbles | null {
+  const tag = BUBBLES_META_PATTERN.exec(html)?.[0];
+  const content = tag ? META_CONTENT_PATTERN.exec(tag) : null;
+  const value = content?.[1] ?? content?.[2];
+  if (value === undefined) return null;
+  const bubbles: ChatBackdropBubbles = {};
+  for (const part of value.split(";")) {
+    const [key, color] = part.split("=", 2).map((text) => text.trim().toLowerCase());
+    if (!isAvatarColor(color)) continue;
+    if (key === "yours") bubbles.yours = color;
+    else if (key === "agents") bubbles.agents = color;
+  }
+  return bubbles.yours === undefined && bubbles.agents === undefined ? null : bubbles;
+}
+
+/**
+ * Puts the bubble colors in the page, in place of a tag that it has. The tag goes after the doctype:
+ * a tag before it puts the page in quirks mode.
+ */
+export function withChatBackdropBubbles(html: string, bubbles: ChatBackdropBubbles): string {
+  const parts = [
+    bubbles.yours === undefined ? undefined : `yours=${bubbles.yours}`,
+    bubbles.agents === undefined ? undefined : `agents=${bubbles.agents}`,
+  ].filter((part) => part !== undefined);
+  const page = html.replace(BUBBLES_META_PATTERN, "");
+  if (parts.length === 0) return page;
+  const tag = `<meta name="${BUBBLES_META_NAME}" content="${parts.join("; ")}">`;
+  const doctype = DOCTYPE_PATTERN.exec(page)?.[0];
+  return doctype === undefined ? `${tag}${page}` : `${doctype}${tag}${page.slice(doctype.length)}`;
 }
 
 /** CSS custom properties that the page can use, such as `--foreground` or `--chart-1`. */

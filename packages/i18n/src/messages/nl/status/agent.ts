@@ -68,6 +68,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Werkt de herinneringen bij…",
   "status.agent.skillUsing": "Gebruikt de vaardigheid {name}…",
+  "status.agent.backdropSetting": "Achtergrond wordt gewijzigd…",
   "status.agent.skillReading": "Leest een vaardigheid…",
   "status.agent.toolStepFailed":
     "Een toolstap is mislukt; het resultaat wordt bekeken en bepaald wat ik daarna probeer…",

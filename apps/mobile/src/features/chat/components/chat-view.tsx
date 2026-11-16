@@ -44,6 +44,7 @@ import {
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import { useChatBackgroundColor } from "@/features/settings/model/chat-background";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
@@ -847,6 +848,8 @@ export function ChatView({
       ? questionForm
       : undefined;
   const dark = useColorScheme() === "dark";
+  // The chat background that the user picked for this theme in Settings › Appearance.
+  const chatBackground = useChatBackgroundColor() ?? background;
   // The glow and the filled voice controls take that agent's colour. A channel with no leader mixes
   // the colours of its first members.
   const voiceColors = useMemo(
@@ -1209,7 +1212,7 @@ export function ChatView({
 
   return (
     <GestureDetector gesture={edgeBackGesture}>
-      <View className="flex-1" style={{ backgroundColor: background }}>
+      <View className="flex-1" style={{ backgroundColor: chatBackground }}>
         <View
           className="flex-1"
           // Nothing here may switch on the card: this view is an ancestor of
@@ -1379,8 +1382,12 @@ export function ChatView({
               {sendError?.agentId === target.id ? (
                 <Typography.Paragraph
                   accessibilityRole="alert"
-                  className="bg-background py-2 text-danger-text"
-                  style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                  className="py-2 text-danger-text"
+                  style={{
+                    backgroundColor: chatBackground,
+                    paddingLeft: insets.left + 16,
+                    paddingRight: insets.right + 16,
+                  }}
                 >
                   {sendError.message}
                 </Typography.Paragraph>
@@ -1388,8 +1395,12 @@ export function ChatView({
               {outboxSnapshot.storageFailed && outboxMessages.length ? (
                 <Typography.Paragraph
                   accessibilityRole="alert"
-                  className="bg-background py-2 text-danger-text"
-                  style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                  className="py-2 text-danger-text"
+                  style={{
+                    backgroundColor: chatBackground,
+                    paddingLeft: insets.left + 16,
+                    paddingRight: insets.right + 16,
+                  }}
                 >
                   {t("mobile.chat.outbox.saveFailed")}
                 </Typography.Paragraph>
@@ -1402,8 +1413,12 @@ export function ChatView({
                       type="body-xs"
                       numberOfLines={2}
                       accessibilityLiveRegion="polite"
-                      className="bg-background py-1.5 text-text-secondary"
-                      style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                      className="py-1.5 text-text-secondary"
+                      style={{
+                        backgroundColor: chatBackground,
+                        paddingLeft: insets.left + 16,
+                        paddingRight: insets.right + 16,
+                      }}
                     >
                       {note}
                     </Typography.Paragraph>

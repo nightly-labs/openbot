@@ -123,6 +123,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Açıklık",
   "mobile.settings.appearance.messageColorFooter":
     "Ajan rengi ile bir ajan sohbetindeki mesajlarınız o ajanın rengini kullanır. Özel renk ile tüm sohbetlerdeki mesajlarınız seçtiğiniz rengi kullanır. Metin rengi okunaklı kalması için değişir.",
+  "mobile.settings.appearance.chatBackground": "Sohbet arka planı",
+  "mobile.settings.appearance.chatBackgroundDefault": "Varsayılan",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Her tema kendi rengini korur. Metnin okunmasını zorlaştıran bir renk koyulaşır veya açılır.",
   "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",

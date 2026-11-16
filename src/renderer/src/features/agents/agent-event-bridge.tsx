@@ -1,5 +1,5 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
-import type { AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
+import type { AgentEvent, AgentRuntimeSnapshot, AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
@@ -8,6 +8,7 @@ import { toast } from "@openbot/ui";
 import { currentText } from "@openbot/ui/text";
 import { classifyUserError } from "@openbot/user-errors";
 import { flush, onSettled } from "solid-js";
+import { showNewAgentBackdrop } from "../../agent-backdrops";
 import { withoutAgent } from "../../app-message-projection";
 import { playCompletionSoundForAgentEvent, prepareCompletionSound } from "../../completion-sound";
 import { usePlatform } from "../../platform";
@@ -57,6 +58,20 @@ import { agentsPort } from "./agents-port";
  *
  * Conversation invalidations also cover read cursors changed on another device.
  */
+/**
+ * The page of a backdrop message in a chat event. The desktop reads it from its file address, on this
+ * computer and on a joined server, so a chat that is not open can change the backdrop too.
+ */
+const agentBackdropPage = {
+  title: (message: ConversationMessage) => message.text,
+  bytes: async (attachment: AttachmentSummary) => {
+    if (!attachment.previewUrl) throw new Error("The page has no address.");
+    const response = await fetch(attachment.previewUrl);
+    if (!response.ok) throw new Error("The page cannot be read.");
+    return new Uint8Array(await response.arrayBuffer());
+  },
+};
+
 export function AgentEventBridge() {
   const channels = useChannels();
   const platform = usePlatform();
@@ -183,6 +198,11 @@ export function AgentEventBridge() {
         applyOwnAgentLevels(event);
         return;
       case "conversation":
+        showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
+          event.snapshot.agentId,
+          event.snapshot.messages,
+          agentBackdropPage,
+        );
         scheduleConversation(event.snapshot);
         return;
       case "conversation-page":
@@ -195,6 +215,11 @@ export function AgentEventBridge() {
             (existingUnreadCount === 0 ||
               explicitlyOpenedAgentChatId() === event.page.agentId ||
               agentChatsToRetryRead.has(trackingKey));
+          showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
+            event.page.agentId,
+            event.page.messages,
+            agentBackdropPage,
+          );
           const pageApplied = applyConversationPage(event.page, "latest", "latest");
           const latestIncomingMessage = markNewMessagesRead
             ? latestIncomingConversationMessage(event.page.messages)

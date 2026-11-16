@@ -122,6 +122,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "밝기",
   "mobile.settings.appearance.messageColorFooter":
     "에이전트 색상을 선택하면 에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 사용자 지정 색상을 선택하면 모든 채팅에서 내 메시지가 선택한 색상을 사용해요. 글자 색은 읽기 쉽도록 바뀌어요.",
+  "mobile.settings.appearance.chatBackground": "채팅 배경",
+  "mobile.settings.appearance.chatBackgroundDefault": "기본값",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "테마마다 고유한 색상을 유지합니다. 글자를 읽기 어려운 색상은 더 어둡거나 밝아집니다.",
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",

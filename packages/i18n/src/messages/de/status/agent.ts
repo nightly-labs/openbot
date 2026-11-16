@@ -66,6 +66,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Erinnerungen werden aktualisiert…",
   "status.agent.skillUsing": "Fähigkeit {name} wird verwendet…",
+  "status.agent.backdropSetting": "Hintergrund wird geändert…",
   "status.agent.skillReading": "Fähigkeit wird gelesen…",
   "status.agent.toolStepFailed":
     "Ein Tool-Schritt ist fehlgeschlagen; das Ergebnis wird geprüft und entschieden, was als Nächstes versucht wird…",

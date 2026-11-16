@@ -316,6 +316,7 @@ import {
   SettingsPageFrame,
   SettingsSearchField,
 } from "../window/SettingsPageFrame";
+import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -2891,6 +2892,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
+          <WindowBackdrop pages="srcdoc" />
           {/* As on desktop: the page rail sits at the left of the frame. */}
           <div class="app-window web-app-window">
             <PageRail

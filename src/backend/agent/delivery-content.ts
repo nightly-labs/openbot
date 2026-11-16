@@ -28,6 +28,12 @@ export function visualReplyMessageId(threadId: string, turnId: string, callId: s
   return `visual-reply:${digest}`;
 }
 
+/** The id of the message that one `set_backdrop` call adds, so a retried call adds no second page. */
+export function backdropMessageId(threadId: string, turnId: string, callId: string): string {
+  const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
+  return `window-backdrop:${digest}`;
+}
+
 /** A file name from a page title, without the characters that file systems refuse. */
 export function visualReplyFileName(title: string): string {
   return (

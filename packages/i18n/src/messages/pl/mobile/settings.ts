@@ -133,6 +133,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Jasność",
   "mobile.settings.appearance.messageColorFooter":
     "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
+  "mobile.settings.appearance.chatBackground": "Tło czatu",
+  "mobile.settings.appearance.chatBackgroundDefault": "Domyślne",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",

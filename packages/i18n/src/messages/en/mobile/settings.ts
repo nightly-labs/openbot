@@ -122,6 +122,10 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.messageColorLightness": "Lightness",
   "mobile.settings.appearance.messageColorFooter":
     "With Agent color, your messages in an agent chat use the color of that agent. With Custom color, your messages in all chats use the color that you select. The text color changes so that it stays readable.",
+  "mobile.settings.appearance.chatBackground": "Chat background",
+  "mobile.settings.appearance.chatBackgroundDefault": "Default",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
