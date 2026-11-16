@@ -1788,8 +1788,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
-      // Only a turn of the agent's own chat holds a new message back: a task or a channel runs beside it.
-      busy: (agentId) => this.#conversation.workingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId),
+      // The rule of the drain for the agent's own chat: a task or a channel turn runs beside it.
+      busy: (agentId) => this.#drain.ownChatHold(agentId) !== null,
       answer: (agentId, threadId, turnId) =>
         this.#store.list().find((agent) => agent.id === agentId)?.threadId === threadId
           ? this.#turnAnswer(agentId, turnId)
