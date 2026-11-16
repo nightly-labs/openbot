@@ -648,6 +648,7 @@ export class LicenseService {
                 currency,
                 anchorSeconds,
                 trial: ordered !== null,
+                automaticTax: subscription.automatic_tax?.enabled === true,
                 paymentMethodId: subscriptionPaymentMethodId(subscription),
                 metadata: {
                   [BILLING_METADATA.userId]: ownerId,
