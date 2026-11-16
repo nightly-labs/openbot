@@ -2,6 +2,7 @@ import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type { RespondToPromptInput } from "@openbot/contracts/ipc";
 import { router, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import { useBrowserFeature } from "@/features/browser/components/use-browser-feature";
@@ -146,11 +147,14 @@ export function MobileChatView({
   );
   // The history and the queue load again when the connection is back, so they read the live state.
   const online = server?.state === "online";
+  // As on desktop, an agent that cannot steer offers Send now: the message goes first and the turn stops.
+  const { steers } = useAgentSteers(agent);
   const queue = useChatQueue(
     agent.id,
     agent.serverId,
     online,
     conversation?.activeTurnId ?? null,
+    steers,
     conversation?.messages,
   );
   const messages = useMemo(() => withFailureReasons(projected, queue.deliveries), [projected, queue.deliveries]);

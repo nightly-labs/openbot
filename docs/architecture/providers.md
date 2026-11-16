@@ -941,7 +941,10 @@ key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`
 (`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
 Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
+and a model that no group names has no reading. Google lists no models for the Argon group (its
+description is a plan note), so a group with no list takes its own name as its model while other groups
+list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
+no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not

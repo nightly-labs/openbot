@@ -174,6 +174,8 @@ export function ApprovalCard(props: {
 /**
  * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
  * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
+ * A bug report about the phone app has no Send here: only the phone has its version, its system and
+ * its support log, so the card tells the user to send the report from the phone app.
  */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
@@ -211,6 +213,9 @@ function FeedbackOffer(props: {
       <Show when={props.cut}>
         <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
       </Show>
+      <Show when={props.report.phone}>
+        <p class="approval-cut-note">{t("prompt.approval.report.phoneOnly")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -223,7 +228,7 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Show when={!props.cut}>
+        <Show when={!props.cut && !props.report.phone}>
           <Button
             variant="default"
             type="button"

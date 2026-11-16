@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Limpar o registro de suporte?",
   "mobile.settings.support.clearBody": "Isso remove todos os eventos do registro neste celular.",
   "mobile.settings.support.logFooter":
-    "O registro fica neste celular e o OpenBot não o envia. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
+    "O registro fica neste celular. O OpenBot envia linhas dele só com um relato de bug do app do celular que você envia, e o cartão do relato as mostra antes. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
   "mobile.settings.support.saveFailed": "Não foi possível salvar o arquivo de registro. Tente novamente.",
   "mobile.settings.support.sharingUnavailable": "O compartilhamento não está disponível neste celular.",
   "mobile.settings.support.newestFirst": "Mais recentes primeiro.",

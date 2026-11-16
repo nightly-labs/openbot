@@ -12,6 +12,7 @@
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // the whole copy of a pending approval (`pending-approval-v1`),
+// a bug report about the phone app, sent with the phone's data (`phone-feedback-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
@@ -296,6 +297,7 @@ import {
   PENDING_APPROVAL_CAPABILITY,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY, PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import {
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_ROUTES,
@@ -390,6 +392,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
 import { Effect } from "effect";
 import { strToU8, unzipSync, zipSync } from "fflate";
+import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../src/backend/agent/inactive-attention-request";
 import { SteerUnsupportedError } from "../src/backend/agent/queue-controls";
 import { AgentLifecycleFailed } from "../src/backend/agent-service";
 import { AgentWaitError } from "../src/backend/agent-waits/agent-wait-store";
@@ -1474,7 +1477,8 @@ const fakeAgents: TeamApiAgents = {
       );
     return Effect.void;
   },
-  agentIdForRequest: () => undefined,
+  // Request 7 is the report of `agent-ada` that `pendingApproval` returns.
+  agentIdForRequest: (requestId) => (requestId === 7 ? "agent-ada" : undefined),
   pendingApproval: (requestId) => {
     record("pendingApproval", requestId);
     // Longer than a runtime snapshot carries (240 characters), so only this read gives all of it.
@@ -1494,7 +1498,19 @@ const fakeAgents: TeamApiAgents = {
     return undefined;
   },
   respondToPrompt: unused("respondToPrompt"),
-  respondToApproval: unused("respondToApproval"),
+  // As the agent service answers: a closed request, an answer that only the owner can give, and a
+  // report about the phone app (request 7), which takes "accept" only with the phone's data.
+  respondToApproval: (input, responder) => {
+    record("respondToApproval", input, responder);
+    const refuse = (cause: Error) => Effect.fail(new AgentLifecycleFailed({ operation: "respondToApproval", cause }));
+    if (input.requestId !== 7)
+      return refuse(new InactiveAttentionRequest(sourceText("error.backend.approvalInactive")));
+    if (responder && !responder.owner)
+      return refuse(new ForbiddenAttentionAnswer(sourceText("error.backend.approvalOwnerOnly")));
+    if (input.decision === "accept" && !responder?.phone)
+      return refuse(new ForbiddenAttentionAnswer(sourceText("error.backend.feedbackNeedsPhone")));
+    return Effect.void;
+  },
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
   respondToBrowserTakeover: unused("respondToBrowserTakeover"),
 };
@@ -11301,6 +11317,130 @@ try {
         errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
         !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
       [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  // ---- A bug report about the phone app, sent from the phone (phone-feedback-v1) ----
+  {
+    const capabilities = [PHONE_FEEDBACK_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const phone = {
+      platform: "Android",
+      appVersion: "1.4.9 (212) · a1b2c3d4",
+      system: "Android 16, Xiaomi 14 (23127PN0CC)",
+      network: "Mobile data · VPN: Tailscale",
+      log: "2026-11-13T10:00:00.000Z WARN  connection host-1 offline (ice_failed)",
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises phone-feedback-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PHONE_FEEDBACK_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PHONE_FEEDBACK_CAPABILITY),
+      summary(compatibility),
+    );
+    const answers = () => callsOf("respondToApproval").length;
+    const before = answers();
+    const unsupported = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      json: { requestId: 7, phone },
+    });
+    const noLog = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone: { ...phone, log: " " } },
+    });
+    const otherSystem = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone: { ...phone, platform: "macOS" } },
+    });
+    const noVersion = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: {
+        requestId: 7,
+        phone: { platform: phone.platform, system: phone.system, network: phone.network, log: phone.log },
+      },
+    });
+    const noNetwork = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: {
+        requestId: 7,
+        phone: { platform: phone.platform, appVersion: phone.appVersion, system: phone.system, log: phone.log },
+      },
+    });
+    accessLevels = { revision: 24, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: bobToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    accessLevels = { revision: 25, everyone: {}, roles: [] };
+    check(
+      "a send without the capability, without a log, a version, a network or a phone system, or by a member who can only view reaches no approval",
+      errorIs(unsupported, 400, sourceText("error.team.phoneFeedbackUnsupported")) &&
+        noLog.status === 400 &&
+        otherSystem.status === 400 &&
+        noVersion.status === 400 &&
+        noNetwork.status === 400 &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        answers() === before,
+      [
+        summary(unsupported),
+        summary(noLog),
+        summary(otherSystem),
+        summary(noVersion),
+        summary(noNetwork),
+        summary(viewer),
+      ],
+    );
+    const member = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: bobToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    const closed = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: "request-closed", phone },
+    });
+    check(
+      "a member who is not the owner is refused, and a request that no longer waits is closed",
+      errorIs(member, 403, sourceText("error.backend.approvalOwnerOnly")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")),
+      [summary(member), summary(closed)],
+    );
+    const sent = await call("POST", PHONE_FEEDBACK_ROUTES.send, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, phone },
+    });
+    check(
+      "the owner's phone sends the report: the approval is accepted with the phone's system, version, device and log",
+      sent.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToApproval").at(-1), [
+          { requestId: 7, decision: "accept" },
+          { owner: true, phone },
+        ]),
+      { status: sent.status, call: callsOf("respondToApproval").at(-1) },
+    );
+    // The old route cannot send the report: it carries no phone data, and the host refuses its "accept".
+    const plain = await call("POST", TEAM_API_ROUTES.respond.approval, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, decision: "accept" },
+    });
+    const declined = await call("POST", TEAM_API_ROUTES.respond.approval, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, decision: "decline" },
+    });
+    check(
+      "a plain accept of a report about the phone app is refused, and a decline is taken",
+      errorIs(plain, 403, sourceText("error.backend.feedbackNeedsPhone")) && declined.status === 204,
+      [summary(plain), summary(declined)],
     );
   }
 

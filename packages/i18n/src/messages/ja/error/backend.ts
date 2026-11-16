@@ -357,6 +357,8 @@ export const messages = {
   "error.backend.promptInactive": "この質問はもう有効ではありません。",
   "error.backend.promptAnswerMismatch": "回答が有効な質問と一致しません。",
   "error.backend.approvalInactive": "この承認はもう有効ではありません。",
+  "error.backend.feedbackNeedsPhone":
+    "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
