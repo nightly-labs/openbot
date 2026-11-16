@@ -637,11 +637,22 @@ export class TeamWebRtcFileTransfer {
     const chunk = yield* remoteDecode(() => decodeTeamProtocolV2FileChunk(data));
     const key = transferKey(peerId, chunk.transferId);
     const transfer = this.#incoming.get(key);
-    if (!transfer || chunk.offset !== transfer.received || transfer.received + chunk.bytes.byteLength > transfer.size) {
+    const end = chunk.offset + chunk.bytes.byteLength;
+    // A resumed sender can start at an ack from its last attempt that came late, before bytes that arrived
+    // after it. Those bytes are the same, so the part that arrived is skipped. A gap stays invalid, and the
+    // hash check at `file-complete` still checks the whole file.
+    if (!transfer || chunk.offset > transfer.received || end > transfer.size) {
       return yield* new RemoteWorkflowError({ cause: new Error("The WebRTC file offset is invalid.") });
     }
-    yield* remoteCall(() => transfer.file.write(chunk.bytes, 0, chunk.bytes.byteLength, chunk.offset));
-    transfer.received += chunk.bytes.byteLength;
+    if (end <= transfer.received) {
+      this.#scheduleExpiration(key);
+      return;
+    }
+    const skipped = transfer.received - chunk.offset;
+    yield* remoteCall(() =>
+      transfer.file.write(chunk.bytes, skipped, chunk.bytes.byteLength - skipped, transfer.received),
+    );
+    transfer.received = end;
     this.#scheduleExpiration(key);
     for (const watch of this.#watches)
       if (watch.peerId === peerId && watch.transferId === chunk.transferId)

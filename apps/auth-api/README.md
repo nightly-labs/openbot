@@ -34,9 +34,13 @@ commands continue to use that file.
 ### Stripe sandbox
 
 `bun run api:stripe:bootstrap` creates the six plan Prices (lookup keys `openbot_{plan}_{month|year}`),
-the license Price (`openbot_license_month`) and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`. It is safe to run
-again: a changed amount makes a new Price and moves the lookup key to it. In the Portal, an upgrade
-is charged at once, and a downgrade or a shorter interval starts at the next period.
+the twelve storage add-on Prices (`openbot_storage_{plan}_{1|2}_{month|year}`, one Product for each
+plan), the license Prices and the Customer Portal settings in the Stripe account of `STRIPE_SECRET_KEY`.
+It is safe to run again: a changed amount makes a new Price and moves the lookup key to it. The Portal
+has no plan change (`subscription_update` is off); it cancels plans and updates payment methods.
+`POST /v1/me/billing/storage` (and `/api/browser/v1/me/billing/storage`) with
+`{subscriptionId, tier}` buys a storage tier for a server on a VPS of the operator. See
+[Hosted servers](../../docs/hosted-servers.md#storage-tiers).
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:
@@ -53,7 +57,8 @@ also sets the allow list from `HOSTED_SERVERS_TEST_ALLOW_LIST` and the developer
 
 `scripts/stripe-flows-e2e.ts` checks the plan flows against the sandbox and a local Worker: renewal,
 failed renewal, cancel at the period end, plan change, renew, delete, another account's server, a
-deleted customer, a refund, a dispute, and the welcome email of a first plan. The `license-*`
+deleted customer, a refund, a dispute, the welcome email of a first plan, and the storage tiers
+(`storage-tier`, which needs the storage Prices of the bootstrap). The `license-*`
 scenarios check the license: buy, Checkout, one open Checkout page, change users, the user count,
 renewal, failed renewal, currency, isolation from the server plans, and the user limit at a join. Each scenario uses a Stripe
 test clock and deletes it at the end. Start the Worker
@@ -68,8 +73,8 @@ repository root:
 bun scripts/stripe-flows-e2e.ts --api http://127.0.0.1:<port> [scenario ...]
 ```
 
-The `portal` scenario prints a Customer Portal cancel page and then an update page, and waits until
-you use them. The report goes to `.openbot-build/stripe-flows-e2e.json`.
+The `portal` scenario prints a Customer Portal cancel page and waits until you use it. Then it checks
+that the plan change flow of an old app opens the Portal home, and that the Portal has no plan change. The report goes to `.openbot-build/stripe-flows-e2e.json`.
 
 The `boat` scenario runs only when you name it. It pays for a server, waits until OpenBot in the VM
 signs in and publishes the host, restarts the service to check the stored session, and deletes the
@@ -172,7 +177,8 @@ Cloudflare places that Worker near the mail host. The relay has no route and kee
 binding request carries the SMTP settings and the message. CI and `bun run api:deploy` deploy the
 relay before the production Worker. When you change `EMAIL_SMTP_HOST` or `EMAIL_SMTP_PORT`, also
 change `placement.host` in `wrangler.email-relay.jsonc`. The test Worker and local `vite dev` send
-from their own socket. To see where the relay runs, read the `colo` of its Workers Logs events.
+from their own socket. Workers Logs are off. To see where the relay runs, read the `colo` of its events in
+`bunx wrangler tail openbot-email-relay`.
 
 For a deployed Worker, `bun run api:deploy` decrypts `.env.production`. It sends
 `EMAIL_SMTP_PASSWORD`, `SKILLS_ADMIN_TOKEN`, `REMOTE_TICKET_PRIVATE_JWK`,
@@ -190,7 +196,7 @@ before remote changes. Test deployments do not send account analytics.
 PKCS #1 key; convert it with `openssl pkcs8 -topk8 -nocrypt -in <key>.pem`. With the key, the
 Worker gives the desktop installation tokens, so GitHub shows `openbotgit[bot]` as the author of an
 agent's work. The key also lets `POST /v1/feedback` open an approved bug report or feature idea from the app as
-an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With no key, the route answers 503, the app
+an issue in `nightly-labs/openbot`, for any signed-in account, three times a minute (`FEEDBACK_RATE_LIMITER`) and 10 times a UTC day (`feedback_daily_counts` in D1). The Worker does not store or log the text. With `sameAs`, the report is a comment on that open app issue. Before the card, `POST /v1/feedback/similar` finds open app issues with a similar title, three times a minute for each account (the same limiter, with its own key); the title is in the body, so request logs do not keep it. With no key, the route answers 503, the app
 gives the GitHub form link instead, and the desktop acts as the signed-in user. In GitHub Actions the secret is
 `OPENBOT_GITHUB_APP_PRIVATE_KEY`, because GitHub refuses secret names that start with `GITHUB_`.
 Secrets are never passed as process arguments. The other values are Worker
@@ -208,6 +214,9 @@ Environment; a local deployment reads it from the encrypted `.env.production`.
 
 `SERVER_CLAIMS_ADMIN_TOKEN` lets an operator sign a new server in for a user without an email code: see
 [server claims](../../docs/self-hosted-server.md#sign-in-with-a-server-claim). Without it, the endpoint answers 401.
+The encrypted `.env.production` has it, so `scripts/hosting/leaseweb-pool.ts custom` can sign a custom
+server in for its owner. GitHub Actions reads it from the `cloudflare-production` Environment. When you
+change it, change it in both places and deploy the Worker.
 
 Use `bun run api:deploy:test` for the isolated `openbot-auth-api-test` Worker
 and the `openbot-auth-test` D1 database.
@@ -323,6 +332,12 @@ ticket names `REMOTE_SIGNAL_URL`, as before.
   until it sends that home's URL as `failedSignalUrl`. Session tickets of the host name the same
   home. Other host tickets (ingress, the webhook relay, released hosts) and hosts with no home use
   `REMOTE_SIGNAL_URL`, which stays the entry Signal.
+- `REMOTE_SIGNAL_HOME_LOCATIONS`: the place of each home, as `id=latitude:longitude,...`, for example
+  `a=60.17:24.94,us=37.34:-121.89`. Empty means no places. Otherwise it must name each home of
+  `REMOTE_SIGNAL_HOMES` one time, or each ticket request fails with `503 remote_not_configured`. With
+  places, a host gets one of the homes at most 1000 km farther from it than the nearest home, from the
+  Cloudflare request location. A host keeps its home while that home is near; otherwise it moves at its
+  next ticket. The variable has no effect when `REMOTE_SIGNAL_HOMES` is empty.
 - `REMOTE_AUTH_WEBHOOK_URLS`: each Signal that gets the auth events, as `url,url`. Empty means
   `REMOTE_AUTH_WEBHOOK_URL` only. The outbox deletes an event when each URL accepted it, and sends it
   again only to the URLs that failed.

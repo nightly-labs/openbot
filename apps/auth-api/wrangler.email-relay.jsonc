@@ -9,8 +9,9 @@
   // Only the service binding reaches the relay.
   "workers_dev": false,
   "preview_urls": false,
+  // Workers Logs stay off, as for the production Worker. `wrangler tail` still shows live events.
   "observability": {
-    "enabled": true
+    "enabled": false
   },
   // Runs the relay near the mail host, and not near the caller. Keep it equal to EMAIL_SMTP_HOST and
   // EMAIL_SMTP_PORT in `wrangler.jsonc`.

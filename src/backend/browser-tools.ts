@@ -37,16 +37,29 @@ const modifiers = z
   .max(4)
   .optional();
 
+/** The number of matches that a target with `nth` can choose from. */
+const MAX_TARGET_NTH = 50;
+
+// The 0-based index of one match, for a target that matches more than one element.
+const nth = z
+  .number()
+  .int()
+  .min(0)
+  .max(MAX_TARGET_NTH - 1)
+  .exactOptional();
+
 const browserTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("ref"), ref: identifier, revision }),
+  // The advertised schema merges the target kinds and keeps only `kind` as required, so name this rule.
+  z.object({ kind: z.literal("ref"), ref: identifier, revision: revision.describe("Required for kind=ref.") }),
   z.object({
     kind: z.literal("role"),
     role: nonBlankString(64),
     name: nonBlankString(500).exactOptional(),
     exact: z.boolean().exactOptional(),
+    nth,
   }),
-  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional() }),
-  z.object({ kind: z.literal("css"), selector: nonBlankString(2_000) }),
+  z.object({ kind: z.literal("text"), text: nonBlankString(500), exact: z.boolean().exactOptional(), nth }),
+  z.object({ kind: z.literal("css"), selector: nonBlankString(2_000), nth }),
   z.object({
     kind: z.literal("point"),
     x: z.number().min(0).max(INPUT_LIMITS.browserCoordinate),
@@ -200,7 +213,7 @@ export function parseBrowserStep(value: unknown): BrowserStep {
   return result.data;
 }
 
-const BROWSER_TOOL_DEFINITIONS = [
+export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "open",
     description: "Open an HTTP(S) URL in a new persistent private-browser tab; returns its first snapshot.",
@@ -226,7 +239,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "submit_secret",
     description:
-      "Request the secret card for the active authentication step discovered in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page instructions before calling. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
+      "Request the secret card for the active authentication step found in a fresh page snapshot. Identify password, email/SMS code, or authenticator-app code from the page. Select any login-method option first. The user authorizes one fill-and-submit action to the shown HTTPS origin. Never pass a secret as an argument. Use takeover if the method or (without loginId) code length is unclear, for nonnumeric/recovery codes, CAPTCHA, passkeys, or payment confirmation. Fill saved cards with fill_card.",
     shape: {
       tabId,
       method: z
@@ -239,7 +252,7 @@ const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Only the active step: one password/whole-code field, or all single-digit fields in entry order. Use fresh snapshot refs; exclude username fields.",
+          "Active step only: one password/whole-code field (+ sign-up confirm field), or each single-digit field in order. Fresh snapshot refs; no username field.",
         ),
       digits: z
         .number()
@@ -248,7 +261,7 @@ const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, explicitly supply the required length from page instructions or the count of single-digit fields. Codes require 4–12 digits; do not infer six from the default. For passwords, omit digits or use 0; no digit limit applies to the password.",
+          "For codes, the length from page instructions or the count of single-digit fields, 4–12; do not infer six from the default. Omit it with loginId and one code field: the saved code sets it. For passwords, omit it or use 0.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])
@@ -273,7 +286,7 @@ const BROWSER_TOOL_DEFINITIONS = [
         .max(VAULT_TEXT_LIMIT)
         .optional()
         .describe(
-          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password in the OpenBot Vault from the card, the login gets this username.",
+          "For password without loginId: the username or email of this sign-in, as typed on the page. When the user saves the password to the Vault from the card, the login gets this username.",
         ),
     },
   }),
@@ -534,16 +547,20 @@ const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "screenshot",
     description:
-      "Capture the visible page as a separate image content item. With a ref, capture only that element: a smaller image costs less context.",
-    shape: { tabId, ref: identifier.optional() },
+      "Capture the visible page as an image; with a ref, only that element, which costs less context. save: true also writes a PNG to your workspace and returns its path.",
+    shape: { tabId, ref: identifier.optional(), save: z.boolean().optional() },
   }),
   browserTool({
     name: "run_script",
     description:
-      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object. A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
+      "Run a short JavaScript program that drives one tab in one call and returns a final snapshot. Use it for a known sequence, such as typing a search, pressing Enter, and waiting for results, or a loop, such as paging. It runs in a sandbox, not in the page, with no network, files, require, or process. It can await these helpers: navigate(url), click(target, options?), type(target, text, options?), press(key, target?), hover(target), scroll(deltaY, target?), selectOption(target, values), setChecked(target, checked), waitFor(text, condition, or page function), sleep(ms), evaluate(expression or function) (runs in the page; returns JSON), snapshot(), and step({ action, ...fields }), where action names one of these tools. A target is a CSS selector string, role(role, name?), text(text), or a target object; .nth(i), from 0, picks one of several matches, as in text('Delete').nth(1). A failed helper throws; try/catch works. Steps before a failure stay done. log(...values) adds to a short log. Return a JSON value. At most 200 steps and timeoutMs (default 60 s) per call.",
     shape: {
       tabId,
-      script: requiredString(BROWSER_SCRIPT_MAX_CHARS),
+      // OpenCode Code Mode shows a cut tool description but the full field descriptions. Without
+      // this, a model called navigate(...) in its own execute code, where no helper exists (#6565).
+      script: requiredString(BROWSER_SCRIPT_MAX_CHARS).describe(
+        "JavaScript source text. It runs in the browser sandbox, not in your own code: navigate, click, evaluate, and the other helpers exist only in this text.",
+      ),
       finalSnapshot: z.boolean().optional(),
       timeoutMs: z.number().int().min(1_000).max(BROWSER_SCRIPT_MAX_TIMEOUT_MS).optional(),
     },
@@ -556,7 +573,7 @@ const BROWSER_TOOL_DEFINITIONS = [
   }),
   browserTool({
     name: "close_tab",
-    description: "Close a browser tab and clean up its CDP leases and recorder.",
+    description: "Close a browser tab.",
     shape: { tabId },
   }),
 ] as const;

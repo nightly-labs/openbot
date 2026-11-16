@@ -5,8 +5,13 @@ export const messages = {
   "error.billing.lifecycleFailed": "Nie udało się zmienić planu serwera. Odśwież Rozliczenia i spróbuj ponownie.",
   "error.billing.confirmMismatch": "Wpisz nazwę serwera, aby go usunąć.",
   "error.billing.restartBusy": "Serwera nie można teraz uruchomić ponownie. Spróbuj ponownie za minutę.",
+  "error.billing.restartUnavailable":
+    "Tego serwera nie można uruchomić ponownie z tego miejsca. Skontaktuj się z pomocą techniczną.",
   "error.billing.planRequired": "Plan tego serwera się skończył. Odnów go, aby uruchomić serwer.",
   "error.billing.planSoldOut": "Ten plan jest wyprzedany. Wybierz inny plan.",
+  "error.billing.storageUnavailable": "Ta pamięć nie jest dostępna dla tego serwera.",
+  "error.billing.storagePaymentFailed":
+    "Płatność za pamięć nie powiodła się. Zaktualizuj metodę płatności i spróbuj ponownie.",
   "error.billing.licenseExists": "To konto ma już licencję. Zamiast tego zmień liczbę jej użytkowników.",
   "error.billing.licenseCurrency": "Licencja musi używać waluty Twoich innych planów.",
   "error.billing.planCurrency": "Nowy plan musi używać waluty Twoich innych planów.",

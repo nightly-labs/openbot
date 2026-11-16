@@ -344,16 +344,106 @@ async function main(): Promise<void> {
         await waitFor({ state: "networkidle" }, 5000);
         await waitFor("item-3-1", 2000);
         await waitFor(() => true, 2000);
+        await waitFor("item-3-1", "page");
+        await waitFor("item-3-1", "load");
+        await waitFor(".absent-spinner", "hidden");
+        await waitFor(() => true, "present");
         let refused = "";
         try { await waitFor("visible", "li"); } catch (error) { refused = error.message; }
-        return [refused, role("button", { name: "Search", exact: true })];
+        return [
+          refused,
+          role("button", { name: "Search", exact: true }),
+          [css("li").nth(2), css("li", 1), css("li").first(), text("Next", { exact: true, nth: 1 }), role("link", "Next", { nth: 0 })],
+        ];
       `,
     });
     assert.equal(guessed.outcome.status, "completed", guessed.outcome.error);
-    const [refused, roleTarget] = z.tuple([z.string(), z.unknown()]).parse(guessed.outcome.value);
+    const [refused, roleTarget, picks] = z.tuple([z.string(), z.unknown(), z.unknown()]).parse(guessed.outcome.value);
     assert.match(refused, /waitFor takes/u);
     assert.deepEqual(roleTarget, { kind: "role", role: "button", name: "Search", exact: true });
-    recordCases("script-accepts-guessed-wait-forms");
+    assert.deepEqual(picks, [
+      { kind: "css", selector: "li", nth: 2 },
+      { kind: "css", selector: "li", nth: 1 },
+      { kind: "css", selector: "li", nth: 0 },
+      { kind: "text", text: "Next", exact: true, nth: 1 },
+      { kind: "role", role: "link", name: "Next", nth: 0 },
+    ]);
+    recordCases("script-accepts-guessed-wait-forms", "script-targets-take-nth");
+
+    // "present" after a selector waits for the element, not for the selector as page text.
+    const presence = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: `
+        await evaluate("void setTimeout(() => document.body.append(Object.assign(document.createElement('div'), { id: 'late-results', textContent: 'Loaded' })), 200)");
+        await waitFor("#late-results", "present", { timeoutMs: 3000 });
+        await waitFor("item-3-1", "appears", { timeoutMs: 3000 });
+        return await evaluate(() => Boolean(document.querySelector("#late-results")));
+      `,
+    });
+    assert.equal(presence.outcome.value, true, presence.outcome.error);
+    recordCases("script-waits-for-present-selector");
+
+    // The sandbox has no page globals: the error says where they are.
+    const pageGlobal = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: "return document.title;",
+    });
+    assert.equal(pageGlobal.outcome.status, "failed");
+    assert.match(pageGlobal.outcome.error ?? "", /runs in a sandbox, not in the page/u);
+    const snakeHelper = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: "await wait_for({ text: 'Next' });",
+    });
+    assert.equal(snakeHelper.outcome.status, "failed");
+    assert.match(snakeHelper.outcome.error ?? "", /helpers use camelCase: waitFor/u);
+    recordCases("script-names-the-sandbox-for-page-globals", "script-names-camel-case-helpers");
+
+    // Scripts resolve the links that they read, as in a browser, and can navigate to a URL object.
+    // location is the tab address after each step, and it is read-only.
+    const resolved = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      script: [
+        "const next = new URL('../b?x=1&x=2#h', 'https://example.com/a/c');",
+        "next.searchParams.set('page', '2');",
+        "const moved = new URL('/list?page=1', location.href);",
+        "moved.search = '?page=2';",
+        "await navigate(moved);",
+        "let assigned = 'assigned';",
+        "try { location.href = '/elsewhere'; } catch (error) { assigned = error.message; }",
+        "return [next.href, next.pathname, next.searchParams.getAll('x'), next.origin, URL.canParse('no scheme'),",
+        "  String(new URLSearchParams({ q: 'a b&c' })), location.href, location.search, String(location), assigned,",
+        "  await evaluate(() => location.href)];",
+      ].join("\n"),
+    });
+    assert.equal(resolved.outcome.status, "completed", resolved.outcome.error);
+    assert.deepEqual(resolved.outcome.value, [
+      "https://example.com/b?x=1&x=2&page=2#h",
+      "/b",
+      ["1", "2"],
+      "https://example.com",
+      false,
+      "q=a+b%26c",
+      `${origin}/list?page=2`,
+      "?page=2",
+      `${origin}/list?page=2`,
+      "location is read-only in the script: call await navigate(url).",
+      `${origin}/list?page=2`,
+    ]);
+    recordCases("script-resolves-urls", "script-reads-tab-location");
+
+    // A wait needs one match: each of these targets matches several elements of the list page.
+    const waitedForMany = await runScript({
+      tabId: list.tab.id,
+      finalSnapshot: false,
+      timeoutMs: 10_000,
+      script: "await waitFor(css('li')); await waitFor(text('Next', { exact: true })); return 'present';",
+    });
+    assert.equal(waitedForMany.outcome.status, "completed", waitedForMany.outcome.error);
+    recordCases("wait-for-target-with-several-matches");
 
     const leftOff = await runScript({
       tabId: list.tab.id,
@@ -416,6 +506,7 @@ async function main(): Promise<void> {
 
     phase("page-settle");
     const pageSchema = z.object({
+      tabId: z.string(),
       url: z.string(),
       elements: z.array(z.object({ name: z.string() })),
       diagnostics: z.array(z.object({ message: z.string() })).optional(),
@@ -448,6 +539,16 @@ async function main(): Promise<void> {
     assert.equal(interstitial.page.challenge?.status, "cleared");
     measurements.interstitialNavigateMs = interstitial.ms;
     recordCases("snapshot-waits-for-interstitial");
+    // The interstitial of a site can load a long consent banner; it is still the check.
+    const longInterstitial = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/long-challenge` });
+    assert.equal(longInterstitial.page.url, `${origin}/form`, "The snapshot did not wait for a long interstitial.");
+    assert.equal(longInterstitial.page.challenge?.status, "cleared");
+    recordCases("snapshot-waits-for-long-interstitial");
+    // A page that redirects during the first read of `open` still comes back as a page.
+    const redirected = await readPage("open", { url: `${origin}/redirect-during-read` });
+    assert.equal(redirected.page.url, `${origin}/form`, "`open` did not read the page after the redirect.");
+    await call("close_tab", { tabId: redirected.page.tabId });
+    recordCases("open-reads-again-after-redirect");
     const captcha = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/captcha` });
     assert.equal(captcha.page.challenge?.status, "needs-user");
     assert(captcha.ms < 5_000, `An interactive check waited: ${captcha.ms} ms.`);
@@ -617,12 +718,22 @@ async function main(): Promise<void> {
     recordCases("idle-tabs-past-cap-sleep");
 
     assert(firstTabId, "Missing the first sleep tab.");
-    const woken = snapshotSchema.parse(
-      parseBrowserToolText(
-        text(await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })))),
-      ),
+    const wokenResult = await runCauseEffect(
+      sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })),
     );
+    const woken = snapshotSchema.parse(parseBrowserToolText(text(wokenResult)));
     assert.equal(woken.url, `${origin}/form?tab=1`, "A slept tab did not load its page again.");
+    // The address is the same, so only this note tells the agent that its page state is gone (#8833).
+    const unloadNote = (result: DynamicToolResult) =>
+      result.contentItems.some((item) => item.type === "inputText" && item.text.includes("unloaded to free memory"));
+    assert(unloadNote(wokenResult), "A woken tab did not tell the agent that its page was unloaded.");
+    assert(
+      !unloadNote(
+        await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" }))),
+      ),
+      "The unload note came again on the next call.",
+    );
+    recordCases("slept-tab-tells-agent-once");
     // The woken tab is now the most recently used one, so the second tab is past the cap.
     await unloaded(second);
     assert(
@@ -688,6 +799,13 @@ const PAGES: Record<string, string> = {
   "/challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>
     <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/long-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=fixture"></script>
+    <p>Verifying the security of your connection.</p>
+    <div role="dialog"><p>${"This site uses cookies to improve your experience. ".repeat(200)}</p></div>
+    <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/redirect-during-read": `<!doctype html><meta charset="utf-8"><title>Redirect</title><p>One moment.</p>
+    <script>setTimeout(() => location.replace("/form"), 100);</script>`,
   "/stuck-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>`,
   "/captcha": `<!doctype html><meta charset="utf-8"><title>Security check</title>

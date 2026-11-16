@@ -3,6 +3,7 @@ import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { ORDER_KEY_COLUMNS, ORDER_KEY_DESC, ORDERED_THREAD_MESSAGES } from "./conversation-queries";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+import { unpinThreadHistory, unpinThreadMessage } from "./pinned-thread-messages";
 
 /**
  * The messages that a person deleted from a thread (`projection_deleted_thread_messages`).
@@ -63,6 +64,7 @@ export function recordDeletedThreadMessage(
   db.prepare(
     "INSERT OR IGNORE INTO projection_deleted_thread_messages (thread_id, message_id, deleted_at) VALUES (?, ?, ?)",
   ).run(threadId, messageId, deletedAt);
+  unpinThreadMessage(db, threadId, messageId);
   const previous = previousShownMessageId(db, threadId, messageId);
   db.prepare(
     "UPDATE projection_thread_reads SET through_message_id = ? WHERE thread_id = ? AND through_message_id = ?",
@@ -124,6 +126,7 @@ export function recordDeletedThreadHistory(db: DatabaseSync, threadId: string, d
     `INSERT OR IGNORE INTO projection_deleted_thread_messages (thread_id, message_id, deleted_at)
      SELECT thread_id, message_id, ? FROM projection_thread_messages WHERE thread_id = ?`,
   ).run(deletedAt, threadId);
+  unpinThreadHistory(db, threadId);
   db.prepare("UPDATE projection_thread_reads SET through_message_id = NULL WHERE thread_id = ?").run(threadId);
   db.prepare("UPDATE projection_thread_read_baselines SET through_message_id = NULL WHERE thread_id = ?").run(threadId);
   scrubAllMessages(db, "orchestration_events", "aggregate_type = 'thread' AND aggregate_id = ?", threadId);

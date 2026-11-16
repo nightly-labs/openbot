@@ -13,6 +13,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "החברים העבירו את המשימה ביניהם יותר מדי פעמים. היא נעצרה כדי למנוע לולאה.",
   "channel.conversation.noMembers": "יש להוסיף סוכנים בהגדרות הערוץ כדי להתחיל לעבוד.",
+  "channel.conversation.waitFull": "ממתין - {name} יתחיל כשמשימה פעילה תסתיים",
   "channel.conversation.archivedNotice": "הערוץ נמחק. תצוגה בלבד.",
   "channel.composer.label": "הודעה לערוץ",
   "channel.composer.placeholder": "הודעה אל {name}",
@@ -23,6 +24,9 @@ export const messages = {
   "channel.settings.isolated": "שמירת הזיכרונות בערוץ הזה",
   "channel.settings.isolatedDescription":
     "הסוכנים שומרים כאן את מה שלמדו כזיכרונות של הערוץ. הצ'אטים האחרים שלהם לא רואים אותם.",
+  "channel.settings.browser": "דפדפן",
+  "channel.settings.browserEveryone": "כל החברים",
+  "channel.settings.browserNone": "אף אחד",
   "channel.settings.memoryCount": {
     one: "זיכרון אחד שמור",
     two: "שני זיכרונות שמורים",

@@ -2,9 +2,9 @@ import type { AgentProviderId } from "@openbot/contracts/agent-providers";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { z } from "zod";
-import { BROWSER_DYNAMIC_TOOLS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
+import { BROWSER_DYNAMIC_TOOLS, BROWSER_TOOL_DEFINITIONS, OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
-import { type DynamicToolCallParams, isRecord } from "../protocol";
+import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
 import { toolGuidance } from "./tool-guidance";
 
@@ -36,6 +36,25 @@ const DIRECT_NAMES = new Set([
 ]);
 
 const BROWSER_SCRIPT_TOOL = requireTool(`${OPENBOT_BROWSER_NAMESPACE}.run_script`);
+
+/**
+ * The browser tools that each agent has directly. Haiku searched the catalog before 29 of 30 browser
+ * tasks, also when its instructions named the tool, and each search cost a model turn of the full
+ * context (`bun run bench:browser-tools`, 2026-11-10). The first result of a browser tool brings the
+ * schemas of the others (`browserToolsPrimer`).
+ */
+const DIRECT_BROWSER_NAMES: ReadonlySet<string> = new Set(["open", "list_tabs", "run_script"]);
+
+/** The direct browser tools, as Claude's in-process MCP server declares them. */
+export const DIRECT_BROWSER_TOOL_DEFINITIONS = BROWSER_TOOL_DEFINITIONS.filter((definition) =>
+  DIRECT_BROWSER_NAMES.has(definition.name),
+);
+
+const DIRECT_BROWSER_DYNAMIC_TOOLS = BROWSER_DYNAMIC_TOOLS.map((namespace) => ({
+  ...namespace,
+  description: "OpenBot's private, persistent browser. Run the other openbot_browser tools with openbot.tool_call.",
+  tools: namespace.tools.filter((tool) => DIRECT_BROWSER_NAMES.has(tool.name)),
+}));
 
 /**
  * Providers whose CLI gives the model a web search tool of its own. Their agents keep it, and do not
@@ -158,6 +177,7 @@ function dynamicTools(definitions: ReturnType<typeof toolDefinitions>) {
         inputSchema: advertisedJsonSchema(z.strictObject(definition.shape)),
       })),
     },
+    ...DIRECT_BROWSER_DYNAMIC_TOOLS,
   ];
 }
 
@@ -189,7 +209,7 @@ export function visibleDynamicTools(provider: AgentProviderId) {
 export function claudeBridgedToolName(name: string, input: unknown): string {
   if (name !== "mcp__openbot__tool_call") return name;
   const called = bridgedName(input);
-  const entry = called ? BUILTIN_TOOL_CATALOG.find((tool) => tool.name === called) : undefined;
+  const entry = called ? catalogEntry(BUILTIN_TOOL_CATALOG, called) : undefined;
   return entry ? `mcp__${entry.namespace}__${entry.tool}` : name;
 }
 
@@ -204,7 +224,8 @@ function bridgedName(input: unknown): string | null {
  * Claude loads its own deferred tools with a search and then calls them directly. After a search here,
  * it called openbot.list_workflows as mcp__openbot__list_workflows, and each refused name cost a model step.
  */
-const CALL_NOTE = "These are not direct tools: run each with tool_call {name, arguments}.";
+const CALL_NOTE =
+  "Run each with openbot.tool_call {name, arguments}, or directly when you also have it as a direct tool.";
 
 /**
  * Search matches whole words, so a query that names a web service, such as "gmail" or "read mail",
@@ -227,6 +248,21 @@ export const DEFERRED_MCP_NOTE =
 export const CODEX_DEFERRED_MCP_NOTE =
   "The tools of your MCP servers are not in this catalog. Find them with the separate tool named exactly tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.";
 
+/**
+ * OpenCode 2.2.7 puts the tools of the user's MCP servers only in `execute`, and lists only some
+ * tools of a large server there (#7097).
+ */
+export const OPENCODE_DEFERRED_MCP_NOTE =
+  "The tools of your MCP servers are not in this catalog. They are in execute: when one is not listed there, find it with search(...) inside execute and call the path that it returns.";
+
+/**
+ * Antigravity 1.5 gives the model only the MCP tools that fit its schema budget, and leaves the others
+ * out of the tool list and of `<mcp_servers>`, with no `call_mcp_tool` for them (#7427). It still
+ * writes each schema to `<appDataDir>/mcp/<server>/<tool>.json`, and tool_call runs the tool.
+ */
+export const ANTIGRAVITY_DEFERRED_MCP_NOTE =
+  'The tools of your MCP servers are not in this catalog. When one is not in your tool list, read its schema in <appDataDir>/mcp/<server>/<tool>.json and run it with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.';
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -243,17 +279,27 @@ const READY_SEARCH_RESULTS = 3;
  * such as "create workflow routine" does not also load the routine schemas and guidance.
  */
 const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+/**
+ * The release notes call the board of the Workflows page the Canvas, so users ask an agent for a
+ * canvas. Without these words a search found no workflow tool, and the agent said that it could not
+ * make one (#9367). A canvas can also be the Routines canvas or a canvas on a web page, so these words
+ * add the workflow tools and keep the other results.
+ */
+const CANVAS_WORDS = new Set(["canvas", "canvases"]);
 const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
   (entry) =>
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
 );
 
 /**
- * The browser tools that most tasks use. An agent calls a browser tool without a search, because the
- * names are in its instructions, so the first browser result in a chat brings these schemas. A search
- * first cost one model turn on each browser task.
+ * The browser tools that most tasks use. The first browser result in a chat brings these schemas, and
+ * the guidance of the browser and of the direct browser tools. A search first cost one model turn on
+ * each browser task.
  */
-const BROWSER_PRIMER_TOOLS = ["open", "snapshot", "navigate", "click", "type", "wait_for", "run_script"].map((tool) =>
+const BROWSER_PRIMER_TOOLS = ["snapshot", "navigate", "click", "type", "wait_for"].map((tool) =>
+  requireTool(`${OPENBOT_BROWSER_NAMESPACE}.${tool}`),
+);
+const DIRECT_BROWSER_CATALOG = [...DIRECT_BROWSER_NAMES].map((tool) =>
   requireTool(`${OPENBOT_BROWSER_NAMESPACE}.${tool}`),
 );
 
@@ -261,7 +307,7 @@ export function browserToolsPrimer() {
   return {
     call: CALL_NOTE,
     tools: BROWSER_PRIMER_TOOLS.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
-    guidance: toolGuidanceFor(BROWSER_PRIMER_TOOLS),
+    guidance: toolGuidanceFor([...BROWSER_PRIMER_TOOLS, ...DIRECT_BROWSER_CATALOG]),
   };
 }
 
@@ -335,9 +381,20 @@ function repairJsonText(text: string): string {
   return repaired;
 }
 
+/**
+ * The text without up to three closing braces and quotes after its end. Models close the envelope in
+ * the `arguments` text, as in `{"tabId":"t1"}}` or `{"tabId":"t1"}"}`, so the text did not parse.
+ */
+function withoutTrailingClosers(text: string): string[] {
+  const trimmed = text.trimEnd();
+  const closers = /[}"\s]{1,3}$/u.exec(trimmed)?.[0].length ?? 0;
+  return Array.from({ length: closers }, (_, index) => trimmed.slice(0, trimmed.length - index - 1));
+}
+
 /** The object in `arguments` text, also after a repair, or null when the text holds no object. */
 function decodeArgumentsText(text: string): DynamicRecord | null {
-  for (const candidate of [text, repairJsonText(text)]) {
+  const trimmed = withoutTrailingClosers(text);
+  for (const candidate of [text, repairJsonText(text), ...trimmed, ...trimmed.map(repairJsonText)]) {
     try {
       const value = JSON.parse(candidate);
       return isRecord(value) ? value : null;
@@ -348,23 +405,86 @@ function decodeArgumentsText(text: string): DynamicRecord | null {
   return null;
 }
 
-/** Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first. */
+/**
+ * Decodes a `tool_call` envelope. Models send `arguments` as JSON text, so the text is decoded first.
+ * For a tool with no arguments, models and OpenAI-compatible gateways leave out `arguments` or send
+ * `null`, empty text or the text `null`, which is an empty object. The target tool still checks its own arguments (#7955).
+ */
 function parseCall(params: DynamicToolCallParams) {
   const envelope = params.arguments;
-  if (!isRecord(envelope) || typeof envelope.arguments !== "string") return callSchema.safeParse(envelope);
-  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(envelope.arguments) });
+  if (!isRecord(envelope)) return callSchema.safeParse(envelope);
+  const sent = envelope.arguments;
+  if (sent === undefined || sent === null || (typeof sent === "string" && /^(?:null)?$/.test(sent.trim())))
+    return callSchema.safeParse({ ...envelope, arguments: {} });
+  if (typeof sent !== "string") return callSchema.safeParse(envelope);
+  return callSchema.safeParse({ ...envelope, arguments: decodeArgumentsText(sent) });
 }
 
 /**
- * The error for a `tool_call` that `resolveDeferredTool` refused because its `arguments` is not an
- * object, or null for another reason. A general error made the agent send the same text again.
+ * The catalog tool of `name`: its qualified name, or the MCP name that an agent sees for it, such as
+ * `openbot_browser__snapshot` or `mcp__openbot_browser__snapshot`. An ACP agent sent these names
+ * through tool_call and got the same refusal for each try (#7955).
  */
-export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+function catalogEntry(catalog: typeof BUILTIN_TOOL_CATALOG, name: string) {
+  const qualified = qualifiedToolName(name);
+  return catalog.find((tool) => tool.name === qualified);
+}
+
+/** The name that a decoded `tool_call` envelope calls, from `name` or its alias `tool`. */
+function calledName(call: { name?: string | undefined; tool?: string | undefined }): string {
+  return qualifiedToolName(call.name ?? call.tool ?? "");
+}
+
+/**
+ * True when a `tool_call` names OpenBot's discovery tool, such as `openbot.tool_describe`. Only a qualified
+ * name counts: a bare `tool_search` can mean the provider's own search for MCP tools.
+ */
+function callsDiscoveryTool(envelope: unknown): boolean {
+  const named = bridgedName(envelope);
+  return named !== null && /^openbot\.tool_(?:search|describe)$/.test(qualifiedToolName(named));
+}
+
+/**
+ * The error for a `tool_call` that `resolveDeferredTool` refused, or null when no specific error
+ * applies. A general error made the agent send the same call again: an agent that loaded a schema
+ * through tool_call never got it (#6754), and a routine's browser calls failed until the run ended
+ * (#7955). No supplied values are echoed: a suggested name comes from the catalog. The text of
+ * `unknownToolNote`, read only when needed, follows the error for a name outside the catalog, which can be a tool of the user's MCP servers.
+ */
+export function deferredCallArgumentsError(
+  params: DynamicToolCallParams,
+  provider: AgentProviderId,
+  unknownToolNote: () => string | null = () => null,
+): string | null {
+  if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
+  const error = refusedCallError(params, provider);
+  const named = bridgedName(params.arguments);
+  if (error === null || (named !== null && catalogEntry(catalogFor(provider), named))) return error;
+  const note = unknownToolNote();
+  return note ? `${error} ${note}` : error;
+}
+
+function refusedCallError(params: DynamicToolCallParams, provider: AgentProviderId): string | null {
   const parsed = parseCall(params);
-  const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
-  return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")
-    ? sourceText("error.agent.toolCallArgumentsNotObject")
-    : null;
+  if (!parsed.success) {
+    const { issues } = parsed.error;
+    if (issues.some(({ code }) => code === "unrecognized_keys")) return sourceText("error.agent.toolCallEnvelopeKeys");
+    return issues.some(({ path }) => path[0] === "arguments")
+      ? sourceText("error.agent.toolCallArgumentsNotObject")
+      : null;
+  }
+  // The envelope is valid, so the name is outside the catalog. A bare name, such as `snapshot`, or a
+  // name in a catalog namespace, such as `openbot.snapshot`, gets the one catalog tool of the same short
+  // name. A name in another namespace can be a tool of the user's MCP servers, so it gets none.
+  const catalog = catalogFor(provider);
+  const name = calledName(parsed.data);
+  const dot = name.lastIndexOf(".");
+  const namespace = dot < 0 ? null : name.slice(0, dot);
+  const short = namespace === null || catalog.some((tool) => tool.namespace === namespace) ? name.slice(dot + 1) : "";
+  const [match, other] = short ? catalog.filter((tool) => tool.tool === short) : [];
+  return match && !other
+    ? sourceText("error.agent.toolCallUnknownToolSuggest", { name: match.name })
+    : sourceText("error.agent.toolCallUnknownTool");
 }
 
 /**
@@ -377,10 +497,18 @@ export function resolveDeferredTool(
 ): DynamicToolCallParams | null {
   const parsed = parseCall(params);
   if (!parsed.success) return null;
-  const name = parsed.data.name ?? parsed.data.tool;
-  const entry = catalogFor(provider).find((tool) => tool.name === name);
+  const entry = catalogEntry(catalogFor(provider), calledName(parsed.data));
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
+}
+
+/** The name and the arguments of a `tool_call`, read as `resolveDeferredTool` reads them, or `null`. */
+export function deferredCall(
+  params: DynamicToolCallParams,
+): { name: string; arguments: z.infer<typeof callShape.arguments> } | null {
+  const parsed = parseCall(params);
+  const name = parsed.success ? (parsed.data.name ?? parsed.data.tool)?.trim() : undefined;
+  return parsed.success && name ? { name, arguments: parsed.data.arguments } : null;
 }
 
 /** The lowercase queries of a tool search and their words, or `null` for invalid arguments. */
@@ -437,10 +565,11 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
         .map(({ entry }) => entry),
     );
     const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
-    if (workflowSearch) {
+    if (workflowSearch)
       // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
       for (const entry of ready)
         if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
+    if (workflowSearch || [...terms].some((term) => CANVAS_WORDS.has(term))) {
       for (const entry of WORKFLOW_TOOLS) {
         if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
         ready.add(entry);

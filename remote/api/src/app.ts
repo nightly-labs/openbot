@@ -302,14 +302,18 @@ export function createRemoteApiApp(
         if (mediaType !== "application/json") return answer(415);
         const signed = webhookSignedHeaders(request.headers);
         if (!signed) return answer(401);
-        if (!signal.holdsWebhookRoute(routeId)) return answer(503);
-        // An older host refuses the signature of this format, so the request cannot authenticate.
-        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return answer(401);
         const address = signalClientIp(
           server?.requestIP(request)?.address,
           request.headers.get("x-forwarded-for"),
           config.trustProxy,
         );
+        // A hosted server that sleeps starts, and a later try of the sender reaches it.
+        if (!signal.holdsWebhookRoute(routeId)) {
+          signal.wakeWebhookRoute(routeId, address);
+          return answer(503);
+        }
+        // An older host refuses the signature of this format, so the request cannot authenticate.
+        if (signed.format && !signal.webhookRouteAccepts(routeId, signed.format)) return answer(401);
         if (!signal.acceptWebhookRequest(`${routeId}:${address}`)) return answer(429);
         const body = await readBounded(request, WEBHOOK_DELIVERY_BODY_BYTES_LIMIT);
         if (!body) return answer(413);

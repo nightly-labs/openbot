@@ -385,6 +385,7 @@ export const messages = {
   "sitePage.landing.download.appStore": "Baixar na App Store",
   "sitePage.landing.download.googlePlay": "Disponível no Google Play",
   "sitePage.landing.download.pages": "Requisitos do sistema e passos de instalação:",
+  "sitePage.landing.download.apk": "Baixar o APK",
   "sitePage.site.download": "Baixar",
   "sitePage.site.app": "App",
   "sitePage.site.primaryNavigation": "Navegação principal",

@@ -129,7 +129,8 @@ export function memoryReviewPrompt(
     "You keep the long-term memory of the agent in this profile. Read the chat below and decide which memories to add, update or forget, so that the agent knows them in later chats. You cannot use tools here.",
     ...(skillInput ? skillRules(skillInput.automatic) : []),
     skillInput ? "Then decide the memories. Memory rules:" : "Rules:",
-    "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, standing decisions, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
+    "- Keep only what stays true across chats: the user's preferences, stable facts about the user, their projects and their environment, and plans that the user can ask about later, such as an offer or a deadline. A fact from a task or side thread counts too. Write the date of a plan that ends.",
+    "- A lasting rule that the user gives the agent (always, never) is not a memory: the agent keeps it in its Instructions.",
     "- Never keep task progress, logs of completed work (such as a skill that was saved, or its id), the steps of a task, or temporary to-do items.",
     ...(skillInput
       ? [
@@ -143,6 +144,7 @@ export function memoryReviewPrompt(
         ]
       : []),
     '- Write each memory as a short declarative fact with one fact per entry, such as "The user prefers short answers.", not as an instruction such as "Always answer briefly." Start a memory of more than one sentence with a short label and a colon, such as "Release notes: ...".',
+    "- Write the text of each memory that you add or update in the language of the user's messages in the chat, not in the language of these rules or of messages from other agents. When the chat has no message from the user, use the language of the agent's answers. Keep names, numbers, paths and dates as they are written.",
     "- Only the searchable memories that relate most to this chat are listed; the count includes the others.",
     "- Do not add what a memory already says. Update or merge an existing memory before you add a new one, and forget a memory that the chat shows is wrong or no longer true.",
     "- When the memories are at the limit, merge or forget memories in the same answer to make room.",

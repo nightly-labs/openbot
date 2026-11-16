@@ -2,7 +2,8 @@ import { AGENT_DOCK_LIMITS, type AgentDockInputRect } from "@openbot/contracts/i
 
 /**
  * The parts of a shaped helper window in whole window px, inside the window, at most as many as main
- * takes. On Linux the agent dock and the Dynamic Island windows take the pointer and show only there.
+ * takes. On Linux the agent dock and the Dynamic Island windows take the pointer and show only there. On
+ * Windows the agent dock window gets the pointer moves only there.
  */
 export function windowShape(
   parts: readonly { x: number; y: number; width: number; height: number }[],

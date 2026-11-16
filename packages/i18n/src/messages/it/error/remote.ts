@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "Un test del desktop remoto è in corso. Riprova quando finisce.",
   "error.remote.screenRecordingDenied":
     "L'host non ha consentito a OpenBot di registrare lo schermo. Concedi la registrazione dello schermo sull'host, poi riprova.",
+  "error.remote.windowsSessionDisconnected":
+    "La sessione Windows dell'host è disconnessa, quindi non c'è uno schermo da condividere. Accedi a Windows dallo schermo dell'host, poi riprova.",
   "error.remote.teamSessionExpired": "La sessione del team è scaduta.",
   "error.remote.finishTestBeforeSwitch": "Termina il test del desktop remoto prima di cambiare schermo.",
   "error.remote.displayNotFound": "Schermo remoto non trovato.",

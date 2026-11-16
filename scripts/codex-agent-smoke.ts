@@ -6,10 +6,12 @@
 //   3. a skill that Codex lists (`skill-creator`),
 //   4. a deferred OpenBot tool: tool_search finds it and tool_call runs it. The smoke answers both,
 //      as the OpenBot tool router does,
-//   5. a web search with Codex's own inline search (a `webSearch` item),
-//   6. a git commit.
-// The checks also confirm, from the thread's rollout file, that the first request declares `web__run`
-// and no `request_plugin_install`, that the OpenBot catalog does not name `openbot.web_search`, and
+//   5. a direct browser tool: `openbot_browser.list_tabs` with no tool_search or tool_call. The smoke
+//      answers it with a fixed tab,
+//   6. a web search with Codex's own inline search (a `webSearch` item),
+//   7. a git commit.
+// The checks also confirm, from the thread's rollout file, that the first request declares `web__run`,
+// the direct browser tools `open`, `list_tabs` and `run_script`, and no `request_plugin_install`, that the OpenBot catalog does not name `openbot.web_search`, and
 // that the prompt lists none of the unfit skills.
 // Costs a few GPT-6 Luna turns. `bun run smoke:codex-agent`; `--model=<id>`
 // replaces GPT-6 Luna. Writes .openbot-build/codex-agent-smoke/report.json.
@@ -39,6 +41,9 @@ const MODEL = argument("model") ?? "gpt-6-luna";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/codex-agent-smoke");
 const ECHO_TOOL = "smoke_echo";
 const ECHO_TEXT = "smoke-echo-7341";
+const BROWSER_NAMESPACE = "openbot_browser";
+const TAB_TITLE = "Smoke tab 5512";
+const DIRECT_BROWSER_TOOLS = ["open", "list_tabs", "run_script"];
 
 const TURNS: Array<{ step: string; prompt: string; expect: string[] }> = [
   {
@@ -69,6 +74,13 @@ const TURNS: Array<{ step: string; prompt: string; expect: string[] }> = [
       `Use the OpenBot tool_search tool to find the \`${ECHO_TOOL}\` tool, then run it once with tool_call. ` +
       "Reply with the text it returns.",
     expect: ["dynamicToolCall:tool_search", "dynamicToolCall:tool_call"],
+  },
+  {
+    step: "browser tool",
+    prompt:
+      "List the tabs of the OpenBot browser with its list_tabs tool. Do not open a page. " +
+      "Reply with the title of the first tab.",
+    expect: ["dynamicToolCall:list_tabs"],
   },
   {
     step: "web search",
@@ -110,8 +122,21 @@ function itemLabel(item: DynamicRecord): string {
   return tool ? `${type}:${tool}${called ? `:${called}` : ""}` : type;
 }
 
-/** Answers `tool_search` and `tool_call` as the OpenBot tool router does, with the fixed echo tool added. */
+/** The tools of the browser namespace that the model called directly. */
+const browserCalls: string[] = [];
+
+/**
+ * Answers `tool_search` and `tool_call` as the OpenBot tool router does, with the fixed echo tool added,
+ * and a direct `openbot_browser.list_tabs` with one fixed tab.
+ */
 async function answerTool(params: DynamicRecord): Promise<{ text: string; success: boolean }> {
+  if (getString(params, "namespace") === BROWSER_NAMESPACE) {
+    const tool = getString(params, "tool") ?? "";
+    browserCalls.push(tool);
+    return tool === "list_tabs"
+      ? { text: JSON.stringify([{ tabId: "tab-1", title: TAB_TITLE, url: "https://example.com/" }]), success: true }
+      : { text: "Not available here.", success: false };
+  }
   const call = toolCallParams(params);
   const named = JSON.stringify(call.arguments).includes(ECHO_TOOL);
   if (call.tool === "tool_search" && named)
@@ -155,6 +180,7 @@ const prompt: {
   requestPluginInstall: boolean;
   webRun: boolean;
   catalogWebSearch: boolean;
+  browserTools: string[];
   toolNames: string[];
   unfitSkills: string[];
   skillCreatorListed: boolean;
@@ -162,6 +188,7 @@ const prompt: {
   requestPluginInstall: false,
   webRun: false,
   catalogWebSearch: false,
+  browserTools: [],
   toolNames: [],
   unfitSkills: [],
   skillCreatorListed: false,
@@ -191,6 +218,9 @@ try {
   prompt.webRun = contents.tools.includes("web__run");
   prompt.catalogWebSearch = contents.tools.includes("openbot.web_search");
   prompt.toolNames = [...new Set(Array.from(contents.tools.matchAll(/"name":"([^"]+)"/g), (match) => match[1] ?? ""))];
+  const declared: Array<{ name?: string; tools?: Array<{ name?: string }> }> = JSON.parse(contents.tools);
+  const browserNamespace = declared.find((tool) => tool.name === BROWSER_NAMESPACE);
+  prompt.browserTools = (browserNamespace?.tools ?? []).map((tool) => tool.name ?? "");
   prompt.unfitSkills = CODEX_UNFIT_SKILLS.filter((skill) => listsSkill(contents.context, skill));
   prompt.skillCreatorListed = listsSkill(contents.context, "skill-creator");
   commitMessage = git("log", "-1", "--format=%B").trim();
@@ -207,6 +237,13 @@ const failures = [
   ...(turns.find((turn) => turn.step === "deferred tool")?.reply.includes(ECHO_TEXT)
     ? []
     : ["deferred tool: wrong reply"]),
+  ...(turns.find((turn) => turn.step === "browser tool")?.reply.includes(TAB_TITLE)
+    ? []
+    : ["browser tool: wrong reply"]),
+  ...(browserCalls.includes("list_tabs") ? [] : [`browser tool: no direct ${BROWSER_NAMESPACE}.list_tabs call`]),
+  ...(DIRECT_BROWSER_TOOLS.every((tool) => prompt.browserTools.includes(tool))
+    ? []
+    : [`the prompt declares ${BROWSER_NAMESPACE} tools ${JSON.stringify(prompt.browserTools)}`]),
   ...(commitMessage === "Add hello" ? [] : [`commit: last message is ${JSON.stringify(commitMessage)}`]),
   ...(prompt.requestPluginInstall ? ["the prompt declares request_plugin_install"] : []),
   ...(prompt.webRun ? [] : ["the prompt declares no web__run"]),
@@ -220,6 +257,7 @@ const report = {
   passed: failures.length === 0,
   failures,
   prompt,
+  browserCalls,
   commitMessage,
   turns,
 };

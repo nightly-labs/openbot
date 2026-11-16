@@ -78,7 +78,7 @@ export const FILL_FIELD_STATE_FUNCTION = String.raw`function(expected, origin, s
   if (this.getClientRects().length === 0) return null;
   for (let element = this; element; element = element.parentElement || element.getRootNode()?.host) {
     const style = getComputedStyle(element);
-    if (element.hidden || element.inert || element.getAttribute('aria-hidden') === 'true' || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
+    if (Element.prototype.hasAttribute.call(element, 'hidden') || Element.prototype.hasAttribute.call(element, 'inert') || element.getAttribute('aria-hidden') === 'true' || style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse' || style.contentVisibility === 'hidden' || style.opacity === '0') return null;
   }
   const fingerprint = JSON.stringify([this.localName, this.type || '', this.getAttribute('autocomplete'), this.form?.getAttribute('autocomplete'), this.getAttribute('id'), this.getAttribute('name'), this.getAttribute('aria-label'), this.getAttribute('placeholder'), this.getAttribute('maxlength'), this.getAttribute('pattern')]);
   const state = JSON.stringify([fingerprint, this.value]);

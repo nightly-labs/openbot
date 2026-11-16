@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "需要你输入",
   "prompt.question.label": "助手提问",
   "prompt.question.cancelled": "提问已取消",
   "prompt.question.expired": "提问已过期",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "下一步",
   "prompt.question.cancel": "取消提问",
   "prompt.question.privatePlaceholder": "输入私密回答",
-  "prompt.customPlaceholder": "输入你自己的回答",
   "prompt.question.customAnswerFor": "针对该问题的自定义回答：{question}",
   "prompt.question.skip": "跳过",
   "prompt.question.chooseAll": "选择所有适用项。",
   "prompt.question.somethingElse": "其他",
   "prompt.question.emptyTitle": "没有等待回答的问题。",
   "prompt.question.emptyBody": "当助手需要再次做决定时，它会继续。",
-  "prompt.choice.hint": "选一个合适的，或自己输入。",
-  "prompt.choice.customLabel": "自定义回答",
   "prompt.approval.answerFailed": "无法回复该批准请求，请重试。",
   "prompt.approval.grantFailed": "无法保存长期批准，请重试。",
   "prompt.approval.label": "助手批准",
@@ -29,6 +25,7 @@ export const messages = {
   "prompt.approval.allow": "允许",
   "prompt.approval.alwaysAllow": "始终允许",
   "prompt.approval.deny": "拒绝",
+  "prompt.approval.cut": "此卡片只显示请求的开头，因此只能拒绝。如果“允许”没有很快出现，请更新服务器上的 OpenBot。",
   "prompt.approval.report.bugHeadline": "发现了问题？我们来修复它。",
   "prompt.approval.report.ideaHeadline": "有想法？我们来实现它。",
   "prompt.approval.report.dontSend": "暂不",

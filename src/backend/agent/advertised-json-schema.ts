@@ -178,8 +178,8 @@ function compact(schema: unknown): JsonValue | undefined {
 /**
  * The input schema that OpenBot advertises for a tool. It leaves out JSON that each request pays for
  * and that tells the model nothing: `$schema`, validation-only keywords and nested or repeated `anyOf`. A union of
- * objects that a tag tells apart becomes one object. Calls are still decoded with the Zod schema, so
- * the rules of each branch still apply. `null` branches stay: a `null` value can mean "clear".
+ * objects that a tag tells apart becomes one object. Calls are still
+ * decoded with the Zod schema, so the rules of each branch still apply. `null` branches stay: a `null` value can mean "clear".
  */
 export function advertisedJsonSchema(schema: z.ZodType): JsonObject {
   const advertised = compact(z.toJSONSchema(schema, { target: "draft-7", unrepresentable: "any" }));

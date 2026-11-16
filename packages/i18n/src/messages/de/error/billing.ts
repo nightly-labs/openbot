@@ -6,8 +6,12 @@ export const messages = {
     "Der Servertarif konnte nicht geändert werden. Lade „Abrechnung“ neu und versuche es erneut.",
   "error.billing.confirmMismatch": "Gib den Servernamen ein, um ihn zu löschen.",
   "error.billing.restartBusy": "Der Server kann jetzt nicht neu starten. Versuche es in einer Minute erneut.",
+  "error.billing.restartUnavailable": "Dieser Server kann von hier aus nicht neu starten. Wende dich an den Support.",
   "error.billing.planRequired": "Der Tarif dieses Servers ist abgelaufen. Verlängere ihn, um den Server zu starten.",
   "error.billing.planSoldOut": "Dieser Tarif ist ausverkauft. Wähle einen anderen Tarif.",
+  "error.billing.storageUnavailable": "Dieser Speicher ist für diesen Server nicht verfügbar.",
+  "error.billing.storagePaymentFailed":
+    "Die Zahlung für den Speicher ist fehlgeschlagen. Aktualisiere die Zahlungsmethode und versuche es erneut.",
   "error.billing.licenseExists": "Dieses Konto hat bereits eine Lizenz. Ändern Sie stattdessen ihre Nutzerzahl.",
   "error.billing.licenseCurrency": "Die Lizenz muss die Währung Ihrer anderen Pläne verwenden.",
   "error.billing.planCurrency": "Ein neuer Plan muss die Währung Ihrer anderen Pläne verwenden.",

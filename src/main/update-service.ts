@@ -13,7 +13,7 @@ import type {
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -63,6 +63,11 @@ export type UpdateAdapter = {
   on(event: "update-downloaded", listener: (info: UpdateInfo) => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
   quitAndInstall: (isSilent?: boolean, isForceRunAfter?: boolean) => void;
+  /**
+   * electron-updater's staged rollout test (docs/RELEASING.md#staged-rollout). An adapter with no
+   * staged rollout, such as the hosted server adapter, does not have it.
+   */
+  isUserWithinRollout?: (info: UpdateInfo) => boolean | Promise<boolean>;
 };
 
 export function createDisabledUpdateAdapter(): UpdateAdapter {
@@ -237,6 +242,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
+  readonly #logWrites = new Set<Fiber.Fiber<void, UpdateOperationFailure>>();
   readonly #workScope = Scope.makeUnsafe();
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
@@ -252,6 +258,15 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #checkRequest: Deferred.Deferred<UpdateCheckOutcome | null, UpdateOperationFailure> | null = null;
   #downloadInFlight = false;
   #teardownCommitted = false;
+  /**
+   * The release in its staged rollout that a person's check found. The later checks and download
+   * retries of this session also get it. A later release keeps its staged rollout.
+   */
+  #requestedVersion: string | null = null;
+  /** The release that the staged rollout left out in the current check request. */
+  #rolloutMiss: string | null = null;
+  /** A newer release in its staged rollout that the last check did not offer to this install. */
+  #stagedVersion: string | null = null;
 
   constructor(updater: UpdateAdapter, options: UpdateServiceOptions) {
     super();
@@ -279,9 +294,21 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     };
     this.on("diagnostic", (event) => {
       const directory = this.#options.logDirectory;
-      if (directory) this.#fork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      if (!directory) return;
+      // `appendUpdateLog` catches every failure, so this write needs no failure log of `#fork`.
+      const write = Effect.runFork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      this.#logWrites.add(write);
+      write.addObserver(() => this.#logWrites.delete(write));
     });
     this.#recordStatus();
+  }
+
+  /**
+   * Waits for the `update.log` events that were recorded before this call. The file write is
+   * asynchronous, so an `app.exit` right after a failed install lost its `install_failed` (#5039).
+   */
+  flushLog(): Effect.Effect<void> {
+    return Effect.suspend(() => Fiber.awaitAll([...this.#logWrites])).pipe(Effect.asVoid);
   }
 
   start(scheduleChecks = true): void {
@@ -293,6 +320,19 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     this.#updater.autoDownload = false;
     this.#updater.autoInstallOnAppQuit = false;
     this.#updater.allowPrerelease = false;
+    // A check that a person asks for gets a release that is still in its staged rollout. A paused
+    // release (0%) stays paused for everyone, because a pause stops a release that is bad.
+    // electron-updater calls this test only for a release that this system supports.
+    const stagedRollout = this.#updater.isUserWithinRollout;
+    if (stagedRollout) {
+      this.#updater.isUserWithinRollout = async (info) => {
+        const percentage = stagingPercentage(info.stagingPercentage);
+        if (percentage !== 0 && info.version === this.#requestedVersion) return true;
+        const within = await stagedRollout(info);
+        if (!within && percentage !== null && percentage > 0) this.#rolloutMiss = info.version;
+        return within;
+      };
+    }
 
     // The check lifecycle is driven entirely by checkForUpdates(), whose result is generation
     // guarded, so there are deliberately no checking-for-update / update-available /
@@ -358,6 +398,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     if (this.#scheduledRestart)
       status.scheduledRestart = { ...this.#scheduledRestart, waitingFor: [...this.#scheduledRestart.waitingFor] };
     if (this.#idleRestart) status.idleRestart = { ...this.#idleRestart, waitingFor: [...this.#idleRestart.waitingFor] };
+    if (this.#stagedVersion && status.phase === "up-to-date") status.stagedVersion = this.#stagedVersion;
     return status;
   }
 
@@ -443,6 +484,9 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
    * The user-facing check. Unlike the periodic loop this one always reports: it moves into
    * "checking" and settles on a real outcome even when an earlier call is still unsettled, because
    * an action that answers a press by leaving the same error on screen reads as a dead button.
+   * Each caller is a person: the Settings button, the app menu, a member's request from a joined
+   * server, and the recovery when an older app opens newer data. So a release in its staged rollout
+   * is offered here, and also to the later checks and download retries of this session.
    */
   checkForUpdates(): Effect.Effect<UpdateStatus, UpdateOperationFailure> {
     return this.#check(true);
@@ -472,7 +516,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       const generation = ++this.#checkGeneration;
       this.#operation = "check";
       this.#setStatus({ phase: "checking", progress: null, message: null, errorCode: null });
-      const checked = yield* Effect.result(this.#issueCheck()).pipe(
+      const checked = yield* this.#issueRequestedCheck(joinOutstandingRequest, generation).pipe(
         Effect.ensuring(
           Effect.sync(() => {
             if (this.#checkGeneration === generation) this.#scheduleCheck(this.#options.checkIntervalMs);
@@ -480,6 +524,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         ),
       );
       if (this.#checkGeneration !== generation) return this.getStatus();
+      this.#stagedVersion = null;
       if (Result.isFailure(checked)) this.#setError("check_failed", describeCheckFailure(checked.failure.cause));
       else {
         const result = checked.success;
@@ -489,6 +534,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
           this.#markAvailable(result.updateInfo.version);
         } else {
           this.#downloadedVersion = null;
+          // Settings > Updates says that a check that a person asks for gets the release that the
+          // staged rollout left out. A paused release (0%) is not offered to any check, so it is not shown.
+          if (this.#rolloutMiss && isNewerRelease(this.#rolloutMiss, this.#status.currentVersion))
+            this.#stagedVersion = this.#rolloutMiss;
           this.#setStatus({
             phase: "up-to-date",
             availableVersion: null,
@@ -687,6 +736,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
       if (this.#checkRequest) return yield* Deferred.await(this.#checkRequest);
       const request = Deferred.makeUnsafe<UpdateCheckOutcome | null, UpdateOperationFailure>();
       this.#checkRequest = request;
+      this.#rolloutMiss = null;
       return yield* updateIO(() => this.#updater.checkForUpdates()).pipe(
         // Logged once per request, here, because joined callers and the status keep only a message.
         Effect.tapError(({ cause }) => Effect.sync(() => logUpdateFailure("OpenBot update check failed.", cause))),
@@ -698,6 +748,24 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
         ),
         Effect.uninterruptible,
       );
+    });
+  }
+
+  /**
+   * A person's check that the staged rollout left out asks again for that release. The second
+   * request also replaces a joined periodic request that ran the staged rollout test.
+   */
+  #issueRequestedCheck(
+    requested: boolean,
+    generation: number,
+  ): Effect.Effect<Result.Result<UpdateCheckOutcome | null, UpdateOperationFailure>> {
+    return Effect.gen({ self: this }, function* () {
+      const checked = yield* Effect.result(this.#issueCheck());
+      const missed = this.#rolloutMiss;
+      if (!requested || !missed || Result.isFailure(checked) || this.#checkGeneration !== generation) return checked;
+      if (checked.success?.isUpdateAvailable) return checked;
+      this.#requestedVersion = missed;
+      return yield* Effect.result(this.#issueCheck());
     });
   }
 
@@ -1030,6 +1098,13 @@ function pruneInstalledUpdate(directory: string, currentVersion: string): Effect
  * a candidate with the same numbers is not newer. A stale feed answer that names an older release
  * must not replace a newer download.
  */
+/** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
+function stagingPercentage(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const percentage = Number.parseInt(String(value), 10);
+  return Number.isNaN(percentage) ? null : percentage;
+}
+
 function isNewerRelease(candidate: string, current: string): boolean {
   const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
   const [left, right] = [parse(candidate), parse(current)];

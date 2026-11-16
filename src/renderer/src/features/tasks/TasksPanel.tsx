@@ -27,8 +27,6 @@ interface TasksPanelProps {
   serverId: string;
   hostName: string;
   onBack?: (() => void) | undefined;
-  agentsOpen?: boolean | undefined;
-  onToggleAgents?: (() => void) | undefined;
 }
 
 /** The Tasks page on desktop: the agents of the active server, the task IPC, and voice from this computer. */

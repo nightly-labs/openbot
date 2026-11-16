@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Requiere respuesta",
   "prompt.question.label": "Preguntas del agente",
   "prompt.question.cancelled": "Preguntas canceladas",
   "prompt.question.expired": "Preguntas caducadas",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Siguiente",
   "prompt.question.cancel": "Cancelar preguntas",
   "prompt.question.privatePlaceholder": "Introduce una respuesta privada",
-  "prompt.customPlaceholder": "Escribe tu propia respuesta",
   "prompt.question.customAnswerFor": "Respuesta personalizada para: {question}",
   "prompt.question.skip": "Omitir",
   "prompt.question.chooseAll": "Elige todas las que correspondan.",
   "prompt.question.somethingElse": "Otra cosa",
   "prompt.question.emptyTitle": "No hay preguntas pendientes.",
   "prompt.question.emptyBody": "El agente continuará cuando necesite otra decisión.",
-  "prompt.choice.hint": "Elige lo que corresponda o escribe tu propia respuesta.",
-  "prompt.choice.customLabel": "Respuesta personalizada",
   "prompt.approval.answerFailed": "No se pudo responder a esta solicitud de aprobación. Vuelve a intentarlo.",
   "prompt.approval.grantFailed": "No se pudo guardar la aprobación permanente. Vuelve a intentarlo.",
   "prompt.approval.label": "Aprobación del agente",
@@ -29,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Permitir",
   "prompt.approval.alwaysAllow": "Permitir siempre",
   "prompt.approval.deny": "Rechazar",
+  "prompt.approval.cut":
+    "Esta tarjeta muestra solo el inicio de la solicitud, así que solo permite rechazarla. Si Permitir no aparece pronto, actualiza OpenBot en el servidor.",
   "prompt.approval.report.bugHeadline": "¿Encontraste un error? Vamos a corregirlo.",
   "prompt.approval.report.ideaHeadline": "¿Tienes una idea? Vamos a hacerla realidad.",
   "prompt.approval.report.dontSend": "Ahora no",

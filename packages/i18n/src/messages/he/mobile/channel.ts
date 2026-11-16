@@ -44,6 +44,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "לא ניתן לשחזר את הערוץ הזה. יש לנסות שוב.",
   "mobile.channel.chat.fallbackName": "ערוץ",
   "mobile.channel.chat.deletedNotice": "ערוץ שנמחק. תצוגה מקדימה בלבד.",
+  "mobile.channel.chat.waitBusy": "ממתין - {name} עובד ב-{channel}",
+  "mobile.channel.chat.waitFull": "ממתין - {name} יתחיל כשמשימה פעילה תסתיים",
   "mobile.channel.records.connect": "יש להתחבר לשרת כדי לערוך את הערוץ הזה.",
   "mobile.channel.records.loadFailed": "לא ניתן לטעון את הגדרות הערוץ.",
   "mobile.channel.records.gone": "הפריט הזה אינו זמין עוד.",

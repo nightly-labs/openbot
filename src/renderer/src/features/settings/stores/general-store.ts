@@ -126,11 +126,13 @@ export function createSettingsGeneralStore(props: GeneralStoreProps) {
           ...account,
           usedBy: props.providerAccountUsers?.[provider]?.[account.id],
         })),
+        accountPool: agent?.accountPool,
         runtimeStatus:
           runtime && agentVersionShown ? { ...runtime, phase: "ready", version: agent?.version ?? null } : runtime,
         // The label goes only with the version of the CLI it names: in other states the row shows
         // the copy's version, while the agent status can still name the user's CLI.
         cliSource: agentVersionShown || agent?.cliSource === "managed" ? agent?.cliSource : undefined,
+        otherCliVersion: agentVersionShown || agent?.cliSource === "managed" ? agent?.otherCliVersion : undefined,
       };
     }),
   );

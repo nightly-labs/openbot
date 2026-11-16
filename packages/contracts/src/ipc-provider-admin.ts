@@ -6,14 +6,19 @@
 
 import { isAgentProvider } from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
+import { type AgentModelOption, isAgentModelOption, isReasoningEffort } from "./ipc-agent-identity";
 import {
   type AccountUsage,
+  type HostProviderAccountModels,
   type HostProviderAccounts,
   isAccountUsage,
   isProviderAccountId,
+  isProviderAccountPool,
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_USAGE_RESET_OUTCOMES,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
@@ -38,6 +43,7 @@ import {
 } from "./ipc-custom-providers";
 import { decodeMcpSignInRelayPage } from "./ipc-mcp-servers";
 import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "./runtime-values";
+import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "./team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ERROR_LIMIT } from "./team-protocol/provider-host-sign-in-v1";
 
 /** Each URL becomes a link the admin opens, so it is held to https here as well. */
@@ -60,6 +66,21 @@ export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginS
     ...(value.verificationUrlComplete === undefined ? {} : { verificationUrlComplete: value.verificationUrlComplete }),
     expiresAt: value.expiresAt,
   };
+}
+
+/** A started code sign-in of an account (`provider-account-code-v1`). */
+export function decodeProviderAccountCodeLoginStart(value: unknown): ProviderAccountCodeLoginStart {
+  if (!isDynamicRecord(value) || !isProviderAccountId(value.accountId)) throw new Error("Invalid code login.");
+  return { accountId: value.accountId, start: decodeProviderCodeLoginStart(value.start) };
+}
+
+export function decodeProviderAccountCodeLoginStatus(value: unknown): ProviderAccountCodeLoginStatus {
+  const invalid = () => new Error("Invalid sign-in response.");
+  if (!isDynamicRecord(value)) throw invalid();
+  if (value.result === null) return { result: null };
+  if (!isDynamicRecord(value.result) || !isNullableBoundedString(value.result.error, PROVIDER_ACCOUNTS_MESSAGE_LIMIT))
+    throw invalid();
+  return { result: { error: value.result.error } };
 }
 
 export function decodeProviderHostSignInStatus(value: unknown): ProviderHostSignInStatus {
@@ -91,6 +112,75 @@ export function decodeHostProviderAccounts(value: unknown): HostProviderAccounts
     return { agentId: row.agentId, accountId: row.accountId };
   });
   return { providers, agents };
+}
+
+/**
+ * The models of a `provider-account-models-v1` list. The route codec has checked the fields. A
+ * provider this client does not know is left out, and so is a model whose default reasoning effort
+ * it does not know; an unknown effort is left out of the supported ones.
+ */
+export function decodeHostProviderAccountModels(value: unknown): HostProviderAccountModels {
+  const invalid = () => new Error("Invalid provider account models.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.providers)) throw invalid();
+  const providers = value.providers.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row) || !Array.isArray(row.accounts) || row.accounts.length > MAX_PROVIDER_ACCOUNTS)
+      throw invalid();
+    const provider = row.provider;
+    if (!isAgentProvider(provider)) return [];
+    const accounts = row.accounts.map((account: unknown) => {
+      if (!isDynamicRecord(account) || !isProviderAccountId(account.accountId) || !Array.isArray(account.models))
+        throw invalid();
+      const models = account.models.flatMap((model: unknown): AgentModelOption[] => {
+        if (!isDynamicRecord(model) || !Array.isArray(model.supportedReasoningEfforts)) throw invalid();
+        const option = {
+          ...model,
+          provider,
+          supportedReasoningEfforts: model.supportedReasoningEfforts.filter(isReasoningEffort),
+        };
+        return isAgentModelOption(option) ? [option] : [];
+      });
+      return { accountId: account.accountId, models };
+    });
+    return [{ provider, accounts }];
+  });
+  return { providers };
+}
+
+/**
+ * The pools of a `provider-account-pool-v1` list. The route codec has checked the fields. A provider
+ * this client does not know is left out.
+ */
+export function decodeHostProviderAccountPools(value: unknown): NonNullable<HostProviderAccounts["pools"]> {
+  const invalid = () => new Error("Invalid provider account pools.");
+  if (!isDynamicRecord(value) || !Array.isArray(value.pools)) throw invalid();
+  return value.pools.flatMap((row: unknown) => {
+    if (!isDynamicRecord(row)) throw invalid();
+    const pool = { leftOut: row.leftOut, inUse: row.inUse };
+    if (!isProviderAccountPool(pool)) throw invalid();
+    return isAgentProvider(row.provider) ? [{ provider: row.provider, pool }] : [];
+  });
+}
+
+/** The accounts with the models that `models` gives for each. An account it does not name keeps its own. */
+export function withHostProviderAccountModels(
+  accounts: HostProviderAccounts,
+  models: HostProviderAccountModels,
+): HostProviderAccounts {
+  const byAccount = new Map(
+    models.providers.flatMap((row) =>
+      row.accounts.map((account) => [`${row.provider}\n${account.accountId}`, account.models] as const),
+    ),
+  );
+  return {
+    ...accounts,
+    providers: accounts.providers.map((row) => ({
+      ...row,
+      accounts: row.accounts.map((account) => {
+        const extra = byAccount.get(`${row.provider}\n${account.id}`);
+        return extra?.length ? { ...account, models: extra } : account;
+      }),
+    })),
+  };
 }
 
 /** Each reading names its account: the released usage routes give the provider's own sign-in. */

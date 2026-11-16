@@ -2,6 +2,8 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 
 /** One earlier message of the external conversation, given to the agent as context. */
 export interface MessagingContextMessage {
+  /** The platform's message id, which `messaging_post` takes as `replyTo`. A quote has none. */
+  id?: string;
   authorName: string;
   text: string;
   /** ISO time. */
@@ -86,8 +88,11 @@ export function messagingPromptText(input: MessagingPromptInput): string {
   const context = boundedContext(input.context);
   if (context.length)
     lines.push(
-      "--- earlier messages (context, oldest first) ---",
-      ...context.map((message) => `[${message.sentAt}] ${message.authorName}: ${message.text}`),
+      "--- earlier messages (context, oldest first, with their message id) ---",
+      ...context.map(
+        (message) =>
+          `[${message.sentAt}]${message.id ? ` (id ${message.id})` : ""} ${message.authorName}: ${message.text}`,
+      ),
     );
   if (input.replyTo)
     lines.push(
@@ -102,7 +107,8 @@ export function messagingPromptText(input: MessagingPromptInput): string {
 /** How to answer, the messaging tools, and the saved facts: the same for each turn of one session. */
 function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORDS)[MessagingPlatform]): string[] {
   const lines = [
-    "Answer yourself when you can answer correctly in this turn from your knowledge, this conversation, the saved facts, or your tools: a greeting, a simple question, a fact, a short explanation, or the status of work you know. Ask an OpenBot teammate only when the request needs its tools, accounts, files, or memory, or long work such as code changes or research.",
+    "Answer yourself when you can answer correctly in this turn from your knowledge, this conversation, the saved facts, or your tools: a greeting, a simple question, a fact, a short explanation, or the status of your own work. Ask an OpenBot teammate only when the request needs its tools, accounts, files, or memory, or long work such as code changes or research.",
+    "A teammate's work can change after its answer, for example when the OpenBot user continues it in the app. To give the status of work that a teammate did, ask that teammate again for its current status, also when you know its earlier answer or your instructions say that you can answer the status of work you know. Do not give its earlier answer as the current status.",
     "To send files, call openbot.attach_files_to_response. When you ask an OpenBot teammate, ask one teammate and end this turn: its reply comes back to this conversation, and your answer to it is posted here.",
     `Through openbot.tool_call: openbot.messaging_history reads more of this place; openbot.messaging_remember saves a fact that every conversation of this ${words.workspace} sees; openbot.messaging_forget_memory deletes one by its id; openbot.messaging_post posts to another place. Keep facts about this ${words.workspace} there, not in openbot.remember: your own memories are private to the OpenBot user.`,
   ];
@@ -113,10 +119,14 @@ function guidanceLines(input: MessagingPromptInput, words: (typeof PLATFORM_WORD
     lines.push(
       `When a person gives a lasting fact or default of this ${words.workspace}, such as the repository or account to use or a person's role, save it with openbot.messaging_remember in the same turn. A new conversation, and a restart, keep only the saved facts.`,
     );
-  // Only Slack takes back the "Working" post of a quiet answer.
+  // Slack and WhatsApp take back the "Working" post of a quiet answer.
   if (input.platform === "slack" && !input.isDirect)
     lines.push(
       `A reply in this thread can reach you without a mention. When a message needs no answer, such as thanks or people talking to each other, answer only ${QUIET_ANSWER}: nothing is posted.`,
+    );
+  if (input.platform === "whatsapp")
+    lines.push(
+      `When you must not answer this message, such as when your instructions say not to answer this person or chat, answer only ${QUIET_ANSWER}: nothing is posted. An empty answer posts a notice in the chat.`,
     );
   if (input.memories.length)
     lines.push(
@@ -142,7 +152,7 @@ function boundedContext(messages: readonly MessagingContextMessage[]): Messaging
   const kept: MessagingContextMessage[] = [];
   let characters = 0;
   for (const message of [...messages].reverse().slice(0, CONTEXT_MESSAGES)) {
-    characters += message.text.length + message.authorName.length;
+    characters += message.text.length + message.authorName.length + (message.id?.length ?? 0);
     if (characters > CONTEXT_CHARACTERS) break;
     kept.unshift(message);
   }

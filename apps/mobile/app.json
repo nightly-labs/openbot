@@ -3,13 +3,14 @@
     "name": "OpenBot",
     "slug": "openbot",
     "platforms": ["ios", "android"],
-    "version": "1.4.9",
+    "version": "1.4.10",
     "orientation": "portrait",
     "icon": "./assets/icons/app-icon.png",
     "scheme": "openbot",
     "userInterfaceStyle": "automatic",
     "ios": {
       "bundleIdentifier": "run.openbot.mobile",
+      "appleTeamId": "8A47NKRZSJ",
       "supportsTablet": true,
       "associatedDomains": ["applinks:openbot.run"],
       "infoPlist": {
@@ -43,6 +44,7 @@
       "./plugins/with-rocketsim",
       "./plugins/with-workspace-bundle-inputs",
       "./plugins/with-update-channel",
+      "./plugins/with-app-icons",
       "expo-router",
       "expo-video",
       [
@@ -232,7 +234,9 @@
           "bundleIdentifier": "run.openbot.mobile.NotificationService",
           "groupIdentifier": "group.run.openbot.mobile"
         }
-      ]
+      ],
+      "./plugins/with-shortcuts",
+      "./plugins/with-xcode-warning-fixes"
     ],
     "experiments": {
       "typedRoutes": true,

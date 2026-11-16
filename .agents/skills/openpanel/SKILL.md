@@ -127,6 +127,16 @@ To remove the access: delete the `Match User openpanel-ci` block (the backup is
 `userdel -r openpanel-ci` and `systemctl disable --now openpanel-clickhouse-proxy.socket`, and delete
 the two units and the script.
 
+## Release health check
+
+`scripts/release-health.ts <version | latest>` compares a new release with the release before it over
+the same hours after each GitHub Release: finished starts, crashes, startup crashes, quit hangs and
+update arrivals, per platform and for servers. It is the check before a staged rollout goes to 100%
+(`docs/RELEASING.md`). Exit code 1 means a metric is clearly worse, and 3 means not enough data yet.
+`.github/workflows/release-health.yml` runs it every two hours in the first 72 hours of a release
+with `--quiet`, and posts worse rows once to the same private channel as the regression report, with
+the same secrets and tunnel. Its state cache is `release-health-state-*`, an HMAC as above.
+
 ## Rotate the token
 
 In OpenPanel, open the OpenBot project, then Settings, Clients. Make a new `root` client. Encrypt

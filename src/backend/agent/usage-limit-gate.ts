@@ -10,8 +10,8 @@ import { agentProviderAccount as accountOf, providerForAgent } from "./thread-it
 export const USAGE_LIMIT_METHOD = "openbot/usageLimit";
 
 /**
- * How often a limit with no reported reset, or with a reset from a usage reading, is read again. A
- * usage read is one request, not a turn.
+ * How often a limit is read again before its reset. The provider can end it early, as when a reset
+ * credit is spent outside OpenBot. A usage read is one request, not a turn.
  */
 const USAGE_LIMIT_RECHECK_MS = 15 * 60_000;
 
@@ -72,6 +72,11 @@ interface UsageLimit extends UsageLimitKey {
    * before it, as when a reset credit is spent in the Codex app, so it is read again.
    */
   resetFromUsage: boolean;
+  /**
+   * A reading ended a limit before the reset that a refusal named, and a turn was refused again before
+   * that reset: the reading does not show this limit, as a limit of one model can be. It waits for the reset.
+   */
+  readBlind: boolean;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -84,8 +89,9 @@ interface UsageLimit extends UsageLimitKey {
  * family only; an account-wide window costs each other model one refused, requeued turn.
  *
  * The entry ends at the reported reset, after a usage read that finds no spent window, or when a
- * turn on that provider and model completes. It is kept in memory only: after a restart the first
- * refused turn closes the gate again. A message from the user lets its agent try one turn before
+ * turn on that provider and model completes. A refusal that names its reset is read again too, unless
+ * a reading already ended it once and the next turn was refused. It is kept in memory only: after a
+ * restart the first refused turn closes the gate again. A message from the user lets its agent try one turn before
  * that: the user can have signed the provider in to another account, or bought more usage, and no
  * reading shows that before the reset.
  *
@@ -103,6 +109,8 @@ export class UsageLimitGate {
   readonly #failures = new Map<string, ProviderFailure>();
   /** The agents that may start one turn while their limit holds, with that limit's key. */
   readonly #tries = new Map<string, string>();
+  /** The limits that a reading ended before the reset a refusal named, with that reset in epoch seconds. */
+  readonly #readReleased = new Map<string, number>();
 
   constructor(options: UsageLimitGateOptions) {
     this.#store = options.store;
@@ -254,6 +262,7 @@ export class UsageLimitGate {
       model: turnModel,
       resetsAt: null,
       resetFromUsage: false,
+      readBlind: false,
       timer: null,
     };
     // A reset already past would release the queue at once into the same refusal.
@@ -261,6 +270,11 @@ export class UsageLimitGate {
     const named = future(resetsAt);
     limit.resetsAt = named ?? future(limit.resetsAt);
     if (named !== null) limit.resetFromUsage = false;
+    const readReleased = this.#readReleased.get(key);
+    this.#readReleased.delete(key);
+    if (named !== null && readReleased !== undefined && readReleased * 1_000 > Date.now()) limit.readBlind = true;
+    // With no reset known, only a reading can end the limit.
+    else if (limit.resetsAt === null) limit.readBlind = false;
     this.#limits.set(key, limit);
     this.#arm(key, limit);
     yield* this.#hooks.held(this.#heldAgents(limit).map((held) => held.id));
@@ -290,6 +304,7 @@ export class UsageLimitGate {
     if (!agent) return;
     const provider = providerForAgent(agent);
     const key = limitKey(provider, accountOf(agent), model ?? agent.model);
+    this.#readReleased.delete(key);
     if (this.#limits.has(key)) yield* this.#release(key);
     if (this.#failures.has(key)) yield* this.#releaseFailure(key);
     if (![...this.#limits.values()].some((limit) => limit.provider === provider)) this.#announced.delete(provider);
@@ -304,6 +319,8 @@ export class UsageLimitGate {
     provider: AgentProvider,
     accountId: string | null,
   ) {
+    const account = limitKey(provider, accountId, "");
+    for (const key of [...this.#readReleased.keys()]) if (key.startsWith(account)) this.#readReleased.delete(key);
     for (const [key, limit] of [...this.#limits])
       if (limit.provider === provider && limit.accountId === accountId) yield* this.#release(key, true);
   }).bind(this);
@@ -314,6 +331,7 @@ export class UsageLimitGate {
     for (const failure of this.#failures.values()) clearTimeout(failure.timer);
     this.#failures.clear();
     this.#tries.clear();
+    this.#readReleased.clear();
     this.#announced.clear();
     yield* Scope.close(this.#scope, Exit.void);
     this.#scope = Scope.makeUnsafe();
@@ -339,7 +357,7 @@ export class UsageLimitGate {
     if (limit.timer) clearTimeout(limit.timer);
     const untilReset =
       limit.resetsAt === null ? USAGE_LIMIT_RECHECK_MS : limit.resetsAt * 1_000 - Date.now() + RESET_GRACE_MS;
-    const delay = limit.resetFromUsage ? Math.min(untilReset, USAGE_LIMIT_RECHECK_MS) : untilReset;
+    const delay = limit.readBlind ? untilReset : Math.min(untilReset, USAGE_LIMIT_RECHECK_MS);
     limit.timer = setTimeout(
       () => Effect.runFork(this.#fire(key, limit).pipe(Effect.forkIn(this.#scope))),
       Math.max(0, Math.min(delay, MAX_TIMER_MS)),
@@ -353,17 +371,21 @@ export class UsageLimitGate {
       yield* this.#release(key, true);
       return;
     }
-    if (limit.resetsAt !== null && !limit.resetFromUsage) {
+    if (limit.readBlind) {
       this.#arm(key, limit);
       return;
     }
     // A reading that still shows a spent window gives the reset, and one that shows none lets one turn
-    // try. With no reset known, no reading lets one turn try too; a reset from a reading waits for it.
-    const known = limit.resetsAt !== null;
+    // try. With no reset known, no reading lets one turn try too; a known reset waits for it.
+    const known = limit.resetsAt;
+    const named = limit.resetFromUsage ? null : known;
     const resetsAt = yield* this.#readReset(key, limit);
-    if (this.#limits.get(key) !== limit || typeof resetsAt === "number") return;
-    if (resetsAt === null || !known) yield* this.#release(key);
-    else this.#arm(key, limit);
+    // A refusal during the reading armed the timer again.
+    if (this.#limits.get(key) !== limit || limit.timer !== null || typeof resetsAt === "number") return;
+    if (resetsAt === null || known === null) {
+      if (named !== null) this.#readReleased.set(key, named);
+      yield* this.#release(key);
+    } else this.#arm(key, limit);
   });
 
   /**
@@ -375,16 +397,22 @@ export class UsageLimitGate {
     key: string,
     limit: UsageLimit,
   ) {
+    const named = limit.resetFromUsage ? null : limit.resetsAt;
     const usage = yield* this.#hooks
       .readUsage(limit.provider, limit.model, limit.accountId)
       .pipe(Effect.catch(() => Effect.succeed(null)));
     if (this.#limits.get(key) !== limit) return null;
     // A reset that a refusal named while the reading ran stays.
-    if (limit.resetsAt !== null && !limit.resetFromUsage) return limit.resetsAt;
+    if (limit.resetsAt !== null && !limit.resetFromUsage && limit.resetsAt !== named) return limit.resetsAt;
     // A provider that does not run, or a reading that does not cover the model, has no window.
     if (!usage?.limits.some((reading) => reading.primary || reading.secondary)) return undefined;
     const resetsAt = spentWindowReset(usage);
     if (resetsAt === null) return null;
+    // A spent window keeps the reset that the refusal named.
+    if (named !== null) {
+      this.#arm(key, limit);
+      return named;
+    }
     const changed = limit.resetsAt !== resetsAt;
     limit.resetsAt = resetsAt;
     limit.resetFromUsage = true;

@@ -5,7 +5,7 @@ import Check from "lucide-react-native/icons/check";
 import { useEffect, useState } from "react";
 import type { NativeScrollEvent, NativeSyntheticEvent } from "react-native";
 import { useCSSVariable } from "uniwind";
-import { useAgentModelPicker } from "@/features/agents/model/agent-model-picker";
+import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   SettingsContent,
@@ -50,7 +50,10 @@ export function AgentModelPickerScreen() {
     if (!request && router.canGoBack()) router.back();
   }, [request]);
   const words = search.trim().toLocaleLowerCase().split(/\s+/u).filter(Boolean);
-  const options = models.data?.filter((option) => option.provider === request?.provider) ?? [];
+  const options = withAccountModels(
+    models.data?.filter((option) => option.provider === request?.provider) ?? [],
+    request?.accountModels ?? [],
+  );
   // The search also reads the model id, as the backup model search does.
   const matches = options.filter((option) => {
     const text = `${option.name} ${option.id}`.toLocaleLowerCase();

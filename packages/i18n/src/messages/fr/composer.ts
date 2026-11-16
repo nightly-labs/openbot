@@ -21,6 +21,11 @@ export const messages = {
   "composer.update.manual": "Mettez à jour {provider} sur l’ordinateur qui l’exécute pour continuer.",
   "composer.update.pending": "Mise à jour…",
   "composer.update.action": "Mettre à jour",
+  "composer.usageLimit.credits":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent maintenant vos crédits.",
+  "composer.usageLimit.creditsResets":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent vos crédits jusqu’à sa réinitialisation {reset}.",
+  "composer.usageLimit.creditsTitle": "Crédits utilisés",
   "composer.usageLimit.resets": "Vous avez utilisé toute votre limite {provider}. Elle se réinitialise {reset}.",
   "composer.usageLimit.selectModel":
     "Vous avez utilisé toute votre limite {provider}. Sélectionnez un autre modèle pour continuer.",
@@ -79,6 +84,7 @@ export const messages = {
   "composer.placeholder.answer": "Saisissez votre réponse",
   "composer.add.label": "Ajouter à la demande",
   "composer.add.files": "Joindre des fichiers",
+  "composer.add.teach": "Enseigner une tâche",
   "composer.add.skill": "Utiliser une compétence",
   "composer.upload.cancel": "Annuler l’envoi",
   "composer.upload.uploading": "Envoi de {name}",

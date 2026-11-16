@@ -17,6 +17,7 @@ import type {
   BrowserPictureInPictureEvent,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
   BrowserViewport,
 } from "@openbot/contracts/ipc";
 import {
@@ -139,6 +140,23 @@ export function decodeBrowserPictureInPictureEvent(value: unknown): BrowserPictu
     default:
       throw new Error("Invalid picture-in-picture event type.");
   }
+}
+
+/** The steps that a person showed. A text that is not a string is left out. */
+export function decodeBrowserTeachSteps(value: unknown): BrowserTeachStep[] {
+  return decodeList(value, "browser teach steps", (entry) => {
+    const step = decodeRecord(entry, "browser teach step");
+    if (step.kind !== "page" && step.kind !== "click") throw new Error("Invalid browser teach step kind.");
+    const { title, role, name } = step;
+    return {
+      kind: step.kind,
+      host: requiredString(step, "host"),
+      path: requiredString(step, "path"),
+      ...(isString(title) ? { title } : {}),
+      ...(isString(role) ? { role } : {}),
+      ...(isString(name) ? { name } : {}),
+    };
+  });
 }
 
 function browserTab(tab: DynamicRecord): BrowserTab {

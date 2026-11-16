@@ -54,6 +54,12 @@
   margin-inline-start: 1px;
 }
 
+/* The agent title gives way before the tabs (see header-controls.css). When the tabs fold into one
+   button, the title hides too. */
+.conversation-heading-group:has(.agent-threads-header:not([data-mode="tabs"])) .conversation-agent-title-room {
+  display: none;
+}
+
 /*
  * Only the two icon buttons are left, and they cannot be narrower. The agent name gives way instead:
  * when it does not fit, only its avatar shows, and the name stays for a screen reader. Then "+" goes,

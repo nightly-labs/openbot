@@ -91,10 +91,39 @@ export const messages = {
   "browser.secret.submitting": "Gönderiliyor…",
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
+  "browser.secret.vaultSkip.agentScript":
+    "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
+  "browser.secret.vaultSkip.fieldKind":
+    "Ajan sayfada yanlış alanı seçtiği için OpenBot kayıtlı oturum bilgilerinizi kullanmadı.",
+  "browser.secret.vaultSkip.loginChoice":
+    "Ajan bu site için kayıtlı oturum bilgilerinden birini seçmediği için OpenBot kayıtlı bir oturum bilgisi kullanmadı. Ajana hangi hesabı kullanacağını söyleyin.",
+  "browser.secret.vaultSkip.noPassword":
+    "Kayıtlı oturum bilgilerinizde bu site için şifre olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "Kayıtlı oturum bilgilerinizde kimlik doğrulayıcı anahtarı olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "Şifre yöneticiniz okunamadığı için OpenBot kayıtlı bir oturum bilgisi kullanmadı.",
   "browser.error.openAddress": "Adres bu sekmede açılamadı.",
+  "browser.error.channelNoBrowserMember": "Bu kanalda hiçbir üye yeni sekme açamaz.",
   "browser.error.closeTab": "Tarayıcı sekmesi kapatılamadı.",
   "browser.error.reloadTab": "Tarayıcı sekmesi yeniden yüklenemedi.",
   "browser.error.stopLoading": "Sayfanın yüklenmesi durdurulamadı.",
+  "browser.error.teachStart": "Görevin kaydı başlatılamadı.",
+  "browser.error.teachStop": "Görevin kaydı durdurulamadı.",
+  "browser.error.teachEmpty": "Kayıtta hiç adım yok.",
+  "browser.teach.intro":
+    "Bu sayfada {name} için bir görev gösterin. {name} adımları öğrenir ve görevi tekrar yapabilir.",
+  "browser.teach.start": "Kaydı başlat",
+  "browser.teach.recording": "{name} adımlarınızı kaydediyor",
+  "browser.teach.stop": "Kaydı durdur ve kaydet",
+  "browser.teach.discard": "Kaydı sil",
+  "browser.teach.message":
+    "Size tarayıcıda bir görev gösterdim. Görevi kayıttan öğrenin ve bir beceri olarak kaydedin. Sonra ne öğrendiğinizi birkaç sade sözcükle bana söyleyin.",
+  "browser.teach.steps": "Kayıtta yazılan metin yok: yazdığım her değeri bana sorun.",
+  "browser.teach.step.page": "{number}. {page} sayfasını aç",
+  "browser.teach.step.pageTitled": "{number}. {page} sayfasını aç (“{title}”)",
+  "browser.teach.step.click": "{number}. “{name}” ({role}) ögesine bas",
+  "browser.teach.step.clickUnnamed": "{number}. {page} sayfasında bir ögeye ({role}) bas",
   "browser.error.takeControl": "Tarayıcı sekmesinin denetimi alınamadı.",
   "browser.error.releaseControl": "Tarayıcı sekmesi ajana geri verilemedi.",
   "browser.error.navigateBack": "Geri gidilemedi.",

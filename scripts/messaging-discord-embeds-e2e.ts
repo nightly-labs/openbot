@@ -145,6 +145,7 @@ const ingress: MessagingIngress = {
   telegram: { available: () => false, call: unused, download: unused, upload: unused },
   reconnect: () => {},
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   discord: (request, decode) => {
     hostRequests.push(request);
     const decoded = decodeDiscordApiRequest(JSON.parse(JSON.stringify(request)));
@@ -225,8 +226,12 @@ async function post(threads: MessagingThreads, connection: string, args: Dynamic
   const before = { requests: hostRequests.length, posts: posts.length };
   const response = await runCauseEffect(
     // The router passes the calling agent; a Discord post records no pings, so any id does.
-    threads.outboundTool("agent-embeds-e2e", "messaging_post", { connection, place: CHANNEL, ...args }, () =>
-      Effect.succeed([]),
+    threads.outboundTool(
+      "agent-embeds-e2e",
+      { threadId: "thread-embeds-e2e", turnId: "turn-embeds-e2e" },
+      "messaging_post",
+      { connection, place: CHANNEL, ...args },
+      () => Effect.succeed([]),
     ),
   );
   const text = response.contentItems[0]?.text ?? "{}";
@@ -348,7 +353,7 @@ try {
         assert.equal(sent.requests.length, 0, "A refused call reached Signal.");
         errors.push(String(sent.result.error));
       }
-      assert.ok(errors[0]?.includes("Give text, embeds, or both."));
+      assert.ok(errors[0]?.includes("Give text, files, embeds, or more than one."));
       assert.ok(errors[1]?.includes("An embed needs a title"));
       assert.ok(errors[6]?.includes("longer than 6000 characters"));
       return { refused: cases.length };

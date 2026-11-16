@@ -8,6 +8,7 @@ import {
   type McpSignInRelayPage,
   type McpTestResult,
   relayCallbackQuery,
+  relayPageUrl,
   type SignInRelayStatus,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -92,7 +93,7 @@ export function webMcpRelay(
       const pasted = new Promise<string>((resolve) => {
         receive = resolve;
       });
-      const view = { authorizeHost: page.host, listening: false, pasteable: true };
+      const view = { authorizeHost: page.host, url: relayPageUrl(page), listening: false, pasteable: true };
       const cancel = () => void run(cancelSignInRelay(request, flowId)).catch(() => undefined);
       own = { cancel, page, view, state: page.searchParams.get("state"), receive };
       waits.set(url, own);

@@ -1,12 +1,12 @@
-import { type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
+import { type VaultItemKind, type VaultSaveInput, vaultExpiryText } from "@openbot/contracts/ipc";
 import {
   type ConversationUiBlock,
+  isSecretFormField,
   UI_API_KEY_SCOPE_FIELD_ID,
   UI_BLOCK_SUBMIT_ACTION_ID,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockState,
-  type UiVaultRequestKind,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
@@ -14,9 +14,10 @@ import {
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { UiBlockingBlock } from "@openbot/ui/features/conversation/ui-blocks/UiBlockingBlock";
+import type { VaultRequestScope } from "@openbot/ui/features/vault/VaultPanel";
 import { VaultRequestCard } from "@openbot/ui/features/vault/VaultRequestCard";
 import { useText } from "@openbot/ui/text";
-import { createSignal, onCleanup, Show } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show } from "solid-js";
 import type { PromptAnswerOptions } from "./conversation-types";
 
 export interface UiBlockPromptProps {
@@ -52,12 +53,37 @@ function vaultFormValues(input: VaultSaveInput): Record<string, string> {
         securityCode: input.securityCode ?? "",
       };
     case "contact": {
-      const { kind: _kind, id: _id, ...fields } = input;
+      const { kind: _kind, id: _id, agents: _agents, ...fields } = input;
       return fields;
     }
     case "apiKey":
       return {};
   }
+}
+
+/** The `request_api_key` form with the choice of who can use the key, which the Vault card shows. */
+interface ApiKeyRequest {
+  /** The secret field, whose label is the name of the key. */
+  keyFieldId: string;
+  name: string;
+  placeholder: string | undefined;
+  scope: VaultRequestScope;
+}
+
+function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined {
+  const spec = block.spec;
+  if (!block.apiKey || spec.type !== "form") return undefined;
+  const key = spec.fields.find(isSecretFormField);
+  const scope = spec.fields.find((field) => field.id === UI_API_KEY_SCOPE_FIELD_ID);
+  if (!key || (scope?.kind !== "segmented" && scope?.kind !== "select")) return undefined;
+  const [first] = scope.options;
+  if (first === undefined) return undefined;
+  return {
+    keyFieldId: key.id,
+    name: key.label ?? key.id,
+    placeholder: "placeholder" in key ? key.placeholder : undefined,
+    scope: { label: scope.label ?? scope.id, options: scope.options, value: scope.value ?? first },
+  };
 }
 
 /**
@@ -121,8 +147,12 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     void send(answers, { status: "closed" });
   }
 
-  /** The fields that the agent filled in. */
+  const apiKeyRequest = createMemo(() => apiKeyRequestOf(props.block));
+
+  /** The fields that the agent filled in, or the name of a requested API key. */
   const prefill = () => {
+    const apiKey = apiKeyRequest();
+    if (apiKey) return { name: apiKey.name };
     const spec = props.block.spec;
     if (spec.type !== "form") return {};
     return Object.fromEntries(
@@ -130,18 +160,28 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     );
   };
 
+  /** The answer of the form for the item, and the secret field ids, which the frozen state does not keep. */
+  function itemAnswer(input: VaultSaveInput, scope: string | undefined): [Record<string, string>, readonly string[]] {
+    const apiKey = apiKeyRequest();
+    if (apiKey && input.kind === "apiKey")
+      return [
+        { [apiKey.keyFieldId]: input.key ?? "", [UI_API_KEY_SCOPE_FIELD_ID]: scope ?? apiKey.scope.value },
+        [apiKey.keyFieldId],
+      ];
+    return [vaultFormValues(input), UI_VAULT_SECRET_FIELDS];
+  }
+
   /**
    * Sends the item as the form's answer. The host saves it to the Vault and gives the agent only its
    * name. The frozen state keeps no secret value. A failure goes to the dialog.
    */
-  async function saveVaultItem(input: VaultSaveInput): Promise<void> {
+  async function saveVaultItem(input: VaultSaveInput, scope?: string): Promise<void> {
     const answer = props.onAnswer;
     if (!answer || state().status !== "pending") return;
-    const values = Object.fromEntries(Object.entries(vaultFormValues(input)).filter(([, value]) => value !== ""));
+    const [answerValues, secrets] = itemAnswer(input, scope);
+    const values = Object.fromEntries(Object.entries(answerValues).filter(([, value]) => value !== ""));
     const response: UiBlockResponse = { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values };
-    const kept = Object.fromEntries(
-      Object.entries(values).filter(([id]) => !UI_VAULT_SECRET_FIELDS.some((secret) => secret === id)),
-    );
+    const kept = Object.fromEntries(Object.entries(values).filter(([id]) => !secrets.includes(id)));
     let failure: unknown;
     setBusy(true);
     setError(undefined);
@@ -159,7 +199,9 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  const vaultRequest = (): UiVaultRequestKind | undefined => props.block.vault?.kind;
+  // An API key request opens the Vault dialog when the host offers the Vault, which the scope field shows.
+  const vaultRequest = (): VaultItemKind | undefined =>
+    props.block.vault?.kind ?? (apiKeyRequest() ? "apiKey" : undefined);
 
   return (
     <Show when={vaultRequest()} fallback={uiBlockCard()}>
@@ -169,6 +211,8 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           title={props.block.spec.title ?? ""}
           agentName={props.agents.find((agent) => agent.id === props.agentId)?.name}
           prefill={prefill()}
+          scope={apiKeyRequest()?.scope}
+          keyPlaceholder={apiKeyRequest()?.placeholder}
           status={state().status}
           saved={props.block.vault?.saved}
           values={state().response?.values}
@@ -182,17 +226,10 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     </Show>
   );
 
-  /** The `request_api_key` form shows its choice of who can use the key small, next to the submit button. */
-  function footerFieldId() {
-    if (props.block.apiKey) return UI_API_KEY_SCOPE_FIELD_ID;
-    return undefined;
-  }
-
   function uiBlockCard() {
     return (
       <UiBlockingBlock
         spec={props.block.spec}
-        footerFieldId={footerFieldId()}
         state={state()}
         busy={busy()}
         error={error()}

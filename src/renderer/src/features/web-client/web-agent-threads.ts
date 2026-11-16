@@ -18,6 +18,7 @@ import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
+import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   agentTaskControl,
@@ -28,6 +29,7 @@ import {
   listAgentThreadBranches,
   markAgentThreadRead,
   readAgentTask,
+  readAgentThreadAround,
   readAgentThreadPage,
   renameAgentThread,
   runQueuedMessageAsAgentTask,
@@ -107,6 +109,12 @@ function webAgentTasksPort(
           Effect.map((page) => ({ ...page, conversation: withoutPreviewUrls(page.conversation) })),
         ),
       ),
+    readTaskAround: (input) =>
+      run((host) =>
+        readAgentThreadAround(host, input).pipe(
+          Effect.map((part) => ({ ...part, conversation: withoutPreviewUrls(part.conversation) })),
+        ),
+      ),
     startTask: (input) => run((host) => startAgentTask(host, input)),
     sendToTask: (input) => run((host) => sendAgentTaskMessage(host, input)),
     stopTask: (input) => run((host) => agentTaskControl(host, "stop", input)),
@@ -151,6 +159,7 @@ export function createWebAgentThreads(options: {
     repliable: () => workspace.state.capabilities.includes(AGENT_THREAD_REPLIES_CAPABILITY),
     messageDeletable: () => workspace.state.capabilities.includes(MESSAGE_DELETE_CAPABILITY),
     pageable: () => workspace.state.capabilities.includes(AGENT_THREAD_PAGES_CAPABILITY),
+    aroundReadable: () => workspace.state.capabilities.includes(MESSAGE_PINS_CAPABILITY),
     // A reconnect sends a runtime snapshot, which reads the threads again.
     reloadKey: () => null,
   });

@@ -1,4 +1,5 @@
 import { CHANNEL_CHATS_CAPABILITY, CHANNEL_TASK_CANCEL_CAPABILITY } from "@openbot/contracts/ipc";
+import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
 import { CHAT_HISTORY_CAPABILITY } from "@openbot/contracts/team-protocol/chat-history-v1";
@@ -60,6 +61,7 @@ export function ChannelsProvider(props: ParentProps) {
     deletionSupported: () => activeServer()?.kind !== "remote" || serverRoleCanAdminister(activeServer()),
     taskCancelSupported: () => activeServerSupportsCapability(CHANNEL_TASK_CANCEL_CAPABILITY),
     isolationSupported: () => activeServerSupportsCapability(CHANNEL_ISOLATION_CAPABILITY),
+    browserSupported: () => activeServerSupportsCapability(CHANNEL_BROWSER_CAPABILITY),
     messageDeletionSupported: () => activeServerSupportsCapability(MESSAGE_DELETE_CAPABILITY),
     deletesAnyMessage: () => activeServer()?.kind === "local" || serverRoleCanAdminister(activeServer()),
     // A joined server keeps the picture with `channel-picture-v1`. Until the server is known, the editor stays hidden.

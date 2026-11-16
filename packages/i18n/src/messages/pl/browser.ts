@@ -93,10 +93,39 @@ export const messages = {
   "browser.secret.submitting": "Wysyłanie…",
   "browser.secret.takeOver": "Przejmij",
   "browser.secret.failed": "Nie udało się wykonać żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent wybrał niewłaściwe pole na stronie.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ agent nie wybrał żadnych z danych logowania zapisanych dla tej witryny. Powiedz agentowi, którego konta ma użyć.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają hasła do tej witryny.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają klucza aplikacji uwierzytelniającej.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ nie mógł odczytać Twojego menedżera haseł.",
   "browser.error.openAddress": "Nie udało się otworzyć adresu w tej karcie.",
+  "browser.error.channelNoBrowserMember": "Żaden członek nie może otworzyć nowej karty w tym kanale.",
   "browser.error.closeTab": "Nie udało się zamknąć karty przeglądarki.",
   "browser.error.reloadTab": "Nie udało się odświeżyć karty przeglądarki.",
   "browser.error.stopLoading": "Nie udało się zatrzymać wczytywania strony.",
+  "browser.error.teachStart": "Nie udało się rozpocząć nagrywania zadania.",
+  "browser.error.teachStop": "Nie udało się zatrzymać nagrywania zadania.",
+  "browser.error.teachEmpty": "Nagranie nie ma żadnych kroków.",
+  "browser.teach.intro":
+    "Pokaż agentowi {name} zadanie na tej stronie. {name} nauczy się kroków i będzie mógł je powtórzyć.",
+  "browser.teach.start": "Rozpocznij nagrywanie",
+  "browser.teach.recording": "{name} nagrywa Twoje kroki",
+  "browser.teach.stop": "Zatrzymaj i zapisz nagranie",
+  "browser.teach.discard": "Odrzuć nagranie",
+  "browser.teach.message":
+    "To zadanie zostało pokazane w przeglądarce. Naucz się go z nagrania i zapisz je jako umiejętność. Potem powiedz mi w kilku prostych słowach, czego się nauczyłeś.",
+  "browser.teach.steps": "Nagranie nie zawiera wpisanego tekstu: zapytaj mnie o każdą wpisaną wartość.",
+  "browser.teach.step.page": "{number}. Otwórz {page}",
+  "browser.teach.step.pageTitled": "{number}. Otwórz {page} („{title}”)",
+  "browser.teach.step.click": "{number}. Naciśnij „{name}” ({role})",
+  "browser.teach.step.clickUnnamed": "{number}. Naciśnij element ({role}) na {page}",
   "browser.error.takeControl": "Nie udało się przejąć kontroli nad kartą przeglądarki.",
   "browser.error.releaseControl": "Nie udało się oddać karty przeglądarki agentowi.",
   "browser.error.navigateBack": "Nie udało się cofnąć.",

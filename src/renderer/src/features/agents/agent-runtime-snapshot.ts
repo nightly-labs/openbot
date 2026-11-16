@@ -1,6 +1,6 @@
 import type { AgentApproval, AgentEvent, AgentRuntimeSnapshot } from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import { keepWholeApprovals, reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
 import type { AgentMessage } from "@openbot/ui/data";
 import { createStoredMessage } from "../../app-stored-values";
 import { promptRequestKey } from "../conversation/conversation-keys";
@@ -154,7 +154,12 @@ export function reconcileAttentionApprovals(
   current: readonly AgentApproval[],
   snapshot: Pick<AgentRuntimeSnapshot, "attentionComplete" | "pendingApprovals">,
 ): AgentApproval[] {
-  return reconcilePendingRequests(current, snapshot.pendingApprovals, snapshot.attentionComplete);
+  // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
+  return reconcilePendingRequests(
+    current,
+    keepWholeApprovals(current, snapshot.pendingApprovals),
+    snapshot.attentionComplete,
+  );
 }
 
 /**

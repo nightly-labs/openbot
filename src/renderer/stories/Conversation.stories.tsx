@@ -1792,6 +1792,37 @@ export const PromptQuestionsInChat: Story = {
   },
 };
 
+/** An answered question card in the chat history. Its page height must not change after it opens. */
+export const AnsweredQuestionsInChat: Story = {
+  name: "Answered questions in chat",
+  args: {
+    messages: [
+      ...promptChatMessages,
+      {
+        id: "question-prompt:turn-answered:answered-auth",
+        turnId: "turn-answered",
+        author: "agent",
+        body: "",
+        time: "10:02",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "answered-auth",
+          questions: promptQuestions.questions.slice(0, 1),
+          resolution: { status: "answered", responses: { approach: { status: "skipped" } } },
+        },
+      },
+      {
+        id: "answered-chat-agent",
+        author: "agent",
+        body: "Session cookies it is. I will keep the secrets where they are and ship to everyone.",
+        time: "10:03",
+        kind: "text",
+      },
+    ],
+  },
+};
+
 export const UiBlocksInChat: Story = {
   name: "Agent UI blocks in chat",
   args: {

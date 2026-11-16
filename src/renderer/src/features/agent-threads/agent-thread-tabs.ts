@@ -37,6 +37,8 @@ export interface AgentThreadTabsOptions {
 export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   const { serverId, activeAgentId, tasks } = options;
   const scopeIsCurrent = createScopeGuard();
+  /** The server of this state. On desktop the server scope makes the state again for each server. */
+  const ownServerId = untrack(serverId);
   const [tabsByServer, setTabsByServer] = createSignal<ThreadTabsByServer>(readThreadTabs());
   /** Agents with a new thread tab. A new thread that has no message is not kept after a restart. */
   const [drafts, setDrafts] = createSignal<ReadonlySet<string>>(new Set());
@@ -386,7 +388,16 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   /** The first message of the new thread tab starts the thread, which then takes the place of the tab. */
   async function sendDraft(agentId: string, text: string, attachmentDraftIds: string[]): Promise<boolean> {
     const started = await tasks.startTask(agentId, text, attachmentDraftIds);
-    if (!started || !scopeIsCurrent()) return false;
+    if (!started) return false;
+    if (!scopeIsCurrent()) {
+      // The user left the server while its files loaded. The thread started there, and its tab waits there (#9123).
+      const stored = readThreadTabs();
+      const tabs = stored[ownServerId]?.[agentId] ?? NO_TABS;
+      const open = [...tabs.open.filter((entry) => entry !== started.id), started.id];
+      const active = tabs.active === DRAFT_THREAD_ID ? started.id : tabs.active;
+      writeThreadTabs({ ...stored, [ownServerId]: { ...stored[ownServerId], [agentId]: { ...tabs, open, active } } });
+      return true;
+    }
     seen.add(started.id);
     const stillOpen = activeId(agentId) === DRAFT_THREAD_ID;
     setDraft(agentId, false);
@@ -423,11 +434,13 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
 
   /**
    * Opens a side thread at one of its messages. An archived thread is restored, as from the menu. The list
-   * has every open thread, so a thread that the list does not have is archived.
+   * has every open thread, so a thread that the list does not have is archived. A thread in the side
+   * panel stays there and scrolls to the message beside the chat.
    */
   async function openAt(agentId: string, id: string, messageId: string): Promise<void> {
     setMessageFocus({ taskId: id, messageId, nonce: (messageFocus()?.nonce ?? 0) + 1 });
     if (!task(agentId, id) && !(await tasks.reopenTask(agentId, id))) return;
+    if (!scopeIsCurrent() || sideIds(agentId).includes(id)) return;
     await restore(agentId, id);
   }
 

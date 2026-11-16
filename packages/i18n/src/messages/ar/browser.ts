@@ -101,10 +101,38 @@ export const messages = {
   "browser.secret.submitting": "جارٍ الإرسال…",
   "browser.secret.takeOver": "تولّي التحكم",
   "browser.secret.failed": "تعذّر إكمال الطلب. تحقّق من الاتصال وحاول مرة أخرى.",
+  "browser.secret.vaultSkip.agentScript":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل شغّل نصًا برمجيًا في هذه الصفحة. لاستخدامها، اطلب من الوكيل إعادة تحميل الصفحة والمحاولة مرة أخرى.",
+  "browser.secret.vaultSkip.fieldKind":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل اختار حقلًا خاطئًا في الصفحة.",
+  "browser.secret.vaultSkip.loginChoice":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأن الوكيل لم يختر أيًّا من بيانات تسجيل الدخول المحفوظة لهذا الموقع. أخبر الوكيل بالحساب الذي يجب استخدامه.",
+  "browser.secret.vaultSkip.noPassword":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على كلمة مرور لهذا الموقع.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على مفتاح تطبيق المصادقة.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأنه تعذّر عليه قراءة مدير كلمات المرور.",
   "browser.error.openAddress": "تعذّر فتح العنوان في علامة التبويب هذه.",
+  "browser.error.channelNoBrowserMember": "لا يمكن لأي عضو فتح علامة تبويب جديدة في هذه القناة.",
   "browser.error.closeTab": "تعذّر إغلاق علامة تبويب المتصفح.",
   "browser.error.reloadTab": "تعذّرت إعادة تحميل علامة تبويب المتصفح.",
   "browser.error.stopLoading": "تعذّر إيقاف تحميل الصفحة.",
+  "browser.error.teachStart": "تعذّر بدء تسجيل المهمة.",
+  "browser.error.teachStop": "تعذّر إيقاف تسجيل المهمة.",
+  "browser.error.teachEmpty": "لا يحتوي التسجيل على خطوات.",
+  "browser.teach.intro": "اعرض على {name} مهمة في هذه الصفحة. يتعلّم {name} الخطوات ويستطيع تنفيذ المهمة مرة أخرى.",
+  "browser.teach.start": "بدء التسجيل",
+  "browser.teach.recording": "{name} يسجّل خطواتك",
+  "browser.teach.stop": "إيقاف التسجيل وحفظه",
+  "browser.teach.discard": "تجاهل التسجيل",
+  "browser.teach.message":
+    "عرضتُ عليك مهمة في المتصفح. تعلّمها من التسجيل واحفظها كمهارة. ثم أخبرني بكلمات قليلة وبسيطة بما تعلّمته.",
+  "browser.teach.steps": "لا يحتوي التسجيل على نص مكتوب: اسألني عن كل قيمة كتبتها.",
+  "browser.teach.step.page": "{number}. افتح {page}",
+  "browser.teach.step.pageTitled": "{number}. افتح {page} («{title}»)",
+  "browser.teach.step.click": "{number}. اضغط «{name}» ({role})",
+  "browser.teach.step.clickUnnamed": "{number}. اضغط عنصر تحكم ({role}) في {page}",
   "browser.error.takeControl": "تعذّر تولّي التحكم في علامة تبويب المتصفح.",
   "browser.error.releaseControl": "تعذّرت إعادة علامة تبويب المتصفح إلى الوكيل.",
   "browser.error.navigateBack": "تعذّر الرجوع.",

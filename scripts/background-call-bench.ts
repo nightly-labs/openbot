@@ -54,7 +54,7 @@ const CASES = [
     name: "memory-review",
     prompt: [
       "You keep the long-term memory of the agent. Read the chat below and decide which memories to add, update or forget. You cannot use tools here.",
-      "- Keep only what stays true across chats: preferences, stable facts, standing decisions. Never keep task progress.",
+      "- Keep only what stays true across chats: preferences, stable facts. Never keep lasting rules or task progress.",
       "- Update or merge an existing memory before you add one; forget a memory that the chat shows is wrong.",
       "- Most chats need no change. Then answer an empty list.",
       'Answer only one JSON object: {"operations":[{"type":"add","text":"..."},{"type":"update","memoryId":"...","text":"..."},{"type":"forget","memoryId":"..."}]}.',

@@ -33,5 +33,7 @@ export const messages = {
   "error.voice.live.signIn": "라이브 음성을 사용하려면 ChatGPT 계정으로 Codex에 로그인하세요.",
   "error.voice.live.unavailable":
     "OpenAI가 라이브 음성을 시작하지 못했습니다. OpenAI 측 문제입니다. 나중에 다시 시도하세요.",
+  "error.voice.live.refused":
+    "OpenAI가 라이브 음성 시작을 거부했습니다. 나중에 다시 시도하거나, 음성으로 대화하려면 설정에서 라이브 음성을 끄세요.",
   "error.voice.live.off": "Codex 라이브 음성이 꺼져 있습니다. 설정 → 음성에서 켜세요.",
 } as const satisfies PartialTranslation<typeof source>;

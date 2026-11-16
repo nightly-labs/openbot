@@ -1,0 +1,125 @@
+name: Release rollout
+
+# Sets the share of installed desktop apps that electron-updater offers a published release to
+# (docs/RELEASING.md#staged-rollout). 0 pauses the rollout and 100 releases it to every install.
+# It downloads the four update manifests, changes only `stagingPercentage`, checks that every other
+# value (each SHA-512 and size) is the same, and uploads only these four `.yml` files. It never
+# uploads, replaces or deletes a binary. A dry run makes the same change and check and uploads
+# nothing; only a run from `main` uploads.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Published release tag, such as v0.68.0
+        type: string
+        required: true
+      percentage:
+        description: Share of installs that get the release (0 pauses, 100 releases to all)
+        type: string
+        required: true
+      dry-run:
+        description: Make and check the change, but upload nothing
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One change at a time for each release. A different release does not wait: a pause must not wait
+# for the build of the patch that replaces the release.
+concurrency:
+  group: release-rollout-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  rollout:
+    name: Set the rollout percentage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      PERCENTAGE: ${{ inputs.percentage }}
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - name: Check the inputs
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "The tag must be a stable release tag, such as v0.68.0." >&2
+            exit 1
+          fi
+          if [[ ! "$PERCENTAGE" =~ ^(0|[1-9][0-9]?|100)$ ]]; then
+            echo "The percentage must be a whole number from 0 to 100." >&2
+            exit 1
+          fi
+          if [[ "$DRY_RUN" != "true" && "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Only a run from main can change a release. Use dry-run on another ref." >&2
+            exit 1
+          fi
+
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Before the dependency install, so that no dependency code runs while a step has the token.
+      - name: Download the update manifests
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A draft is a release that the publish job still uploads.
+          draft="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)"
+          if [[ "$draft" != "false" ]]; then
+            echo "$RELEASE_TAG is not a published release. Wait for the publish job to end." >&2
+            exit 1
+          fi
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.yml --pattern latest-mac.yml \
+            --pattern latest-linux.yml --pattern latest-linux-arm64.yml --dir manifests
+          cp -R manifests original
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      # The script stops before it writes when a manifest is missing, names another version, or has
+      # any change other than stagingPercentage. It reads each file again after the write.
+      - name: Change the rollout percentage
+        shell: bash
+        run: |
+          bun scripts/update-rollout.ts --version "${RELEASE_TAG#v}" --percentage "$PERCENTAGE" manifests/*.yml
+          {
+            echo "### $RELEASE_TAG: $PERCENTAGE%"
+            echo
+            echo '```diff'
+            diff -u original manifests || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Only the four manifests, by name. electron-updater reads them at its next check.
+      - name: Upload the update manifests
+        if: inputs.dry-run != true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            manifests/latest.yml \
+            manifests/latest-mac.yml \
+            manifests/latest-linux.yml \
+            manifests/latest-linux-arm64.yml \
+            --clobber --repo "$GITHUB_REPOSITORY"
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.yml --pattern latest-mac.yml \
+            --pattern latest-linux.yml --pattern latest-linux-arm64.yml --dir published
+          for name in latest.yml latest-mac.yml latest-linux.yml latest-linux-arm64.yml; do
+            cmp "manifests/$name" "published/$name"
+          done
+
+      - name: Check the published manifests
+        if: inputs.dry-run != true
+        shell: bash
+        run: bun scripts/update-rollout.ts --check --version "${RELEASE_TAG#v}" --percentage "$PERCENTAGE" published/*.yml

@@ -70,17 +70,36 @@ export interface AppServerRequest {
    * as an MCP client whose tool call timed out. An answer after that reaches nobody.
    */
   signal?: AbortSignal;
+  /**
+   * In process only, never on the wire. The provider stops waiting for the answer after a fixed time
+   * that OpenBot cannot extend, such as an MCP client that asked for no progress notifications. A
+   * question that waits longer than this answers the call first and stays open (#6230).
+   */
+  detachAfterMs?: number;
+  /**
+   * In process only, never on the wire. A Codex subagent sent it, and OpenBot runs it in the chat and
+   * turn of the parent agent. Its call still waits in the subagent's own turn (#9727).
+   */
+  subagent?: true;
 }
 
 /** The account type of Claude's own sign-in when it runs on the saved key, with no claude.ai account. */
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 /**
- * Whether Codex can run on a login of this type: a ChatGPT plan, or an OpenAI API key that Codex
- * keeps in its own home (`codex login --with-api-key`). Turns on a key use API credits.
+ * The account of a Codex whose selected model provider does not use an OpenAI login
+ * (`requires_openai_auth` is false, the default of a custom provider). Codex then reports no account
+ * and skips its own login screen: the provider's key or gateway authenticates the turns.
+ */
+export const CODEX_MODEL_PROVIDER_ACCOUNT_TYPE = "codex-model-provider";
+
+/**
+ * Whether Codex can run on a login of this type: a ChatGPT plan, an OpenAI API key that Codex
+ * keeps in its own home (`codex login --with-api-key`), or a model provider that needs no OpenAI
+ * login. Turns on a key use API credits.
  */
 export function isCodexLoginType(type: string | undefined): boolean {
-  return type === "chatgpt" || type === "apiKey";
+  return type === "chatgpt" || type === "apiKey" || type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE;
 }
 
 export interface AccountReadResult {
@@ -151,6 +170,11 @@ export interface AccountRateLimitResult {
   normalModelSlug?: string | null | undefined;
   primary?: AccountRateLimitWindowResult | null | undefined;
   secondary?: AccountRateLimitWindowResult | null | undefined;
+  /**
+   * Codex only: whether the account can work on credits when its plan windows are spent. Null when
+   * Codex sends no credit state, as for a model's own quota, or a push that leaves it unchanged.
+   */
+  credits?: { available: boolean } | null | undefined;
 }
 
 /** One named quota of the plan and the model names it covers. Antigravity only. */
@@ -294,6 +318,16 @@ export function decodeAccountReadResult(value: unknown): AccountReadResult {
     },
     requiresOpenaiAuth: requiresOpenaiAuth === undefined ? false : recordBoolean(record, "requiresOpenaiAuth"),
   };
+}
+
+/**
+ * The Codex `account/read`. Only an explicit `requiresOpenaiAuth: false` means that the model
+ * provider needs no OpenAI login; a response without the field stays signed out.
+ */
+export function decodeCodexAccountReadResult(value: unknown): AccountReadResult {
+  const result = decodeAccountReadResult(value);
+  if (result.account || decodeRecord(value, "account response").requiresOpenaiAuth !== false) return result;
+  return { account: { type: CODEX_MODEL_PROVIDER_ACCOUNT_TYPE, email: null }, requiresOpenaiAuth: false };
 }
 
 export function decodeAccountLoginStartResult(value: unknown): AccountLoginStartResult {
@@ -451,13 +485,26 @@ function decodeRateLimit(value: unknown): AccountRateLimitResult | null | undefi
   const normalModelSlug = optionalString(record, "normalModelSlug");
   const primary = decodeRateLimitWindow(record.primary);
   const secondary = decodeRateLimitWindow(record.secondary);
+  const credits = decodeRateLimitCredits(record.credits);
   return {
     ...(limitId === undefined ? {} : { limitId }),
     ...(limitName === undefined ? {} : { limitName }),
     ...(normalModelSlug === undefined ? {} : { normalModelSlug }),
     ...(primary === undefined ? {} : { primary }),
     ...(secondary === undefined ? {} : { secondary }),
+    ...(credits === undefined ? {} : { credits }),
   };
+}
+
+/**
+ * Codex's `{ hasCredits, unlimited, balance }`. Only whether credits remain: OpenBot does not show the
+ * balance. A state it cannot read is unknown, so the usage reading that carries it still decodes.
+ */
+function decodeRateLimitCredits(value: unknown): AccountRateLimitResult["credits"] {
+  if (value === undefined) return value;
+  if (!isDynamicRecord(value) || typeof value.hasCredits !== "boolean" || typeof value.unlimited !== "boolean")
+    return null;
+  return { available: value.hasCredits || value.unlimited };
 }
 
 function decodeRateLimitGroups(value: unknown): AccountRateLimitGroupResult[] | undefined {
@@ -558,7 +605,19 @@ export function bridgedToolName(item: ThreadItem): string | null {
   const tool = getString(item, "tool") ?? getString(item, "name");
   if (tool !== "tool_call" && tool !== "mcp__openbot__tool_call") return null;
   const args = getRecord(item, "arguments");
-  return getString(args, "name") ?? getString(args, "tool");
+  const name = getString(args, "name") ?? getString(args, "tool");
+  return name === null ? null : qualifiedToolName(name);
+}
+
+/**
+ * The qualified name `<namespace>.<tool>` of a name that an agent sends to tool_call. An agent also sends
+ * the MCP name that it sees for the tool, `<namespace>__<tool>` or `mcp__<namespace>__<tool>`, and
+ * tool_call runs it (#7955), so the readers of its items read the same tool.
+ */
+export function qualifiedToolName(name: string): string {
+  const trimmed = name.trim();
+  const mcp = /^(?:mcp__)?([A-Za-z0-9_-]+?)__([A-Za-z0-9_-]+)$/.exec(trimmed);
+  return mcp ? `${mcp[1]}.${mcp[2]}` : trimmed;
 }
 
 export function getArray(record: unknown, key: string): unknown[] {

@@ -6,8 +6,12 @@ export const messages = {
     "サーバーのプランを変更できませんでした。「お支払い」を更新して、もう一度お試しください。",
   "error.billing.confirmMismatch": "削除するにはサーバー名を入力してください。",
   "error.billing.restartBusy": "サーバーは今は再起動できません。1 分後にもう一度お試しください。",
+  "error.billing.restartUnavailable": "このサーバーはここから再起動できません。サポートにお問い合わせください。",
   "error.billing.planRequired": "このサーバーのプランは終了しました。サーバーを起動するにはプランを更新してください。",
   "error.billing.planSoldOut": "このプランは売り切れです。別のプランを選んでください。",
+  "error.billing.storageUnavailable": "このストレージはこのサーバーでは利用できません。",
+  "error.billing.storagePaymentFailed":
+    "ストレージの支払いに失敗しました。支払い方法を更新して、もう一度お試しください。",
   // Billing errors.
   "error.billing.licenseExists": "このアカウントにはすでにライセンスがあります。代わりにユーザー数を変更してください。",
   "error.billing.licenseCurrency": "ライセンスは他のプランと同じ通貨を使う必要があります。",

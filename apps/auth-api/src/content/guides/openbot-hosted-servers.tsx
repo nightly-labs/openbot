@@ -33,7 +33,7 @@ export function OpenBotHostedServers() {
         server runs—not in the number of agents you can create.
       </p>
       <p>
-        Starter is for one person, with 12 GB of storage and base speed. It could suit a founder or a freelancer who
+        Starter is for one person, with 25 GB of storage and base speed. It could suit a founder or a freelancer who
         wants agents to keep working on research, routine admin, or client work while the laptop is closed.
       </p>
       <p>
@@ -54,8 +54,8 @@ export function OpenBotHostedServers() {
       <ArticleImage
         src={pricing}
         alt="OpenBot hosted server pricing with Starter, Standard, and Pro plans. The yearly billing option is selected, showing member limits, storage, and speed for each plan."
-        width={1528}
-        height={1232}
+        width={1616}
+        height={1532}
         caption="The hosted server plans differ in team size, storage, and speed. Yearly billing saves 20%."
       />
 
@@ -77,9 +77,10 @@ export function OpenBotHostedServers() {
         routine runs at the right time.
       </p>
       <p>
-        If you connect Slack, the server stays awake while Slack is connected. That lets your team send requests to
-        OpenBot in Slack and get responses from its agents. Without an active connection like this, the server goes idle
-        when it’s not being used.
+        Messages and webhooks wake it too. When someone mentions OpenBot or messages it in Slack, Discord or Telegram,
+        the server starts and answers once it is back online. A webhook routine works the same way: the first delivery
+        gets a “try again later” answer and starts the server, which takes a few minutes. A later try reaches it. Most
+        webhook senders, such as Shopify and Stripe, try again on their own for hours.
       </p>
 
       <h2>Hosted Server or Self-Hosting?</h2>

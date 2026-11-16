@@ -335,6 +335,13 @@ const MAXIMUM_EXPIRATION_TIMER_MILLISECONDS = 24 * 60 * 60_000;
 const INGRESS_RATE_FACTOR = 10;
 // Slack sends at most 30,000 events an hour for one app in one workspace.
 const SLACK_TEAM_RATE_FACTOR = 2;
+/**
+ * A generic webhook for a route that no socket holds asks the account service for its host. Signal cannot
+ * check the sender, so new routes from one address ask at most 1/10 of the message limit a minute.
+ */
+const WEBHOOK_WAKE_RATE_FACTOR = 1 / 10;
+/** All addresses together ask at most the message limit a minute, so many addresses cannot flood it either. */
+const WEBHOOK_WAKE_TOTAL_RATE_FACTOR = 1;
 // A host can answer a callback query that Signal delivered to it in this time. Telegram allows less.
 const TELEGRAM_CALLBACK_TTL_MILLISECONDS = 15 * 60_000;
 const MAXIMUM_TELEGRAM_CALLBACKS = 100_000;
@@ -742,6 +749,24 @@ export class SignalService {
     if (floor > through) return;
     this.#webhookRouteFloor.set(routeId, through + 1);
     this.#webhookRoutes.delete(routeId);
+    this.#queue.forget(queueRouteKey("webhook", routeId));
+  }
+
+  /**
+   * Starts the hosted server that sleeps for a generic webhook route that no socket holds. It does not
+   * wait: the sender gets 503 and sends again, and a later try reaches the server once it is online.
+   */
+  wakeWebhookRoute(routeId: string, address: string): void {
+    if (!this.#queue.enabled) return;
+    this.#fork(
+      this.#queue.wakeOnly({ platform: "webhook", routeId }, queueRouteKey("webhook", routeId), () => {
+        const now = Date.now();
+        return (
+          this.#acceptRateKey(`webhook-wake:${address}`, now, WEBHOOK_WAKE_RATE_FACTOR) &&
+          this.#acceptRateKey("webhook-wake", now, WEBHOOK_WAKE_TOTAL_RATE_FACTOR)
+        );
+      }),
+    );
   }
 
   /**

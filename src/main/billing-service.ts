@@ -1,6 +1,7 @@
 import {
   type BillingPortalRequest,
   type BillingState,
+  type BillingStorageRequest,
   parseBillingSessionUrl,
   parseBillingState,
 } from "@openbot/contracts/billing";
@@ -33,6 +34,11 @@ export class BillingDesktopService {
   openPortal(request: BillingPortalRequest): Effect.Effect<void, AccountServiceFailure> {
     return openBillingPortal(request).pipe(Effect.provide(this.#platform));
   }
+
+  /** Buys a larger storage tier for one server. The account server charges the saved payment method. */
+  buyStorage(request: BillingStorageRequest): Effect.Effect<BillingState, AccountServiceFailure> {
+    return buyBillingStorage(request).pipe(Effect.provide(this.#platform));
+  }
 }
 
 const readBillingState = Effect.fn("BillingDesktop.getState")(function* () {
@@ -48,6 +54,15 @@ const openBillingPortal = Effect.fn("BillingDesktop.openPortal")(function* (requ
     decodeSessionUrl,
   );
   yield* platform.openPage(url);
+});
+
+const buyBillingStorage = Effect.fn("BillingDesktop.buyStorage")(function* (request: BillingStorageRequest) {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request(
+    "/v1/me/billing/storage",
+    { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
+    decodeBillingState,
+  );
 });
 
 function decodeBillingState(value: unknown): BillingState {

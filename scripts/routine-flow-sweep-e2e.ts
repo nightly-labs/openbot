@@ -161,6 +161,8 @@ try {
         handoffs.push({ runId: input.run.id, agentId: input.agentId });
         return Effect.succeed(`handoff-${input.run.id}`);
       },
+      stopRoutineRun: () => Effect.void,
+      stopDelivery: () => Effect.void,
       changed: () => {},
     }),
   );

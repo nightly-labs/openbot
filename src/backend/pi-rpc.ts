@@ -4,6 +4,8 @@ import { EventEmitter } from "node:events";
 import { StringDecoder } from "node:string_decoder";
 import type { KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { RequestTimeoutError } from "./agent-client";
 import type { SpawnTarget } from "./process-confinement";
@@ -18,6 +20,26 @@ import { createDiagnosticStream } from "./stderr-diagnostics";
 import { stopWindowsProcessTree } from "./windows-process-tree";
 
 const PI_RECORD_LIMIT_BYTES = 256 * 1024 * 1024;
+const logger = createOpenBotLogger("provider-runtime");
+
+/** A JSON object with a string `type`, or null for any other line. */
+function piRecord(line: string): DynamicRecord | null {
+  let value: unknown;
+  try {
+    value = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  return isDynamicRecord(value) && typeof value.type === "string" ? value : null;
+}
+
+/**
+ * Pi in RPC mode exits with code 1 when one of the user's extensions does not load (#9399). Its
+ * stderr names the extension and the cause, and then gives a hint for the terminal, `pi -ne`, as
+ * its last line. Only the line with the cause tells the user what to remove or update.
+ */
+const PI_EXTENSION_FAILURE = /^(?:Error:\s*)?(Failed to load extension\b.*)$/u;
+const PI_EXTENSION_FAILURE_DETAIL_LIMIT = 500;
 
 /** Owns one Pi RPC process and its correlated requests. Session policy belongs to the client. */
 export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [string]; exit: [Error] }> {
@@ -47,7 +69,15 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
     endProcessGroupOnExit(child);
     const decoder = new StringDecoder("utf8");
     let buffered = "";
-    const diagnostics = createDiagnosticStream({ redact: this.redact, emit: (line) => this.emit("diagnostic", line) });
+    // Redacted before it is kept: the stream gives only redacted records.
+    let extensionFailure: string | null = null;
+    const diagnostics = createDiagnosticStream({
+      redact: this.redact,
+      emit: (line) => {
+        extensionFailure ??= PI_EXTENSION_FAILURE.exec(line.trim())?.[1] ?? null;
+        this.emit("diagnostic", line);
+      },
+    });
     let failed = false;
     const fail = (error: Error) => {
       if (failed) return;
@@ -63,9 +93,18 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
     child.once("error", fail);
     child.once("close", (code, signal) => {
       diagnostics.flush();
-      fail(new Error(`Pi process closed (${signal ?? code ?? "unknown"}).`));
+      fail(
+        new Error(
+          extensionFailure !== null && code !== 0 && signal === null
+            ? sourceText("error.provider.piExtensionFailed", {
+                detail: extensionFailure.slice(0, PI_EXTENSION_FAILURE_DETAIL_LIMIT),
+              })
+            : `Pi process closed (${signal ?? code ?? "unknown"}).`,
+        ),
+      );
       if (this.#child === child) this.#child = null;
     });
+    let skippedLine = false;
     child.stdout.on("data", (chunk: Buffer) => {
       buffered += decoder.write(chunk);
       try {
@@ -74,7 +113,17 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
           const line = buffered.slice(0, newline);
           buffered = buffered.slice(newline + 1);
           if (Buffer.byteLength(line) > PI_RECORD_LIMIT_BYTES) throw new Error("Pi RPC record is too large.");
-          if (line.trim()) this.#record(JSON.parse(line));
+          const record = line.trim() ? piRecord(line) : null;
+          if (record) this.#record(record);
+          else if (line.trim() && !skippedLine) {
+            // A user's Pi extension or package can print to stdout (#6815). Pi's own RPC client skips
+            // such a line too. The log has only its length: the text can hold a secret.
+            skippedLine = true;
+            logger.warn("Pi wrote a stdout line that is not an RPC record. OpenBot skips such lines.", {
+              provider: this.provider,
+              length: line.length,
+            });
+          }
           newline = buffered.indexOf("\n");
         }
         if (Buffer.byteLength(buffered) > PI_RECORD_LIMIT_BYTES) throw new Error("Pi RPC record is too large.");
@@ -86,8 +135,7 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
     });
   }
 
-  #record(value: unknown): void {
-    if (!isDynamicRecord(value) || typeof value.type !== "string") throw new Error("Invalid Pi RPC record.");
+  #record(value: DynamicRecord): void {
     if (value.type !== "response") {
       this.emit("record", value);
       return;
