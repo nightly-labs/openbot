@@ -953,7 +953,12 @@ correction applies from this point, and the unfinished work continues unless the
 The block is a text item of its own, as the turn context blocks are, so the history readers remove
 it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
 with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
-block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+block of a steer. Claude Code shows a steer to its model next to the result of the running tool. With
+the header and rules of a teammate prompt, Claude Haiku took a steered teammate message for text in
+the tool result and ignored it. For Claude, `QueueControls.steer` therefore sets `steerFramedAsUser`,
+and `deliveryPromptInput` sends a teammate message as plain words (`userFramedTeammateText`): the
+sender, the text, and for a request the `send_message` reply rule. The steer's uuid is the delivery
+ID, so the history import finds the delivery without `teammatePrompts`. A routine run gets no block. A slash command from the person gets none, as at the
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.
 

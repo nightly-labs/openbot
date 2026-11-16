@@ -101,6 +101,13 @@ export interface DeliveryPromptSources {
    * session. That session closed with the run, so the answer gives the task again (#6457).
    */
   answeredRoutine?: AnsweredRoutine | null;
+  /**
+   * A steer that the provider shows to its model as a message from the user, next to the result of
+   * the running tool. Claude Code does this. With the header and rules of a teammate prompt, Claude
+   * Haiku took the message for text in the tool result and ignored it, mostly when two came in one
+   * result. A teammate message then goes in plain words (`userFramedTeammateText`).
+   */
+  steerFramedAsUser?: boolean;
 }
 
 /** A routine run's name and task, for the answer to a request that the run sent. */
@@ -257,6 +264,36 @@ function currentTeammatePrompts(prompt: string): TeammatePrompt[] | null {
   return messages;
 }
 
+/**
+ * A teammate message in a steer that the provider frames as the user's (`steerFramedAsUser`). It
+ * has no header or `Message ID` line: the steer's uuid is the delivery ID, so the history import
+ * finds the delivery without `teammatePrompts`. The developer instructions still say that a teammate
+ * message is collaborator input. An answer to a routine run's request keeps the full prompt, which
+ * gives the routine task.
+ */
+function userFramedTeammateText(
+  delivery: QueueDelivery,
+  senderAgentId: string,
+  agentNames: ReadonlyMap<string, string>,
+  displayText: string,
+): string {
+  const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
+  const teammate = `Your teammate ${senderName} (${senderAgentId})`;
+  if (delivery.replyToMessageId)
+    return [
+      `${teammate} answered your message through OpenBot:`,
+      displayText,
+      "Give the result to the user naturally, starting with the teammate's name.",
+    ].join("\n");
+  if (delivery.expectsReply === false)
+    return [`${teammate} sent you this message through OpenBot. It needs no answer:`, displayText].join("\n");
+  return [
+    `${teammate} sent you this request through OpenBot:`,
+    displayText,
+    `Do it, then send the result to ${senderName} with openbot.send_message: recipientAgentIds ["${senderAgentId}"], replyToMessageId "${delivery.messageId}", expectsReply false. Reply in three lines: Status: done | partial | blocked, Result: <concrete outcome>, Evidence: <file, test, command, or none>.`,
+  ].join("\n");
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -329,6 +366,12 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
       COLLABORATOR_SEPARATOR,
       displayText,
     ].join("\n");
+  } else if (
+    delivery.sender.kind === "agent" &&
+    sources.steerFramedAsUser &&
+    !(delivery.replyToMessageId && sources.answeredRoutine)
+  ) {
+    text = userFramedTeammateText(delivery, delivery.sender.agentId, agentNames, displayText);
   } else if (delivery.sender.kind === "agent") {
     const senderAgentId = delivery.sender.agentId;
     const senderName = agentNames.get(senderAgentId) ?? senderAgentId;
