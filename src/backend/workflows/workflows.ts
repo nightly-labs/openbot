@@ -636,9 +636,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const inputs = graph
             ? mediaInputs(graph, node.id, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
             : [];
+          const images = mediaImages(node.fields, kind, inputs);
+          // A step with no description, no text and no picture would make media from nothing.
+          const empty = !fieldText(node, "prompt").trim() && !step.input.trim() && images.length === 0;
           const make = Effect.gen(function* () {
-            const result =
-              !generateMedia || !model
+            const result = empty
+              ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
+              : !generateMedia || !model
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
                 : yield* mediaLock
                     .withPermit(
@@ -649,7 +653,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                         account: mediaAccount(node.fields),
                         specs,
                         prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                        images: mediaImages(node.fields, kind, inputs),
+                        images,
                         voice: mediaVoice(node.fields, kind, model),
                       }),
                     )

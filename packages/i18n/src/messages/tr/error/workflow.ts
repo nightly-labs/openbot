@@ -31,6 +31,8 @@ export const messages = {
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
   "error.workflow.pictureType": "PNG, JPEG veya WebP görseli kullanın.",
   "error.workflow.mediaInputMissing": "Önceki bir adımın görseli kullanılamıyor. O adımı yeniden çalıştırın.",
+  "error.workflow.mediaEmptyRequest":
+    "Bir açıklama yazın ya da bir metin veya görsel gelmesi için önceki adımları çalıştırın.",
   "error.workflow.mediaInputNotImage": "Bu adım yalnızca görsel alır, video almaz. Videodan gelen bağlantıyı kaldırın.",
   "error.workflow.stepMissing": "Bu adım artık yok.",
   "error.workflow.nodeMissing": "Bu adım iş akışında yok.",
