@@ -125,10 +125,8 @@ export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
  */
 export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16", "4:5", "5:4"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
-/** The aspect ratios of an image model without `aspects`. */
-export const WORKFLOW_IMAGE_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_MEDIA_ASPECTS;
 /** The aspect ratios of a video model without `aspects`: no 4:5 or 5:4, which the video models do not make. */
-export const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
+const WORKFLOW_VIDEO_ASPECTS: readonly WorkflowMediaAspect[] = ["1:1", "4:3", "16:9", "9:16"];
 /** The aspect ratios that a host without `workflows-media-size-v1` reads. */
 export const WORKFLOW_MEDIA_LEGACY_ASPECTS: readonly WorkflowMediaAspect[] = WORKFLOW_VIDEO_ASPECTS;
 
@@ -169,7 +167,7 @@ export interface WorkflowMediaModel {
   kinds: readonly WorkflowMediaKind[];
   /** Whether a video can speak in a preset voice of `WORKFLOW_VIDEO_VOICES`. */
   voices: boolean;
-  /** The aspect ratios that it makes. `WORKFLOW_IMAGE_ASPECTS` or `WORKFLOW_VIDEO_ASPECTS` when absent. */
+  /** The aspect ratios that it makes. When absent, an image has each one and a video has no 4:5 or 5:4. */
   aspects?: readonly WorkflowMediaAspect[];
   /** The lengths of a video in seconds. `WORKFLOW_VIDEO_DURATIONS` when absent. */
   durations?: readonly number[];
@@ -331,7 +329,7 @@ export function workflowMediaAspects(
   model: WorkflowMediaRange | null | undefined,
   kind: WorkflowMediaKind,
 ): readonly WorkflowMediaAspect[] {
-  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_IMAGE_ASPECTS);
+  return model?.aspects ?? (kind === "video" ? WORKFLOW_VIDEO_ASPECTS : WORKFLOW_MEDIA_ASPECTS);
 }
 
 export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
