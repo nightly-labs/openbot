@@ -744,6 +744,10 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   // X11: a window that is not focusable when it is made has no window manager, so it never takes keys.
   // A dock window that is focusable at first stays on top on each desktop and takes keys for the chat.
   const x11 = process.platform === "linux";
+  // Hyprland ignores the X11 shape and draws its border and shadow around the full window, also around
+  // its empty part (#9855). It draws none around a splash window, which floats and takes focus on a
+  // click there, as a dock window does.
+  const x11Type = process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
@@ -760,7 +764,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     hasShadow: false,
     skipTaskbar: true,
     // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
-    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11Type : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
