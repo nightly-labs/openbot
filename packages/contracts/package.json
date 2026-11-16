@@ -57,6 +57,7 @@
     "./mobile-features": "./src/mobile-features.ts",
     "./marketplace-links": "./src/marketplace-links.ts",
     "./plugin-links": "./src/plugin-links.ts",
+    "./release-version": "./src/release-version.ts",
     "./runtime-values": "./src/runtime-values.ts",
     "./server-setup": "./src/server-setup.ts",
     "./ipc-decoding": "./src/ipc-decoding.ts",
