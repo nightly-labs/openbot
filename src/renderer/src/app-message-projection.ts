@@ -21,6 +21,7 @@ import {
   mcpSignInEvent,
   modelSwitchReason,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
   skillConversationEvent,
@@ -216,23 +217,22 @@ export function planItems(plan: AgentMessagePlan, streaming: boolean): TaskListI
 const PLAN_TITLE_LIMIT = 80;
 
 /**
- * The plan rows that a later turn of the same agent replaced. The work of a stopped turn goes on in a
- * later turn, for example on a backup model or after a new request, and that turn does not change
- * the earlier plan. So only a plan with no later turn shows as stopped (#9876).
+ * The plan rows that a later turn of the same agent replaced (`replacedConversationPlans`). Only the
+ * agent's own output counts: not an exchange with a teammate, a routine or event marker, or the
+ * memory changes, which are system rows.
  */
 export function replacedPlanIds(messages: readonly AgentMessage[]): ReadonlySet<string> {
-  const replaced = new Set<string>();
-  const laterTurns = new Map<string, Set<string>>();
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (message?.author !== "agent" || message.turnId === undefined || message.exchange) continue;
-    const agent = message.senderAgentId ?? "";
-    const turns = laterTurns.get(agent) ?? new Set<string>();
-    if (message.kind === "plan" && (turns.size > 1 || (turns.size === 1 && !turns.has(message.turnId))))
-      replaced.add(message.id);
-    laterTurns.set(agent, turns.add(message.turnId));
-  }
-  return replaced;
+  return replacedConversationPlans(
+    messages.map((message) => ({
+      id: message.id,
+      turnId: message.turnId,
+      agent:
+        message.author === "agent" && !message.exchange && !message.actionMarker && message.kind !== "memory-changes"
+          ? (message.senderAgentId ?? "")
+          : null,
+      plan: message.kind === "plan",
+    })),
+  );
 }
 
 /**

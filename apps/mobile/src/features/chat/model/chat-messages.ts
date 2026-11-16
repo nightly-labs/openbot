@@ -29,6 +29,7 @@ import {
   isContextResetMarker,
   marketplaceSuggestionEvent,
   parseConversationPlanText,
+  replacedConversationPlans,
   routineConversationEvent,
   routineRunConversationEvent,
 } from "@openbot/contracts/ipc";
@@ -366,32 +367,6 @@ const aliasedMessages = new WeakMap<ChatMessage, ChatMessage>();
 const PLAN_HEADING_LIMIT = 80;
 
 /**
- * The plan messages that a later turn of the same agent replaced, as on desktop. The work of a stopped
- * turn goes on in a later turn, for example on a backup model or after a new request, and that turn
- * does not change the earlier plan. So only a plan with no later turn shows as stopped (#9876).
- * `agent` is null for a message that no turn of an agent wrote.
- */
-function replacedPlans(
-  entries: readonly { id: string; message: ConversationMessage; agent: string | null }[],
-): ReadonlySet<string> {
-  const replaced = new Set<string>();
-  const laterTurns = new Map<string, Set<string>>();
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index];
-    const turnId = entry?.message.turnId;
-    if (!entry || entry.agent === null || !turnId) continue;
-    const turns = laterTurns.get(entry.agent) ?? new Set<string>();
-    if (
-      entry.message.itemType === CONVERSATION_PLAN_ITEM_TYPE &&
-      (turns.size > 1 || (turns.size === 1 && !turns.has(turnId)))
-    )
-      replaced.add(entry.id);
-    laterTurns.set(entry.agent, turns.add(turnId));
-  }
-  return replaced;
-}
-
-/**
  * The task list of a `plan` message, as desktop shows it. A released host sends only the checklist
  * text, so the plan is read back from it. The last line of a streaming text can be incomplete, so
  * it is left out. Returns null when the text is not a checklist; the message then shows as text.
@@ -510,11 +485,14 @@ export function projectChatMessages(
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
-  const replacedIds = replacedPlans(
+  // As on desktop, only the agent's own output counts: not an exchange with a teammate or a routine marker.
+  const replacedIds = replacedConversationPlans(
     sorted.map((message) => ({
       id: message.id,
-      message,
-      agent: message.author === "assistant" && !message.exchange ? (message.senderAgentId ?? "") : null,
+      turnId: message.turnId,
+      agent:
+        message.author === "assistant" && !message.exchange && !message.routine ? (message.senderAgentId ?? "") : null,
+      plan: message.itemType === CONVERSATION_PLAN_ITEM_TYPE,
     })),
   );
   for (const message of sorted) {
@@ -1037,11 +1015,12 @@ export function projectChannelMessages(
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
   const answered = progressUpdates ? answerTimes(messages.map((entry) => entry.message)) : undefined;
-  const replacedIds = replacedPlans(
+  const replacedIds = replacedConversationPlans(
     messages.map((entry) => ({
       id: entry.id,
-      message: entry.message,
-      agent: entry.author.kind === "agent" ? entry.author.id : null,
+      turnId: entry.message.turnId,
+      agent: entry.author.kind === "agent" && !entry.message.routine ? entry.author.id : null,
+      plan: entry.message.itemType === CONVERSATION_PLAN_ITEM_TYPE,
     })),
   );
   const showsUpdate = (entry: ChannelMessage) =>
