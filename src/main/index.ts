@@ -166,6 +166,7 @@ import { systemHourCycle } from "./system-hour-cycle";
 import { TeardownRegistry } from "./teardown-registry";
 import type { TraceFile } from "./trace-file";
 import { setIpcCallObserver } from "./trusted-ipc";
+import { macShipItDirectory, shipItInstallInProgress } from "./update-install-guard";
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
@@ -334,6 +335,23 @@ if (
     (await Effect.runPromise(restartOnXWaylandWithoutMonitor(process.env))))
 )
   app.exit(0);
+// macOS #9776: a launch while ShipIt installs an update cancels that install, and the old version stays.
+// Exit at once instead; ShipIt opens the new version when it is done. `process.exit`, as for a second
+// launch: no start marker or log may record this launch as a start that did not finish.
+if (
+  process.platform === "darwin" &&
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  Effect.runSync(
+    shipItInstallInProgress({
+      userDataPath: app.getPath("userData"),
+      shipItDirectory: macShipItDirectory(),
+      currentVersion: app.getVersion(),
+      now: Date.now(),
+    }),
+  )
+)
+  process.exit(0);
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 // A second launch exits at once and must not write into the files of the instance that runs.
 if (hasSingleInstanceLock) {
