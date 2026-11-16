@@ -85,7 +85,7 @@ import {
   stopRunningSubagents,
   subagentsFromNotification,
 } from "./subagent-updates";
-import { shellReadPaths, ThreadFileHistory } from "./thread-file-history";
+import { shellReadPaths, shellWorkFolders, ThreadFileHistory } from "./thread-file-history";
 import {
   isNonActionableCodexWarning,
   isToolItem,
@@ -1078,10 +1078,12 @@ export class TurnLifecycle {
         const turnId = getString(params, "turnId");
         const item = getRecord(params, "item");
         if (!turnId || !item) return;
-        this.fileHistory.record(agentId, this.#conversation.publicThreadId(agentId, threadId), [
-          ...getArray(params, "filePaths"),
-          ...shellReadPaths(item),
-        ]);
+        this.fileHistory.record(
+          agentId,
+          this.#conversation.publicThreadId(agentId, threadId),
+          [...getArray(params, "filePaths"), ...shellReadPaths(item)],
+          [...getArray(params, "folderPaths"), ...shellWorkFolders(item)],
+        );
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         this.#markProduced(turnId, isRepeatedWork(item));

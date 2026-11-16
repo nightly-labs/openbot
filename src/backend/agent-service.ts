@@ -4856,7 +4856,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...localWorkspaceAccess(agent),
       ...(options.exactPath
         ? { exactPath: true }
-        : { fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId) }),
+        : {
+            fileHistory: this.#turn.fileHistory.paths(agent.id, agent.threadId),
+            workFolders: this.#turn.fileHistory.folders(agent.id, agent.threadId),
+          }),
     }).pipe(
       Effect.mapError(
         (failure) => new AgentLifecycleFailed({ operation: "resolve local workspace file", cause: failure.cause }),
