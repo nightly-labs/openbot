@@ -7,7 +7,7 @@
 // into the Vault. The keys for every agent also stay at the shared path of earlier versions,
 // `.vault/<NAME>`, and come back there at start after 0.70.0 deleted them (#8983). The key file of one
 // agent from such a build becomes a link to its Vault copy, and comes back at start after 0.70.0
-// deleted it (#9313). With a Vault, the form saves the key there for every agent by default, and "Only this
+// deleted it (#9313). A key file that OpenBot did not write stays, also with a key name (#10077). With a Vault, the form saves the key there for every agent by default, and "Only this
 // agent" saves it there for the agent only. Logins, cards and contacts for chosen agents are hidden
 // from the other agents. A login that an agent saves for one subdomain never changes the password of a
 // login for another subdomain.
@@ -290,12 +290,13 @@ try {
     async () => {
       const keyRoot = join(root, "agent-api-keys");
       const vaultFolder = join(keyRoot, ".vault");
-      // A build before agent scope: an agent's own key as a plain file, and a Vault key for every agent
-      // directly in the Vault folder.
+      // A build before agent scope: an agent's own key as a plain file, and a key file with a key name
+      // that an agent put by hand in the Vault folder, which no Vault item has.
       await mkdir(join(keyRoot, "agent-3"), { recursive: true, mode: 0o700 });
       await writeFile(join(keyRoot, "agent-3", "OPENAI_API_KEY"), `${KEY}\n`, { mode: 0o600 });
       await mkdir(vaultFolder, { recursive: true, mode: 0o700 });
-      await writeFile(join(vaultFolder, "OLD_SHARED_TOKEN"), "e2e-old-shared-0a1b");
+      const handPlacedKey = join(vaultFolder, "GOOGLE_SA_E2E_JSON");
+      await writeFile(handPlacedKey, "e2e-hand-placed-service-account");
       const vault = new VaultService({
         store: new VaultStore(join(root, "openbot-vault-v1.json"), REVERSING_CIPHER),
         canPersist: () => true,
@@ -323,7 +324,8 @@ try {
             )?.id ?? ""
         );
       };
-      // The start: the old agent key moves into the Vault, and the old shared file goes.
+      // The start: the old agent key moves into the Vault. OpenBot did not write the hand-placed key
+      // file, so it stays (#10077).
       await Effect.runPromise(keys.registerSaved());
       await Effect.runPromise(keys.syncVault());
       // Scripts of 0.69 and earlier read the agent's own key at its old path: a link to the Vault copy
@@ -334,7 +336,7 @@ try {
         assert.ok((await lstat(ownPath)).isSymbolicLink(), "the old key file is not a link");
         assert.equal(await readFile(ownPath, "utf8"), KEY);
       } else await assert.rejects(stat(ownPath));
-      await assert.rejects(stat(join(vaultFolder, "OLD_SHARED_TOKEN")));
+      assert.equal(await readFile(handPlacedKey, "utf8"), "e2e-hand-placed-service-account");
       const moved = vault.state().items.find((item) => item.kind === "apiKey" && item.name === "OPENAI_API_KEY");
       assert.deepEqual(moved?.agents, ["agent-3"]);
       assert.equal(vault.state().agentScope, true);
@@ -464,17 +466,22 @@ try {
       await assert.rejects(stat(join(vaultFolder, AGENT, "NOTION_TOKEN")));
       assert.equal(await readFile(join(vaultFolder, "agent-3", "NOTION_TOKEN"), "utf8"), "e2e-notion-key-a91e");
       // A file that an agent put here, such as a key that cannot be downloaded again, survives each
-      // Vault change (#7136). The temporary file of a stopped write does not.
+      // Vault change (#7136), also with a key name (#10077). The temporary file of a stopped write does not.
       const handPlaced = join(vaultFolder, AGENT, "AuthKey_E2E.p8");
+      const handPlacedAgentKey = join(vaultFolder, AGENT, "APP_STORE_E2E_KEY");
       const stoppedWrite = join(vaultFolder, AGENT, "GITHUB_TOKEN.0f8e6a52-3c1d-4b7e-9a20-5d6c7b8e9f10.tmp");
+      const stoppedRecord = join(vaultFolder, AGENT, ".openbot-keys.0f8e6a52-3c1d-4b7e-9a20-5d6c7b8e9f10.tmp");
       await writeFile(handPlaced, "e2e-hand-placed-private-key");
+      await writeFile(handPlacedAgentKey, "e2e-hand-placed-agent-key");
       await mkdir(join(vaultFolder, AGENT, "notes"));
       await writeFile(stoppedWrite, "e2e-partial");
+      await writeFile(stoppedRecord, "e2e-partial");
       await saveKey(githubId, "GITHUB_TOKEN", NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, AGENT, "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, "agent-3", "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
       assert.equal(await readFile(join(vaultFolder, "GITHUB_TOKEN"), "utf8"), NEW_VAULT_KEY);
       await assert.rejects(stat(stoppedWrite));
+      await assert.rejects(stat(stoppedRecord));
       await Effect.runPromise(vault.delete(githubId));
       await synced;
       await assert.rejects(stat(join(vaultFolder, "GITHUB_TOKEN")));
@@ -498,6 +505,8 @@ try {
       await assert.rejects(stat(join(vaultFolder, "OPENAI_API_KEY")));
       await assert.rejects(stat(join(vaultFolder, "agent-3", "NOTION_TOKEN")));
       assert.equal(await readFile(handPlaced, "utf8"), "e2e-hand-placed-private-key");
+      assert.equal(await readFile(handPlacedAgentKey, "utf8"), "e2e-hand-placed-agent-key");
+      assert.equal(await readFile(handPlacedKey, "utf8"), "e2e-hand-placed-service-account");
       assert.ok((await stat(join(vaultFolder, AGENT, "notes"))).isDirectory());
       assert.deepEqual(await Effect.runPromise(keys.list("agent-3")), []);
       // Without a Vault, a key for one agent is a plain file again.
