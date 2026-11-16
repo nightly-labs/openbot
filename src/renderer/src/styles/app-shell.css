@@ -2583,12 +2583,16 @@ textarea {
   overflow: visible;
 }
 
+/* The face paints past the avatar box. In the sidebar it covered the edge of the row above, so a
+   click there opened the agent below. Only the box takes the pointer. The eyes follow the pointer
+   through a window listener, so they still move. */
 .agent-avatar > svg {
   display: block;
   width: 128%;
   height: 128%;
   overflow: visible;
   translate: var(--agent-avatar-optical-offset-x, 0) var(--agent-avatar-optical-offset, 0);
+  pointer-events: none;
 }
 
 /* The outline: a ring in the colour of the surface under the avatar, so a face that overlaps another
