@@ -350,6 +350,8 @@ export const messages = {
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
   "error.provider.codexHistoryItemMissing":
     "O Codex não pôde continuar este chat porque falta um item no histórico salvo. O OpenBot iniciou uma nova sessão do Codex com o histórico do chat. Tente novamente.",
+  "error.provider.codexRequestRefused":
+    "O {provider} recusou a solicitação deste chat e não informou a causa. Isso pode acontecer em um chat longo com muitas imagens. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooSmall":
     "O modelo não aceitou uma imagem deste chat porque a imagem é pequena demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooLarge":
@@ -476,6 +478,8 @@ export const messages = {
   "error.provider.nativeNotStarted": "A CLI do {provider} não conseguiu iniciar.",
   "error.provider.nativeVersionUnreadable": "A versão da CLI do {provider} não pôde ser lida.",
   "error.provider.piSessionBusy": "Aguarde o turno atual do Pi terminar.",
+  "error.provider.acpSessionBusy":
+    "{provider} ainda está terminando um turno interrompido. Tente novamente em instantes.",
   "error.provider.piStopped": "O Pi não está rodando. Conecte o Pi e tente de novo.",
   "error.provider.piSessionMissing": "O arquivo de sessão do Pi não está disponível neste computador.",
   "error.provider.piResumeCancelled": "O Pi cancelou a retomada da sessão. Tente de novo.",

@@ -18,6 +18,10 @@ export const messages = {
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. tool_search가 알려 주는 정확한 전체 이름(예: openbot_browser.snapshot)을 사용하세요.",
   "error.agent.toolCallUnknownToolSuggest":
     "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. 전체 이름은 {name}일 수 있어요. 맞다면 그 이름으로 다시 호출하세요.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe가 {names} 이름의 OpenBot 도구를 찾지 못했습니다. openbot.tool_search가 나열하는 OpenBot 및 브라우저 도구만 설명하며 MCP 도구는 설명하지 않습니다.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "{names}은(는) 직접 호출하세요. tool_describe는 검색 도구를 설명하지 않습니다.",
   "error.agent.routineScheduleArgumentsInvalid":
     "루틴 일정이 올바르지 않아요: {detail} 일정을 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.approvalWhileDeleting": "에이전트를 삭제하는 중에는 승인할 수 없어요.",

@@ -158,6 +158,23 @@ function isCodexUnstoredItem(provider: AgentProvider, message: string): boolean 
 }
 
 /**
+ * The ChatGPT backend that Codex uses can refuse a request with only the 24-byte body
+ * `{"detail":"Bad Request"}`. Codex compresses the request with zstd, and the backend refuses some
+ * compressed requests, often in a long chat with many images (openai/codex#60594). Codex sends the
+ * same history on each turn, so each later turn failed the same way, in about 2 seconds, until a new
+ * chat (#9915). A new session, given the OpenBot transcript, sends different bytes. Only the bare
+ * body matches: a `detail` that names a cause, such as "Instructions are not valid", does not.
+ * Codex sends a 400 of a turn as the body only. Its other form is `unexpected status 400 Bad
+ * Request: <body>, url: …`, with the cf-ray and request id after the url.
+ */
+function isCodexBareBadRequest(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "codex" &&
+    /^(?:[^{]*\b400 Bad Request:\s*)?\{\s*"detail"\s*:\s*"Bad Request"\s*\}(?:,\s*url:.*)?$/.test(message.trim())
+  );
+}
+
+/**
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
@@ -234,6 +251,8 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
   if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
+  if (isCodexBareBadRequest(provider, message))
+    return sourceText("error.provider.codexRequestRefused", { provider: providerLabel(provider) });
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))

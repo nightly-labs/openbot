@@ -18,6 +18,9 @@ export const messages = {
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Используйте точное полное имя из tool_search, например openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Инструмент не запущен. tool_call не нашёл инструмент с таким именем. Возможно, полное имя — {name}. Если это так, отправьте вызов снова с этим именем.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe не нашёл инструмент OpenBot с именем {names}. Он описывает только инструменты OpenBot и браузера из списка openbot.tool_search, а не инструменты MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "Вызовите {names} напрямую. tool_describe не описывает инструменты поиска.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Расписание регулярной задачи некорректно: {detail} Исправьте расписание и повторите попытку. openbot.tool_describe возвращает схему.",
   "error.agent.approvalWhileDeleting": "Нельзя дать подтверждение, пока агент удаляется.",

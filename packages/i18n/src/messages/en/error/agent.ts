@@ -17,6 +17,10 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "The tool did not run. tool_call found no tool with this name. The qualified name is possibly {name}. If it is, send the call again with that name.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe found no OpenBot tool named {names}. It describes only the OpenBot and browser tools that openbot.tool_search lists, not MCP tools.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Call {names} directly. tool_describe does not describe the discovery tools.",
   "error.agent.routineScheduleArgumentsInvalid":
     "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
   // Agent errors that the main process and the backend send.

@@ -341,6 +341,8 @@ export const messages = {
     "{provider} не принял предыдущие рассуждения в этом чате, потому что их получил другой аккаунт или API-ключ. OpenBot начал новую сессию {provider} с историей чата. Повторите попытку.",
   "error.provider.codexHistoryItemMissing":
     "Codex не смог продолжить этот чат, потому что в его сохранённой истории не хватает элемента. OpenBot начал новую сессию Codex с историей чата. Повторите попытку.",
+  "error.provider.codexRequestRefused":
+    "{provider} отклонил запрос этого чата и не указал причину. Это может произойти в длинном чате с большим количеством изображений. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooSmall":
     "Модель не приняла изображение в этом чате, потому что изображение слишком маленькое. OpenBot начал новый сеанс {provider} с историей чата. Попробуйте снова.",
   "error.provider.imageTooLarge":
@@ -468,6 +470,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "Не удалось запустить CLI {provider}.",
   "error.provider.nativeVersionUnreadable": "Не удалось прочитать версию CLI {provider}.",
   "error.provider.piSessionBusy": "Дождитесь окончания текущего хода Pi.",
+  "error.provider.acpSessionBusy": "{provider} ещё завершает остановленный ход. Повторите попытку чуть позже.",
   "error.provider.piStopped": "Pi не запущен. Подключите Pi и повторите попытку.",
   "error.provider.piSessionMissing": "Файл сессии Pi недоступен на этом компьютере.",
   "error.provider.piResumeCancelled": "Pi отменил возобновление сессии. Повторите попытку.",

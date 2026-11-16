@@ -352,6 +352,8 @@ export const messages = {
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.codexHistoryItemMissing":
     "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexRequestRefused":
+    "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":
@@ -477,6 +479,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
+  "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
   "error.provider.piStopped": "Pi çalışmıyor. Pi'yi bağlayıp tekrar deneyin.",
   "error.provider.piSessionMissing": "Pi oturum dosyası bu bilgisayarda yok.",
   "error.provider.piResumeCancelled": "Pi oturumu sürdürmeyi iptal etti. Tekrar deneyin.",

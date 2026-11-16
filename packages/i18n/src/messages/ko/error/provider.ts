@@ -344,6 +344,8 @@ export const messages = {
     "다른 계정이나 API 키가 받은 추론이라서 {provider}이(가) 이 채팅의 이전 추론을 수락하지 않았어요. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했어요. 다시 시도해 주세요.",
   "error.provider.codexHistoryItemMissing":
     "저장된 기록의 항목이 없어서 Codex가 이 채팅을 계속할 수 없었어요. OpenBot이 채팅 기록으로 새 Codex 세션을 시작했어요. 다시 시도해 주세요.",
+  "error.provider.codexRequestRefused":
+    "{provider}이(가) 원인을 알리지 않고 이 채팅의 요청을 거부했습니다. 이미지가 많은 긴 채팅에서 발생할 수 있습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooSmall":
     "이미지가 너무 작아서 모델이 이 채팅의 이미지를 받지 않았습니다. OpenBot이 채팅 기록으로 새 {provider} 세션을 시작했습니다. 다시 시도하세요.",
   "error.provider.imageTooLarge":
@@ -468,6 +470,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI를 시작할 수 없었어요.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI 버전을 읽을 수 없었어요.",
   "error.provider.piSessionBusy": "현재 Pi 턴이 끝날 때까지 기다려 주세요.",
+  "error.provider.acpSessionBusy": "{provider}이(가) 중지된 턴을 아직 마무리하고 있습니다. 잠시 후 다시 시도해 주세요.",
   "error.provider.piStopped": "Pi가 실행 중이 아니에요. Pi를 연결한 후 다시 시도해 주세요.",
   "error.provider.piSessionMissing": "이 컴퓨터에서 Pi 세션 파일을 사용할 수 없어요.",
   "error.provider.piResumeCancelled": "Pi가 세션 재개를 취소했어요. 다시 시도해 주세요.",

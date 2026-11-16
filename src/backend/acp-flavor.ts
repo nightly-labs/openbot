@@ -142,6 +142,11 @@ export interface AcpFlavor {
    * prompt is not ended again.
    */
   refusesUntilRestart?(error: unknown): boolean;
+  /**
+   * Whether the agent refused to open a session again because a prompt still runs in it, such as a
+   * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
+   */
+  sessionBusy?(error: unknown): boolean;
   /** A failed model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
@@ -598,6 +603,21 @@ function hermesRefusal(error: unknown): boolean {
   );
 }
 
+/**
+ * Hermes Agent changes the MCP servers or the folder of a session only while no turn runs in it. An
+ * open of a session with new MCP tokens, after a stop whose command still ran, then failed with an
+ * internal error and only `session_busy` in `data.details`, and each message to that agent failed
+ * (#9938). Hermes ends that turn by itself, so the open works again later.
+ */
+function hermesSessionBusy(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.details === "session_busy"
+  );
+}
+
 /** The cause codes of Hermes Agent (`FailoverReason`) that have an OpenBot cause. */
 const HERMES_FAILURE_REASONS: Readonly<Partial<Record<string, CauseCode>>> = {
   auth: "authentication",
@@ -656,6 +676,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
+  sessionBusy: hermesSessionBusy,
   // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
   // each turn failed every turn when the gateway was slow (#9738).
   setsConfigOnlyOnChange: true,
@@ -814,6 +835,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
+    sessionBusy: hermesSessionBusy,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,

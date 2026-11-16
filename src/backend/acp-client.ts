@@ -71,6 +71,7 @@ import {
   AgentProcessExitError,
   type AgentProvider,
   type DiagnosticOrigin,
+  ProviderSessionBusyError,
   ProviderTurnActiveError,
 } from "./agent-client";
 import { type AgentCliInfo, cliPathEnvironment, compareReleases, isVersion } from "./cli";
@@ -1115,11 +1116,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /**
    * A non-resumable ACP session must keep its process and in-memory context. A session with running
-   * work (`AcpThread.workHold`) keeps the process that runs it.
+   * work (`AcpThread.workHold`) or a running background subagent keeps the process that runs it.
    */
   canReleaseProcess(): boolean {
     if (this.#threads.ids().next().done) return true;
-    for (const id of this.#threads.ids()) if (this.#threads.get(id)?.workHold) return false;
+    for (const id of this.#threads.ids()) {
+      const thread = this.#threads.get(id);
+      if (thread && (thread.workHold || this.#heldByBackgroundSubagent(thread))) return false;
+    }
     return this.#supportsSessionResume || this.#loadsSessions;
   }
 
@@ -2204,6 +2208,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (method === "load" && isSessionNotFound(error, request.sessionId, this.#flavor)) {
         return yield* providerFailure(new MissingAcpSessionError(`ACP session not found: ${request.sessionId}`, error));
       }
+      // A prompt that OpenBot stopped still runs in the session. Nothing ran, so the caller waits (#9938).
+      if (this.#flavor.sessionBusy?.(error)) return yield* providerFailure(new ProviderSessionBusyError(this.#label));
       recovery = this.#flavor.restoreFailure?.(error, method) ?? null;
       if (!recovery) return yield* providerFailure(error);
       failure = error;
@@ -3777,10 +3783,13 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     thread: AcpThread,
   ) {
     const stallLimit = this.options.turnStallMs ?? ACP_TURN_STALL_MS;
-    // A turn of the agent's own ends only here, so the watch goes on while one is open.
+    // A turn of the agent's own ends only here, so the watch goes on while one is open. A running
+    // background subagent also keeps it: the watch keeps the session open for the subagent's end.
     while (
       this.#threads.get(thread.id) === thread &&
-      (Date.now() < thread.backgroundUntil || thread.activeTurn?.unprompted === true)
+      (Date.now() < thread.backgroundUntil ||
+        thread.activeTurn?.unprompted === true ||
+        this.#heldByBackgroundSubagent(thread))
     ) {
       yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
       const active = thread.activeTurn;
@@ -3821,12 +3830,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * updates of that subagent, and its card and the agent's avatar showed "Working" with no end (#8352).
    */
   #backgroundSubagentRuns(thread: AcpThread): boolean {
-    for (const [turnId, threadId] of this.#subagentThreads) {
-      if (threadId !== thread.id) continue;
-      const subagents = this.#subagents.turns.get(turnId)?.subagents ?? [];
-      if (subagents.some((subagent) => subagent.background && subagent.status === "running")) return true;
-    }
-    return false;
+    return this.#runningBackgroundSubagents(thread).length > 0;
+  }
+
+  /**
+   * A background subagent of the session runs and started less than `ACP_WORK_HOLD_MAX_MS` ago. Its
+   * watch, its session and its process then stay open: a closed session stopped the subagent, and the
+   * agent and the chat got no end of it (#9962). The subagent's end then wakes the agent in the chat.
+   */
+  #heldByBackgroundSubagent(thread: AcpThread): boolean {
+    const since = Date.now() - ACP_WORK_HOLD_MAX_MS;
+    return this.#runningBackgroundSubagents(thread).some((subagent) => Date.parse(subagent.startedAt) > since);
+  }
+
+  #runningBackgroundSubagents(thread: AcpThread) {
+    return [...this.#subagentThreads]
+      .filter(([, threadId]) => threadId === thread.id)
+      .flatMap(([turnId]) => this.#subagents.turns.get(turnId)?.subagents ?? [])
+      .filter((subagent) => subagent.background && subagent.status === "running");
   }
 
   /** The session's `updatedAt` on the first `session/list` page, which lists the latest first. */

@@ -18,6 +18,10 @@ export const messages = {
     "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. Use o nome qualificado exato que tool_search fornece, como openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "A ferramenta não foi executada. tool_call não encontrou nenhuma ferramenta com este nome. O nome qualificado talvez seja {name}. Se for, envie a chamada novamente com esse nome.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe não encontrou nenhuma ferramenta do OpenBot chamada {names}. Ele descreve só as ferramentas do OpenBot e do navegador que openbot.tool_search lista, não as ferramentas MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Chame {names} diretamente. tool_describe não descreve as ferramentas de busca.",
   "error.agent.routineScheduleArgumentsInvalid":
     "O agendamento da rotina é inválido: {detail} Corrija o agendamento e tente novamente. openbot.tool_describe fornece o esquema.",
   "error.agent.approvalWhileDeleting": "Não é possível conceder aprovação enquanto o agente está sendo excluído.",
