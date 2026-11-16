@@ -422,7 +422,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_agents",
     description:
-      "List local OpenBot agents: name, title, description (first 300 characters; read_agent has all), progress: status (working, queued or ready), queuedMessages, turnStartedAt while working, waitingFor (approval, answer or browser) while a turn waits for a person, lastActivityAt, and openWaits. OpenBot does not track which files an agent changed.",
+      "List local OpenBot agents: name, title, description (300 characters; read_agent has all), status (working, queued or ready), queuedMessages, turnStartedAt, waitingFor (approval, answer, browser) while working, lastActivityAt, openWaits. Changed files are not tracked.",
     shape: {},
   },
   {
