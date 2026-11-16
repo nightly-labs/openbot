@@ -459,7 +459,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Aucun fuseau horaire ne correspond à cette recherche.",
   "mobile.server.settings.timezoneMore": "Saisissez plus de lettres pour voir d’autres fuseaux horaires.",
   "mobile.server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "mobile.server.settings.timezoneLoading": "Chargement du fuseau horaire…",
   "mobile.server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "mobile.server.settings.timezoneSaveFailed": "Impossible d’enregistrer le fuseau horaire. Réessayez.",

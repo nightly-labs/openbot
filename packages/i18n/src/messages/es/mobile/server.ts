@@ -457,7 +457,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Ninguna zona horaria coincide con esta búsqueda.",
   "mobile.server.settings.timezoneMore": "Escribe más del nombre para ver otras zonas horarias.",
   "mobile.server.settings.timezoneDescription":
-    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
+    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "mobile.server.settings.timezoneLoading": "Cargando zona horaria…",
   "mobile.server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
   "mobile.server.settings.timezoneSaveFailed": "No se pudo guardar la zona horaria. Inténtalo de nuevo.",

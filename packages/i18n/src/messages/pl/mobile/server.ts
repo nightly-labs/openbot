@@ -507,7 +507,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Żadna strefa czasowa nie pasuje do wyszukiwania.",
   "mobile.server.settings.timezoneMore": "Wpisz więcej liter nazwy, aby zobaczyć inne strefy czasowe.",
   "mobile.server.settings.timezoneDescription":
-    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy.",
+    "Nowe rutyny używają tej strefy czasowej, gdy wiadomość nie podaje strefy czasowej nadawcy. Na serwerze przeglądarka też używa jej po następnym ponownym uruchomieniu.",
   "mobile.server.settings.timezoneLoading": "Wczytywanie strefy czasowej…",
   "mobile.server.settings.timezoneLoadFailed": "Nie udało się wczytać strefy czasowej serwera.",
   "mobile.server.settings.timezoneSaveFailed": "Nie udało się zapisać strefy czasowej. Spróbuj ponownie.",

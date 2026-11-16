@@ -437,7 +437,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "搜索时区",
   "mobile.server.settings.timezoneNoMatch": "没有匹配该搜索的时区。",
   "mobile.server.settings.timezoneMore": "输入更多名称以查看其他时区。",
-  "mobile.server.settings.timezoneDescription": "消息没有给出发送者的时区时，新的自动化任务使用该时区。",
+  "mobile.server.settings.timezoneDescription":
+    "消息没有给出发送者的时区时，新的自动化任务使用该时区。在服务器上，浏览器也会在下次重启后使用该时区。",
   "mobile.server.settings.timezoneLoading": "正在加载时区…",
   "mobile.server.settings.timezoneLoadFailed": "无法加载服务器时区。",
   "mobile.server.settings.timezoneSaveFailed": "无法保存时区，请重试。",

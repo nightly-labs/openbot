@@ -451,7 +451,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Nessun fuso orario corrisponde alla ricerca.",
   "mobile.server.settings.timezoneMore": "Scrivi più lettere del nome per vedere altri fusi orari.",
   "mobile.server.settings.timezoneDescription":
-    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente.",
+    "Le nuove routine usano questo fuso orario quando il messaggio non indica quello del mittente. Su un server, anche il browser lo usa dopo il prossimo riavvio.",
   "mobile.server.settings.timezoneLoading": "Caricamento fuso orario…",
   "mobile.server.settings.timezoneLoadFailed": "Impossibile caricare il fuso orario del server.",
   "mobile.server.settings.timezoneSaveFailed": "Impossibile salvare il fuso orario. Riprova.",

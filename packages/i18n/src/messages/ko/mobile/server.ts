@@ -438,7 +438,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "시간대 검색",
   "mobile.server.settings.timezoneNoMatch": "검색과 일치하는 시간대가 없어요.",
   "mobile.server.settings.timezoneMore": "이름을 더 입력하면 다른 시간대를 볼 수 있어요.",
-  "mobile.server.settings.timezoneDescription": "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요.",
+  "mobile.server.settings.timezoneDescription":
+    "메시지에 보낸 사람의 시간대가 없으면 새 루틴이 이 시간대를 사용해요. 서버에서는 다음 재시작 후 브라우저도 이 시간대를 사용해요.",
   "mobile.server.settings.timezoneLoading": "시간대 불러오는 중…",
   "mobile.server.settings.timezoneLoadFailed": "서버 시간대를 불러오지 못했어요.",
   "mobile.server.settings.timezoneSaveFailed": "시간대를 저장하지 못했어요. 다시 시도해 주세요.",

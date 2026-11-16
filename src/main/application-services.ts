@@ -411,7 +411,7 @@ import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from ".
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
 import { ServerSetupPage } from "./server-setup-page";
-import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
+import { SERVER_TIMEZONE_PREFERENCE_FILE, ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
   configureApplicationProtocol,
   configureAttachmentProtocol,
@@ -496,7 +496,6 @@ const BROWSING_MEMORY_PREFERENCE_FILE = "openbot-browsing-memory-v1.json";
 const USER_BROWSING_FILE = "openbot-browsing-steps-v1.json";
 const AGENT_NOTIFICATION_LEVELS_FILE = "openbot-agent-notification-levels-v1.json";
 const SIDEBAR_PINS_FILE = "openbot-sidebar-pins-v1.json";
-const SERVER_TIMEZONE_PREFERENCE_FILE = "openbot-server-timezone-v1.json";
 const HOST_TURN_LIMITS_PREFERENCE_FILE = "openbot-host-turn-limits-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
@@ -666,6 +665,8 @@ export interface ApplicationServiceContext {
   localServerChild: LocalServerChildEnvironment | null;
   /** The control pipe of a local server: the commands of the desktop app. */
   localServerControl: Readable | null;
+  /** The zone of this computer. See `applyServerTimezone`. */
+  systemTimezone: () => string;
   /** How the previous run ended when it did not quit cleanly (`run-marker.ts`). */
   previousUncleanExit: UncleanExitProperties | null;
   macHapticFeedback: MacHapticFeedback;
@@ -1091,6 +1092,7 @@ export async function createApplicationServices({
   hostingDeveloperKey,
   localServerChild,
   localServerControl,
+  systemTimezone,
   previousUncleanExit,
   macHapticFeedback,
   teardown,
@@ -1571,6 +1573,7 @@ export async function createApplicationServices({
   const mcpAccessStore = new McpAccessStore(join(app.getPath("userData"), MCP_ACCESS_FILE));
   const serverTimezone = new ServerTimezonePreferenceStore(
     join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE),
+    systemTimezone,
   );
   const hostTurnLimits = new HostTurnLimitsPreferenceStore(
     join(app.getPath("userData"), HOST_TURN_LIMITS_PREFERENCE_FILE),
