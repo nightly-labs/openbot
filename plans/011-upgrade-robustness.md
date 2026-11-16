@@ -35,7 +35,9 @@
   data loss. Every migration and its fixtures stay.
 - **Forced update**: the account service publishes a minimum version for each surface. An older app
   shows a blocking "Update required" screen and installs the update (item 24).
-- **Pre-migration copy**: approved. Item 15 changes the no-backup rule.
+- **Pre-migration copy**: dropped (developer decision, the same day, after the hosted size check). The
+  rule "No backup of `openbot.db` is made before an upgrade" stays. Migrations must be safe by
+  themselves: items 7 to 10 and 12 come first.
 
 Host protocol by release: V4 from v0.8.0 (2026-09-11), V5 v0.24.0 (09-28), V6 v0.31.0 (10-07), V7 v0.35.0
 (10-10), V8 v0.48.0 (10-22), V9 v0.55.0 (10-30). Mobile 1.4.3 (10-29 to 10-31) is the last protocol 8 mobile
@@ -75,8 +77,10 @@ The 17 GB database (huskytail): `orchestration_events` 11.9 GB (70%), of which
 1.6 GB (112,501 rows). `provider_history_staging` is 2.9 GB (277,979 rows). The free list is
 empty, so `VACUUM` gives nothing back. Consequences:
 
-- Item 15: every volume has space for 2 copies, but a 17 GB copy adds start time (estimate: about
-  20 s at the measured 1.2 s/GB; not measured on this host) and 34 GB of disk.
+- Item 15 (dropped): a 17 GB copy adds start time (estimate: about 20 s at the measured 1.2 s/GB;
+  not measured on this host) and 34 GB of disk to each upgrade.
+- Item 12: a migration that rebuilds `orchestration_events` on this database needs minutes and about
+  12 GB of extra disk. Measure each migration on a large database.
 - Item 23 is the real size fix: snapshot payloads are more than half of the largest database.
 - New item 25: find out why `provider_history_staging` keeps 2.9 GB, and clear staged rows after use.
 
@@ -92,7 +96,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | 4 | Desktop start recovery offers only a release that can open the database | TODO |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | TODO |
-| 15 | Copy `openbot.db` before a migration (PR #7150) | TODO: rule change approved |
+| 15 | Copy `openbot.db` before a migration (PR #7150) | DROPPED: not practical for large databases (#7150 closed) |
 | 24 | Minimum app version for each surface; blocking "Update required" screen | TODO |
 
 ### 1. Bootstrap list stays at 64
@@ -164,13 +168,12 @@ Change: inject the database; one shared comparator for TypeScript, with a shared
 bash function must also pass. Fix the hosted auto-install docs if they disagree with
 `requested-update.ts`.
 
-### 15. Pre-migration copy
+### 15. Pre-migration copy (dropped)
 
-PR #7150 (draft) runs `VACUUM INTO` before the first pending migration, keeps 2 copies, and skips
-the copy when the disk is too full. The measured cost is 0.46 s for 385 MB. The developer approved
-the rule change on 2026-11-17: the PR changes "No backup of `openbot.db` is made before an upgrade"
-(`AGENTS.md`) and "No automatic full-database backups" (`src/backend/AGENTS.md`), and fixes its open
-review findings. Migrations stay irreversible; the copy is a recovery aid, not a rollback path.
+PR #7150 made a `VACUUM INTO` copy before the first pending migration. The developer dropped it on
+2026-11-17: one hosted server has a 17 GB database, and migrations ship several times a week, so each
+upgrade start would pay tens of seconds and 34 GB of disk. The no-backup rule stays. Do not start a
+new copy PR.
 
 ### 24. Minimum app version for each surface
 
@@ -183,12 +186,12 @@ send new user data (`PRIVACY.md` if outbound data changes).
 
 | # | Item | State |
 |---|---|---|
-| 7 | Shared migration test harness (migrate to version N, fixtures per released schema) | TODO |
-| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | TODO |
-| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | TODO |
-| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | TODO |
+| 7 | Shared migration test harness (migrate to version N, fixtures per released schema) | IN PROGRESS (with 12) |
+| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | IN PROGRESS |
+| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | IN PROGRESS |
+| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | IN PROGRESS |
 | 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | TODO |
-| 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | TODO |
+| 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | IN PROGRESS (with 7) |
 
 ## Phase 3: durable state
 
