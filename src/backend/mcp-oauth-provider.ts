@@ -1644,8 +1644,10 @@ function mcpOAuthServerUrl(key: string): string {
  * such a document, the server's origin when authorization server metadata is there; else `null`. A
  * sign-in needs one to open a page. Any answer below 500 that is not resource metadata goes on to the
  * origin: a 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server
- * (408, 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked
- * for none, which left the row showing the result of the earlier test, with no page and no words.
+ * (408, 429) at the resource metadata says nothing about the server, so it fails: a sign-in must not
+ * end as if the server asked for none, which left the row showing the result of the earlier test, with
+ * no page and no words. The read at the origin can only add a yes: when it fails, the answer is `null`,
+ * as it was before that read, so a server that takes no sign-in does not get an error.
  */
 export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
   let metadataStatus: number | null = null;
