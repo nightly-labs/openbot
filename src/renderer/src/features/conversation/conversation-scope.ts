@@ -815,19 +815,50 @@ export function createConversationViewScope(props: ConversationProps) {
         ])
       : new Set<string>(),
   );
-  // Filtered here as well as settled below, so the two rows never stand together for a frame. A send
-  // made while the agent works goes to the queue panel; drawn here first, it would jump there.
-  // A send behind a failed one waits for Retry or Dismiss, and the host does not have it yet, so the
-  // queue panel cannot show it: the chat shows it, queued or not.
+  /**
+   * The host can report the queue before it answers the send. A `late` send has no id then, so its
+   * row and its queued delivery would stand together. Here a send takes a user delivery that came
+   * after it and has its text. The deliveries that were there when the send started do not count,
+   * so an earlier queued message with the same text is not taken.
+   */
+  const deliveriesBefore = new Map<string, ReadonlySet<string>>();
+  const queuedSendIds = createMemo((): ReadonlySet<string> => {
+    const found = new Set<string>();
+    const waiting = currentPendingSends().filter((send) => send.queued && send.state === "sending");
+    for (const id of deliveriesBefore.keys())
+      if (!waiting.some((send) => send.clientMessageId === id)) deliveriesBefore.delete(id);
+    if (waiting.length === 0) return found;
+    const deliveries = (props.queue?.deliveries ?? []).filter((delivery) => delivery.sender.kind === "user");
+    const taken = new Set<string>();
+    for (const send of waiting) {
+      const before = deliveriesBefore.get(send.clientMessageId);
+      if (!before) {
+        deliveriesBefore.set(send.clientMessageId, new Set(deliveries.map((delivery) => delivery.id)));
+        continue;
+      }
+      const match = deliveries.find(
+        (delivery) => !before.has(delivery.id) && !taken.has(delivery.id) && delivery.text.trim() === send.text.trim(),
+      );
+      if (!match) continue;
+      found.add(send.clientMessageId);
+      taken.add(match.id);
+    }
+    return found;
+  });
+  // Filtered here as well as settled below, so the two rows never stand together for a frame.
+  // A send made while the agent works goes to the queue panel. The panel shows only what the host
+  // reports, so the chat shows a failed send, and a send that the host is slow to answer (`late`),
+  // until the host's row is drawn: a message is never out of view while a slow host answers, or
+  // while an earlier send of the chat is in flight.
   const pendingMessages = createMemo(() => {
-    const sends = currentPendingSends();
-    const firstFailed = sends.findIndex((send) => send.state === "failed");
-    return sends
+    // Read on each run, so the deliveries are recorded when the send starts and not when it is late.
+    const queuedIds = queuedSendIds();
+    return currentPendingSends()
       .filter((send) => {
         const messageId = sentMessageId(send);
         return !(messageId && drawnHostIds().has(messageId));
       })
-      .filter((send) => !send.queued || (firstFailed !== -1 && sends.indexOf(send) >= firstFailed))
+      .filter((send) => !send.queued || send.state === "failed" || (send.late && !queuedIds.has(send.clientMessageId)))
       .map(pendingSendMessage);
   });
   /** The pending send a timeline row draws, by the row's message id. */

@@ -1646,13 +1646,21 @@ export function createWebWorkspace(
             prompt.threadId !== page.threadId ||
             !resolvedRequests.has(String(prompt.requestId)),
         );
+        // A latest page that does not meet the loaded messages, after a long time with no connection,
+        // replaces them: joined end to end, the two would hide the messages between with no sign.
+        const pageIds = new Set(page.messages.map((message) => message.id));
+        const apart =
+          merge === "latest" &&
+          !around &&
+          page.pageInfo.hasOlder &&
+          !(old?.messages ?? []).some((message) => pageIds.has(message.id));
         item.page = {
           ...page,
           messages: around
             ? windowedSnapshotMessages(old?.messages ?? [], page.messages, { mode: "around", capped: true })
-            : mergeConversationPage(old?.messages ?? [], page.messages, merge),
+            : mergeConversationPage(old?.messages ?? [], page.messages, apart ? "replace" : merge),
           references: merge === "replace" ? page.references : { ...old?.references, ...page.references },
-          pageInfo: merge === "latest" ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
+          pageInfo: merge === "latest" && !apart ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
           // An older page has the thread's current revision but not its newest messages. The loaded
           // newest messages keep their revision, so a delta held during this read still applies.
           revision: older && old ? old.revision : page.revision,

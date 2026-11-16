@@ -18,6 +18,7 @@ import {
   NO_ACCOUNT_ANALYTICS,
 } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
+import { alertAmount, alertCode } from "./billing-purchase";
 import { BillingUsd, BillingUsdError } from "./billing-usd";
 import type { HostedPoolAlert } from "./hosted-pool-alert";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
@@ -43,8 +44,9 @@ export interface BillingSalesOptions {
   clientSecret: string | undefined;
   now?: () => number;
   /**
-   * Sends the operator one message for each paid invoice line of a server plan or a license
-   * (docs/hosted-servers.md#pool-alerts). Only `processPending` sends it.
+   * Sends the operator one message, with the account email, for each paid or failed invoice line, refund
+   * and dispute of a server plan or a license (docs/hosted-servers.md#pool-alerts). Only
+   * `processPending` sends it.
    */
   saleAlert?: HostedPoolAlert | null;
 }
@@ -161,25 +163,41 @@ interface FactAttributes {
   suppressBillingAction?: boolean;
 }
 
-const SALE_KIND_TEXT = { first_purchase: "first purchase", renewal: "renewal", adjustment: "adjustment" } as const;
+const SALE_KIND_TEXT = { first_purchase: "First purchase", renewal: "Renewal", adjustment: "Adjustment" } as const;
 
-/** The operator message of one paid invoice line. It has no account, email, name or server. */
-function saleAlertText(attributes: FactAttributes): string {
-  const product =
-    (attributes.product ?? "server") === "license"
-      ? attributes.users === undefined
-        ? "license"
-        : `license for ${attributes.users} user${attributes.users === 1 ? "" : "s"}`
-      : `${attributes.plan ?? "unknown"} server`;
+/** The start of the operator message of each fact that moves money or fails to. A checkout step has none. */
+const SALE_EVENT_TEXT: Partial<Record<FactType, string>> = {
+  payment_succeeded: "Paid",
+  payment_failed: "Failed payment of the",
+  payment_refunded: "Refunded",
+  refund_failed: "Failed refund of the",
+  payment_disputed: "Disputed payment of the",
+  dispute_lost: "Lost dispute of the",
+};
+
+/**
+ * The operator message of one payment fact, in the form of `purchaseAlertText`: the account email, the
+ * product, the amount of the payment and the period. `email` is null when the account is gone.
+ */
+function saleAlertText(event: string, type: FactType, attributes: FactAttributes, email: string | null): string {
+  const license = (attributes.product ?? "server") === "license";
+  const head = `${event} ${license ? "license" : "server plan"} for ${email === null ? "an unknown account" : alertCode(email)}`;
   const parts = [
-    product,
-    ...(attributes.interval ? [`each ${attributes.interval}`] : []),
-    ...(attributes.amount !== undefined && attributes.currency
-      ? [`${(attributes.amount / 100).toFixed(2)} ${attributes.currency.toUpperCase()}`]
-      : []),
-    SALE_KIND_TEXT[attributes.paymentKind ?? "adjustment"],
+    ...(license
+      ? attributes.users === undefined
+        ? []
+        : [`${attributes.users} user${attributes.users === 1 ? "" : "s"}`]
+      : [attributes.plan ?? "plan not known"]),
+    ...(attributes.currency ? [alertAmount(attributes.amount ?? null, attributes.currency)] : []),
+    ...(attributes.interval ? [`1 ${attributes.interval} period`] : []),
   ];
-  return `Sale: ${parts.join(", ")}.`;
+  const note =
+    type === "payment_succeeded"
+      ? ` ${SALE_KIND_TEXT[attributes.paymentKind ?? "adjustment"]}.`
+      : type === "payment_failed" && attributes.failureReason
+        ? ` Reason: ${attributes.failureReason}.`
+        : "";
+  return `${head}: ${parts.join(", ")}.${note}`;
 }
 
 interface CheckoutRow {
@@ -923,13 +941,15 @@ export class BillingSales {
     );
     // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
     // FX lookup, or that two cron runs read, sends one message. An imported payment sends none.
-    if (
-      this.#saleAlert &&
-      row.fact_type === "payment_succeeded" &&
-      marked.meta.changes === 1 &&
-      !attributes.suppressBillingAction
-    )
-      yield* this.#saleAlert(saleAlertText(attributes));
+    const event = SALE_EVENT_TEXT[row.fact_type];
+    if (!this.#saleAlert || !event || marked.meta.changes !== 1 || attributes.suppressBillingAction) return;
+    // The fact is ended, so a failed read of the email must not fail the run.
+    const account = row.user_id
+      ? yield* d1(this.#database, () =>
+          this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(row.user_id).first<{ email: string }>(),
+        ).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null;
+    yield* this.#saleAlert(saleAlertText(event, row.fact_type, attributes, account?.email ?? null));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (

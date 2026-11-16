@@ -769,11 +769,27 @@ const Conversation = createSimpleContext({
         // A delta that came before this page can show a commentary item as its own message. The page
         // groups that item under its turn's thinking message, so the loaded copy goes.
         const pageItemIds = new Set(page.messages.map((message) => message.id));
-        conversation.messages = mergeConversationPage(
-          currentMessages.filter((message) => !pageItemIds.has(message.id)),
-          pageMessages,
-          merge,
-        );
+        // A latest page is the end of the thread. The loaded messages can reach further back, and
+        // their cursor of the older pages stays. Two cases must not join end to end, because the
+        // messages between would be out of view with no sign: a window around an old message keeps
+        // its place, and loaded messages that the page does not meet give way to the page.
+        const mappedIds = new Set(pageMessages.map((message) => message.id));
+        // A chat with no page yet, or a trimmed one, has no cursor of its own, so it takes the page's.
+        const own = conversation.page;
+        const trimmed = !own || (own.hasOlder && !own.olderCursor);
+        const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
+        const keepsWindow = tail && conversation.windowMode === "around";
+        const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
+        const kept = currentMessages.filter((message) => !pageItemIds.has(message.id));
+        conversation.messages = keepsWindow
+          ? windowedSnapshotMessages(currentMessages, pageMessages, { mode: "around", capped: true }).filter(
+              (message) => mappedIds.has(message.id) || !pageItemIds.has(message.id),
+            )
+          : mergeConversationPage(kept, pageMessages, apart ? "replace" : merge);
+        const first = conversation.messages[0];
+        // The loaded messages start before the page, so the cursor of the older pages is still theirs.
+        // A window that starts in the page dropped the page's messages before it, so it keeps its cursor too.
+        const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
           ...Object.fromEntries(
@@ -784,8 +800,8 @@ const Conversation = createSimpleContext({
           ...(merge === "replace" ? {} : conversation.missingReferences),
           ...missingReplyOriginals(page),
         };
-        conversation.page = page.pageInfo;
-        if (windowMode) conversation.windowMode = windowMode;
+        if (!keepsOlder) conversation.page = page.pageInfo;
+        if (windowMode && !keepsWindow) conversation.windowMode = windowMode;
         conversation.revision = page.revision;
         conversation.loaded = true;
       });
