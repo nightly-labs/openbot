@@ -88,4 +88,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra nie mogła utworzyć pliku: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra nie skończyła pliku na czas. Sprawdź projekt OpenBot na sunra.ai, zanim uruchomisz krok ponownie.",
+  "error.workflow.higgsfieldSignIn": "Zaloguj się do Higgsfield w Aplikacjach, aby używać modeli Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Twoje konto Higgsfield nie ma wystarczającej liczby kredytów. Dodaj kredyty na higgsfield.ai/pricing, a potem uruchom krok ponownie.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Ten model Higgsfield wymaga planu Higgsfield. Wybierz plan na higgsfield.ai/pricing albo inny model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield nie utworzył pliku, bo zatrzymała go kontrola treści. Zmień prompt lub obrazy wejściowe, a potem uruchom krok ponownie.",
+  "error.workflow.higgsfieldFailed": "Higgsfield nie mógł utworzyć pliku: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield nie skończył pliku na czas. Sprawdź swoją historię na higgsfield.ai, zanim uruchomisz krok ponownie.",
 } as const satisfies PartialTranslation<typeof source>;
