@@ -116,3 +116,23 @@ export function revealSettingRow(root: HTMLElement, label: string): boolean {
   control?.focus({ preventScroll: true });
   return true;
 }
+
+/**
+ * Calls `done` each time the content of `root` changes, until it returns true. A row can show after its
+ * page, so a reveal waits for it. An input of the user in `root` stops the wait, so a row that shows
+ * later does not take the focus. Returns the function that stops the wait.
+ */
+export function waitForSettingRow(root: HTMLElement, done: () => boolean): () => void {
+  const stop = () => {
+    observer.disconnect();
+    root.removeEventListener("pointerdown", stop, true);
+    root.removeEventListener("keydown", stop, true);
+  };
+  const observer = new MutationObserver(() => {
+    if (done()) stop();
+  });
+  observer.observe(root, { childList: true, subtree: true });
+  root.addEventListener("pointerdown", stop, true);
+  root.addEventListener("keydown", stop, true);
+  return stop;
+}

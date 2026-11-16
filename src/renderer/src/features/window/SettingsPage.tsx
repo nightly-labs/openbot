@@ -1,5 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Server } from "@openbot/ui";
+import { waitForSettingRow } from "@openbot/ui/features/conversation/agent-setting-links";
 import { createEffect, createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
@@ -205,18 +206,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       if (props.kind !== "personal" || !request || !root || request.nonce === handledRowNonce) return;
       handledRowNonce = request.nonce;
       if (markRow(root, request.tab, request.anchor)) return;
-      const stop = () => {
-        observer.disconnect();
-        root.removeEventListener("pointerdown", stop, true);
-        root.removeEventListener("keydown", stop, true);
-      };
-      const observer = new MutationObserver(() => {
-        if (markRow(root, request.tab, request.anchor)) stop();
-      });
-      observer.observe(root, { childList: true, subtree: true });
-      root.addEventListener("pointerdown", stop, true);
-      root.addEventListener("keydown", stop, true);
-      return stop;
+      return waitForSettingRow(root, () => markRow(root, request.tab, request.anchor));
     },
   );
 

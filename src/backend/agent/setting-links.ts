@@ -332,13 +332,9 @@ export interface SettingLinkSummary {
   about: string;
 }
 
-function summary(id: SettingLinkId): SettingLinkSummary {
+export function settingLinkSummary(id: SettingLinkId): SettingLinkSummary {
   const { title, place, about } = SETTING_LINKS[id];
   return { id, title, place, about };
-}
-
-export function settingLinkSummary(id: SettingLinkId): SettingLinkSummary {
-  return summary(id);
 }
 
 const terms = (text: string) =>
@@ -379,5 +375,5 @@ export function searchSettingLinks(query: string, limit = 5): SettingLinkSummary
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
-    .map((entry) => summary(entry.id));
+    .map((entry) => settingLinkSummary(entry.id));
 }

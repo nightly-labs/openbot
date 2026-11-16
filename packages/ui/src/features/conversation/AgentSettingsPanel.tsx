@@ -127,6 +127,7 @@ import {
   type AgentSettingReveal,
   type AgentSettingsPage,
   revealSettingRow,
+  waitForSettingRow,
 } from "./agent-setting-links";
 import { BackupModelsPage } from "./BackupModels";
 
@@ -398,19 +399,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       }
       const label = t(row.match);
       if (pageShown && revealSettingRow(root, label)) return;
-      const stop = () => {
-        observer.disconnect();
-        root.removeEventListener("pointerdown", stop, true);
-        root.removeEventListener("keydown", stop, true);
-      };
-      const observer = new MutationObserver(() => {
-        // The user went to another page: the row is not wanted there.
-        if (untrack(page) !== row.page || revealSettingRow(root, label)) stop();
-      });
-      observer.observe(root, { childList: true, subtree: true });
-      root.addEventListener("pointerdown", stop, true);
-      root.addEventListener("keydown", stop, true);
-      return stop;
+      // The user went to another page: the row is not wanted there.
+      return waitForSettingRow(root, () => untrack(page) !== row.page || revealSettingRow(root, label));
     },
   );
 
