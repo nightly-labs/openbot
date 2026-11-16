@@ -293,6 +293,13 @@ export function laneChannelId(lane: string | null): string | null {
   return lane?.startsWith(CHANNEL_LANE_PREFIX) ? lane.slice(CHANNEL_LANE_PREFIX.length) : null;
 }
 
+/**
+ * The lane of an agent's external conversations (Slack, Discord, Telegram, WhatsApp). It runs one
+ * turn at a time beside the agent's own chat, so a turn there, such as one that waits on a card, does
+ * not hold the people who write from outside (#9890).
+ */
+export const MESSAGING_LANE = "\u0001messaging";
+
 export class MailboxStore {
   readonly #statePath: string;
   readonly #files: AttachmentFiles;
@@ -958,14 +965,17 @@ export class MailboxStore {
   }
 
   /**
-   * The lane a delivery runs in: its task, the channel thread of its channel, or null for the
-   * agent's own chat. Each lane runs one turn at a time, beside the other lanes.
+   * The lane a delivery runs in: its task, the channel thread of its channel, the agent's external
+   * conversations, or null for the agent's own chat. Each lane runs one turn at a time, beside the
+   * other lanes.
    */
   #laneOf(delivery: StoredDelivery, messages?: ReadonlyMap<string, StoredMessage>): string | null {
     const message = messages
       ? messages.get(delivery.messageId)
       : this.#state.messages.find((candidate) => candidate.id === delivery.messageId);
-    return message?.taskId ?? (message?.channelId ? channelLane(message.channelId) : null);
+    if (message?.taskId) return message.taskId;
+    if (message?.channelId) return channelLane(message.channelId);
+    return message?.messaging ? MESSAGING_LANE : null;
   }
 
   /** The lane a delivery runs in, as {@link nextQueued} takes it. */
@@ -979,6 +989,17 @@ export class MailboxStore {
    * `queuedOnly`, only the lanes with a queued delivery.
    */
   channelLanes(agentId: string, queuedOnly = false): string[] {
+    return this.#lanesWithWork(agentId, queuedOnly).filter((lane) => laneChannelId(lane) !== null);
+  }
+
+  /** As {@link channelLanes}, with the lane of the agent's external conversations when it has work. */
+  sideLanes(agentId: string, queuedOnly = false): string[] {
+    return this.#lanesWithWork(agentId, queuedOnly).filter(
+      (lane) => lane === MESSAGING_LANE || laneChannelId(lane) !== null,
+    );
+  }
+
+  #lanesWithWork(agentId: string, queuedOnly: boolean): string[] {
     const deliveries = queuedOnly
       ? this.#queuedFor(agentId)
       : this.#state.deliveries.filter(
@@ -990,7 +1011,7 @@ export class MailboxStore {
     const lanes = new Set<string>();
     for (const delivery of deliveries) {
       const lane = this.#laneOf(delivery, messages);
-      if (lane !== null && laneChannelId(lane) !== null) lanes.add(lane);
+      if (lane !== null) lanes.add(lane);
     }
     return [...lanes];
   }
@@ -1730,8 +1751,8 @@ export class MailboxStore {
   }
 
   /**
-   * The delivery that starts the next turn in one lane of this agent: its own chat (`taskId` null,
-   * with its channel and messaging work), or one task. Each lane runs one turn at a time.
+   * The delivery that starts the next turn in one lane of this agent: its own chat (`taskId` null),
+   * one task, one channel or its external conversations. Each lane runs one turn at a time.
    */
   nextQueued(agentId: string, taskId: string | null = null): DeliveryContext | null {
     if (this.laneActive(agentId, taskId)) return null;
@@ -3026,9 +3047,9 @@ export class MailboxStore {
 
   /**
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
-   * threads. Channel work counts only with `includeChannels`: on a provider that runs one turn at a
-   * time, a channel turn holds the agent's own chat too. The `exceptQueued` deliveries do not count
-   * while they are queued.
+   * threads. External conversation work counts as before it had its own lane. Channel work counts
+   * only with `includeChannels`: on a provider that runs one turn at a time, a channel turn holds the
+   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued.
    */
   hasUnfinishedDeliveryOutsideTasks(
     agentId: string,
@@ -3040,7 +3061,7 @@ export class MailboxStore {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
       if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
-      return lane === null || (includeChannels && laneChannelId(lane) !== null);
+      return lane === null || lane === MESSAGING_LANE || (includeChannels && laneChannelId(lane) !== null);
     });
   }
 

@@ -312,7 +312,7 @@ import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
-import type { MailboxStore } from "./mailbox-store";
+import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
@@ -1564,6 +1564,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         (this.#tasks.oneTurnAtATime(agentId) &&
           (Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)) ||
             this.#mailbox.laneActive(agentId, null) ||
+            this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
             this.#conversation.workingTaskSnapshots(agentId).some((snapshot) => snapshot.activeTurnId))),
       usageLimited: (agentId) => this.#channelHeld(agentId),
       retry: (agentId) => this.#usageLimits.retry(agentId),
@@ -1661,8 +1663,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
+      // The external conversations have their own lane. On a provider that runs one turn at a time,
+      // any running turn of the agent holds it too.
       busy: (agentId) =>
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
+        this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
+        this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
+        (this.#tasks.oneTurnAtATime(agentId) && this.#conversation.anyWorkingSnapshot(agentId) !== undefined),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
@@ -1933,6 +1939,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ),
             ),
         taskForThread: (threadId) => this.#tasks.taskForThread(threadId),
+        // A conversation whose thread is also the agent's own chat (#2120) is in that lane only while
+        // its delivery starts there: the scheduler runs one of the two lanes of that thread at a time.
+        inMessagingLane: (agentId, threadId) =>
+          this.messaging.takes(threadId) ||
+          (this.messaging.store.linkForThread(threadId) !== null &&
+            this.#mailbox.startingDeliveryForAgent(agentId, MESSAGING_LANE) !== null),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
@@ -4148,11 +4160,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
   }
 
-  /** Whether work waits for the agent: in its chat, a task, a channel lane, or a channel. */
+  /** Whether work waits for the agent: in its chat, a task, a channel lane, its conversations, or a channel. */
   #hasWaitingWork(agentId: string): boolean {
     return (
       Boolean(this.#mailbox.nextQueued(agentId)) ||
-      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
+      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.sideLanes(agentId, true)].some((laneId) =>
         this.#mailbox.nextQueued(agentId, laneId),
       ) ||
       this.channels.ownsWaitingWork(agentId)
@@ -4319,7 +4331,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * a limit stopped.
    */
   #queuedContinuation(agentId: string): boolean {
-    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some(
+    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.sideLanes(agentId, true)].some(
       (taskId) => this.#mailbox.nextQueued(agentId, taskId)?.resumeAfterUsageLimit !== undefined,
     );
   }

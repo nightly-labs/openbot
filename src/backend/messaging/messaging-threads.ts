@@ -891,10 +891,10 @@ export class MessagingThreads {
       case "conversation":
         if (event.snapshot.threadId === null) return false;
         this.#reportProgress(event.snapshot);
-        return this.#takes(event.snapshot.threadId);
+        return this.takes(event.snapshot.threadId);
       case "conversation-delta":
       case "turn-progress":
-        return this.#takes(event.threadId);
+        return this.takes(event.threadId);
       case "turn-started": {
         const link = this.store.linkForThread(event.threadId);
         if (!link) return false;
@@ -955,8 +955,11 @@ export class MessagingThreads {
     }
   }
 
-  /** Whether an event of this thread is kept out of the app: a conversation thread that is no agent's own chat. */
-  #takes(threadId: string): boolean {
+  /**
+   * Whether an event of this thread is kept out of the app: a conversation thread that is no agent's
+   * own chat. Its turns run in the messaging lane, beside the agent's own chat.
+   */
+  takes(threadId: string): boolean {
     return this.store.linkForThread(threadId) !== null && !this.#hooks.ownChat(threadId);
   }
 

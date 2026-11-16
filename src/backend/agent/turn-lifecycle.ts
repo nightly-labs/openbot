@@ -40,6 +40,7 @@ import {
   channelLane,
   type DeliveryContext,
   type MailboxStore,
+  MESSAGING_LANE,
   type UsageLimitContinuation,
 } from "../mailbox-store";
 import {
@@ -274,6 +275,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether the turns of this public thread run in the lane of the agent's external conversations now. */
+  inMessagingLane(agentId: string, threadId: string): boolean;
   /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
   isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
@@ -749,12 +752,17 @@ export class TurnLifecycle {
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
   }
 
-  /** The mailbox lane of a provider thread: its task, its channel, or null for the agent's own chat. */
+  /**
+   * The mailbox lane of a provider thread: its task, its channel, the agent's external conversations,
+   * or null for the agent's own chat.
+   */
   #laneForThread(agentId: string, externalThreadId: string): string | null {
     const taskId = this.#taskForThread(agentId, externalThreadId);
     if (taskId !== null) return taskId;
-    const channelId = this.#conversation.channelForThread(this.#conversation.publicThreadId(agentId, externalThreadId));
-    return channelId === null ? null : channelLane(channelId);
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    const channelId = this.#conversation.channelForThread(threadId);
+    if (channelId !== null) return channelLane(channelId);
+    return this.#hooks.inMessagingLane(agentId, threadId) ? MESSAGING_LANE : null;
   }
 
   /**
@@ -1136,7 +1144,7 @@ export class TurnLifecycle {
         if (started && reports && unprompted) started.reports = reports;
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
-        if (laneId === null) this.#failedTurns.delete(agentId);
+        if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
         const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
           const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
@@ -2245,7 +2253,12 @@ export class TurnLifecycle {
               answer: latestAssistant?.text,
             })
           : null);
-      if (!continuation) this.#planContinuation.cancel(agentId, laneTaskId);
+      // An external conversation's turn ends only the plan continuation of its own lane.
+      if (!continuation)
+        this.#planContinuation.cancel(
+          agentId,
+          laneTaskId ?? (this.#laneForThread(agentId, threadId) === MESSAGING_LANE ? MESSAGING_LANE : null),
+        );
       if (deliveries.length > 0) {
         const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
         for (const delivery of deliveries) {
