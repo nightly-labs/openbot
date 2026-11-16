@@ -2503,6 +2503,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
     agentId: string;
     text: string;
+    /** Stored files that the message carries, such as the pictures of a workflow's image steps. */
+    sourcePaths?: readonly string[];
     idempotencyKey: string;
   }): Effect.Effect<string, AgentLifecycleFailed> {
     return this.#routines

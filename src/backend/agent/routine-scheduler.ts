@@ -1036,6 +1036,8 @@ export class RoutineScheduler implements RoutineDueSource {
       run: Pick<RoutineRun, "id" | "routineId" | "routineName" | "scheduledFor">;
       agentId: string;
       text: string;
+      /** Files of this host that the message carries as copies, such as the pictures of a workflow's image steps. */
+      sourcePaths?: readonly string[];
       idempotencyKey: string;
     },
   ) {
@@ -1058,6 +1060,7 @@ export class RoutineScheduler implements RoutineDueSource {
         recipientAgentIds: [agent.id],
         text: input.text,
         draftIds: [],
+        sourcePaths: [...(input.sourcePaths ?? [])],
         replyToMessageId: null,
         idempotencyKey: input.idempotencyKey,
       })
