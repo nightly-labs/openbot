@@ -8,7 +8,7 @@ import {
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 
-export interface AgentSteering {
+interface AgentSteering {
   /** True when the agent takes a queued message into its running turn. False shows Send now, as on desktop. */
   steers: boolean;
   /**
