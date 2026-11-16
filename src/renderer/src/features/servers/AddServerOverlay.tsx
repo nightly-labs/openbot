@@ -141,6 +141,8 @@ interface AddServerState {
   currency: HostedCurrency | null;
   /** The pricing page order, as the dialog's choices. */
   order: CreateHostedServerInput | null;
+  /** The web pricing page order that the pricing page starts with, when the account must give its country first. */
+  pageOrder: PricingOrder | null;
   /** The plans with their prices, for the order form of the pricing page. */
   catalog: HostedServerCatalogPlan[];
   /** True when the account has an open license. A server order then buys the server alone. */
@@ -269,6 +271,7 @@ function AddServerSession(
     licenseOffer: null,
     currency: null,
     order: null,
+    pageOrder: null,
     catalog: [],
     ownLicense: false,
     ordering: false,
@@ -303,7 +306,9 @@ function AddServerSession(
     draft.paid = resume?.paid ?? false;
     // An order with no billing country cannot pay, so the pricing page asks for the country first.
     const needsCountry = untrack(() => props.billingDetails) !== undefined && !details?.country;
-    draft.order = resume || needsCountry ? null : dialogOrderOf(untrack(() => props.order) ?? null, licenseState);
+    const order = resume ? null : (untrack(() => props.order) ?? null);
+    draft.order = needsCountry ? null : dialogOrderOf(order, licenseState);
+    draft.pageOrder = needsCountry ? order : null;
     draft.licenseOffer = licenseOfferOf(licenseState);
     draft.currency =
       HOSTED_CURRENCIES.find((currency) => HOSTED_BILLING_CURRENCY[currency] === licenseState?.currency) ?? null;
@@ -579,14 +584,16 @@ function AddServerSession(
    */
   const pageShown = () => pageOpen() || state.orderedFromPage;
   const pageCurrency = (plans: HostedServerPlan[]) =>
-    HOSTED_BILLING_CURRENCY[state.currency ?? guessHostedCurrency(hostedCurrencies(plans))];
+    state.currency
+      ? HOSTED_BILLING_CURRENCY[state.currency]
+      : (state.pageOrder?.currency ?? HOSTED_BILLING_CURRENCY[guessHostedCurrency(hostedCurrencies(plans))]);
   const offerLicense = () => !state.ownLicense && props.license !== undefined;
   /**
    * The page reads its first choices once. When the new read changes them, after the page showed the last answers,
    * the page starts again with the new ones.
    */
   const pageKey = (plans: HostedServerPlan[]) =>
-    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}`;
+    `${pageCurrency(plans)}:${state.currency !== null}:${offerLicense()}:${state.licenseOffer?.used ?? ""}:${state.pageOrder !== null}`;
   /** The web client has no window page, so the page covers the app frame there. */
   const overlayMount = () => document.querySelector(".app-window > .app-frame") ?? document.body;
   const headerFrame = createPageHeaderFrame();
@@ -677,6 +684,7 @@ function AddServerSession(
                   error={state.orderError}
                   errorTitle={state.orderErrorTitle}
                   billingDetails={props.billingDetails ? state.detailsDraft : undefined}
+                  initialOrder={state.pageOrder ?? undefined}
                   onBillingDetailsChange={(next) =>
                     setState((draft) => {
                       draft.detailsDraft = next;

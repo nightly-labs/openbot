@@ -78,6 +78,8 @@ export interface HostedPricingPageProps {
    * does not ask for them.
    */
   billingDetails?: BillingDetailsDraft | undefined;
+  /** The first choices, such as the order of the web pricing page. Without it, the page starts with its defaults. */
+  initialOrder?: PricingOrder | undefined;
   onBillingDetailsChange?: ((details: BillingDetailsDraft) => void) | undefined;
   onSubmit: (order: PricingOrder) => void;
   onClose: () => void;
@@ -96,9 +98,13 @@ export interface HostedPricingPageProps {
  */
 export function HostedPricingPage(props: HostedPricingPageProps) {
   const { t } = useText();
-  const initialLicense = untrack(() => (props.offerLicense ? FIRST_LICENSE : null));
+  const initialOrder = untrack(() => props.initialOrder);
+  const initialServer = initialOrder ? initialOrder.server : FIRST_SERVER;
+  const initialLicense = untrack(() =>
+    props.offerLicense ? (initialOrder ? (initialOrder.license?.tier ?? null) : FIRST_LICENSE) : null,
+  );
   const [order, setOrder] = createSignal<{ server: BillingPlanId | null; license: LicenseTier | null }>({
-    server: FIRST_SERVER,
+    server: initialServer,
     license: initialLicense,
   });
   // The tick stays when the buyer changes the order.
@@ -219,8 +225,10 @@ export function HostedPricingPage(props: HostedPricingPageProps) {
             currencyLocked={props.currencyLocked}
             used={props.used}
             licenseTrialEnd={props.licenseTrialEnd}
-            initialServer={FIRST_SERVER}
+            initialServer={initialServer}
             initialLicense={initialLicense}
+            initialInterval={initialOrder?.interval}
+            initialUsers={initialOrder?.license?.users}
             noServerTitle={noServerTitle()}
             controlsMount={controlsMount()}
             action={action}
