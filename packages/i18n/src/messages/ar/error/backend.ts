@@ -250,12 +250,18 @@ export const messages = {
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
     "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
   "error.backend.mcpServerFailedForProvider":
     "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
+  "error.backend.mcpServerFailedInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم لم يردّ في الوقت المحدد. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -380,6 +386,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "أجاب الخادم بـ {status}. تحقق من مفتاح API أو بيانات الاعتماد الأخرى.",
   "error.backend.mcpServerHttpUrl":
     "أجاب الخادم بـ {status}. تحقق من URL. قد يكون الرابط خاطئًا أو منتهي الصلاحية أو محذوفًا.",
+  "error.backend.mcpServerBearerKey":
+    "يستخدم هذا الخادم مفتاح API، وليس تسجيل الدخول. في الترويسات، اجعل المفتاح Authorization والقيمة Bearer ثم مسافة ثم مفتاح API.",
   "error.backend.mcpSignInAppUrl": "يحتاج تطبيق تسجيل الدخول إلى URL خادم صالح.",
   "error.backend.mcpSignInAppClientId": "أدخل Client ID لتطبيق تسجيل الدخول.",
   "error.backend.mcpSignInAppIssuerChanged":

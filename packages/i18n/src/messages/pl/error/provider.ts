@@ -276,6 +276,10 @@ export const messages = {
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
+  "error.provider.grokServiceFailure":
+    "Usługa Grok jest przeciążona lub zgłasza błąd. Spróbuj ponownie za kilka minut albo wybierz inny model.",
+  "error.provider.grokConnectionFailed":
+    "Grok nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem, a potem wyślij wiadomość ponownie.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Na hoście z Windows Gemini otwiera stronę Google na samym hoście. Połącz Gemini na komputerze hosta.",
   "error.provider.cursorArchivePath": "Archiwum Cursor zawiera nieoczekiwany plik.",

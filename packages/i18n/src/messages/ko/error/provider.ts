@@ -278,6 +278,10 @@ export const messages = {
     "Google이 이 에이전트를 실행하는 컴퓨터의 네트워크 위치에서는 Gemini 사용을 허용하지 않아요. 다른 컴퓨터에서 Gemini를 사용하거나 이 에이전트에 다른 제공자를 선택하세요.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini가 에이전트와의 연결이 끊겨 중지됐어요. 계속하려면 메시지를 보내 주세요.",
+  "error.provider.grokServiceFailure":
+    "Grok 서비스가 혼잡하거나 오류가 있어요. 몇 분 후 다시 시도하거나 다른 모델을 선택해 주세요.",
+  "error.provider.grokConnectionFailed":
+    "Grok이 서비스에 연결할 수 없어요. 인터넷 연결을 확인한 다음 메시지를 다시 보내 주세요.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows 호스트에서는 Gemini가 Google 페이지를 호스트에서 직접 엽니다. 호스트 컴퓨터에서 Gemini를 연결하세요.",
   "error.provider.cursorArchivePath": "Cursor 아카이브에 예상하지 못한 파일이 있어요.",

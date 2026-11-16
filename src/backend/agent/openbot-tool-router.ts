@@ -670,7 +670,12 @@ export class OpenBotToolRouter {
                 if (request.signal?.aborted || !client.running) return;
                 client.respond(
                   request.id,
-                  mcpResult ?? openBotToolFailure(deferredCallArgumentsError(params) ?? invalid()),
+                  mcpResult ??
+                    openBotToolFailure(
+                      deferredCallArgumentsError(params, client.provider, () =>
+                        this.#deferredMcpNote(client, threadId),
+                      ) ?? invalid(),
+                    ),
                 );
                 return;
               }

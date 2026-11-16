@@ -39,6 +39,7 @@ import { loadPhotoQualityPreference } from "@/features/settings/model/photo-qual
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
+import { loadFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { resetShareExtension } from "@/features/share/model/share-extension";
 import { resetShortcutDirectory } from "@/features/shortcuts/model/shortcut-directory";
 import { installShortcuts, resetShortcuts } from "@/features/shortcuts/shortcuts-native";
@@ -229,6 +230,7 @@ export default function RootLayout() {
       void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadFullVisualPreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);

@@ -126,6 +126,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",
+  "mobile.settings.appearance.fullVisuals": "Görsel önizlemeleri tam göster",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Bir ajanın görseli sohbette tam yüksekliğiyle görünür. Bu kapalıyken uzun bir görsel kesilir; tamamını görmek için ona dokunun.",
   "mobile.settings.animations.title": "Animasyonlar",
   "mobile.settings.animations.footer":
     "Uygulamanın tamamında hareketi azaltmak için “Animasyonlar” ayarını kapatın. Telefon ayarlarında “Hareketi Azalt” açıkken uygulama da hareketi azaltır. Bu durumda aşağıdaki animasyonlar kapalı kalır.",

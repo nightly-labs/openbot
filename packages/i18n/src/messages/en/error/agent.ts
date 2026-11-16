@@ -11,6 +11,12 @@ export const messages = defineMessages("error.agent", {
     "The tool did not run. In tool_call, arguments must be a JSON object, not text. Send the call again with arguments as an object.",
   "error.agent.toolCallDiscoveryTool":
     "The tool did not run. tool_call cannot run openbot.tool_search or openbot.tool_describe. Call them directly, with the same arguments.",
+  "error.agent.toolCallEnvelopeKeys":
+    "The tool did not run. tool_call takes only name and arguments. Put the arguments of the tool in arguments, as an object, and send the call again.",
+  "error.agent.toolCallUnknownTool":
+    "The tool did not run. tool_call found no tool with this name. Use the exact qualified name that tool_search gives, such as openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "The tool did not run. tool_call found no tool with this name. The qualified name is possibly {name}. If it is, send the call again with that name.",
   "error.agent.routineScheduleArgumentsInvalid":
     "The routine schedule is invalid: {detail} Correct the schedule and try again. openbot.tool_describe gives the schema.",
   // Agent errors that the main process and the backend send.

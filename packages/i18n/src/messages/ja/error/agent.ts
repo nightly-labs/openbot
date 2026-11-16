@@ -12,6 +12,12 @@ export const messages = {
     "ツールは実行されませんでした。tool_call の arguments はテキストではなく JSON オブジェクトにする必要があります。arguments をオブジェクトにして、もう一度呼び出してください。",
   "error.agent.toolCallDiscoveryTool":
     "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
+  "error.agent.toolCallEnvelopeKeys":
+    "ツールは実行されませんでした。tool_call が受け付けるのは name と arguments だけです。ツールの引数をオブジェクトとして arguments に入れ、もう一度呼び出してください。",
+  "error.agent.toolCallUnknownTool":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
   "error.agent.routineScheduleArgumentsInvalid":
     "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",

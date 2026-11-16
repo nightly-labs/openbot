@@ -625,6 +625,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-quota-failover
 
+      - name: Run the Gemini failing session E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-failing-session
+
       - name: Run the Gemini Windows zip E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-windows-zip
@@ -705,6 +709,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:memory-review
 
+      - name: Run the memory changes wire E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:memory-changes-wire
+
       - name: Run the local skill revision E2E test
         if: ${{ !cancelled() }}
         run: bun run test:skill-revision
@@ -744,6 +752,7 @@ jobs:
             .openbot-build/provider-runtime-remove-e2e/
             .openbot-build/provider-exit-session-e2e/
             .openbot-build/acp-subagents-e2e/
+            .openbot-build/memory-changes-e2e/
             .openbot-build/codex-subagent-steps-e2e/
             .openbot-build/subagent-status-e2e/
             .openbot-build/codex-hung-app-server-e2e/
@@ -784,6 +793,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
+            .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/
@@ -889,6 +899,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-steer
 
+      - name: Run the Devin steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:devin-steer
+
       - name: Run the Grok steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:grok-steer
@@ -896,6 +910,10 @@ jobs:
       - name: Run the OpenCode steer E2E test
         if: ${{ !cancelled() }}
         run: bun run test:opencode-steer
+
+      - name: Run the custom agent steer E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:custom-agent-steer
 
       - name: Run the Grok question E2E test
         if: ${{ !cancelled() }}
@@ -979,8 +997,10 @@ jobs:
             .openbot-build/acp-instructions-once-e2e/
             .openbot-build/acp-audio-input-e2e/
             .openbot-build/antigravity-steer-e2e/
+            .openbot-build/devin-steer-e2e/
             .openbot-build/grok-steer-e2e/
             .openbot-build/opencode-steer-e2e/
+            .openbot-build/custom-agent-steer-e2e/
             .openbot-build/grok-question-e2e/
             .openbot-build/grok-partial-model-list-e2e/
             .openbot-build/pi-steer-e2e/

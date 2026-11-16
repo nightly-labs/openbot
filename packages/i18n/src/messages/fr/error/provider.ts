@@ -298,6 +298,10 @@ export const messages = {
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
+  "error.provider.grokServiceFailure":
+    "Le service Grok est surchargé ou rencontre une erreur. Réessayez dans quelques minutes ou choisissez un autre modèle.",
+  "error.provider.grokConnectionFailed":
+    "Grok ne parvient pas à se connecter à son service. Vérifiez votre connexion internet, puis renvoyez le message.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Sur un hôte Windows, Gemini ouvre la page Google sur l’hôte lui-même. Connectez Gemini sur l’ordinateur hôte.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",

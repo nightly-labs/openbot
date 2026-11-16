@@ -289,6 +289,10 @@ export const messages = {
     "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
+  "error.provider.grokServiceFailure":
+    "Grok のサービスが混み合っているか、エラーが発生しています。数分後にもう一度お試しいただくか、別のモデルを選んでください。",
+  "error.provider.grokConnectionFailed":
+    "Grok がサービスに接続できません。インターネット接続を確認してから、メッセージをもう一度送信してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ホストでは、Gemini は Google のページをホスト上で開きます。ホストのコンピューターで Gemini を接続してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",

@@ -419,22 +419,21 @@ export class BrowserCdpEngine {
     this: BrowserCdpEngine,
     targets: BrowserTarget[],
     origin: string,
-    /** A password goes whole into each field, such as a sign-up form's password and its confirmation. */
-    wholeSecretInEachField: boolean,
     submission: "on_input" | "enter" | "click",
     submitTarget?: BrowserTarget,
   ): Effect.fn.Return<
     {
-      enter: (secret: string) => Effect.Effect<void, BrowserOperationError>;
-      clear: (secret: string) => Effect.Effect<boolean, BrowserOperationError>;
+      /** `values` has one value for each field of `targets`, in order. */
+      enter: (values: readonly string[]) => Effect.Effect<void, BrowserOperationError>;
+      clear: (secrets: readonly string[]) => Effect.Effect<boolean, BrowserOperationError>;
       /**
        * Hides the value from what the agent reads of this tab until the document goes. When the page
        * still shows it, waits and targets that query the raw page are also refused.
        */
       hide: (secret: string, shown: boolean) => void;
       /**
-       * Which secret the fields are built for, so a fill that no user approves goes only there: every
-       * field is a password field, or every field asks for a one-time code. A text field that the page
+       * Which secret each field is built for, in the order of `enter`, so a fill that no user approves
+       * goes only to a password field or a one-time code field. A text field that the page
        * masks with `-webkit-text-security` is a password field. A code field has
        * `autocomplete="one-time-code"`, or is a text, tel or number input with a strong code word such as
        * otp, totp, authentication code or verification code in its id, name, aria-label, placeholder,
@@ -446,7 +445,7 @@ export class BrowserCdpEngine {
        * check of `enter` keeps the field, its form, and its id, name and autocomplete until the fill;
        * the mask and the label text are read here only, because a page can change them as it fills.
        */
-      fields: { password: boolean; oneTimeCode: boolean };
+      kinds: Array<{ password: boolean; oneTimeCode: boolean }>;
       /**
        * A service worker handled the page's navigation, so its code could come from Cache Storage. Read
        * in the automation world. A worker that the page registers and claims later serves no navigation.
@@ -530,7 +529,7 @@ export class BrowserCdpEngine {
         }
         // The form method does not count: many sign-in forms have no method and send with their own
         // script. The host blocks a navigation that would carry a vault value in its URL.
-        const fields = { password: inputs.length > 0, oneTimeCode: inputs.length > 0 };
+        const kinds: Array<{ password: boolean; oneTimeCode: boolean }> = [];
         let servedByWorker = false;
         for (const node of inputs) {
           const kind = yield* this.#callOnNode(
@@ -549,19 +548,18 @@ export class BrowserCdpEngine {
             }`,
             [],
           );
-          fields.password &&= isDynamicRecord(kind) && kind.password === true;
-          fields.oneTimeCode &&= isDynamicRecord(kind) && kind.oneTimeCode === true;
+          kinds.push({
+            password: isDynamicRecord(kind) && kind.password === true,
+            oneTimeCode: isDynamicRecord(kind) && kind.oneTimeCode === true,
+          });
           servedByWorker ||= !isDynamicRecord(kind) || kind.network !== true;
         }
-        // A second copy of a password goes only to a password field, so no field shows the value.
-        if (wholeSecretInEachField && inputs.length > 1 && !fields.password)
-          return yield* browserFailure(new Error("A password and its confirmation must both be password fields."));
-        return { inputs, button, fingerprints, fields, servedByWorker };
+        return { inputs, button, fingerprints, kinds, servedByWorker };
       }),
     );
     if (generation !== this.#navigationGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
-    const enter = (secret: string) =>
+    const enter = (values: readonly string[]) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
@@ -596,9 +594,9 @@ export class BrowserCdpEngine {
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
-                yield* send("Input.insertText", {
-                  text: wholeSecretInEachField || nodes.inputs.length === 1 ? secret : secret[index],
-                });
+                const text = values[index];
+                if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
+                yield* send("Input.insertText", { text });
               }
               if (submission === "on_input" || generation !== this.#navigationGeneration) return;
               if (submission === "click" && nodes.button) {
@@ -653,7 +651,7 @@ export class BrowserCdpEngine {
      * Empties the filled fields, attached or detached, and reports whether the document is now free
      * of the value: every field is empty and no title, URL, text, value or attribute contains it.
      */
-    const clear = (secret: string) =>
+    const clear = (secrets: readonly string[]) =>
       this.#leaseEffect((send) =>
         Effect.gen({ self: this }, function* () {
           for (const node of nodes.inputs) {
@@ -667,17 +665,20 @@ export class BrowserCdpEngine {
             if (cleared !== true) return false;
           }
           const executionContextId = yield* automationContextId(send);
-          const scan = yield* send("Runtime.callFunctionOn", {
-            executionContextId,
-            functionDeclaration: SECRET_SCAN_FUNCTION,
-            arguments: [{ value: secret }],
-            returnByValue: true,
-          });
-          return !recordValue(scan.exceptionDetails) && recordValue(scan.result)?.value === false;
+          for (const secret of secrets) {
+            const scan = yield* send("Runtime.callFunctionOn", {
+              executionContextId,
+              functionDeclaration: SECRET_SCAN_FUNCTION,
+              arguments: [{ value: secret }],
+              returnByValue: true,
+            });
+            if (recordValue(scan.exceptionDetails) || recordValue(scan.result)?.value !== false) return false;
+          }
+          return true;
         }),
       ).pipe(Effect.catch(() => Effect.succeed(false)));
     const hide = (secret: string, shown: boolean) => this.#cardScrub.addDocumentSecret(secret, shown);
-    return { enter, clear, hide, fields: nodes.fields, servedByWorker: nodes.servedByWorker };
+    return { enter, clear, hide, kinds: nodes.kinds, servedByWorker: nodes.servedByWorker };
   });
 
   /**

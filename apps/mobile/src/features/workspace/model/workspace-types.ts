@@ -199,7 +199,7 @@ import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/c
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
 import type { PlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
+import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import type {
   HostLocalServer,
   HostLocalServerList,
@@ -1051,10 +1051,10 @@ export interface MobileWorkspaceContextValue {
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
-   * The provider compacts the context of the agent's chat now; the messages stay. The host refuses
-   * while the agent works, or when its provider cannot compact.
+   * The provider compacts the context of the agent's chat now, or of its side task `taskId`; the
+   * messages stay. The host refuses while the chat or task works, or when its provider cannot compact.
    */
-  compactContext: (agentId: string, serverId: string) => Promise<void>;
+  compactContext: (agentId: string, serverId: string, taskId?: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */
@@ -1206,6 +1206,8 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     attachmentId: string,
     largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file as they arrive. The size is the attachment's size. */
+    progress?: RemoteDownloadWatch,
   ) => Promise<RemoteFileUpload>;
   /**
    * A file that a message names, from the agent's workspace or from the shared folder. Any member

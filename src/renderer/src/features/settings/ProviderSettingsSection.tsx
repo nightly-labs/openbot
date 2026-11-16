@@ -234,6 +234,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
     onUpdate: (input) => props.onUpdateCustomProvider?.(input),
+    discoverModels: () => props.detectedProviderApi?.discoverModels,
     onSaved: (value) => void selectSavedEndpoint(value),
     onRemoved: (id) => {
       const provider = props.defaultProvider?.preferredProvider ?? null;
@@ -360,6 +361,8 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
           harnesses={harnesses()}
           onDownloadHarness={downloadHarness()}
           harnessError={downloadError()}
+          discovery={host.discovery()}
+          onDiscoverModels={host.discover()}
           busy={host.state.saving}
           submitError={host.state.submitError}
           takenProviderIds={customProviders().map((provider) => provider.id)}

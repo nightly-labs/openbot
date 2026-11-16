@@ -35,6 +35,8 @@ export interface VaultRequestCardProps {
   status: UiBlockStatus;
   /** The item that the user saved. */
   saved?: UiVaultSavedItem | undefined;
+  /** Why a closed request closed, such as a new chat message. Without it, the card says that nobody answered. */
+  closedOutcome?: string | undefined;
   /** The values of the saved item that are not secret, for its summary line. */
   values?: Readonly<Record<string, UiBlockValue>> | undefined;
   /** Why the last answer failed, such as a skip that did not go through. */
@@ -167,7 +169,7 @@ export function VaultRequestCard(props: VaultRequestCardProps) {
           </Show>
         </span>
       }
-      outcome={saved() ? t("vault.request.saved") : undefined}
+      outcome={saved() ? t("vault.request.saved") : props.status === "closed" ? props.closedOutcome : undefined}
       outcomeBadge
       inlineActions
       busy={props.busy}

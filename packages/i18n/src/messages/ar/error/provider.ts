@@ -259,6 +259,9 @@ export const messages = {
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
+  "error.provider.grokServiceFailure": "خدمة Grok مشغولة أو بها خطأ. أعد المحاولة بعد بضع دقائق، أو اختر نموذجًا آخر.",
+  "error.provider.grokConnectionFailed":
+    "لا يستطيع Grok الاتصال بخدمته. تحقق من اتصالك بالإنترنت، ثم أرسل الرسالة مرة أخرى.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "على مضيف Windows، يفتح Gemini صفحة Google على المضيف نفسه. اربط Gemini على الكمبيوتر المضيف.",
   "error.provider.cursorArchivePath": "يحتوي أرشيف Cursor على ملف غير متوقع.",

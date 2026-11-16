@@ -279,12 +279,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
   "error.backend.mcpToolSchemaRefused":
     "Su herramienta {tool} tiene un formato de entrada que este proveedor no puede leer. Los agentes con otros proveedores siguen recibiendo el servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre los ajustes de MCP y elige Iniciar sesión.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} no pudo iniciar el servidor MCP {name}. Abre los ajustes de MCP y elige Probar conexión para ver la causa.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}. Sus herramientas no están disponibles para {provider}. {provider} inicia el servidor por su cuenta, así que la prueba de conexión en OpenBot puede funcionar. Inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no respondió a tiempo. Inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -409,6 +415,8 @@ export const messages = {
     "El servidor respondió {status}. Comprueba la clave de API u otras credenciales.",
   "error.backend.mcpServerHttpUrl":
     "El servidor respondió {status}. Comprueba la URL. El enlace puede ser incorrecto, haber caducado o haberse eliminado.",
+  "error.backend.mcpServerBearerKey":
+    "Este servidor usa una clave de API, no un inicio de sesión. En los encabezados, pon Authorization como clave y, como valor, Bearer, un espacio y tu clave de API.",
   "error.backend.mcpSignInAppUrl": "La app de inicio de sesión necesita una URL de servidor válida.",
   "error.backend.mcpSignInAppClientId": "Introduce el ID de cliente de la app de inicio de sesión.",
   "error.backend.mcpSignInAppIssuerChanged":

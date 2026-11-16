@@ -115,10 +115,13 @@ import { MCP_ACCESS_CAPABILITY } from "./mcp-access-v1";
 import { MCP_MANY_SERVERS_CAPABILITY } from "./mcp-many-servers-v1";
 import { MCP_SIGN_IN_APP_CAPABILITY } from "./mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY } from "./mcp-sign-in-v1";
+import { TEAM_MEMORY_CHANGES_CAPABILITY } from "./memory-changes-v1";
 import { MEMORY_REVIEW_CAPABILITY } from "./memory-review-v1";
 import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "./message-client-id-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "./message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "./message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "./mistral-code-sign-in-v1";
+import { MODEL_STEERING_CAPABILITY } from "./model-steering-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
@@ -358,6 +361,7 @@ export {
   MEMORY_REVIEW_CAPABILITY,
   MESSAGE_DELETE_CAPABILITY,
   MESSAGE_PINS_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
   MODEL_VISIBILITY_CAPABILITY,
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
@@ -410,6 +414,7 @@ export {
   TEAM_CHANNEL_ATTENTION_CAPABILITY,
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
@@ -637,6 +642,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  MISTRAL_CODE_SIGN_IN_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
@@ -661,6 +667,8 @@ export const TEAM_CURRENT_CAPABILITIES = [
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -875,6 +883,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
     capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
     capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+    capability !== MISTRAL_CODE_SIGN_IN_CAPABILITY &&
     capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
     capability !== GITHUB_SKILLS_CAPABILITY &&
     capability !== HOST_RESTART_CAPABILITY &&
@@ -898,7 +907,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
     capability !== HOST_APPEARANCE_CAPABILITY &&
     capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
-    capability !== BROWSER_VAULT_SKIP_CAPABILITY,
+    capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+    capability !== MODEL_STEERING_CAPABILITY &&
+    capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -988,6 +999,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_ACCOUNT_POOL_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  MISTRAL_CODE_SIGN_IN_CAPABILITY,
   INSTANCE_TRANSFER_FULL_COPY_CAPABILITY,
   GITHUB_SKILLS_CAPABILITY,
   HOST_RESTART_CAPABILITY,
@@ -1012,6 +1024,8 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
   PROVIDER_ACCOUNT_CODE_CAPABILITY,
   BROWSER_VAULT_SKIP_CAPABILITY,
+  MODEL_STEERING_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1185,6 +1199,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PROVIDER_ACCOUNT_POOL_CAPABILITY &&
       capability !== TEAM_VIDEO_GENERATION_CAPABILITY &&
       capability !== CHANNEL_SEEN_SUBTASKS_CAPABILITY &&
+      capability !== MISTRAL_CODE_SIGN_IN_CAPABILITY &&
       capability !== INSTANCE_TRANSFER_FULL_COPY_CAPABILITY &&
       capability !== GITHUB_SKILLS_CAPABILITY &&
       capability !== HOST_RESTART_CAPABILITY &&
@@ -1208,6 +1223,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_SIGN_IN_STORAGE_CAPABILITY &&
       capability !== HOST_APPEARANCE_CAPABILITY &&
       capability !== SIGN_IN_RELAY_DEEP_LINK_CAPABILITY &&
-      capability !== BROWSER_VAULT_SKIP_CAPABILITY,
+      capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
+      capability !== MODEL_STEERING_CAPABILITY &&
+      capability !== TEAM_MEMORY_CHANGES_CAPABILITY,
   );
 }

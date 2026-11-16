@@ -190,7 +190,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
+import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   addAgentFolder,
@@ -378,6 +378,7 @@ export type WorkspaceRequest = <T>(
   upload?: RemoteFileUpload,
   onUploadProgress?: (fraction: number) => void,
   largeDownload?: RemoteLargeDownload,
+  download?: RemoteDownloadWatch,
 ) => Promise<T>;
 
 /** The capability checks that only read what a host advertised. */
@@ -1536,9 +1537,11 @@ export function createHostRequestActions({
           sessionId,
         ),
       ),
-    compactContext: async (agentId, serverId) => {
+    compactContext: async (agentId, serverId, taskId) => {
       requireCapability(capabilities, serverId, CONTEXT_COMPACT_CAPABILITY, "mobile.agent.compact.unsupported");
-      await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
+      if (taskId === undefined)
+        await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
+      else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, ignoreResponse, { agentId, taskId }, serverId);
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),
@@ -1644,7 +1647,7 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
       const download = () =>
         request(
           "GET",
@@ -1655,6 +1658,7 @@ export function createHostRequestActions({
           undefined,
           undefined,
           largeDownload,
+          progress,
         );
       // Limit native/DOM copies when a message contains several large images. A file above the
       // attachment limit has its own lane: the images of the chat do not wait behind it, and two

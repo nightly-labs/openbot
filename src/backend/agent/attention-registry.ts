@@ -998,6 +998,8 @@ export class AttentionRegistry {
   readonly respondToBrowserSecret = Effect.fnUntraced(function* (
     this: AttentionRegistry,
     input: LocalBrowserSecretResponse,
+    /** The current authenticator code of the saved login, for a request with code fields. Vault fill only. */
+    vaultCode?: string,
   ) {
     const { pending, secret } = yield* attentionStep(() => {
       const value = this.#takeovers.get(input.requestId);
@@ -1014,7 +1016,7 @@ export class AttentionRegistry {
       secret.cancel();
     } else {
       pending.submitting = true;
-      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined).pipe(
+      const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined, vaultCode).pipe(
         Effect.catch(() => Effect.succeed("takeover")),
         Effect.ensuring(
           Effect.sync(() => {
@@ -1325,6 +1327,14 @@ export class AttentionRegistry {
           if (this.#messagingRequestTurn(agentId, turnId)) {
             resolve(browserTakeoverError(MESSAGING_REQUEST_CARD_REFUSED));
             this.#resolveBrowserTakeover(requestId, pending, "cancel");
+          } else if (pending.secret?.withCode) {
+            // The card asks for one secret, so it cannot fill the password and the code together.
+            resolve(
+              browserTakeoverError(
+                `${pending.vaultSkipped ?? "OpenBot did not fill a saved login: no password manager is connected."} Correct the call, or use request_takeover so that the user signs in.`,
+              ),
+            );
+            this.#resolveBrowserTakeover(requestId, pending, "cancel");
           } else {
             this.#routines.markNeedsAttention(turnId);
             this.#emit({ type: "browser-takeover-requested", request: takeover });
@@ -1365,6 +1375,10 @@ export class AttentionRegistry {
     if (call.tool !== "list_vault_items")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
     const agentId = params.ownerAgentId;
+    // A Vault file that cannot be read lists no items. Without this, the agent tells the user that
+    // nothing is saved (#7748).
+    if (this.#vaultItems && !this.#vaultItems.ready())
+      return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
     const listed = yield* Effect.result(
       attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
     );
@@ -2066,13 +2080,17 @@ export class AttentionRegistry {
       // A detached question holds no call, so the turn reads the message, and the card stays.
       if (pending.saving || pending.detached || pending.responseKind === "mcp-elicitation") continue;
       this.#routines.markRunningForTurn(turnId);
-      // The card shows as the user's own skip does.
+      // The card closes as the user's own skip does, and says why: the user did not press Skip (#7678).
+      const uiBlockState = pending.uiBlock
+        ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined)
+        : undefined;
+      if (uiBlockState) uiBlockState.outcome = sourceText("status.agent.uiBlockClosedByMessage");
       this.#closePrompt(
         requestId,
         pending,
         userMessagePromptResult(pending.responseKind, pending.uiBlock?.blockId, pending.client.userInputNote),
         { status: "cancelled" },
-        pending.uiBlock ? answeredUiBlockState(pending.uiBlock.spec, null, undefined, undefined) : undefined,
+        uiBlockState,
       );
       changed = true;
     }
@@ -2330,12 +2348,17 @@ export class AttentionRegistry {
         "a script that you ran with evaluate can still run in this page or in another open page of this site. Reload this page with navigate direction=reload, not with evaluate or by opening its address again, and close or navigate each other tab where you ran evaluate on this site, before submit_secret.",
         namedCard("agent-script"),
       );
+    const withCode = pending.secret.withCode;
+    const codeFields =
+      'A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.';
     if (pending.secret.vaultFillable !== true)
       return skip(
         "field-kind",
-        kind === "password"
-          ? "the field target is not a password input."
-          : 'the field targets are not code fields. A code field has autocomplete="one-time-code", or is a text, tel, or number input with a word such as otp, totp, authentication code, or verification code in its id, name, aria-label, placeholder, title, or label, or a field named "code" or "passcode" in a form whose visible text names an authenticator app and no email or SMS. Its name and label have no backup, recovery, mail, phone, SMS, name, label, promo, coupon, voucher, discount, gift, invite, referral, zip, postal, country, card, CVC, CVV, or CSC word.',
+        withCode
+          ? `the field target is not a password input, or the code targets are not code fields. ${codeFields}`
+          : kind === "password"
+            ? "the field target is not a password input."
+            : `the field targets are not code fields. ${codeFields}`,
         namedCard("field-kind"),
       );
     const fits = (login: VaultLogin) => kind === "password" || login.hasOneTimePassword;
@@ -2352,10 +2375,13 @@ export class AttentionRegistry {
         const listed = secret || !loginId ? null : yield* Effect.result(vault.loginsFor(request.origin, agentId));
         const sitesLogins = listed !== null && Result.isSuccess(listed) ? (listed.success ?? []) : null;
         const unknown = sitesLogins !== null && !sitesLogins.some((candidate) => candidate.id === loginId);
+        // The code is read last, so that it is as new as possible when it goes in.
+        const code = withCode && secret ? yield* vault.secretFor(chosen, request.origin, "totp", agentId) : undefined;
         return {
           chosen: true as const,
           loginId: chosen,
           secret,
+          code,
           unknown,
           listUnread: listed !== null && Result.isFailure(listed),
           otherLogins: Boolean(sitesLogins?.some(fits)),
@@ -2388,14 +2414,21 @@ export class AttentionRegistry {
         `saved login ${login.loginId} has no ${kind === "password" ? "password" : "authenticator key"} for this site.`,
         { loginId: login.loginId, ...(login.listUnread ? {} : { card: "no-secret" }) },
       );
+    if (withCode && !login.code)
+      return skip("no-code", `saved login ${login.loginId} has no authenticator key for this site.`, {
+        loginId: login.loginId,
+      });
     pending.vaultLoginId = login.loginId;
     const submitted = yield* Effect.result(
-      this.respondToBrowserSecret({
-        requestId,
-        agentId: pending.request.agentId,
-        decision: "submit",
-        secret: login.secret,
-      }),
+      this.respondToBrowserSecret(
+        {
+          requestId,
+          agentId: pending.request.agentId,
+          decision: "submit",
+          secret: login.secret,
+        },
+        login.code ?? undefined,
+      ),
     );
     if (Result.isFailure(submitted)) {
       // The tab could not be handed to the user. Answer the agent, so it does not wait forever.

@@ -125,6 +125,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
+  "mobile.settings.appearance.fullVisuals": "시각 자료 미리보기 전체 표시",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "에이전트의 시각 자료를 채팅에 전체 높이로 표시합니다. 끄면 긴 시각 자료가 잘리며, 탭하면 전체를 볼 수 있습니다.",
   "mobile.settings.animations.title": "애니메이션",
   "mobile.settings.animations.footer":
     "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",

@@ -263,12 +263,18 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
   "error.backend.mcpToolSchemaRefused":
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} could not start the MCP server {name}, because the server did not answer in time. Start a new chat to try again.",
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
@@ -409,6 +415,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerHttpCredentials": "The server answered {status}. Check the API key or other credentials.",
   "error.backend.mcpServerHttpUrl":
     "The server answered {status}. Check the URL. The link may be wrong, expired, or deleted.",
+  "error.backend.mcpServerBearerKey":
+    "This server takes an API key, not a sign-in. Under Headers, set the key to Authorization and the value to Bearer, a space, and your API key.",
   "error.backend.mcpSignInAppUrl": "The sign-in app needs a valid server URL.",
   "error.backend.mcpSignInAppClientId": "Enter the client ID of the sign-in app.",
   "error.backend.mcpSignInAppIssuerChanged":
