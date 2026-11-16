@@ -474,6 +474,7 @@ import { VoiceSpeechService } from "./voice-speech-service";
 import { spawnVoiceTranscriptionHost } from "./voice-transcription-host-process";
 import { VoiceTranscriptionService } from "./voice-transcription-service";
 import { WebhookRelay } from "./webhook-relay";
+import { WindowsTopmostKeeper } from "./windows-topmost-keeper";
 
 const logger = createOpenBotLogger("application-services");
 const SETUP_FILE = "openbot-setup-v2.json";
@@ -1159,6 +1160,8 @@ export async function createApplicationServices({
   // mouse move of the computer.
   const pointerForwarding =
     windowKind === "tool" ? new PointerForwardingGate(() => screen.getCursorScreenPoint()) : null;
+  // Windows: a game or another app that makes its own window topmost can cover the dock and the island.
+  const topmost = windowKind === "tool" ? new WindowsTopmostKeeper() : null;
   const dynamicIsland = new DynamicIslandWindowController({
     windowKind,
     preferencePath: join(app.getPath("userData"), DYNAMIC_ISLAND_PREFERENCE_FILE),
@@ -1193,6 +1196,7 @@ export async function createApplicationServices({
         },
       ]).popup({ window }),
     pointerForwarding,
+    topmost,
     performCriticalAction: (action) =>
       Effect.suspend(() => {
         if (!criticalActionTargets) {
@@ -1218,6 +1222,7 @@ export async function createApplicationServices({
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     pointerForwarding,
+    topmost,
     // The same send as a reply from the Dynamic Island: main sends it to the local or the remote agent.
     // A channel message is the same send command as in the channel view of the main window.
     sendMessage: (action) =>

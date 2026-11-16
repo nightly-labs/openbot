@@ -832,8 +832,9 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
   // A floating level, which is the only thing that holds this window in front on macOS: both
   // `moveAbove` and `moveTop` return without an error and leave a transparent panel where it was.
   // The level stays below the menu bar, and the rim is a thin edge around one window, so being in
-  // front costs the user almost none of what is behind it.
-  window.setAlwaysOnTop(true, "floating");
+  // front costs the user almost none of what is behind it. On Windows, Electron puts a "floating"
+  // window just behind the taskbar, where a full-screen app can put it under other apps.
+  window.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
   // The agent works wherever the user left the window, which can be another Space or another
   // application's full screen. One overlay on every Space is what lets the rim follow it there
   // without a second window and without pulling the user out of the Space they are on. The
