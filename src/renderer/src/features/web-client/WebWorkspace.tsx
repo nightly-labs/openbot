@@ -91,6 +91,7 @@ import { SIDE_QUESTION_CAPABILITY } from "@openbot/contracts/team-protocol/side-
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { STORAGE_CHANNEL_CAPABILITY } from "@openbot/contracts/team-protocol/storage-channel-v1";
+import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -147,7 +148,7 @@ import { clearAgentContext, type TeamApiRequest } from "@openbot/team-client/tea
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { GlobalSearchRoutine } from "@openbot/ui/components/GlobalSearch";
-import type { AgentMessage } from "@openbot/ui/data";
+import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { accountUsageProviderRows } from "@openbot/ui/features/account/account-usage-view";
 import { computeAgentAvatarMoods } from "@openbot/ui/features/agents/agent-avatar-mood";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -203,7 +204,7 @@ import "katex/contrib/copy-tex";
 import "../../selection-copy";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
-import { formatMessageTime, toAgentMessage } from "../../app-message-projection";
+import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
@@ -929,6 +930,18 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   /** A host without `conversation-file-search-v1` gets no Files filter. A named function: a ternary prop would make a memo. */
   function fileSearch() {
     return workspace.state.capabilities.includes(CONVERSATION_FILE_SEARCH_CAPABILITY) ? searchAllFiles : undefined;
+  }
+  /** The side thread messages of the open agent that have the `@` query. */
+  function searchAgentThreadMessages(query: string): Promise<ComposerThreadMessageMatch[]> {
+    const id = workspace.state.selectedId;
+    if (!id || workspace.state.status !== "online") return Promise.resolve([]);
+    return collectThreadMessageMatches((cursor) => workspace.runtime.search(id, query, cursor, true));
+  }
+  /** An older host does not name the thread of a search result, so its `@` list finds thread titles only. */
+  function threadSearch() {
+    return workspace.state.capabilities.includes(THREAD_MESSAGE_SEARCH_CAPABILITY)
+      ? searchAgentThreadMessages
+      : undefined;
   }
   /** A search hit in a side thread opens its tab, as the desktop does; another hit opens the message. */
   function openSearchHit(agentId: string, messageId: string) {
@@ -4017,6 +4030,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                     const result = await workspace.runtime.search(id, query);
                     return { messageIds: result.results.map((item) => item.message.id), total: result.total };
                   }}
+                  onSearchThreads={threadSearch()}
                   onOpenSearchMessage={async (messageId) => {
                     await workspace.openSearchMessage(messageId);
                   }}
