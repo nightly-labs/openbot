@@ -164,6 +164,17 @@ export class ProviderTurnActiveError extends Error {
 }
 
 /**
+ * The provider refused to open the session because a prompt that OpenBot stopped still runs in it.
+ * Nothing ran. No event tells when that prompt ends, so the caller tries the message again later.
+ */
+export class ProviderSessionBusyError extends ProviderTurnActiveError {
+  constructor(providerName: string) {
+    super(providerName);
+    this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
+  }
+}
+
+/**
  * Claude cannot resume this session ID, because another provider made it. Nothing ran, so
  * `isMissingProviderSessionError` reads it as a missing session and the caller opens a new one.
  */

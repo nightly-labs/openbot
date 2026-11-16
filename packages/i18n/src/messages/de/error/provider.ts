@@ -498,6 +498,8 @@ export const messages = {
   "error.provider.nativeNotStarted": "Die {provider} CLI konnte nicht starten.",
   "error.provider.nativeVersionUnreadable": "Die Version der {provider} CLI konnte nicht gelesen werden.",
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
+  "error.provider.acpSessionBusy":
+    "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
   "error.provider.piStopped": "Pi läuft nicht. Verbinde Pi und versuche es erneut.",
   "error.provider.piSessionMissing": "Die Pi-Sitzungsdatei ist auf diesem Computer nicht verfügbar.",
   "error.provider.piResumeCancelled": "Pi hat das Fortsetzen der Sitzung abgebrochen. Versuche es erneut.",

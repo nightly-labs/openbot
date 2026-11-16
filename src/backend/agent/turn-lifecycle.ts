@@ -409,7 +409,7 @@ export class TurnLifecycle {
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
    * `produced` is set by the first item or delta other than the echo of the user's message: a
-   * refused turn is run again only without one.
+   * refused turn is run again only without one. A completed answer item with no text does not count.
    * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
    * and the echo of the user's message do not count. `sentAt` (when the message that started the
    * turn was sent) and `firstOutputAt` split a slow reply into OpenBot's wait and the provider's.
@@ -1197,8 +1197,11 @@ export class TurnLifecycle {
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
         // Codex starts each turn with the echo of the user's message, which the model did not produce.
-        // Counted, it blocked the one run again of each refused Codex turn (#9915).
-        if (item.type !== "userMessage") this.#markProduced(turnId, isRepeatedWork(item));
+        // Counted, it blocked the one run again of each refused Codex turn (#9915). Claude completes
+        // each failed turn with an empty answer, which is not output either: a session that Claude
+        // cannot find then also runs again (#9928).
+        if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item)))
+          this.#markProduced(turnId, isRepeatedWork(item));
         const running = this.#runningTurns.get(turnId);
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
           if (
@@ -3248,7 +3251,16 @@ function isRepeatedWork(item: { type?: unknown; phase?: unknown; text?: unknown;
   if (item.type === "userMessage" || item.type === "reasoning" || item.type === "contextCompaction") return false;
   if (item.type !== "agentMessage") return true;
   if (item.failureReport === true) return false;
-  return item.phase !== "commentary" && isString(item.text) && item.text.trim() !== "";
+  return item.phase !== "commentary" && hasText(item);
+}
+
+/** An answer item, not thinking, with no text: it shows nothing. */
+function isEmptyAnswer(item: { type?: unknown; phase?: unknown; text?: unknown }): boolean {
+  return item.type === "agentMessage" && item.phase !== "commentary" && !hasText(item);
+}
+
+function hasText(item: { text?: unknown }): boolean {
+  return isString(item.text) && item.text.trim() !== "";
 }
 
 /** Which subagents a list holds and the state of each, without their steps. */

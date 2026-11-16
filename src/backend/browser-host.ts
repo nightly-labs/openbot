@@ -4088,9 +4088,10 @@ export class BrowserHost {
       changed();
       this.#schedulePersist();
     });
-    contents.on("did-navigate-in-page", (_event, url) => {
+    contents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
       if (this.#tabs.get(tab.id) !== tab) return;
-      if (isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
+      // Electron reports this for each frame. A frame of another site must not become the tab address (#9974).
+      if (isMainFrame && isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
       tab.revision += 1;
       changed();
       this.#schedulePersist();

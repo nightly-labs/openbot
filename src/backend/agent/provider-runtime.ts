@@ -4672,17 +4672,24 @@ export class ProviderRuntime implements ProviderPort {
     this.#modelsReadAt = Date.now();
     const errorSerialAtStart = this.#errorSerial;
     const { fresh, timedOut, failed, sourceChanged } = yield* this.#modelCatalog.refresh();
-    let cleared = false;
+    let changed = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
       if (!lastError || lastError.serial > errorSerialAtStart) continue;
       this.#lastErrors.delete(provider);
-      cleared = true;
+      changed = true;
     }
-    if (cleared || sourceChanged) this.#setStatus({});
+    // A list that timed out gets one more read below, which keeps its own failure. A provider that a
+    // read holds already gets none, and the quiet read of `#rereadModels` keeps no error.
+    for (const [provider, cause] of timedOut) {
+      if (!this.#relisting.has(provider)) continue;
+      this.#recordProviderError(provider, cause);
+      changed = true;
+    }
+    if (changed || sourceChanged) this.#setStatus({});
     // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
     // the picker kept the built-in models until a provider started again (#6212).
-    for (const provider of timedOut) {
+    for (const provider of timedOut.keys()) {
       if (this.#relisting.has(provider)) continue;
       this.#relisting.add(provider);
       yield* this.#relistModels(provider).pipe(

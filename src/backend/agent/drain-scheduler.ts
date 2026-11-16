@@ -10,7 +10,7 @@ import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
-import { type AgentProvider, ProviderTurnActiveError } from "../agent-client";
+import { type AgentProvider, ProviderSessionBusyError, ProviderTurnActiveError } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ChannelService } from "../channel-service";
 import { incomingAgentExchange } from "../conversation-snapshots";
@@ -61,6 +61,12 @@ const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
+/**
+ * How long messages wait before they try again a session that the provider refused as busy. The wait
+ * doubles after each refusal in a row, up to the longest wait.
+ */
+const PROVIDER_SESSION_BUSY_RETRY_MS = 15_000;
+const PROVIDER_SESSION_BUSY_RETRY_MAX_MS = 2 * 60_000;
 
 export interface DrainHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
@@ -235,6 +241,11 @@ export class DrainScheduler {
    * `scheduleDrain` of the agent, which the end of any of its turns calls, lets the lane try again.
    */
   readonly #providerTurnHolds = new Set<string>();
+  /**
+   * Agents whose provider refused to open a session because a stopped prompt still runs in it, with
+   * the refusals in a row and whether a retry waits. No event tells when that prompt ends (#9938).
+   */
+  readonly #busyRetries = new Map<string, { refusals: number; waiting: boolean }>();
   /**
    * The `scheduleDrain` calls of each agent. A start that a call overtook is not held: the call can
    * be the end of the provider's turn, and no later one would come.
@@ -509,6 +520,28 @@ export class DrainScheduler {
   }
 
   /**
+   * Drains the agent again after a wait, once for all its lanes that the busy session refused. A
+   * turn that starts, `forgetAgent` and `dispose` end the retry.
+   */
+  #retryBusySession(agentId: string): Effect.Effect<void> {
+    const entry = this.#busyRetries.get(agentId) ?? { refusals: 0, waiting: false };
+    this.#busyRetries.set(agentId, entry);
+    if (entry.waiting) return Effect.void;
+    entry.waiting = true;
+    entry.refusals += 1;
+    const delay = Math.min(
+      PROVIDER_SESSION_BUSY_RETRY_MS * 2 ** (entry.refusals - 1),
+      PROVIDER_SESSION_BUSY_RETRY_MAX_MS,
+    );
+    const retry = Effect.sync(() => {
+      if (this.#busyRetries.get(agentId) !== entry) return;
+      entry.waiting = false;
+      this.scheduleDrain(agentId);
+    });
+    return Effect.asVoid(Effect.forkDetach(retry.pipe(Effect.delay(delay))));
+  }
+
+  /**
    * Tries the agents that wait for a turn slot again. Each drain that ends can free a slot, and the
    * memory sample calls this too, for a turn that ended on a path that schedules no drain.
    */
@@ -617,10 +650,12 @@ export class DrainScheduler {
     for (const key of [...this.#turnModels.keys()]) if (ofAgent(key)) this.#turnModels.delete(key);
     this.#requeuedAtLimit.delete(agentId);
     this.#drainCalls.delete(agentId);
+    this.#busyRetries.delete(agentId);
     this.retrySlotWaiters();
   }
 
   dispose(): void {
+    this.#busyRetries.clear();
     this.#drainingLanes.clear();
     this.#scheduledDrains.clear();
     this.#slotWaiters.clear();
@@ -1116,6 +1151,7 @@ export class DrainScheduler {
       // event would end it, and it would hold every message of this agent.
       if (!this.#hooks.turnEnded(response.turn.id)) snapshot.activeTurnId = response.turn.id;
       confirmedTurnId = response.turn.id;
+      this.#busyRetries.delete(agent.id);
       this.#turnModels.set(laneKey({ agentId: agent.id, taskId: laneId }), {
         turnId: response.turn.id,
         model: agent.model,
@@ -1191,6 +1227,7 @@ export class DrainScheduler {
               this.#providerTurnHolds.add(laneKey({ agentId: delivery.recipientAgentId, taskId: laneId }));
             for (const item of batch) yield* this.#mailbox.restoreQueued(item.delivery.id).pipe(toDeliveryStartFailed);
             this.#mailboxSync.emitQueue(delivery.recipientAgentId);
+            if (error instanceof ProviderSessionBusyError) yield* this.#retryBusySession(delivery.recipientAgentId);
             return;
           }
           if (isRequestTimeout(error, "turn/start")) {

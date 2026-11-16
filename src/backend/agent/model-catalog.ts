@@ -170,13 +170,16 @@ export class ModelCatalog {
 
   /**
    * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
-   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed.
+   * which providers' 5 s `model/list` timed out, with the cause, and which providers' `model/list`
+   * failed. A timeout is not recorded here: the caller reads the list again with `relist`, which keeps
+   * its own failure, or records the cause when no second read follows.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
    * process now running serves, so its id is absent from the set and no caller may treat it as proof.
    */
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
+    const timeouts = new Map<AgentProvider, unknown>();
     const discovered = yield* Effect.forEach(
       BUILT_IN_PROVIDER_DRIVERS,
       ({ id: provider, catalog = {} }) =>
@@ -220,7 +223,12 @@ export class ModelCatalog {
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
-              this.#options.recordProviderError(provider, failure.cause);
+              // A slow list already had the full request timeout, so a second read gains nothing.
+              const timedOut = timeout && !catalog.slowList;
+              // A slow start that the second read of the caller repairs is no error: before, the row of a
+              // working provider showed "Error" with the timeout of the first read (#9945, #3436).
+              if (timedOut) timeouts.set(provider, failure.cause);
+              else this.#options.recordProviderError(provider, failure.cause);
               logger.warn("A provider did not list its models.", {
                 provider,
                 durationMs: Math.round(performance.now() - startedAt),
@@ -230,8 +238,7 @@ export class ModelCatalog {
                 provider,
                 models: catalog.fallback?.(previous) ?? previous,
                 fresh: false,
-                // A slow list already had the full request timeout, so a second read gains nothing.
-                timedOut: timeout && !catalog.slowList,
+                timedOut,
                 // The list that stays can be the list of a CLI that an update replaced (#8321).
                 failed: !timeout,
               });
@@ -243,7 +250,7 @@ export class ModelCatalog {
     this.#models = discovered.flatMap((entry) => entry.models);
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
-      timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
+      timedOut: timeouts,
       failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
       /** True when a provider's model source changed, so the provider rows must go out again. */
       sourceChanged: discovered.some((entry) => "sourceChanged" in entry && entry.sourceChanged),

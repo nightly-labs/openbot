@@ -441,6 +441,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
+  "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
   "error.provider.piStopped": "Pi لا يعمل. اربط Pi وأعد المحاولة.",
   "error.provider.piSessionMissing": "ملف جلسة Pi غير متاح على هذا الحاسوب.",
   "error.provider.piResumeCancelled": "ألغى Pi استئناف الجلسة. أعد المحاولة.",
