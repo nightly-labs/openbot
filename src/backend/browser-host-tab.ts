@@ -35,6 +35,11 @@ export interface BrowserHostTab {
    */
   secretDocument?: boolean;
   /**
+   * The kept document of `secretDocument` can still show the secret: its fields did not empty, or the
+   * page copied the value. Images of the tab stay blocked, as for `filledCard`, until it navigates.
+   */
+  secretShown?: boolean;
+  /**
    * `fill_card` typed a saved card into the current document. Its fields show the number and the
    * security code, and page code can read them, so screenshots, previews, evaluation and recording
    * stay blocked until a main-frame navigation replaces the document.
@@ -182,7 +187,11 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
+    // A page can put a typed card value or password in its title. The address stays as it is: the
+    // app loads it again and looks up saved logins with it.
+    title: tab.secret
+      ? "Secure authentication"
+      : restoredTabTitle(tab) || tab.engine.scrubText(tab.contents.getTitle()) || "New tab",
     url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,

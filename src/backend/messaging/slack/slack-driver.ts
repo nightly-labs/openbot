@@ -17,6 +17,7 @@ import type {
   MessagingDriverOptions,
   MessagingIngress,
   MessagingPlace,
+  RecentMessages,
   StatusReaction,
 } from "../messaging-types";
 import { MessagingAdapterError, MessagingConnectionError } from "../messaging-types";
@@ -292,7 +293,7 @@ class SlackAdapter implements MessagingAdapter {
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.fn.Return<ContextEntry[], MessagingAdapterError> {
+  ): Effect.fn.Return<RecentMessages, MessagingAdapterError> {
     const messages = threadKey
       ? yield* this.#threadReplies(platformChannelId, threadKey)
       : yield* this.#api
@@ -304,7 +305,7 @@ class SlackAdapter implements MessagingAdapter {
         (message.subtype === undefined || RECENT_SUBTYPES.has(String(message.subtype))) &&
         (isString(message.user) || message.bot_id !== undefined),
     );
-    return (yield* this.#entries(kept, threadKey === null)).slice(-limit);
+    return { messages: (yield* this.#entries(kept, threadKey === null)).slice(-limit) };
   });
 
   /**

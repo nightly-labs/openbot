@@ -12,6 +12,7 @@ import { type BrowserUserControlEvent, browserUserControlEvent } from "./browser
 // adapters reject them, so each transport asks here first and sends or decodes them as they are.
 import { type ChannelEvent, channelEvent } from "./channels-v1";
 import { type ChatColorsEvent, chatColorsEvent } from "./chat-colors-v1";
+import { type HostAppearanceEvent, hostAppearanceEvent } from "./host-appearance-v1";
 import { type HostRestartEvent, hostRestartEvent } from "./host-update-v1";
 import { type LibraryFoldersEvent, libraryFoldersEvent } from "./library-folders-events-v1";
 import { type LiveVoiceEvent, liveVoiceEvent } from "./live-voice-v1";
@@ -38,6 +39,7 @@ export type OptionalTeamEvent =
   | BrowserUserControlEvent
   | AgentTasksEvent
   | ChannelEvent
+  | HostAppearanceEvent
   | HostRestartEvent
   | LibraryFoldersEvent
   | LiveVoiceEvent
@@ -74,6 +76,7 @@ export function optionalTeamEvent(value: unknown, options?: OptionalTeamEventOpt
     browserUserControlEvent(value) ??
     agentTasksEvent(value) ??
     channelEvent(value) ??
+    hostAppearanceEvent(value) ??
     hostRestartEvent(value) ??
     libraryFoldersEvent(value) ??
     liveVoiceEvent(value) ??

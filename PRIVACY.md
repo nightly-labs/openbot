@@ -181,7 +181,7 @@ completed or was cancelled, for a plan, a license or the billing portal. The con
 name and email are not sent to analytics.
 The production desktop app records application, sign-in, onboarding, agent, message, turn, prompt,
 approval, queue, routine, workflow, team, browser, search, Remote Desktop, update, marketplace, memory,
-provider, voice transcription, Voice pane, spoken reply, voice model download, spoken reply setting,
+provider, voice transcription, voice conversation, spoken reply, voice model download, spoken reply setting,
 reaction, Hosted Site, hosted server offer, hosted server plans, plan and member limits, license,
 contact sales, provider usage limit, agent template, phone connection, connector, Computer Use
 permission, help link, channel, server export and import, Usage view, and confirmed
@@ -796,6 +796,13 @@ change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Str
 customer, invoices and payment records under its own policy, also after the subscription ends.
 Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
 
+When a server plan or a license starts or ends, when you cancel or resume its renewal, and when a
+payment for it succeeds, fails, or goes back (a refund or a dispute), the account service sends one
+message to a private Discord channel of the OpenBot team, through a Discord webhook. The message has
+your account email, the plan or the license tier and its number of users, the billing period, the
+currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
+server ID. Discord keeps the message under its own policy.
+
 ## Data stored on the OpenBot computer
 
 Saved agent memories, their inclusion settings, and their full-text search index stay in the local
@@ -1110,20 +1117,20 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
-- the user dictates or opens the Voice pane for the first time, or presses Download in **Settings →
+- the user dictates or starts a voice conversation for the first time, or presses Download in **Settings →
   Voice**. OpenBot downloads the speech model that it pins, Parakeet TDT, Parakeet Unified EN,
   Underdog Bark 3.0 Plus, Whisper turbo or Cohere Transcribe, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
   the application data folder. The request carries no user data. Dictation audio from these models
   stays on the computer, and the chosen model and language are saved in `voice-preference.json` in
   the same folder;
 - the user selects ElevenLabs Scribe v2 Realtime in **Settings → Voice** and dictates or talks in
-  the Voice pane. While the microphone records, or when a Voice pane turn ends, OpenBot streams the
+  a voice conversation. While the microphone records, or when a voice conversation turn ends, OpenBot streams the
   audio and the chosen language to `api.elevenlabs.io` with the user's own API key, and receives the
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
 - the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
-  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  dictates or talks in a voice conversation. When the recording stops, or when a voice conversation turn ends,
   OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
   `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
   conversation, file or agent instruction. Groq handles the audio and the text under its own policy
@@ -1141,7 +1148,7 @@ Network traffic can also occur when:
   the recording in memory, writes it as a WAV file to the app's cache folder only while the request
   runs, and deletes it after. The address and the choices are saved in the phone's keychain, and the
   API key in a separate keychain entry. **Remove voice server** deletes both;
-- the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
+- the user turns on Read replies aloud, starts a voice conversation for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
   in the application data folder. The request carries no user data. When Supertonic reads a reply
@@ -1152,7 +1159,7 @@ Network traffic can also occur when:
   `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
   sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
   provider handles the text and the audio under its own policy and the user's plan.
-  In the Voice pane, the spoken reply runs on this
+  In a voice conversation, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
   **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
@@ -1161,7 +1168,7 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
-- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of an agent on
+- the user turns on Codex live voice in **Settings → Voice** and starts a voice conversation with an agent on
   this computer, with any provider. OpenBot starts a separate Codex App Server process for the
   session. The app window sends a WebRTC offer to it, and it opens a realtime voice session with
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
@@ -1552,10 +1559,16 @@ restrict or block a number that it sees as automated.
   holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
   that the owner allowed, and one row per conversation that an agent answers. The messages of that
   conversation are kept as a conversation of that agent, and files people send are kept with the
-  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
-  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
-  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
-  allowed senders.
+  agent's attachments. The messages of the allowed chats that OpenBot sees, also those that do not
+  mention the number, are kept in the database for 90 days after they arrive, so that an agent can
+  read and search them. The files of these messages are downloaded when they arrive, up to 100 MB
+  each, to `<userData>/whatsapp/files/`, readable only by the user, and are deleted with their
+  message. The copies of one number use at most 2 GB: when they use more, the copies of the oldest
+  messages are deleted first, and those messages keep only the names of their files. A message that
+  its author deletes for everyone is deleted with its files, and a changed message keeps the new text. Names are kept in memory until OpenBot quits. Pairing requests are kept in memory for at
+  most an hour. Disconnect logs the device out (when OpenBot is connected), deletes its keys, the saved
+  messages and their files, and keeps the conversations, the workspace memories and the allowed
+  senders.
 - **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
   only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
   the groups the owner allowed, where a request starts only from a mention of the number or a reply in

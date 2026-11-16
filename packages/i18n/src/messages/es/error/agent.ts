@@ -151,6 +151,8 @@ export const messages = {
     "Este servidor tiene poca memoria disponible. Tu mensaje espera en la cola y se iniciará cuando se libere memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo espacio de trabajo requiere {tool}, que OpenBot no encontró. Instálalo o elige Acceso completo en los ajustes del agente.",
+  "error.agent.codexSandboxUnavailable":
+    "«Solo espacio de trabajo» necesita el sandbox de Codex, que Codex no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Preguntar antes o Acceso completo en los ajustes del agente.",
   "error.agent.claudeSandboxUnavailable":
     "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador: {reason}. Elige Acceso completo u otro proveedor en los ajustes del agente.",
   "error.agent.screenCaptureOff":
@@ -159,6 +161,8 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La captura de pantalla no funciona en una conversación de Slack, Discord o Telegram, porque otras personas reciben sus archivos.",
   "error.agent.screenCaptureDeclined": "El usuario no permitió esta captura de pantalla. No se capturó nada.",
+  "error.agent.mcpToolDeclined":
+    "El usuario no permitió esta llamada a la herramienta MCP. La herramienta no se ejecutó.",
   "error.agent.screenCaptureWindowMissing":
     "Esa ventana no está abierta ahora. Llama a list_capture_sources para obtener los ID de ventana actuales.",
   "error.agent.screenCaptureDisplayMissing":

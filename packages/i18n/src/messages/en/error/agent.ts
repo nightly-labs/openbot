@@ -141,6 +141,8 @@ export const messages = defineMessages("error.agent", {
     "This server is low on memory. Your message waits in the queue and starts when memory is free.",
   "error.agent.workspaceOnlyToolMissing":
     "Workspace only needs {tool}, which OpenBot did not find. Install it, or choose Full access in the agent settings.",
+  "error.agent.codexSandboxUnavailable":
+    "Workspace only needs the Codex sandbox, which Codex cannot start on this computer, so the agent's commands fail. Choose Ask first or Full access in the agent settings.",
   "error.agent.claudeSandboxUnavailable":
     "Workspace only needs the Claude sandbox, which Claude cannot start on this computer: {reason}. Choose Full access or another provider in the agent settings.",
   "error.agent.screenCaptureOff":
@@ -150,6 +152,7 @@ export const messages = defineMessages("error.agent", {
     "Screen capture does not work in a Slack, Discord or Telegram conversation, because other people get its files.",
   "error.agent.screenCaptureDeclined": "The user did not allow this screen capture. Nothing was captured.",
   "error.agent.mcpServerDeclined": "The user did not allow this MCP server change. Nothing changed.",
+  "error.agent.mcpToolDeclined": "The user did not allow this MCP tool call. The tool did not run.",
   "error.agent.mcpServerNotSaved": "The MCP server did not answer, so it was not saved. {error}",
   "error.agent.mcpServerKeysMove":
     "The MCP server {name} holds keys for its current server. Ask the user to change its address, command, arguments or transport in Server settings, MCP.",

@@ -917,6 +917,10 @@ export class DrainScheduler {
               routineRun:
                 item.delivery.sender.kind === "routine" ? this.#routines.runForDelivery(item.delivery.id) : null,
               wokenWaits: item.delivery.sender.kind === "routine" ? this.#routines.wokenWaits(item.delivery.id) : [],
+              routineTimezone:
+                item.delivery.sender.kind === "routine"
+                  ? this.#routines.timezoneForDelivery(item.delivery.id)
+                  : undefined,
               answeredRoutine: this.answeredRoutine(item.delivery),
               tags,
               ...(executionText === undefined ? {} : { executionText }),

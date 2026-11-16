@@ -165,6 +165,8 @@ export const messages = {
     "Dieser Server hat wenig freien Arbeitsspeicher. Deine Nachricht wartet in der Warteschlange und startet, wenn Speicher frei ist.",
   "error.agent.workspaceOnlyToolMissing":
     "„Nur Arbeitsbereich“ benötigt {tool}, das OpenBot nicht gefunden hat. Installiere es oder wähle „Voller Zugriff“ in den Agenteneinstellungen.",
+  "error.agent.codexSandboxUnavailable":
+    "„Nur Arbeitsbereich“ braucht die Codex-Sandbox, die Codex auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Erst fragen“ oder „Voller Zugriff“ in den Agenteneinstellungen.",
   "error.agent.claudeSandboxUnavailable":
     "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
@@ -174,6 +176,8 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.mcpToolDeclined":
+    "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":
     "Dieses Fenster ist gerade nicht geöffnet. Rufe list_capture_sources auf, um die aktuellen Fenster-IDs zu erhalten.",
   "error.agent.screenCaptureDisplayMissing":

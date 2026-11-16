@@ -32,6 +32,7 @@ import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
 import { type AgentHostSettingsService, createAgentHostSettings } from "./agent-host-settings";
+import { fitImageForAgent } from "./agent-image-fit";
 import { type AgentInstructionsFiles, createAgentInstructionsFiles } from "./agent-instructions-files";
 import {
   type BrowserProfileService,
@@ -231,7 +232,12 @@ import {
 } from "./computer-use-target-window";
 import { isSupportedCuaDriverTarget, resolveCuaDriver } from "./cua-driver-artifact";
 import { CuaDriverDaemonClient } from "./cua-driver-daemon-client";
-import { CuaDriverRuntime, cuaDriverCommandAlias, resolveCuaDriverEndpoint } from "./cua-driver-runtime";
+import {
+  CuaDriverRuntime,
+  cuaDriverCommandAlias,
+  cuaDriverDrivesWayland,
+  resolveCuaDriverEndpoint,
+} from "./cua-driver-runtime";
 import { type CustomAgentChanges, createCustomAgentChanges } from "./custom-agent-changes";
 import { CUSTOM_AGENTS_FILE, CustomAgentStore } from "./custom-agent-store";
 import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
@@ -286,7 +292,12 @@ import { LibraryFoldersService } from "./library-folders-service";
 import { LinkAccountService } from "./link-account-service";
 import { LinkAccountStore } from "./link-account-store";
 import { relaunchApp } from "./linux-appimage-relaunch";
-import { aboveAppsWindowKind, ozonePlatformArguments, setAboveAppsXWayland } from "./linux-wayland-output";
+import {
+  aboveAppsWindowKind,
+  ozonePlatformArguments,
+  setAboveAppsXWayland,
+  usesX11Windows,
+} from "./linux-wayland-output";
 import { localRoutineFeedDocument } from "./local-routine-calendar";
 import {
   formatLocalServerMembersRequest,
@@ -394,6 +405,7 @@ import { SERVER_AUDIT_FILE, ServerAuditStore, serverAuditNames } from "./server-
 import { AGENT_PROCESS_VARIABLE, agentProcessEnvironment, ServerMemory } from "./server-memory";
 import { ServerMode, type ServerModeEnvironment } from "./server-mode";
 import { ServerPersonalityPreferenceStore } from "./server-personality-preference-store";
+import { ServerSetupPage } from "./server-setup-page";
 import { ServerTimezonePreferenceStore } from "./server-timezone-preference-store";
 import {
   configureApplicationProtocol,
@@ -769,6 +781,8 @@ export interface ApplicationServices {
   routineFeed: RoutineFeedServer;
   events: HostEventsService;
   eventsRuntime: HostEventsRuntime;
+  /** Who the webhook routes belong to now: the signed-in account, or the machine token of a server on this computer. */
+  webhookPrincipal: () => string | null;
   /** The terminal control of a self-hosted server. Null in every other build. */
   serverMode: ServerMode | null;
   customProviders: CustomProviderStore;
@@ -1138,6 +1152,7 @@ export async function createApplicationServices({
     getDisplays: () => screen.getAllDisplays(),
     getPrimaryDisplay: () => screen.getPrimaryDisplay(),
     getMainWindow: windows.getMainWindow,
+    getFocusedWindow: () => BrowserWindow.getFocusedWindow(),
     ensureMainWindow: windows.ensureMainWindow,
     presentMainWindow: showMainWindow,
     performHaptic: () => macHapticFeedback.performAlignment(),
@@ -1446,6 +1461,8 @@ export async function createApplicationServices({
   });
   // The agent service starts after the browser: a proxy failure before it has no open list to update.
   let browserProxyStatusChanged = () => {};
+  // The profile service needs the agent service, so agents read it after it exists.
+  let agentBrowserProfiles: BrowserProfileService | null = null;
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -1820,9 +1837,16 @@ export async function createApplicationServices({
   let mcpOAuthAuthority: McpOAuth | null = null;
   // A joined server's sign-in can send its callback to this same port: the host's own listener
   // uses the same port number. A `state` that no local sign-in started goes to the relay.
+  // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
+  // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
+  const mcpOAuthDeepLink = () =>
+    (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
+      ? MCP_OAUTH_REDIRECT_URL
+      : undefined;
   const signInRelayClient = new SignInRelayClient({
     openExternal: openLink,
     language,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     ownListener: () =>
       mcpOAuthRedirect
         ? { port: Number(new URL(mcpOAuthRedirect.redirectUrl).port), paths: MCP_OAUTH_REDIRECT_PATHS }
@@ -1858,12 +1882,7 @@ export async function createApplicationServices({
     storage: mcpOAuthStore,
     openExternal: openLink,
     redirectUrl: mcpOAuthRedirect?.redirectUrl ?? MCP_OAUTH_REDIRECT_URL,
-    // A development build on macOS or Windows, and a Linux desktop that refused the scheme, do not
-    // open `openbot://` in this app (`presentApplication`), so their sign-ins keep the loopback names.
-    deepLinkRedirectUrl: () =>
-      (process.platform === "linux" || app.isPackaged) && app.isDefaultProtocolClient("openbot")
-        ? MCP_OAUTH_REDIRECT_URL
-        : undefined,
+    deepLinkRedirectUrl: mcpOAuthDeepLink,
     logger: createOpenBotLogger("mcp-oauth"),
   });
   mcpOAuthAuthority = mcpOAuth;
@@ -2098,7 +2117,11 @@ export async function createApplicationServices({
   });
   // The overlays are OpenBot windows, so they can mark only the display OpenBot is on. With an agent
   // display of its own, the driver works where they cannot be drawn.
-  const drawsComputerUseHighlight = !hasSeparateAgentDisplay(process.platform);
+  const agentsShareDisplay = !hasSeparateAgentDisplay(process.platform);
+  // Not on Wayland windows either, as the agent dock and the Dynamic Island: a Wayland client cannot
+  // place a window or keep it out of the dock. There the overlay was a blank window of the display's
+  // size in the dock, and closing it only made the next tick open it again (#9655).
+  const drawsComputerUseHighlight = agentsShareDisplay && (process.platform !== "linux" || usesX11Windows());
   const computerUsePermissionHelp = new ComputerUsePermissionHelpWindowController({
     createWindow: () =>
       createComputerUsePermissionHelpWindow(language.translate, () => localeDirection(language.locale)),
@@ -2173,6 +2196,7 @@ export async function createApplicationServices({
       if (!clearFlatBackground(pixels, size.width, size.height)) return null;
       return nativeImage.createFromBitmap(pixels, size).toPNG();
     },
+    fitImage: fitImageForAgent,
     videoReader: new VideoReader({
       runtimeDirectory: join(app.getPath("userData"), "runtimes", "yt-dlp"),
       target: runtimeTarget(process.platform, process.arch),
@@ -2233,6 +2257,9 @@ export async function createApplicationServices({
     hostTurnLimits,
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
+    // An agent display of its own is X11, where the driver records video.
+    computerUseOnWayland: agentsShareDisplay && cuaDriverDrivesWayland(process.platform),
+    computerUseInputRefused: () => agentsShareDisplay && cuaDriver.waylandInputRefused(),
     requestTimeoutMs: 30_000,
     offProviders: providerUse.off(),
     providerAccounts,
@@ -2330,6 +2357,7 @@ export async function createApplicationServices({
     linkWallet: linkAccount,
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
+    browserProfiles: () => agentBrowserProfiles,
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
@@ -2886,6 +2914,16 @@ export async function createApplicationServices({
         );
     },
   });
+  // The webhook routes belong to the signed-in account. A server on this computer has no account: its
+  // routes follow the machine token that the desktop app gives it, as the Signal ingress does (#9716).
+  const webhookPrincipal = (): string | null => {
+    if (localServerChild) {
+      const hostId = teamStore.getIdentity()?.serverId;
+      return hostId && centralAuth.hostSiteCredential(hostId) ? hostId : null;
+    }
+    const state = centralAuth.getState();
+    return state.status === "signed_in" ? state.user.id : null;
+  };
   // Analytics starts later in this function. A request before then is not reported.
   let reportWebhookDelivery: ((report: WebhookDeliveryReport) => void) | null = null;
   const events = new HostEventsService({
@@ -2896,10 +2934,7 @@ export async function createApplicationServices({
     },
     cipher: secretCipher,
     relay: webhookRelay,
-    accountPrincipal: () => {
-      const state = centralAuth.getState();
-      return state.status === "signed_in" ? state.user.id : null;
-    },
+    accountPrincipal: webhookPrincipal,
     onDelivery: (report) => reportWebhookDelivery?.(report),
   });
   const eventsRuntime = new HostEventsRuntime(events);
@@ -3016,6 +3051,7 @@ export async function createApplicationServices({
     onChanged: () => service.notifyBrowserProfilesChanged(),
   });
   browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
+  agentBrowserProfiles = browserProfiles;
   // A computer that comes online or goes offline changes the proxy list.
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
@@ -3602,6 +3638,8 @@ export async function createApplicationServices({
       centralAuth.removeRemoteMember(hostId, membershipId).pipe(toRemoteWorkflowError),
     updateRemoteHostLogo: (hostId, image, version) =>
       centralAuth.updateRemoteHostLogo(hostId, image, version).pipe(toRemoteWorkflowError),
+    updateRemoteHostAppearance: (hostId, appearance) =>
+      centralAuth.updateRemoteHostAppearance(hostId, appearance).pipe(toRemoteWorkflowError),
     localDevelopmentHost: developmentRemoteRole === "host",
     passwordOwner: localServerChild !== null,
     logDirectory: join(app.getPath("userData"), "logs", "remote"),
@@ -4065,6 +4103,9 @@ export async function createApplicationServices({
               centralAuth.useHostCredential(serverId, machineToken);
               // The Signal socket of the Slack, Discord and Telegram connections opens with this token.
               signalIngress.reconnect();
+              // The webhook routes register with it too, also again after the account changed.
+              eventsRuntime.setAccountPrincipal(webhookPrincipal());
+              eventsRuntime.syncRoutes({ all: true });
               return host.publishLocalServer();
             }),
           unpublish: () =>
@@ -4073,6 +4114,7 @@ export async function createApplicationServices({
                 Effect.sync(() => {
                   const serverId = teamStore.getIdentity()?.serverId;
                   if (serverId) centralAuth.useHostCredential(serverId, null);
+                  eventsRuntime.setAccountPrincipal(webhookPrincipal());
                   signalIngress.reconnect();
                 }),
               ),
@@ -4491,8 +4533,30 @@ export async function createApplicationServices({
       onError: (message, error) => logger.warn(message, toLogValue(error)),
     });
     serverStartRetry.start();
+    // The setup page of a container (docs/umbrel.md). Only a container starts it: on a computer, its
+    // port would be reachable from the network of that computer.
+    const setupPagePort = serverModeEnvironment?.setupPagePort ?? null;
+    let setupPage: ServerSetupPage | null = null;
+    if (setupPagePort !== null && installationMode !== "container") {
+      logger.warn("OPENBOT_SETUP_PAGE_PORT works only in the OpenBot container. The setup page did not start.");
+    } else if (setupPagePort !== null) {
+      const page = new ServerSetupPage({
+        port: setupPagePort,
+        address: "0.0.0.0",
+        rendererRoot: resolve(__dirname, "../renderer"),
+        request: serverMode.setupRequest,
+        onError: (message, error) => logger.warn(message, toLogValue(error)),
+      });
+      await runCauseEffect(page.listen()).then(
+        () => {
+          setupPage = page;
+        },
+        (error) => logger.error("The server setup page did not start:", toLogValue(error)),
+      );
+    }
     teardown.push(TEARDOWN_ORDER.serverMode, "the server control socket", async () => {
       await Effect.runPromise(serverStartRetry.stop());
+      if (setupPage) await Effect.runPromise(setupPage.close());
       await Effect.runPromise(serverMode.close());
     });
   }
@@ -4592,6 +4656,7 @@ export async function createApplicationServices({
     routineFeed,
     events,
     eventsRuntime,
+    webhookPrincipal,
     serverMode,
     customProviders,
     customProviderChanges,

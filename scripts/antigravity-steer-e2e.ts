@@ -42,6 +42,7 @@ interface Report {
   afterTurn?: { refused: string; prompts: number };
   waitingOnUser?: { refused: string; prompts: number; reply: string; status: string | null };
   oldCli?: { refused: string; prompts: number; status: string | null };
+  heldWork?: { status: string | null; releasable: boolean | undefined; closedSessions: number; daemonRuns: boolean };
   failure?: string;
 }
 
@@ -137,6 +138,32 @@ function steer(client: AgentClient, thread: string, turnId: string, text: string
       (value) => getString(value, "turnId"),
     ),
   );
+}
+
+/** The process of the session that got the `index`th prompt with this text. The fake's session ids hold it. */
+async function sessionPid(log: string, text: string, index: number): Promise<number> {
+  const sessionId = (await prompts(log)).filter((entry) => entry.text === text)[index]?.sessionId ?? "";
+  const pid = Number(/^agy-(\d+)-/u.exec(sessionId)?.[1]);
+  if (!Number.isInteger(pid)) throw new Error(`No session got the prompt "${text}".`);
+  return pid;
+}
+
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Waits until the process ends, or fails after 10 s. */
+async function waitForExit(pid: number): Promise<void> {
+  const deadline = Date.now() + 10_000;
+  while (isRunning(pid)) {
+    if (Date.now() > deadline) throw new Error(`The session process ${pid} did not end.`);
+    await new Promise((settle) => setTimeout(settle, 25));
+  }
 }
 
 async function refusal(operation: Promise<string | null>): Promise<string> {
@@ -257,6 +284,29 @@ try {
     prompts: (await prompts(old.log)).length - beforeOld,
     status: oldFinished.status,
   };
+
+  // A turn that ends while a daemon command runs keeps its session's process (#9551). The idle limit
+  // keeps one idle session, so the end of each later turn closes the session that went idle before it,
+  // but not the one whose command runs. The provider's idle stop also keeps the process.
+  const held = await open("held-work", {});
+  held.client.start();
+  const daemonThread = await startThread(held.client, { cwd: root });
+  const daemon = await (await startTurn(held.client, daemonThread, held.log, "daemon")).done;
+  assert.equal(daemon.status, "completed");
+  const releasable = held.client.canReleaseProcess?.();
+  assert.equal(releasable, false, "Running work must keep the provider process.");
+  const laterPids: number[] = [];
+  for (let index = 0; index < 3; index += 1) {
+    const thread = await startThread(held.client, { cwd: root });
+    assert.equal((await (await startTurn(held.client, thread, held.log, "hello")).done).status, "completed");
+    laterPids.push(await sessionPid(held.log, "hello", index));
+  }
+  // The first two later sessions went idle before another one, so the limit closed them.
+  await Promise.all(laterPids.slice(0, 2).map((pid) => waitForExit(pid)));
+  const daemonRuns = isRunning(await sessionPid(held.log, "daemon", 0));
+  assert.ok(daemonRuns, "The idle limit closed the session whose daemon command runs.");
+  const closedSessions = laterPids.filter((pid) => !isRunning(pid)).length;
+  report.heldWork = { status: daemon.status, releasable, closedSessions, daemonRuns };
 
   report.passed = true;
 } catch (error) {

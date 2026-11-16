@@ -288,6 +288,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Namen und sein Logo hier zu ändern.",
   "mobile.server.settings.identityOffline": "Verbinde dich mit diesem Server, um seinen Namen und sein Logo zu ändern.",
+  "mobile.server.settings.appearance": "Form und Farbe",
+  "mobile.server.settings.appearanceShape": "Form",
+  "mobile.server.settings.appearanceShapeOption": "Form {number}",
+  "mobile.server.settings.appearanceColor": "Serverfarbe",
+  "mobile.server.settings.appearanceAutomatic": "Automatisch",
+  "mobile.server.settings.appearanceReset": "Zurücksetzen",
+  "mobile.server.settings.appearanceSaveFailed":
+    "Form und Farbe des Servers konnten nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.route.cropLogo": "Logo zuschneiden",
   "mobile.server.members.remove": "Mitglied entfernen",
   "mobile.server.members.invitePeople": "Personen einladen",
@@ -922,6 +930,8 @@ export const messages = {
     "WhatsApp hat diesen Server aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot kann WhatsApp unter dieser Nummer nicht erreichen. Verbinde sie erneut oder trenne die Nummer.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot kann die gespeicherten Schlüssel dieser Nummer nicht lesen. Verknüpfe die Nummer erneut.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Neu verknüpfen",
   "mobile.server.connectors.whatsapp.ownNumber": "Private Nummer",

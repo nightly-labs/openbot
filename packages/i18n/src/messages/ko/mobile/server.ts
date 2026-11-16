@@ -275,6 +275,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "여기에서 이름과 로고를 변경하려면 이 서버의 OpenBot을 업데이트해 주세요.",
   "mobile.server.settings.identityOffline": "서버 이름과 로고를 변경하려면 이 서버에 연결하세요.",
+  "mobile.server.settings.appearance": "모양과 색상",
+  "mobile.server.settings.appearanceShape": "모양",
+  "mobile.server.settings.appearanceShapeOption": "모양 {number}",
+  "mobile.server.settings.appearanceColor": "서버 색상",
+  "mobile.server.settings.appearanceAutomatic": "자동",
+  "mobile.server.settings.appearanceReset": "초기화",
+  "mobile.server.settings.appearanceSaveFailed": "서버 모양과 색상을 저장하지 못했어요. 다시 시도해 주세요.",
   "mobile.server.route.cropLogo": "로고 자르기",
   "mobile.server.members.remove": "멤버 삭제",
   "mobile.server.members.invitePeople": "사람 초대",
@@ -851,6 +858,8 @@ export const messages = {
     "WhatsApp이 연결된 기기에서 이 서버를 삭제했어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot이 이 번호로 WhatsApp에 접근할 수 없어요. 다시 연결하거나 번호 연결을 해제해 주세요.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot이 이 번호에 저장된 키를 읽을 수 없어요. 번호를 다시 연결해 주세요.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp이 OpenBot에 기다리라고 요청했어요. {time}에 다시 시도해요.",
   "mobile.server.connectors.whatsapp.linkAgain": "다시 연결",
   "mobile.server.connectors.whatsapp.ownNumber": "개인 번호",

@@ -324,6 +324,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby zmienić tutaj jego nazwę i logo.",
   "mobile.server.settings.identityOffline": "Połącz się z tym serwerem, aby zmienić jego nazwę i logo.",
+  "mobile.server.settings.appearance": "Kształt i kolor",
+  "mobile.server.settings.appearanceShape": "Kształt",
+  "mobile.server.settings.appearanceShapeOption": "Kształt {number}",
+  "mobile.server.settings.appearanceColor": "Kolor serwera",
+  "mobile.server.settings.appearanceAutomatic": "Automatyczny",
+  "mobile.server.settings.appearanceReset": "Resetuj",
+  "mobile.server.settings.appearanceSaveFailed": "Nie udało się zapisać kształtu i koloru serwera. Spróbuj ponownie.",
   "mobile.server.route.cropLogo": "Przytnij logo",
   "mobile.server.members.remove": "Usuń członka",
   "mobile.server.members.invitePeople": "Zaproś osoby",
@@ -1001,6 +1008,8 @@ export const messages = {
     "WhatsApp usunął ten serwer z połączonych urządzeń. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot nie może połączyć się z WhatsApp na tym numerze. Połącz ponownie lub odłącz numer.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot nie może odczytać zapisanych kluczy tego numeru. Połącz numer ponownie.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp poprosił OpenBot o czekanie. Kolejna próba o {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
   "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",

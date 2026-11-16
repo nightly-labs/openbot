@@ -157,6 +157,8 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.codexSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Codex, que Codex ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Demander d’abord » ou « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":
@@ -165,6 +167,7 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La capture d’écran ne fonctionne pas dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
   "error.agent.screenCaptureDeclined": "L’utilisateur n’a pas autorisé cette capture d’écran. Rien n’a été capturé.",
+  "error.agent.mcpToolDeclined": "L’utilisateur n’a pas autorisé cet appel d’outil MCP. L’outil n’a pas été exécuté.",
   "error.agent.screenCaptureWindowMissing":
     "Cette fenêtre n’est pas ouverte. Appelez list_capture_sources pour obtenir les identifiants actuels des fenêtres.",
   "error.agent.screenCaptureDisplayMissing":

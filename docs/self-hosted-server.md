@@ -165,7 +165,7 @@ A self-hosted server uses the memory guards of a hosted server (see
 again when memory is available. A message from a person starts first. The browser opens no new tab
 and unloads idle pages sooner. By default, a fixed number of turns run at the same time: 2 up to
 5 GiB of memory, 8 up to 10 GiB, and 16 above. An owner or admin can choose another number, 1 to 128, or
-Unlimited, in Server Settings > General > Threads at the same time. Low memory still holds a new turn.
+Unlimited, in Server Settings > Agent defaults > Threads at the same time. Low memory still holds a new turn.
 
 The memory ceiling is the smaller of the machine memory and the limit of `openbot.service`
 (`MemoryMax=90%`). To give OpenBot less memory, lower the limit with
@@ -247,7 +247,7 @@ An image costs `⌈width / 28⌉ × ⌈height / 28⌉` visual tokens on Claude. 
 
 ### Screenshots and clicks
 
-The computer use driver (cua-driver, `cua-driver-rs-v0.41.3`) has two screenshots on Linux:
+The computer use driver (cua-driver, `cua-driver-rs-v0.43.2`) has two screenshots on Linux:
 
 - **One window** (`get_window_state`). The driver makes the image 1.15 megapixels or less, with a long
   edge of 1568 px or less, and changes the x and y of each click back to screen pixels. A 1260x780
@@ -328,7 +328,9 @@ The server has two Xvfb displays, one in each of two nested `xvfb-run` commands 
 authority file. The outer one starts the agent display, at the [display size](#display-size), and
 the script names it in `OPENBOT_AGENT_DISPLAY`. The inner one starts the display that OpenBot shows
 its windows on, at 1280x800. Main gives that display to Computer Use, to remote desktop and to the agent
-processes, so an agent's screenshot and remote desktop do not show the OpenBot window. See
+processes, so an agent's screenshot and remote desktop do not show the OpenBot window. The agent
+display has a window manager (Openbox) and a dark background with the OpenBot logo: windows have
+title bars, and a right-click on the empty screen opens a menu with a terminal and a file manager. See
 [Computer Use and remote desktop](architecture/computer-use.md#agent-display-on-a-server).
 
 Updates work as on a hosted server (see [Updates](hosted-servers.md#updates)): the timer stages a

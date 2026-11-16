@@ -121,6 +121,10 @@ export const messages = {
   "marketplace.app.remove.action": "Eliminar",
   "marketplace.app.remove.confirmTitle": "¿Eliminar {name}?",
   "marketplace.app.remove.keep": "Conservar",
+  "marketplace.app.replace.title": "¿Reemplazar {server}?",
+  "marketplace.app.replace.description":
+    "Ya tienes un servidor llamado {server}, pero no es {name}. ¿Reemplazarlo por {name}? Se eliminarán su dirección y sus claves guardadas.",
+  "marketplace.app.replace.action": "Reemplazar",
   "marketplace.app.connection": "Conexión",
   "marketplace.app.access.use": "Puede usar",
   "marketplace.app.access.noAgents": "Ningún agente",

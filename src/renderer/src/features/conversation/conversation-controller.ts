@@ -6,12 +6,12 @@ import type {
   BrowserTab,
   MarketplaceSkillDetail,
 } from "@openbot/contracts/ipc";
-import { SETTINGS_PANEL_DEFAULT } from "@openbot/ui/components/SettingsPanel";
 import type { AgentActivityLabel } from "@openbot/ui/features/conversation/AgentActivity";
 import { currentText } from "@openbot/ui/text";
 import type { UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createSignal, createStore, onCleanup } from "solid-js";
 import { actionToast } from "../../action-toast";
+import { readSidePanelWidth } from "../../components/side-panel-width";
 import type { ChatSearchMatch } from "./chat-search";
 import {
   appendDraftText,
@@ -45,7 +45,6 @@ import type { SideQuestionState } from "./stores/side-question-store";
 import { createVoiceSessions } from "./stores/voice-session-store";
 import type { VoiceCloudStream } from "./stores/voice-store";
 
-export const BROWSER_PANEL_DEFAULT = 380;
 const BROWSER_PIP_STORAGE_KEY = "openbot:browser-pip-native-bounds";
 
 function readBrowserPipBounds(): BrowserBounds | null {
@@ -285,8 +284,8 @@ export function createStableConversationState(
   /** The conversation whose last recording stopped at the time limit. */
   const [voiceLimitReached, setVoiceLimitReached] = createSignal<ConversationTarget | null>(null);
   const [browserPipBounds, setBrowserPipBounds] = createSignal<BrowserBounds | null>(readBrowserPipBounds());
-  const [settingsPanelWidth, setSettingsPanelWidth] = createSignal(SETTINGS_PANEL_DEFAULT);
-  const [browserPanelWidth, setBrowserPanelWidth] = createSignal(BROWSER_PANEL_DEFAULT);
+  /** The width of the docked side panel. All its panes share it, so a change to another tab does not resize it. */
+  const [sidePanelWidth, setSidePanelWidth] = createSignal(readSidePanelWidth());
   const resources: ConversationResources = {
     agentActivityLabels: new Map(),
     turnRuntimes: new Map(),
@@ -419,10 +418,8 @@ export function createStableConversationState(
     setVoiceLimitReached,
     browserPipBounds,
     setBrowserPipBounds,
-    settingsPanelWidth,
-    setSettingsPanelWidth,
-    browserPanelWidth,
-    setBrowserPanelWidth,
+    sidePanelWidth,
+    setSidePanelWidth,
     resources,
   };
 }
@@ -487,8 +484,8 @@ export function createServerConversationState() {
   const [hiddenAwaitingReplyIds, setHiddenAwaitingReplyIds] = createSignal<ReadonlySet<string>>(new Set());
   // Keyed by agent id, as `rightPanels` is: a side question lives as long as its pane, not its view.
   const [sideQuestions, setSideQuestions] = createStore<Record<string, SideQuestionState>>({});
-  // A voice conversation lives as long as its Voice tab, not its view.
-  const voiceSessions = createVoiceSessions(sidePanels);
+  // A voice conversation lives until End, not as long as its view.
+  const voiceSessions = createVoiceSessions();
 
   return {
     showComposerActions,

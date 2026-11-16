@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "O {provider} não respondeu a tempo, então o OpenBot encerrou o processo dele.",
   "error.provider.acpSignInLost":
     "O {provider} perdeu o login, então o OpenBot encerrou o processo dele. Envie sua mensagem de novo.",
+  "error.provider.acpRefusedUntilRestart":
+    "O {provider} recusou uma mensagem, então o OpenBot encerrou o processo dele. Envie sua mensagem de novo.",
+  "error.provider.acpSettingsTimedOut": "O {provider} não respondeu a tempo. Tente novamente em instantes.",
   "error.provider.acpPlanUsedUp":
     "O {provider} informa que seu plano se esgotou. Escolha outro modelo ou faça upgrade do seu plano do {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -278,6 +281,8 @@ export const messages = {
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "O Gemini recusou esta solicitação. Escolha outro modelo e envie sua mensagem novamente. Se falhar de novo, inicie um novo chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "O Google não permite que o Gemini funcione a partir da localização de rede do computador que executa este agente. Use o Gemini em outro computador ou escolha outro provedor para este agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "O Gemini perdeu a conexão com seu agente e parou. Envie uma mensagem para continuar.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -316,6 +321,8 @@ export const messages = {
   "error.provider.hermesSignIn": "Entre com o Nous Portal ou execute `hermes setup` em um terminal para usar o Hermes.",
   "error.provider.hermesTurnFailed":
     "O Hermes não conseguiu terminar este turno. Se a resposta dele der um motivo, siga o que ela diz. Se não, um servidor MCP deste agente pode estar indisponível: verifique-o em Configurações do servidor › MCP e envie sua mensagem de novo.",
+  "error.provider.hermesRefused":
+    "O Hermes recusou esta mensagem antes de começar. Envie-a de novo. Se o Hermes recusar todas as mensagens, reinicie o OpenBot no computador que executa este agente.",
   "error.provider.copilotThinkingRejected":
     "O GitHub Copilot não conseguiu usar este modelo: o modelo não aceitou a configuração de raciocínio. Selecione outro modelo para este agente e envie a mensagem de novo.",
   "error.provider.usageLimitReached": "A conta atingiu seu limite de uso.",
@@ -323,6 +330,8 @@ export const messages = {
     "Este chat ficou longo demais para o Claude. O OpenBot iniciou uma nova sessão do Claude Code com o histórico do chat. Tente novamente.",
   "error.provider.claudeApiKeyNoCredit":
     "A chave de API da Anthropic não tem crédito de API. Um plano do Claude não paga as solicitações feitas com uma chave de API. Adicione crédito no Anthropic Console, ou entre no Claude em Configurações e selecione a conta do Claude no menu de modelos do agente.",
+  "error.provider.claudeServiceBlocked":
+    "O serviço do Claude bloqueou esta solicitação. Normalmente é um problema rápido do lado do Claude, não da sua conta. Envie a mensagem de novo em alguns minutos.",
   "error.provider.foreignReasoning":
     "{provider} não aceitou o raciocínio anterior neste chat porque ele foi recebido por outra conta ou chave de API. O OpenBot iniciou uma nova sessão de {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageTooSmall":
@@ -331,6 +340,8 @@ export const messages = {
     "O modelo não aceitou uma imagem deste chat porque a imagem é grande demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageCountLimit":
     "O modelo não aceitou este chat porque ele tem imagens demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.requestTooLarge":
+    "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":
     "O OpenCode recusou a solicitação e não informou a causa. Isso pode acontecer em um chat longo ou depois de trocar de modelo. O OpenBot iniciou uma nova sessão do OpenCode com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo ou um esforço menor.",
   "error.provider.opencodeCompactionFailed":
@@ -348,6 +359,8 @@ export const messages = {
     "O Gemini não conseguiu abrir a página de login no seu navegador. Verifique o navegador padrão e conecte novamente.",
   "error.provider.acpSignInFailed": "O login não foi concluído.",
   "error.provider.acpSignInFailedReason": "O login não foi concluído: {reason}",
+  "error.provider.acpSignInNetwork":
+    "O login não conseguiu acessar o servidor do provedor. Verifique a conexão de rede e as configurações de DNS do computador que executa o OpenBot e tente novamente.",
   "error.provider.acpSignOutFailed": "O logout não foi concluído.",
   "error.provider.acpSignOutFailedReason": "O logout não foi concluído: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -355,6 +368,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Somente links de login HTTPS podem abrir no navegador.",
   "error.provider.geminiKeyRefused":
     "O Gemini recusou a chave de API salva. Substitua ou remova a chave nas Configurações e conecte novamente.",
+  "error.provider.geminiKeyRateLimited":
+    "O Gemini recusou a solicitação porque sua chave de API do Gemini salva atingiu um limite de requisições ou a cota dela. A chave é usada no lugar do seu plano do Google. Aguarde alguns minutos ou escolha outro modelo e tente novamente. Para usar seu plano do Google, remova a chave nas Configurações.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Sua chave de API do Gemini salva não tem cota para este modelo. A chave é usada no lugar do seu plano do Google. Escolha outro modelo ou remova a chave nas Configurações para usar seu plano do Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "O Gemini não consegue abrir o arquivo de configurações desta conta, então não consegue entrar. Remova esta conta e adicione-a novamente.",
   "error.provider.geminiSettingsUnreadable":
@@ -445,6 +462,8 @@ export const messages = {
   "error.provider.piSessionMissing": "O arquivo de sessão do Pi não está disponível neste computador.",
   "error.provider.piResumeCancelled": "O Pi cancelou a retomada da sessão. Tente de novo.",
   "error.provider.piSessionIdentity": "O Pi retornou uma sessão diferente. A sessão salva não foi substituída.",
+  "error.provider.piExtensionFailed":
+    "O Pi parou porque não conseguiu carregar uma extensão. Remova ou atualize essa extensão e tente de novo. {detail}",
   "error.provider.piModelInvalid": "Selecione um modelo do Pi que inclua seu provedor.",
   "error.provider.piToolInvalid": "A ferramenta retornou um resultado inválido.",
   "error.provider.piSignIn": "Use /login no Pi no computador anfitrião. Feche o Pi quando o login terminar.",

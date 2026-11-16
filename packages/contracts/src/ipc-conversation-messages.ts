@@ -189,6 +189,26 @@ export interface AgentExchangeSummary {
   senderTaskId?: string;
 }
 
+/**
+ * The loaded requests to teammates that a page of the latest messages does not hold, and that a
+ * teammate still had open. A client keeps each older loaded message as it was, so it reads these
+ * again: else a teammate that has ended shows as working in the waiting block (#9381).
+ */
+export function openExchangesOutside(
+  loaded: readonly { id: string; exchange?: AgentExchangeSummary | undefined }[],
+  page: readonly { id: string }[],
+): string[] {
+  const onPage = new Set(page.map((message) => message.id));
+  return loaded.flatMap(({ id, exchange }) =>
+    !onPage.has(id) &&
+    exchange?.direction === "outgoing" &&
+    exchange.expectsReply !== false &&
+    exchange.deliveries.some(({ status }) => status === "queued" || status === "starting" || status === "running")
+      ? [id]
+      : [],
+  );
+}
+
 function isAgentExchangeSummary(value: unknown): value is AgentExchangeSummary {
   return (
     isDynamicRecord(value) &&

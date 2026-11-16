@@ -282,6 +282,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Werk OpenBot bij op deze server om de naam en het logo hier te wijzigen.",
   "mobile.server.settings.identityOffline": "Maak verbinding met deze server om de naam en het logo te wijzigen.",
+  "mobile.server.settings.appearance": "Vorm en kleur",
+  "mobile.server.settings.appearanceShape": "Vorm",
+  "mobile.server.settings.appearanceShapeOption": "Vorm {number}",
+  "mobile.server.settings.appearanceColor": "Serverkleur",
+  "mobile.server.settings.appearanceAutomatic": "Automatisch",
+  "mobile.server.settings.appearanceReset": "Herstellen",
+  "mobile.server.settings.appearanceSaveFailed":
+    "De vorm en kleur van de server konden niet worden opgeslagen. Probeer het opnieuw.",
   "mobile.server.route.cropLogo": "Logo bijsnijden",
   "mobile.server.members.remove": "Lid verwijderen",
   "mobile.server.members.invitePeople": "Mensen uitnodigen",
@@ -869,6 +877,8 @@ export const messages = {
     "WhatsApp heeft deze server uit de gekoppelde apparaten verwijderd. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot kan WhatsApp op dit nummer niet bereiken. Verbind opnieuw of koppel het nummer los.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot kan de opgeslagen sleutels van dit nummer niet lezen. Koppel het nummer opnieuw.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp vroeg OpenBot te wachten. Het probeert het opnieuw om {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",

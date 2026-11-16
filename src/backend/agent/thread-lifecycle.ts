@@ -45,6 +45,7 @@ import {
   mcpFingerprintValues,
   NO_MCP_TOOL_RUNTIMES,
   openCodeMcpServers,
+  providerMcpServerName,
   toMcpShapeFailed,
   usableMcpServers,
 } from "../mcp-provider-shapes";
@@ -213,6 +214,10 @@ export interface ThreadLifecycleOptions {
   hostedStorageGb?: () => number | null;
   /** OpenBot draws the Computer Use agent cursor. False on a host whose agents have a display of their own. */
   agentCursorDrawn?: boolean;
+  /** The Computer Use driver drives a native Wayland desktop, where video can have no route. */
+  computerUseOnWayland?: boolean;
+  /** The Computer Use driver refuses keys and clicks on this Wayland desktop, read at each start and resume of a session. */
+  computerUseInputRefused?: () => boolean;
   /** How the agents talk while they work, read at each start and resume of a session. */
   responseStyle?: () => ResponseStyle;
   /** The background memory review runs, read at each start and resume of a session. Omitted, it does not. */
@@ -262,6 +267,8 @@ export class ThreadLifecycle {
   readonly #serverHost: boolean;
   readonly #hostedStorageGb: () => number | null;
   readonly #agentCursorDrawn: boolean;
+  readonly #computerUseOnWayland: boolean;
+  readonly #computerUseInputRefused: () => boolean;
   readonly #responseStyle: () => ResponseStyle;
   readonly #memoryReview: () => boolean;
   readonly #skillRevision: () => boolean;
@@ -318,6 +325,8 @@ export class ThreadLifecycle {
     this.#serverHost = options.serverHost ?? false;
     this.#hostedStorageGb = options.hostedStorageGb ?? (() => null);
     this.#agentCursorDrawn = options.agentCursorDrawn ?? false;
+    this.#computerUseOnWayland = options.computerUseOnWayland ?? false;
+    this.#computerUseInputRefused = options.computerUseInputRefused ?? (() => false);
     this.#responseStyle = options.responseStyle ?? (() => DEFAULT_RESPONSE_STYLE);
     this.#memoryReview = options.memoryReview ?? (() => false);
     this.#skillRevision = options.skillRevision ?? (() => false);
@@ -1479,6 +1488,8 @@ export class ThreadLifecycle {
       serverHost: this.#serverHost,
       hostedStorageGb: this.#hostedStorageGb(),
       agentCursorDrawn: this.#agentCursorDrawn,
+      computerUseOnWayland: this.#computerUseOnWayland,
+      computerUseInputRefused: this.#computerUseInputRefused(),
       responseStyle: this.#responseStyle(),
       memoryReview: this.#memoryReview(),
       skillRevision: this.#skillRevision(),
@@ -1497,7 +1508,13 @@ export class ThreadLifecycle {
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
-            : [],
+            : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
+              // tools of the saved http rows through tool_call, so only those are listed.
+              client.provider === "antigravity"
+              ? mcpServers
+                  .filter((config) => config.transport === "http" && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID)
+                  .map((config) => providerMcpServerName(config.name))
+              : [],
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

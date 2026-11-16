@@ -364,6 +364,8 @@ export const messages = {
     "Этот прокси изменился после того, как вы его открыли. Проверьте его ещё раз и повторите попытку.",
   "error.backend.browserProxyUnreachable": "Прокси {name} не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
+  "error.backend.browserSystemProxyFailed":
+    "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":

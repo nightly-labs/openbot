@@ -77,6 +77,8 @@ import type {
   McpTestResult,
   MessagePinner,
   PinnedMessagesSnapshot,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderCodeLoginStart,
   ProviderUsageResets,
   QueuedMessageReceipt,
@@ -140,6 +142,7 @@ import {
   DEFAULT_RESPONSE_STYLE,
   isContextResetMarker,
   isCustomProviderHarness,
+  isReservedMcpServerName,
   MODEL_SWITCH_ITEM_TYPES,
   type ModelSwitchReason,
   type QueueSteerFallback,
@@ -176,6 +179,7 @@ import {
 } from "./agent/attention-registry";
 import { backgroundModel, withBackgroundEffort } from "./agent/background-model";
 import { BootRecovery } from "./agent/boot-recovery";
+import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
@@ -199,6 +203,7 @@ import {
   generatedVideoName,
   imageGenerationFailure,
 } from "./agent/image-generation";
+import type { ImageFitter } from "./agent/image-reader";
 import { InstructionsChanges } from "./agent/instructions-changes";
 import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
@@ -391,6 +396,8 @@ export interface AgentServiceOptions {
   screenCapture?: ScreenCaptureHost | null;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
   videoReader?: VideoReaderHost | null;
+  /** Decodes and fits pictures for `read_image`; null where this process cannot decode them. */
+  fitImage?: ImageFitter | null;
   /**
    * What an agent's MCP server test waits for first, as the Test button does: the managed tool
    * runtimes a stdio command may need. Without it the test runs with what this machine holds.
@@ -409,6 +416,8 @@ export interface AgentServiceOptions {
   feedback?: AgentFeedback | null;
   /** Makes one-time claims for `create_server_install_command` with the account session. */
   serverClaims?: AgentServerClaims | null;
+  /** The named browser profiles, for `read_agent` and `set_browser_profile`. */
+  browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
   sidebarLayout?: AgentSidebar | null;
   /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
   libraryFolders?: AgentLibraryFolders | null;
@@ -544,6 +553,10 @@ export interface AgentServiceOptions {
   hostedStorageGb?: () => number | null;
   /** OpenBot draws the Computer Use agent cursor, because the agents share the display of its windows. */
   agentCursorDrawn?: boolean;
+  /** The Computer Use driver drives a native Wayland desktop, where video can have no route (#9127). */
+  computerUseOnWayland?: boolean;
+  /** The Computer Use driver refuses keys and clicks on this Wayland desktop (#9703). Read at each start of a session. */
+  computerUseInputRefused?: () => boolean;
   /** When an idle Codex session is unloaded, and how many idle sessions one app server keeps. Tests make it short. */
   codexIdleSessions?: { releaseAfterMs: number; idleLimit: number };
 }
@@ -1351,6 +1364,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       serverHost: hostMemory !== null,
       ...(options.hostedStorageGb ? { hostedStorageGb: options.hostedStorageGb } : {}),
       ...(options.agentCursorDrawn ? { agentCursorDrawn: true } : {}),
+      ...(options.computerUseOnWayland ? { computerUseOnWayland: true } : {}),
+      ...(options.computerUseInputRefused ? { computerUseInputRefused: options.computerUseInputRefused } : {}),
       ...(options.responseStyle ? { responseStyle: options.responseStyle } : {}),
       memoryReview: () => this.#memoryReview.running(),
       skillRevision: () => options.skillLearning?.() === "automatic",
@@ -1947,12 +1962,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
-      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest),
+      ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
+      // The saved http rows that the agent gets. The built-in servers are left out: OpenBot gives their
+      // tools another way, and their bearer is the main process's. A stdio server is left out too: a
+      // Workspace only provider starts it in its sandbox, and OpenBot would start it outside.
+      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        const saved = new Set(this.#mcp.list().map((config) => config.id));
+        return this.enabledMcpServers(agentId).filter(
+          (config) => saved.has(config.id) && config.transport === "http" && !isReservedMcpServerName(config.name),
+        );
+      }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
       serverClaims: options.serverClaims ?? null,
+      ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -2561,9 +2586,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   signInMcpServer(
     input: TestMcpServerInput,
     open?: McpSignInOpener,
+    deepLinkRedirectUrl?: string,
   ): Effect.Effect<McpTestResult, AgentLifecycleFailed> {
     return this.#mcp
-      .signIn(input, open)
+      .signIn(input, open, deepLinkRedirectUrl)
       .pipe(
         Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "signInMcpServer", cause: failure.cause })),
       );
@@ -3091,7 +3117,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             this.#mailbox.storeGeneratedAttachment({
               sourcePath: savedPath,
               kind: input.kind,
-              name: input.kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+              name:
+                input.kind === "video" ? generatedVideoName(savedPath, input.prompt) : generatedImageName(savedPath),
             }),
           )
         : null;
@@ -3476,6 +3503,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
   }
 
+  /**
+   * The pin of an update, or undefined to keep it (#9116). An agent that names an account of a pooled
+   * provider pins it, and an agent that names the provider's own sign-in gives the account back to
+   * the pool. A person's change of the provider, model or account in the app, which shows the pool as
+   * one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
+   * it when the agent moves to another account.
+   */
+  #accountPin(
+    input: AgentUpdate,
+    move: ModelMove | null,
+    initiatingAgentId: string | undefined,
+    next: AgentModelChoice | undefined,
+  ): string | null | undefined {
+    if (move !== null || input.leaveUsageLimit) return undefined;
+    if (initiatingAgentId === undefined)
+      return input.provider !== undefined || input.model !== undefined || input.providerAccountId !== undefined
+        ? null
+        : undefined;
+    if (input.providerAccountId === undefined) return undefined;
+    return next?.providerAccountId && this.#pooled(next) ? next.providerAccountId : null;
+  }
+
   /** An update of the account alone also takes the new account's model when `#modelForAccount` gives one. */
   #withAccountModel(input: AgentUpdate): AgentUpdate {
     if (input.providerAccountId === undefined || input.model !== undefined || input.provider !== undefined)
@@ -3507,6 +3556,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? choice.reasoningEffort
         : model.defaultReasoningEffort,
     };
+  }
+
+  /**
+   * The fields of `input` other than its runtime, applied now while its provider change waits for
+   * the next turn. The declared type lets `#applyAgentUpdate` call it.
+   */
+  #applyFieldsNow(
+    input: AgentUpdate,
+    initiatingAgentId: string | undefined,
+  ): Effect.Effect<AgentSummary, AgentLifecycleFailed> {
+    return this.#applyAgentUpdate(withoutRuntimeFields(input), initiatingAgentId).pipe(
+      Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })),
+    );
   }
 
   /**
@@ -3660,16 +3722,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input.model !== undefined ||
       input.reasoningEffort !== undefined ||
       input.providerAccountId !== undefined;
-    // Only an update of the runtime alone waits for the next turn. An update with other fields is
-    // refused while work runs, as before, and so is a move to a backup model: `pendingRuntime` does
-    // not keep the model to go back to.
-    const queueable =
-      queueWhileBusy &&
-      previous !== undefined &&
-      !input.leaveUsageLimit &&
-      Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // A move to a backup model is refused while work runs, as before: `pendingRuntime` does not keep
+    // the model to go back to.
+    const queueable = queueWhileBusy && previous !== undefined && !input.leaveUsageLimit;
+    const runtimeOnly = Object.keys(input).every((key) => RUNTIME_UPDATE_KEYS.has(key));
+    // The provider checks access and resets fast mode, so a provider change with them is refused while
+    // work runs, as before, and does not apply them to the provider that the agent leaves.
+    const providerBound = Object.keys(input).some((key) => PROVIDER_BOUND_UPDATE_KEYS.has(key));
+    const pinnedAccountId = this.#accountPin(
+      input,
+      move,
+      initiatingAgentId,
+      previous && requestedProvider
+        ? {
+            provider: requestedProvider,
+            model: requestedModel?.id ?? previous.model,
+            ...(requestedAccount ? { providerAccountId: requestedAccount } : {}),
+          }
+        : undefined,
+    );
+    const pin = pinnedAccountId === undefined ? {} : { pinnedAccountId };
     const queue = (pendingRuntime: AgentPendingRuntime) =>
-      this.#store.updateAgent({ agentId: input.agentId, pendingRuntime }, initiatingAgentId).pipe(
+      this.#store.updateAgent({ agentId: input.agentId, pendingRuntime, ...pin }, initiatingAgentId).pipe(
         Effect.tap(() =>
           Effect.sync(() => {
             this.#emit({ type: "agents-changed", agents: this.listAgents() });
@@ -3680,10 +3754,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // An effort that the queued model does not support becomes the model's default.
     const queuedEffort = (effort: AgentReasoningEffort, model = requestedModel) =>
       model && !model.supportedReasoningEfforts.includes(effort) ? model.defaultReasoningEffort : effort;
-    if (queueable && previous && requestedProvider && runtimeFields && handoverNeeded && idleRefusal(previous)) {
+    if (
+      queueable &&
+      !providerBound &&
+      previous &&
+      requestedProvider &&
+      runtimeFields &&
+      handoverNeeded &&
+      idleRefusal(previous)
+    ) {
       yield* this.#providers.ensureProvider(requestedProvider);
       if (input.provider || input.model)
         yield* lifecycleStep("check provider switch", () => this.#providers.requireProviderOn(requestedProvider));
+      // The other fields of the same update apply now, as they do without a runtime change; only the
+      // handover waits (#9628). They are written after the checks above, so a refused provider change
+      // leaves them unchanged.
+      if (!runtimeOnly) yield* this.#applyFieldsNow(input, initiatingAgentId);
       return yield* queue({
         provider: requestedProvider,
         model: requestedModel?.id ?? previous.model,
@@ -3700,6 +3786,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const queued = previous?.pendingRuntime;
     if (
       queueable &&
+      runtimeOnly &&
       queued &&
       !handoverNeeded &&
       input.provider === undefined &&
@@ -3776,6 +3863,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ...(usageLimitReturn !== undefined ? { usageLimitReturn } : {}),
         // A Team API client cannot see the queued change, so only a handover from it ends the change.
         ...(runtimeFields && (queueWhileBusy || handoverNeeded) ? { pendingRuntime: null } : {}),
+        ...pin,
       },
       initiatingAgentId,
     );
@@ -3947,7 +4035,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    */
   #poolMove(agent: AgentSummary): AgentModelChoice | null {
     const choice = agentModelChoice(agent);
-    if (!this.#pooled(choice)) return null;
+    if (!this.#pooled(choice) || this.#keepsPinnedAccount(agent)) return null;
     this.#readPoolWhenStale(choice.provider);
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
@@ -3965,10 +4053,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     if (!agent) return false;
     const choice = agentModelChoice(agent);
-    if (!this.#pooled(choice)) return false;
+    if (!this.#pooled(choice) || this.#keepsPinnedAccount(agent)) return false;
     const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
     const pick = this.#poolPick(choice.provider, choice.model, current);
     return pick !== null && pick !== current;
+  }
+
+  /**
+   * Whether the agent stays on the account that an agent chose for it: the agent is on it, and it is
+   * ready for the model. A limit or a sign-out lets the pool move the agent, and the move ends the pin.
+   */
+  #keepsPinnedAccount(agent: AgentSummary): boolean {
+    const choice = agentModelChoice(agent);
+    return (
+      agent.pinnedAccountId === (choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) &&
+      this.#usageLimitReady(choice)
+    );
   }
 
   /**
@@ -4171,7 +4271,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             // A change that fails on an idle agent, such as a provider that is now off, would fail again
             // before each turn. The agent stays on its provider, and the header stops showing the change.
             if (this.#runtimeHandoverBusy(agentId)) return false;
-            const cleared = yield* Effect.exit(this.#store.updateAgent({ agentId, pendingRuntime: null }));
+            // A pin that the change set for its account ends with it.
+            const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+            const stalePin =
+              agent?.pinnedAccountId !== undefined &&
+              agent.pinnedAccountId !== (agent.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID);
+            const cleared = yield* Effect.exit(
+              this.#store.updateAgent({
+                agentId,
+                pendingRuntime: null,
+                ...(stalePin ? { pinnedAccountId: null } : {}),
+              }),
+            );
             if (Exit.isSuccess(cleared)) this.#emit({ type: "agents-changed", agents: this.listAgents() });
             return false;
           }),
@@ -4978,6 +5089,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
         ),
       );
+  }
+
+  /** See `ProviderRuntime.startProviderAccountCodeLogin`. */
+  startProviderAccountCodeLogin(
+    provider: AgentProvider,
+    accountId: string | null,
+  ): Effect.Effect<ProviderAccountCodeLoginStart, AgentLifecycleFailed> {
+    return this.#providers
+      .startProviderAccountCodeLogin(provider, accountId)
+      .pipe(
+        Effect.mapError(
+          (failure) => new AgentLifecycleFailed({ operation: "connectProviderAccount", cause: failure.cause }),
+        ),
+      );
+  }
+
+  /** See `ProviderRuntime.submitProviderAccountCodeLogin`. */
+  submitProviderAccountCodeLogin(provider: AgentProvider, accountId: string, code: string): void {
+    this.#providers.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** See `ProviderRuntime.providerAccountCodeLoginStatus`. */
+  providerAccountCodeLoginStatus(provider: AgentProvider, accountId: string): ProviderAccountCodeLoginStatus {
+    return this.#providers.providerAccountCodeLoginStatus(provider, accountId);
   }
 
   /** See `ProviderRuntime.connectProviderAccountKey`. */
@@ -6918,6 +7053,16 @@ const RUNTIME_UPDATE_KEYS: ReadonlySet<string> = new Set([
   "providerAccountId",
   "leaveUsageLimit",
 ]);
+
+/** Fields that depend on the agent's provider, so they do not apply now while a provider change waits. */
+const PROVIDER_BOUND_UPDATE_KEYS: ReadonlySet<string> = new Set(["access", "fastMode", "ultrafast"]);
+
+/** `update` without the fields of `RUNTIME_UPDATE_KEYS`, which a provider change during work queues. */
+function withoutRuntimeFields(update: AgentUpdate): AgentUpdate {
+  const fields: AgentUpdate = { ...update };
+  for (const key of RUNTIME_UPDATE_KEYS) if (key !== "agentId") Reflect.deleteProperty(fields, key);
+  return fields;
+}
 
 const MODEL_SWITCH_TEXT = {
   "usage-limit": "status.agent.modelSwitchedForLimit",

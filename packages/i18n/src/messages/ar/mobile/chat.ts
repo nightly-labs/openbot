@@ -176,6 +176,7 @@ export const messages = {
   "mobile.chat.composer.send": "إرسال الرسالة",
   "mobile.chat.composer.stop": "إيقاف {name}",
   "mobile.chat.composer.dictate": "إملاء رسالة",
+  "mobile.chat.composer.voiceSettings": "إعدادات الصوت",
   "mobile.chat.composer.stopDictation": "إيقاف الإملاء",
   "mobile.chat.composer.mention": "الإشارة إلى {name}",
   "mobile.chat.composer.skills": "المهارات",
@@ -368,6 +369,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "انتهيت",
   "mobile.chat.browserSecret.submitOnce": "إرسال مرة واحدة إلى {origin}. لا تُضاف هذه القيمة إلى الدردشة.",
   "mobile.chat.browserSecret.submitFailed": "تعذّر إكمال الطلب. تحقق من الاتصال وحاول مرة أخرى.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل شغّل نصًا برمجيًا في هذه الصفحة. لاستخدامها، اطلب من الوكيل إعادة تحميل الصفحة والمحاولة مرة أخرى.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل اختار حقلًا خاطئًا في الصفحة.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأن الوكيل لم يختر أيًّا من بيانات تسجيل الدخول المحفوظة لهذا الموقع. أخبر الوكيل بالحساب الذي يجب استخدامه.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على كلمة مرور لهذا الموقع.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على مفتاح تطبيق المصادقة.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأنه تعذّر عليه قراءة مدير كلمات المرور.",
   "mobile.chat.browserSecret.submit": "إرسال",
   "mobile.chat.browserSecret.takeOver": "تولي التحكم",
   "mobile.chat.starter.title": "على ماذا نعمل أولًا؟",

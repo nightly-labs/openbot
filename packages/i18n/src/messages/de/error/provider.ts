@@ -11,6 +11,9 @@ export const messages = {
     "{provider} hat nicht rechtzeitig geantwortet, daher hat OpenBot den Prozess beendet.",
   "error.provider.acpSignInLost":
     "{provider} hat seine Anmeldung verloren, daher hat OpenBot den Prozess beendet. Sende deine Nachricht erneut.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} hat eine Nachricht abgelehnt, daher hat OpenBot den Prozess beendet. Sende deine Nachricht erneut.",
+  "error.provider.acpSettingsTimedOut": "{provider} hat nicht rechtzeitig geantwortet. Versuche es gleich noch einmal.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldet, dass dein Tarif aufgebraucht ist. Wähle ein anderes Modell oder wechsle zu einem höheren {provider}-Tarif.",
   "error.provider.acpMcpNotLoaded":
@@ -288,6 +291,8 @@ export const messages = {
     "Der Gemini-Dienst von Google hat die Anfrage nicht abgeschlossen. Versuche es in ein paar Minuten erneut.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini hat diese Anfrage abgelehnt. Wähle ein anderes Modell und sende deine Nachricht erneut. Wenn es wieder fehlschlägt, starte einen neuen Chat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini hat die Verbindung zu seinem Agenten verloren und wurde beendet. Sende eine Nachricht, um fortzufahren.",
   "error.provider.antigravityRemoteWindowsSignIn":
@@ -328,6 +333,8 @@ export const messages = {
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
   "error.provider.hermesTurnFailed":
     "Hermes konnte diesen Durchlauf nicht abschließen. Wenn die Antwort einen Grund nennt, folge ihm. Sonst ist vielleicht ein MCP-Server dieses Agenten nicht erreichbar: Prüfe ihn unter Servereinstellungen › MCP und sende deine Nachricht erneut.",
+  "error.provider.hermesRefused":
+    "Hermes hat diese Nachricht abgelehnt, bevor sie begann. Sende sie erneut. Wenn Hermes jede Nachricht ablehnt, starte OpenBot auf dem Computer neu, auf dem dieser Agent läuft.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot konnte dieses Modell nicht verwenden: Das Modell hat die Denk-Einstellung nicht akzeptiert. Wähle ein anderes Modell für diesen Agenten und sende deine Nachricht erneut.",
   "error.provider.usageLimitReached": "Das Konto hat sein Nutzungslimit erreicht.",
@@ -335,6 +342,8 @@ export const messages = {
     "Dieser Chat ist für Claude zu lang geworden. OpenBot hat eine neue Claude-Code-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.claudeApiKeyNoCredit":
     "Der Anthropic-API-Schlüssel hat kein API-Guthaben. Ein Claude-Abo bezahlt keine Anfragen mit einem API-Schlüssel. Lade Guthaben in der Anthropic Console auf, oder melde dich in den Einstellungen bei Claude an und wähle das Claude-Konto im Modellmenü des Agenten.",
+  "error.provider.claudeServiceBlocked":
+    "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooSmall":
@@ -343,6 +352,8 @@ export const messages = {
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu groß ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageCountLimit":
     "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.requestTooLarge":
+    "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
     "OpenCode hat die Anfrage abgelehnt und keinen Grund genannt. Das kann in einem langen Chat oder nach einem Modellwechsel passieren. OpenBot hat eine neue OpenCode-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell oder einen niedrigeren Aufwand.",
   "error.provider.opencodeCompactionFailed":
@@ -360,6 +371,8 @@ export const messages = {
     "Gemini konnte die Anmeldeseite nicht in deinem Browser öffnen. Prüfe deinen Standardbrowser und verbinde dich dann erneut.",
   "error.provider.acpSignInFailed": "Die Anmeldung wurde nicht abgeschlossen.",
   "error.provider.acpSignInFailedReason": "Die Anmeldung wurde nicht abgeschlossen: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Die Anmeldung konnte den Server des Anbieters nicht erreichen. Prüfe die Netzwerkverbindung und die DNS-Einstellungen des Computers, auf dem OpenBot läuft, und versuche es dann erneut.",
   "error.provider.acpSignOutFailed": "Die Abmeldung wurde nicht abgeschlossen.",
   "error.provider.acpSignOutFailedReason": "Die Abmeldung wurde nicht abgeschlossen: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -367,6 +380,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Im Browser können nur HTTPS-Anmeldelinks geöffnet werden.",
   "error.provider.geminiKeyRefused":
     "Gemini hat den gespeicherten API-Schlüssel abgelehnt. Ersetze oder entferne den Schlüssel in den Einstellungen und verbinde dich dann erneut.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini hat die Anfrage abgelehnt, weil dein gespeicherter Gemini-API-Schlüssel ein Ratenlimit oder sein Kontingent erreicht hat. Der Schlüssel wird statt deines Google-Tarifs verwendet. Warte ein paar Minuten oder wähle ein anderes Modell und versuche es dann erneut. Um deinen Google-Tarif zu verwenden, entferne den Schlüssel in den Einstellungen.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Dein gespeicherter Gemini-API-Schlüssel hat kein Kontingent für dieses Modell. Der Schlüssel wird statt deines Google-Tarifs verwendet. Wähle ein anderes Modell oder entferne den Schlüssel in den Einstellungen, um deinen Google-Tarif zu verwenden.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini kann die Einstellungsdatei dieses Kontos nicht öffnen und sich deshalb nicht anmelden. Entferne dieses Konto und füge es erneut hinzu.",
   "error.provider.geminiSettingsUnreadable":
@@ -466,6 +483,8 @@ export const messages = {
   "error.provider.piResumeCancelled": "Pi hat das Fortsetzen der Sitzung abgebrochen. Versuche es erneut.",
   "error.provider.piSessionIdentity":
     "Pi hat eine andere Sitzung zurückgegeben. Die gespeicherte Sitzung wurde nicht ersetzt.",
+  "error.provider.piExtensionFailed":
+    "Pi wurde beendet, weil eine Erweiterung nicht geladen werden konnte. Entferne oder aktualisiere diese Erweiterung und versuche es erneut. {detail}",
   "error.provider.piModelInvalid": "Wähle ein Pi-Modell, das seinen Anbieter enthält.",
   "error.provider.piToolInvalid": "Das Werkzeug hat ein ungültiges Ergebnis zurückgegeben.",
   "error.provider.piSignIn":

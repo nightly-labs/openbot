@@ -327,6 +327,147 @@
     content: none;
   }
 
+  /* The selected tab of the chat header and of the side panel is part of the card: a shape with the card
+   * fill and the card line goes from the top of the tab down to the card's top line, and two inward curves
+   * join its sides to that line. The shape is behind the content of the tab row. A translucent card would
+   * show the card line through it, so the transparent window keeps the fill of the tabs. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape {
+    --tab-shape-curve: var(--openbot-radius-md);
+    position: absolute;
+    z-index: -1;
+    top: var(--tab-shape-top, 0);
+    left: var(--tab-shape-left, 0);
+    right: var(--tab-shape-right, 100%);
+    display: block;
+    height: var(--tab-shape-height, 0);
+    border: 1px solid var(--openbot-border);
+    border-bottom: 0;
+    border-start-start-radius: var(--openbot-radius-md);
+    border-start-end-radius: var(--openbot-radius-md);
+    background: var(--openbot-bg-canvas);
+    pointer-events: none;
+    transition:
+      left var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-start-delay, 0ms),
+      right var(--openbot-duration-overlay) var(--openbot-ease-out) var(--tab-shape-end-delay, 0ms),
+      top var(--openbot-duration-overlay) var(--openbot-ease-out),
+      height var(--openbot-duration-overlay) var(--openbot-ease-out);
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape:is([data-hidden], [data-instant]) {
+    transition: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape[data-hidden] {
+    visibility: hidden;
+  }
+
+  /* Each curve is a square with a quarter circle cut out: the line follows the arc, and the card fill is
+   * outside it. The square also covers the bottom of the shape's side line, so that line turns into the
+   * arc and does not go on down beside it. The arc starts on the side line and ends on the card line. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::before,
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::after {
+    position: absolute;
+    bottom: 0;
+    width: calc(var(--tab-shape-curve) + 1px);
+    height: calc(var(--tab-shape-curve) + 1px);
+    content: "";
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::before {
+    left: calc(-1 * var(--tab-shape-curve) - 1px);
+    background:
+      radial-gradient(
+        circle at 0 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-border) var(--tab-shape-curve),
+        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+        transparent calc(var(--tab-shape-curve) + 1px)
+      ),
+      radial-gradient(
+        circle at 0 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-bg-canvas) var(--tab-shape-curve)
+      );
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape::after {
+    right: calc(-1 * var(--tab-shape-curve) - 1px);
+    background:
+      radial-gradient(
+        circle at 100% 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-border) var(--tab-shape-curve),
+        var(--openbot-border) calc(var(--tab-shape-curve) + 1px),
+        transparent calc(var(--tab-shape-curve) + 1px)
+      ),
+      radial-gradient(
+        circle at 100% 0,
+        transparent var(--tab-shape-curve),
+        var(--openbot-bg-canvas) var(--tab-shape-curve)
+      );
+  }
+
+  /* While the shape shows, it is the fill of the selected tab. A selected thread that waits or failed
+   * keeps its state icon, but not its tinted fill. A tab that the pointer drags keeps its fill. */
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .conversation-panel
+    > .conversation-header:has(> .tab-shape:not([data-hidden]))
+    :is(
+      .conversation-title.ui-button[data-tab][data-selected],
+      .agent-threads-tab.ui-sliding-tabs-trigger[aria-selected="true"]:not([data-renaming], [data-dragged=""]),
+      .agent-threads-switcher.ui-button:not(:hover, [aria-expanded="true"])
+    ) {
+    background: transparent;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .conversation-panel
+    > .conversation-header:has(> .tab-shape:not([data-hidden]))
+    .agent-threads-fill {
+    display: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    .side-panel-docked
+    > .side-panel-header:has(> .tab-shape:not([data-hidden]))
+    .side-panel-tab[data-selected]:not([data-dragged=""]) {
+    background: transparent;
+  }
+
   /* The line between the agent list and the chat starts at the card's top line. In the top row, a short
    * line sits above it. */
   .app-window > .app-frame-edge > .sidebar::before {
@@ -521,6 +662,13 @@
     overflow: hidden;
   }
 
+  /* The chip of a parent in a path starts before its text. The identity clips a long title, so it starts
+     earlier by the same width and does not cut the chip. The text stays where it was. */
+  .app-window > .app-frame-edge .page-header-identity[data-path] {
+    margin-inline-start: calc(-1 * var(--openbot-space-2) - 1px);
+    padding-inline-start: calc(var(--openbot-space-2) + 1px);
+  }
+
   .app-window > .app-frame-edge .page-header-title {
     font-size: var(--openbot-text-md);
     font-weight: var(--openbot-weight-medium);
@@ -693,7 +841,10 @@
     margin-inline-end: 0;
   }
 
+  /* The row stays when it has no path, because a section page shows its title in the panel. It is
+   * the part of the top row that moves the window. */
   .app-frame-edge[data-window-page-kind="settings"] > .window-page > .settings-page > .settings-page-path-row {
+    display: flex;
     padding-block: 0;
     padding-inline-start: 0;
     -webkit-app-region: drag;
@@ -708,9 +859,10 @@
     width: auto;
     flex: 0 1 auto;
     max-width: none;
-    /* The page starts 1px after the start of the frame. */
-    margin-inline: -1px 0;
-    padding-inline: var(--top-row-padding-inline);
+    /* The path starts near the section list. The pill of the section before the open page starts just after
+       the line of the list, so the start padding is the start inset of the pill. */
+    margin-inline: 0;
+    padding-inline: calc(var(--openbot-space-2) + 1px) var(--openbot-space-3);
   }
 
   .app-frame-edge[data-window-page-kind="titled"] > .window-page {
@@ -778,6 +930,8 @@
 
 /* The settings page: the nav at the width of the sidebar, and the path to an open detail page above the panel. */
 .settings-page {
+  /* The widest line of the panel and of the path above it. */
+  --settings-page-column-width: 960px;
   display: grid;
   width: 100%;
   height: 100%;
@@ -787,14 +941,15 @@
 }
 
 .settings-page-path-row {
+  /* The room of the Close button. */
+  --settings-page-close-room: calc(var(--openbot-space-8) + var(--openbot-space-4));
   display: flex;
   min-width: 0;
   grid-column: 2;
   grid-row: 1;
   align-items: center;
   padding-block: var(--openbot-space-4) 0;
-  /* The room of the Close button. */
-  padding-inline: 0 calc(var(--openbot-space-8) + var(--openbot-space-4));
+  padding-inline: 0 var(--settings-page-close-room);
 }
 
 .settings-page-path-row:empty {
@@ -812,12 +967,15 @@
   margin-inline-end: var(--openbot-space-3);
 }
 
-/* Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge. */
+/*
+ * Below the top row, the path takes the column and the inline padding of the panel, so both start on one edge.
+ * The row ends before the Close button, so the start margin adds that room back to center on the panel column.
+ */
 .settings-page-path-row > .settings-page-path {
   width: 100%;
-  max-width: 784px;
-  margin-inline: auto;
-  padding-inline: var(--openbot-space-8);
+  max-width: var(--settings-page-column-width);
+  margin-inline: max(0px, calc((100% + var(--settings-page-close-room) - var(--settings-page-column-width)) / 2)) 0;
+  padding-inline: var(--openbot-space-6);
 }
 
 .settings-page-nav {
@@ -829,7 +987,7 @@
   gap: var(--openbot-space-1);
   overflow: hidden;
   border-inline-end: 1px solid var(--openbot-border);
-  padding: var(--openbot-space-4) var(--openbot-space-3) 0;
+  padding: var(--openbot-space-4) var(--openbot-space-2) 0;
 }
 
 /* The title and the search stay at the top. The list below them scrolls. */
@@ -897,13 +1055,14 @@
   }
 }
 
+/* The title starts on the edge of the row icons below it. */
 .settings-page-title {
   margin: 0 0 var(--openbot-space-3);
   padding: 0 var(--openbot-space-2);
   color: var(--openbot-text-primary);
-  font-size: var(--openbot-text-lg);
+  font-size: var(--openbot-text-2xl);
   font-weight: var(--openbot-weight-semibold);
-  line-height: var(--openbot-leading-lg);
+  line-height: var(--openbot-leading-2xl);
 }
 
 /* The heading takes the focus when the page opens, only so a screen reader reads it. */
@@ -915,7 +1074,8 @@
 /* The search has more space below it than the gap of the nav, so it does not look like a section row. */
 .settings-page-search {
   flex: none;
-  margin-bottom: var(--openbot-space-2);
+  height: var(--openbot-control-md);
+  margin-bottom: var(--openbot-space-3);
   border-radius: var(--openbot-radius-pill);
   padding: 0 var(--openbot-space-3);
 }
@@ -959,7 +1119,7 @@
 /* The row to the other settings page: below the section list, apart from it, at the end of the column. */
 .settings-page-footer {
   flex: none;
-  margin-inline: calc(-1 * var(--openbot-space-3));
+  margin-inline: calc(-1 * var(--openbot-space-2));
   --settings-page-switch-radius: calc(var(--openbot-radius-card) - var(--openbot-space-1));
   border-top: 1px solid var(--openbot-border);
   padding: var(--openbot-space-1);
@@ -1019,14 +1179,23 @@
   transform: scaleX(-1);
 }
 
-.settings-page-nav-group .settings-modal-nav-item {
-  padding-inline: var(--openbot-space-3);
+/* The rows of the list are close together, so a long list shows in one view. */
+.settings-page-nav-group .settings-modal-nav {
+  gap: var(--openbot-space-0-5);
+}
+
+/* The selected row keeps the weight of the other rows, so its name does not get wider when it is selected.
+   Only its background and color change. */
+.settings-page-nav-group .settings-modal-nav-item,
+.settings-page-nav-group .settings-modal-nav-item[aria-current="page"] {
+  min-height: var(--openbot-control-sm);
+  padding-inline: var(--openbot-space-2);
+  font-weight: var(--openbot-weight-regular);
 }
 
 .settings-page-nav-group .settings-modal-nav-item[data-selected] {
   background: var(--openbot-bg-control-hover);
   color: var(--openbot-text-primary);
-  font-weight: var(--openbot-weight-medium);
 }
 
 /* A search result: the section with its icon, and below it the matching row title */
@@ -1080,6 +1249,13 @@
   height: var(--openbot-icon-sm);
 }
 
+/* The icons of the section list have a thin line, so the list looks light. */
+.settings-page-search > svg,
+.settings-page-footer svg,
+.settings-page-nav-group .settings-modal-nav-item svg {
+  stroke-width: var(--openbot-icon-stroke-lg);
+}
+
 .settings-page-result-title {
   overflow: hidden;
   padding-inline-start: calc(var(--openbot-icon-sm) + var(--openbot-space-2));
@@ -1113,10 +1289,12 @@
   background: transparent;
 }
 
+/* The content uses the width of the window, up to a readable line, and is in the center of the panel. */
 .settings-page-content > .settings-modal-page .settings-modal-content {
   width: 100%;
-  max-width: 784px;
+  max-width: var(--settings-page-column-width);
   margin-inline: auto;
+  padding-inline: var(--openbot-space-6);
 }
 
 /* The row that a search result opened */
@@ -1155,12 +1333,16 @@
     grid-row: 3;
   }
 
+  .settings-page-content > .settings-modal-page .settings-modal-content {
+    padding-inline: var(--openbot-space-4);
+  }
+
   .settings-page-nav {
     grid-column: 1;
     grid-row: 1;
     border-inline-end: 0;
     border-bottom: 1px solid var(--openbot-border);
-    padding: var(--openbot-space-3) var(--openbot-space-3) 0;
+    padding: var(--openbot-space-3) var(--openbot-space-2) 0;
   }
 
   .settings-page-title {
@@ -1267,5 +1449,13 @@
 @media (prefers-reduced-motion: reduce) {
   .quit-shortcut-backdrop {
     animation: none;
+  }
+
+  :root:not([data-openbot-window-glass])
+    .app-window
+    > .app-frame-edge
+    :is(.conversation-panel > .conversation-header, .side-panel-docked > .side-panel-header)
+    > .tab-shape {
+    transition: none;
   }
 }

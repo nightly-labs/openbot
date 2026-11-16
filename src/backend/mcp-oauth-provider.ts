@@ -195,7 +195,7 @@ export interface McpOAuthOptions {
  * resolve every token before they connect, so an authorization server that accepts a connection
  * but never finishes its response would otherwise stall either past its own deadline.
  */
-const MCP_TOKEN_TIMEOUT_MS = 10_000;
+export const MCP_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
  * An access token is refreshed this long before it is due to expire, so a thread that starts at the
@@ -293,7 +293,7 @@ export interface McpOAuthAuthority {
   accessToken: (url: string) => Effect.Effect<string | null, McpOperationError>;
   /** A new token after the server refused `rejected`, or `null`. See `McpOAuth.refreshAccessToken`. */
   refreshAccessToken: (url: string, rejected: string) => Effect.Effect<string | null, McpOperationError>;
-  signIn: (url: string, open?: McpSignInOpener) => McpSignIn | null;
+  signIn: (url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string) => McpSignIn | null;
   /** Ends the sign-in waiting for this URL's browser, if one is. Answers whether one was. */
   cancelSignIn: (url: string) => boolean;
   /** Whether this computer holds a token for this URL. Never the token itself. */
@@ -486,8 +486,12 @@ export class McpOAuth implements McpOAuthAuthority {
     ),
   );
 
-  /** A sign-in the user asked for, or `null` when the URL is not one this can sign in to. */
-  signIn(url: string, open?: McpSignInOpener): McpSignIn | null {
+  /**
+   * A sign-in the user asked for, or `null` when the URL is not one this can sign in to. With `open`,
+   * `deepLinkRedirectUrl` is the link that the computer where the page opens returns to OpenBot on
+   * (`sign-in-relay-deep-link-v1`).
+   */
+  signIn(url: string, open?: McpSignInOpener, deepLinkRedirectUrl?: string): McpSignIn | null {
     const key = mcpOAuthAccountKey(url);
     if (!key) return null;
     this.#attempts.get(key)?.();
@@ -505,7 +509,7 @@ export class McpOAuth implements McpOAuthAuthority {
     let cancelled = false;
     let exchangeFailed = false;
     const resource = mcpOAuthServerUrl(key);
-    const provider = this.#provider(key, state, () => abandoned, open, unanswered);
+    const provider = this.#provider(key, state, () => abandoned, open, unanswered, deepLinkRedirectUrl);
     const abandon = () => {
       // `receiveAuthorizationCode` removes the state when the grant arrives. An attempt that ended
       // before it opened a page keeps the record it was given, for the next attempt.
@@ -832,6 +836,7 @@ export class McpOAuth implements McpOAuthAuthority {
     isAbandoned: () => boolean = () => false,
     open?: McpSignInOpener,
     unansweredRedirectUrl?: string,
+    openedDeepLinkRedirectUrl?: string,
   ): McpOAuthClientProvider {
     const generation = this.#generations.get(key) ?? 0;
     const storage = this.#options.storage;
@@ -867,7 +872,8 @@ export class McpOAuth implements McpOAuthAuthority {
       storage: guarded,
       redirectUrl: this.#options.redirectUrl,
       // A page that an opener shows is not in this computer's browser, which is what opens the deep link.
-      deepLinkRedirectUrl: open ? undefined : this.#options.deepLinkRedirectUrl,
+      // A relayed page opens on a computer that can name its own.
+      deepLinkRedirectUrl: open ? () => openedDeepLinkRedirectUrl : this.#options.deepLinkRedirectUrl,
       openExternal: open ?? this.#options.openExternal,
       isAbandoned,
       legacyIssuer: legacyIssuer(stored),
@@ -1640,7 +1646,7 @@ function mcpOAuthServerUrl(key: string): string {
  * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
  * none, which left the row showing the result of the earlier test, with no page and no words.
  */
-const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
+export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
   let metadataStatus: number | null = null;
   const metadataFetch: FetchLike = async (input, init) => {
     metadataStatus = null;

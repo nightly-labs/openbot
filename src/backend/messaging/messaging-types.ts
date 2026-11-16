@@ -38,6 +38,8 @@ export interface InboundFile {
   mimeType: string;
   size: number;
   url: string;
+  /** A copy on this computer, when the connection saved the file at arrival (WhatsApp). */
+  path?: string;
 }
 
 /** One message that addresses OpenBot, in the same shape for every platform. */
@@ -74,6 +76,9 @@ interface InboundQuote {
   mentionedUserIds: string[];
   /** ISO time. */
   sentAt: string;
+  /** The replied-to message's id and files, for a platform that keeps them apart from the message's own files. */
+  messageId?: string;
+  files?: InboundFile[];
 }
 
 interface InboundActionBase {
@@ -124,6 +129,18 @@ export interface ContextEntry {
   files?: InboundFile[];
 }
 
+/** Keeps only the messages sent before `before` (an ISO time) whose text or author has each word of `query`. */
+export interface HistoryFilter {
+  query?: string;
+  before?: string;
+}
+
+/** What the history tool reads of a place. `note` says why the platform gave fewer messages, when it knows. */
+export interface RecentMessages {
+  messages: ContextEntry[];
+  note?: string;
+}
+
 /** A failure the connection cannot recover from alone. The user must act. */
 export class MessagingConnectionError extends Error {
   constructor(readonly state: Extract<MessagingConnectionState, "invalid_token">) {
@@ -137,6 +154,8 @@ export class MessagingAdapterError extends Schema.TaggedError<MessagingAdapterEr
 
 export interface MessagingAdapter {
   readonly platform: MessagingPlatform;
+  /** True when `recent` applies its filter to all the messages that the platform keeps. */
+  readonly searchesHistory?: boolean;
   identify(): Effect.Effect<ConnectionIdentity, MessagingAdapterError>;
   post(target: MessageTarget, body: MessageBody): Effect.Effect<string, MessagingAdapterError>;
   edit(target: MessageTarget, messageId: string, body: MessageBody): Effect.Effect<void, MessagingAdapterError>;
@@ -195,13 +214,14 @@ export interface MessagingAdapter {
   /**
    * The newest messages of a place, oldest first, posts by bots included, for the agent's history
    * tool. With `threadKey`, only that conversation; with null, the whole channel or chat. At most
-   * `limit` messages; the platform can give fewer.
+   * `limit` messages; the platform can give fewer. A platform with `searchesHistory` applies `filter` to all that it saved; the others ignore it.
    */
   recent(
     platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError>;
+    filter?: HistoryFilter,
+  ): Effect.Effect<RecentMessages, MessagingAdapterError>;
   /** Downloads one file to `destination`. Refuses a file larger than `maxBytes`. */
   download(file: InboundFile, destination: string, maxBytes: number): Effect.Effect<void, MessagingAdapterError>;
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;

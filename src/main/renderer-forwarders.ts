@@ -52,6 +52,7 @@ import {
   notificationForAgentEvent,
   notificationForUsageLimit,
   notificationRequestKey,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
   channelForThread,
@@ -373,6 +374,8 @@ export function createRendererForwarders({
     // A turn of a side thread that is not a routine thread shows no desktop notification, as before.
     // The phone notifies about it (`PushNotificationService`).
     if (received.type === "thread-turn-completed" && !received.routine) return;
+    // Work between agents stays in the chat and does not call the user.
+    if (teammateTurnCompleted(received)) return;
     // A routine thread's turn notifies as a turn of the chat does. Its answer is in the routine thread.
     const routineTaskId = received.type === "thread-turn-completed" ? received.taskId : null;
     const event = received.type === "thread-turn-completed" ? received.turn : received;

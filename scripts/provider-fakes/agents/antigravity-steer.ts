@@ -3,8 +3,9 @@
 // `end_turn` at once, echoes the new message as `user_message_chunk`, and the work goes on under the
 // new prompt. A `work` prompt opens one tool call and stays open. A steer that starts with `more`
 // also stays open; another steer ends the tool call and answers with its text. Each other prompt
-// answers at once. An `ask` prompt asks for a permission and answers with the outcome.
-// `FAKE_VERSION` sets the version in `agentInfo`.
+// answers at once. An `ask` prompt asks for a permission and answers with the outcome. A `daemon`
+// prompt starts a daemon command and answers while it runs, as `agy acp` 1.5.x does for a dev server.
+// `FAKE_VERSION` sets the version in `agentInfo`. A session id holds the process id.
 import { type AcpPeer, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
 const MODELS = { availableModels: [{ modelId: "gemini-fake", name: "Gemini Fake" }], currentModelId: "gemini-fake" };
@@ -83,6 +84,19 @@ serveFakeAcpAgent(
             peer.say(sessionId, `asked: ${outcome}`);
             answer(peer, request);
           });
+        return;
+      }
+      if (text === "daemon") {
+        peer.update(sessionId, {
+          sessionUpdate: "tool_call",
+          toolCallId: "tool-daemon",
+          title: "npm run dev",
+          kind: "execute",
+          status: "in_progress",
+          rawInput: { CommandLine: "npm run dev", IsDaemon: true },
+        });
+        peer.say(sessionId, "The dev server runs.");
+        answer(peer, request);
         return;
       }
       if (text !== "work") {

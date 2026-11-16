@@ -51,6 +51,7 @@ export function usePlanLimitRows() {
               limit.model,
             remainingPercent: 0,
             tone: usageTone(0),
+            durationMins: null,
             resetsAt,
             resetsAtLabel: formatUsageReset(resetsAt, text),
           };

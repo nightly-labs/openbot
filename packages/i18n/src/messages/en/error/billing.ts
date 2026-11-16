@@ -7,6 +7,9 @@ export const messages = defineMessages("error.billing", {
   "error.billing.restartUnavailable": "This server cannot restart from here. Contact support.",
   "error.billing.planRequired": "The plan of this server ended. Renew it to start the server.",
   "error.billing.planSoldOut": "This plan is sold out. Choose another plan.",
+  // Storage tier errors.
+  "error.billing.storageUnavailable": "This storage is not available for this server.",
+  "error.billing.storagePaymentFailed": "The payment for the storage failed. Update the payment method and try again.",
   // License errors.
   "error.billing.licenseExists": "This account already has a license. Change its users instead.",
   "error.billing.licenseCurrency": "The license must use the currency of your other plans.",

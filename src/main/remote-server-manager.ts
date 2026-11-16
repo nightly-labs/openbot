@@ -93,6 +93,7 @@ import {
 } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import type { HostAppearanceEvent, ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
@@ -495,6 +496,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectMessage: (serverId, event) => this.emit("directMessage", serverId, event),
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
+      onHostAppearance: (serverId, event) => this.#applyHostAppearance(serverId, event),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
@@ -1977,6 +1979,20 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /** Saves the shape and colour that a joined host took, so the change shows before its event arrives. */
+  readonly applyAppearance = Effect.fn("RemoteManager.applyAppearance")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      appearance: ServerAppearance | null,
+    ): Effect.fn.Return<ServerSummary, RemoteWorkflowError> {
+      yield* this.#store.update(serverId, { appearance });
+      this.#emitChanged();
+      return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
   listMembers(serverId: string): Effect.Effect<TeamMemberSummary[], RemoteWorkflowError> {
     return this.#owned(this.#team.listMembers(serverId)).pipe(
       Effect.map((members) => this.#refresh.withMemberChatColors(serverId, members)),
@@ -2907,6 +2923,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     } else if (event.type === "team-direct-message") this.emit("directMessage", serverId, event);
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
+    else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
@@ -2942,6 +2959,19 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     );
   }
 
+  // Best effort, as the identity is: the host sends the appearance at each connect and change.
+  #applyHostAppearance(serverId: string, { appearance }: HostAppearanceEvent): void {
+    if (sameAppearance(this.#store.find(serverId)?.appearance, appearance)) return;
+    this.#background(
+      this.#owned(
+        this.#store.update(serverId, { appearance }).pipe(
+          Effect.tap(() => Effect.sync(() => this.#emitChanged())),
+          Effect.catch(() => Effect.void),
+        ),
+      ),
+    );
+  }
+
   #emitChanged(): void {
     this.#syncFocusUse();
     this.emit("changed", this.list());
@@ -2956,6 +2986,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.supportsCapability(serverId, FOCUS_USE_CAPABILITY);
     this.#focusUse.setTarget(focused ? serverId : null);
   }
+}
+
+function sameAppearance(left: ServerAppearance | null | undefined, right: ServerAppearance | null): boolean {
+  if (!left || !right) return (left ?? null) === right;
+  return left.shape === right.shape && left.color === right.color;
 }
 
 function requiredServerSummary(servers: ServerSummary[], serverId: string): ServerSummary {

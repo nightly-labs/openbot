@@ -86,6 +86,23 @@ export function usageTone(remainingPercent: number | null): PlanLimitTone {
   return remainingPercent < 10 ? "critical" : "warning";
 }
 
+/**
+ * The share of a window's time that is left, 0 to 100. A reader who spends the quota at an even pace
+ * has this share of the quota left, so less left than this means the quota ends before the reset.
+ * Null when the window has no length or no reset time, or when the reset time is not in the window:
+ * the window ended, or it has not started. A month is 28 to 31 days, so the length has a tolerance.
+ */
+export function usagePaceRemainingPercent(
+  durationMins: number | null,
+  resetsAt: number | null,
+  nowMs: number,
+): number | null {
+  if (durationMins === null || durationMins <= 0 || resetsAt === null) return null;
+  const leftMins = (resetsAt * 1_000 - nowMs) / 60_000;
+  if (!(leftMins > 0) || leftMins > durationMins * 1.05) return null;
+  return Math.min(100, (leftMins / durationMins) * 100);
+}
+
 /** The windows of a reading, the shortest first. A window with no duration comes last. */
 export function reportedUsageWindows(
   limit: Pick<AccountUsageLimit, "primary" | "secondary" | "tertiary">,

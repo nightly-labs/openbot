@@ -68,6 +68,7 @@ import { FOCUS_USE_CODECS } from "./focus-use-v1";
 import { GITHUB_SKILLS_CODECS } from "./github-skills-v1";
 import { HERMES_IMPORT_CODECS } from "./hermes-import-v1";
 import { HOST_ADMIN_CODECS } from "./host-admin-v1";
+import { HOST_APPEARANCE_CODECS } from "./host-appearance-v1";
 import { HOST_KEY_ROTATION_CODECS } from "./host-key-rotation-v1";
 import { HOST_MEMBER_UPDATE_CODECS } from "./host-member-update-v1";
 import { HOST_PERSONALITY_CODECS } from "./host-personality-v1";
@@ -96,6 +97,7 @@ import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PENDING_APPROVAL_CODECS } from "./pending-approval-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CODECS } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CODECS } from "./provider-account-pool-v1";
@@ -129,6 +131,7 @@ import { SHARED_TABLES_CODECS } from "./shared-tables-v1";
 import { SIDE_QUESTION_CODECS } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CODECS } from "./sidebar-folders-v1";
 import { SIDEBAR_PINS_CODECS } from "./sidebar-pins-v1";
+import { SIGN_IN_RELAY_DEEP_LINK_CODECS } from "./sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CODECS } from "./sign-in-relay-v1";
 import { SKILL_LEARNING_CODECS } from "./skill-learning-v1";
 import { SKILLS_ADMIN_CODECS } from "./skills-admin-v1";
@@ -190,6 +193,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...DISCORD_ACCESS_CODECS,
   ...HOST_RELEASE_CODECS,
   ...HOST_RESTART_CODECS,
+  ...HOST_APPEARANCE_CODECS,
   ...HOST_MEMBER_UPDATE_CODECS,
   ...CONTEXT_RESET_CODECS,
   ...EVENTS_CODECS,
@@ -216,6 +220,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_HOST_SIGN_IN_CODECS,
   ...MCP_SIGN_IN_APP_CODECS,
   ...SIGN_IN_RELAY_CODECS,
+  ...SIGN_IN_RELAY_DEEP_LINK_CODECS,
   ...FOCUS_USE_CODECS,
   ...COMPUTER_ACTIVITY_CODECS,
   ...CONNECTORS_CODECS,
@@ -230,6 +235,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_MODELS_CODECS,
   ...PROVIDER_ACCOUNT_POOL_CODECS,
   ...PROVIDER_ACCOUNT_KEYS_CODECS,
+  ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,

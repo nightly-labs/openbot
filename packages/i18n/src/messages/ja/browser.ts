@@ -90,6 +90,18 @@ export const messages = {
   "browser.secret.submitting": "送信しています…",
   "browser.secret.takeOver": "操作を引き継ぐ",
   "browser.secret.failed": "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "browser.secret.vaultSkip.agentScript":
+    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+  "browser.secret.vaultSkip.fieldKind":
+    "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.loginChoice":
+    "エージェントがこのサイトの保存済みログイン情報を選ばなかったため、OpenBot は保存したログイン情報を使いませんでした。どのアカウントを使うかエージェントに伝えてください。",
+  "browser.secret.vaultSkip.noPassword":
+    "このサイトのパスワードがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "認証アプリのキーがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "パスワードマネージャーを読み取れなかったため、OpenBot は保存したログイン情報を使いませんでした。",
   "browser.error.openAddress": "このタブでアドレスを開けませんでした。",
   "browser.error.channelNoBrowserMember": "このチャンネルでは、新しいタブを開けるメンバーがいません。",
   "browser.error.closeTab": "ブラウザーのタブを閉じられませんでした。",

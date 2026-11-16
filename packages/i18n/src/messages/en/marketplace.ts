@@ -141,6 +141,11 @@ export const messages = defineMessages("marketplace", {
   "marketplace.app.remove.action": "Remove",
   "marketplace.app.remove.confirmTitle": "Remove {name}?",
   "marketplace.app.remove.keep": "Keep",
+  // Connect meets a server with the app's server name that is not the app. {server} is that name, {name} the app.
+  "marketplace.app.replace.title": "Replace {server}?",
+  "marketplace.app.replace.description":
+    "You already have a server named {server}, but it is not {name}. Replace it with {name}? Its address and saved keys are deleted.",
+  "marketplace.app.replace.action": "Replace",
   // The plugin page section with one row for each app, and the row text by how the app connects.
   // {name} is the app name, {field} the label of its key field, {host} "this computer" or a server name.
   "marketplace.app.connection": "Connection",

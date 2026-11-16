@@ -451,8 +451,6 @@ export const messages = {
   "chat.video.pause": "Wstrzymaj wideo",
   "chat.video.position": "Pozycja wideo",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "Pobierz wideo",
-  "chat.video.open": "Otwórz wideo",
   "chat.video.mute": "Wycisz wideo",
   "chat.video.unmute": "Włącz dźwięk wideo",
   "chat.message.you": "Ty",

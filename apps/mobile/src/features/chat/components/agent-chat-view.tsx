@@ -19,6 +19,7 @@ import { showsOnline } from "@/features/workspace/model/server-status";
 import { currentText, useText } from "@/shared/lib/text";
 import {
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
   withFailureReasons,
@@ -39,12 +40,6 @@ import { useOpenAgentTasks } from "./use-open-agent-tasks";
 import { useQuestionPrompt } from "./use-question-prompt";
 
 const NO_MESSAGE_IDS: ReadonlySet<string> = new Set();
-
-/** `previous` when it holds exactly `ids`, else a new set of them. */
-function keptIdSet(previous: ReadonlySet<string> | null, ids: readonly string[]): ReadonlySet<string> {
-  if (previous && previous.size === ids.length && ids.every((id) => previous.has(id))) return previous;
-  return new Set(ids);
-}
 
 /** `focusMessageId` opens the chat at a message from search instead of at the latest message. */
 export function MobileChatView({

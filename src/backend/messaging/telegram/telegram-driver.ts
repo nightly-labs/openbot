@@ -22,6 +22,7 @@ import {
   type MessagingDriverOptions,
   type MessagingIngress,
   type MessagingPlace,
+  type RecentMessages,
   type StatusReaction,
   TelegramCallError,
   type TelegramGateway,
@@ -231,8 +232,8 @@ class TelegramAdapter implements MessagingAdapter {
     _platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#state.recent(threadKey, limit));
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.sync(() => ({ messages: this.#state.recent(threadKey, limit) }));
   }
 
   readonly download = Effect.fnUntraced(function* (

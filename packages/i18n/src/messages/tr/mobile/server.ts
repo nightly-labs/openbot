@@ -287,6 +287,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Adını ve logosunu buradan değiştirmek için bu sunucudaki OpenBot'u güncelleyin.",
   "mobile.server.settings.identityOffline": "Adını ve logosunu değiştirmek için bu sunucuya bağlanın.",
+  "mobile.server.settings.appearance": "Şekil ve renk",
+  "mobile.server.settings.appearanceShape": "Şekil",
+  "mobile.server.settings.appearanceShapeOption": "Şekil {number}",
+  "mobile.server.settings.appearanceColor": "Sunucu rengi",
+  "mobile.server.settings.appearanceAutomatic": "Otomatik",
+  "mobile.server.settings.appearanceReset": "Sıfırla",
+  "mobile.server.settings.appearanceSaveFailed": "Sunucunun şekli ve rengi kaydedilemedi. Tekrar deneyin.",
   "mobile.server.route.cropLogo": "Logoyu kırp",
   "mobile.server.members.remove": "Üyeyi kaldır",
   "mobile.server.members.invitePeople": "Kişileri davet et",
@@ -897,6 +904,8 @@ export const messages = {
     "WhatsApp bu sunucuyu bağlı cihazlardan kaldırdı. Numarayı yeniden bağlayın.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot bu numarada WhatsApp'a ulaşamıyor. Yeniden bağlanın veya numaranın bağlantısını kesin.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot bu numaranın kayıtlı anahtarlarını okuyamıyor. Numarayı yeniden bağlayın.",
   "mobile.server.connectors.whatsapp.retryAt":
     "WhatsApp OpenBot'tan beklemesini istedi. {time} saatinde tekrar deneyecek.",
   "mobile.server.connectors.whatsapp.linkAgain": "Yeniden bağla",

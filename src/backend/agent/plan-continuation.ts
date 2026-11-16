@@ -159,6 +159,13 @@ const PT_ANNOUNCES_WORK = new RegExp(
   "iu",
 );
 
+/**
+ * A closing sentence that only tells the user that they need to do nothing, such as "Nothing needed from
+ * you." or "De você, nada.". It waits for no one, so the sentence before it is the agent's last word (#9392).
+ */
+const NOTHING_FROM_USER =
+  /(?:(?<=[.!…])\s+|\s*\n\s*)(?:nothing\s+(?:else\s+)?(?:(?:needed|required)\s+)?(?:from\s+you|for\s+you\s+to\s+do)|no\s+action\s+(?:needed|required)\s+from\s+you|(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte)[,:]?\s+nada|nada\s+(?:de\s+(?:você|voce|vc)|da\s+sua\s+parte|para\s+(?:você|voce|vc)\s+fazer)|(?:você|voce|vc)\s+não\s+precisa\s+fazer\s+nada)[.!]?\s*$/iu;
+
 /** A last line that says the agent waits for the user, such as "I'll now wait for your approval." */
 const WAITS_FOR_USER =
   /\b(?:i['\u2019]ll|i will|i['\u2019]m going to|let me)\s+(?:now\s+)?(?:wait|hold|pause|stop)\b|\bwaiting\s+(?:for|on)\s+(?:you|your)\b/i;
@@ -188,7 +195,10 @@ function stoppedBeforeNextStep(answer: string | undefined): boolean {
   const text = answer?.trim() ?? "";
   if (text.length === 0 || text.length > NEXT_STEP_ANSWER_MAX) return false;
   if (NAMES_NEXT_STEP.test(text.slice(-160))) return true;
-  const plain = text.replace(/[*_`>#]/g, "").trimEnd();
+  const plain = text
+    .replace(/[*_`>#]/g, "")
+    .trimEnd()
+    .replace(NOTHING_FROM_USER, "");
   return ANNOUNCES_WORK.test(plain) || STATES_WORK.test(plain) || PT_ANNOUNCES_WORK.test(plain);
 }
 
