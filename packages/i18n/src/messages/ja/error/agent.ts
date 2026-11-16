@@ -18,6 +18,10 @@ export const messages = {
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
   "error.agent.toolCallUnknownToolSuggest":
     "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe は {names} という名前の OpenBot ツールを見つけられませんでした。openbot.tool_search が一覧にする OpenBot とブラウザーのツールだけを説明し、MCP ツールは説明しません。",
+  "error.agent.toolDescribeDiscoveryNames":
+    "{names} は直接呼び出してください。tool_describe は検索ツールを説明しません。",
   "error.agent.routineScheduleArgumentsInvalid":
     "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",

@@ -17,6 +17,9 @@ export const messages = {
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. יש להשתמש בשם המלא המדויק ש-tool_search מחזיר, למשל openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "הכלי לא רץ. tool_call לא מצא כלי בשם הזה. ייתכן שהשם המלא הוא {name}. אם כן, יש לשלוח את הקריאה שוב עם השם הזה.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe לא מצא כלי OpenBot בשם {names}. הוא מתאר רק את כלי OpenBot והדפדפן ש-openbot.tool_search מציג, ולא כלי MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "קרא ל-{names} ישירות. tool_describe לא מתאר את כלי החיפוש.",
   "error.agent.routineScheduleArgumentsInvalid":
     "לוח הזמנים של השגרה אינו תקין: {detail} יש לתקן את לוח הזמנים ולנסות שוב. openbot.tool_describe מחזיר את הסכמה.",
   "error.agent.approvalWhileDeleting": "אי אפשר לתת אישור בזמן שהסוכן נמחק.",

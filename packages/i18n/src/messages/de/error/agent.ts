@@ -18,6 +18,10 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe hat kein OpenBot-Werkzeug mit dem Namen {names} gefunden. Es beschreibt nur die OpenBot- und Browser-Werkzeuge, die openbot.tool_search auflistet, keine MCP-Werkzeuge.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Rufe {names} direkt auf. tool_describe beschreibt die Suchwerkzeuge nicht.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Der Zeitplan der Routine ist ungültig: {detail} Korrigiere den Zeitplan und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",

@@ -231,6 +231,7 @@ import {
   namesInSearch,
   OPENCODE_DEFERRED_MCP_NOTE,
   resolveDeferredTool,
+  UnknownToolNamesError,
 } from "./tool-catalog";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 import type { AgentBrowserHost } from "./turn-lifecycle";
@@ -747,11 +748,9 @@ export class OpenBotToolRouter {
           if (params.namespace === "openbot") {
             // Read only where it is used: the Antigravity note reads the agent's access list.
             const { threadId } = params;
-            const invalid = () => {
+            const invalid = (text = sourceText("error.agent.toolRequestInvalid")) => {
               const note = this.#deferredMcpNote(client, threadId);
-              return note
-                ? `${sourceText("error.agent.toolRequestInvalid")} ${note}`
-                : sourceText("error.agent.toolRequestInvalid");
+              return note ? `${text} ${note}` : text;
             };
             if (params.tool === "tool_search" || params.tool === "tool_describe") {
               const agentId = this.#conversation.agentForThread(params.threadId);
@@ -760,14 +759,19 @@ export class OpenBotToolRouter {
               try {
                 this.#requireAgent(agentId);
                 result = discoverTools(params, client.provider);
-              } catch {
-                client.respond(request.id, openBotToolFailure(invalid()));
+              } catch (error) {
+                client.respond(
+                  request.id,
+                  openBotToolFailure(error instanceof UnknownToolNamesError ? invalid(error.message) : invalid()),
+                );
                 return;
               }
               if (givesBrowserSchemas(result)) this.#browserSchemasGiven.add(params.threadId);
               const signIns = yield* this.#searchSignIns(agentId, params);
               if (request.signal?.aborted || !client.running) return;
-              const deferredMcp = params.tool === "tool_search" ? this.#deferredMcpNote(client, threadId) : null;
+              // A name that tool_describe did not find can be a tool of the user's MCP servers.
+              const deferredMcp =
+                params.tool === "tool_search" || "notFound" in result ? this.#deferredMcpNote(client, threadId) : null;
               const found = deferredMcp ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,

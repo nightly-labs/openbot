@@ -660,11 +660,39 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
   }
   const parsed = describeSchema.safeParse(params.arguments);
   if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
-  const names = [...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])];
-  const entries = [...new Set(names)].map((name) => requireTool(name, catalog));
+  const names = [...new Set([...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])])];
+  const entries = names.flatMap((name) => catalog.find((entry) => entry.name === name) ?? []);
+  const notFound = names.filter((name) => !entries.some((entry) => entry.name === name));
+  if (entries.length === 0) throw new UnknownToolNamesError(unknownToolNamesText(notFound));
   return {
     call: CALL_NOTE,
     tools: entries.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
     guidance: toolGuidanceFor(entries),
+    ...(notFound.length > 0 ? { notFound, note: unknownToolNamesText(notFound) } : {}),
   };
+}
+
+/** OpenBot's discovery tools. They are not catalog tools, so tool_describe does not describe them. */
+const DISCOVERY_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "openbot.tool_search",
+  "openbot.tool_describe",
+  "openbot.tool_call",
+]);
+
+/** A tool_describe call that named no catalog tool. The message names each refused name. */
+export class UnknownToolNamesError extends Error {}
+
+/**
+ * The text for the names that tool_describe did not find. One general error for the whole call did not
+ * tell the agent which name to correct, so it tried the same wrong names again (#9930).
+ */
+function unknownToolNamesText(names: readonly string[]): string {
+  const discovery = names.filter((name) => DISCOVERY_TOOL_NAMES.has(name));
+  const other = names.filter((name) => !DISCOVERY_TOOL_NAMES.has(name));
+  return [
+    ...(other.length > 0 ? [sourceText("error.agent.toolDescribeUnknownNames", { names: other.join(", ") })] : []),
+    ...(discovery.length > 0
+      ? [sourceText("error.agent.toolDescribeDiscoveryNames", { names: discovery.join(", ") })]
+      : []),
+  ].join(" ");
 }
