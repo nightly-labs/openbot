@@ -68,6 +68,7 @@ const laidOut = z.object({
   edges: z.array(z.object({ from: z.string(), to: z.string() })),
 });
 const runStarted = z.object({ runId: z.string() });
+const runList = z.object({ runs: z.array(z.object({})) });
 const runRead = z.object({
   steps: z.array(
     z.object({
@@ -303,7 +304,11 @@ try {
   // Some model paths see the untyped values of `tool_call.arguments` as text, so their models send
   // `true` as "true" and `1` as "1" (#9980). The value gets the type of the target's schema.
   const textBoolean = await call("read-layout-text", "read_workflow", { workflowId, layout: "true" });
-  check("tool_call gives a boolean sent as text its type", textBoolean.ok, textBoolean.value);
+  check(
+    "tool_call gives a boolean sent as text its type",
+    laidOut.safeParse(textBoolean.value).success,
+    textBoolean.value,
+  );
   const typed = resolveDeferredTool(
     params("tool_call", {
       name: "openbot.read_workflow_runs",
@@ -535,8 +540,6 @@ try {
     runs = await call("runs", "read_workflow_runs", { workflowId, runId });
   }
   check("read_workflow_runs shows the agent step running", runs.ok, runs.value);
-  const textLimit = await call("runs-limit-text", "read_workflow_runs", { workflowId, limit: "1" });
-  check("tool_call gives an integer sent as text its type", textLimit.ok, textLimit.value);
   check(
     "the trigger of a run gives the run input as its output",
     runRead.parse(runs.value).steps.some((step) => step.nodeId === ids.start && step.output === caseInput),
@@ -571,6 +574,13 @@ try {
     await new Promise((done) => setImmediate(done));
     triggerRun = await call("runs-from-trigger", "read_workflow_runs", { workflowId, runId: triggerRunId });
   }
+  // The workflow has two runs now, and a read without a limit gives one.
+  const textLimit = await call("runs-limit-text", "read_workflow_runs", { workflowId, limit: "2" });
+  check(
+    "tool_call gives an integer sent as text its type",
+    runList.safeParse(textLimit.value).data?.runs.length === 2,
+    textLimit.value,
+  );
   check(
     "the trigger of a run from that trigger gives the run input as its output",
     runRead.parse(triggerRun.value).steps.some((step) => step.nodeId === ids.start && step.output === triggerInput),

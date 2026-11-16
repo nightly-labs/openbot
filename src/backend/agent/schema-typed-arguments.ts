@@ -28,7 +28,9 @@ function typedValue<Value>(value: Value, schema: DynamicRecord): Value | TypedTe
       const property = subschema(schema, (branch) => {
         if (isDynamicRecord(branch.properties) && Object.hasOwn(branch.properties, key))
           return [branch.properties[key]];
-        return isDynamicRecord(branch.additionalProperties) ? [branch.additionalProperties] : [];
+        if (isDynamicRecord(branch.additionalProperties)) return [branch.additionalProperties];
+        // An object branch that does not close its keys takes this key with any value, so it stays as sent.
+        return isDynamicRecord(branch.properties) && branch.additionalProperties !== false ? [{}] : [];
       });
       return [key, property === undefined ? item : typedValue(item, property)];
     }),
@@ -72,8 +74,10 @@ function typedText<Text extends string>(text: Text, types: Set<string> | null): 
   if (types === null || types.has("string")) return text;
   const trimmed = text.trim();
   if ((types.has("number") || types.has("integer")) && NUMBER_TEXT.test(trimmed)) {
+    // A whole number past the safe range changes its digits, so it stays text, and the tool refuses it.
     const number = Number(trimmed);
-    if (Number.isFinite(number) && (types.has("number") || Number.isSafeInteger(number))) return number;
+    if (Number.isInteger(number) ? Number.isSafeInteger(number) : Number.isFinite(number) && types.has("number"))
+      return number;
   }
   if (types.has("boolean") && (trimmed === "true" || trimmed === "false")) return trimmed === "true";
   if (types.has("null") && trimmed === "null") return null;
