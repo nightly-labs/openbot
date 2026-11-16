@@ -4,23 +4,21 @@ const STREAMING_INTERNAL_CITATION = /\u{e200}(?:c(?:i(?:t(?:e(?:\u{e202}[^\u{e20
 /**
  * A file or page that Codex cites, such as `:codex-file-citation{path="/work/q1.xlsx" purpose="source"}`.
  * Codex apps draw it as a link, so it becomes a Markdown link here. Code keeps it as written, and a
- * quoted value can hold `}`.
+ * quoted value can hold `}`. The start of a citation that is still streaming, at the end of the text,
+ * does not show until the citation is complete.
  */
 const FILE_CITATION_OR_CODE =
-  /(```[\s\S]*?(?:```|$)|`[^`\r\n]*`)|(?<![:\\]):codex-file-citation\{((?:\s*[A-Za-z_][\w-]*=(?:"[^"<>\r\n]*"|[^\s"<>{}]+))*\s*)\}/gu;
+  /(```[\s\S]*?(?:```|$)|`[^`\r\n]*`)|(?<![:\\]):codex-file-citation\{(?:((?:\s*[A-Za-z_][\w-]*=(?:"[^"<>\r\n]*"|[^\s"<>{}]+))*\s*)\}|[^}\r\n]*$)/gu;
 const FILE_CITATION_ATTRIBUTE = /([A-Za-z_][\w-]*)=(?:"([^"]*)"|(\S+))/gu;
-/** The start of a citation that is still streaming. It shows as a link when it is complete. */
-const STREAMING_FILE_CITATION = /(?<![:\\]):codex-file-citation\{[^}\r\n]*$/u;
 const LABEL_MARKDOWN = /[\\`*_[\]<>~$&|]/gu;
 
 export function cleanAgentMessageText(text: string): string {
   const cleaned = text.replace(COMPLETE_INTERNAL_CITATION, "").replace(STREAMING_INTERNAL_CITATION, "");
   if (!cleaned.includes(":codex-file-citation{")) return cleaned;
-  return cleaned
-    .replace(FILE_CITATION_OR_CODE, (match, code: string | undefined, attributes: string | undefined) =>
-      code === undefined && attributes !== undefined ? (fileCitationLink(attributes) ?? match) : match,
-    )
-    .replace(STREAMING_FILE_CITATION, "");
+  return cleaned.replace(FILE_CITATION_OR_CODE, (match, code: string | undefined, attributes: string | undefined) => {
+    if (code !== undefined) return match;
+    return attributes === undefined ? "" : (fileCitationLink(attributes) ?? match);
+  });
 }
 
 function fileCitationLink(attributes: string): string | null {
