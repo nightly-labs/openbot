@@ -479,7 +479,10 @@ export function mediaStepPrompt(
             .filter(Boolean)
             .join(" ");
   const description = typeof fields.prompt === "string" ? fields.prompt.trim() : "";
-  return [ask, description, input ? `--- input ---\n${input}` : ""].filter(Boolean).join("\n\n");
+  // A step with no description and no text input makes its media from the pictures that come in.
+  // Sunra and Higgsfield get no other request, so they get one line rather than an empty prompt.
+  const fallback = ask || description || input ? "" : `Make one ${kind} from the input pictures.`;
+  return [ask, description, input ? `--- input ---\n${input}` : "", fallback].filter(Boolean).join("\n\n");
 }
 
 /** The most reference pictures that Grok's `reference_to_video` tool takes (Grok CLI 1.0.77). */
