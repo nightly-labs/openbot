@@ -132,9 +132,10 @@ export function RoutineCalendarCreateCard(props: {
     saving: false,
     error: null,
   });
-  let anchor: HTMLSpanElement | undefined;
   let card: HTMLElement | undefined;
   let nameInput: HTMLInputElement | undefined;
+  /** The control that had the focus when the card opened, such as the "+" of a day. */
+  let opener: HTMLElement | null = null;
 
   // Only a new slot starts a new draft: a refresh of the agents keeps what the person wrote.
   createEffect(
@@ -145,9 +146,19 @@ export function RoutineCalendarCreateCard(props: {
         : null;
     },
     (opened) => {
-      if (!opened) return;
+      if (!opened) {
+        // The card has no trigger, and a card that is not modal does not give the focus back. The focus
+        // goes back to the control that opened the card, unless the person moved it to another control.
+        const focused = document.activeElement;
+        const lost = !focused || focused === document.body || Boolean(card?.contains(focused));
+        if (opener?.isConnected && lost) opener.focus();
+        opener = null;
+        return;
+      }
       const [slot, once, agents] = opened;
       if (!slot) return;
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && focused !== document.body && !card?.contains(focused)) opener = focused;
       const agentId = agentOf(agents, lastAgentId ?? "")?.id ?? agents[0]?.id ?? "";
       const schedule = slotSchedule(slot, once);
       setDraft((value) => {
@@ -174,7 +185,8 @@ export function RoutineCalendarCreateCard(props: {
   // open menu in the card keeps its own Escape.
   onSettled(() => {
     const key = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || event.defaultPrevented || !props.slot || !card) return;
+      // An Escape that ends an IME composition stays with the field.
+      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !props.slot || !card) return;
       const own = card;
       const popups = [...document.querySelectorAll("[data-popper-positioner]")];
       if (popups.some((popup) => !popup.contains(own) && !popup.querySelector("[role=tooltip]"))) return;
@@ -215,17 +227,21 @@ export function RoutineCalendarCreateCard(props: {
       value.saving = true;
       value.error = null;
     });
+    // The person can open another day while the host saves. The result is only for this card.
+    const slot = props.slot;
     try {
       await props.create.save(routine);
-      props.onClose();
+      if (props.slot === slot) props.onClose();
     } catch (caught) {
-      setDraft((value) => {
-        value.error = errorMessage(caught, t("routine.settings.saveFailed"));
-      });
+      if (props.slot === slot)
+        setDraft((value) => {
+          value.error = errorMessage(caught, t("routine.settings.saveFailed"));
+        });
     } finally {
-      setDraft((value) => {
-        value.saving = false;
-      });
+      if (props.slot === slot)
+        setDraft((value) => {
+          value.saving = false;
+        });
     }
   }
 
@@ -235,18 +251,13 @@ export function RoutineCalendarCreateCard(props: {
 
   return (
     <>
-      <span
-        ref={anchor}
-        class="routine-planner-create-anchor"
-        style={{ left: `${props.slot?.x ?? 0}px`, top: `${props.slot?.y ?? 0}px` }}
-        aria-hidden="true"
-      />
       <Popover.Root
         open={props.slot !== null}
         onOpenChange={(next) => {
           if (!next) props.onClose();
         }}
-        anchorRef={() => anchor}
+        // The point of the click, in the viewport.
+        getAnchorRect={() => ({ x: props.slot?.x ?? 0, y: props.slot?.y ?? 0, width: 0, height: 0 })}
         placement="right-start"
         gutter={8}
         modal={false}

@@ -747,13 +747,6 @@
 }
 
 /* The card at the click. One ring, no shadow. */
-.routine-planner-create-anchor {
-  position: fixed;
-  width: 0;
-  height: 0;
-  pointer-events: none;
-}
-
 .routine-planner-create.ui-popover-menu-surface {
   z-index: var(--openbot-layer-popover);
   width: 360px;

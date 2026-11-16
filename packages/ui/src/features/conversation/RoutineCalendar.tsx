@@ -262,11 +262,15 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
   const [slot, setSlot] = createSignal<RoutineCalendarSlot | null>(null);
   const creates = () => props.create !== undefined && props.agents.length > 0;
   const nowHour = () => calendarHourOf(props.now, props.timeZone);
-  /** A future day can get a routine; a past day and a day of the month next to it cannot. */
-  const opensDay = (day: CalendarDay) => creates() && day >= today() && !outsideMonth(day);
+  /**
+   * A future day can get a routine; a past day and a day of the month next to it cannot. Today can
+   * until its last hour starts: no whole hour is left after it.
+   */
+  const opensDay = (day: CalendarDay) =>
+    creates() && (day > today() || (day === today() && nowHour() < 23)) && !outsideMonth(day);
   /** Today: the next whole hour. Another day: 9 AM. A later hour of the day view keeps its own. */
   const slotTime = (day: CalendarDay, hour?: number) => {
-    const next = day === today() ? Math.min(23, nowHour() + 1) : 9;
+    const next = day === today() ? nowHour() + 1 : 9;
     const chosen = hour !== undefined && (day !== today() || hour > nowHour()) ? hour : next;
     return `${String(chosen).padStart(2, "0")}:00`;
   };
@@ -294,15 +298,28 @@ export function RoutineCalendar(props: RoutineCalendarProps) {
       const found = slotTarget(event.target);
       if (found && openSlot(found.day, event.clientX, event.clientY, found.hour)) event.preventDefault();
     };
+    // A click on the calendar while the card is open only closes the card, so a draft is not replaced.
+    // The window sees the press before the card closes on it.
+    let closing = false;
+    const press = (event: PointerEvent) => {
+      if (event.button === 0)
+        closing = slot() !== null && event.target instanceof Node && element.contains(event.target);
+    };
     // A click opens the card only on the empty part of a day: a run, the day and "+N more" keep theirs.
     const click = (event: MouseEvent) => {
+      if (closing) {
+        closing = false;
+        return;
+      }
       if (!(event.target instanceof Element) || event.target.closest("button, a, [role='button']")) return;
       const found = slotTarget(event.target);
       if (found) openSlot(found.day, event.clientX, event.clientY, found.hour);
     };
+    window.addEventListener("pointerdown", press, true);
     element.addEventListener("contextmenu", menu);
     element.addEventListener("click", click);
     return () => {
+      window.removeEventListener("pointerdown", press, true);
       element.removeEventListener("contextmenu", menu);
       element.removeEventListener("click", click);
     };

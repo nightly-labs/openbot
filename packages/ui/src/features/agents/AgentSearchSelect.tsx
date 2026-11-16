@@ -8,7 +8,10 @@ import { useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, onCleanup, Show, untrack } from "solid-js";
 
 /** What the select shows of an agent: its name and its face. */
-export type AgentSearchSelectAgent = Pick<AgentProfile, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
+export type AgentSearchSelectAgent = Pick<
+  AgentProfile,
+  "id" | "name" | "avatarSeed" | "avatarHue" | "avatarColor" | "avatarUrl"
+>;
 
 export const agentOf = <Agent extends AgentSearchSelectAgent>(agents: readonly Agent[], agentId: string) =>
   agents.find((agent) => agent.id === agentId);

@@ -14,7 +14,7 @@ import {
   type RoutinesPort,
 } from "../conversation/routines-port";
 import { hostedUpsellRoutineCreated } from "../servers/hosted-server-upsell-controller";
-import { serverSupportsCapability } from "../servers/server-capabilities";
+import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 
 /** The agent routine calls of one desktop server. The schedule page can show a server that is not the active one. */
 function desktopAgentRoutinesApi(serverId: string): AgentRoutinesApi {
@@ -32,14 +32,14 @@ function desktopAgentRoutinesApi(serverId: string): AgentRoutinesApi {
 
 /**
  * The routines of each agent of a server, as the routine editor of the agent saves them. The web
- * client gives its runtime; it has routine calls only for an owner or an admin, so other members
- * get no port and the calendar shows no create action.
+ * client gives its runtime. On a joined server only an owner or an admin gets a port: the host
+ * keeps routine changes to a member who manages the agent, so other members see no create action.
  */
 export function scheduleRoutinePorts(
   server: ServerSummary | undefined,
   runtime: ConversationRuntime | undefined,
 ): ((agentId: string) => RoutinesPort) | undefined {
-  if (!server) return undefined;
+  if (!server || !serverRoleCanAdminister(server)) return undefined;
   const api = runtime ? runtime.routines : desktopAgentRoutinesApi(server.id);
   if (!api) return undefined;
   const localHost = server.kind === "local";
