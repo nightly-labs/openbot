@@ -84,7 +84,7 @@ const runSchema = z
   .object({
     workflowId: identifier,
     fromNodeId: identifier.optional(),
-    input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional().describe("the case of this run"),
+    input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional(),
   })
   .strict();
 const runsSchema = z
@@ -116,8 +116,7 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   },
   {
     name: "run_workflow",
-    description:
-      "Start a run of a workflow, or from one node with the newest answers of the nodes before it. The trigger gives input to the next steps, in a full run or a run from that trigger.",
+    description: "Run a workflow, or from one node with the newest answers before it. Triggers output input.",
     shape: runSchema.shape,
   },
   {
