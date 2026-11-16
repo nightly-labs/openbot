@@ -246,7 +246,10 @@ export function isAccountUsageWindow(value: unknown): value is AccountUsageWindo
 export interface AccountUsageGroup {
   /** The provider's name for the group, such as "Gemini Models". */
   name: string;
-  /** The model names that the provider lists for the group, such as "Gemini Flash". */
+  /**
+   * The model names that the provider lists for the group, such as "Gemini Flash". A group with no list,
+   * such as "Gemini 4 Argon", has its own name when other groups list theirs.
+   */
   models: string[];
   primary: AccountUsageWindow | null;
   secondary: AccountUsageWindow | null;

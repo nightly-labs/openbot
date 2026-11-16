@@ -126,6 +126,7 @@ import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
@@ -367,6 +368,7 @@ export {
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
@@ -671,6 +673,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_VAULT_SKIP_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
 ] as const;
 
@@ -913,6 +916,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
     capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
+    capability !== PHONE_FEEDBACK_CAPABILITY &&
     capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
 );
 /**
@@ -1030,6 +1034,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_VAULT_SKIP_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
@@ -1231,6 +1236,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
       capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
+      capability !== PHONE_FEEDBACK_CAPABILITY &&
       capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
   );
 }

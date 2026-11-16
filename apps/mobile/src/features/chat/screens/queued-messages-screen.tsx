@@ -98,9 +98,10 @@ export function QueuedMessagesScreen() {
           // With nothing else to show, the sheet would only say that the queue is empty.
           if (count === 0 && !queue?.error) router.back();
         }}
-        // Steer is the only action of an answer, so the row opens it only while a turn runs.
+        // Steer is the only action of an answer, so the row opens it only while a turn runs, and only
+        // for an agent that steers, as on desktop.
         onOpenReply={
-          queue?.activeTurnId
+          queue?.activeTurnId && queue.steers
             ? (deliveryId) => router.push({ pathname: "/queued-messages/actions", params: { chat, deliveryId } })
             : undefined
         }

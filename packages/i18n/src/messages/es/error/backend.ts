@@ -355,6 +355,8 @@ export const messages = {
   "error.backend.promptInactive": "Esta pregunta ya no está activa.",
   "error.backend.promptAnswerMismatch": "Una respuesta no coincide con ninguna pregunta activa.",
   "error.backend.approvalInactive": "Esta aprobación ya no está activa.",
+  "error.backend.feedbackNeedsPhone":
+    "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
