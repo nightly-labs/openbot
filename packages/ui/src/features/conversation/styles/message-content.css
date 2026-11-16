@@ -803,12 +803,23 @@
   tab-size: 2;
 }
 
-.message-code-scroll:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
+.message-code-frame {
+  width: 100%;
+}
+
+/* The code block clips its children, so the focus ring is inside the frame. */
+.message-code-frame:has(> .scroll-edges-view:focus-visible) {
   outline-offset: -2px;
 }
 
-.message-code-scroll > code {
+.message-code-pre {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
+  font: inherit;
+}
+
+.message-code-pre > code {
   min-width: 100%;
   display: block;
   font: inherit;

@@ -29,7 +29,9 @@ const STEP = 0.8;
 export function ScrollEdges(props: {
   axis: ScrollEdgesAxis;
   /** The accessible name of the scroll area. */
-  label: string;
+  label?: string;
+  /** The direction of the area, when it differs from the text around it, such as code. */
+  dir?: "ltr" | "rtl";
   /** The class of the frame around the scroll area. */
   class?: string;
   /** The class of the scroll area. */
@@ -187,6 +189,7 @@ export function ScrollEdges(props: {
     <div
       class={cx("scroll-edges", props.class)}
       data-axis={props.axis}
+      dir={props.dir}
       style={state.middle === null ? undefined : { "--scroll-edges-middle": `${state.middle}px` }}
       onPointerEnter={() => setHovered(true)}
       onPointerLeave={() => setHovered(false)}
@@ -198,7 +201,8 @@ export function ScrollEdges(props: {
       <section
         class={cx("scroll-edges-view", props.viewClass)}
         aria-label={props.label}
-        tabindex="0"
+        // Only an area that scrolls is a stop in the Tab order.
+        tabindex={state.start || state.end ? 0 : undefined}
         ref={(element) => (view = element)}
       >
         {props.children}

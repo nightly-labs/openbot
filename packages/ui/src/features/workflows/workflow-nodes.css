@@ -945,7 +945,7 @@
   padding: var(--openbot-space-1-5);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 /* An action list groups its rows in a fieldset, which has the group role. */
