@@ -3,8 +3,12 @@ import {
   type AgentModelId,
   type AgentProviderId,
   type AgentStatus,
+  CUSTOM_PROVIDER_HARNESSES,
+  type CustomProviderHarness,
   type CustomProviderRestart,
   type CustomProviderSummary,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
+  isCustomProviderHarness,
   isLocalOnlyProvider,
   type ProviderRuntimeStatus,
   type SaveCustomProviderInput,
@@ -15,8 +19,11 @@ import {
   ProviderPicker,
   type ProviderPickerOption,
 } from "@openbot/ui/components/ProviderPicker";
-import { freeModelsReady } from "@openbot/ui/components/provider-row";
-import { CustomProviderDialog } from "@openbot/ui/features/custom-providers/CustomProviderDialog";
+import { freeModelsReady, servesCustomProvider } from "@openbot/ui/components/provider-row";
+import {
+  CustomProviderDialog,
+  type CustomProviderHarnessChoice,
+} from "@openbot/ui/features/custom-providers/CustomProviderDialog";
 import { CustomProviderListDialog } from "@openbot/ui/features/custom-providers/CustomProviderListDialog";
 import { DetectedProviders } from "@openbot/ui/features/custom-providers/DetectedProviders";
 import type { DetectedProviderApi, ProviderDetection } from "@openbot/ui/features/custom-providers/detected-providers";
@@ -141,14 +148,29 @@ function providerReady(option: ProviderPickerOption): boolean {
   return option.state === "available" || freeModelsReady(option);
 }
 
-/** The saved model when it names a custom endpoint, which OpenCode calls `<endpoint id>/<model id>`. */
+/**
+ * The saved model when it names a custom endpoint that `provider` runs. OpenCode and Pi both call
+ * the model `<endpoint id>/<model id>`.
+ */
 export function savedCustomModel(
   provider: AgentProviderId | null,
   model: AgentModelId | null,
   customProviders: readonly CustomProviderSummary[] | undefined,
 ): AgentModelId | null {
-  if (provider !== FREE_PROVIDER || !model) return null;
-  return (customProviders ?? []).some((endpoint) => model.startsWith(`${endpoint.id}/`)) ? model : null;
+  if (!isCustomProviderHarness(provider) || !model) return null;
+  const endpoint = customEndpointOf(model, customProviders);
+  return endpoint && harnessOf(endpoint) === provider ? model : null;
+}
+
+function customEndpointOf(
+  model: AgentModelId | null,
+  customProviders: readonly CustomProviderSummary[] | undefined,
+): CustomProviderSummary | undefined {
+  return model ? (customProviders ?? []).find((endpoint) => model.startsWith(`${endpoint.id}/`)) : undefined;
+}
+
+function harnessOf(endpoint: CustomProviderSummary): CustomProviderHarness {
+  return endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
 }
 
 export type SetupProviders = ReturnType<typeof createSetupProviders>;
@@ -163,7 +185,7 @@ export function createSetupProviders(
   initial?: SetupProviderChoice,
   settings: SetupProviderOptions = {},
 ) {
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const includeFree = () => settings.includeFree?.() ?? true;
   const [selectedProvider, setSelectedProvider] = createSignal<AgentProviderId | null>(initial?.provider ?? null);
   /**
@@ -296,12 +318,50 @@ export function createSetupProviders(
     setCustomSelected(false);
   }
 
-  /** OpenCode runs the custom endpoints, so the form opens only when OpenCode can run one. */
+  /**
+   * The providers that can run an endpoint, for "Runs on". It is of this computer: a joined server's
+   * host keeps the harness of each endpoint, as in Settings.
+   */
+  const harnesses = createMemo((): CustomProviderHarnessChoice[] | undefined =>
+    props.hostProviders
+      ? undefined
+      : CUSTOM_PROVIDER_HARNESSES.map((id) => {
+          const option = providerOptions().find((item) => item.id === id);
+          return { id, ready: servesCustomProvider(option), runtime: option?.runtimeStatus };
+        }),
+  );
+  /**
+   * The provider of the custom row: the one that runs the endpoint of its model. Before an endpoint
+   * has a model, it is the one the form chooses first.
+   */
+  function customHarness(): CustomProviderHarness {
+    const endpoint = customEndpointOf(customModel() ?? firstSavedCustomModel(), props.customProviders);
+    if (endpoint) return harnessOf(endpoint);
+    return harnesses()?.find((choice) => choice.ready)?.id ?? DEFAULT_CUSTOM_PROVIDER_HARNESS;
+  }
+  const [harnessError, setHarnessError] = createSignal("");
+  /** The download that "Runs on" starts. The dialog shows its error, and the choice of the step stays. */
+  async function downloadHarness(harness: CustomProviderHarness): Promise<void> {
+    if (!props.onDownloadProvider) return;
+    setHarnessError("");
+    try {
+      await props.onDownloadProvider(harness);
+    } catch (cause) {
+      setHarnessError(errorMessage(cause, t("onboarding.error.download", { provider: providerName(harness) })));
+    }
+  }
+
+  /** A new form does not show the download error of the one before. */
+  function openCustomForm(): void {
+    setHarnessError("");
+    host.openForm();
+  }
+
+  /** The form opens only when a provider can run the endpoint. */
   function chooseMoreCustom(): void {
     keepProviderRows();
     setCustomRevealed(true);
-    const openCode = providerOptions().find((option) => option.id === FREE_PROVIDER);
-    if (openCode?.state === "available" || openCode?.state === "sign-in-required") host.openForm();
+    if (servesCustomProvider(providerOptions().find((option) => option.id === customHarness()))) openCustomForm();
   }
 
   /**
@@ -312,6 +372,7 @@ export function createSetupProviders(
   const host = createCustomProviderHostState({
     onAdd: (value) => props.onAddCustomProvider?.(value),
     onDelete: (id) => props.onDeleteCustomProvider?.(id),
+    discoverModels: () => props.detectedProviderApi?.discoverModels,
     onSaved: selectSavedEndpoint,
     onRemoved: (id) => {
       // The save reads these two to decide whether to send a model, so a model of an endpoint that
@@ -320,6 +381,8 @@ export function createSetupProviders(
       // The row stays where the user saw it, and does not go back into "More providers".
       setCustomRevealed(true);
       if ((props.customProviders ?? []).length === 0) setCustomSelected(false);
+      // The model of the row can now be of an endpoint that a different provider runs.
+      else if (customSelected()) setSelectedProvider(customHarness());
     },
   });
 
@@ -328,7 +391,7 @@ export function createSetupProviders(
    *
    * Without it the custom choice would reach setup with no model, and a new agent would start on the
    * first model the catalog lists - a hosted one, because free models come first. The endpoint the
-   * user selected would then be unused, which is the opposite of what the row says. OpenCode names a
+   * user selected would then be unused, which is the opposite of what the row says. OpenCode and Pi name a
    * custom model `<endpoint id>/<model id>`, so the id is composed rather than looked up in a list
    * the CLI has not published yet.
    */
@@ -343,11 +406,12 @@ export function createSetupProviders(
   /**
    * The endpoint the user just described is what they came here to use, so the step selects the
    * custom row rather than leaving the choice on whichever provider connected first, and its first
-   * model becomes the one a new agent starts on. OpenCode names a custom model by its endpoint, so
-   * the id is composed here rather than looked up in a catalog it has yet to list.
+   * model becomes the one a new agent starts on. OpenCode and Pi name a custom model by its endpoint,
+   * so the id is composed here rather than looked up in a catalog they have yet to list. The saved
+   * list does not hold the new endpoint yet, so its provider comes from the form.
    */
   function selectSavedEndpoint(value: SaveCustomProviderInput): void {
-    selectCustomProvider();
+    selectCustomProvider(value.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS);
     const [firstModel] = value.models;
     if (firstModel) setCustomModel(`${value.id}/${firstModel.id}`);
   }
@@ -366,12 +430,12 @@ export function createSetupProviders(
     };
   });
 
-  /** OpenCode runs every custom endpoint, so choosing them chooses that provider along with them. */
-  function selectCustomProvider(): void {
+  /** Choosing the endpoints chooses the provider that runs them along with them. */
+  function selectCustomProvider(harness: CustomProviderHarness = customHarness()): void {
     keepProviderRows();
     choiceChanged = true;
     setProviderSelectedByUser(true);
-    setSelectedProvider("opencode");
+    setSelectedProvider(harness);
     setCustomSelected(true);
   }
 
@@ -627,6 +691,12 @@ export function createSetupProviders(
     keyProvider,
     closeKeyDialog: () => setKeyProvider(null),
     host,
+    harnesses,
+    harnessError,
+    downloadHarness,
+    openCustomForm,
+    /** The provider that runs the custom row, whose status the row shows. */
+    customEngine: () => providerOptions().find((option) => option.id === customHarness()),
     chooseProvider,
     chooseMoreCustom,
     selectCustomProvider,
@@ -725,14 +795,14 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         onRefreshProviders={
           !lazyProviderMode() && source().onRefreshProviders ? props.providers.refreshProviders : undefined
         }
-        onAddCustomProvider={source().onAddCustomProvider ? props.providers.host.openForm : undefined}
+        onAddCustomProvider={source().onAddCustomProvider ? props.providers.openCustomForm : undefined}
         customProviders={source().customProviders}
         customSelected={props.providers.customSelected()}
         onSelectCustomProvider={source().onAddCustomProvider ? props.providers.selectCustomProvider : undefined}
         onManageCustomProviders={source().onAddCustomProvider ? props.providers.host.openList : undefined}
         moreProviders={props.providers.rows().hidden}
         customInMore={props.providers.customInMore()}
-        customEngine={props.providers.options().find((option) => option.id === FREE_PROVIDER)}
+        customEngine={props.providers.customEngine()}
         versionInDetail
         moreCallout={{
           title: t("onboarding.provider.moreTitle"),
@@ -773,6 +843,13 @@ export function SetupProviderPicker(props: SetupProviderPickerProps) {
         <CustomProviderDialog
           open={props.providers.host.state.open}
           contextWindows={!source().hostProviders}
+          harnesses={props.providers.harnesses()}
+          onDownloadHarness={
+            source().onDownloadProvider ? (harness) => void props.providers.downloadHarness(harness) : undefined
+          }
+          harnessError={props.providers.harnessError()}
+          discovery={props.providers.host.discovery()}
+          onDiscoverModels={props.providers.host.discover()}
           busy={props.providers.host.state.saving}
           submitError={props.providers.host.state.submitError}
           takenProviderIds={(source().customProviders ?? []).map((provider) => provider.id)}
