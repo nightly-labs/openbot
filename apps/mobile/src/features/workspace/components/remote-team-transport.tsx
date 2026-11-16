@@ -6,6 +6,7 @@ import {
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import { LIVE_VOICE_ROUTES } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { isQueueEditRoute, QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
@@ -319,7 +320,9 @@ export const RemoteTeamTransport = memo(
           if (
             result.status === 409 &&
             method === "POST" &&
-            (path === TEAM_API_ROUTES.respond.approval || path === PENDING_APPROVAL_ROUTES.read)
+            (path === TEAM_API_ROUTES.respond.approval ||
+              path === PENDING_APPROVAL_ROUTES.read ||
+              path === PHONE_FEEDBACK_ROUTES.send)
           )
             throw new InactiveRequestError(currentText().t("mobile.workspace.error.approvalInactive"));
           if (result.status === 409 && method === "POST" && path === TEAM_API_ROUTES.respond.prompt)

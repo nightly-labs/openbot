@@ -1987,6 +1987,16 @@ export class MailboxStore {
     );
   }
 
+  /** The deliveries of this agent that completed in the turn `turnId`. */
+  completedDeliveriesOfTurn(agentId: string, turnId: string): DeliveryContext[] {
+    return this.#contexts(
+      this.#state.deliveries.filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId && delivery.turnId === turnId && delivery.status === "completed",
+      ),
+    );
+  }
+
   /** Without `taskId`, any lane of the agent; with it, only that lane (null: the agent's own chat). */
   startingDeliveryForAgent(agentId: string, taskId?: string | null): DeliveryContext | null {
     const delivery = this.#state.deliveries.find((candidate) => this.#startingIn(candidate, agentId, taskId));
@@ -2830,15 +2840,19 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** A refused delivery, or unfinished work that a backup continues, back at its place in the queue. */
+  /**
+   * A refused delivery, or unfinished work that a backup continues, back at its place in the queue.
+   * `finished`: the delivery completed, and work that its turn started in the background goes on.
+   */
 
   requeueRefused = Effect.fn("MailboxStore.requeueRefused")(function* (
     this: MailboxStore,
     deliveryId: string,
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    finished = false,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+      yield* this.#updateDeliveryEffect(deliveryId, finished ? ["completed"] : ["starting", "running"], {
         status: "queued",
         turnId: null,
         error: null,

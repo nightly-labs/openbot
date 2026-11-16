@@ -7,6 +7,7 @@ import { bytesToBase64 } from "./base64";
 // whose path, body and decoding are the same in both are here. A request that differs in one of them
 // stays at its call site.
 
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import {
   type AgentApproval,
   type AgentImportPreview,
@@ -131,6 +132,7 @@ import {
   decodePendingApprovalResponse,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
 import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
@@ -839,6 +841,23 @@ export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(f
 ): Effect.fn.Return<AgentApproval, TeamRequestError> {
   return yield* teamCall(() =>
     request("POST", PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, { ...input }),
+  );
+});
+
+/**
+ * Sends a bug report about the phone app that an agent waits on, with the phone's version, system
+ * and support log (`phone-feedback-v1`). It answers the approval: the host takes no plain "accept"
+ * of such a report.
+ */
+export const sendPhoneFeedback = Effect.fn("TeamClient.sendPhoneFeedback")(function* (
+  request: TeamApiRequest,
+  input: { requestId: string | number; phone: FeedbackPhone },
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PHONE_FEEDBACK_ROUTES.send, ignoreResponse, {
+      requestId: input.requestId,
+      phone: { ...input.phone },
+    }),
   );
 });
 
