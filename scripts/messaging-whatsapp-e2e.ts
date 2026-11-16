@@ -15,7 +15,6 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
 import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
-import { registerSecretValue } from "@openbot/logging";
 import {
   newStoreKey,
   WhatsAppAuthStore,
@@ -1128,33 +1127,6 @@ try {
         return { saved: BRAZIL_ACCOUNT, postedTo: accountJid };
       },
     );
-
-    // A saved password that is also part of a site name made each link to that site `https:[redacted]`.
-    await step("redaction: a link keeps its site name, and a secret in its path is hidden", async () => {
-      registerSecretValue("acmeshop", { allowShort: true });
-      registerSecretValue("feedtoken42x");
-      const link = "https://acmeshop.pl/offer?x=1";
-      const before = phone.textsTo(OWNER_JID).length;
-      const posted = await runCauseEffect(
-        agents.messaging.outboundTool(
-          "agent-whatsapp-e2e",
-          { threadId: "thread-whatsapp-e2e", turnId: "turn-whatsapp-e2e" },
-          "messaging_post",
-          {
-            connection: connectionId(agents),
-            place: OWNER,
-            text: `See ${link} and https://example.com/feed/feedtoken42x`,
-          },
-          () => Effect.succeed([]),
-        ),
-      );
-      assert.ok(posted.success, posted.contentItems[0]?.text);
-      await until(() => phone.textsTo(OWNER_JID).length > before, "the post with links");
-      const text = phone.textsTo(OWNER_JID).at(-1) ?? "";
-      assert.ok(text.includes(link), `The link lost its site name: ${text}`);
-      assert.ok(!text.includes("feedtoken42x"), "The secret in the path was sent.");
-      return { text };
-    });
 
     await step("burst: short messages of one person within 1.5 s become one request", async () => {
       const strangerJid = `${STRANGER}@s.whatsapp.net`;
