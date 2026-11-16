@@ -388,16 +388,17 @@ export function ConversationTimeline() {
   });
   /**
    * Remove on a thank-you card. The host whose account sent the report removes it: this computer, or
-   * a joined server with `feedback-withdraw-v1`. On an older server, the card asks the agent in the
-   * composer, and the agent removes the report with `withdraw_feedback`.
+   * a joined server with `feedback-withdraw-v1` for its owner. Only the owner approves a report. For
+   * another member, or on an older server, the card asks the agent in the composer, and the agent
+   * removes the report with `withdraw_feedback` when the owner approves.
    */
   const withdrawFeedback = createMemo(() => {
     const agentId = props.agent?.id;
     const server = props.server;
-    if (channel || !agentId) return undefined;
+    if (channel || !agentId || !server || (server.kind !== "local" && server.role !== "owner")) return undefined;
     const remove = props.runtime?.withdrawFeedback;
     if (remove) return (messageId: string) => remove({ agentId, messageId }).then(({ status }) => status);
-    if (props.runtime || !server || !serverSupportsCapability(server, FEEDBACK_WITHDRAW_CAPABILITY)) return undefined;
+    if (props.runtime || !serverSupportsCapability(server, FEEDBACK_WITHDRAW_CAPABILITY)) return undefined;
     return (messageId: string) =>
       conversationPort()
         .agent.withdrawFeedback({ agentId, messageId }, server.id)

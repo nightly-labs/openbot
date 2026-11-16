@@ -8,13 +8,14 @@ import { parseWithdrawFeedback } from "../ipc/agent-inputs";
 import type { TeamApiAgents } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
-import { readJson, requireAgentLevel } from "./request-helpers";
+import { readJson, requireOwner } from "./request-helpers";
 
 /**
  * Remove on a thank-you card in one agent's chat: the host's own account sent the report, so the host
- * takes it off GitHub. A member who can chat with the agent can press it, as the member could ask the
- * agent to remove it. The agent id is in the body, so the router's check of the path does not see it,
- * and this module refuses an agent hidden from the caller. Frozen by `feedback-withdraw-v1`.
+ * takes it off GitHub. Only the owner approves a report (`send_feedback` and `withdraw_feedback` ask
+ * the owner), so only the owner can press it. The agent id is in the body, so the router's check of
+ * the path does not see it, and this module refuses an agent hidden from the caller. Frozen by
+ * `feedback-withdraw-v1`.
  */
 export async function routeFeedbackWithdraw(
   context: TeamApiRequestContext,
@@ -35,7 +36,7 @@ export async function routeFeedbackWithdraw(
   }
   if (hiddenAgentIds.has(input.agentId) || !agents.listAgents().some((agent) => agent.id === input.agentId))
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
-  requireAgentLevel(context, input.agentId, "chat");
+  requireOwner(context.member);
   // The wire names the agent's own chat only, so a task id never reaches the host.
   const { status } = await runCauseEffect(
     agents.withdrawFeedback({ agentId: input.agentId, messageId: input.messageId }),

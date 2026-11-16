@@ -1,4 +1,4 @@
-import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
+import { feedbackSentIssue, feedbackSentItemType, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
 import type { ConversationMessage, ConversationSnapshot, WithdrawFeedbackInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -108,11 +108,15 @@ export class FeedbackWithdrawal {
   }
 
   /**
-   * Changes each loaded thank-you card of the issue in the thread to a removed card, and publishes the
-   * chat or the task. `card` is the card that the user removed; it can be older than the loaded messages.
+   * Changes each thank-you card of the issue in the thread to a removed card, also an older one that
+   * is not loaded, and publishes the chat or the task. `card` is the card that the user removed.
    */
   #markWithdrawn(agentId: string, threadId: string, number: number, card?: CardTarget): void {
-    const taskId = card?.taskId ?? null;
+    // The agent's `withdraw_feedback` names only its thread, which can be the thread of a side task.
+    const taskId =
+      card?.taskId ??
+      this.#tasks.openTaskIds(agentId).find((candidate) => this.#tasks.threadId(candidate) === threadId) ??
+      null;
     const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
     // The agent can be on another chat now. Then the stored row of this thread gives the active turn.
     const loaded = current.threadId === threadId;
@@ -131,7 +135,14 @@ export class FeedbackWithdrawal {
         changed.push(next);
         return next;
       });
-    if (card && !changed.some((message) => message.id === card.message.id)) changed.push(removed(card.message));
+    const stored = this.#store.database.readConversationMessagesOfItemType(
+      agentId,
+      threadId,
+      feedbackSentItemType(number),
+    );
+    for (const message of card ? [card.message, ...stored] : stored)
+      if (!changed.some((candidate) => candidate.id === message.id) && feedbackSentIssue(message)?.withdrawn === false)
+        changed.push(removed(message));
     if (changed.length === 0) return;
     const revision = this.#store.database.persistConversationChanges({
       agentId,
