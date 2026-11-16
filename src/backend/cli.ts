@@ -924,6 +924,14 @@ function parseMistralVersion(output: string): string {
   return match[1] ?? match[0];
 }
 
+/**
+ * GitHub Copilot CLI 1.0.105 updates itself unless told not to, and without this variable it also runs
+ * the newest package in its cache, so `--version` names that package (#9888). OpenBot owns the
+ * version, so every process gets the variable, the version check too: `copilot login` rejects the
+ * `--no-auto-update` flag.
+ */
+export const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
+
 /** The providers whose CLI is one native program that OpenBot can download. */
 type NativeCliProvider = "pi" | "muse" | "devin" | "copilot" | "mistral" | "antigravity";
 
