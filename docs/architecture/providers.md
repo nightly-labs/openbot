@@ -1129,7 +1129,9 @@ The GitHub Copilot provider (id `copilot`, issue #4637) starts GitHub's Copilot 
 `github/copilot-cli` and downloads `copilot-<target>.tar.gz` (`.zip` on Windows). Each archive holds
 only `copilot` (`copilot.exe`). The licence lets an app include the CLI only unchanged, so OpenBot
 downloads it and does not ship it. `OPENBOT_COPILOT_PATH` selects another executable. Every Copilot
-process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`.
+process gets `COPILOT_AUTO_UPDATE=false`, because `copilot login` refuses `--no-auto-update`. The
+install check runs `copilot --version` with it too: without it, the CLI runs the newest package in its
+cache and reports that version, so a newer cached package failed the check (#9888).
 
 The executable unpacks its JavaScript package into `pkg/<platform>/<version>` of its cache folder
 when that folder is missing. A confined process gets `COPILOT_CACHE_HOME` and

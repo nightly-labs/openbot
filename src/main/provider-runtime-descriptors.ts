@@ -109,6 +109,8 @@ export interface ProviderRuntimeDescriptor {
   verify(root: string, spec: RuntimeSpec, lock: AgentRuntimeLock): Effect.Effect<void, ProviderRuntimeFailure>;
   /** A file of the install whose text `parseVersion` reads, for a program with no `--version`. */
   readonly versionFile?: string;
+  /** Variables that `--version` gets, so that it reports the installed program as a session runs it. */
+  readonly versionEnvironment?: Readonly<Record<string, string>>;
   /**
    * The program names of older installs whose CLI had another name. Such an install cannot run, but
    * its version tells the update after an app upgrade that OpenBot installed this provider.
