@@ -379,6 +379,7 @@ describe("registerSecretValue", () => {
     );
     expect(redactText("https://example.com/feed/feedtoken42x")).toBe("https://example.com[redacted]");
     expect(redactText("https://user:acmeshop@db.example.com/x")).not.toContain("acmeshop");
+    expect(redactText("myapp://acmeshop/callback")).not.toContain("acmeshop");
     expect(redactText("sign in with acmeshop")).toBe("sign in with [redacted]");
   });
 
