@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "O OpenBot não consegue acessar o app do 1Password. Abra o 1Password e desbloqueie-o. Em Ajustes > Desenvolvedor, confira se “Integrar com a CLI do 1Password” está ativado. Depois tente novamente.",
   "error.connector.onePasswordCliFailed": "A CLI do 1Password falhou: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Sua conta do 1Password não permite que você crie o cofre compartilhado nem uma conta de serviço. Peça essa permissão a um proprietário ou administrador da conta, ou peça um token de conta de serviço e clique em “Usar token”.",
   "error.connector.onePasswordUnexpected": "O 1Password enviou uma resposta inesperada: {detail}",
   "error.connector.onePasswordTokenRejected": "O 1Password não aceitou o token da conta de serviço.",
   "error.connector.onePasswordNoVault":

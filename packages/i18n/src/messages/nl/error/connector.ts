@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "OpenBot kan de 1Password-app niet bereiken. Open 1Password en ontgrendel het. Controleer in Instellingen > Ontwikkelaar dat “Integreren met 1Password CLI” aan staat. Probeer het dan opnieuw.",
   "error.connector.onePasswordCliFailed": "De 1Password-CLI is mislukt: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Je 1Password-account staat niet toe dat je de gedeelde kluis of een serviceaccount maakt. Vraag een eigenaar of beheerder van het account om deze toestemming, of vraag om een token van een serviceaccount en klik op “Gebruik token”.",
   "error.connector.onePasswordUnexpected": "1Password gaf een onverwacht antwoord: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password heeft het token van het serviceaccount niet geaccepteerd.",
   "error.connector.onePasswordNoVault":

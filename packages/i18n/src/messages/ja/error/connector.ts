@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "OpenBot が 1Password アプリに接続できません。1Password を開いてロックを解除してください。「設定」>「開発者」で「1Password CLI と連携」がオンになっていることを確認し、もう一度お試しください。",
   "error.connector.onePasswordCliFailed": "1Password CLI が失敗しました: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "この 1Password アカウントには、共有保管庫やサービスアカウントを作成する権限がありません。アカウントのオーナーまたは管理者にこの権限を依頼するか、サービスアカウントのトークンを受け取って「トークンを使う」をクリックしてください。",
   "error.connector.onePasswordUnexpected": "1Password から予期しない応答がありました: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password はサービスアカウントのトークンを受け付けませんでした。",
   "error.connector.onePasswordNoVault":

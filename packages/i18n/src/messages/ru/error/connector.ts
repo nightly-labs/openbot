@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "OpenBot не может связаться с приложением 1Password. Откройте 1Password и разблокируйте его. В разделе «Настройки» > «Разработчик» проверьте, что параметр «Integrate with 1Password CLI» включён. Затем повторите попытку.",
   "error.connector.onePasswordCliFailed": "CLI 1Password завершился с ошибкой: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Ваш аккаунт 1Password не позволяет вам создать общее хранилище или сервисный аккаунт. Попросите владельца или администратора аккаунта дать это разрешение или выдать токен сервисного аккаунта, затем нажмите «Использовать токен».",
   "error.connector.onePasswordUnexpected": "1Password прислал неожиданный ответ: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password не принял токен сервисного аккаунта.",
   "error.connector.onePasswordNoVault":

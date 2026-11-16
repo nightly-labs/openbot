@@ -31,6 +31,8 @@ export const messages = defineMessages("error.connector", {
   "error.connector.onePasswordAppUnreachable":
     "OpenBot cannot reach the 1Password app. Open 1Password and unlock it. In Settings > Developer, make sure that “Integrate with 1Password CLI” is on. Then try again.",
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Your 1Password account does not let you create the shared vault or a service account. Ask an owner or administrator of the account for this permission, or ask them for a service account token and click “Use token”.",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
   "error.connector.onePasswordNoVault":

@@ -21,6 +21,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "OpenBot ne parvient pas à joindre l’app 1Password. Ouvrez 1Password et déverrouillez-le. Dans Réglages > Développeur, vérifiez que « Intégrer avec 1Password CLI » est activé. Puis réessayez.",
   "error.connector.onePasswordCliFailed": "La CLI 1Password a échoué : {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Votre compte 1Password ne vous permet pas de créer le coffre partagé ni un compte de service. Demandez cette autorisation à un propriétaire ou à un administrateur du compte, ou demandez-lui un jeton de compte de service, puis cliquez sur « Utiliser un jeton ».",
   "error.connector.onePasswordUnexpected": "1Password a envoyé une réponse inattendue : {detail}",
   "error.connector.onePasswordTokenRejected": "1Password n’a pas accepté le jeton du compte de service.",
   "error.connector.onePasswordNoVault":

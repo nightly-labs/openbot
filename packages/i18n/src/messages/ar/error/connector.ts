@@ -30,6 +30,8 @@ export const messages = {
   "error.connector.onePasswordAppUnreachable":
     "لا يستطيع OpenBot الوصول إلى تطبيق 1Password. افتح 1Password وافتح قفله. في Settings > Developer، تأكد من تشغيل «Integrate with 1Password CLI». ثم حاول مرة أخرى.",
   "error.connector.onePasswordCliFailed": "فشل 1Password CLI: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "لا يسمح لك حساب 1Password بإنشاء الخزنة المشتركة أو حساب خدمة. اطلب هذا الإذن من مالك الحساب أو مسؤوله، أو اطلب منه رمز حساب خدمة وانقر «استخدام رمز».",
   "error.connector.onePasswordUnexpected": "أرسل 1Password إجابة غير متوقعة: {detail}",
   "error.connector.onePasswordTokenRejected": "لم يقبل 1Password رمز حساب الخدمة.",
   "error.connector.onePasswordNoVault": "لا يمكن لحساب الخدمة قراءة أي خزنة. امنحه الوصول إلى خزنة، ثم حاول مرة أخرى.",
