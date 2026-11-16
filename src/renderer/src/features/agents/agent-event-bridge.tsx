@@ -33,7 +33,13 @@ import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
-import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
+import {
+  agentErrorDetails,
+  claimErrorToast,
+  createRetryNotices,
+  providerErrorTitle,
+  readableAgentError,
+} from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
   attentionAgentId,
@@ -160,6 +166,7 @@ export function AgentEventBridge() {
     (agentId) =>
       soundLevel(agentId) !== "nothing" && agentList().some((agent) => agent.id === agentId && agent.notifications),
   );
+  const retryNotices = createRetryNotices();
   let readRefresh = 0;
   let modelRefresh = 0;
 
@@ -309,8 +316,10 @@ export function AgentEventBridge() {
         }));
         if (soundLevel(event.agentId) === "all" && !platform.chatWindow) prepareCompletionSound();
         return;
-      case "turn-completed":
+      case "turn-completed": {
         completedTurnByAgent.set(event.agentId, event.turnId);
+        const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
+        retryNotices.clearAtTurnEnd(bannerKey, setConversationErrors, setConversationErrorRuns);
         setTurnProgress((current) =>
           current[event.agentId]?.turnId === event.turnId ? withoutAgent(current, event.agentId) : current,
         );
@@ -360,6 +369,7 @@ export function AgentEventBridge() {
           if (!platform.chatWindow && !event.quiet && !event.continues) noteSocialFollowReplyCompleted();
         }
         return;
+      }
       case "thread-turn-completed":
         // The chat's turn state stays: the run's own `turn-completed` did not leave its thread. Only a
         // routine thread plays the sound, as before: a routine run played it in the agent's chat.
@@ -458,6 +468,7 @@ export function AgentEventBridge() {
           // reader one line whatever its length, and dismissing it clears the whole run.
           const key = composerDraftKey({ agentId, serverId: activeServerId() });
           const message = readableAgentError(event.message);
+          retryNotices.noteError(key, event.message, message);
           setConversationErrors((current) => ({ ...current, [key]: message }));
           // The provider and model above the error let the user report which run failed (#2858).
           const provider = event.provider ? providerDisplayName(event.provider) : null;

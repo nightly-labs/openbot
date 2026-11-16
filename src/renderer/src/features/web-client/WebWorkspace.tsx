@@ -238,7 +238,7 @@ import { createUsageRefreshPoll } from "../account/usage-refresh-poll";
 import { conversationThreads } from "../agent-threads/conversation-threads";
 import { type NewAgentDraft, newAgentInput } from "../agents/agent-create-input";
 import { type CreationPreference, resolveCreationModel } from "../agents/agent-creation-model";
-import { agentErrorDetails, claimErrorToast, readableAgentError } from "../agents/agent-error-text";
+import { agentErrorDetails, claimErrorToast, createRetryNotices, readableAgentError } from "../agents/agent-error-text";
 import { withHostAccountUsage, withHostProfileAccount } from "../agents/host-provider-accounts";
 import { createRemoteAgentAdmin, updateRemoteAgent } from "../agents/remote-agent-admin";
 import type { ServerBrowserProfilesOptions } from "../browser/ServerBrowserProfilesPanel";
@@ -2080,14 +2080,22 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   );
   // As on desktop: an agent's error is the banner above its composer, and the newest one replaces
   // the last. An error with no agent is a toast, once per text in 30 seconds. The host redacts the
-  // message before it sends it.
+  // message before it sends it. The end of the agent's turn removes a retry notice.
+  const retryNotices = createRetryNotices();
   onCleanup(
     workspace.onHostEvent((event) => {
-      if (event.type !== "error") return;
       const serverId = server()?.id;
+      if (event.type === "turn-completed") {
+        if (!serverId) return;
+        const key = composerDraftKey({ agentId: event.agentId, serverId });
+        retryNotices.clearAtTurnEnd(key, controller.setConversationErrors, controller.setConversationErrorRuns);
+        return;
+      }
+      if (event.type !== "error") return;
       if (event.agentId && serverId) {
         const key = composerDraftKey({ agentId: event.agentId, serverId });
         const message = readableAgentError(event.message);
+        retryNotices.noteError(key, event.message, message);
         controller.setConversationErrors((current) => ({ ...current, [key]: message }));
         // The general sentence hides the cause, so the user can copy it into a report (#6410).
         const details = agentErrorDetails(event.message, message);
