@@ -1983,6 +1983,8 @@ export function createRemoteTeamPeer(
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
+        // The list that this request declares to the host. The snapshot request below depends on it.
+        const sentCapabilities = teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol);
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -1994,7 +1996,7 @@ export function createRemoteTeamPeer(
               path,
               body: payloadBody,
               ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
-              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
+              capabilities: [...sentCapabilities],
             },
           }),
         );
@@ -2099,14 +2101,13 @@ export function createRemoteTeamPeer(
         delivery?.complete();
         // The host applied this request's capabilities before it answered, on the same event socket that
         // the request below goes to, so the snapshot it sends has the fields of every capability.
-        if (
-          !checksConnection &&
-          !state.fullSnapshotRequested &&
-          state.hostProtocol !== undefined &&
-          teamCapabilitiesForProtocol(state.hostProtocol) !== TEAM_BOOTSTRAP_CAPABILITIES
-        ) {
+        // A request that went with the bootstrap list does not count, also when the protocol is known now.
+        if (!state.fullSnapshotRequested && sentCapabilities !== TEAM_BOOTSTRAP_CAPABILITIES) {
           state.fullSnapshotRequested = true;
-          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => undefined);
+          // A send that fails, such as on a channel that is not open yet, lets the next answer ask again.
+          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => {
+            state.fullSnapshotRequested = false;
+          });
         }
         return response;
       }).pipe(
