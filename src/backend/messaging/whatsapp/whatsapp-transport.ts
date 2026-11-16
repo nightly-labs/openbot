@@ -92,7 +92,7 @@ export class WhatsAppTransport implements MessagingTransport {
         for (const message of messages) {
           if (freshUpsert(type, message, upsertWindow)) this.#enqueue(message, true);
           // History, or a message held too long to answer: it is only saved, so agents can still read it.
-          else if (type === "append") this.#enqueue(message, true, true);
+          else if (type === "append") this.#enqueue(message, false, true);
         }
       }),
     );
@@ -143,9 +143,10 @@ export class WhatsAppTransport implements MessagingTransport {
 
   async #read(message: WAMessage, live: boolean, historyOnly: boolean): Promise<void> {
     const dedupKey = whatsAppDedupKey(message);
-    // A message that is only saved is not marked as seen: a later copy that can be answered is still read,
-    // and saving the same message again changes nothing.
-    if (!dedupKey || (!historyOnly && this.#remember(dedupKey))) return;
+    if (!dedupKey) return;
+    // A message that is only saved is not marked as seen, so a later copy that can be answered is still
+    // read. A copy of a message that was read already is skipped: an old edit must not undo a newer one.
+    if (historyOnly ? this.#seen.has(dedupKey) : this.#remember(dedupKey)) return;
     const { session, store, chats } = this.#handle;
     let event: WhatsAppEvent | null;
     try {

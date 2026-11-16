@@ -133,10 +133,8 @@ export async function whatsAppInbound(
     isSelfChat,
     fromMe: Boolean(key.fromMe),
   });
-  // The owner's own message in an allowed group is part of its conversation: it is saved, never answered.
-  const ownGroupMessage = isGroup && Boolean(key.fromMe) && context.rules.groups.has(chatJid);
-  if (decision.type === "ignore" && !ownGroupMessage) return null;
-  const historyOnly = ownGroupMessage || context.historyOnly === true;
+  if (decision.type === "ignore") return null;
+  const historyOnly = decision.type === "save" || context.historyOnly === true;
   const authorId = authorNumber ?? userOf(authorJid) ?? context.me.number;
   if (protocol) {
     applyChange(protocol, chatJid, authorId, context.chats);
