@@ -4727,14 +4727,14 @@ function callsBridgeTool(thread: AcpThread, title: string | null | undefined): b
 
 /**
  * Whether a permission request names the no-update tool of a bridge server: `<server>__<tool>` as Grok
- * names it, or `mcp_<server>_<tool>` as the Antigravity CLI names it.
+ * names it, or `Run mcp_<server>_<tool>` as the Antigravity CLI 1.5.9 titles it.
  */
 function callsNoUpdateTool(thread: AcpThread, title: string | null | undefined): boolean {
   return thread.dynamicTools.some(
     (namespace) =>
       namespace.tools.some((tool) => tool.name === ROUTINE_NO_UPDATE_TOOL) &&
       (title === `${namespace.name}__${ROUTINE_NO_UPDATE_TOOL}` ||
-        title === `mcp_${namespace.name}_${ROUTINE_NO_UPDATE_TOOL}`),
+        title === `Run mcp_${namespace.name}_${ROUTINE_NO_UPDATE_TOOL}`),
   );
 }
 
