@@ -2058,14 +2058,29 @@ export class BrowserHost {
     this.#emitChanged();
     // A failed submission can leave the secret in a page that never loads a new document, such as a
     // single-page sign-in. Load the page again with GET, as `submit` does, so that the commit ends
-    // the protection. Without it the tab stays hidden and every tool, close included, is refused.
+    // the protection. Without it the tab stays hidden and every tool is refused. A card can also end
+    // while its fill runs: the reload then waits behind the fill in the tab queue, and does nothing
+    // when the fill ended the protection (#9883).
     const protection = tab?.secret;
-    if (tab && protection?.submitted && !protection.running)
+    if (tab && protection?.submitted)
       Effect.runFork(
         this.#reloadProtected(tab, protection).pipe(
           Effect.tapError((error) =>
             Effect.sync(() =>
               logger.warn("Unable to reload a protected browser tab after a takeover", { error: toLogValue(error) }),
+            ),
+          ),
+          Effect.ignore,
+          // Nothing else ends the protection when the page does not load again, for example offline.
+          // An empty page is a new document, so its commit ends it.
+          Effect.andThen(
+            this.#enqueue(
+              tab.id,
+              (current) =>
+                current.secret === protection
+                  ? navigateAndWait(current.contents, () => current.contents.loadURL("about:blank"))
+                  : Effect.void,
+              true,
             ),
           ),
           Effect.ignore,
@@ -2776,7 +2791,7 @@ export class BrowserHost {
         // success and a repeated close is idempotent.
         const tab = this.#tabs.get(tabId);
         if (tab) {
-          yield* browserSync(() => this.#requireToolTab(params, tabId, true));
+          yield* browserSync(() => this.#requireToolTab(params, tabId, true, true));
           logger.info("Agent closed a browser tab.", {
             tabId,
             host: logUrlHost(tab.requestedUrl),
@@ -4474,8 +4489,11 @@ export class BrowserHost {
     return tab;
   });
 
-  /** `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`. */
-  #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false): void {
+  /**
+   * `dialogTool` is true for a tool that works while a page dialog is open: `handle_dialog` and `close_tab`.
+   * `closing` is true for `close_tab`: closing reads nothing of the page, so it works on a protected tab.
+   */
+  #requireToolTab(params: DynamicToolCallParams, tabId: string, dialogTool = false, closing = false): void {
     const tab = this.listTabs().find((candidate) => candidate.id === tabId);
     if (!tab) {
       const closed = this.#pageClosedTabs.get(tabId);
@@ -4488,7 +4506,7 @@ export class BrowserHost {
     // the agent service; this one is per tab and holds for every caller of a tabId-bearing tool.
     // A distinct message matters: telling the model the tab vanished, while the user is part-way
     // through a login on it, invites an `open` and a second tab onto the same flow.
-    if (this.#tabs.get(tabId)?.secret)
+    if (!closing && this.#tabs.get(tabId)?.secret)
       throw new Error("Browser inspection is protected during authentication. Use takeover.");
     if (this.#takeoverTabIds.has(tabId)) throw new Error(`Browser tab is under user takeover: ${tabId}`);
     if (this.#heldByUser(tabId)) throw new BrowserUserControlHeld(tabId);
