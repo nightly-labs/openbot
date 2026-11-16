@@ -1215,7 +1215,7 @@ Network traffic can also occur when:
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
   else the default Codex sign-in. The microphone audio then goes from this computer to OpenAI, and the
   spoken reply comes back, until the pane closes. OpenAI also gets the short relay instructions of
-  OpenBot, but not the agent's chat. Each request that the voice gives to the agent goes to the
+  OpenBot, with the agent's name, but not the agent's chat. Each request that the voice gives to the agent goes to the
   agent's own provider as a text message, as for a typed message, and shows in the chat. The agent's
   text answer then goes to OpenAI to be spoken. OpenBot never reads the Codex credentials. The voice
   transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text
