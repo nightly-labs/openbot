@@ -166,6 +166,8 @@ export const messages = {
   "provider.picker.selectEffort": "Выбрать уровень усилий",
   "provider.picker.custom": "Свой",
   "provider.picker.cliReady": "{cli} готов",
+  "provider.picker.modelSourceProvider": "Использует {name} из настроек {cli}",
+  "provider.picker.modelSourceCatalog": "Использует список моделей из настроек {cli}",
   "provider.status.signInRequired": "Нужно войти",
   "provider.model.free": "Бесплатно",
   "provider.model.new": "Новая",

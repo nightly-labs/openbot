@@ -435,13 +435,30 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
   const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
     status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
+  /**
+   * The line that says where the provider's models come from when its CLI settings give them from
+   * elsewhere, such as Ollama models under ChatGPT (#9956). It comes before the pool's line: it explains
+   * the list below it. Only the provider's own entry has it, as its own sign-in read those settings.
+   */
+  const sourceSummary = (key: RailKey, status: AgentProviderStatus): string | undefined => {
+    const rail = railOf(key);
+    const source = status.modelSource;
+    if (rail === CUSTOM_RAIL || key !== rail || status.state !== "available" || !source) return undefined;
+    const cli = agentProviderCliName(rail);
+    return source.kind === "provider"
+      ? t("provider.picker.modelSourceProvider", { name: source.name, cli })
+      : t("provider.picker.modelSourceCatalog", { cli });
+  };
   const railSummary = (key: RailKey, status: AgentProviderStatus): string => {
     const rail = railOf(key);
-    return rail === CUSTOM_RAIL ? customSummary() : (poolSummary(key, status) ?? providerSummary(rail, status, text));
+    return rail === CUSTOM_RAIL
+      ? customSummary()
+      : (sourceSummary(key, status) ?? poolSummary(key, status) ?? providerSummary(rail, status, text));
   };
   const railHeadingSummary = (key: RailKey, status: AgentProviderStatus): string => {
     const rail = railOf(key);
-    if (rail !== CUSTOM_RAIL) return poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
+    if (rail !== CUSTOM_RAIL)
+      return sourceSummary(key, status) ?? poolSummary(key, status) ?? providerHeadingSummary(rail, status, text);
     // OpenCode is what serves a custom endpoint, so its trouble is this tab's trouble.
     return status.state === "available" ? customSummary() : providerStatusLabel(status.state, t);
   };

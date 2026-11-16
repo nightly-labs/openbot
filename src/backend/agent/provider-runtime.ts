@@ -816,6 +816,7 @@ export class ProviderRuntime implements ProviderPort {
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
           row.id === "muse" && row.state === "available" && this.#accounts.get(row.id)?.type === "muse-unverified";
+        const modelSource = this.#modelCatalog.source(row.id);
         const withSource = {
           ...row,
           ...(unverified
@@ -828,6 +829,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
           ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
           ...(row.id === "muse" && this.#credentials.apiKey("muse") ? { apiKeyInUse: true } : {}),
+          ...(modelSource ? { modelSource } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -4669,7 +4671,7 @@ export class ProviderRuntime implements ProviderPort {
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     this.#modelsReadAt = Date.now();
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut, failed } = yield* this.#modelCatalog.refresh();
+    const { fresh, timedOut, failed, sourceChanged } = yield* this.#modelCatalog.refresh();
     let cleared = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
@@ -4677,7 +4679,7 @@ export class ProviderRuntime implements ProviderPort {
       this.#lastErrors.delete(provider);
       cleared = true;
     }
-    if (cleared) this.#setStatus({});
+    if (cleared || sourceChanged) this.#setStatus({});
     // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
     // the picker kept the built-in models until a provider started again (#6212).
     for (const provider of timedOut) {

@@ -153,6 +153,8 @@ export const messages = {
   "provider.picker.selectEffort": "Aufwand auswählen",
   "provider.picker.custom": "Benutzerdefiniert",
   "provider.picker.cliReady": "{cli} bereit",
+  "provider.picker.modelSourceProvider": "Nutzt {name} aus deinen {cli}-Einstellungen",
+  "provider.picker.modelSourceCatalog": "Nutzt eine Modellliste aus deinen {cli}-Einstellungen",
   "provider.status.signInRequired": "Anmeldung erforderlich",
   "provider.model.free": "Kostenlos",
   "provider.model.new": "Neu",

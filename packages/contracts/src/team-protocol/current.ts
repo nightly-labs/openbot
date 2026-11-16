@@ -143,6 +143,7 @@ import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
 import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
+import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "./provider-model-source-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
 import { PROVIDER_USE_CAPABILITY } from "./provider-use-v1";
@@ -385,6 +386,7 @@ export {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_DEFAULT_CAPABILITY,
   PROVIDER_HOST_SIGN_IN_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
   PROVIDER_SIGN_OUT_CAPABILITY,
   PROVIDER_USAGE_RESET_CAPABILITY,
   PROVIDER_USE_CAPABILITY,
@@ -695,6 +697,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   CRM_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -944,7 +947,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
     capability !== CRM_CAPABILITY &&
     capability !== SETTING_LINK_MARKERS_CAPABILITY &&
-    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+    capability !== PROVIDER_MODEL_SOURCE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1070,6 +1074,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   CRM_CAPABILITY,
   SETTING_LINK_MARKERS_CAPABILITY,
   WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1278,6 +1283,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
       capability !== CRM_CAPABILITY &&
       capability !== SETTING_LINK_MARKERS_CAPABILITY &&
-      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
+      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
+      capability !== PROVIDER_MODEL_SOURCE_CAPABILITY,
   );
 }

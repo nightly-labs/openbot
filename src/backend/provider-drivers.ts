@@ -11,6 +11,7 @@ import {
   type KeyOnlyProviderId,
   type PromptCacheTtl,
   type ProviderEnvironmentProvider,
+  type ProviderModelSource,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -34,6 +35,7 @@ import {
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
 import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
+import { CODEX_VARIABLE_PROVIDER, readCodexModelSource } from "./agent/codex-model-source";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
 import type { TurnContext } from "./agent/turn-context";
@@ -689,9 +691,6 @@ export interface ProviderClientContext {
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
 }
 
-/** The model provider of Codex that `OPENAI_BASE_URL` on the Codex page makes. */
-const CODEX_VARIABLE_PROVIDER = "openbot_environment";
-
 /**
  * Codex does not read a base URL from its environment while it has a ChatGPT sign-in (checked with
  * Codex 0.167.2), so `OPENAI_BASE_URL` in the Codex variables becomes a model provider of Codex, as
@@ -817,6 +816,12 @@ interface ProviderModelCatalog {
    * failed list keeps the previous models, and an empty list is a real answer.
    */
   fallback?(previous: AgentModelOption[]): AgentModelOption[];
+  /**
+   * Where the CLI's own settings say its models come from, when that is not the provider's own list,
+   * such as a Codex model provider or model list file (#9956). Read with each list. A failed read
+   * keeps the source that the last good read gave.
+   */
+  source?(client: AgentClient, timeoutMs: number): Effect.Effect<ProviderModelSource | null, unknown>;
 }
 
 /**
@@ -1036,7 +1041,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: serviceTierFields },
+    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) => {
       // Codex reads the system roots itself and skips a root that it cannot parse. With

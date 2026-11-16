@@ -167,6 +167,8 @@ export const messages = {
   "provider.picker.selectEffort": "اختيار الجهد",
   "provider.picker.custom": "مخصص",
   "provider.picker.cliReady": "{cli} جاهز",
+  "provider.picker.modelSourceProvider": "يستخدم {name} من إعدادات {cli}",
+  "provider.picker.modelSourceCatalog": "يستخدم قائمة نماذج من إعدادات {cli}",
   "provider.status.signInRequired": "تسجيل الدخول مطلوب",
   "provider.model.free": "مجاني",
   "provider.model.new": "جديد",

@@ -1,4 +1,4 @@
-import type { AgentModelOption } from "@openbot/contracts/ipc";
+import type { AgentModelOption, ProviderModelSource } from "@openbot/contracts/ipc";
 import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -39,6 +39,8 @@ export interface ModelCatalogOptions {
 export class ModelCatalog {
   readonly #options: ModelCatalogOptions;
   #models = structuredClone(FALLBACK_MODELS);
+  /** The source of each provider whose CLI settings give its models from elsewhere (`ProviderModelCatalog.source`). */
+  readonly #sources = new Map<AgentProvider, ProviderModelSource>();
 
   constructor(options: ModelCatalogOptions) {
     this.#options = options;
@@ -47,6 +49,35 @@ export class ModelCatalog {
   list(): AgentModelOption[] {
     return structuredClone(this.#models);
   }
+
+  /** Where the provider's models come from, when its CLI settings say that it is not its own list. */
+  source(provider: AgentProvider): ProviderModelSource | undefined {
+    const source = this.#sources.get(provider);
+    return source ? structuredClone(source) : undefined;
+  }
+
+  /**
+   * Reads the source again after a good list from the same client, and answers whether it changed. A
+   * failed read keeps the source that the last good read gave: the list did not change because a
+   * settings read failed.
+   */
+  readonly #readSource = Effect.fn("ModelCatalog.readSource")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    client: AgentClient,
+    catalog: ProviderModelCatalog,
+  ) {
+    if (!catalog.source) return false;
+    const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
+    if (Result.isFailure(result)) {
+      logger.warn("A provider did not give the source of its models.", { provider });
+      return false;
+    }
+    const before = JSON.stringify(this.#sources.get(provider) ?? null);
+    if (result.success) this.#sources.set(provider, result.success);
+    else this.#sources.delete(provider);
+    return JSON.stringify(result.success) !== before;
+  });
 
   /**
    * Reads the models that one client serves, in the catalogue's order, and how many the CLI listed.
@@ -174,7 +205,8 @@ export class ModelCatalog {
             if (catalog.fallback && listed === 0) {
               return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false, failed: false };
             }
-            return { provider, models: sorted, fresh: true, timedOut: false, failed: false };
+            const sourceChanged = yield* this.#readSource(provider, client, catalog);
+            return { provider, models: sorted, fresh: true, timedOut: false, failed: false, sourceChanged };
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
@@ -203,6 +235,8 @@ export class ModelCatalog {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
       timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
       failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
+      /** True when a provider's model source changed, so the provider rows must go out again. */
+      sourceChanged: discovered.some((entry) => "sourceChanged" in entry && entry.sourceChanged),
     };
   });
 
@@ -240,6 +274,8 @@ export class ModelCatalog {
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
     if ((catalog.fallback || options.quiet) && listed === 0) return false;
+    yield* this.#readSource(provider, client, catalog);
+    if (this.#options.client(provider) !== client) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),

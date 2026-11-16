@@ -143,6 +143,8 @@ export const messages = {
   "provider.picker.selectEffort": "Kies niveau",
   "provider.picker.custom": "Eigen",
   "provider.picker.cliReady": "{cli} gereed",
+  "provider.picker.modelSourceProvider": "Gebruikt {name} uit je {cli}-instellingen",
+  "provider.picker.modelSourceCatalog": "Gebruikt een modellijst uit je {cli}-instellingen",
   "provider.status.signInRequired": "Inloggen vereist",
   "provider.model.free": "Gratis",
   "provider.model.new": "Nieuw",

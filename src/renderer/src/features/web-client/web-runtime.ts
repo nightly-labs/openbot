@@ -71,6 +71,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentSteeringModels,
+  decodeProviderModelSources,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
@@ -87,6 +88,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withModelSources,
   withSteeringModels,
   withUsageCredits,
   withWorkspaceOnlyLimit,
@@ -174,6 +176,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import {
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOW_STOP_ROUTES,
@@ -1738,9 +1744,15 @@ export function createWebWorkspaceRuntime(
       );
     },
     async status() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.status);
+      // Where a provider's models come from is optional: when the route fails, the picker shows no source.
+      const [value, sources] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.status),
+        capabilities.includes(PROVIDER_MODEL_SOURCE_CAPABILITY)
+          ? request("POST", PROVIDER_MODEL_SOURCE_ROUTES.list, {}).then(decodeProviderModelSources, () => [])
+          : [],
+      ]);
       if (!isAgentStatus(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withModelSources(value, sources);
     },
     async accountUsage() {
       // Whether an account works on credits is optional: when its read fails, the reading shows as before.

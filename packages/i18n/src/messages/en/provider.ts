@@ -161,6 +161,8 @@ export const messages = defineMessages("provider", {
   "provider.picker.selectEffort": "Select effort",
   "provider.picker.custom": "Custom",
   "provider.picker.cliReady": "{cli} ready",
+  "provider.picker.modelSourceProvider": "Uses {name} from your {cli} settings",
+  "provider.picker.modelSourceCatalog": "Uses a model list from your {cli} settings",
   "provider.status.signInRequired": "Sign in required",
   "provider.model.free": "Free",
   "provider.model.new": "New",

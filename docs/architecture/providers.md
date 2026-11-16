@@ -1503,6 +1503,14 @@ Checked with Claude Code 2.1.325, Codex 0.167.2 and Antigravity CLI 1.5.9 agains
 logged each request. Grok is not in the list: with a Grok sign-in, Grok CLI 1.0.52 sends the Grok token
 to `GROK_XAI_API_BASE_URL` and ignores `XAI_API_KEY`.
 
+The user's own Codex settings can also give Codex another model provider (`model_provider`, such as
+Ollama) or a model list file (`model_catalog_json`). Codex then lists those models in `model/list`, and
+OpenBot shows them on the ChatGPT tab (#9956). With each good model list, `readCodexModelSource` reads
+`config/read` and the Codex status row gets `modelSource`. The model picker shows it on the ChatGPT tab
+in place of the pool and version line, so the user sees why the list is not OpenAI's. The
+`openbot_environment` provider above is not a source: the user set it on this page, and Codex keeps
+OpenAI's list with it. A joined server gives the source on `provider-model-source-v1`.
+
 The commands that agents run can read the variables: Claude Code and the Antigravity CLI pass their
 environment on, and Codex leaves out the names with `KEY`, `SECRET` or `TOKEN`. With a proxy, the proxy
 picks the account for each request, so the account of an agent and the account pool no longer choose the

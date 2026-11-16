@@ -25,6 +25,10 @@ import {
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
+import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -51,6 +55,7 @@ import {
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
+  decodeProviderModelSources,
   decodeSaveAgentProfileResult,
   decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
@@ -76,6 +81,7 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withModelSources,
   withSteeringModels,
   withUsageCredits,
   withWorkspaceOnlyLimit,
@@ -437,7 +443,24 @@ export function agentIpcHandlers({
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
         remote: (serverId) =>
-          runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost)),
+          runCauseEffect(
+            Effect.gen(function* () {
+              const status = remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost);
+              // `provider-model-source-v1` says where a provider's models come from, such as the
+              // Ollama models of a Codex that its settings point to Ollama. A host without it, or a
+              // failed read, leaves the rows as they are: the picker then shows no source.
+              const sources = remoteServers.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, PROVIDER_MODEL_SOURCE_ROUTES.list, decodeProviderModelSources, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              const [rows, listed] = yield* Effect.all([status, sources], { concurrency: "unbounded" });
+              return withModelSources(rows, listed);
+            }),
+          ),
       }),
       getRuntimeSnapshot: scopedQueryHandler({
         local: () => service.getRuntimeSnapshot(),
