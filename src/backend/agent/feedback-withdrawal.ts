@@ -1,5 +1,5 @@
 import { feedbackSentIssue, feedbackSentItemType, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
-import type { ConversationMessage, ConversationSnapshot, WithdrawFeedbackInput } from "@openbot/contracts/ipc";
+import type { ConversationMessage, WithdrawFeedbackInput } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -17,10 +17,9 @@ export interface FeedbackWithdrawalOptions {
   feedback: AgentFeedback | null;
 }
 
-/** A thank-you card: its thread, the task that shows it when it is in a task, and the message. */
+/** A thank-you card in the agent's own chat: its thread and the message. */
 interface CardTarget {
   threadId: string;
-  taskId: string | null;
   message: ConversationMessage;
 }
 
@@ -90,21 +89,14 @@ export class FeedbackWithdrawal {
 
   #target(input: WithdrawFeedbackInput): CardTarget | null {
     const agent = this.#store.list().find((candidate) => candidate.id === input.agentId);
-    if (!agent) return null;
-    let snapshot: ConversationSnapshot;
-    if (input.taskId !== undefined) {
-      if (!this.#tasks.has(agent.id, input.taskId)) return null;
-      snapshot = this.#tasks.read(agent.id, input.taskId);
-    } else {
-      if (!agent.threadId) return null;
-      snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
-    }
+    if (!agent?.threadId) return null;
+    const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     const threadId = snapshot.threadId;
     if (!threadId) return null;
     const message =
       snapshot.messages.find((candidate) => candidate.id === input.messageId) ??
       this.#store.database.readConversationMessages(agent.id, threadId, [input.messageId])[0];
-    return message ? { threadId, taskId: input.taskId ?? null, message } : null;
+    return message ? { threadId, message } : null;
   }
 
   /**
@@ -114,9 +106,7 @@ export class FeedbackWithdrawal {
   #markWithdrawn(agentId: string, threadId: string, number: number, card?: CardTarget): void {
     // The agent's `withdraw_feedback` names only its thread, which can be the thread of a side task.
     const taskId =
-      card?.taskId ??
-      this.#tasks.openTaskIds(agentId).find((candidate) => this.#tasks.threadId(candidate) === threadId) ??
-      null;
+      this.#tasks.openTaskIds(agentId).find((candidate) => this.#tasks.threadId(candidate) === threadId) ?? null;
     const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
     // The agent can be on another chat now. Then the stored row of this thread gives the active turn.
     const loaded = current.threadId === threadId;

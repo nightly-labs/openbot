@@ -37,9 +37,6 @@ export async function routeFeedbackWithdraw(
   if (hiddenAgentIds.has(input.agentId) || !agents.listAgents().some((agent) => agent.id === input.agentId))
     throw new HttpError(404, sourceText("error.team.agentNotFound"));
   requireOwner(context.member);
-  // The wire names the agent's own chat only, so a task id never reaches the host.
-  const { status } = await runCauseEffect(
-    agents.withdrawFeedback({ agentId: input.agentId, messageId: input.messageId }),
-  );
+  const { status } = await runCauseEffect(agents.withdrawFeedback(input));
   return json(200, { status });
 }

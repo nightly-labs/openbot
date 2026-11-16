@@ -200,10 +200,8 @@ export interface DeleteConversationMessageInput {
 /** Takes the report of a thank-you card off GitHub. The card is in the agent's chat or in one of its side threads. */
 export interface WithdrawFeedbackInput {
   agentId: string;
-  /** The thank-you card. */
+  /** The thank-you card, in the agent's own chat. */
   messageId: string;
-  /** The task of this agent whose chat holds the card. Without it, the agent's own chat. */
-  taskId?: string;
 }
 
 /**

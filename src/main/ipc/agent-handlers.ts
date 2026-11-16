@@ -1162,7 +1162,7 @@ export function agentIpcHandlers({
       withdrawFeedback: scopedHandler(parseWithdrawFeedback, {
         local: (input) => runCauseEffect(service.withdrawFeedback(input)),
         remote: (input, serverId) => {
-          if (input.taskId !== undefined || !remoteServers.supportsCapability(serverId, FEEDBACK_WITHDRAW_CAPABILITY))
+          if (!remoteServers.supportsCapability(serverId, FEEDBACK_WITHDRAW_CAPABILITY))
             throw new Error(sourceText("error.backend.feedbackWithdrawRemoteUnsupported"));
           return runCauseEffect(
             remoteServers.request(serverId, FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {

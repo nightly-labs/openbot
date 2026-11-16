@@ -729,7 +729,6 @@ export function parseWithdrawFeedback(value: unknown): WithdrawFeedbackInput {
   return {
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
-    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
   };
 }
 
