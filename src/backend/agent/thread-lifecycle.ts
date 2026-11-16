@@ -1522,6 +1522,7 @@ export class ThreadLifecycle {
                   .filter((config) => config.transport === "http" && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID)
                   .map((config) => providerMcpServerName(config.name))
               : [],
+      catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
       instructionsFileName: instructionsFile.fileName,
       instructionsFile: instructionsFile.file,
     };

@@ -60,7 +60,7 @@ import {
   type SubagentChange,
   stopSubagents,
 } from "./agent/subagent-updates";
-import { visibleDynamicTools } from "./agent/tool-catalog";
+import { visibleDynamicTools, withCatalogTools } from "./agent/tool-catalog";
 import { TurnContext } from "./agent/turn-context";
 import {
   AgentProcessExitError,
@@ -644,6 +644,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return this.options.provider;
   }
   readonly mcpToolsFixedAtStart = (): boolean => this.#flavor.mcpToolsFixedAtStart === true;
+  readonly catalogAsMcpTools = (): boolean => this.#flavor.catalogAsMcpTools === true;
   /** The memories and section-mates go with the prompts, so a memory change sends no instructions again. */
   readonly turnContext = true;
   readonly #turnContext = new TurnContext();
@@ -1850,7 +1851,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return yield* providerFailure(new Error(`Unknown ACP session: ${requestedThreadId}`));
     }
     const cwd = yield* providerSync(() => requiredString(params, "cwd"));
-    const dynamicTools = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const given = getArray(params, "dynamicTools").filter(isDynamicToolNamespace);
+    const dynamicTools = this.#flavor.catalogAsMcpTools ? withCatalogTools(given, this.provider) : given;
     const computerUse = computerUseParam(params);
     const agentId = mcpAgentParam(params);
     let threadRef: AcpThread | null = null;
@@ -4388,7 +4390,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   }
 }
 
-function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
+export function isDynamicToolNamespace(value: unknown): value is DynamicToolNamespace {
   return (
     isRecord(value) &&
     value.type === "namespace" &&

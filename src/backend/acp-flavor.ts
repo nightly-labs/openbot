@@ -311,6 +311,12 @@ export interface AcpFlavor {
    * only as a note, and the model cannot call its tools. A changed MCP set must start a new session.
    */
   mcpToolsFixedAtStart?: true;
+  /**
+   * The agent hides all MCP tools behind its own tool search, so each OpenBot catalog tool is also an
+   * MCP tool of its own (`withCatalogTools`). Behind OpenBot's own search, the model must find OpenBot's
+   * tool_call with the agent's search, and the agent's tool_call refused `openbot.channel_result` (#9312).
+   */
+  catalogAsMcpTools?: true;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /**
@@ -584,6 +590,9 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   // Its `delegate_task` call is titled `delegate_task: <goal>`, and its subagents send no events.
   subagentTools: ["delegate_task"],
   turnFailure: hermesTurnFailure,
+  // Hermes Agent 0.23.1 defers all MCP tools behind its own tool_search, also with the default
+  // `tools.tool_search.enabled: auto`, and a session cannot turn it off.
+  catalogAsMcpTools: true,
 };
 
 /**
@@ -717,9 +726,10 @@ const CUSTOM_ACP_FLAVOR: AcpFlavor = {
 const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
-  // is found, its lost turns are discarded, its answer sent again replaces the streamed one, and its
-  // failed turn is explained, a process that starts to refuse each prompt ends, and an unchanged
-  // model or effort is not sent again, as for the Hermes provider (#9718, #9738).
+  // is found, its lost turns are discarded, its answer sent again replaces the streamed one, its
+  // failed turn is explained, a process that starts to refuse each prompt ends, an unchanged model or
+  // effort is not sent again, and it gets the catalog as MCP tools, as for the Hermes provider
+  // (#9718, #9738, #9312).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
@@ -728,6 +738,7 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,
+    catalogAsMcpTools: true,
   },
   // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
   // turn, as for the Kimi provider (#8931).

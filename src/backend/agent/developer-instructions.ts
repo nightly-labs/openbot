@@ -168,6 +168,11 @@ export interface DeveloperInstructionOptions {
    * in `execute`, behind its own `search(...)` (#7097). Antigravity 1.5 leaves some out (#7427).
    */
   deferredMcpServers?: readonly string[];
+  /**
+   * The agent gets each catalog tool as an MCP tool of its own behind its own tool search (`AcpFlavor`
+   * `catalogAsMcpTools`). Its tool_call refused `openbot.channel_result` (#9312).
+   */
+  catalogAsMcpTools?: boolean;
   /** The name of the agent's instruction file in its workspace. Omitted, `AGENTS.md`. */
   instructionsFileName?: AgentInstructionFileName;
   /**
@@ -503,7 +508,13 @@ export function developerInstructions(
   const style = options.responseStyle ?? DEFAULT_RESPONSE_STYLE;
   return [
     STYLE_OPENING[style],
-    `openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools.${
+    `${
+      // Hermes hides each MCP tool behind its own tool_search and tool_call, which refused the name
+      // openbot.channel_result (#9312). With `tools.tool_search.enabled: off`, the tools are direct.
+      options.catalogAsMcpTools
+        ? "Each OpenBot and browser tool is its own tool named mcp__<server>__<tool>, such as mcp__editor_openbot_<tag>__channel_result for openbot.channel_result. A name such as openbot.<tool> or openbot_browser.<tool> in these instructions or in a tool result means that tool. Call it directly when it is in your tool list. Otherwise find it with your tool_search and run it with your tool_call under the exact name that tool_search lists, never under the dotted name; tool_describe gives its guidance."
+        : "openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools."
+    }${
       // Codex makes the `openbot` namespace direct-only (`CODEX_DIRECT_ONLY_NAMESPACES`), so `exec`
       // leaves it out of `ALL_TOOLS`; a model that looked only there said the browser was gone (#5036).
       // Codex 0.167 and later keeps no more than 8 MiB of image data URL from one `exec`, and `view_image`
