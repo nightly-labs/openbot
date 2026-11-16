@@ -957,18 +957,17 @@ block of a steer. A routine run gets no block. A slash command from the person g
 start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
 block.
 
-A message from another agent that only gives information follows the recipient's busy-message mode,
-as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
-When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
-`send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
-turn automatically, in each mode: it asks for work and a result, and in a running turn that result
-and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
-tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
-Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
-messaging and task work, and each answer to a request that went to two or more teammates, stay
-queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
-agent that cannot steer gets no fallback reason on its row.
+A message from another agent follows the recipient's busy-message mode, as a message from the person
+does: a request, an answer, a requested result, or a notice. When the mode is "steer", the provider
+steers natively and the recipient runs a chat turn, `send_message` and the result relay take the
+message into that turn (`AgentService.#steerAgentMessage`). A request that joins a running turn keeps
+its result separate from the answer to the person: the request text tells the recipient to send the
+result with `send_message`, and when it does not, the turn end relays the turn's answer to the sender
+(`TurnLifecycle.#relayAgentResult`). Routine runs, channel work and messages from Slack, Telegram or
+WhatsApp do not steer automatically: each starts a turn of its own. Channel, messaging and task
+work, and each answer to a request that went to two or more teammates, stay queued
+(`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
+cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.

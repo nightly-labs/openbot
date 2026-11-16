@@ -316,7 +316,6 @@ export type FeedbackWithdrawResult =
  */
 export type AgentMessageSteer =
   | "steered"
-  | "own-turn"
   | "recipient-queues"
   | "provider-unsupported"
   | "routine-run"
@@ -3735,10 +3734,6 @@ type SentDelivery = QueuedMessageReceipt["deliveries"][number] & {
   note?: string;
 };
 
-/** A request does not join the recipient's running turn, so the sender does not wait for a steer. */
-const OWN_TURN_NOTE =
-  "The recipient works now. A request gets a turn of its own after that work, so its result stays separate.";
-
 /** The one reason that the user can change, named as the agent settings show it. */
 const RECIPIENT_QUEUES_NOTE =
   "The recipient's While working setting is Queue, so the message waits for its next turn. The user can set it to Steer.";
@@ -3751,7 +3746,6 @@ const RECIPIENT_QUEUES_NOTE =
 function sentDelivery(delivery: QueuedMessageReceipt["deliveries"][number], steer: AgentMessageSteer): SentDelivery {
   if (steer === "steered") return { ...delivery, status: "running", position: null, outcome: "steered" };
   if (delivery.status !== "queued") return delivery;
-  if (steer === "own-turn") return { ...delivery, outcome: "queued", queuedBecause: steer, note: OWN_TURN_NOTE };
   if (steer === "recipient-queues")
     return { ...delivery, outcome: "queued", queuedBecause: steer, note: RECIPIENT_QUEUES_NOTE };
   return { ...delivery, outcome: "queued", ...(steer ? { queuedBecause: steer } : {}) };

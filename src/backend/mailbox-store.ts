@@ -1880,23 +1880,23 @@ export class MailboxStore {
   }
 
   /**
-   * What a queued message from another agent does when its recipient runs a chat turn: it `joins`
-   * that turn, or it waits for its `own-turn`. A request asks for work and a result, so it gets its
-   * own turn: in a running turn, its result and the answer to the person would be one message. An
-   * answer, a requested result or a notice only gives information, so it can join. Null for channel,
-   * messaging and task work, which runs outside that turn, and for the answers to a request that went
-   * to several teammates: they start together in one turn (`#isHeldReply`), so none goes in alone.
+   * Whether a queued message from another agent can join its recipient's running chat turn. A
+   * request, an answer, a requested result and a notice can all join, as a message from the person
+   * can. The request text tells the recipient to send its result with `send_message`, and the turn
+   * end relays the result when it does not (`TurnLifecycle`), so the result still goes to the sender.
+   * False for channel, messaging and task work, which runs outside that turn, and for the answers to
+   * a request that went to several teammates: they start together in one turn (`#isHeldReply`), so
+   * none goes in alone.
    */
-  chatTurnSteer(deliveryId: string): "joins" | "own-turn" | null {
+  joinsChatTurn(deliveryId: string): boolean {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
-    if (delivery?.status !== "queued") return null;
+    if (delivery?.status !== "queued") return false;
     const message = this.#requireMessage(delivery.messageId);
-    if (message.channelId || message.messaging || message.taskId) return null;
-    if (message.expectsReply !== false) return "own-turn";
-    return !isAnswer(message) ||
+    if (message.channelId || message.messaging || message.taskId) return false;
+    return (
+      !isAnswer(message) ||
       this.#state.deliveries.filter((candidate) => candidate.messageId === message.replyToMessageId).length < 2
-      ? "joins"
-      : null;
+    );
   }
 
   queuedDeliveryIds(agentId: string): string[] {
