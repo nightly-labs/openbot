@@ -27,11 +27,10 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
   tool: string,
   args: unknown,
   sidebar: AgentSidebar | null,
-  agentIds: ReadonlySet<string>,
+  agentIds: () => ReadonlySet<string>,
   channelIds: () => ReadonlySet<string>,
 ) {
   let action: SidebarLayoutAction | null;
-  let sidebarIds = agentIds;
   switch (tool) {
     case "list_sections":
       action = null;
@@ -50,16 +49,13 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
       const id = channelId ?? agentId;
       if (id === undefined || (agentId !== undefined && channelId !== undefined))
         return openBotToolFailure("Pass one of agentId and channelId.");
+      if (channelId !== undefined && !channelIds().has(channelId))
+        return openBotToolFailure("Unknown channel. Use a channel id from openbot.list_channels.");
       // A channel id passed as agentId is accepted too: agents tried that before channelId existed.
-      if (!agentIds.has(id)) {
-        if (!channelIds().has(id))
-          return openBotToolFailure(
-            channelId === undefined
-              ? "Unknown agent. Use an agent id from openbot.list_agents, or a channel id from openbot.list_channels as channelId."
-              : "Unknown channel. Use a channel id from openbot.list_channels.",
-          );
-        sidebarIds = new Set([...agentIds, id]);
-      }
+      if (agentId !== undefined && !agentIds().has(agentId) && !channelIds().has(agentId))
+        return openBotToolFailure(
+          "Unknown agent. Use an agent id from openbot.list_agents, or a channel id from openbot.list_channels as channelId.",
+        );
       action = { type: "assign", agentId: id, sectionId };
       break;
     }
@@ -67,6 +63,9 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
       return null;
   }
   if (!sidebar) return yield* new ToolOperationFailed({ cause: new Error("Sidebar sections are unavailable.") });
-  const layout = action ? yield* sidebar.mutate(action, sidebarIds).pipe(toToolOperationFailed) : sidebar.getSnapshot();
+  // The sidebar files agents and channels alike (`AgentService.sidebarChatIds`).
+  const layout = action
+    ? yield* sidebar.mutate(action, new Set([...agentIds(), ...channelIds()])).pipe(toToolOperationFailed)
+    : sidebar.getSnapshot();
   return openBotToolResult(layout);
 });

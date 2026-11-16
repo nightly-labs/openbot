@@ -2081,7 +2081,7 @@ export class OpenBotToolRouter {
       params.tool,
       params.arguments,
       this.#sidebarLayout,
-      new Set(this.#hooks.listAgents().map((agent) => agent.id)),
+      () => new Set(this.#hooks.listAgents().map((agent) => agent.id)),
       // Archived channels too: the sidebar keeps their folder (`ChannelStore.ids`).
       () => new Set(this.#channels.store.ids()),
     );
