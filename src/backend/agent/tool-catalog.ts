@@ -7,6 +7,7 @@ import type { DynamicToolNamespace } from "../local-mcp-bridge";
 import { OPENBOT_DYNAMIC_TOOLS, OPENBOT_TOOL_DEFINITIONS } from "../openbot-tools";
 import { type DynamicToolCallParams, isRecord, qualifiedToolName } from "../protocol";
 import { advertisedJsonSchema } from "./advertised-json-schema";
+import { withSchemaTypes } from "./schema-typed-arguments";
 import { toolGuidance } from "./tool-guidance";
 
 /** Discovery changes visibility only. Original definitions and execution owners stay authoritative. */
@@ -559,7 +560,8 @@ export function resolveDeferredTool(
   if (!parsed.success) return null;
   const entry = catalogEntry(catalogFor(provider), calledName(parsed.data));
   if (!entry) return null;
-  return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
+  const args = withSchemaTypes(parsed.data.arguments, entry.inputSchema);
+  return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: args };
 }
 
 /** The name and the arguments of a `tool_call`, read as `resolveDeferredTool` reads them, or `null`. */
