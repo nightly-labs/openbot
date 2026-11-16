@@ -74,6 +74,9 @@ interface ChatActionMarkerProps {
   onOpenInstructions?: ((agentId: string) => void) | undefined;
 }
 
+/** The actions of a skill or instruction change line, the same in the agent's chat and in its threads. */
+export type ChangeMarkerActions = Pick<ChatActionMarkerProps, "onOpenSkill" | "instructions" | "onOpenInstructions">;
+
 /** The parts of a marker that open the text of an agent message, for the markers in a group. */
 type AgentMessageTextProps = Pick<ChatActionMarkerProps, "onToggleAgentMessage" | "agentMessageText">;
 
