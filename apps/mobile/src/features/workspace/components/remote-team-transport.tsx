@@ -13,6 +13,8 @@ import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { runTeamEffect } from "@openbot/team-client";
 import {
   createRemoteCommandMailbox,
+  type RemoteDownloadProgress,
+  type RemoteDownloadWatch,
   type RemoteFileUpload,
   type RemoteLargeDownload,
   type RemoteTeamCommand,
@@ -67,6 +69,8 @@ export interface RemoteTeamTransportRef {
     onUploadProgress?: (fraction: number) => void,
     /** Lets one file larger than the attachment limit answer this request. */
     largeDownload?: RemoteLargeDownload,
+    /** Hears the bytes of the file of `size` that answers this request. */
+    download?: RemoteDownloadWatch,
   ): Promise<T>;
   /** Null until the peer page is ready for views. Events of a closed view are dropped. */
   openBrowserView(
@@ -120,6 +124,7 @@ type RemoteTeamCommandInput =
       body: TeamProtocolV2Json;
       upload?: RemoteFileUpload;
       largeDownload?: RemoteLargeDownload;
+      downloadSize?: number;
     };
 
 /**
@@ -204,10 +209,13 @@ export const RemoteTeamTransport = memo(
 
     // Upload progress arrives from the web view by command ID, while the command is still pending.
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
+    // Download progress arrives the same way, for a request that names the size of its file.
+    const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
         onUploadProgress?: (fraction: number) => void,
+        onDownloadProgress?: (received: number, total: number) => void,
       ): Promise<RemoteTeamCommandResult> => {
         const id = Crypto.randomUUID();
         const command: RemoteTeamCommand =
@@ -230,11 +238,16 @@ export const RemoteTeamTransport = memo(
                     : next.largeDownload
                       ? { largeDownload: next.largeDownload }
                       : {}),
+                  ...(next.downloadSize === undefined ? {} : { downloadSize: next.downloadSize }),
                 }
               : { id, type: "disconnect" };
-        if (!onUploadProgress) return mailbox.send(command);
-        uploadListeners.current.set(id, onUploadProgress);
-        return mailbox.send(command).finally(() => uploadListeners.current.delete(id));
+        if (!onUploadProgress && !onDownloadProgress) return mailbox.send(command);
+        if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
+        if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
+        return mailbox.send(command).finally(() => {
+          uploadListeners.current.delete(id);
+          downloadListeners.current.delete(id);
+        });
       },
       [mailbox],
     );
@@ -273,9 +286,15 @@ export const RemoteTeamTransport = memo(
           upload?: RemoteFileUpload,
           onUploadProgress?: (fraction: number) => void,
           largeDownload?: RemoteLargeDownload,
+          download?: RemoteDownloadWatch,
         ): Promise<T> => {
           const started = Date.now();
-          const send = () => enqueue({ type: "request", method, path, body, upload, largeDownload }, onUploadProgress);
+          const send = () =>
+            enqueue(
+              { type: "request", method, path, body, upload, largeDownload, downloadSize: download?.size },
+              onUploadProgress,
+              download?.onProgress,
+            );
           const result = await (isBackgroundRead(method, path) ? backgroundLane(send) : send());
           // Method, path, status and time only. Never the body or the upload.
           const request = `${hostIdRef.current ?? "unknown server"} ${method} ${supportLogUrl(path)}`;
@@ -424,6 +443,8 @@ export const RemoteTeamTransport = memo(
       },
       onUploadProgress: async ({ commandId, sent, total }: RemoteUploadProgress) =>
         uploadListeners.current.get(commandId)?.(total > 0 ? sent / total : 1),
+      onDownloadProgress: async ({ commandId, received, total }: RemoteDownloadProgress) =>
+        downloadListeners.current.get(commandId)?.(received, total),
       onAccountProfileChanged: () => latest.current.refreshProfile(),
       onBrowserViewEvent: async (event: BrowserViewBridgeEvent) => {
         const listener = viewListeners.current.get(event.viewId);

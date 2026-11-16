@@ -7,12 +7,21 @@ import {
 } from "@agentclientprotocol/sdk";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import type { CauseCode } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure } from "@openbot/telemetry";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { enableCursorMcpServers } from "./cursor-mcp-disabled";
 import { grokMediaItem, grokMediaKind, grokMediaToolKind } from "./grok-media";
 import { grokMcpServerName } from "./mcp-provider-shapes";
 import { isRecord, type ThreadItem } from "./protocol";
+
+/** An agent's notice that it sends a failed model request again (`AcpFlavor.retryNotice`). */
+interface AcpRetryNotice {
+  readonly sessionId: string;
+  readonly attempt: number;
+  readonly maxAttempts: number;
+  /** The agent could not connect to its server. Else the server answered with an error or stopped answering. */
+  readonly unreachable: boolean;
+}
 
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
@@ -71,7 +80,8 @@ export interface AcpFlavor {
   /**
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
-   * custom endpoint that serves that model, or null.
+   * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
+   * API key for the provider of that model.
    */
   turnFailure?(
     error: unknown,
@@ -80,6 +90,7 @@ export interface AcpFlavor {
     log: (text: string) => void,
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
+    savedKey: boolean,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -169,10 +180,13 @@ export interface AcpFlavor {
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
     /**
-     * The https link in the failure text that the user must open to fix their account, or `null`.
-     * The turn fails as a sign-in failure, and the error banner opens the link.
+     * The https link that the user must open to fix their account, from the failure text or, for a
+     * text that names no link, from the agent's own log, or `null`. The turn fails as a sign-in
+     * failure, and the error banner opens the link.
      */
-    accountLink?(text: string): string | null;
+    accountLink?(text: string, argv: readonly string[], sessionId: string): string | null;
+    /** A failure text that asks the user to verify their account: the turn fails as a sign-in failure. */
+    accountVerification?: RegExp;
     /** The message of an answer chunk that reports an exhausted quota, or `null`. */
     quota(text: string): string | null;
     /** The MCP server whose failed start ended the turn, from the failure text, or `null`. */
@@ -191,10 +205,16 @@ export interface AcpFlavor {
   cancelLocallyThenResume?: true;
   /**
    * The CLI version from which a second `session/prompt` during a running turn joins that turn. The
-   * CLI answers the first prompt with `end_turn` at once, and the work goes on under the new prompt.
-   * Without it, ACP has no steer request, and a second prompt can cancel the running turn.
+   * CLI answers the prompt before it with `end_turn`, and the work goes on under the new prompt.
+   * Without it or `steerByPromptCapability`, ACP has no steer request, and a second prompt can cancel
+   * the running turn.
    */
   steerByPromptSince?: string;
+  /**
+   * The `agentCapabilities._meta` key that is `true` when a second `session/prompt` during a running
+   * turn joins that turn, for a CLI whose `agentInfo.version` does not tell the release.
+   */
+  steerByPromptCapability?: string;
   /** A turn that does not complete marks its open tool calls as stopped. */
   interruptToolsOnStop?: true;
   /** Answer text is shown at once, not only when `session/prompt` answers. */
@@ -239,6 +259,12 @@ export interface AcpFlavor {
    * the client asks for them, and they show in the subagent card, not in the parent's steps.
    */
   childSessionUpdates?: true;
+  /**
+   * An extension notification that says that the agent sends a failed model request again, else null.
+   * The prompt is still in progress, so such a notice keeps its turn from ending as stalled, as a
+   * session update does, and the chat shows the retry.
+   */
+  retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
   /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
@@ -327,6 +353,11 @@ export interface AcpFlavor {
   loadInsteadOfResume?: { missing(response: LoadSessionResponse): boolean };
   /** The usage of this prompt alone, for an agent that sends it in the `_meta` of the prompt result, not in `usage`. */
   promptUsage?(response: PromptResponse): DynamicRecord | null;
+  /**
+   * The run of the agent that a prompt reply ends. Replies of the same run carry the same usage, so
+   * a steered turn reports it once.
+   */
+  promptRun?(response: PromptResponse): string | undefined;
   /**
    * The agent asks the user its questions with this extension method (the name without the `_` of
    * the wire) and reads a reply of its own shape. `answers` has the answers of each question by its
@@ -435,7 +466,52 @@ export const GROK_ACP_FLAVOR: AcpFlavor = {
         : { outcome: "cancelled" };
     },
   },
+  retryNotice: grokRetryNotice,
+  turnFailure: grokTurnFailure,
 };
+
+/**
+ * Grok CLI 1.0.77 fails a prompt after its last retry with the error of the model request, such as
+ * `Internal error: API error (status 503 Service Unavailable)` or `reqwest error stream: error sending
+ * request for url (…)`. The user reads what failed and what to do; the cause still comes from the
+ * agent's own text (#6883).
+ */
+function grokTurnFailure(error: unknown, detail: string): string {
+  if (!(error instanceof RequestError)) return detail;
+  const cause = classifyFailure(detail);
+  if (cause === "network") return sourceText("error.provider.grokConnectionFailed");
+  if (cause === "provider_unavailable" || cause === "timeout") return sourceText("error.provider.grokServiceFailure");
+  return detail;
+}
+
+/**
+ * The `error_type` of a Grok retry, with whether Grok could not connect. Grok CLI 1.0.77 sends `api`
+ * for a 5xx status, `idle_timeout` for a stream that stopped for 10 minutes, and `http` for a failed
+ * connection. A retry after an answer of only reasoning (`empty_response`) sends that reasoning as a
+ * session update, so it needs no notice.
+ */
+const GROK_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
+  ["api", false],
+  ["idle_timeout", false],
+  ["http", true],
+]);
+
+/**
+ * Grok CLI 1.0.77 sends a model request that fails with a 5xx status again 14 times in about five
+ * minutes, then starts again, and sends no session update meanwhile. It tells of each attempt only in
+ * an `x.ai/session_notification` with a `retry_state` update. Without it, OpenBot ended the turn as
+ * stalled before Grok gave its error, so a backup model did not start (#6883).
+ */
+function grokRetryNotice(method: string, params: DynamicRecord): AcpRetryNotice | null {
+  if (method.replace(/^_/u, "") !== "x.ai/session_notification") return null;
+  const { sessionId, update } = params;
+  if (!isRecord(update) || update.sessionUpdate !== "retry_state" || update.type !== "retrying") return null;
+  const unreachable = typeof update.error_type === "string" ? GROK_RETRY_TYPES.get(update.error_type) : undefined;
+  const { attempt, max_retries: maxAttempts } = update;
+  if (unreachable === undefined || typeof sessionId !== "string") return null;
+  if (typeof attempt !== "number" || typeof maxAttempts !== "number") return null;
+  return { sessionId, attempt, maxAttempts, unreachable };
+}
 
 /**
  * Hermes Agent 0.22 marks a turn as lost when its gateway restarts during the turn. It then refuses
@@ -574,6 +650,15 @@ export const KIMI_ACP_FLAVOR: AcpFlavor = {
 export const DEVIN_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: (error) =>
     error.code === -32016 ? isRecord(error.data) && error.data["cognition.ai/errorKind"] === "session_not_found" : null,
+  // Devin CLI 3000.12.57 reports `agentInfo.version` "0.0.0-dev", and sets this capability. In a live
+  // probe, a second prompt during a turn moved the running command to the background, and the agent
+  // went on under the new prompt. Both prompts got `end_turn` when that run ended.
+  steerByPromptCapability: "cognition.ai/midTurnPrompts",
+  // Each reply of that probe had the same `usage` and `cognition.ai/userMessageId`.
+  promptRun: (response) => {
+    const run = isRecord(response._meta) ? response._meta["cognition.ai/userMessageId"] : undefined;
+    return typeof run === "string" ? run : undefined;
+  },
 };
 
 /**

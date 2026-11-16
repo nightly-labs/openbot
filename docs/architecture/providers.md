@@ -748,6 +748,11 @@ A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
 maps that code to `error.provider.opencodeAuthRequired`, which names the provider from the model ID
 before its first `/` and lists the fixes: a Free model, a Go key, or `opencode auth login`.
+OpenCode 2.2.5 sends the same error, with no reason, when OpenCode Go refuses a key, such as an
+expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a saved key and an
+`opencode-go/` model the client's `savedKey` option makes the flavor show
+`error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
+same, and the text stays `error.provider.opencodeAuthRequired`.
 
 #### Turns of a background subagent or shell command
 
@@ -1161,9 +1166,14 @@ organization's managed configuration from Mistral is a higher layer, so it can t
 again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
 not confirmed in a run).
 
-Vibe 3.1.0 lists one ACP auth method, `browser-auth`. Sign in calls `authenticate` with it: the CLI
+Vibe 3.1.0 lists the ACP auth method `browser-auth`. Sign in calls `authenticate` with it: the CLI
 opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
-has no `127.0.0.1` callback and no code sign-in for a joined computer (`localCodeSignIn: null`). The
+has no `127.0.0.1` callback and no device code (`localCodeSignIn: null`). A client that sets
+`_meta["browser-auth-delegated"]` at `initialize` also gets `browser-auth-delegated`: its `start`
+gives the page and opens no browser, and its `complete` polls Mistral until the user finishes there.
+That is the code sign-in of a joined server (`acp-delegated` in `provider-drivers.ts`): the host gives
+the page as a `link` on the released providers-v8 `codeLoginStart`, and a client offers it only on a
+host with `mistral-code-sign-in-v1`. The
 sign-in saves an API key in the system keychain (`ai.mistral.vibe`, `MISTRAL_API_KEY`), or in
 `$VIBE_HOME/.env` when there is no keychain, and can write the provider and console address to
 `config.toml`. `MISTRAL_API_KEY` in OpenBot's environment also signs in. A signed-out process answers

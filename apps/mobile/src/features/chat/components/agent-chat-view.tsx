@@ -34,6 +34,7 @@ import { MAIN_THREAD_ID, useChatThreadMenu } from "./chat-thread-menu";
 import { ChatView } from "./chat-view";
 import { useBranchThread } from "./use-branch-thread";
 import { useChatQueue } from "./use-chat-queue";
+import { useComposerContextMeter } from "./use-context-usage";
 import { useMessageDelete } from "./use-message-delete";
 import { useMessagePins } from "./use-message-pins";
 import { useOpenAgentTasks } from "./use-open-agent-tasks";
@@ -104,6 +105,7 @@ export function MobileChatView({
   );
   const tasks = useOpenAgentTasks(agent.serverId, agent.id);
   const threadMenu = useChatThreadMenu(agent, MAIN_THREAD_ID);
+  const contextMeter = useComposerContextMeter({ serverId: agent.serverId, agentId: agent.id });
   // The pins of the agent's own chat, on a host with `message-pins-v1`.
   const pins = useMessagePins(agent.serverId, agent.id);
   const pinnedMessageIds = useMemo(
@@ -440,6 +442,7 @@ export function MobileChatView({
       questionForm={questionForm}
       activityAccessory={activityAccessory}
       threadMenu={threadMenu}
+      contextMeter={contextMeter}
       threadId={threadId}
       approvals={approvals}
       readBoundary={latest ? `${latest.id}:${latest.status}` : null}

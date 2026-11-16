@@ -125,6 +125,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
+  "mobile.settings.appearance.fullVisuals": "Show full visual previews",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "A visual from an agent shows at its full height in the chat. When this is off, a tall visual is cut, and you tap it to see all of it.",
   "mobile.settings.animations.title": "Animations",
   "mobile.settings.animations.footer":
     "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",

@@ -32,6 +32,7 @@ import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/compo
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
@@ -332,6 +333,12 @@ function AgentTaskChat({
   // The composer answers only after the person chooses it in the form. A private answer has its own field.
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;
+  // A draft has no provider thread yet, so it shows no ring.
+  const contextMeter = useComposerContextMeter({
+    serverId,
+    agentId,
+    task: { taskId, threadId: isDraft ? null : threadId },
+  });
   const browserRequests = useBrowserRequests(serverId);
   // Only the browser requests of the task's own thread; the agent's chat shows those of its thread.
   const taskBrowserRequests = useMemo(
@@ -840,6 +847,7 @@ function AgentTaskChat({
               keyboardProgress={motion.keyboardProgress}
               voice={dictationVoice(voice, t)}
               voiceAccent={accent}
+              contextMeter={contextMeter}
             />
           )}
         </Animated.View>

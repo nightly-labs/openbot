@@ -106,21 +106,33 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
 
 /**
  * Asks the host to compact the context of the agent's chat now, as "Compact now" on desktop. The
- * messages stay. The phone does not show the context usage, so it does not show the progress. The
+ * messages stay. The context ring of the composer shows the progress, on a host that reports it. The
  * host refuses while the agent works or when its provider cannot compact, and its reason shows in
  * the alert.
  */
-export function AgentCompactSection({ agent, available }: { agent: MobileAgent; available: boolean }) {
+export function AgentCompactSection({
+  agent,
+  available,
+  taskId,
+  compacting = false,
+}: {
+  agent: MobileAgent;
+  available: boolean;
+  /** A side thread of the agent, from the context sheet of its composer. Absent for the agent's own chat. */
+  taskId?: string;
+  /** The host reports a compaction that runs now: the row waits for it. */
+  compacting?: boolean;
+}) {
   const { t } = useText();
   const { compactContext } = useMobileWorkspaceActions();
-  const [compacting, setCompacting] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   // The host starts the compaction and answers; the provider finishes it later.
   const [started, setStarted] = useState(false);
 
   function compact(): void {
-    setCompacting(true);
+    setRequesting(true);
     setStarted(false);
-    compactContext(agent.id, agent.serverId)
+    compactContext(agent.id, agent.serverId, taskId)
       .then(() => {
         setStarted(true);
         void haptics.notification("success");
@@ -135,14 +147,20 @@ export function AgentCompactSection({ agent, available }: { agent: MobileAgent; 
           text.errorMessage(cause, text.t("mobile.agent.compact.failedBody")),
         );
       })
-      .finally(() => setCompacting(false));
+      .finally(() => setRequesting(false));
   }
 
   return (
     <SettingsSection footer={t(started ? "mobile.agent.compact.started" : "mobile.agent.compact.footer")}>
-      <SettingsRow disabled={!available || compacting} onPress={compact}>
+      <SettingsRow disabled={!available || requesting || compacting} onPress={compact}>
         <Typography.Paragraph>
-          {t(compacting ? "mobile.agent.compact.compacting" : "mobile.agent.compact.title")}
+          {t(
+            compacting
+              ? "mobile.chat.context.labelCompacting"
+              : requesting
+                ? "mobile.agent.compact.compacting"
+                : "mobile.agent.compact.title",
+          )}
         </Typography.Paragraph>
       </SettingsRow>
     </SettingsSection>

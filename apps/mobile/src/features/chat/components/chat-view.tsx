@@ -30,6 +30,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
+import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
@@ -169,6 +170,8 @@ export interface ChatViewProps {
   activityAccessory?: ReactNode;
   /** The agent's threads, in the menu of the agent's name in the header. */
   threadMenu?: ChatThreadMenu;
+  /** How full the agent chat's context is, as a ring in the open composer. A channel has none. */
+  contextMeter?: ComposerContextMeter;
   /** This chat's thread. Browser requests of the agent's other threads, such as its tasks, do not show here. */
   threadId?: string | null;
   /** The threads of a channel's member agents, from a host with `channel-attention-v1`. */
@@ -286,6 +289,7 @@ export function ChatView({
   channelTurnSummaries,
   activityAccessory,
   threadMenu,
+  contextMeter,
   threadId = null,
   channelThreadIds = null,
   approvals,
@@ -483,6 +487,23 @@ export function ChatView({
       if (thinkingAgentId) router.push({ pathname: "/turn-thinking", params: { agentId: thinkingAgentId, turnId } });
     },
     [thinkingAgentId],
+  );
+  const openMemoryChanges = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
+  const openSubagents = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({
+          pathname: "/subagent",
+          params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
+        });
+    },
+    [thinkingAgentId, target.serverId],
   );
   const queuedMessageIds = useMemo(
     () =>
@@ -1267,6 +1288,8 @@ export function ChatView({
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}
               onOpenTurn={thinkingAgentId ? openTurn : undefined}
+              onOpenSubagents={thinkingAgentId ? openSubagents : undefined}
+              onOpenMemoryChanges={thinkingAgentId ? openMemoryChanges : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}
@@ -1507,6 +1530,7 @@ export function ChatView({
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}
                   voiceAvatar={voiceAvatar}
+                  contextMeter={contextMeter}
                 />
               )}
             </Animated.View>

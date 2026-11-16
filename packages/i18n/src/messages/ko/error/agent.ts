@@ -12,6 +12,12 @@ export const messages = {
     "도구가 실행되지 않았어요. tool_call의 arguments는 텍스트가 아니라 JSON 객체여야 해요. arguments를 객체로 바꿔 다시 호출하세요.",
   "error.agent.toolCallDiscoveryTool":
     "도구가 실행되지 않았어요. tool_call로는 openbot.tool_search나 openbot.tool_describe를 실행할 수 없어요. 같은 인수로 직접 호출하세요.",
+  "error.agent.toolCallEnvelopeKeys":
+    "도구가 실행되지 않았어요. tool_call은 name과 arguments만 받아요. 도구의 인수를 arguments에 객체로 넣고 다시 호출하세요.",
+  "error.agent.toolCallUnknownTool":
+    "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. tool_search가 알려 주는 정확한 전체 이름(예: openbot_browser.snapshot)을 사용하세요.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "도구가 실행되지 않았어요. tool_call이 이 이름의 도구를 찾지 못했어요. 전체 이름은 {name}일 수 있어요. 맞다면 그 이름으로 다시 호출하세요.",
   "error.agent.routineScheduleArgumentsInvalid":
     "루틴 일정이 올바르지 않아요: {detail} 일정을 수정한 후 다시 시도하세요. openbot.tool_describe가 스키마를 제공합니다.",
   "error.agent.approvalWhileDeleting": "에이전트를 삭제하는 중에는 승인할 수 없어요.",

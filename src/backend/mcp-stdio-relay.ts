@@ -14,6 +14,12 @@ export interface StdioMcpLaunch {
   args: readonly string[];
   env: Record<string, string>;
   cwd: string;
+  /**
+   * The client closed its first request, `initialize`, before the server answered: it stopped
+   * waiting for the server to start. OpenCode 2.2.7 waits 30 seconds and then continues without the
+   * server, with no error, although OpenBot's own test waits 60 (#8520).
+   */
+  onStartAbandoned?: () => void;
 }
 
 export interface StdioMcpRelay {
@@ -47,6 +53,8 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
   const sessions = new Map<string, StreamableHTTPServerTransport>();
   /** The server processes that have not exited. `close` waits for them, as a provider stop waits for its own. */
   const children = new Set<ChildProcess>();
+  /** A relay that closes ends its pending requests itself: that is no failed start. */
+  let closing = false;
 
   const authorized = (request: IncomingMessage) => {
     const header = Buffer.from(request.headers.authorization ?? "");
@@ -94,6 +102,13 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
       return;
     }
     const transport = existing ?? open();
+    // The client gave up on the start. Its process is ended now, not when the relay closes.
+    if (!existing)
+      response.once("close", () => {
+        if (response.writableFinished || closing) return;
+        launch.onStartAbandoned?.();
+        void transport.close().catch(() => undefined);
+      });
     void transport
       .handleRequest(request, response)
       .catch(() => {
@@ -126,6 +141,7 @@ export const startStdioMcpRelay = Effect.fn("StdioMcpRelay.start")(function* (la
     token,
     close: () =>
       providerCall(async () => {
+        closing = true;
         const closed = new Promise<void>((resolve) => server.close(() => resolve()));
         server.closeAllConnections();
         await Promise.all([...transports].map((transport) => transport.close().catch(() => undefined)));

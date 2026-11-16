@@ -182,7 +182,7 @@ export interface AgentProviderDescriptor {
   /**
    * How the CLI takes a message into a running turn. `native`: it reads the message at its next
    * step (Grok through its `x.ai/interject` ACP extension, OpenCode through its `_session/steering`
-   * ACP extension, Antigravity through a second `session/prompt`). `deferred`: the protocol has no
+   * ACP extension, Antigravity and Devin through a second `session/prompt`). `deferred`: the protocol has no
    * steer request (ACP), so the message can wait until the turn ends. `reported`: each agent of the
    * provider reports whether it steers, and its models carry `steersTurns` (a custom ACP agent with
    * the `_session/steering` extension). Only a `native` provider, or a `reported` one whose model
@@ -444,7 +444,8 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     homeSkills: "native",
     workspaceInstructionFiles: ["AGENTS.md", "CLAUDE.md"],
     workspaceEnforcement: "confined-process",
-    steer: "deferred",
+    // A Devin CLI that sets `cognition.ai/midTurnPrompts` (3000.12.57 does) takes a second prompt into the turn.
+    steer: "native",
     concurrentTurns: true,
     reportsUsage: false,
     approvalsInFullAccess: true,
