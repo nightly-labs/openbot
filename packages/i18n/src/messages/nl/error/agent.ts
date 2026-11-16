@@ -18,6 +18,10 @@ export const messages = {
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. Gebruik de exacte gekwalificeerde naam die tool_search geeft, zoals openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "De tool is niet uitgevoerd. tool_call heeft geen tool met deze naam gevonden. De gekwalificeerde naam is mogelijk {name}. Als dat zo is, stuur de aanroep dan opnieuw met die naam.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe heeft geen OpenBot-tool met de naam {names} gevonden. Het beschrijft alleen de OpenBot- en browsertools die openbot.tool_search toont, geen MCP-tools.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Roep {names} rechtstreeks aan. tool_describe beschrijft de zoektools niet.",
   "error.agent.routineScheduleArgumentsInvalid":
     "De planning van de routine is ongeldig: {detail} Corrigeer de planning en probeer het opnieuw. openbot.tool_describe geeft het schema.",
   "error.agent.approvalWhileDeleting": "Je kunt geen toestemming geven terwijl de agent wordt verwijderd.",
