@@ -458,6 +458,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "更新技能 {name}",
   "chat.suggestion.update": "更新",
   "chat.suggestion.updated": "已更新",
+  "chat.suggestion.saving": "正在保存…",
+  "chat.suggestion.updating": "正在更新…",
   "chat.suggestion.saveReply": "好的，把它保存为技能。",
   "chat.suggestion.updateReply": "好的，把它加到这个技能里。",
   "chat.suggestion.detailsNamed": "在市场中查看 {name}",

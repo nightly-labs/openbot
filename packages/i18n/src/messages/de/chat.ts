@@ -485,6 +485,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "Fähigkeit {name} aktualisieren",
   "chat.suggestion.update": "Aktualisieren",
   "chat.suggestion.updated": "Aktualisiert",
+  "chat.suggestion.saving": "Wird gespeichert…",
+  "chat.suggestion.updating": "Wird aktualisiert…",
   "chat.suggestion.saveReply": "Ja, speichere es als Fähigkeit.",
   "chat.suggestion.updateReply": "Ja, füge es der Fähigkeit hinzu.",
   "chat.suggestion.detailsNamed": "{name} im Marketplace öffnen",

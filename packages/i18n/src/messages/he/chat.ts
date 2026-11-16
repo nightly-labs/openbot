@@ -475,6 +475,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "עדכון המיומנות {name}",
   "chat.suggestion.update": "עדכון",
   "chat.suggestion.updated": "עודכן",
+  "chat.suggestion.saving": "שומר…",
+  "chat.suggestion.updating": "מעדכן…",
   "chat.suggestion.saveReply": "כן, שמור את זה כמיומנות.",
   "chat.suggestion.updateReply": "כן, הוסף את זה למיומנות.",
   "chat.suggestion.detailsNamed": "פתיחת {name} בחנות",

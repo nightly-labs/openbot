@@ -459,6 +459,8 @@ export const messages = defineMessages("chat", {
   "chat.suggestion.updateNamed": "Update the skill {name}",
   "chat.suggestion.update": "Update",
   "chat.suggestion.updated": "Updated",
+  "chat.suggestion.saving": "Saving…",
+  "chat.suggestion.updating": "Updating…",
   "chat.suggestion.saveReply": "Yes, save it as a skill.",
   "chat.suggestion.updateReply": "Yes, add it to the skill.",
   "chat.suggestion.detailsNamed": "Open {name} in Marketplace",

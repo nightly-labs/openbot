@@ -459,6 +459,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "{name} 스킬 업데이트",
   "chat.suggestion.update": "업데이트",
   "chat.suggestion.updated": "업데이트됨",
+  "chat.suggestion.saving": "저장 중…",
+  "chat.suggestion.updating": "업데이트 중…",
   "chat.suggestion.saveReply": "네, 스킬로 저장해 줘.",
   "chat.suggestion.updateReply": "네, 스킬에 추가해 줘.",
   "chat.suggestion.detailsNamed": "마켓플레이스에서 {name} 열기",
