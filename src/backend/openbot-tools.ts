@@ -472,7 +472,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "set_commit_co_author",
     description:
-      "Turn off, or on again, the OpenBot co-author trailer that agents add to their git commits, when the user asks. It applies to every agent of this OpenBot. The owner approves each change on a card.",
+      "Turn the OpenBot co-author trailer in the git commits of all agents off or on, when the user asks. The owner approves a card.",
     shape: setCommitCoAuthorToolSchema.shape,
   },
   {

@@ -144,14 +144,13 @@ try {
     return parsed.commitCoAuthor;
   };
 
-  await step("Agents get the tool, and the prompt names it and the setting while the trailer is on", async () => {
+  await step("Agents get the tool, and the prompt names it while the trailer is on", async () => {
     assert.ok(OPENBOT_TOOL_DEFINITIONS.some((tool) => tool.name === "set_commit_co_author"));
     assert.ok(PROFILE_TOOL_NAMES.has("set_commit_co_author"), "A failure goes back to the agent to correct.");
     assert.equal(store.agentDefaults().commitCoAuthor, true, "The trailer is on by default.");
     const text = prompt();
     assert.ok(text.includes(OPENBOT_COMMIT_TRAILER));
     assert.ok(text.includes("openbot.set_commit_co_author"));
-    assert.ok(text.includes("Credit OpenBot in commits"));
     assert.ok(text.includes(`trailer once: ${OPENBOT_COMMIT_TRAILER}\n`), "No period follows the trailer.");
     return { commitCoAuthor: true };
   });

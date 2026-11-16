@@ -8,7 +8,7 @@ import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from 
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
 
 export const setCommitCoAuthorToolSchema = z.strictObject({
-  enabled: z.boolean().describe("false: agents stop adding the OpenBot trailer. true: they add it again."),
+  enabled: z.boolean(),
 });
 
 /** Where the user changes the setting, for an agent that tells the user. */
