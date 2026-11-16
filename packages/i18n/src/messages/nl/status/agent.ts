@@ -108,7 +108,8 @@ export const messages = {
   "status.agent.mcpServerDisable": "De MCP-server {name} uitzetten voor elke agent op deze server.",
   "status.agent.mcpServerRemove": "De MCP-server {name} en de inlog ervan verwijderen bij elke agent op deze server.",
   "status.agent.mcpToolCall": "De tool {tool} van de MCP-server {name} uitvoeren.",
-  "status.agent.mcpSignInRequested": "De MCP-server {name} vraagt om in te loggen. Log in via Serverinstellingen, MCP.",
+  "status.agent.mcpSignInRequested":
+    "De MCP-server {name} vraagt om in te loggen. Log in via Marktplaats, Apps, {name}.",
   "status.agent.uiBlockClosedByMessage": "Gesloten door een nieuw bericht",
   "status.agent.vaultAdded": "Opgeslagen in de Kluis: {name}",
   "status.agent.vaultUpdated": "Gewijzigd in de Kluis: {name}",

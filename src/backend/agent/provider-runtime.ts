@@ -4299,7 +4299,7 @@ export class ProviderRuntime implements ProviderPort {
         return;
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
-      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
       // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
       // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed

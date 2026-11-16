@@ -260,9 +260,6 @@ export const messages = {
   "server.settings.membersDescription": "Публикуйте сервер, приглашайте людей и управляйте доступом.",
   "server.settings.desktopTitle": "Рабочий стол",
   "server.settings.desktopDescription": "Настройте рабочий стол этого сервера или подключитесь к нему.",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription":
-    "Подключайте серверы MCP и выбирайте, какие из них могут использовать агенты этого сервера.",
   "server.settings.storageTitle": "Хранилище",
   "server.settings.storageDescription": "Посмотрите, что OpenBot хранит на диске этого сервера, и освободите место.",
   "server.settings.hostedSitesTitle": "Сайты",
@@ -306,7 +303,6 @@ export const messages = {
   "server.settings.copyFailedTitle": "Не удалось скопировать",
   "server.settings.copyFailed": "OpenBot не удалось скопировать это значение.",
   "server.settings.unavailableTitle": "Настройки сервера недоступны",
-  "server.settings.unsavedMcpChanges": "Несохранённые изменения MCP",
   "server.settings.reset": "Сбросить",
   "server.settings.unsavedChanges": "Несохранённые изменения",
   "server.settings.changesNotSaved": "Изменения не сохранены",

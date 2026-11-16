@@ -15,8 +15,10 @@ import type {
   MarketplaceSkillSummary,
   McpServerAccess,
   McpServerConfig,
+  McpSignInAppState,
   McpSignInRelayPage,
   McpSignInState,
+  SaveMcpSignInAppInput,
 } from "@openbot/contracts/ipc";
 import {
   assignedSkillCount,
@@ -47,6 +49,7 @@ import type {
   MarketplaceMacAutomation,
   MarketplaceMcpAccess,
   MarketplaceModel,
+  MarketplaceServerSlots,
   MarketplaceSkillChange,
   MarketplaceSkillRef,
   SkillRead,
@@ -69,6 +72,7 @@ import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import type { AgentSkillCalls } from "../../skills-port";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
+import type { McpServerSignIn, McpServerTools } from "../servers/mcp-server-tools";
 import { mcpSignInRecord } from "../servers/mcp-servers";
 import { desktopMarketplaceCalls, type MarketplaceCalls, type MarketplaceSignInRelay } from "./marketplace-calls";
 import { createPluginAppConfig } from "./marketplace-plugin-catalog";
@@ -137,10 +141,19 @@ export interface MarketplaceControllerProps {
   calls?: MarketplaceCalls | undefined;
   /** This computer runs macOS, so an app that drives Apple apps can ask for their Automation access. */
   macOS?: boolean | undefined;
-  /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
-  onAddServer?: (() => void) | undefined;
-  /** Opens the form that edits the custom MCP server with this ID. Absent when the user cannot edit one. */
-  onEditServer?: ((id: string) => void) | undefined;
+  /** The server in `pluginServerId` keeps a pre-registered OAuth app for an MCP server (`mcp-sign-in-app-v1`). */
+  pluginSignInApp?: boolean | undefined;
+  /**
+   * One sentence about the managed runtime that starts a STDIO server on this computer, or null.
+   * Absent for a joined server, which holds its own runtime.
+   */
+  mcpToolRuntimeNote?: string | null | undefined;
+  /** An MCP row to sign in to: the user pressed Sign in on an agent's card. Its page opens and signs in. */
+  mcpSignInRequest?: string | null | undefined;
+  /** Runs once the request is taken, so it does not start again. */
+  onMcpSignInRequestHandled?: (() => void) | undefined;
+  /** The sign-in state of the MCP rows of `serverId`, after each read. An agent's card shows it. */
+  onMcpSignIns?: ((serverId: string, states: Readonly<Record<string, McpSignInState>>) => void) | undefined;
 }
 
 /** The connect step of one app. `settle(null)` is a closed dialog. */
@@ -269,7 +282,11 @@ interface AddedRecord {
 /** A GitHub skill id names a repository and a folder. Analytics get the source only. */
 const skillSlug = (id: string) => (isGithubSkillId(id) ? "github" : id);
 
-export function createMarketplaceController(props: MarketplaceControllerProps) {
+export function createMarketplaceController(
+  props: MarketplaceControllerProps,
+  /** Draws the custom MCP server form and card with the tools the controller builds. */
+  serverSlots?: (tools: McpServerTools) => MarketplaceServerSlots,
+) {
   const { t, format } = useText();
   const calls = () => props.calls ?? desktopMarketplaceCalls();
   const skillCalls = () => calls().agentSkills(props.hostServerId);
@@ -278,6 +295,7 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
   const agents = createMemo(() => props.agents);
   const activeAgentId = createMemo(() => props.activeAgentId);
   const hostServerId = createMemo(() => props.hostServerId);
+  const mcpSignInRequest = createMemo(() => props.mcpSignInRequest ?? null);
 
   const [error, setErrorText] = createSignal<string | null>(null);
   const [errorCode, setErrorCode] = createSignal<string | null>(null);
@@ -1266,6 +1284,164 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     stop?.();
   }
 
+  /* Custom MCP servers: the form and the connection card of a custom server's page. */
+
+  /** The server that holds the rows, or the error that the form shows. */
+  function mcpServerId(): string {
+    const serverId = props.pluginServerId;
+    if (!serverId) throw new Error(t("marketplace.error.connectNoServer"));
+    return serverId;
+  }
+  const mcpServerKind = () => (props.pluginHostName ? "remote" : "local");
+
+  /** Main answers each change with the whole list, so the rows are taken from the answer. */
+  async function changeMcpServers(
+    action: "mcp_server_saved" | "mcp_server_removed" | "mcp_server_toggled",
+    failureCode: string,
+    change: (serverId: string) => Promise<McpServerConfig[]>,
+  ): Promise<McpServerConfig[]> {
+    const serverId = mcpServerId();
+    const analytics = desktopAnalytics.scope();
+    let next: McpServerConfig[];
+    try {
+      next = await change(serverId);
+    } catch (cause) {
+      analytics.track("team_action", {
+        action,
+        result: "failed",
+        server_kind: mcpServerKind(),
+        failure_code: failureCode,
+      });
+      throw cause;
+    }
+    analytics.track("team_action", { action, result: "succeeded", server_kind: mcpServerKind() });
+    if (props.pluginServerId !== serverId) return next;
+    // A read in flight started before this change and would put the old rows back.
+    serversRead += 1;
+    setServers(next);
+    // A saved row can name an address the host is already signed in to.
+    void readSignIns(serverId);
+    return next;
+  }
+
+  /** A changed or removed OAuth app drops the sign-in that the old client held, so the states are read again. */
+  async function changeSignInApp(change: (serverId: string) => Promise<McpSignInAppState>) {
+    const serverId = mcpServerId();
+    const state = await change(serverId);
+    await readSignIns(serverId);
+    return state;
+  }
+
+  const mcpTools: McpServerTools = {
+    servers,
+    signIns,
+    save: async (config) => {
+      const next = await changeMcpServers("mcp_server_saved", "mcp_server_save_failed", (serverId) =>
+        calls().mcp.saveMcpServer({ config }, serverId),
+      );
+      // The host keeps names unique, and a new row gets its id there.
+      const saved = next.find((row) => row.name === config.name);
+      if (!saved) throw new Error(t("mcp.panel.saveFailed"));
+      return saved;
+    },
+    test: async (config) => {
+      const serverId = mcpServerId();
+      const analytics = desktopAnalytics.scope();
+      const result = await calls().mcp.testMcpServer({ config }, serverId);
+      analytics.track("team_action", {
+        action: "mcp_server_tested",
+        result: result.error ? "failed" : "succeeded",
+        server_kind: mcpServerKind(),
+        ...(result.error ? { failure_code: "mcp_server_test_failed" } : {}),
+      });
+      return result;
+    },
+    setEnabled: async (id, enabled) => {
+      await changeMcpServers("mcp_server_toggled", "mcp_server_toggle_failed", (serverId) =>
+        calls().mcp.setMcpServerEnabled({ mcpServerId: id, enabled }, serverId),
+      );
+    },
+    toolRuntimeNote: () => props.mcpToolRuntimeNote ?? null,
+    signIn: () => {
+      // This computer signs in itself; a joined server only when it relays the page here.
+      if (!props.pluginServerId || (props.pluginHostName && !signInRelay())) return undefined;
+      return mcpSignIn;
+    },
+    signInRequest: mcpSignInRequest,
+    // The owner clears the request, so the same row can be asked for again later.
+    endSignInRequest: () => props.onMcpSignInRequestHandled?.(),
+  };
+
+  const mcpSignIn: McpServerSignIn = {
+    start: async (config) => {
+      const serverId = mcpServerId();
+      const result = await signInPluginApp(config);
+      await readSignIns(serverId);
+      return result;
+    },
+    cancel: (url) => calls().mcp.cancelMcpSignIn({ url }, mcpServerId()),
+    signOut: async (id) => {
+      const serverId = mcpServerId();
+      const states = await calls().mcp.signOutMcpServer({ mcpServerId: id }, serverId);
+      if (props.pluginServerId === serverId) {
+        signInsRead += 1;
+        setSignIns(mcpSignInRecord(states));
+      }
+    },
+    get relay() {
+      const relay = signInRelay();
+      if (!relay) return undefined;
+      return {
+        hostName: props.pluginHostName ?? "",
+        page: (url: string) => {
+          const current = relayed();
+          return current?.url === url ? current.page : undefined;
+        },
+        open: (url: string) => relay.open(url, mcpServerId()),
+        paste: (url: string, address: string) => relay.paste(url, address, mcpServerId()),
+      };
+    },
+    get app() {
+      // Read here, where the page tracks it: the section loads the app in an effect callback.
+      const serverId = props.pluginServerId;
+      if (!props.pluginSignInApp || !serverId) return undefined;
+      const { mcp } = calls();
+      return {
+        load: (id: string) => mcp.mcpSignInApp({ mcpServerId: id }, serverId),
+        save: (input: SaveMcpSignInAppInput) =>
+          changeSignInApp((serverId) => calls().mcp.saveMcpSignInApp(input, serverId)),
+        remove: (id: string) =>
+          changeSignInApp((serverId) => calls().mcp.removeMcpSignInApp({ mcpServerId: id }, serverId)),
+      };
+    },
+  };
+  const serverSlotsBuilt = serverSlots?.(mcpTools);
+
+  /**
+   * The page of an MCP row: `custom:<id>` for a row the user added, the app's id for a row that an
+   * app installed. Undefined until the rows are read, and null when the host has no such row.
+   */
+  function mcpServerApp(id: string): string | null | undefined {
+    if (!props.pluginServerId || serversReadFor() !== props.pluginServerId) return undefined;
+    const holds = (app: MarketplaceApp) =>
+      app.kind === "custom"
+        ? app.server.id === id
+        : app.kind === "plugin" && app.plugin.apps.some((entry) => heldApps(entry).some((row) => row.id === id));
+    return apps().find(holds)?.id ?? null;
+  }
+
+  /* An agent's card shows whether the host holds a sign-in, read with the rows here. */
+  createEffect(
+    () => {
+      const serverId = serversReadFor();
+      const report = props.onMcpSignIns;
+      return serverId && report ? { serverId, states: signIns(), report } : null;
+    },
+    (read) => {
+      read?.report(read.serverId, read.states);
+    },
+  );
+
   /**
    * The ways into `app` that work from here. On a joined server a local server answers only on the
    * host, and a browser sign-in needs a host that relays it; a key works from any computer.
@@ -1642,9 +1818,12 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
       return false;
     }
     const name = servers().find((server) => server.id === id)?.name ?? "";
-    const next = await run(() => calls().mcp.removeMcpServer({ mcpServerId: id }, serverId));
+    const next = await run(() =>
+      changeMcpServers("mcp_server_removed", "mcp_server_remove_failed", (target) =>
+        calls().mcp.removeMcpServer({ mcpServerId: id }, target),
+      ),
+    );
     if (!next) return false;
-    setServers(next);
     setNotice(t("marketplace.notice.serverRemoved", { name }));
     return true;
   }
@@ -1797,11 +1976,8 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     get mcpAccess() {
       return accessServers() ? mcpAccess : undefined;
     },
-    get addServer() {
-      return props.onAddServer;
-    },
-    get editServer() {
-      return props.onEditServer;
+    get servers() {
+      return props.pluginServerId ? serverSlotsBuilt : undefined;
     },
     get runPrompt() {
       const run = props.onRunPluginPrompt;
@@ -1839,5 +2015,6 @@ export function createMarketplaceController(props: MarketplaceControllerProps) {
     pasteSignInRelay,
     cancelSignIn,
     openPluginUrl,
+    mcpServerApp,
   };
 }

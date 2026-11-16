@@ -9,6 +9,8 @@ import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPag
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { McpServerControls } from "../servers/McpServerControls";
+import { McpServerForm } from "../servers/McpServerForm";
 import {
   createMarketplaceController,
   type MarketplaceControllerProps,
@@ -45,7 +47,10 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const { t } = useText();
   const nav = createMarketplaceNavigation();
-  const controller = createMarketplaceController(props);
+  const controller = createMarketplaceController(props, (tools) => ({
+    form: (form) => <McpServerForm tools={tools} id={form.id} onClose={form.onClose} />,
+    controls: (controls) => <McpServerControls tools={tools} id={controls.id} />,
+  }));
   const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
     t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
   const skillConfirmBody = (confirm: PendingSkillConfirm) =>
@@ -114,6 +119,24 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             draft.missingListing = link.kind;
           });
       });
+    },
+  );
+
+  /* Sign in on an agent's card opens the row's page once the rows are read. A custom row's card
+     then starts the sign-in; an app's page has its own Reconnect. */
+  createEffect(
+    () => {
+      const id = props.open ? props.mcpSignInRequest : undefined;
+      if (!id) return null;
+      const app = controller.mcpServerApp(id);
+      return app === undefined ? null : { id, app };
+    },
+    (request) => {
+      if (!request) return;
+      nav.reset();
+      if (request.app) nav.go({ kind: "app", id: request.app });
+      // Only a custom row's card takes the request; another page, or no row, ends it here.
+      if (!request.app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 

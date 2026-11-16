@@ -250,8 +250,6 @@ export const messages = {
   "server.settings.membersDescription": "このサーバーを公開し、ユーザーを招待して、アクセスを管理します。",
   "server.settings.desktopTitle": "デスクトップ",
   "server.settings.desktopDescription": "このサーバーのデスクトップを設定、または接続します。",
-  "server.settings.mcpTitle": "MCP",
-  "server.settings.mcpDescription": "MCP サーバーを接続し、このサーバーのエージェントが使用できるものを選択します。",
   "server.settings.storageTitle": "ストレージ",
   "server.settings.storageDescription":
     "OpenBot がこのサーバーのディスクに保存しているものを確認し、空き容量を増やします。",
@@ -295,7 +293,6 @@ export const messages = {
   "server.settings.copyFailedTitle": "コピーに失敗しました",
   "server.settings.copyFailed": "OpenBot はこの値をコピーできませんでした。",
   "server.settings.unavailableTitle": "サーバーの設定を利用できません",
-  "server.settings.unsavedMcpChanges": "未保存の MCP の変更",
   "server.settings.reset": "リセット",
   "server.settings.unsavedChanges": "未保存の変更",
   "server.settings.changesNotSaved": "変更は保存されていません",

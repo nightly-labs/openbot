@@ -463,7 +463,7 @@ export const messages = {
   "chat.mcpSignIn.continue": "继续",
   "chat.mcpSignIn.continueNamed": "让助手再次测试 {name}",
   "chat.mcpSignIn.message": "我已登录 MCP 服务器 {name}，请再测试一次。",
-  "chat.mcpSignIn.unavailable": "请在你电脑上的 OpenBot 中登录 {name}：服务器设置，MCP。",
+  "chat.mcpSignIn.unavailable": "请在你电脑上的 OpenBot 中登录 {name}：市场，应用，{name}。",
   "chat.serverInstall.title": "新服务器",
   "chat.serverInstall.expired": "命令已过期。请让代理生成一个新命令。",
   "chat.compaction.running": "正在压缩上下文",

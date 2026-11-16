@@ -184,17 +184,13 @@ export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined)
 }
 
 /**
- * Whether a joined server signs in to an MCP server for this computer. With `sign-in-relay-v1` the
- * page opens in this computer's browser and the callback is relayed to the host. An older host opens
- * the page in its own browser, and the live view shows it; the live view streams the active server only.
+ * Whether the Marketplace can sign in to a joined server's MCP server for this computer: the user
+ * manages the host's MCP servers, and the host relays its sign-ins (`sign-in-relay-v1`), so the page
+ * opens in this computer's browser and the callback is relayed to the host.
  */
 export function remoteMcpSignIn(server: ServerSummary | undefined): boolean {
-  if (server?.kind !== "remote") return false;
-  if (serverSupportsCapability(server, "sign-in-relay-v1")) return true;
   return (
-    server.active &&
-    serverSupportsCapability(server, "mcp-sign-in-v1") &&
-    serverSupportsCapability(server, "browser-view")
+    server?.kind === "remote" && serverCanManageMcp(server) && serverSupportsCapability(server, "sign-in-relay-v1")
   );
 }
 

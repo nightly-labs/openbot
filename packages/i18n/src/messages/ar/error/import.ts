@@ -99,7 +99,7 @@ export const messages = {
   "error.import.transferProviderKey": "{name}: أدخل مفتاح API الخاص به مرة أخرى في الإعدادات.",
   "error.import.transferAgentEnv": "{name}: أدخل قيم {names} مرة أخرى في الإعدادات.",
   "error.import.transferMcpValues":
-    "{name}: أُضيف خادم MCP متوقفًا. تحقّق من أمره، وأدخل قيمه وعنوانه الكامل مرة أخرى، وشغّله في إعدادات MCP.",
+    "{name}: أُضيف خادم MCP متوقفًا. تحقّق من أمره، وأدخل قيمه وعنوانه الكامل مرة أخرى، وشغّله في المتجر، التطبيقات.",
   "error.import.transferValuesCleared":
     "{name}: أُزيلت من وسائطه أو عنوانه القيم التي يمكن أن تحتوي على سر. أدخلها مرة أخرى في الإعدادات.",
   "error.import.transferSharedKept": "{number} من الملفات في المجلد المشترك موجودة هنا بالفعل، لذا تبقى كما هي.",

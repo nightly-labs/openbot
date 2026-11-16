@@ -5,6 +5,7 @@ import {
   type DynamicIslandPreference,
   type ExternalLinkTarget,
   LOCAL_SERVER_ID,
+  type McpSignInState,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
@@ -116,6 +117,16 @@ const Settings = createSimpleContext({
      * page starts the connect step. A link never sets it.
      */
     const [pendingPluginConnect, setPendingPluginConnect] = createSignal(false);
+    /**
+     * The MCP row whose sign-in the person asked for on an agent's card, held as the plugin slug is.
+     * The Marketplace opens the row's page and signs in, then clears it.
+     */
+    const [pendingMcpSignIn, setPendingMcpSignIn] = createSignal<string | null>(null);
+    /** The sign-in state of the MCP rows of one server, as the Marketplace last read them. The cards show it. */
+    const [mcpSignIns, setMcpSignIns] = createSignal<{
+      serverId: string;
+      states: Readonly<Record<string, McpSignInState>>;
+    } | null>(null);
     /**
      * The agent or skill that a Marketplace link named, held as the plugin slug is. It is a kind and
      * an id, never a listing: the page loads the listing, and only Add on that page adds it.
@@ -749,6 +760,10 @@ const Settings = createSimpleContext({
       setPendingPluginSlug,
       pendingPluginConnect,
       setPendingPluginConnect,
+      pendingMcpSignIn,
+      setPendingMcpSignIn,
+      mcpSignIns,
+      setMcpSignIns,
       pendingMarketplaceListing,
       setPendingMarketplaceListing,
       pendingAgentTemplateId,
