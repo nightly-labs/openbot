@@ -484,10 +484,15 @@ export interface PreparedBrowserSecret {
    */
   vaultFillable: boolean;
   /**
+   * True when the request also has code fields of the same form. Only a saved login fills it: `submit`
+   * then takes the login's password and its current authenticator code, and no card can answer it.
+   */
+  withCode: boolean;
+  /**
    * `vault` is true for a value that no user typed. A navigation that would carry it in its URL, such as
    * a GET form submission, is then blocked, and the user finishes in the tab.
    */
-  submit(secret: string, vault: boolean): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
+  submit(secret: string, vault: boolean, code?: string): Effect.Effect<"submitted" | "takeover", BrowserOperationError>;
   cancel(): void;
 }
 
@@ -1689,11 +1694,16 @@ export class BrowserHost {
     if (url.protocol !== "https:")
       return yield* browserFailure(new Error(sourceText("error.backend.authHttpsRequired")));
     yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-    if (args.method !== "password" && args.digits < 4)
+    // method=password takes one password field, a password and its confirmation, or the password and
+    // then the code field or digit fields of a form that also asks for the authenticator code. A form
+    // with both gets both from one saved login, so no field is filled while the other waits for a
+    // second call. With two targets, the kind of the second field tells a confirmation from a code.
+    const digitFields = args.method === "password" && args.targets.length > 2;
+    if ((args.method !== "password" || digitFields) && args.digits < 4)
       return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRange")));
     if (
       (args.method === "password"
-        ? args.targets.length > 2
+        ? digitFields && (!args.loginId || args.targets.length !== args.digits + 1)
         : args.targets.length !== 1 && args.targets.length !== args.digits) ||
       (args.submission === "click") !== Boolean(args.submitTarget)
     )
@@ -1704,7 +1714,7 @@ export class BrowserHost {
             : args.submission !== "click" && args.submitTarget
               ? "Invalid authentication targets: submitTarget is only for submission=click."
               : args.method === "password"
-                ? "Invalid authentication targets: method=password needs one field target, or a password and its confirmation field."
+                ? `Invalid authentication targets: method=password needs one field target, a password and its confirmation field, or, with loginId, the password field and then one code field or ${args.digits} digit field targets.`
                 : `Invalid authentication targets: use one field target for the whole code, or ${args.digits} digit field targets.`,
         ),
       );
@@ -1722,13 +1732,7 @@ export class BrowserHost {
             tab.diagnostics.clearDiagnostics();
             return yield* boundEngineOperation(
               tab,
-              tab.engine.prepareSecret(
-                args.targets,
-                url.origin,
-                args.method === "password",
-                args.submission,
-                args.submitTarget,
-              ),
+              tab.engine.prepareSecret(args.targets, url.origin, args.submission, args.submitTarget),
               10_000,
               "Authentication target resolution timed out.",
               keepQueueBlocked,
@@ -1736,14 +1740,30 @@ export class BrowserHost {
           }),
         true,
       );
+      // A second copy of a password goes only to a password field, so no field shows the value.
+      const confirmation = args.method === "password" && args.targets.length === 2 && entry.kinds[1]?.password === true;
+      const withCode = args.method === "password" && args.targets.length > 1 && !confirmation;
+      if (confirmation && !entry.kinds[0]?.password)
+        return yield* browserFailure(new Error("A password and its confirmation must both be password fields."));
+      if (withCode && !args.loginId)
+        return yield* browserFailure(
+          new Error(
+            "A password and its confirmation must both be password fields. A form that also asks for the authenticator code needs loginId.",
+          ),
+        );
+      // A saved authenticator code has the length of its key, which a page often does not state.
+      // One field takes the whole code; digit fields keep their count.
+      const codeFields = args.method === "password" ? args.targets.length - 1 : args.targets.length;
       return {
         // Password cards do not use digits; keep public metadata within its released bounds.
         request: { method: args.method, origin: url.origin, digits: args.method === "password" ? 6 : args.digits },
         agentScriptedOrigin: yield* this.#agentCodeCanRead(tab, [url.origin], entry.servedByWorker),
-        vaultFillable:
-          args.method === "password"
-            ? entry.fields.password
-            : args.method === "authenticator" && entry.fields.oneTimeCode,
+        vaultFillable: entry.kinds.every((kind, index) =>
+          args.method === "password" && (index === 0 || confirmation)
+            ? kind.password
+            : (args.method === "authenticator" || withCode) && kind.oneTimeCode,
+        ),
+        withCode,
         cancel: () => {
           if (tab.secret === protection && !protection.submitted) {
             tab.secret = undefined;
@@ -1751,17 +1771,29 @@ export class BrowserHost {
             this.#emitChanged();
           }
         },
-        submit: (secret: string, vault: boolean) =>
+        submit: (secret: string, vault: boolean, code?: string) =>
           Effect.gen({ self: this }, function* (): Effect.fn.Return<"submitted" | "takeover", BrowserOperationError> {
             if (tab.secret !== protection || protection.submitted)
               return yield* browserFailure(new Error(sourceText("error.backend.authExpired")));
             // A connected page can navigate to the secret's site while the card is open.
             yield* browserSync(() => this.#requireIsolatedFromConnectedTabs(tab, url.origin));
-            // A saved authenticator code has the length of its key, which a page often does not state.
-            // One field takes the whole code; digit fields keep their count.
-            const length = vault && args.method === "authenticator" && args.targets.length === 1 ? "4,12" : args.digits;
-            if (args.method !== "password" && !new RegExp(`^[0-9]{${length}}$`, "u").test(secret))
+            const length = vault && codeFields === 1 ? "4,12" : args.digits;
+            const digits = new RegExp(`^[0-9]{${length}}$`, "u");
+            if (
+              (args.method !== "password" && !digits.test(secret)) ||
+              (withCode && (!vault || code === undefined || !digits.test(code)))
+            )
               return yield* browserFailure(new Error(sourceText("error.backend.authDigitsRequired")));
+            const spread = (value: string, fields: number) => (fields === 1 ? [value] : [...value]);
+            // After the check above, a request with code fields always has its code.
+            const filledCode = withCode ? code : undefined;
+            const values =
+              args.method !== "password"
+                ? spread(secret, codeFields)
+                : confirmation
+                  ? [secret, secret]
+                  : [secret, ...(filledCode === undefined ? [] : spread(filledCode, codeFields))];
+            const secrets = filledCode === undefined ? [secret] : [secret, filledCode];
             protection.submitted = true;
             this.#invalidateViews(tab);
             protection.running = true;
@@ -1773,7 +1805,7 @@ export class BrowserHost {
             let stopWaiting = () => {};
             const contents = tab.contents;
             const blockLeak = (event: ElectronEvent<WebContentsWillFrameNavigateEventParams>) => {
-              if (!urlCarriesSecret(event.url, secret)) return;
+              if (!secrets.some((value) => urlCarriesSecret(event.url, value))) return;
               leaked = true;
               event.preventDefault();
               stopWaiting();
@@ -1786,7 +1818,7 @@ export class BrowserHost {
                   Effect.gen({ self: this }, function* () {
                     yield* boundEngineOperation(
                       tab,
-                      entry.enter(secret),
+                      entry.enter(values),
                       10_000,
                       "Authentication submission timed out.",
                       keepQueueBlocked,
@@ -1817,13 +1849,13 @@ export class BrowserHost {
                       // snapshots hide it and no image of the tab is taken until it navigates.
                       const cleared = yield* boundEngineOperation(
                         tab,
-                        entry.clear(secret),
+                        entry.clear(secrets),
                         10_000,
                         "Authentication field cleanup timed out.",
                         keepQueueBlocked,
                       ).pipe(Effect.catch(() => Effect.succeed(false)));
                       if (!protection.replaced && (cleared || !leaked)) {
-                        entry.hide(secret, !cleared);
+                        for (const value of secrets) entry.hide(value, !cleared);
                         kept = true;
                         shown = !cleared;
                       }
