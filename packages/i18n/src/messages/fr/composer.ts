@@ -119,6 +119,13 @@ export const messages = {
   "composer.error.holdQueued": "Impossible de réserver le message en attente pour le modifier.",
   "composer.error.cancelEdit": "Impossible d’annuler la modification du message en attente. Réessayez.",
   "composer.error.updateQueued": "Impossible de mettre à jour le message en attente. Réessayez.",
+  "composer.queueEdit.received": "L’agent a déjà reçu ce message, votre modification est donc terminée.",
+  "composer.queueEdit.receivedKept":
+    "L’agent a déjà reçu ce message, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
+  "composer.queueEdit.deletedKept":
+    "Ce message a été supprimé, votre modification est donc terminée. Vos changements sont toujours dans la zone de message.",
+  "composer.queueEdit.endedKept":
+    "Cette modification s’est terminée avant d’être enregistrée. Vos changements sont toujours dans la zone de message.",
   "composer.voice.prepareFailed": "Impossible de préparer le modèle vocal. Réessayez.",
   "composer.voice.noSpeechRecorded": "Aucune parole n’a été enregistrée.",
   "composer.voice.noSpeechDetected": "Aucune parole n’a été détectée.",

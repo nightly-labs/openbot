@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.feedbackSending": "Отправка отзыва команде OpenBot…",
   "status.agent.workflowDelete":
     "Удалить рабочий процесс {title} вместе с его запусками и версиями. Его открытые шаги остановятся.",
+  "status.agent.deleteAgents": "Удалить {agents} вместе с их чатами и файлами. Это нельзя отменить.",
   "status.agent.screenCaptureProgress": "Запрос снимка экрана…",
   "status.agent.screenCaptureReviewing": "Просмотр снимка экрана…",
   "status.agent.browserOpening": "Открытие веб-страницы…",

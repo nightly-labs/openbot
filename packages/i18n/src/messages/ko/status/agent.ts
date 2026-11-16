@@ -55,6 +55,7 @@ export const messages = {
   "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
+  "status.agent.deleteAgents": "{agents}을(를) 채팅 및 파일과 함께 삭제합니다. 되돌릴 수 없습니다.",
   "status.agent.screenCaptureProgress": "화면 캡처를 요청하는 중…",
   "status.agent.screenCaptureReviewing": "화면 캡처를 확인하는 중…",
   "status.agent.browserOpening": "웹 페이지를 여는 중…",

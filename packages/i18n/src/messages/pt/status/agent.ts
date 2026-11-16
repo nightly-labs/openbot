@@ -56,6 +56,7 @@ export const messages = {
   "status.agent.feedbackSending": "Enviando seu feedback para a equipe do OpenBot…",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
+  "status.agent.deleteAgents": "Excluir {agents} com seus chats e arquivos. Não é possível desfazer.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",
   "status.agent.screenCaptureReviewing": "Analisando a captura de tela…",
   "status.agent.browserOpening": "Abrindo uma página da web…",

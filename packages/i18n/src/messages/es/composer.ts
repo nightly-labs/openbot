@@ -115,6 +115,13 @@ export const messages = {
   "composer.error.holdQueued": "No se pudo retener el mensaje en cola para editarlo.",
   "composer.error.cancelEdit": "No se pudo cancelar la edición de la cola. Vuelve a intentarlo.",
   "composer.error.updateQueued": "No se pudo actualizar el mensaje en cola. Vuelve a intentarlo.",
+  "composer.queueEdit.received": "El agente ya recibió este mensaje, así que tu edición terminó.",
+  "composer.queueEdit.receivedKept":
+    "El agente ya recibió este mensaje, así que tu edición terminó. Tus cambios siguen en el cuadro de mensaje.",
+  "composer.queueEdit.deletedKept":
+    "Este mensaje se eliminó, así que tu edición terminó. Tus cambios siguen en el cuadro de mensaje.",
+  "composer.queueEdit.endedKept":
+    "Esta edición terminó antes de guardarse. Tus cambios siguen en el cuadro de mensaje.",
   "composer.voice.prepareFailed": "No se pudo preparar el modelo de voz. Vuelve a intentarlo.",
   "composer.voice.noSpeechRecorded": "No se grabó ninguna voz.",
   "composer.voice.noSpeechDetected": "No se detectó ninguna voz.",
