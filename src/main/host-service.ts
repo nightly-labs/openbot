@@ -152,6 +152,7 @@ interface HostServiceOptions {
   instanceTransfer?: ForwardedApiOptions["instanceTransfer"];
   routineFlows?: ForwardedApiOptions["routineFlows"];
   workflows?: ForwardedApiOptions["workflows"];
+  crm?: ForwardedApiOptions["crm"];
   hiddenAgents?: ForwardedApiOptions["hiddenAgents"];
   routineRunPlaces?: ForwardedApiOptions["routineRunPlaces"];
   /** The level that each person chose for each agent (`agent-notification-levels-v1`). */
@@ -524,6 +525,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.instanceTransfer === undefined ? {} : { instanceTransfer: options.instanceTransfer }),
       ...(options.routineFlows === undefined ? {} : { routineFlows: options.routineFlows }),
       ...(options.workflows === undefined ? {} : { workflows: options.workflows }),
+      ...(options.crm === undefined ? {} : { crm: options.crm }),
       ...(options.hiddenAgents === undefined ? {} : { hiddenAgents: options.hiddenAgents }),
       ...(options.routineRunPlaces === undefined ? {} : { routineRunPlaces: options.routineRunPlaces }),
       ...(options.agentNotificationLevels === undefined

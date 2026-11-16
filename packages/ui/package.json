@@ -522,6 +522,10 @@
     "./features/transfer/instance-transfer.css": "./src/features/transfer/instance-transfer.css",
     "./features/conversation/AgentSessionSettings": "./src/features/conversation/AgentSessionSettings.tsx",
     "./features/conversation/AgentSettingsPanel": "./src/features/conversation/AgentSettingsPanel.tsx",
+    "./features/crm/CrmView": "./src/features/crm/CrmView.tsx",
+    "./features/crm/crm-model": "./src/features/crm/crm-model.ts",
+    "./features/crm/crm-state": "./src/features/crm/crm-state.ts",
+    "./features/crm/crm.css": "./src/features/crm/crm.css",
     "./features/conversation/ConversationHeader": "./src/features/conversation/ConversationHeader.tsx"
   },
   "dependencies": {

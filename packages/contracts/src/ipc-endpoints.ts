@@ -312,6 +312,20 @@ import type {
   SetMessageReactionInput,
 } from "./ipc-conversations";
 import type {
+  CrmActivityPage,
+  CrmActivityPageInput,
+  CrmApplyResult,
+  CrmChange,
+  CrmCustomerPage,
+  CrmCustomerPageInput,
+  CrmOverview,
+  CrmPaymentPage,
+  CrmPaymentPageInput,
+  CrmSettings,
+  CrmSourceConnectInput,
+  CrmSourceInput,
+} from "./ipc-crm";
+import type {
   CheckCustomAgentInput,
   CustomAgentCheckResult,
   CustomAgentResult,
@@ -2004,6 +2018,24 @@ export const IPC_ENDPOINTS = {
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
   },
   /**
+   * CRM: leads and customers, their plans and payments, and the changes that agents propose. Only an
+   * owner or admin reads it. The agent event `crm-changed` says that it changed. A joined server
+   * answers through `crm-v1` when it supports it.
+   */
+  crm: {
+    overview: scopedQuery<CrmOverview>()("crm:overview"),
+    customers: scopedRequest<CrmCustomerPageInput, CrmCustomerPage>()("crm:customers"),
+    payments: scopedRequest<CrmPaymentPageInput, CrmPaymentPage>()("crm:payments"),
+    activity: scopedRequest<CrmActivityPageInput, CrmActivityPage>()("crm:activity"),
+    apply: scopedRequest<CrmChange, CrmApplyResult>()("crm:apply"),
+    sourceConnect: scopedRequest<CrmSourceConnectInput, CrmApplyResult>()("crm:source-connect"),
+    sourceDisconnect: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-disconnect"),
+    sourceSync: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-sync"),
+    /** The CRM switch of Server Settings > Experimental. The answer of `settings` comes before the CRM is on. */
+    settings: scopedQuery<CrmSettings>()("crm:settings"),
+    setSettings: scopedRequest<CrmSettings, CrmSettings>()("crm:set-settings"),
+  },
+  /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
    * keeps a destination, so the group has no remote route. The agent event `routines-changed` says
    * when a destination or a delivery changed.
@@ -2452,6 +2484,7 @@ export const IPC_GROUP_PATHS = {
   routineFeed: "routineFeed",
   routineFlows: "routineFlows",
   workflows: "workflows",
+  crm: "crm",
   routineResults: "routineResults",
   billing: "billing",
   license: "license",

@@ -70,6 +70,7 @@ import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/clau
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -361,6 +362,7 @@ import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
 import { routeConversationUnreadFrom } from "./team-api/route-conversation-unread-from";
+import { routeCrm } from "./team-api/route-crm";
 import { routeCustomAgents } from "./team-api/route-custom-agents";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
@@ -1388,6 +1390,7 @@ export class TeamApiServer {
       if ((await routeRoutineFlows(context, this.#options.routineFlows, this.#options.agents, hidden)) === "handled")
         return;
       if ((await routeWorkflows(context, this.#options.workflows, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeCrm(context, this.#options.crm)) === "handled") return;
       if ((await this.#routeEvents(context)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if ((await routeHermesImport(context, this.#options.hermesImport, newAgentHidden)) === "handled") return;
@@ -1743,6 +1746,8 @@ export class TeamApiServer {
         continue;
       }
       const { member, blocked, key: blockedKey } = accessFor(connection);
+      // Only owners and admins may read the CRM (`crm-v1`), so only they hear that it changed.
+      if (event.type === "crm-changed" && !canAdministerServer(member.role)) continue;
       // An event this client's protocol cannot describe is skipped for this client only. Thrown
       // out of the loop, it would stop the event for every client after this one.
       const encodeEvent = (event: AgentEvent, options = {}) => {
@@ -2764,6 +2769,7 @@ export class TeamApiServer {
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === ROUTINE_FLOW_STOP_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === CRM_CAPABILITY) return this.#options.crm !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
@@ -2946,6 +2952,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "skills-changed") return SKILLS_EVENTS_CAPABILITY;
   if (event.type === "routine-flows-changed") return ROUTINE_FLOWS_CAPABILITY;
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
+  if (event.type === "crm-changed") return CRM_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
   if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;

@@ -316,6 +316,12 @@ export const messages = {
   "server.settings.group.agents": "助手",
   "server.settings.group.people": "人员",
   "server.settings.group.server": "服务器",
+  "server.settings.experimentalTitle": "实验性",
+  "server.settings.experimentalDescription": "开启尚未完成的功能。",
+  "server.settings.experimentalFeatures": "功能",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "向所有者和管理员显示 CRM 页面，允许智能体读取 CRM，并同步 Stripe。关闭后数据仍会保留。",
   "server.settings.agentDefaultsTitle": "助手默认值",
   "server.settings.threadsCard": "话题与时区",
   "server.settings.memoryTitle": "记忆",

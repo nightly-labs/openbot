@@ -313,6 +313,12 @@ export const messages = {
   "server.settings.group.agents": "סוכנים",
   "server.settings.group.people": "אנשים",
   "server.settings.group.server": "שרת",
+  "server.settings.experimentalTitle": "ניסיוני",
+  "server.settings.experimentalDescription": "הפעל תכונות שעדיין לא הושלמו.",
+  "server.settings.experimentalFeatures": "תכונות",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "הצג את דף ה-CRM לבעלים ולמנהלים, אפשר לסוכנים לקרוא את ה-CRM וסנכרן את Stripe. כשמכבים אותו, הנתונים נשארים.",
   "server.settings.agentDefaultsTitle": "ברירות מחדל של סוכנים",
   "server.settings.threadsCard": "שרשורים ואזור זמן",
   "server.settings.memoryTitle": "זיכרון",

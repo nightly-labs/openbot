@@ -21,6 +21,7 @@ import { advertisedJsonSchema } from "./agent/advertised-json-schema";
 import { interruptAgentToolSchema } from "./agent/agent-interrupt-tool";
 import { setBrowserProfileToolSchema } from "./agent/browser-profile-tool";
 import { createChannelToolSchema, listChannelsToolSchema, updateChannelToolSchema } from "./agent/channel-agent-tools";
+import { CRM_TOOL_DEFINITIONS } from "./agent/crm-tool";
 import { DATA_TOOL_DEFINITIONS } from "./agent/data-tools";
 import { deleteAgentToolSchema } from "./agent/delete-agent-tool";
 import { HISTORY_TOOL_DEFINITIONS } from "./agent/history-tools";
@@ -273,6 +274,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...LOCAL_SKILL_TOOL_DEFINITIONS,
   ...ROUTINE_FLOW_TOOL_DEFINITIONS,
   ...WORKFLOW_TOOL_DEFINITIONS,
+  ...CRM_TOOL_DEFINITIONS,
   ...MCP_SERVER_TOOL_DEFINITIONS,
   {
     name: "list_sites",
