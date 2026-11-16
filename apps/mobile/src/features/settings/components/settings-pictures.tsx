@@ -11,7 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { ScopedTheme } from "uniwind";
 import { useReducedMotion } from "@/shared/lib/motion";
-import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { END_X } from "@/shared/lib/text-direction";
 
 // Grey wireframe pictures for the picture choices in Settings. Each one is still until `play` grows,
 // then plays its demonstration once. Reduced motion keeps them still. Colors come from the theme
@@ -292,17 +292,16 @@ export function SwipePicture({ target, play }: { target: "threads" | "browser"; 
     const slide = { duration: 320, easing: SLIDE };
     shown.value = withSequence(withTiming(0, slide), withDelay(600, withTiming(1, slide)));
   });
+  // React Native mirrors the layout in RTL (the panel opens from the left), but not translateX.
   const chatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -shown.value * width.value * (PANEL_SHARE - 0.08) }],
+    transform: [{ translateX: -END_X * shown.value * width.value * (PANEL_SHARE - 0.08) }],
   }));
   const panelStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: (1 - shown.value) * width.value * PANEL_SHARE }],
+    transform: [{ translateX: END_X * (1 - shown.value) * width.value * PANEL_SHARE }],
   }));
   return (
     <View
       className="flex-1"
-      // In RTL the swipe goes to the right and the panel opens from the left.
-      style={MIRROR_IN_RTL}
       onLayout={(event) => {
         width.value = event.nativeEvent.layout.width;
       }}
