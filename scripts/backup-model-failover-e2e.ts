@@ -764,9 +764,23 @@ try {
     assert.ok(ran[1]?.input.includes("Continue the unfinished task"), "The backup continues the work.");
     assert.equal(agentOf(continuer.id).model, BACKUP, "The agent is on the backup model.");
     assert.deepEqual(errorsFor(continuer.id, since), [], "No error shows for the moved turn.");
+    const shown = (await runCauseEffect(service.readConversation(continuer.id))).messages
+      .filter((message) => message.text.trim())
+      .slice(-4)
+      .map((message) => message.text);
+    assert.deepEqual(
+      shown,
+      [
+        "act-then-fail",
+        "Partial answer.",
+        sourceText("status.agent.modelSwitchedForError", { model: modelName(BACKUP) }),
+        "Done.",
+      ],
+      "The chat shows the stopped text, the switch and then the backup's answer.",
+    );
     failing([]);
     await restart();
-    return { ran: ran.map((turn) => turn.model) };
+    return { ran: ran.map((turn) => turn.model), shown };
   });
 
   await check("a thread turn moves to the backup model", async () => {
