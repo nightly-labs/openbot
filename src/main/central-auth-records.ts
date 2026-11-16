@@ -8,6 +8,10 @@ import {
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isBoolean, isNumber, isString } from "@openbot/contracts/runtime-values";
+import {
+  optionalServerAppearanceField,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
 
 /** The account API's answers, and the decoders that `CentralAuthManager` checks them with. */
 
@@ -23,6 +27,11 @@ export interface RemoteHostSummary {
   hostId: string;
   name: string;
   logoKey: string | null;
+  /**
+   * The shape and colour that the server shows with no logo; null for the automatic look. An older
+   * account server sends none, and a bad value is dropped.
+   */
+  appearance?: ServerAppearance | null;
   devicePublicKey: string | null;
   /** The host's signed key handovers. An account server from before handovers sends none. */
   keyHandovers: HostKeyHandover[];
@@ -35,6 +44,8 @@ export interface RemoteHostSummary {
    * A hosted server with a plan: its owner and its admins can restart it. An older account server sends none.
    */
   hosted?: boolean;
+  /** False for a hosted server that the account service cannot restart. Absent for each other server. */
+  restartAvailable?: boolean;
   /** The storage in GB that the plan of a hosted server gives. An older account server sends none. */
   storageGb?: number;
 }
@@ -188,6 +199,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       hostId: requiredString(host, "hostId"),
       name: requiredString(host, "name"),
       logoKey: host.logoKey,
+      ...optionalServerAppearanceField(host.appearance),
       devicePublicKey: host.devicePublicKey,
       keyHandovers: optionalHostKeyHandovers(host.keyHandovers),
       authEpoch: host.authEpoch,
@@ -196,6 +208,7 @@ export function decodeRemoteHosts(value: unknown): RemoteHostSummary[] {
       ...(validLimit ? { memberLimit } : {}),
       // A bad value drops only the flag, as for the limit.
       ...(isBoolean(host.hosted) ? { hosted: host.hosted } : {}),
+      ...(isBoolean(host.restartAvailable) ? { restartAvailable: host.restartAvailable } : {}),
       ...(validStorage ? { storageGb } : {}),
     };
   });

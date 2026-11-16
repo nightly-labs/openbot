@@ -1,9 +1,10 @@
 {
-  "version": "0.67.1",
+  "version": "0.72.0",
   "highlights": [
-    "Gemini installs and updates on Windows again.",
-    "An agent that sends a message to a busy teammate now knows if the message went into the running task, and can tell you why it waits.",
-    "During Computer Use, agents no longer say that their cursor is not available.",
-    "Agents can now use an n8n MCP server that you signed in to through OpenBot."
+    "Update your joined servers to this version too, so that the CRM, Add account with code and agent backdrops work there.",
+    "Play an animated backdrop behind the whole window, or ask an agent to make one for you.",
+    "Try the experimental CRM in Server settings > Experimental, with a Stripe import and agent proposals that you approve.",
+    "Answer an agent in the agent dock chat without the main window.",
+    "A chat that loses its saved session recovers by itself, and more agents move to their backup model at a usage limit."
   ]
 }

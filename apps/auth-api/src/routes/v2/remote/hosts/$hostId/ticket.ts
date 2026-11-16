@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
 import { runApiResponse } from "../../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../../server/json-body";
+import { type SignalLocation, signalLocation } from "../../../../../server/remote-control-plane";
 import {
   apiError,
   json,
@@ -30,6 +31,7 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
               yield* requestRemoteControlPlane().issueHostTicket(params.hostId, body.machineToken, {
                 signalHome,
                 failedSignalUrl: signalHome === true && isString(body.failedSignalUrl) ? body.failedSignalUrl : null,
+                location: signalHome === true ? requestLocation(request) : null,
               }),
             );
           }),
@@ -38,3 +40,9 @@ export const Route = createFileRoute("/v2/remote/hosts/$hostId/ticket")({
     },
   },
 });
+
+/** Where Cloudflare puts the host request, so the host gets a Signal home near it. */
+function requestLocation(request: Request): SignalLocation | null {
+  const cf = request.cf;
+  return cf && "latitude" in cf && "longitude" in cf ? signalLocation(cf.latitude, cf.longitude) : null;
+}

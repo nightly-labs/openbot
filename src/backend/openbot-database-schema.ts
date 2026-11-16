@@ -17,13 +17,16 @@ import { AGENT_WAIT_SCHEMA_SQL } from "./agent-waits/agent-wait-schema";
 import { BROWSER_PROFILE_SCHEMA_SQL } from "./browser-profiles/browser-profile-schema";
 import { BROWSER_PROXY_SCHEMA_SQL } from "./browser-profiles/browser-proxy-schema";
 import { CHANNEL_SCHEMA_SQL, CHANNEL_SETTINGS_SCHEMA_SQL } from "./channel-schema";
+import { CRM_SCHEMA_SQL } from "./crm/crm-schema";
 import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schema";
 import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
+import { PINNED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/pinned-thread-messages-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
   MESSAGING_ALLOWED_SENDERS_SCHEMA_SQL,
+  MESSAGING_HISTORY_SCHEMA_SQL,
   MESSAGING_MEMORY_SCHEMA_SQL,
   MESSAGING_PINGS_SCHEMA_SQL,
   MESSAGING_SCHEMA_SQL,
@@ -652,7 +655,10 @@ const LATEST_SCHEMA_SQL =
   BROWSER_PROXY_SCHEMA_SQL +
   AGENT_SKILL_LOADS_SCHEMA_SQL +
   MESSAGING_PINGS_SCHEMA_SQL +
-  V60_AGENT_MEMORY_SITE_INDEX_SQL;
+  V60_AGENT_MEMORY_SITE_INDEX_SQL +
+  PINNED_THREAD_MESSAGES_SCHEMA_SQL +
+  MESSAGING_HISTORY_SCHEMA_SQL +
+  CRM_SCHEMA_SQL;
 
 /** The end of the thread message table with the migration 40 columns before its PRIMARY KEY constraint. */
 function withThreadMessageOrderColumns(tableEnd: string): string {
@@ -1020,6 +1026,24 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
     // Adds one nullable column and a partial index: no rebuild, so no foreign-key pause and no vacuum.
     // Every existing memory gets no site, so the agent recalls it as before.
     up: addAgentMemorySite,
+  },
+  {
+    version: 61,
+    // Only creates a table, so no foreign-key pause and no vacuum. No message was pinned before it,
+    // so the table starts empty and every thread shows its messages as before.
+    up: (db) => db.exec(PINNED_THREAD_MESSAGES_SCHEMA_SQL),
+  },
+  {
+    version: 62,
+    // Only creates a table and its indexes, so no foreign-key pause and no vacuum. No WhatsApp message
+    // was saved before it, so the table starts empty and each number saves what it sees from then on.
+    up: (db) => db.exec(MESSAGING_HISTORY_SCHEMA_SQL),
+  },
+  {
+    version: 63,
+    // Only creates tables and their indexes, and adds the three built-in statuses, so no foreign-key
+    // pause and no vacuum. No CRM data was saved before it, so the other tables start empty.
+    up: (db) => db.exec(CRM_SCHEMA_SQL),
   },
 ];
 

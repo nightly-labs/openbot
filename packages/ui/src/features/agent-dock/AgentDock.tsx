@@ -36,8 +36,22 @@ import {
 } from "solid-js";
 import { AmbientMotion } from "../../ambient-motion";
 import type { AvatarMood } from "../../bloub-avatar";
+import { createMenuSearch } from "../../components/createMenuSearch";
 import { createScrollFades } from "../../components/createScrollFades";
 import type { ComposerAgent } from "../../data";
+import {
+  createMotion,
+  GooFilter,
+  LIQUID_CLOSE,
+  LIQUID_OPEN,
+  LIQUID_PAD,
+  SLIDE_END,
+  SNAPPY,
+  SOFT,
+  type Spring,
+  stagedCurve,
+  WOBBLY,
+} from "../../liquid";
 import { useText } from "../../text";
 import { prefersReducedMotion } from "../../utils";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -47,6 +61,7 @@ import { SidebarAgentIndicator, SidebarPinnedAvatar } from "../sidebar/SidebarAg
 import type { SidebarAgentState } from "../sidebar/sidebar-types";
 import {
   AgentDockChat,
+  type AgentDockChatAnswers,
   type AgentDockChatModel,
   type AgentDockChatVoice,
   type AgentDockPendingMessage,
@@ -54,7 +69,6 @@ import {
 import { AgentDockShelf, type AgentDockShelfResult } from "./AgentDockShelf";
 import {
   addCenterY,
-  createMotion,
   DOCK_LEFT,
   DOCK_PAD,
   DOCK_WIDTH,
@@ -64,24 +78,18 @@ import {
   dockPath,
   HANDLE_STROKE,
   LIQUID_HEIGHT,
-  LIQUID_PAD,
   LIQUID_WIDTH,
   MAX_STRETCH,
+  neckCenterInBand,
   neckPath,
-  PANEL_CLOSE,
   PANEL_GAP,
   PANEL_HEIGHT,
-  PANEL_OPEN,
   PANEL_RADIUS,
   PANEL_WIDTH,
   SEAT,
   SEAT_CENTER_X,
   SEAT_PITCH,
   SEAT_VIEW_INSET,
-  SLIDE_END,
-  SNAPPY,
-  SOFT,
-  type Spring,
   STAGE_WIDTH,
   STRETCH_FOLLOW,
   STRETCH_PER_SPEED,
@@ -89,13 +97,11 @@ import {
   seatsHeight,
   seatView,
   seatViewTop,
-  stagedCurve,
   TUCK,
   TUCK_DISTANCE,
-  WOBBLY,
 } from "./agent-dock-motion";
 
-export type { AgentDockChatModel } from "./AgentDockChat";
+export type { AgentDockChatAnswers, AgentDockChatModel } from "./AgentDockChat";
 export type { AgentDockShelfResult } from "./AgentDockShelf";
 
 /** A seat of the dock: an agent or a channel. The ids of the two kinds can be equal. */
@@ -114,10 +120,25 @@ export interface AgentDockChannel {
   imageUrl: string | null;
 }
 
-/** `state` is the badge on the seat: the same state as the agent's or channel's badge in the sidebar. */
+/**
+ * `state` is the badge on the seat: the same state as the agent's or channel's badge in the sidebar.
+ * A `temporary` seat is not on the dock: it shows while it has a new message or waits for the user. Its
+ * menus add it to the dock in place of removing it.
+ */
 export type AgentDockSeat =
-  | { kind: "agent"; agent: ComposerAgent; mood: AvatarMood; state: SidebarAgentState | undefined }
-  | { kind: "channel"; channel: AgentDockChannel; state: SidebarAgentState | undefined };
+  | {
+      kind: "agent";
+      agent: ComposerAgent;
+      mood: AvatarMood;
+      state: SidebarAgentState | undefined;
+      temporary?: boolean | undefined;
+    }
+  | {
+      kind: "channel";
+      channel: AgentDockChannel;
+      state: SidebarAgentState | undefined;
+      temporary?: boolean | undefined;
+    };
 
 /**
  * The dock body in the document: the part between and around the seats that takes the pointer. It has the
@@ -211,6 +232,11 @@ export interface AgentDockProps {
   agents: ComposerAgent[];
   onSelectAgent?: ((agentId: string) => void) | undefined;
   onOpenLink?: ((url: string) => void) | undefined;
+  /**
+   * How the chats answer the requests that the agents wait for. Without it, a chat shows the wait bar,
+   * which opens the main window.
+   */
+  answers?: AgentDockChatAnswers | undefined;
   /** Opens the dock settings. The add menu shows the item only when it is set. */
   onOpenSettings?: (() => void) | undefined;
   /** Turns the dock off. The right-click menus of the dock show the item only when it is set. */
@@ -342,7 +368,7 @@ export function AgentDock(props: AgentDockProps) {
    */
   const listH = motion.spring(SEAT_VIEW_INSET + seatsHeight(initialCount), SOFT);
   /** Open progress: 0 is the seat, 1 is the full panel. Width leads height for a liquid stretch. */
-  const panelOpen = motion.spring(0, PANEL_OPEN);
+  const panelOpen = motion.spring(0, LIQUID_OPEN);
   // 0 while the panel opens, 1 while it closes: a close goes back as a drop, not as a tall bar.
   const closing = motion.spring(0, SOFT);
   const neckY = motion.spring(PANEL_HEIGHT / 2, WOBBLY);
@@ -498,7 +524,8 @@ export function AgentDock(props: AgentDockProps) {
     panelContent.style.transform = `scale(${0.96 + 0.04 * reveal})`;
 
     // While the blob is over the dock, it joins the dock itself; the neck grows once it is clear.
-    neck.setAttribute("d", neckPath(neckY.value, Math.max(0, Math.min(neckSize.value, free))));
+    const neckOpen = Math.max(0, Math.min(neckSize.value, free));
+    neck.setAttribute("d", neckPath(neckCenterInBand(neckY.value, neckOpen, height, pull), neckOpen));
 
     const r = Math.max(0, dropR.value);
     drop.style.transform = `translate(${dropX.value}px, ${dropY.value}px) translate(-50%, -50%) scale(${r / (SEAT / 2)})`;
@@ -551,24 +578,12 @@ export function AgentDock(props: AgentDockProps) {
       : t("agent.dock.noMatch", { query: addQuery().trim() });
   const addFades = createScrollFades();
   onCleanup(() => addFades.stop());
-  let addField: HTMLInputElement | undefined;
-  let addList: HTMLDivElement | undefined;
-  const addFirstRow = () => addList?.querySelector<HTMLElement>('[role="menuitem"]:not([data-disabled])');
-  const onAddSearchKey = (event: KeyboardEvent) => {
-    if (event.key === "Escape" || event.key === "Tab") return;
-    // The menu reads a letter as a jump to a row. In the field, letters are the search.
-    event.stopPropagation();
-    // A key that chooses an input method candidate stays in the field.
-    if (event.isComposing) return;
-    const enter = event.key === "Enter" && addQuery().trim() !== "";
-    if (!enter && event.key !== "ArrowDown") return;
-    const row = addFirstRow();
-    if (!row) return;
-    event.preventDefault();
-    row.focus();
-    // Enter adds the first match through its row, so the menu closes as it does for a click.
-    if (enter) row.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-  };
+  const addMenu = createMenuSearch({
+    row: '[role="menuitem"]:not([data-disabled])',
+    enabled: addSearch,
+    // Enter adds the first match.
+    enter: () => addQuery().trim() !== "",
+  });
   /**
    * Applies a new search, and morphs the list to its new rows: the height follows them, rows that
    * stay slide to their new places, and new rows fade in. A row keeps its element while it matches.
@@ -576,7 +591,7 @@ export function AgentDock(props: AgentDockProps) {
   /** The morph animations that run, so a new search stops them and no other animation in the list. */
   let addMorphs: Animation[] = [];
   const searchAdd = (value: string) => {
-    const list = addList;
+    const list = addMenu.list();
     if (!list || typeof list.animate !== "function" || prefersReducedMotion()) {
       setAddQuery(value);
       if (list) list.scrollTop = 0;
@@ -619,22 +634,8 @@ export function AgentDock(props: AgentDockProps) {
     }
   };
   const bindAddList = (element: HTMLDivElement) => {
-    addList = element;
+    addMenu.bindList(element);
     addFades.bind(element);
-    // A letter or Backspace typed on a row goes to the field, so typing always edits the search.
-    // A plain list has no field, and keeps the jump to a row.
-    element.addEventListener(
-      "keydown",
-      (event) => {
-        if (!addSearch() || !addField) return;
-        const text = event.key !== " " && Array.from(event.key).length === 1;
-        if (!text && event.key !== "Backspace") return;
-        if (event.metaKey || event.ctrlKey || event.altKey) return;
-        event.stopPropagation();
-        addField.focus();
-      },
-      true,
-    );
   };
 
   /**
@@ -742,7 +743,7 @@ export function AgentDock(props: AgentDockProps) {
       // From rest the path changes at once; during a close it blends, so the shape does not jump.
       if (panelOpen.value < 0.02) closing.jump(0);
       else closing.to(0);
-      panelOpen.to(1, undefined, PANEL_OPEN);
+      panelOpen.to(1, undefined, LIQUID_OPEN);
     }
     motion.kick();
   }
@@ -825,7 +826,7 @@ export function AgentDock(props: AgentDockProps) {
     if (panelOpen.value > 0.98) closing.jump(1);
     else closing.to(1);
     // The neck holds the blob until it is back in the dock, so no gap opens on the way in.
-    panelOpen.to(0, () => neckSize.jump(0), PANEL_CLOSE);
+    panelOpen.to(0, () => neckSize.jump(0), LIQUID_CLOSE);
     motion.kick();
     setState((draft) => {
       draft.open = null;
@@ -1166,12 +1167,7 @@ export function AgentDock(props: AgentDockProps) {
       }}
     >
       <AmbientMotion when={ambientMotion()}>
-        <svg class="agent-dock-filter" aria-hidden="true" width="0" height="0">
-          <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="9" result="blur" />
-            <feColorMatrix in="blur" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -11" />
-          </filter>
-        </svg>
+        <GooFilter id={filterId} class="agent-dock-filter" />
 
         {/* The liquid: the dock, the neck, the panel and the drop under the goo filter. */}
         <div
@@ -1317,10 +1313,20 @@ export function AgentDock(props: AgentDockProps) {
                                 )}
                               </Show>
                               <ContextMenu.Separator />
-                              <ContextMenu.Item onSelectAfterClose={() => props.onRemove(refOfKey(id))}>
-                                <PanelRight aria-hidden="true" />
-                                {t("agent.dock.remove")}
-                              </ContextMenu.Item>
+                              <Show
+                                when={seat().temporary}
+                                fallback={
+                                  <ContextMenu.Item onSelectAfterClose={() => props.onRemove(refOfKey(id))}>
+                                    <PanelRight aria-hidden="true" />
+                                    {t("agent.dock.remove")}
+                                  </ContextMenu.Item>
+                                }
+                              >
+                                <ContextMenu.Item onSelectAfterClose={() => props.onAdd(refOfKey(id))}>
+                                  <Plus aria-hidden="true" />
+                                  {t("agent.dock.add")}
+                                </ContextMenu.Item>
+                              </Show>
                               <Show when={props.onHide}>
                                 {(hide) => (
                                   <ContextMenu.Item
@@ -1365,25 +1371,14 @@ export function AgentDock(props: AgentDockProps) {
                   <DropdownMenu.Portal>
                     <DropdownMenu.Content
                       class={addMenuClass()}
-                      onOpenAutoFocus={(event: Event) => {
-                        if (!addSearch()) return;
-                        event.preventDefault();
-                        addField?.focus();
-                      }}
-                      onFocusIn={(event: FocusEvent) => {
-                        // The menu takes the focus itself after a pointer opens it and when the
-                        // pointer leaves a row. With a field, the focus goes on to the field, so
-                        // typing searches and does not jump to a row.
-                        if (addSearch() && event.target === event.currentTarget) addField?.focus();
-                      }}
+                      onOpenAutoFocus={addMenu.onOpenAutoFocus}
+                      onFocusIn={addMenu.onFocusIn}
                     >
                       <Show when={addSearch()}>
                         <div class="ui-search-select-search agent-dock-add-search">
                           <Search aria-hidden="true" />
                           <Input
-                            ref={(element: HTMLInputElement) => {
-                              addField = element;
-                            }}
+                            ref={addMenu.bindField}
                             class="ui-search-select-input agent-dock-add-search-input"
                             aria-label={t("agent.dock.search")}
                             placeholder={t("agent.dock.searchPlaceholder")}
@@ -1391,7 +1386,7 @@ export function AgentDock(props: AgentDockProps) {
                             spellcheck={false}
                             value={addQuery()}
                             onValueChange={searchAdd}
-                            onKeyDown={onAddSearchKey}
+                            onKeyDown={addMenu.onFieldKey}
                           />
                         </div>
                       </Show>
@@ -1401,7 +1396,9 @@ export function AgentDock(props: AgentDockProps) {
                         onScroll={addFades.measure}
                       >
                         <Show when={addEmpty()}>
-                          <DropdownMenu.Item disabled>{addEmptyText()}</DropdownMenu.Item>
+                          <DropdownMenu.Item class="agent-dock-add-empty" disabled>
+                            {addEmptyText()}
+                          </DropdownMenu.Item>
                         </Show>
                         <For each={addMatches()}>
                           {(agent) => (
@@ -1503,6 +1500,7 @@ export function AgentDock(props: AgentDockProps) {
                     onSend={() => void send()}
                     onClose={() => closeChat()}
                     onRemove={() => props.onRemove(refOfKey(id))}
+                    onAdd={() => props.onAdd(refOfKey(id))}
                     onOpenInMain={() => {
                       closeChat(false);
                       props.onOpenInMain(refOfKey(id));
@@ -1515,6 +1513,7 @@ export function AgentDock(props: AgentDockProps) {
                       props.onSelectAgent?.(agentId);
                     }}
                     onOpenLink={(url) => props.onOpenLink?.(url)}
+                    answers={props.answers}
                   />
                 )}
               </Show>

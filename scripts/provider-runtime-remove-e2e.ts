@@ -9,7 +9,9 @@
 // removes the downloads of providers that are off in one step, and never one that is on: one that a
 // program holds fails and is named, and the others still go. A provider that runs the CLI the user
 // installed runs nothing from the store, so its download can go. The real resolver picks that CLI
-// over OpenBot's copy when it is as new, and an update still starts the copy it downloaded.
+// over OpenBot's copy when it is as new, and an update still starts the copy it downloaded. When the
+// user chose their own CLI it runs also when the copy is newer, the resolver names the CLI the user
+// can switch to, and a copy that is newer than the user's CLI offers no update to itself (#6327).
 // `bun scripts/provider-runtime-remove-e2e.ts`.
 // Writes .openbot-build/provider-runtime-remove-e2e/report.json.
 import assert from "node:assert/strict";
@@ -18,7 +20,7 @@ import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "no
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import type { AgentProviderId, ManagedProviderId } from "@openbot/contracts/agent-providers";
-import { resolveCodexCli, resolveInstalledFirst } from "../src/backend/cli";
+import { chooseInstalledFirst, resolveCodexCli } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { INSTALL_RECORD } from "../src/main/provider-runtime-descriptors";
 import { ProviderRuntimeManager } from "../src/main/provider-runtime-manager";
@@ -77,7 +79,8 @@ interface Report {
   installedListed?: ManagedProviderId[];
   installedGoneMeasured?: number;
   installedRemoved?: { phase: string; gone: boolean };
-  choice?: Record<string, { source: string; version: string }>;
+  chosenCopyOffer?: string | null;
+  choice?: Record<string, { source: string; version: string; passedOver: string | null }>;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-provider-runtime-remove-e2e-"));
@@ -145,6 +148,16 @@ async function exists(path: string): Promise<boolean> {
   );
 }
 
+/** Waits until `path` is removed. False when it is still there after 10 s. */
+async function gone(path: string): Promise<boolean> {
+  const deadline = Date.now() + 10_000;
+  while (await exists(path)) {
+    if (Date.now() > deadline) return false;
+    await new Promise((done) => setTimeout(done, 20));
+  }
+  return true;
+}
+
 async function refusal(provider: ManagedProviderId): Promise<string> {
   const error = await runCauseEffect(manager.removeDownload(provider)).then(
     () => null,
@@ -183,7 +196,8 @@ try {
   assert.equal(report.offStampedAtStart, false, "a provider that is off is not stamped");
   report.readyPhase = manager.getStatus().providers[READY].phase;
   assert.equal(report.readyPhase, "ready", "the verified version is what the provider runs");
-  report.readyBackupCollected = !(await exists(readyBackup));
+  // The start does not wait for the removal, so the window is not held by it.
+  report.readyBackupCollected = await gone(readyBackup);
   assert.ok(report.readyBackupCollected, "a verified version keeps no older one to fall back on");
 
   // A version run within the window stays, and this instance does not stamp it again.
@@ -326,6 +340,12 @@ try {
   report.installedRemoved = { phase: installedSnapshot.providers[ON].phase, gone: !(await exists(onVersion)) };
   assert.deepEqual(report.installedRemoved, { phase: "not-downloaded", gone: true }, "the copy is removed");
 
+  // The user chose their older CLI, and the copy that runs nothing is newer than this build's pin.
+  manager.setSystemVersion(READY, "0.0.1");
+  report.chosenCopyOffer = manager.getStatus().providers[READY].availableVersion ?? null;
+  assert.equal(report.chosenCopyOffer, null, "the copy is newer than the release, so nothing is offered");
+  manager.setSystemVersion(READY, null);
+
   // The real Codex resolver, with a CLI on PATH and OpenBot's copy that answer their versions.
   const fakeCodex = async (name: string, version: string) => {
     const path = join(root, "choice", name, "codex");
@@ -337,17 +357,23 @@ try {
     installed: string | null,
     copy: string,
     preferInstalled = true,
-  ): Promise<{ source: string; version: string }> => {
+    installedChosen = false,
+  ): Promise<{ source: string; version: string; passedOver: string | null }> => {
     const system = installed ? await fakeCodex(`system-${installed}`, installed) : join(root, "choice", "none");
     const managed = await fakeCodex(`managed-${copy}`, copy);
-    const cli = await runCauseEffect(
-      resolveInstalledFirst(
+    const { cli, passedOver } = await runCauseEffect(
+      chooseInstalledFirst(
         (input) => resolveCodexCli({ ...input, systemCandidates: [system] }),
         managed,
         preferInstalled,
+        installedChosen,
       ),
     );
-    return { source: cli.source, version: cli.version };
+    return {
+      source: cli.source,
+      version: cli.version,
+      passedOver: passedOver ? `${passedOver.source} ${passedOver.version}` : null,
+    };
   };
   report.choice = {
     same: await choose("0.200.0", "0.200.0"),
@@ -355,17 +381,23 @@ try {
     copyNewer: await choose("0.200.0", "0.201.0"),
     update: await choose("0.201.0", "0.200.0", false),
     noInstalled: await choose(null, "0.200.0"),
+    chosenCopyNewer: await choose("0.200.0", "0.201.0", true, true),
+    chosenUpdate: await choose("0.200.0", "0.201.0", false, true),
+    chosenNoInstalled: await choose(null, "0.201.0", true, true),
   };
   assert.deepEqual(
     report.choice,
     {
-      same: { source: "system", version: "0.200.0" },
-      installedNewer: { source: "system", version: "0.201.0" },
-      copyNewer: { source: "managed", version: "0.201.0" },
-      update: { source: "managed", version: "0.200.0" },
-      noInstalled: { source: "managed", version: "0.200.0" },
+      same: { source: "system", version: "0.200.0", passedOver: null },
+      installedNewer: { source: "system", version: "0.201.0", passedOver: null },
+      copyNewer: { source: "managed", version: "0.201.0", passedOver: "system 0.200.0" },
+      update: { source: "managed", version: "0.200.0", passedOver: "system 0.201.0" },
+      noInstalled: { source: "managed", version: "0.200.0", passedOver: null },
+      chosenCopyNewer: { source: "system", version: "0.200.0", passedOver: "managed 0.201.0" },
+      chosenUpdate: { source: "managed", version: "0.201.0", passedOver: "system 0.200.0" },
+      chosenNoInstalled: { source: "managed", version: "0.201.0", passedOver: null },
     },
-    "the user's CLI wins when it is as new, and an update starts OpenBot's copy",
+    "the user's CLI wins when it is as new or chosen, an update starts OpenBot's copy, and the other CLI is named",
   );
 
   report.passed = true;

@@ -24,11 +24,9 @@
   --openbot-text-grouped-secondary: #96969b;
   --openbot-border-grouped: #333335;
   --openbot-radius-grouped: 16px;
-  /* The milky chrome of the native app where it has no Liquid Glass: the search field and bar buttons. */
+  /* The milky chrome of the iPhone app where it has no Liquid Glass: the bar buttons. */
   --openbot-bg-chrome-glass: rgba(38, 38, 40, 0.96);
   --openbot-border-chrome-glass: rgba(255, 255, 255, 0.08);
-  /* The fill of that chrome over a real blur, lighter than the solid glass. */
-  --openbot-bg-chrome-blur: rgba(26, 26, 28, 0.62);
 
   /* Neutral color system. Keep UI colors here, not in components. */
   --openbot-bg-canvas: #1a1a1a;
@@ -78,6 +76,9 @@
   --openbot-price-sheen-warm-clear: rgba(255, 184, 132, 0);
   --openbot-price-rim: rgba(255, 255, 255, 0.28);
   --openbot-price-rim-under: rgba(255, 255, 255, 0.1);
+  /* The accent of the pricing page: the frame of the order form and the glow behind it. The web page has the
+     same pink. */
+  --openbot-price-accent: #ec4899;
   --openbot-price-glow: rgba(180, 200, 255, 0.22);
   --openbot-bg-host-inset: #101216;
   --openbot-bg-notch: #000000;
@@ -247,6 +248,15 @@
      a white button as well as on a dark surface. Both themes use the same pair. */
   --openbot-star: #facc15;
   --openbot-star-edge: #ca8a04;
+  /* Controls over a video or an image. The media has its own colors and does not follow the theme,
+     so both themes use white controls on a dark scrim. */
+  --openbot-media-control-text: #ffffff;
+  --openbot-media-control-muted: rgba(255, 255, 255, 0.78);
+  --openbot-media-control-track: rgba(255, 255, 255, 0.3);
+  --openbot-media-control-hover: rgba(255, 255, 255, 0.16);
+  --openbot-media-control-surface: rgba(0, 0, 0, 0.5);
+  --openbot-media-control-surface-hover: rgba(0, 0, 0, 0.64);
+  --openbot-media-control-scrim: rgba(0, 0, 0, 0.55);
   /* The moving border of an offer, such as the hosted server offer: teal, blue, then pink. */
   --openbot-beam-teal: var(--openbot-file-teal);
   --openbot-beam-blue: var(--openbot-accent-text);
@@ -296,9 +306,12 @@
   --openbot-hover: rgba(255, 255, 255, 0.06);
   /* The default fonts. The desktop puts a font that the user chooses in Settings before them, in
    * --openbot-font-sans and --openbot-font-mono, so a letter that the chosen font does not have still
-   * shows. Noto Sans Arabic draws Arabic on Linux, where the system fallback is often DejaVu Sans. */
+   * shows. On macOS the system font (SF Pro) comes first: -apple-system and BlinkMacSystemFont exist
+   * only there, and they keep its automatic text and display sizes, which "SF Pro" by name does not.
+   * Other systems use Inter. Noto Sans Arabic draws Arabic on Linux, where the system fallback is
+   * often DejaVu Sans. */
   --openbot-font-sans-default:
-    "Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic", sans-serif;
+    -apple-system, BlinkMacSystemFont, "Inter Variable", "Segoe UI", "Noto Sans Arabic", sans-serif;
   --openbot-font-mono-default: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
   --openbot-font-sans: var(--openbot-font-sans-default);
   --openbot-font-mono: var(--openbot-font-mono-default);
@@ -306,15 +319,15 @@
    * sixteen sizes and eight line-heights, four of them a single call site, which is how
    * an 11px size ended up paired with a 26px line-height. scripts/ui-foundation-check.ts
    * holds "untokenized font-size" at zero, so a size that is not here has nowhere to go. */
-  --openbot-text-sm: 12px;
-  --openbot-text-md: 13px;
-  --openbot-text-lg: 14px;
+  --openbot-text-sm: 13px;
+  --openbot-text-md: 14px;
+  --openbot-text-lg: 15px;
   --openbot-text-xl: 16px;
   --openbot-text-2xl: 18px;
   --openbot-text-3xl: 24px;
-  --openbot-leading-sm: 16px;
-  --openbot-leading-md: 18px;
-  --openbot-leading-lg: 20px;
+  --openbot-leading-sm: 18px;
+  --openbot-leading-md: 20px;
+  --openbot-leading-lg: 22px;
   --openbot-leading-xl: 22px;
   --openbot-leading-2xl: 24px;
   --openbot-leading-3xl: 30px;
@@ -499,5 +512,13 @@
 }
 
 [data-provider="acp"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="sunra"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
+[data-provider="higgsfield"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

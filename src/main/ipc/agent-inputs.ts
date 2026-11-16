@@ -1,3 +1,4 @@
+import { CHAT_VISUAL_PAGE_LIMIT } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS, INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AcknowledgeFailedTurnInput,
@@ -52,8 +53,10 @@ import {
   type PasteMessageLinkInput,
   type PreviewSharedFileInput,
   type PreviewWorkspaceFileInput,
+  type ReadAgentTaskAroundInput,
   type ReadAgentTaskPageInput,
   type ReadConversationPageInput,
+  type ReadPendingApprovalInput,
   type RenameAgentTaskInput,
   type ReorderQueueInput,
   type RespondToApprovalInput,
@@ -73,6 +76,7 @@ import {
   type SetAgentAvatarInput,
   type SetAgentMemoryInclusionInput,
   type SetChannelImageInput,
+  type SetMessagePinnedInput,
   type SetMessageReactionInput,
   type SidebarLayoutAction,
   type StartAgentTaskInput,
@@ -85,6 +89,7 @@ import {
   type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
+  type WithdrawFeedbackInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -124,6 +129,12 @@ export function parseChannelId(value: unknown): string {
 
 export function parseAttachmentId(value: unknown): string {
   return requireString(value, "attachmentId", INPUT_LIMITS.identifier);
+}
+
+/** HTML that the renderer holds. Main bounds it again by bytes when it keeps the page. */
+export function parsePreviewPageHtml(value: unknown): string {
+  if (typeof value !== "string" || value.length > CHAT_VISUAL_PAGE_LIMIT) throw new Error("Invalid preview page.");
+  return value;
 }
 
 export function parseFilePreviewPageUrl(value: unknown): string {
@@ -636,6 +647,16 @@ export function parseReadAgentTaskPage(value: unknown): ReadAgentTaskPageInput {
   };
 }
 
+export function parseReadAgentTaskAround(value: unknown): ReadAgentTaskAroundInput {
+  if (!isObject(value)) throw new Error("Invalid task request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    limit: parsePageLimit(value.limit),
+  };
+}
+
 export function parseBranchAgentTask(value: unknown): BranchAgentTaskInput {
   if (!isObject(value)) throw new Error("Invalid branch request.");
   return {
@@ -700,6 +721,24 @@ export function parseDeleteConversationMessage(value: unknown): DeleteConversati
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
     ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseWithdrawFeedback(value: unknown): WithdrawFeedbackInput {
+  if (!isObject(value)) throw new Error("Invalid feedback withdraw request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+  };
+}
+
+export function parseSetMessagePinned(value: unknown): SetMessagePinnedInput {
+  if (!isObject(value) || typeof value.pinned !== "boolean") throw new Error("Invalid pinned.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
+    pinned: value.pinned,
   };
 }
 
@@ -1081,6 +1120,22 @@ export function parsePromptResponse(value: unknown): RespondToPromptInput {
     answers[key] = answer;
   }
   return { requestId: value.requestId, answers };
+}
+
+export function parseReadPendingApprovalInput(value: unknown): ReadPendingApprovalInput {
+  if (
+    !isObject(value) ||
+    !isString(value.agentId) ||
+    value.agentId.length === 0 ||
+    value.agentId.length > INPUT_LIMITS.identifier ||
+    !(
+      (isString(value.requestId) && value.requestId.length > 0 && value.requestId.length <= INPUT_LIMITS.identifier) ||
+      (isNumber(value.requestId) && Number.isFinite(value.requestId))
+    )
+  ) {
+    throw new Error("Invalid pending approval request.");
+  }
+  return { agentId: value.agentId, requestId: value.requestId };
 }
 
 export function parseApprovalResponse(value: unknown): RespondToApprovalInput {

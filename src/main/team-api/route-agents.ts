@@ -30,6 +30,10 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -40,7 +44,7 @@ import { ForbiddenAttentionAnswer, InactiveAttentionRequest } from "../../backen
 import { runCauseEffect } from "../../backend/effect-boundary";
 import { parseSidebarLayoutAction } from "../ipc/agent-inputs";
 import type { ModelVisibility } from "../model-visibility";
-import type { TeamApiAgents, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
+import type { TeamApiAgents, TeamApiLibraryFolders, TeamApiOptions, TeamApiSidebarLayout } from "./dependencies";
 import { HttpError } from "./http-error";
 import type { RouteOutcome, TeamApiRequestContext } from "./request-context";
 import {
@@ -72,6 +76,8 @@ export interface AgentRouteDependencies {
   agents: TeamApiAgents;
   skills?: TeamApiOptions["skills"];
   sidebarLayout: Pick<TeamApiSidebarLayout, "getSnapshot" | "mutate" | "removeAgent" | "withProfileAssignment">;
+  /** The Library folders of this host: a deleted agent takes its folders with it. */
+  libraryFolders?: Pick<TeamApiLibraryFolders, "removeAgent"> | undefined;
   duplicateAgent: (agentId: string, operationId: string) => Effect.Effect<DuplicateAgentResult, AgentDuplicationFailed>;
   /** `model-visibility-v1`: the models that the model picker of this server shows. */
   visibleModels?: Pick<ModelVisibility, "picker">;
@@ -79,7 +85,7 @@ export interface AgentRouteDependencies {
 
 export async function routeAgents(
   context: TeamApiRequestContext,
-  { agents, skills, sidebarLayout, duplicateAgent, visibleModels }: AgentRouteDependencies,
+  { agents, skills, sidebarLayout, libraryFolders, duplicateAgent, visibleModels }: AgentRouteDependencies,
 ): Promise<RouteOutcome> {
   const { method, url, request, response, member, capabilities, json, empty } = context;
   const hidden = hiddenProviderAgentIds(agents.listAgents(), context.protocol);
@@ -183,6 +189,19 @@ export async function routeAgents(
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
   }
+  // Where each provider's models come from, when its own settings give them from elsewhere (#9956).
+  // Every member reads it: it says no more than the model list. Frozen by `provider-model-source-v1`.
+  if (method === "POST" && url.pathname === PROVIDER_MODEL_SOURCE_ROUTES.list) {
+    if (!capabilities.has(PROVIDER_MODEL_SOURCE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.providerModelSourceUnsupported"));
+    // `readJson` runs the empty body through the wire codec.
+    await readJson(request);
+    // Only a protocol 9 peer has the capability, and it knows every provider (`OPEN_PROVIDER_ID`).
+    const sources = (agents.getStatus().providers ?? []).flatMap((row) =>
+      row.modelSource ? [{ provider: row.id, source: row.modelSource }] : [],
+    );
+    return json(200, { sources });
+  }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.sidebarLayout.state) {
     return json(200, sidebarLayout.getSnapshot());
   }
@@ -203,7 +222,10 @@ export async function routeAgents(
     // Only ids the peer's protocol accepts: its model list decoder fails closed on the whole array, and
     // `isAgentModel` also accepts `=` and `,`, which only protocol 6 knows.
     const modelId = context.protocol < 6 ? V5_AGENT_MODEL : V6_AGENT_MODEL;
-    const models = (await agents.listModels()).filter((model) => modelId.test(model.id));
+    // The released model list does not carry `steersTurns`; `model-steering-v1` gives it on its own route.
+    const models = (await agents.listModels())
+      .filter((model) => modelId.test(model.id))
+      .map(({ steersTurns: _steersTurns, ...model }) => model);
     if (!visibleModels) return json(200, models);
     // The released model list does not carry `listing`; `model-visibility-v1` gives it on its own route.
     const listed = await runCauseEffect(visibleModels.picker(models));
@@ -271,6 +293,7 @@ export async function routeAgents(
         throw new HttpError(403, sourceText("error.team.membersCannotDeleteAgents"));
       await runCauseEffect(agents.deleteAgent(agentId));
       await runCauseEffect(sidebarLayout.removeAgent(agentId));
+      if (libraryFolders) await runCauseEffect(libraryFolders.removeAgent(agentId));
       return empty(204);
     }
     if (action === "avatar") {
@@ -363,10 +386,13 @@ export async function routeAgents(
     const requestId = promptRequestId(body.requestId);
     requireRequestAgent(agents.agentIdForRequest(requestId));
     await runCauseEffect(
-      agents.respondToBrowserTakeover({
-        requestId,
-        decision: browserTakeoverDecision(body.decision),
-      }),
+      agents.respondToBrowserTakeover(
+        {
+          requestId,
+          decision: browserTakeoverDecision(body.decision),
+        },
+        true,
+      ),
     );
     return empty(204);
   }

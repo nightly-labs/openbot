@@ -498,6 +498,71 @@ async function main(): Promise<void> {
       await press(25);
       assert.equal(captured.length, count, "A released tab was recorded.");
       recordCases("capture-stops-after-release");
+
+      // Teach a task: the steps go to the recording of the tab, not to the log of the agent.
+      const settled = async () => {
+        // The page answers the host's read of the pressed control before it answers this call.
+        await contents.executeJavaScript("0");
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      };
+      const held = () => host.listTabs().find((item) => item.id === tab.id)?.userControl === true;
+      const pageStep = { kind: "page", host: "127.0.0.1", path: "/capture", title: "Capture" };
+      const clickStep = {
+        kind: "click",
+        host: "127.0.0.1",
+        path: "/capture",
+        role: "button",
+        name: "Proceed to checkout",
+      };
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      assert(held(), "The recording did not give the tab to the person.");
+      await press(25);
+      await settled();
+      assert.equal(captured.length, count, "A step of a shown task went to the log of the agent.");
+      const saved = host.stopTeach(tab.id, { kind: "local" }, true);
+      assert.deepEqual(saved, [pageStep, clickStep], "The saved recording did not have the page and the click.");
+      assert(!JSON.stringify(saved).includes("QUERY-SECRET"), "A saved step kept the query.");
+      assert(!held(), "The saved recording did not give the tab back.");
+      recordCases("teach-records-page-and-click", "teach-keeps-steps-from-agent-log", "teach-save-releases-tab");
+
+      captureState.enabled = false;
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      await press(25);
+      await settled();
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "local" }, true),
+        [pageStep, clickStep],
+        "A shown task was not recorded with the setting off.",
+      );
+      captureState.enabled = true;
+      recordCases("teach-records-with-setting-off");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      await press(25);
+      await settled();
+      assert.deepEqual(host.stopTeach(tab.id, { kind: "local" }, false), [], "A discarded recording gave steps.");
+      assert(!held(), "The discarded recording did not give the tab back.");
+      recordCases("teach-discard-gives-no-step");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      host.releaseUserControl(tab.id);
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "local" }, true),
+        [],
+        "A recording stayed after the control of its tab ended.",
+      );
+      recordCases("teach-ends-with-control");
+
+      await runCauseEffect(host.startTeach(tab.id, { kind: "local" }));
+      assert.deepEqual(
+        host.stopTeach(tab.id, { kind: "member", memberId: "other-member", sessionId: "other-session" }, true),
+        [],
+        "A person who did not start the recording got its steps.",
+      );
+      assert(held(), "A person who did not start the recording ended it.");
+      assert.deepEqual(host.stopTeach(tab.id, { kind: "local" }, true), [pageStep], "The recording lost its steps.");
+      assert.equal(captured.length, count, "A teach recording added to the log of the agent.");
+      recordCases("teach-other-holder-gets-no-step");
     }
 
     const report = {
@@ -509,7 +574,7 @@ async function main(): Promise<void> {
       electron: process.versions.electron,
       cases,
       scope:
-        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, the capture of a held tab for learning from browsing, and the remote event merge. No provider calls, no Team API transport, no secret request.",
+        "Owned hidden native process, temporary profile, and a loopback page. BrowserHost with the tool router's composition, the history state and Stop, the capture of a held tab for learning from browsing, the recording of a shown task, and the remote event merge. No provider calls, no Team API transport, no secret request.",
     };
     await mkdir(dirname(reportPath), { recursive: true });
     await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);

@@ -81,7 +81,7 @@ a plugin listing - open the app and gives the launcher an icon that stays after 
 #### Theme palette files
 
 OpenBot reads each `<name>.json` file in the `themes` folder of its data folder
-(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > General > Theme. Another
+(`~/.config/OpenBot/themes/` on Linux) and lists it under Settings > Appearance > Theme. Another
 program, such as an Omarchy theme script, can write the file. OpenBot follows each change to the
 file with no restart. Replace the file with a rename, so that OpenBot never reads half of it:
 
@@ -149,7 +149,7 @@ docker exec -it openbot openbot login
 ```
 
 See [Docker](docs/docker.md) for Compose, the data volume, upgrades and the security limits. For Amazon ECS,
-see [AWS ECS](docs/aws-ecs.md).
+see [AWS ECS](docs/aws-ecs.md). For an Umbrel home server, see [Umbrel](docs/umbrel.md).
 
 ### Nix
 
@@ -230,7 +230,8 @@ starts the Cursor editor. Set `OPENBOT_CURSOR_PATH` to select an executable your
 agents stay on this computer: team members do not see them.
 
 Cline uses a Cline account, which has free models with limits for each model. The provider of a
-free model can use your prompts to train models. OpenBot downloads and pins the Cline CLI (`cline`) when you
+free model can use your prompts to train models. With a ClinePass subscription, select a model with
+"(ClinePass)" in its name: it runs on the subscription, and other paid models use Cline Credits. OpenBot downloads and pins the Cline CLI (`cline`) when you
 select Download on the Cline row in More providers, and starts it with `cline --acp`. Sign in opens
 Cline's sign-in page in your browser. You can also set `CLINE_API_KEY` in the environment used to
 launch OpenBot. If you installed `cline` 3.0.68 or newer yourself, OpenBot uses it until a download
@@ -458,6 +459,7 @@ See [web client delivery](docs/web-client.md) for the release gate and focused c
 | `bun run test:related -- <source>...` | Run, on one worker, only the test files that import the named source files. |
 | `bun run test:browser-agent-session` | Check that an agent with its own browser session, and the agents of a named browser profile, keep their cookies and storage apart, across popups, a restart, a deleted profile, and a clear. |
 | `bun run test:browser-profile-agents` | Check that the shared profile, an agent's own session, a named profile, and the delete of a named profile change the stored browser profile of an agent, and that the choice stays after a restart. |
+| `bun run test:browser-takeover-deadline` | Run the real attention registry past a provider's tool-call deadline (#9689): a password or takeover card stays open after its call gets the waiting answer, the next call for the tab waits on the same card, a result between calls reaches that call, and the end of the turn closes the card. Offline; writes `.openbot-build/browser-takeover-deadline-e2e/report.json`. |
 | `bun run test:browser` | Run the complete local embedded-browser smoke test, including cross-process persistence. Use `--scenario=controls`, `--scenario=tool-boundary`, `--scenario=evaluation`, `--scenario=wait-deadlines`, or `--scenario=popups` for one isolated scenario. |
 | `bun run test:codex` | Probe the real CLI handshake and account without starting a paid turn. |
 | `bun run test:durations` | Re-record how long each desktop test file takes. CI splits its shards by this table, so run it when the two shards stop finishing together. |

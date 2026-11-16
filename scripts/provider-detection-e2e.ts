@@ -3,10 +3,11 @@
 // OpenAI-compatible servers on this computer. A fake cipher replaces the operating system's secret
 // storage, which exists only in Electron. It also scans a folder that holds a file named like a known
 // agent, and proves that the scan never starts it. A model list in the models.dev, OpenRouter and
-// vLLM shapes gives each model's input kinds, context window and max output (#3946).
+// vLLM shapes gives each model's input kinds, context window and max output (#3946). A list with
+// model names only gets each model's limits from the models.dev copy of OpenCode (#3946, #5789).
 // `bun scripts/provider-detection-e2e.ts`. Writes .openbot-build/provider-detection-e2e/report.json.
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, utimes, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -15,6 +16,7 @@ import { Effect } from "effect";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { type CustomProviderCipher, CustomProviderStore } from "../src/main/custom-provider-store";
 import { probeModels } from "../src/main/model-server-probe";
+import { ModelReleaseCatalog } from "../src/main/model-visibility";
 import { createProviderDetection } from "../src/main/provider-detection";
 import { ProviderDetectionSettingsStore } from "../src/main/provider-detection-settings-store";
 
@@ -85,6 +87,8 @@ interface Report {
     agentFound: string;
     agentStarted: boolean;
   };
+  catalogLimits?: unknown;
+  tornCatalog?: unknown;
   edit?: {
     keyKeptOnEdit: boolean;
     ciphertextUnchanged: boolean;
@@ -344,6 +348,75 @@ try {
     { id: "text-only", inputs: [] },
     { id: "odd-model" },
     { id: "bare-model" },
+  ]);
+
+  // 6b. A list with names only gets the limits of the models.dev copy that OpenCode keeps. A model
+  // that the endpoint gives a window keeps it, and a model that the copy does not have gets none.
+  const cache = join(root, "cache");
+  const copy = join(cache, "opencode", "models.json");
+  await mkdir(join(cache, "opencode"), { recursive: true });
+  await writeFile(
+    copy,
+    JSON.stringify({
+      google: { models: { "gemini-3.8-flash": { limit: { context: 1_048_576, output: 65_536 } } } },
+      "relay-a": { models: { "gemini-3.8-flash": { limit: { context: 200_000, output: 8_000 } } } },
+      "relay-b": { models: { "vendor/big.model": { limit: { context: 1_000_000, output: 64_000 } } } },
+      "relay-c": { models: { "big-model": { limit: { context: 1_000_000, output: 64_000 } } } },
+      "relay-d": { models: { "big-model": { limit: { context: 128_000, output: 8_000 } } } },
+      "relay-e": { models: { "full-cap": { limit: { context: 200_000, output: 200_000 } } } },
+    }),
+  );
+  // A confined OpenCode on this computer can have a copy of its own. This one is the newer.
+  const later = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  await utimes(copy, later, later);
+  const namesOnly = await fakeServer([
+    "proxy/google/gemini-3.8-flash",
+    "Big.Model",
+    "full-cap",
+    "unknown-model",
+    { id: "local/big-model", context_length: 32_768 },
+  ]);
+  servers.push(namesOnly);
+  const withCatalog = await Effect.runPromise(
+    createProviderDetection({
+      settings,
+      customProviders: endpoints,
+      customAgents: { configs: () => [] },
+      probe: probeModels,
+      catalog: new ModelReleaseCatalog({ XDG_CACHE_HOME: cache }, root),
+    }),
+  );
+  detections.push(withCatalog);
+  const filled = await Effect.runPromise(
+    withCatalog.discoverModels({ baseUrl: namesOnly.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.catalogLimits = filled.models;
+  assert.ok(isDiscoverModelsResult(filled), "The preload decoder accepts the filled list.");
+  assert.deepEqual(filled.models, [
+    // The id ends in a catalog key: the maker's limits, not those of a relay.
+    { id: "proxy/google/gemini-3.8-flash", contextWindow: 1_048_576, maxOutput: 65_536 },
+    // By name: the window that most services give.
+    { id: "Big.Model", contextWindow: 1_000_000, maxOutput: 64_000 },
+    { id: "full-cap", contextWindow: 200_000 },
+    { id: "unknown-model" },
+    { id: "local/big-model", contextWindow: 32_768 },
+  ]);
+
+  // 6c. OpenCode can write the copy during the read. Text that is not JSON gives a list with no
+  // limits; it does not make the search fail.
+  await writeFile(copy, '{"google": {"models": {"gemini-3.8-fl');
+  const afterTear = new Date(later.getTime() + 60 * 1000);
+  await utimes(copy, afterTear, afterTear);
+  const torn = await Effect.runPromise(
+    withCatalog.discoverModels({ baseUrl: namesOnly.baseUrl, apiKey: null, headers: [] }),
+  );
+  report.tornCatalog = torn.models;
+  assert.deepEqual(torn.models, [
+    { id: "proxy/google/gemini-3.8-flash" },
+    { id: "Big.Model" },
+    { id: "full-cap" },
+    { id: "unknown-model" },
+    { id: "local/big-model", contextWindow: 32_768 },
   ]);
 
   // 7. Detection off: nothing is probed.

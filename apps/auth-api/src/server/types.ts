@@ -27,8 +27,15 @@ export interface WorkerBindings {
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
   EMAIL_FROM?: string;
+  /**
+   * The team's inbox. Automated emails name it in `Reply-To`, and contact form messages go to it.
+   * Empty uses `EMAIL_FROM`.
+   */
+  EMAIL_REPLY_TO?: string;
   /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
   EMAIL_LICENSE_FROM?: string;
+  /** The address for replies to license emails. Empty uses the license sender. */
+  EMAIL_LICENSE_REPLY_TO?: string;
   /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
   EMAIL_RELAY?: Fetcher;
   /**
@@ -57,6 +64,11 @@ export interface WorkerBindings {
    * each ticket names `REMOTE_SIGNAL_URL`.
    */
   REMOTE_SIGNAL_HOMES?: string;
+  /**
+   * The place of each home, as `id=latitude:longitude,id=latitude:longitude`. A host that asks for a
+   * home gets one near the place that Cloudflare gives for its request. Empty = any home.
+   */
+  REMOTE_SIGNAL_HOME_LOCATIONS?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
   /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
   REMOTE_AUTH_WEBHOOK_URLS?: string;
@@ -99,10 +111,22 @@ export interface WorkerBindings {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   /**
+   * The seller's EU VAT ID, such as `PL1234567890`. VIES then gives a consultation number for each VAT ID
+   * check, the proof of the check. Not secret. Absent: the check works with no consultation number.
+   */
+  VIES_REQUESTER_VAT_ID?: string;
+  /**
    * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
    * a new license is paid at once.
    */
   LICENSE_TRIAL_END?: string;
+  /**
+   * `true`: a Checkout page needs the billing country of the account (409 `billing_country_required`).
+   * Otherwise a customer with no country gets a Stripe Tax page, so that a desktop app from before the
+   * billing details step can still buy. Turn it on after that desktop release and the run of
+   * `scripts/stripe-vat-migrate.ts --live`.
+   */
+  BILLING_COUNTRY_REQUIRED?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;
@@ -112,6 +136,8 @@ export interface WorkerBindings {
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
+  /** A Discord webhook for operator messages about the server pool. Without it there are no pool alerts. */
+  HOSTED_POOL_ALERT_WEBHOOK_URL?: string;
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;
@@ -119,6 +145,11 @@ export interface WorkerBindings {
   GITHUB_APP_CLIENT_ID?: string;
   /** The private key of the OpenBot GitHub App as a PKCS #8 PEM. Without it, no installation token is issued. */
   GITHUB_APP_PRIVATE_KEY?: string;
+  /**
+   * The private repository, as `owner/name`, where a withdrawn feedback issue moves. The OpenBot
+   * GitHub App needs issue write access to it. Empty, an issue cannot be withdrawn; a comment can.
+   */
+  FEEDBACK_WITHDRAWN_REPOSITORY?: string;
   /** The Apple Push Notification service key (`.p8`, PEM text). The Live Activity relay is off without it. */
   APNS_PRIVATE_KEY?: string;
   APNS_KEY_ID?: string;

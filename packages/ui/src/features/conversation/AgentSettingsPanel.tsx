@@ -1,9 +1,12 @@
 import type { ExpressionId } from "@norbert_bodziony/bloub";
-import { agentProviderDescriptor, agentProviderName, foreignProvider } from "@openbot/contracts/agent-providers";
+import {
+  agentProviderDescriptor,
+  agentProviderName,
+  agentSteersTurns,
+  foreignProvider,
+} from "@openbot/contracts/agent-providers";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
-  AGENT_TASK_LIMIT_DEFAULT,
-  AGENT_TASK_LIMIT_MAX,
   type AgentBackupModels,
   type AgentBrowserProfile,
   type AgentDefaults,
@@ -37,6 +40,7 @@ import {
   type UpdateAgentAdminSettingsInput,
   type UpdateAgentInput,
   widensAgentPermission,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import {
@@ -118,6 +122,14 @@ import { AgentChatColorRow } from "../settings/ChatColorSetting";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
+import {
+  AGENT_SETTING_LINK_ROWS,
+  AGENT_SETTINGS_PAGE_TITLE,
+  type AgentSettingReveal,
+  type AgentSettingsPage,
+  revealSettingRow,
+  waitForSettingRow,
+} from "./agent-setting-links";
 import { BackupModelsPage } from "./BackupModels";
 
 export interface AgentRuntimeSettings {
@@ -163,8 +175,6 @@ export interface AgentSettingsPanelProps {
   busyMessageModeEditable?: boolean;
   /** Whether the busy-message default belongs to a joined server's host, not to this app. */
   busyMessageDefaultIsHost?: boolean;
-  /** Tasks run only on this computer: the Team API has no task route. */
-  taskLimitEditable?: boolean;
   /** Backup models are local-only too: the Team API does not carry them. */
   backupModelsEditable?: boolean;
   /** The folders the agent can change besides its workspace. Local-only: the Team API does not carry them. */
@@ -193,6 +203,13 @@ export interface AgentSettingsPanelProps {
   width: number;
   onResize: (width: number) => void;
   onResizeEnd: (width: number) => void;
+  /** The width from the last drag. When the chat gets wider again, the panel goes back to it. */
+  preferredWidth?: (() => number) | undefined;
+  /**
+   * Shows one row, as a setting card in the chat asks: its page opens and the row is marked. While
+   * `detailOpen`, only the page changes.
+   */
+  reveal?: AgentSettingReveal | null | undefined;
   /** Application-owned navigation and detail surfaces, in the existing panel layout. */
   links?: JSX.Element;
   detailOpen?: boolean;
@@ -256,19 +273,6 @@ function choiceBrowserProfile(choice: BrowserProfileChoice): AgentBrowserProfile
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
 
-/**
- * The pages behind the root list. The root edits the agent's face, name, title and instructions
- * in place, as the mobile app does, and shows one row for each page.
- */
-type AgentSettingsPage = "permissions" | "folders" | "backup-models" | "advanced";
-
-const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
-  permissions: "agentSettings.permissions.title",
-  folders: "agentSettings.folders.title",
-  "backup-models": "agentSettings.backupModels.title",
-  advanced: "agentSettings.advanced.title",
-};
-
 /** The three free-text fields of the panel, each with a flag for edits made since the last save. */
 interface AgentTextFields {
   description: string;
@@ -301,8 +305,6 @@ interface AgentSettingsDraft {
   browserProfile: BrowserProfileChoice;
   /** `default` follows the app setting. */
   busyMessage: BusyMessageChoice;
-  /** `default` is `AGENT_TASK_LIMIT_DEFAULT`. */
-  taskLimit: TaskLimitChoice;
   /** Null asks first, with no saved order. */
   backupModels: AgentBackupModels | null;
   /** A level that gives the agent more freedom waits here for the confirmation. */
@@ -321,7 +323,7 @@ interface TextSaveRequest {
 }
 
 export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
-  const { t, errorMessage, format } = useText();
+  const { t, errorMessage } = useText();
   const agentDefaults = () => props.agentDefaults ?? DEFAULT_AGENT_DEFAULTS;
   const [newChatOpen, setNewChatOpen] = createSignal(false);
   const [deleteHistoryOpen, setDeleteHistoryOpen] = createSignal(false);
@@ -342,7 +344,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     quickAcknowledgement: false,
     browserProfile: "shared",
     busyMessage: "default",
-    taskLimit: "default",
     backupModels: null,
     confirmingPermission: null,
     runtime: untrack(() => ({ ...props.runtimeSettings })),
@@ -378,6 +379,31 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       )?.focus(),
     );
   }
+
+  // The row can show later than its page, such as a row that waits for the host. A new request, another
+  // page, an input of the user in the page or a closed panel stops the wait.
+  createEffect(
+    () => props.reveal,
+    (reveal) => {
+      if (!reveal) return;
+      const row = AGENT_SETTING_LINK_ROWS[reveal.settingId];
+      // An effect cannot flush, so a new page shows after this callback, and the observer finds its row.
+      const pageShown = untrack(page) === row.page;
+      setPage(row.page);
+      // A detail page covers the panel: the page is where its Back goes, and no row shows to mark.
+      if (untrack(() => props.detailOpen)) return;
+      const root = pageRoot;
+      if (!root) return;
+      if (!row.match) {
+        if (row.page) openPage(row.page);
+        return;
+      }
+      const label = t(row.match);
+      if (pageShown && revealSettingRow(root, label)) return;
+      // The user went to another page: the row is not wanted there.
+      return waitForSettingRow(root, () => untrack(page) !== row.page || revealSettingRow(root, label));
+    },
+  );
 
   function closePage(): void {
     returnFocusPage = page();
@@ -499,7 +525,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           String(agentQuickAcknowledgementEnabled(agent, agentDefaults())),
           browserProfile,
           agent.busyMessageMode ?? "default",
-          String(agent.taskLimit ?? "default"),
           JSON.stringify(agent.backupModels ?? null),
           runtimeSettings.provider,
           runtimeSettings.model,
@@ -544,7 +569,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           state.quickAcknowledgement = agentQuickAcknowledgementEnabled(agent, agentDefaults());
           state.browserProfile = browserProfile;
           state.busyMessage = agent.busyMessageMode ?? "default";
-          state.taskLimit = taskLimitChoice(agent.taskLimit);
           state.backupModels = agent.backupModels ?? null;
           if (agentChanged) state.confirmingPermission = null;
           state.runtime.provider = runtimeSettings.provider;
@@ -912,20 +936,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     }
   }
 
-  async function saveTaskLimit(next: TaskLimitChoice): Promise<void> {
-    const agentId = props.agent.id;
-    const previous = draft.taskLimit;
-    setDraft((state) => {
-      state.taskLimit = next;
-    });
-    if (await saveAgentPatch({ taskLimit: next === "default" ? null : Number(next) }, agentId)) return;
-    if (!disposed && props.agent.id === agentId && draft.taskLimit === next) {
-      setDraft((state) => {
-        state.taskLimit = previous;
-      });
-    }
-  }
-
   /** The store wraps the saved value in a proxy, so a newer save is told apart by its number. */
   let backupModelsSave = 0;
   async function saveBackupModels(next: AgentBackupModels | null): Promise<void> {
@@ -975,18 +985,10 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     return (
       provider !== undefined &&
       (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
-      agentProviderDescriptor(provider).steer !== "native"
+      // A custom agent steers when its model reports it (#4977).
+      !agentSteersTurns({ provider, model: draft.runtime.model }, props.modelOptions)
     );
   };
-
-  const oneTurnAtATime = () => {
-    const provider = knownProvider();
-    return provider !== undefined && !agentProviderDescriptor(provider).concurrentTurns;
-  };
-  const taskLimitLabel = (choice: TaskLimitChoice) =>
-    choice === "default"
-      ? t("agentSettings.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
-      : format.number(Number(choice));
 
   async function saveComputerUse(next: boolean): Promise<void> {
     const agentId = props.agent.id;
@@ -1067,6 +1069,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       width={props.width}
       maxWidth={props.maxWidth}
       onResize={props.onResize}
+      preferredWidth={props.preferredWidth}
     >
       <Show when={!props.detailOpen}>
         <Show
@@ -1084,7 +1087,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         >
           {(current) => (
             <SettingsPanelHeader
-              title={t(PAGE_TITLE[current()])}
+              title={t(AGENT_SETTINGS_PAGE_TITLE[current()])}
               onBack={closePage}
               backLabel={t("agentSettings.backToSettings")}
               onClose={props.onClose}
@@ -1405,6 +1408,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   disabledReason={t("agentSettings.runtime.modelUnavailable")}
                   accountChoice
                   providerAccountId={agentNextProviderAccountId(props.agent)}
+                  workspaceOnly={workspaceAccessEnforced(props.agent)}
                   onChange={(nextModel, provider, accountId, effort) =>
                     void selectModel(nextModel, provider, accountId, effort)
                   }
@@ -1612,32 +1616,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                     <SelectContent />
                   </Select>
                 </Show>
-                <Show when={props.taskLimitEditable}>
-                  <Select<TaskLimitChoice>
-                    class="agent-settings-runtime-select"
-                    options={[...TASK_LIMIT_CHOICES]}
-                    value={oneTurnAtATime() ? "1" : draft.taskLimit}
-                    disabled={oneTurnAtATime()}
-                    onChange={(next) => {
-                      if (!next || next === draft.taskLimit) return;
-                      void saveTaskLimit(next);
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>{taskLimitLabel(item.item.rawValue)}</SelectItem>
-                    )}
-                  >
-                    <SelectTrigger
-                      class="agent-settings-runtime-row"
-                      aria-label={t("agentSettings.runtime.taskLimitLabel")}
-                    >
-                      <span class="agent-settings-runtime-label">{t("agentSettings.runtime.taskLimit")}</span>
-                      <SelectValue<TaskLimitChoice>>
-                        {(state) => taskLimitLabel(state.selectedOption() ?? "default")}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent />
-                  </Select>
-                </Show>
                 <Show when={props.browserProfiles}>
                   {(options) => (
                     <BrowserProfileSelect
@@ -1662,11 +1640,6 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
                   {t("agentSettings.busyMessage.steerUnsupported", {
                     provider: agentProviderName(draft.runtime.provider),
                   })}
-                </Text>
-              </Show>
-              <Show when={props.taskLimitEditable && oneTurnAtATime()}>
-                <Text as="p" class="agent-settings-runtime-note" variant="caption" tone="muted">
-                  {t("agentSettings.taskLimit.oneTurn", { provider: agentProviderName(draft.runtime.provider) })}
                 </Text>
               </Show>
               <Show when={props.onStartNewChat}>
@@ -1837,17 +1810,6 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
     current.model === settings.model &&
     current.reasoningEffort === settings.reasoningEffort
   );
-}
-
-/** `default`, then each limit as text, because a select keys its options by value. */
-type TaskLimitChoice = "default" | `${number}`;
-const TASK_LIMIT_CHOICES: readonly TaskLimitChoice[] = [
-  "default",
-  ...Array.from({ length: AGENT_TASK_LIMIT_MAX }, (_, index): TaskLimitChoice => `${index + 1}`),
-];
-
-function taskLimitChoice(limit: number | undefined): TaskLimitChoice {
-  return limit === undefined ? "default" : `${limit}`;
 }
 
 const BUSY_MESSAGE_CHOICES = ["default", "queue", "steer"] as const;

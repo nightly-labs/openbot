@@ -1,4 +1,4 @@
-import type { AgentTask, ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { AgentTask, ConversationMessage, ConversationSnapshot, QueueDelivery } from "@openbot/contracts/ipc";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
 
 /** Side threads of Chief for the desktop and web thread stories. */
@@ -169,6 +169,70 @@ export const THREAD_OPTIONS: MockOpenBotOptions = {
         "assistant",
         "Yes, with the yearly switch. A member is a person who signs in. Yes, from Settings.",
         "2026-08-19T08:20:00.000Z",
+      ),
+    ]),
+  },
+};
+
+const COMPETITORS = requireThread("competitors");
+
+function requireThread(id: string): AgentTask {
+  const task = THREADS.find((candidate) => candidate.id === id);
+  if (!task) throw new Error(`No thread fixture: ${id}`);
+  return task;
+}
+
+function queued(id: string, position: number, text: string): QueueDelivery {
+  return {
+    id,
+    messageId: `message-${id}`,
+    recipientAgentId: AGENT_ID,
+    sender: { kind: "user" },
+    text,
+    attachments: [],
+    replyToMessageId: null,
+    status: "queued",
+    position,
+    turnId: null,
+    error: null,
+    createdAt: "2026-08-19T10:01:00.000Z",
+    expectsReply: false,
+  };
+}
+
+/**
+ * "Competitor scan" works, and two messages wait in its queue. Reply to a message of the thread to see
+ * the reply card under the queue.
+ */
+export const THREAD_QUEUE_OPTIONS: MockOpenBotOptions = {
+  ...THREAD_OPTIONS,
+  tasks: {
+    [AGENT_ID]: THREADS.map((task) =>
+      task.id === COMPETITORS.id
+        ? {
+            ...task,
+            queue: [
+              queued("competitors-queue-1", 1, "Also add the two newest competitors."),
+              queued("competitors-queue-2", 2, "Keep the summary under one page."),
+            ],
+          }
+        : task,
+    ),
+  },
+  taskConversations: {
+    ...THREAD_OPTIONS.taskConversations,
+    competitors: snapshot(COMPETITORS, [
+      message(
+        "competitors-queue-message-1",
+        "user",
+        "Compare the pricing pages of our three closest competitors.",
+        "2026-08-19T09:50:00.000Z",
+      ),
+      message(
+        "competitors-queue-message-2",
+        "assistant",
+        "I have the first two pages. The third one loads its prices late, so I read it again.",
+        "2026-08-19T09:56:00.000Z",
       ),
     ]),
   },

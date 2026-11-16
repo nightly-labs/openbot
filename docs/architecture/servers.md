@@ -51,6 +51,37 @@ says "Storage almost full" and can be closed until the next level; under 2% free
 is red and cannot be closed. "Free up space" opens Server settings › Storage. A host without the
 capability shows no card.
 
+The optional `storage-user-files-v1` capability (`team-protocol/storage-user-files-v1.ts`, protocol 9
+only) adds `POST /v1/storage/user-files`. It answers the same free and total bytes, plus `userBytes`:
+the bytes that the home folder and the temporary folders of the server's user use on that disk. The
+frozen `storage-disk-v1` reply cannot get a new field, so this is a new route. Only a hosted server
+measures it (`src/backend/user-files-bytes.ts`, `nice -n 19 du -s -x -c`), at most each 10 minutes,
+in the background after the first value. It is null on another host, and on a machine with Docker,
+because `du` cannot read the Docker folder. The clients count the plan storage that is left
+(`hostedPlanDisk` in `@openbot/contracts/hosted-servers`) from `userBytes`. When it is null or the
+host does not have the capability, they subtract `HOSTED_SERVER_BASE_IMAGE_GB` for the system, which
+is correct only for a boat sandbox. Every member can read it. The desktop, the web client and mobile
+prefer this route and use `storage-disk-v1` with an older host.
+
+The optional `library-folders-v1` capability (`team-protocol/library-folders-v1.ts`, protocol 9 only)
+adds `POST /v1/library-folders` and `POST /v1/library-folders/actions` for the folders of the Library
+page. Each agent has folders for its files, five levels in all, and a file is in one folder of its
+agent or in none. The folders are a layout over the stored files: a change moves, copies and deletes
+no file. The host keeps them in `openbot-library-folders-v1.json` in its user data
+(`src/backend/library-folders-store.ts`), and `src/main/library-folders-service.ts` applies each change
+for the `storage:getLibraryFolders` and `storage:changeLibraryFolders` IPC of this computer and for the
+route, so a joined server uses the same rules. The service reads the agent of a file from the `host`
+scan, and scans one more time when the kept scan result does not have the file. Every member reads
+the folders of each agent that they can see. A member changes the folders of an agent only with `chat`
+access to it, and gets 403 without it; an owner or an admin changes all folders. A member gets no folder of an agent that they cannot see or that the host no longer
+has, and no file that is in one, as in `storage-v1`. An action that names an agent that they cannot see, a folder of one or a file in
+one gets 404. A refused change is 404 for
+an agent, a folder or a file that the host does not have, and 400 for each other rule. Each route
+answers the full snapshot that the member can see. `library-folders-v1` has no event; see
+[Library folder events](#library-folder-events). The read is a passive route. A deleted agent loses its folders, and a file that an owner or
+admin deletes leaves its folder. A host without the capability reads as null, and a change is refused
+before any request. The instance transfer does not carry the folders.
+
 The optional `machine-resources-v1` capability (`team-protocol/machine-resources-v1.ts`) adds the
 machine part at the top of Server settings › Storage, for an owner or admin only. `POST
 /v1/admin/host/machine/metrics` answers the disk, memory and CPU use of the machine that runs the
@@ -300,6 +331,26 @@ part at a time, checks each part it gets, and sends or reads a part again up to 
 connection fails; it does not send a part again when the host refuses it. A download appears only
 when it is complete.
 
+Server settings > Transfer > Copy to another server joins the two directions in one step, on the
+desktop only. It shows when the user administers two or more servers with `instance-transfer-v1`,
+this computer's included. `instance-transfer:copy` is scoped to the destination and takes
+`{ fromServerId, agentIds }`. Main exports the agents of the source with their workspace files and
+without chat history or server settings to a temporary file. As in a file export, the file also has
+the channels that have a selected agent as a member and the Shared folder. Each apply adds the
+channels again as new channels. Main then stages the file at the destination, applies all of its
+agents, and removes the file. Each side uses the routes above, in parts when its host has
+`instance-transfer-chunks-v1`, so a host needs no new route; a destination with only
+`instance-transfer-v1` takes at most 100 MB, the Shared folder included. An agent whose name is already on the destination is
+added beside it. The browser client has no copy: it connects to one host at a time.
+
+The mobile app has the same copy in Server settings > Transfer > Copy to another server. The source
+is the server of the page, and the destination is another online server that the user administers
+with `instance-transfer-v1`. The phone downloads the file from the source with the export route,
+sends it to the destination with the upload route, and applies all of its agents. The phone uses
+only `instance-transfer-v1`, so the file is at most 100 MB. The file stays in memory on the phone and
+is not written to its storage. A token that the destination keeps when the page closes before the
+apply is discarded.
+
 After a restart, the first upload or export removes old files from `instance-transfer-uploads/`,
 including unfinished `.part` files and the parts of `instance-transfer-chunks-v1`, before it writes a
 new file. Concurrent uploads and exports wait
@@ -321,6 +372,11 @@ optional event `routine-flows-changed { agentId }` names the canvas that changed
 only to a connection with the capability and never for a hidden agent. Webhook config, secret
 rotation and webhook test runs stay on `events-v1`. A client without the capability shows a notice
 in the Routines view; the web client shows the view switch only when the host serves it.
+
+`routine-flow-stop-v1` adds `POST /v1/routine-flows/runs/stop { routineId, runId }`, which stops a run
+that has not ended and answers `{}`. The member needs manage access to each agent of the routine and
+of the run's steps, and every one of them must be visible. A client without the capability shows no
+Stop.
 
 ### Workflows
 
@@ -357,6 +413,73 @@ Node kinds, port types, statuses, run sources, trigger types and version kinds c
 so a newer host can add one. A client shows a workflow with a node kind or a port type that it does
 not know as read-only (`needsNewerApp`), and keeps the node when it saves.
 
+`workflows-media-v1` lets the host run the `image` and `asset` nodes of `workflows-v1`. An image
+step makes a picture or a video with the subscription of the model's provider and keeps it as a
+generated attachment; a client fetches it through `GET /v1/attachments/:id`. An asset step names a
+picture of the host by its file id. The capability adds one route,
+`POST /v1/workflows/media/keep-picture { draftId }`: it keeps an attachment draft that the member
+sent through `POST /v1/attachments` as a picture of the host with no owner agent, and answers
+`{ fileId }`. Only a PNG, JPEG or WebP draft is kept (`refused`), and a draft that is not there
+answers `missing`. Each member who can use workflows can keep a picture, as each member can send a
+draft. A client without the capability does not offer image and asset steps.
+
+`workflows-sunra-v1` lets the host run an `image` node with a Sunra model of `WORKFLOW_MEDIA_MODELS`
+(the ids that start with `sunra-`). The host calls the tools of Sunra's MCP server with the Sunra
+sign-in of an enabled Sunra row in its Apps (`src/backend/workflows/sunra-media.ts`), and the credits
+of the selected Sunra account pay for each file. The capability adds two routes.
+`POST /v1/workflows/media/providers {}` answers `{ sunra }`: true while that sign-in exists. It
+never sends a token or the Sunra account. Each member who can use workflows can read it. A client
+shows the Sunra models only while it is true, and reads it again when its window comes to the front,
+because the sign-in ends in the browser. `POST /v1/workflows/media/credits {}` answers
+`{ sunra: { available, quota } | null }`: the credits that the host's Sunra sign-in can still spend.
+The host reads them with Sunra's `get_balance` tool, which spends no credits. For a Sunra team
+member, `available` is what is left of the member's quota and `quota` is that quota; for a personal
+account, `quota` is null. It is null with no sign-in or when Sunra does not answer. Each member who
+can use workflows can read it, because those members spend the same credits. The Canvas page rail
+shows it as a ring, and reads it again when the window comes to the front. A client of a host
+without the capability shows no Sunra models and no credits.
+
+`workflows-higgsfield-v1` does the same for the Higgsfield models (the ids that start with
+`higgsfield-`). The host calls the tools of Higgsfield's MCP server with the Higgsfield sign-in of an
+enabled Higgsfield row in its Apps (`src/backend/workflows/higgsfield-media.ts`, with the parts it
+shares with Sunra in `mcp-media.ts`), and the credits of that account pay for each file; the host
+always sends `use_unlim: false`. The capability has its own two routes, because a frozen answer cannot
+get a new field: `POST /v1/workflows/media/higgsfield/providers {}` answers `{ higgsfield }`, and
+`POST /v1/workflows/media/higgsfield/credits {}` answers `{ higgsfield: { available, quota } | null }`,
+read with Higgsfield's `balance` tool. `quota` is always null. The Sunra routes keep answering
+`{ sunra }` only. A client of a host without the capability shows no Higgsfield models and no
+Higgsfield credits. The `background` field of `workflows-media-transparent-v1` also applies to
+GPT Image 2.6 and Seedream 5.0 Pro on Higgsfield. A video model that takes no reference pictures
+(Wan 2.7) gets a reference picture as its first frame, or as its last frame when the first one is set.
+
+`workflows-media-account-v1` lets an `image` node choose the account that pays for its file. The node
+reads one more field, `account`: the id of one account of the model's provider, as `provider-accounts-v1`
+lists them. An empty field and `default` mean the provider's own sign-in. When the host does not have
+that account, the step fails with "account not found"; the host never makes the file on another
+account. A Sunra model ignores the field. The capability adds no route. A client shows the accounts
+in the model picker only on a host that advertises it, because an older host ignores the field.
+
+`workflows-media-transparent-v1` lets an image step of GPT Image or Grok Imagine have a transparent
+background. The node reads one more field, `background`; with `transparent` the host makes a picture
+with clear pixels around the subject. Codex's image tool makes the clear pixels itself. Grok's tool
+cannot, so the host asks Grok for one flat colour and removes it before it keeps the file. A video,
+another model and any other value keep the model's own background. The capability adds no route. A
+client shows the Background chip only on a host that advertises it, because an older host ignores
+the field.
+
+`workflows-media-size-v1` lets an image step have a size of its own. With `aspect` set to `custom`,
+the node reads two more fields, `width` and `height`: whole pixels from 64 to 4096. The host asks the
+model for the nearest aspect ratio it makes, at the smallest resolution that is at least the longer
+side (else the largest). When the file is made, the host crops its centre to the shape of the size and
+scales it to exactly `width` × `height` as a PNG, then deletes the model's file. When the host cannot
+decode the file (Electron decodes PNG and JPEG, not WebP), the step keeps the model's file. A video
+and a side out of range keep the model's size. The capability adds no route. A client shows Custom
+in the aspect ratio menu only on a host that advertises it, because an older host reads `custom` as
+the model's first aspect ratio. The same capability adds the aspect ratios `4:5` and `5:4` for an
+image: the host asks the model for that ratio, and a client offers them only on a host that
+advertises the capability, for the same reason. A video model without its own list of aspect ratios
+does not make them.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 
@@ -385,6 +508,28 @@ The chats, workspaces and channels come from the routine-results options, so the
 as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
 sends the Discord roles.
 
+### CRM
+
+`crm-v1` serves the CRM (see [CRM](agents.md#crm)) to a joined desktop and to the web client. Its
+routes are `POST /v1/crm/<name>`: `overview`, `customers`, `payments`, `activity`, `apply`,
+`source-connect`, `source-disconnect`, `source-sync`, `settings` and `set-settings`. The contract header in
+`team-protocol/crm-v1.ts` records the grant:
+
+- Only an owner or admin reads or changes the CRM. A member gets 403 on every route, and the host
+  sends `crm-changed` only to owner and admin clients (the broadcast loop in `team-api-server.ts`).
+- Customers cross in pages of at most 500, ordered by `number`; payments and activity cross in pages
+  of at most 500 with an opaque cursor. A payments or activity page that does not fit in a frame gets
+  413 `tooLargeToSend`; a customers page is cut and its cursor moves to the last customer sent.
+- A Stripe key goes to the host only in `source-connect`. The host keeps and uses it; no response
+  or event carries it back, only its last four characters (`keyHint`). The sync runs on the host,
+  so a joined server pulls from Stripe with no client open.
+- `settings` and `set-settings` read and write the Server Settings > Experimental switch. The CRM is
+  off by default. The routes answer while it is off, but the clients hide the CRM page and the CRM
+  button, so the switch is data and not a capability. A change sends `crm-changed`, so each owner and
+  admin client reads the switch again.
+- A host without the CRM service, or a client without the capability, gets 400 `serverTooOld`. The
+  client hides the CRM page until the host confirms `crm-v1`. Mobile does not show the CRM.
+
 ### History extent
 
 `history-extent-v1` lets the chat's scroll rail draw the history that is not loaded on a joined server.
@@ -411,6 +556,10 @@ in words on a block that has one, is for the owner and admins only; the host ans
 403. A secret form value goes to the agent in the tool result. The stored block and the prompt
 resolution leave it out. The provider transcript of the tool call can keep it, and the agent can
 repeat it in a reply or a thought, which the conversation stores as any other message.
+
+The `ask_ui` tool gives agents only the `confirm` block, to approve an action or a draft; a question
+with options goes to `ask_user`. The contract and every client keep `choice` and `form`: OpenBot
+builds forms itself, such as the API key and Vault cards, and older messages hold both.
 
 `agent-task-ui-blocks-v1` (`team-protocol/agent-task-ui-blocks-v1.ts`) adds the same `uiBlock`, with
 the same normalization and wire budget, to the task conversations of `agent-tasks-v1`: the response
@@ -449,6 +598,21 @@ whenever it is present, and a list that the contract refuses fails closed. The h
 through `clampConversationSubagents`, so only known keys go out, and the lists of one page share a
 wire budget, newest first. The task conversations of `agent-tasks-v1` do not carry it. The WebRTC
 host peer encodes the local response and the events again with the same option.
+
+### Video generation
+
+`video-generation-v1` (protocol 9 only) carries the request of a video that an agent made with a
+tool (see `VideoGenerationInfo` in `packages/contracts/src/ipc-conversation-messages.ts` and
+`team-protocol/video-generation-v1.ts`). It adds `videoGeneration` beside the frozen keys of a
+message in `GET /v1/agents/:id/conversation` and `conversation-page` (messages and references), and
+in the `conversation` and `conversation-page` events, as `subagents-v1` does. The host adds it only
+for a connection that advertises the capability. A released client reads the `video_generation`
+message as its fallback: the mp4 in `attachments`, with no prompt or aspect ratio. A host without
+the capability never sends `videoGeneration`, so a client keeps it whenever it is present, and a
+value that `isVideoGenerationInfo` refuses fails closed. Only known keys go out, and the values of
+one page share a wire budget, newest first. Channel messages and the task conversations of
+`agent-tasks-v1` do not carry it. The WebRTC host peer encodes the local response and the events
+again with the same option.
 
 ### Prompt multi-select
 
@@ -531,6 +695,13 @@ browser tool calls on it wait until the release. The host refuses a take while a
 active on the tab, and releases the holds of a session when it ends. Each change sends
 `browser-user-control-changed { tabIds }`.
 
+`browser-teach-v1` (protocol 9 only) lets a member show a task in an agent's tab that they can see:
+`POST /v1/browser/teach/start` (`{ tabId }`, answers `{}`) takes the tab for the member and starts
+the recording, and `POST /v1/browser/teach/stop` (`{ tabId, save }`) gives the tab back and answers
+`{ steps }`, at most 200. Only the session that started the recording can end it; another session
+gets no step and changes nothing. A client shows the action only when the host also has
+`browser-user-control-v1`.
+
 `browser-page-state-v1` adds `POST /v1/browser/page-state` (empty body) and `POST /v1/browser/stop`
 (`{ tabId }`). Both answer with `{ tabs: [{ tabId, canGoBack, canGoForward }] }`, and each change
 sends `browser-page-state-changed` with the same list. A stop ends the load at once, before the queued
@@ -563,6 +734,30 @@ steps; otherwise it stays open and waits for the next cookie. Done sends without
 The desktop discards the window's session after a send that set cookies, on Cancel, and at shutdown.
 A failed send keeps it, so Done can try again. The web client has no menu item: a web page cannot
 read the cookies of another site.
+
+`browser-sign-in-storage-v1` (protocol 9 only) adds `POST /v1/browser/sign-in/storage` with
+`{ tabId, cookies, storage }` and answers with `{ cookies, storage }`, the counts that the host set.
+Some sites keep the sign-in in the page storage (localStorage), not in a cookie (#8686). `storage` is
+null, or the origin of the window's page and its pairs, at most 1000 pairs and 262,144 characters in
+all. The window reads the page storage in its isolated world when the page is on the tab's host,
+at each check and at Done, and keeps the last copy, so a closed window still sends it. The host sets
+the cookies as `browser-sign-in` does. It writes the pairs only when the tab shows the same origin,
+keeps the other pairs of that origin, and loads the tab again when it set a cookie or a pair. A
+desktop uses this route when the server advertises the capability, and `browser-sign-in` with
+cookies only for an older server. The host never sends the values back or records them.
+
+`browser-vault-skip-v1` (protocol 9 only) adds `vaultSkip` beside the frozen takeover projection, in
+the `browser-takeover-requested` event and in `pendingBrowserTakeovers`. The host sets it on a password
+or code card when the host did not fill a saved login (#7262): `agent-script` or `field-kind` when
+the agent named a saved login, `login-choice` when several fit or the named one is not for the site,
+`no-secret` when the login has no password or authenticator key, and `vault-unreadable` when a password
+manager could not be read. It names no login, account or value. With no saved login for the site, the
+card has no reason, because asking the user is the usual step. The host does not read the vault only
+to choose a reason: a password manager sync would delay the card.
+The host adds the field only for a client with the capability. A client decodes a present value and
+refuses an unknown one. The secret card on the desktop, the web client and mobile shows one line that
+says why; an older host or client shows the card with no reason. The agent still gets its own
+`vaultSkipped` text in the tool result.
 
 ### Skill events
 
@@ -617,13 +812,28 @@ for 5 minutes, so a host without a phone of the member does not learn when the m
 computer. The web client cannot read the idle time of the computer and does not send it. The owner of
 the host computer needs no report: the host reads `powerMonitor` itself (`hostComputerInUse`).
 
+### Library folder events
+
+`library-folders-events-v1` (`team-protocol/library-folders-events-v1.ts`, protocol 9 only) adds one
+optional event, `library-folders-changed`, with no data. `LibraryFoldersStore` calls its `onChanged`
+listeners after each change that it saves: a change from a member through the route or the IPC, an
+agent that saves a file into a folder path, and the start-up removal of the folders of deleted agents
+and of the entries of deleted files. `application-services.ts` emits the event through `AgentService`,
+so this computer's windows get it too. The host advertises the capability with `library-folders-v1`.
+A client reads `POST /v1/library-folders` again: the desktop Library (`library-folders.ts`), the web
+client and the phone (`apps/mobile/src/features/servers/model/use-library-folders.ts`) show a change
+made on another device or by an agent while the page is open. A client of an older host reads the
+folders again after a storage scan only. The phone also scans again when the folders name a file
+that its last scan does not have, as after an agent saved a new file into a folder.
+
 ### Admin capabilities
 
 An owner or admin of a joined server manages its host through optional `POST /v1/admin/...` routes.
 Each capability has a frozen codec in `team-protocol/<name>-v1.ts`, registered in
 `team-protocol/optional-routes.ts`, and both transports use it. Every route calls `requireAdmin`,
-except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`,
-`storage-channel-v1` and `agent-fast-mode-v1`. The
+except those that also answer a member: `/v1/browser/tab-profiles`, `storage-disk-v1`, `storage-user-files-v1`,
+`storage-channel-v1`, `library-folders-v1`, `agent-fast-mode-v1`, `agent-speed-v1`,
+`model-steering-v1`, `provider-model-source-v1` and `usage-credits-v1`. The
 host advertises a capability only when its `TeamApiAdmin` member exists.
 
 | Capability | Grants | IPC group |
@@ -634,7 +844,9 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `agent-task-limit-v1` | Agent task limit: how many tasks run at the same time, 1 to 4, or the host default | `agentAdmin` |
 | `agent-new-chat-v1` | Whether the agent starts a new chat itself when its chat gets long. The read gives the agent's choice or the host default; a change saves the agent's choice. Protocol 9 only | `agentAdmin` |
 | `agent-plan-card-v1` | Whether the agent shows its plan before a long task; reads the value that applies on the host. Protocol 9 only | `agentAdmin` |
+| `agent-defaults-v1` | Server Settings › Agents of the host: the defaults of local scripts, the agent's own new chats and the plan card, the plan start time, the local script limit for each hour, the commit co-author line and "Steer agents while they work", and the own value of each visible agent. An update changes only the fields it sends; a choice sets `default`, `on` or `off` for a list of agents. Owners and admins only. Before it, these defaults were a local choice of the host. Protocol 9 only | `agentAdmin` |
 | `agent-fast-mode-v1` | Whether the agent asks for the fast service tier, and the host models that have one with the tier id (the released model list drops it). A member reads it with view access to the agent and changes it with manage access, as the model and effort. Protocol 9 only | `agentAdmin` |
+| `agent-speed-v1` | The speed of the agent: standard, fast or ultrafast. Its model list adds the Ultrafast tier ids and the Claude models, which `agent-fast-mode-v1` leaves out. A client that advertises it asks the user to confirm the price before it turns on a faster speed for a Claude agent. The access is that of `agent-fast-mode-v1`. A client uses it in place of `agent-fast-mode-v1` when the host has both. Protocol 9 only | `agentAdmin` |
 | `agent-folders-v1` | The folders that an agent can change besides its workspace, and the folders in them that it must not change: read, add, remove, exclude, include. Lists the folders in one host folder (no files, no hidden folders, at most 500), with the home folder and at most 32 disks, so that a phone or the desktop app of a member can pick one. The host checks each folder as the desktop folder picker does (`src/main/agent-folders.ts`). Protocol 9 only | `agentFolders` |
 | `agent-instructions-v1` | Read and save the instruction file at the root of an agent's workspace (`AGENTS.md`, or `CLAUDE.md` in an older workspace). A save sends the text that the edit started from; the host refuses it with 409 when the file changed. The workspace path does not cross the wire, and a client cannot show the file in its file manager. Protocol 9 only | `agentInstructions` |
 | `browser-profiles-v1` | Named browser profiles of the host: list, create, rename, recolor, clear, delete, and the profile of each agent. One route, `/v1/browser/tab-profiles`, also answers a member: the profile label of each tab that the member can see. Cookies and site data stay on the host. Advertised when the host has `browserProfiles` | `agentAdmin` |
@@ -653,29 +865,38 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
 | `custom-provider-edit-v1` | List, add, edit and remove custom endpoints. A list names each endpoint's harness and header names. An edit changes the name, address, models, key and headers; no key keeps the saved key, and `value: null` keeps a saved header value. The host keeps the harness and the limits of each kept model. Protocol 9 only | `providerAdmin` |
+| `custom-provider-harness-choice-v1` | The routes of `custom-provider-edit-v1`, and a save or an edit names the harness (`opencode` or `pi`). A save runs the new endpoint on that harness; an edit moves the endpoint and the agents on each kept model to it. The host keeps the limits of each kept model. Protocol 9 only | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
 | `provider-usage-reset-v1` | Read the usage reset credits of each provider account on the host, and spend one. Only Codex gives credits | `providerAdmin` |
 | `provider-sign-out-v1` | Sign the host's own Claude or Codex sign-in out. The host's other accounts stay | `providerAdmin` |
+| `usage-credits-v1` | Whether each provider account of the host keeps working on credits when a plan window is spent (`/v1/usage-credits/list`). A member gets the provider's own sign-ins; an owner or admin also gets the accounts after them. Only the flag travels, no balance. The event `usage-credits-changed`, with no data, says that a flag changed. Protocol 9 only | `agent` |
 | `host-admin-v1` | Server name and logo | `hostAdmin` |
 | `host-update-v1` | Check for, download and restart into an app update; cancel a restart that waits | `hostAdmin` |
 | `host-timezone-v1` | Read and set the server timezone | `hostAdmin` |
+| `host-turn-limits-v1` | Read and set the turns at the same time on the host (1 to 128, unlimited, or automatic) and the default task limit of an agent (1 to 64). Owner or admin. Protocol 9 only | `hostAdmin` |
 | `host-personality-v1` | Read (any member) and set (owner or admin) the response style of the agents | `hostAdmin` |
 | `host-key-rotation-v1` | Change the host's key. Owner only: an admin gets 403 | none: only the mobile app sends it |
+| `host-restart-v1` | Restart a self-hosted server now. Owner or admin. Only a host in server mode advertises it. Protocol 9 only | `hostAdmin` |
 | `local-servers-v1` | List the servers that the desktop app runs on the host computer, create one, and delete one. Owner only: an admin gets 403. Only the desktop app's own server advertises it | none: only the mobile app sends it |
 | `agent-memory-limit-v1` | Read and set how many memories each agent keeps | `hostAdmin` |
 | `memory-review-v1` | Read and set how often the host's agents review their memories in the background, or Off | `hostAdmin` |
 | `browsing-memory-v1` | Read and set whether the host records what a person does in an agent's browser tab that they hold, for the memory review of that agent. Protocol 9 only | `hostAdmin` |
+| `browser-teach-v1` | Start and stop the recording of a task that a member shows in an agent's browser tab. The steps go only to the session that started it. Protocol 9 only | none: each member, for a tab they can see |
 | `skill-learning-v1` | Read and set whether the memory reviews of the host's agents save the skills they learn, ask first, or do not look for skills. Sends the skill name of a skill question in chat messages, and saves that skill on Save (any member with chat level). Protocol 9 only | `hostAdmin`, `agent.saveSkillSuggestion` |
+| `feedback-withdraw-v1` | Remove on a feedback thank-you card in an agent's own chat (the owner only, who approves each report). The host takes the report off GitHub with its own OpenBot account, which sent it, and changes the card for every member. Protocol 9 only | `agent.withdrawFeedback` |
 | `agent-notification-levels-v1` | Read and set the member's own notification level of the server and of each agent | none: each member, own levels only |
 | `sidebar-pins-v1` | Read, replace and seed the member's own ordered list of pinned agents and channels | none: each member, own pins only |
 | `live-voice-v1` | Start and stop Codex live voice with an agent, with the host's Codex sign-in; the `live-voice` event goes to the member who started it. Protocol 9 only | none: each member who can chat with the agent |
 | `machine-resources-v1` | Read the disk, memory and CPU use of the host machine; read and set the alert levels and the owner or admin who gets the `machine-alert` event | `storage`, `hostAdmin` |
 | `prompt-cache-ttl-v1` | Read and set how long Claude keeps the prompt cache of the host's agents | `hostAdmin` |
 | `claude-compact-window-v1` | Read and set the size at which Claude Code compacts the chats of the host's agents. Protocol 9 only | `hostAdmin` |
+| `provider-environment-v1` | Read and set the environment variables that each process of the host's Claude, Codex and Gemini starts with. Protocol 9 only | `hostAdmin` |
 | `provider-account-models-v1` | Read the models that each account after the first of the host's providers serves and the provider's own sign-in does not, for the model picker of that account. Protocol 9 only | `hostAdmin` |
 | `model-visibility-v1` | Read every model of one provider of the host, and set which of them the model picker shows. Every member reads which models the picker folds under Older models or labels New. Protocol 9 only | `hostAdmin` |
+| `model-steering-v1` | Every member reads which models of a provider that reports steering for each agent (a custom ACP agent) take a message into the running turn. A model that is not listed does not steer: the client shows "Send now" for it, and the host queues the message. Protocol 9 only | `hostAdmin` |
+| `provider-model-source-v1` | Every member reads, for each provider of the host whose own settings give its models from another source, which source that is: a model provider by its name, such as Ollama, or a model list file. No path, address or key. Today only Codex reports one. The model picker shows it on that provider's tab. Protocol 9 only | `agent` (merged into the status) |
 | `provider-default-v1` | Read and set the provider that a new agent of the host starts on | none: only the mobile app sends it |
 | `agent-access-v1` | Read and set the roles that give members access to agents (see [Roles](#roles)) | `hostAdmin` |
 | `server-audit-v1` | Read the changes to the members, roles and agent access of the server (see [Audit log](#audit-log)). Protocol 9 only | `hostAdmin` |
@@ -730,6 +951,17 @@ automatic, the system zone of the host). When an agent creates a routine, the zo
 call first, then from the sender's last message in that turn, then from this setting. The sender's
 zone stays in memory only, so after a restart a queued message uses the server timezone. Agent import
 and instance transfer use it in place of the system zone. A change does not move existing routines.
+On a server, main sets `TZ` to the chosen zone before the app is ready (`applyServerTimezone`),
+because Chromium reads the zone of its pages only when a renderer starts: the agent browser, the
+agent processes and main use it after the next restart (#8935). "Automatic" still shows and uses the
+zone of the computer from before that change.
+
+`host-turn-limits-v1` reads and sets the turn limits of the host (`openbot-host-turn-limits-v1.json`).
+`turnLimit` is the most turns that run at the same time on the host; `null` is automatic: 2, 8 or 16 by
+the memory of a server, no limit on a desktop computer. `automaticTurnLimit` gives that value. A chosen
+value can be above it; low memory still holds a new turn. `agentTaskLimit` is the task limit of an
+agent with no limit of its own; `null` is `defaultAgentTaskLimit` (4). A save starts the turns that a
+higher limit lets start. `openbot status` shows the limit that runs.
 
 `host-personality-v1` reads and sets how the agents of a server talk while they work
 (`openbot-server-personality-v1.json`, Server settings → Personality). `natural`, the default, tells
@@ -738,6 +970,15 @@ the agents to send short updates between their steps, and the chat shows them as
 the style, so each client knows what to show; only an owner or admin changes it. A change unloads the
 agents' threads, so the next turn uses the new prompt. A host without the capability reads as
 `classic`. Other clients see a change when they open the server again.
+
+`host-restart-v1` lets an owner or admin restart a self-hosted server from Restart server in the
+server menu (desktop and web client) or in Server settings (mobile). Only a host in server mode
+(`OPENBOT_SERVER=1`, not a hosted server) advertises it, because only there does a service manager
+start the app again: systemd (`Restart=always` in `openbot.service`) or the Docker restart policy.
+The host answers, then quits; it does not use `app.relaunch`, which would start the app outside
+`xvfb-run`. Running agent turns stop, as on any restart. A hosted server still restarts through the
+account service, and a server on this computer through `localServers`. A host that does not answer
+cannot get the request; then the owner runs `sudo openbot restart`.
 
 `host-key-rotation-v1` lets the owner change the host's key from another device, with the same steps
 as Server settings → General → Server key on the host computer (`HostService.rotateIdentityKey`).
@@ -858,6 +1099,15 @@ and the environment of the host still apply. An environment value of the agent s
 compaction stays on. A change applies to the next Claude process, not to a running one. The Context
 section of the Claude page in Server settings → Providers sets it for this computer, for a joined
 server, on the web client and in the mobile app.
+
+`provider-environment-v1` reads and sets the variables of one provider of the host (see
+[Provider variables](providers.md#provider-variables)): names and plain values in
+`openbot-provider-environment-v1.json`, sensitive values in the encrypted provider key file. A read
+gives a sensitive variable with an empty value and `stored: true`. A change restarts the provider when
+its turns end, and an agent's own process before the agent's next turn. The Environment section of each
+provider page in Server settings → Providers sets them for this computer, for a joined server, on the
+web client and in the mobile app. Instance transfer does not copy them: the sensitive values are
+encrypted for this computer.
 
 `model-visibility-v1` reads every model that one provider of the host lists, and sets which of them
 the model picker shows. The file `openbot-model-visibility-v1.json` keeps, for each provider, only the
@@ -1163,6 +1413,42 @@ creates them and the Customer Portal settings.
   checks that it is a `billing.stripe.com` page, and opens it with `shell.openExternal`. The IPC takes
   no URL. The web client does the same check before `location.assign`. Checkout URLs get the same
   check for `checkout.stripe.com` (`isStripeCheckoutUrl`).
+- VAT does not use Stripe Tax. The seller is in Poland and is not in the EU One Stop Shop
+  (`apps/auth-api/src/server/billing-tax.ts`). Before a server or license Checkout, the client saves
+  the billing country and an optional EU VAT ID with `GET`/`PUT /v1/me/billing/details` (desktop IPC
+  `billing:get-details`/`billing:set-details`, shared form `BillingDetailsFields`). The Worker keeps
+  them on the Stripe customer: the address country, an `eu_vat` tax ID and `tax_exempt`. While no
+  country is saved, the `GET` adds `suggestedCountry`, the Cloudflare `CF-IPCountry` of the request
+  (not `XX` or `T1`). The form starts on it; only the country that the buyer sends is saved.
+  - A buyer in Poland, and a buyer in another EU country with no valid VAT ID, pay Polish VAT: the
+    Checkout and the license split subscription get the `default_tax_rates` of the Tax Rate with the
+    metadata `openbot_vat=pl_standard` (`VAT_TAX_RATE`, made by `api:stripe:bootstrap`).
+  - A VAT ID of another EU country gets reverse charge (`tax_exempt=reverse`, no Tax Rate) only after
+    the EU VIES REST service confirms it. An unknown ID returns 400 `vat_id_invalid`; no answer from
+    VIES returns 503 `vat_id_unverified`, and nothing changes. The optional setting
+    `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
+    customer metadata `openbot_vies_request` keeps as proof.
+  - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.
+  - A `PUT` of new details also sets the Tax Rate of each open subscription with the metadata
+    `openbot_vat_treatment`, so that the next invoice of a plan that runs gets the new VAT. Checkout,
+    the license split and `scripts/stripe-vat-migrate.ts` write that metadata. A plan from before VAT
+    has none and keeps its tax. The buyer declares the new country with no proof, so each subscription
+    whose VAT treatment changes writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
+    with the customer, the subscription and the two countries.
+  - A customer with no country (a client from before this step) gets a Checkout with Stripe Tax
+    (`automatic_tax`, tax ID collection) and no VAT metadata, as before. With the Worker setting
+    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Turn the
+    setting on after the desktop release and the live run of `scripts/stripe-vat-migrate.ts`. Checkout requires the billing address; when its country differs from the saved
+    one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
+    with the Checkout session ID and the two countries.
+  - Consumers in other EU countries pay Polish VAT only below the EU limit of EUR 10,000 a year.
+    `BillingOss` (`apps/auth-api/src/server/billing-oss.ts`) keeps the net euro amount of each paid
+    invoice of such a consumer in D1 (`billing_vat_oss_sales`) and sends one pool alert for a year at
+    EUR 9,000 (`billing_vat_oss_alerts`). It converts other currencies with the ECB rates of
+    `BillingUsd`. Refunds do not lower the total.
+  - `scripts/stripe-vat-migrate.ts` (a dry run by default; `--apply`, `--live`) moves the existing
+    subscriptions from Stripe Tax to the Tax Rate. A customer with no country, or in another EU
+    country with an EU VAT ID that no check confirmed, keeps Stripe Tax and is named for a manual check.
 - The change and cancel actions open the Portal flow of one subscription. The Worker first checks
   that the subscription belongs to the account.
 - The server name comes only from a `remote_hosts` row that the same account owns. A plan whose
@@ -1309,7 +1595,9 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
   Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
   all children before the joined-server connections close (step 60). The sibling scan before an
-  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  update leaves out the child PIDs. The desktop installs the update for its children too, so a
+  restart when idle and the automatic install also wait while an agent of a child works (the
+  child's `OPENBOT_LOCAL_SERVER_WORKING` line, reason `agent-turn`). After an unexpected exit, the desktop starts the child again
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash
@@ -1534,7 +1822,18 @@ and replaces it when the host answers (`src/renderer/src/features/servers/remote
   from the host, so no host request starts before the connection.
 - Web applies the frame in `connectWorkspace` when it does not keep a loaded workspace of the same
   host. It does not seed capabilities, so the capability-gated reads wait for the connection, and
-  agent avatars load only when the host is online. The web connect starts before the frame renders.
+  an agent avatar with no saved copy loads only when the host is online. The web connect starts
+  before the frame renders.
+- The frame names each picture by a host URL, which only the host can answer. Each client thus keeps
+  a copy of the pictures that it loaded, and shows the agent pictures while the host is offline. The
+  frame keeps no channel picture URL, so a channel copy only saves a download while the host is online. Desktop keeps agent
+  and channel pictures on disk in the main process (`src/main/remote-picture-cache.ts`, folder
+  `remote-pictures` in `userData`, one account, 400 pictures for each server). Web keeps agent
+  pictures in the browser's Cache storage
+  (`src/renderer/src/features/web-client/web-agent-pictures.ts`). A picture URL names a version, so
+  a new picture is a miss and replaces the copy. Sign-out, a change of account, server removal and
+  the end of access (`authentication_required`, a revoked session) delete the copies; a download
+  that started before the delete stores nothing.
 - A frame agent's row shows no preview: the last message is not known, so it does not say that
   there are no messages. Until the host lists channels, the sidebar sets `channelPreviewsPending`,
   and a channel row with no last message shows no preview and no time.

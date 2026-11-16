@@ -506,6 +506,7 @@ async function main(): Promise<void> {
 
     phase("page-settle");
     const pageSchema = z.object({
+      tabId: z.string(),
       url: z.string(),
       elements: z.array(z.object({ name: z.string() })),
       diagnostics: z.array(z.object({ message: z.string() })).optional(),
@@ -538,6 +539,16 @@ async function main(): Promise<void> {
     assert.equal(interstitial.page.challenge?.status, "cleared");
     measurements.interstitialNavigateMs = interstitial.ms;
     recordCases("snapshot-waits-for-interstitial");
+    // The interstitial of a site can load a long consent banner; it is still the check.
+    const longInterstitial = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/long-challenge` });
+    assert.equal(longInterstitial.page.url, `${origin}/form`, "The snapshot did not wait for a long interstitial.");
+    assert.equal(longInterstitial.page.challenge?.status, "cleared");
+    recordCases("snapshot-waits-for-long-interstitial");
+    // A page that redirects during the first read of `open` still comes back as a page.
+    const redirected = await readPage("open", { url: `${origin}/redirect-during-read` });
+    assert.equal(redirected.page.url, `${origin}/form`, "`open` did not read the page after the redirect.");
+    await call("close_tab", { tabId: redirected.page.tabId });
+    recordCases("open-reads-again-after-redirect");
     const captcha = await readPage("navigate", { tabId: settleTab.id, url: `${origin}/captcha` });
     assert.equal(captcha.page.challenge?.status, "needs-user");
     assert(captcha.ms < 5_000, `An interactive check waited: ${captcha.ms} ms.`);
@@ -707,12 +718,22 @@ async function main(): Promise<void> {
     recordCases("idle-tabs-past-cap-sleep");
 
     assert(firstTabId, "Missing the first sleep tab.");
-    const woken = snapshotSchema.parse(
-      parseBrowserToolText(
-        text(await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })))),
-      ),
+    const wokenResult = await runCauseEffect(
+      sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" })),
     );
+    const woken = snapshotSchema.parse(parseBrowserToolText(text(wokenResult)));
     assert.equal(woken.url, `${origin}/form?tab=1`, "A slept tab did not load its page again.");
+    // The address is the same, so only this note tells the agent that its page state is gone (#8833).
+    const unloadNote = (result: DynamicToolResult) =>
+      result.contentItems.some((item) => item.type === "inputText" && item.text.includes("unloaded to free memory"));
+    assert(unloadNote(wokenResult), "A woken tab did not tell the agent that its page was unloaded.");
+    assert(
+      !unloadNote(
+        await runCauseEffect(sleepy.handleDynamicTool(params("snapshot", { tabId: firstTabId, image: "never" }))),
+      ),
+      "The unload note came again on the next call.",
+    );
+    recordCases("slept-tab-tells-agent-once");
     // The woken tab is now the most recently used one, so the second tab is past the cap.
     await unloaded(second);
     assert(
@@ -778,6 +799,13 @@ const PAGES: Record<string, string> = {
   "/challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>
     <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/long-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
+    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=fixture"></script>
+    <p>Verifying the security of your connection.</p>
+    <div role="dialog"><p>${"This site uses cookies to improve your experience. ".repeat(200)}</p></div>
+    <script>setTimeout(() => location.replace("/form"), 3000);</script>`,
+  "/redirect-during-read": `<!doctype html><meta charset="utf-8"><title>Redirect</title><p>One moment.</p>
+    <script>setTimeout(() => location.replace("/form"), 100);</script>`,
   "/stuck-challenge": `<!doctype html><meta charset="utf-8"><title>Just a moment...</title>
     <div id="challenge-running">Checking your browser before accessing the site.</div>`,
   "/captcha": `<!doctype html><meta charset="utf-8"><title>Security check</title>

@@ -41,6 +41,8 @@ export const messages = {
   "mobile.channel.deleted.restoreFailedBody": "Kan dit kanaal niet herstellen. Probeer opnieuw.",
   "mobile.channel.chat.fallbackName": "Kanaal",
   "mobile.channel.chat.deletedNotice": "Verwijderd kanaal. Alleen ter inzage.",
+  "mobile.channel.chat.waitBusy": "Wachten - {name} is bezig in {channel}",
+  "mobile.channel.chat.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "mobile.channel.records.connect": "Maak verbinding met de server om dit kanaal te bewerken.",
   "mobile.channel.records.loadFailed": "Kan de kanaalinstellingen niet laden.",
   "mobile.channel.records.gone": "Dit item is niet meer beschikbaar.",

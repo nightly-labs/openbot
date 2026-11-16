@@ -39,15 +39,20 @@ export const SIDEBAR_HIDDEN_GROUP_OPEN_ID = "hidden-agents:open";
  * How the list orders the chats in the sections. Pins and "Needs you" come first in each order, and
  * none of them changes the saved `agentOrder`.
  * - `manual`: the saved order of the layout.
+ * - `recent`: each section shows its chats by last activity, the most recent first. Chats do not
+ *   drag in this order, because the order is not manual.
  * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
  *   back to their place when they are read.
  * - `unread-first`: each section shows its unread chats first, then the others, both by last
  *   activity. Chats do not drag in this order, because the order is not manual.
+ *
+ * Neither unread order moves a muted agent (`mutedAgentIds`): it stays in its place with its badge.
  */
-export type SidebarChatOrder = "manual" | "unread-group" | "unread-first";
+export type SidebarChatOrder = "manual" | "recent" | "unread-group" | "unread-first";
 
 export const SIDEBAR_CHAT_ORDERS = [
   "manual",
+  "recent",
   "unread-group",
   "unread-first",
 ] as const satisfies readonly SidebarChatOrder[];
@@ -55,9 +60,15 @@ export const SIDEBAR_CHAT_ORDERS = [
 /** The name of each order, in the sidebar menu and in Settings. */
 export const SIDEBAR_CHAT_ORDER_LABEL = {
   manual: "sidebar.order.manual",
+  recent: "sidebar.order.recent",
   "unread-group": "sidebar.order.unreadGroup",
   "unread-first": "sidebar.order.unreadFirst",
 } as const satisfies Record<SidebarChatOrder, AppTextKey>;
+
+/** True when the order sorts the chats of each section itself, so a chat cannot keep a dropped place. */
+export function sidebarChatOrderSortsSections(order: SidebarChatOrder | undefined): boolean {
+  return order === "recent" || order === "unread-first";
+}
 
 export interface SidebarProps {
   /** The switch over the list is shown only when the caller handles `onViewChange`. */
@@ -90,6 +101,8 @@ export interface SidebarProps {
   chatHistory?: SidebarChatHistory | undefined;
   /** A new OpenBot version of the server. The header shows a button that opens its update. */
   serverUpdate?: { version: string; running: boolean; onOpen: () => void } | undefined;
+  /** Content at the end of the top bar, after its buttons. The desktop dev build puts the worktree branch here. */
+  topbarDetail?: JSX.Element | undefined;
   agents: AgentProfile[];
   activeAgentId: string;
   showPeople?: boolean | undefined;
@@ -139,11 +152,17 @@ export interface SidebarProps {
   onDuplicateAgent?: ((agentId: string) => Promise<void>) | undefined;
   onDeleteAgent: (agentId: string) => Promise<void>;
   /**
-   * The agents that a user hid on this server (`agent-hidden-v1`). They leave their sections, the
-   * pinned strip and "Needs you", and show only in the "Hidden" group at the end of the list. Each
-   * one keeps its section and its pin for a restore.
+   * The agents that a user hid on this server (`agent-hidden-v1`). They leave their sections and the
+   * pinned strip, and show in the "Hidden" group at the end of the list. Each one keeps its section
+   * and its pin for a restore.
    */
   userHiddenAgents?: HiddenAgent[] | undefined;
+  /**
+   * The host keeps a hidden agent at work (`agent-hidden-work`). A hidden agent that waits for the
+   * user then shows in "Needs you", and a row of the "Hidden" group shows the state of its agent.
+   * Without it the host stops a hidden agent, so each row shows the date of the hide instead.
+   */
+  userHiddenAgentsWork?: boolean | undefined;
   /**
    * The agents whose own chat or side threads have unread replies. Their menu offers Mark read; the
    * menu of the other agents offers Mark unread.
@@ -153,6 +172,16 @@ export interface SidebarProps {
   onMarkAgentRead?: ((agentId: string) => void) | undefined;
   /** Marks the newest reply of an agent unread. Without it, the agent menu shows no unread item. */
   onMarkAgentUnread?: ((agentId: string) => void) | undefined;
+  /**
+   * The agents that the user muted: their own notification level for the agent is "nothing"
+   * (`agent-notification-levels-v1`). Their menu offers Unmute.
+   */
+  mutedAgentIds?: ReadonlySet<string> | undefined;
+  /**
+   * Mutes an agent for the user on all of their devices, or gives the agent the server level again.
+   * Without it, such as on a host that keeps no levels, the agent menu shows no mute item.
+   */
+  onSetAgentMuted?: ((agentId: string, muted: boolean) => void) | undefined;
   /** Hides an agent. Without it, the agent menu shows no hide item. */
   onHideAgent?: ((agentId: string) => void) | undefined;
   /** Puts a hidden agent back in its section. Without it, a hidden agent's menu shows no restore item. */
@@ -167,6 +196,8 @@ export interface SidebarProps {
   /** A card under the chat list, such as an announcement. The compact sidebar has no room for it. */
   footer?: JSX.Element;
   onExpand: () => void;
+  /** Closes the sidebar. With it, the top row of the expanded sidebar shows the sidebar toggle. */
+  onCollapse?: (() => void) | undefined;
   /** Opens the global search. The search field and the compact search button both call it. */
   onOpenSearch: () => void;
   onOpenMarketplace: () => void;

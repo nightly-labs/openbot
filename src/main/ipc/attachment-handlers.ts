@@ -64,6 +64,7 @@ import {
   parseOpenAttachment,
   parseOpenSharedFile,
   parseOpenWorkspaceFile,
+  parsePreviewPageHtml,
   parsePreviewSharedFile,
   parsePreviewWorkspaceFile,
 } from "./agent-inputs";
@@ -151,6 +152,12 @@ export function attachmentIpcHandlers({
         remote: (data, serverId) => runCauseEffect(uploadRemoteImports(remoteServers, serverId, { paths: [], data })),
       }),
       releaseFilePreview: payloadHandler(parseFilePreviewPageUrl, (pageUrl) => filePreviewPages.release(pageUrl)),
+      // The page gets the same sandbox as a visual reply, so HTML from the renderer reaches nothing more.
+      addPreviewPage: payloadHandler(
+        parsePreviewPageHtml,
+        (html) =>
+          filePreviewPages.add("text/html", new TextEncoder().encode(html), filePreviewPages.generation) ?? null,
+      ),
       chooseAttachments: payloadHandler(agentRequest(parseChooseAttachments), async (parsed) => {
         const mainWindow = getMainWindow();
         const {

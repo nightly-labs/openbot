@@ -5,6 +5,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   type HostProviderAccounts,
   type UpdateAgentInput,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { useQueryClient } from "@tanstack/react-query";
 import { router, Stack, useLocalSearchParams } from "expo-router";
@@ -163,8 +164,13 @@ function AgentForm({
     setAgentProviderAccount,
   } = useMobileWorkspace();
   const queryClient = useQueryClient();
-  // The Permissions row shows the access, as on desktop. Its page reads the same host answer.
-  const { settings: adminSettings } = useAgentAdminSettings(agent, host, available && page === "info");
+  // The Permissions row shows the access, as on desktop. Its page reads the same host answer. The
+  // Model page reads it to say when the chosen provider does not work with Workspace only.
+  const { settings: adminSettings } = useAgentAdminSettings(
+    agent,
+    host,
+    available && (page === "info" || page === "runtime"),
+  );
   const showPermissions = canManageAgentAccess(agent.serverId) || canManageAgentHostSettings(agent.serverId);
   const showFolders = canManageAgentFolders(agent.serverId);
   // The user's own level of the agent, on a host that keeps it for each member. Settings > Notifications
@@ -439,6 +445,7 @@ function AgentForm({
           reasoningEffort={edits.reasoningEffort ?? agent.reasoningEffort}
           accounts={providerAccounts}
           accountId={account ?? savedAccount}
+          workspaceOnly={adminSettings ? workspaceAccessEnforced(adminSettings) : false}
           onChange={(value) => {
             change(value);
             // An account belongs to one provider.

@@ -3,16 +3,20 @@
  * computer, and the listener of a sign-in that this computer relays to a joined server.
  *
  * Every refusal that does not depend on the sign-in is here, so each listener makes the same checks:
- * the `Host` header names the loopback address, the method is GET or HEAD, and the path is the one
- * the sign-in sent. The page the browser is left on is a fixed catalog message. The code is in the
- * request line, and a page that repeated it would put a credential in the browser's history.
+ * the `Host` header names the loopback address, the method is GET, HEAD or a form POST, and the path
+ * is one that the sign-in sent. The page the browser is left on is a fixed catalog message. The code
+ * is in the request line or the form, and a page that repeated it would put a credential in the
+ * browser's history.
  */
 
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import type { Socket } from "node:net";
 import type { AppTextKey } from "@openbot/i18n";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { LanguageService } from "./language-service";
 import { listenLoopback, listenLoopbackExact } from "./listen-loopback";
+
+const logger = createOpenBotLogger("loopback-callback-server");
 
 /** The names a request may claim to have reached. Anything else is a page rebinding a name here. */
 const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost"]);
@@ -29,8 +33,8 @@ export interface LoopbackCallbackServer {
 }
 
 export interface LoopbackCallbackServerOptions {
-  /** The one path this listener answers. Everything else is a 404, including `/`. */
-  path: string;
+  /** The paths this listener answers. Everything else is a 404, including `/`. */
+  paths: readonly string[];
   /**
    * Answers a callback that passed the checks. It is synchronous, so the browser does not wait for
    * the network: the sign-in shows its own end in OpenBot.
@@ -51,8 +55,10 @@ export async function startLoopbackCallbackServer(
   // every one of them - so shutdown would sit on a socket nobody is using. They are ended by hand.
   // A socket whose page is still on its way is ended when the page is sent: the callback that ends a
   // sign-in can close this listener before the browser has the page that says so.
+  // A socket whose form is still arriving has no page to wait for, so it is ended at once.
   const sockets = new Set<Socket>();
   const answering = new Set<Socket>();
+  const reading = new Set<Socket>();
   let closing = false;
   const server: Server = createServer((request, response) => {
     const socket = request.socket;
@@ -61,16 +67,32 @@ export async function startLoopbackCallbackServer(
       answering.delete(socket);
       if (closing) socket.destroy();
     });
-    const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.path);
-    const answer = checked instanceof URL ? options.receive(checked) : checked;
-    response
-      .writeHead(answer.status, {
-        "content-type": "text/html; charset=utf-8",
-        // The grant is in this request's own URL. A page kept on disk keeps the URL that fetched
-        // it, and nothing here is worth a second read anyway.
-        "cache-control": "no-store",
-      })
-      .end(callbackPage(options.language.locale, options.language.translate(answer.message)));
+    const send = (answer: CallbackAnswer) =>
+      response
+        .writeHead(answer.status, {
+          "content-type": "text/html; charset=utf-8",
+          // The grant is in this request's own URL. A page kept on disk keeps the URL that fetched
+          // it, and nothing here is worth a second read anyway.
+          "cache-control": "no-store",
+        })
+        .end(callbackPage(options.language.locale, options.language.translate(answer.message)));
+    const checked = checkCallbackRequest(request.method, request.url, request.headers.host, options.paths);
+    if (!(checked instanceof URL)) return send(checked);
+    if (request.method !== "POST") return send(options.receive(checked));
+    // A server that answers with `response_mode=form_post` posts the same fields as a form (#7709).
+    // They are added to the query, so the sign-in reads them exactly as it reads a redirect.
+    reading.add(socket);
+    void readFormBody(request).then((form) => {
+      reading.delete(socket);
+      if (form === null) {
+        logger.warn("A sign-in callback was posted with a body that OpenBot cannot read.", {
+          contentType: request.headers["content-type"] ?? null,
+        });
+        return send({ status: 400, message: "error.mcp.redirectNotSignIn" });
+      }
+      for (const [name, value] of new URLSearchParams(form)) checked.searchParams.set(name, value);
+      send(options.receive(checked));
+    });
   });
   server.on("connection", (socket) => {
     sockets.add(socket);
@@ -85,7 +107,7 @@ export async function startLoopbackCallbackServer(
     port,
     close: async () => {
       closing = true;
-      for (const socket of sockets) if (!answering.has(socket)) socket.destroy();
+      for (const socket of sockets) if (!answering.has(socket) || reading.has(socket)) socket.destroy();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },
   };
@@ -99,22 +121,49 @@ function checkCallbackRequest(
   method: string | undefined,
   target: string | undefined,
   host: string | undefined,
-  path: string,
+  paths: readonly string[],
 ): URL | CallbackAnswer {
   // A page on the web can point a name it controls at 127.0.0.1 and have the browser send a
   // request here believing it is talking to that site. It cannot read the answer, but it can
   // deliver a grant of its own choosing. The `Host` header is what the browser thinks it reached,
   // so a request naming anything but the loopback address is not from a redirect this sent.
   if (!isLoopbackHost(host)) return { status: 403, message: "error.mcp.redirectByName" };
-  if (method !== "GET" && method !== "HEAD") return { status: 405, message: "error.mcp.redirectGetOnly" };
+  if (method !== "GET" && method !== "HEAD" && method !== "POST") {
+    return { status: 405, message: "error.mcp.redirectNotSignIn" };
+  }
   let url: URL;
   try {
     url = new URL(target ?? "/", "http://127.0.0.1");
   } catch {
     return { status: 404, message: "error.mcp.redirectNotSignIn" };
   }
-  if (url.pathname !== path) return { status: 404, message: "error.mcp.redirectNotSignIn" };
+  if (!paths.includes(url.pathname)) return { status: 404, message: "error.mcp.redirectNotSignIn" };
   return url;
+}
+
+/** More than a grant needs. A larger body is refused as soon as it passes this size. */
+const FORM_BODY_LIMIT = 16 * 1024;
+
+/** The body of a urlencoded form post, or `null` when it is another type, too large, or cut off. */
+function readFormBody(request: IncomingMessage): Promise<string | null> {
+  const type = request.headers["content-type"]?.split(";")[0]?.trim().toLowerCase();
+  if (type !== "application/x-www-form-urlencoded") {
+    request.resume();
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    request.on("data", (chunk: Buffer) => {
+      size += chunk.length;
+      if (size <= FORM_BODY_LIMIT) chunks.push(chunk);
+      else resolve(null);
+    });
+    request.on("end", () => resolve(size <= FORM_BODY_LIMIT ? Buffer.concat(chunks).toString("utf8") : null));
+    // A request that ends any other way, such as a closed tab, gets no grant. After `end` this does nothing.
+    request.on("error", () => resolve(null));
+    request.on("close", () => resolve(null));
+  });
 }
 
 function isLoopbackHost(host: string | undefined): boolean {

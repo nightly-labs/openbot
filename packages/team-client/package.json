@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./ed25519": "./src/ed25519.ts",
+    "./feedback-approval": "./src/feedback-approval.ts",
     "./host-key-handover": "./src/host-key-handover.ts",
     "./remote-directory": "./src/remote-directory.ts",
     "./remote-peer": "./src/remote-peer.ts",
@@ -40,7 +41,8 @@
     "./plan-limits": "./src/plan-limits.ts",
     "./agent-tasks": "./src/agent-tasks.ts",
     "./stored-files": "./src/stored-files.ts",
-    "./workflow-decoding": "./src/workflow-decoding.ts"
+    "./workflow-decoding": "./src/workflow-decoding.ts",
+    "./crm-decoding": "./src/crm-decoding.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

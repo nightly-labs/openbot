@@ -104,7 +104,7 @@ export const messages = {
   "onboarding.action.connect": "Verbinden",
   "onboarding.action.open": "OpenBot öffnen",
   "onboarding.action.next": "Weiter",
-  "onboarding.server.title": "{server} einrichten",
+  "onboarding.server.title": "Willkommen bei {server}",
   "onboarding.server.description":
     "OpenBot enthält kein KI-Abonnement. Verbinde deinen eigenen Anbieter mit diesem Server, bevor du einen Agenten erstellst.",
   "onboarding.server.label": "KI-Anbieter dieses Servers auswählen",

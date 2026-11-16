@@ -32,6 +32,12 @@ export interface AgentClient {
    * instructions, and the provider's cached prefix with them.
    */
   readonly turnContext?: boolean;
+  /**
+   * True when the client gives the model the `note` of an `item/tool/requestUserInput` result, such
+   * as the note that the user wrote a new message instead of answering. Optional, because Codex sends
+   * the result on as it is, and its `request_user_input` response has no field for a note.
+   */
+  readonly userInputNote?: boolean;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**
@@ -40,6 +46,17 @@ export interface AgentClient {
    * because the other providers declare the MCP tools or load them on their own.
    */
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
+  /**
+   * True when the provider keeps the MCP tools of this session's first turn (`AcpFlavor`
+   * `mcpToolsFixedAtStart`). A changed MCP set then needs a new session, not a resume. Optional,
+   * because the other providers take the current servers on resume.
+   */
+  readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
+  /**
+   * True when the agent of `model` gets each OpenBot catalog tool as an MCP tool of its own (`AcpFlavor`
+   * `catalogAsMcpTools`). Optional, because the other providers do not hide OpenBot's tools.
+   */
+  readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;
@@ -147,6 +164,17 @@ export class ProviderTurnActiveError extends Error {
 }
 
 /**
+ * The provider refused to open the session because a prompt that OpenBot stopped still runs in it.
+ * Nothing ran. No event tells when that prompt ends, so the caller tries the message again later.
+ */
+export class ProviderSessionBusyError extends ProviderTurnActiveError {
+  constructor(providerName: string) {
+    super(providerName);
+    this.message = sourceText("error.provider.acpSessionBusy", { provider: providerName });
+  }
+}
+
+/**
  * Claude cannot resume this session ID, because another provider made it. Nothing ran, so
  * `isMissingProviderSessionError` reads it as a missing session and the caller opens a new one.
  */
@@ -167,6 +195,15 @@ export class MissingPiSessionError extends Error {
     this.name = "MissingPiSessionError";
   }
 }
+
+/**
+ * The line that the Go runtime of a CLI writes before it stops with SIGILL on a processor without a
+ * feature that the CLI was built for, such as "This binary was compiled with aes enabled, but this
+ * feature is not available on this processor" (#7111). A SIGILL without it can have another cause,
+ * such as a crash bug or the CPU list of a container (`docs/docker.md`), that a different provider
+ * does not fix.
+ */
+export const PROCESSOR_FEATURE_MISSING = /\bcompiled with \S+ enabled, but this feature is not available\b/iu;
 
 /** What of the CLI's last stderr line a status message carries. The full line is in the log. */
 const EXIT_DETAIL_LIMIT = 300;

@@ -1,6 +1,6 @@
 import { useThemeColor } from "heroui-native/hooks";
 import Reply from "lucide-react-native/icons/reply";
-import { type PropsWithChildren, useMemo, useRef, useState } from "react";
+import { type PropsWithChildren, useContext, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -15,6 +15,7 @@ import Animated, {
 import { scheduleOnRN } from "react-native-worklets";
 import { haptics } from "@/shared/lib/haptics";
 import { END_X, MIRROR_IN_RTL } from "@/shared/lib/text-direction";
+import { ChatSwipeGestureContext } from "./chat-swipe-gesture";
 
 /** How long a touch and hold lasts before the sheet opens. */
 const HOLD_MS = 500;
@@ -70,6 +71,9 @@ export function ChatMessageGesture({
   handlers.current = { onReply, onHold };
   const canReply = Boolean(onReply) && !selecting;
   const canHold = Boolean(onHold) && !selecting;
+  // The swipe away from Back over the whole list waits for this one. A bubble at the end replies with
+  // a swipe in the same direction, so the swipe on the bubble replies and does not open the screen.
+  const listSwipe = useContext(ChatSwipeGestureContext);
   // Build the gestures once per row. A streaming reply re-renders its row for each chunk, and a new
   // gesture would reconfigure the native handler each time.
   const gesture = useMemo(() => {
@@ -98,6 +102,7 @@ export function ChatMessageGesture({
       .onFinalize(() => {
         offset.set(withSpring(0, { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System }));
       });
+    if (listSwipe) swipe.blocksExternalGesture(listSwipe);
     const press = Gesture.LongPress()
       .enabled(canHold)
       .minDuration(HOLD_MS)
@@ -112,7 +117,7 @@ export function ChatMessageGesture({
         pressScale.set(withSpring(1, RELEASE));
       });
     return Gesture.Race(swipe, press);
-  }, [canReply, canHold, direction, offset, pressScale]);
+  }, [canReply, canHold, direction, offset, pressScale, listSwipe]);
 
   return (
     <View className={align === "end" ? "max-w-full self-end" : "max-w-[92%] self-start"}>

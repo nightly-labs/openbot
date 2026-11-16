@@ -114,7 +114,10 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   const cloudflare = frame(/challenges\.cloudflare\.com/) || has("script[src*='/cdn-cgi/challenge-platform/']");
   if ((cloudflare || short) && has("#challenge-form, #challenge-running, #challenge-stage, #cf-challenge-running, .cf-browser-verification, #cf-please-wait"))
     return found("cloudflare", "non-interactive", "cloudflare-challenge-markup");
-  if ((/^(just a moment|attention required)/i.test(title) && short) || (/^one more step/i.test(title) && cloudflare))
+  // The interstitial of a site can load a consent banner, which makes the page long. Its own script
+  // still identifies it.
+  const challengePage = has("script[src*='/cdn-cgi/challenge-platform/'][src*='/orchestrate/chl_page/']");
+  if ((/^(just a moment|attention required)/i.test(title) && (short || challengePage)) || (/^one more step/i.test(title) && cloudflare))
     return found("cloudflare", "non-interactive", "cloudflare-title");
   if (frame(/captcha-delivery\.com/)) return found("datadome", "interactive", "datadome-frame");
   if (has("#px-captcha")) return found("perimeterx", "interactive", "px-captcha");
@@ -122,7 +125,8 @@ const CHALLENGE_SCRIPT = String.raw`(() => {
   if (short && frame(/_Incapsula_Resource/)) return found("imperva", "interactive", "incapsula-frame");
   if (/^access denied/i.test(title) && /reference #\s*\d+\.[0-9a-f]+/i.test(text))
     return found("akamai", "block", "akamai-reference");
-  if (has("#sec-if-cpt-container, #sec-cpt-if") || (short && has("#sec-container")))
+  // Akamai can leave its check elements, hidden, on the normal page after the check passed.
+  if (short && has("#sec-if-cpt-container, #sec-cpt-if, #sec-container"))
     return found("akamai", "non-interactive", "akamai-sec-cpt");
   // Sites that use the AWS WAF integration SDK load its scripts on each page. Only the interstitial
   // counts: the script in the head and its container as a direct child of the body.
@@ -268,6 +272,8 @@ export function describeChallenge(
   checking = false,
   /** The checkbox that the agent may click once. Only the first read of a document offers it. */
   clickOnce: DetectedChallenge["checkbox"] = null,
+  /** A person completed a takeover of the tab, and the check is still there. */
+  afterTakeover = false,
 ): BrowserChallenge | undefined {
   if (detected?.kind === "block")
     return {
@@ -282,6 +288,13 @@ export function describeChallenge(
       status: "checking",
       waitedMs,
       next: "The security check is still running. Do not reload or click it; call snapshot, which waits for it.",
+    };
+  if (detected && afterTakeover)
+    return {
+      vendor: detected.vendor,
+      status: "blocked",
+      waitedMs,
+      next: "The user took over this tab, and the security check is still here: the site refuses this browser, often because of its network address. Do not reload, retry, or call request_takeover for it again unless the user asks. In one plain sentence, tell the user that the site blocks this browser.",
     };
   if (detected && clickOnce)
     return {

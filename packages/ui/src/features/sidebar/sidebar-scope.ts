@@ -10,7 +10,7 @@
 import { createContext, createEffect, createSignal, onCleanup, useContext } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { createSidebarDragEngine } from "./createSidebarDragEngine";
-import type { SidebarProps } from "./sidebar-types";
+import { type SidebarProps, sidebarChatOrderSortsSections } from "./sidebar-types";
 import { createSidebarAnnouncementStore } from "./stores/announcement-store";
 import { createSidebarDataStore } from "./stores/data-store";
 import { createSidebarDragStateStore } from "./stores/drag-state-store";
@@ -19,8 +19,8 @@ import { createSidebarPendingStore } from "./stores/pending-store";
 
 export function createSidebarScope(props: SidebarProps) {
   const layoutMutable = () => props.layoutMutable !== false;
-  /** A chat drags only in the manual orders. "Unread first" sorts each section itself. */
-  const chatsDraggable = () => layoutMutable() && props.chatOrder !== "unread-first";
+  /** A chat drags only in the manual orders. "Recent activity" and "Unread first" sort each section. */
+  const chatsDraggable = () => layoutMutable() && !sidebarChatOrderSortsSections(props.chatOrder);
   const scrollFades = createScrollFades({ stuck: ".sidebar-folder > header" });
 
   const { announce, announceError, reorderAnnouncement } = createSidebarAnnouncementStore();
@@ -35,6 +35,7 @@ export function createSidebarScope(props: SidebarProps) {
   const [pointerInList, setPointerInList] = createSignal(false);
   const {
     assignedSectionId,
+    chatIsUnread,
     chatKind,
     chatName,
     chatPinnedItems,
@@ -48,6 +49,7 @@ export function createSidebarScope(props: SidebarProps) {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionIsInside,
@@ -213,6 +215,7 @@ export function createSidebarScope(props: SidebarProps) {
     deleteTarget,
     channelDeleteTarget,
     deleting,
+    chatIsUnread,
     chatPinnedItems,
     chatsDraggable,
     directThreadByMember,
@@ -247,6 +250,7 @@ export function createSidebarScope(props: SidebarProps) {
     scrollFades,
     sectionDeleteTarget,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionDragClasses: dragState.sectionDragClasses,
     sectionIsCollapsed,

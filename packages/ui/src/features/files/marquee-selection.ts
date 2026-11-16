@@ -40,7 +40,7 @@ const SCROLL_EDGE = 48;
 const SCROLL_SPEED = 18;
 /** A press on these does not start a drag: they have their own pointer behavior. */
 const NO_DRAG =
-  'input, textarea, select, a, label, [contenteditable="true"], [role="menu"], .library-pill, button:not(.library-file-card, .library-picture, .file-row-main)';
+  'input, textarea, select, a, label, [contenteditable="true"], [role="menu"], .library-pill, button:not(.library-file-card, .library-picture, .library-folder-tile-main, .file-row-main)';
 
 export interface MarqueeSelectionOptions {
   /** A press can start a drag now. */

@@ -1,13 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 import { type AgentProviderId, type ConversationMessage, ROUTINE_QUIET_ANSWER_ITEM_TYPE } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
-import { isImageGenerationItem } from "./agent/image-generation";
+import { generatedMediaKind } from "./agent/image-generation";
 import {
   isNoUpdateAnswer,
   isNoUpdateToolCall,
   isTextAnswer,
   keptQuietAnswer,
-  quietTeammateDelivery,
+  quietTeammateTurnDelivery,
+  teammateRequest,
 } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
@@ -29,7 +30,7 @@ interface ProviderHistoryImportDatabase {
     threadId: string;
     provider: AgentProviderId;
     externalSessionId: string;
-  }): unknown;
+  }): { state: string; createdAt: string };
   stageProviderHistoryFragment(input: { sessionId: string; fragment: ProviderHistoryFragment }): {
     turnImported: boolean;
   };
@@ -74,6 +75,17 @@ export interface ProviderHistoryImportInput {
    * routine's side thread, as at the turn completion. Left out, it cannot.
    */
   quietTeammateThread?: boolean;
+  /**
+   * Whether this teammate's answer replies to a request that a quiet routine run of the agent sent.
+   * Its turn can have ended quiet after a call to the no-update tool. A run whose record is gone does
+   * not count: the tool refused its answer, so the answer showed. Left out, no answer counts.
+   */
+  continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
+  /**
+   * Whether the agent answered this teammate request with its own `send_message` reply in the turn that
+   * ran it, so the turn can have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   */
+  hasOwnReplyFrom?(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -105,13 +117,16 @@ export function importProviderHistory(
   input: ProviderHistoryImportInput,
 ): Effect.Effect<ProviderHistoryImportResult, ProviderClientOperationError> {
   return Effect.gen(function* () {
-    yield* providerSync(() =>
-      input.database.ensureProviderHistoryImport({
-        sessionId: input.sessionId,
-        threadId: input.publicThreadId,
-        provider: input.provider,
-        externalSessionId: input.externalSessionId,
-      }),
+    const resumeKey = yield* providerSync(() =>
+      importResumeKey(
+        input,
+        input.database.ensureProviderHistoryImport({
+          sessionId: input.sessionId,
+          threadId: input.publicThreadId,
+          provider: input.provider,
+          externalSessionId: input.externalSessionId,
+        }),
+      ),
     );
     let turns = 0;
     let messages = 0;
@@ -162,6 +177,7 @@ export function importProviderHistory(
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
           items: "full",
           providerOnly: true,
+          ...(resumeKey === undefined ? {} : { resumeKey }),
         } satisfies ProviderHistoryRequest,
         consume,
       )
@@ -176,6 +192,27 @@ export function importProviderHistory(
       yield* providerSync(() => input.database.markProviderHistoryImportState(input.sessionId, "complete"));
     return { turns, messages };
   });
+}
+
+/**
+ * The key that lets the provider read send only changed turns. It is given only when the last read
+ * of this import row ended complete, and no complete turn waits for its import. A new import row has
+ * a new creation time, so a cursor of an earlier row does not apply to it.
+ */
+function importResumeKey(
+  input: ProviderHistoryImportInput,
+  current: { state: string; createdAt: string },
+): string | undefined {
+  if (current.state !== "complete") return undefined;
+  const waiting = databaseRow(
+    input.database.connection
+      .prepare(
+        `SELECT 1 AS waiting FROM provider_history_turns
+         WHERE session_id = ? AND imported = 0 AND complete = 1 LIMIT 1`,
+      )
+      .get(input.sessionId),
+  );
+  return waiting ? undefined : `${input.sessionId}:${current.createdAt}`;
 }
 
 function importCompletedTurn(
@@ -275,8 +312,9 @@ function importCompletedTurn(
 }
 
 /**
- * How a turn that a quiet routine run or a teammate update (`quietTeammateDelivery`) started answered: `quiet` when each answer is only the
- * no-update marker, or the agent called the no-update tool and generated no image, so the turn
+ * How a turn that a quiet routine run, a teammate update or an answered request (`quietTeammateTurnDelivery`) started answered: `quiet` when each answer is only the
+ * no-update marker, or the agent called the no-update tool or ran only answered teammate requests,
+ * and generated no image, so the turn
  * completion kept only its quiet answers; `image` when the agent called the tool
  * and generated an image, so the completion dropped only the text answers; `answered` for any
  * other such turn, and `none` for a turn that no quiet routine run started. A Test run keeps its
@@ -291,11 +329,15 @@ function routineTurnAnswers(
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
   return Effect.gen(function* () {
     let routine: boolean | undefined;
+    // Only answered teammate requests: the turn completion makes their text answers quiet (#7465).
+    let requestsOnly = true;
     let markers = 0;
     let reported = false;
     let noUpdateCalled = false;
     let failureReported = false;
     let imageGenerated = false;
+    // A teammate's answer to a quiet routine run is quiet only after a call to the no-update tool.
+    let needsNoUpdate = false;
     let afterIndex = -1;
     while (true) {
       const page = yield* providerSync(() =>
@@ -307,10 +349,18 @@ function routineTurnAnswers(
         if (routine !== false && item.type === "userMessage" && typeof item.clientId === "string") {
           const delivery = input.findDelivery(item.clientId)?.delivery;
           // A continuation turn has its own client ID, so the check uses the delivery's ID.
+          const continuesQuietRun =
+            delivery !== undefined &&
+            input.quietTeammateThread === true &&
+            input.continuesQuietRun?.(delivery) === true;
+          if (continuesQuietRun) needsNoUpdate = true;
           routine =
             delivery !== undefined &&
-            ((input.quietTeammateThread === true && quietTeammateDelivery(delivery)) ||
-              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)));
+            ((input.quietTeammateThread === true &&
+              quietTeammateTurnDelivery(delivery, (request) => input.hasOwnReplyFrom?.(request.id) === true)) ||
+              (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
+              continuesQuietRun);
+          requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
@@ -318,7 +368,7 @@ function routineTurnAnswers(
           if (isNoUpdateAnswer(item.text)) markers += 1;
           else reported = true;
         }
-        if (isImageGenerationItem(item)) imageGenerated = true;
+        if (generatedMediaKind(item)) imageGenerated = true;
         if (isNoUpdateToolCall(item)) noUpdateCalled = true;
       }
       const last = page.at(-1);
@@ -326,11 +376,29 @@ function routineTurnAnswers(
       if (page.length < 50 || !last || last.itemIndex <= afterIndex) break;
       afterIndex = last.itemIndex;
     }
-    if (!routine) return "none";
+    if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
+    // A file, an image or a question keeps the turn shown, as at the turn completion.
+    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
+}
+
+/**
+ * Whether the chat holds a file or a question of this turn. OpenBot writes them to the chat itself, so
+ * the provider history does not hold them; the import reads the stored messages instead.
+ */
+function storedTurnReport(input: ProviderHistoryImportInput, turnId: string): boolean {
+  const row = input.database.connection
+    .prepare(
+      `SELECT 1 AS found FROM projection_thread_messages
+       WHERE thread_id = ? AND turn_id = ? AND author = 'assistant'
+         AND (item_type = 'question_prompt' OR json_array_length(message_json, '$.attachments') > 0)
+       LIMIT 1`,
+    )
+    .get(input.publicThreadId, turnId);
+  return row !== undefined;
 }
 
 function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {

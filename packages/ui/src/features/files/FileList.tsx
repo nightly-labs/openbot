@@ -76,6 +76,12 @@ export interface FileListProps {
   canDelete?: boolean | undefined;
   /** Lets the caller select rows, such as the Library for a delete of many files. */
   selection?: FileSelection | undefined;
+  /** The folder of a file, such as "Autumn campaign › Images". It shows on the row of a file that has one. */
+  folderLabel?: ((file: StoredFileRow) => string | undefined) | undefined;
+  /** More items for the menu of a row, before Delete. */
+  rowMenu?: ((file: StoredFileRow) => JSX.Element) | undefined;
+  /** The files are on the computer of the viewer: a row offers Open and Show in folder. The default is true. */
+  opensFiles?: boolean | undefined;
   onPreview: (file: StoredFileRow) => void;
   onAction: (file: StoredFileRow, action: StoredFileAction) => void | Promise<void>;
 }
@@ -206,6 +212,9 @@ export function FileList(props: FileListProps) {
                       <FileRow
                         file={file}
                         agentName={agentName(file.agentId)}
+                        folderLabel={props.folderLabel}
+                        rowMenu={props.rowMenu}
+                        opensFiles={props.opensFiles !== false}
                         showConversation={props.showConversation !== false && !props.compact}
                         canDelete={props.canDelete === true && file.deletable}
                         selection={props.selection}
@@ -416,6 +425,9 @@ export function FileSelectionMark(props: { selected: boolean; class?: string }) 
 function FileRow(props: {
   file: StoredFileRow;
   agentName: string | null;
+  folderLabel: ((file: StoredFileRow) => string | undefined) | undefined;
+  rowMenu: ((file: StoredFileRow) => JSX.Element) | undefined;
+  opensFiles: boolean;
   showConversation: boolean;
   canDelete: boolean;
   selection: FileSelection | undefined;
@@ -440,6 +452,7 @@ function FileRow(props: {
       format.fileSize(props.file.size),
       props.showConversation ? props.file.conversation?.title : null,
       props.agentName,
+      props.folderLabel?.(props.file),
       props.dateLabel,
     ].filter(Boolean);
   const rowLabel = () => {
@@ -489,7 +502,14 @@ function FileRow(props: {
       </Button>
       <FileStatusBadge status={props.file.status} />
       <Show when={!selecting()}>
-        <FileRowMenu file={props.file} canDelete={props.canDelete} onAction={props.onAction} />
+        <FileRowMenu
+          file={props.file}
+          canDelete={props.canDelete}
+          opensFiles={props.opensFiles}
+          onAction={props.onAction}
+        >
+          {props.rowMenu?.(props.file)}
+        </FileRowMenu>
       </Show>
     </li>
   );
@@ -541,8 +561,12 @@ function FileStatusBadge(props: { status: StoredFileRow["status"] }) {
 export function FileRowMenu(props: {
   file: StoredFileRow;
   canDelete: boolean;
+  /** Open and Show in folder need the file on this computer. The web client only downloads it. Default true. */
+  opensFiles?: boolean | undefined;
   onAction: (action: StoredFileAction) => void;
   class?: string | undefined;
+  /** More items, such as "Move to". They come before Delete. */
+  children?: JSX.Element;
 }) {
   const { t } = useText();
   const status = () => props.file.status;
@@ -556,7 +580,7 @@ export function FileRowMenu(props: {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content>
-          <Show when={status() === "available"}>
+          <Show when={status() === "available" && props.opensFiles !== false}>
             <DropdownMenu.Item onSelect={() => props.onAction("open")}>
               <ExternalLink aria-hidden="true" />
               {t("common.open")}
@@ -585,6 +609,7 @@ export function FileRowMenu(props: {
               {t("files.action.showInChat")}
             </DropdownMenu.Item>
           </Show>
+          {props.children}
           <Show when={props.canDelete}>
             <DropdownMenu.Separator />
             <DropdownMenu.Item class="ui-action-menu-danger" onSelect={() => props.onAction("delete")}>

@@ -1,12 +1,16 @@
 import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
-import type {
-  AgentStatus,
-  AvatarImageInput,
-  ClientAgentModelOption,
-  ClientAgentSummary,
-  HiddenAgent,
-  UpdateAgentInput,
+import {
+  type AgentNotificationLevelsSnapshot,
+  type AgentStatus,
+  type AvatarImageInput,
+  agentNotificationLevelMap,
+  type ClientAgentModelOption,
+  type ClientAgentSummary,
+  type HiddenAgent,
+  type ServerNotificationLevel,
+  type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
+import { AGENT_HIDDEN_WORK_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import type { AgentProfile } from "@openbot/ui/data";
 import { createFirstAgentDraft, type FirstAgentDraft } from "@openbot/ui/features/agents/FirstAgentSetup";
@@ -73,7 +77,7 @@ import {
 const Agents = createSimpleContext({
   name: "Agents",
   init: () => {
-    const { activeServer, activeServerId } = useServers();
+    const { activeServer, activeServerId, activeServerSupportsCapability } = useServers();
     const { activeDirectMember, setDirectTyping } = useDirectMessages();
     const windowPage = useWindowPage();
     const { uiErrors, setUiErrors, appendUiError } = useUiErrors();
@@ -172,11 +176,36 @@ const Agents = createSimpleContext({
      */
     const [userHiddenAgents, setUserHiddenAgents] = createSignal<HiddenAgent[]>([]);
     const userHiddenAgentIds = createMemo(() => new Set(userHiddenAgents().map((agent) => agent.agentId)));
+    /** The host keeps a hidden agent at work. A host without `agent-hidden-work` stops it. */
+    const userHiddenAgentsWork = () => activeServerSupportsCapability(AGENT_HIDDEN_WORK_CAPABILITY);
+    const noAgentIds: ReadonlySet<string> = new Set();
+    /** The hidden agents that the host stops: they get no mention and no channel work. */
+    const userPausedAgentIds = createMemo(() => (userHiddenAgentsWork() ? noAgentIds : userHiddenAgentIds()));
 
     /** Applies the whole hidden list of this server, from a read, an event or a write. */
     function applyUserHiddenAgents(agents: HiddenAgent[]): void {
       if (!scopeIsCurrent()) return;
       setUserHiddenAgents(agents);
+    }
+
+    /**
+     * The user's own notification level of each agent on this server (`agent-notification-levels-v1`).
+     * Empty until the server answers, and on a server that keeps no levels. The agent menu and the
+     * sounds read it; the notifications read the copy of main.
+     */
+    const [ownAgentLevels, setOwnAgentLevels] = createSignal<ReadonlyMap<string, ServerNotificationLevel>>(new Map());
+    /** Counts the applied levels, so the answer of a read that started before a write or an event is dropped. */
+    let ownAgentLevelsApplied = 0;
+    /** The agents that the user muted: their own level is "nothing". */
+    const mutedAgentIds = createMemo(
+      () => new Set([...ownAgentLevels()].flatMap(([agentId, level]) => (level === "nothing" ? [agentId] : []))),
+    );
+
+    /** Applies all levels of the user on this server, from a read, an event or a write. */
+    function applyOwnAgentLevels(snapshot: Pick<AgentNotificationLevelsSnapshot, "agents">): void {
+      if (!scopeIsCurrent()) return;
+      ownAgentLevelsApplied += 1;
+      setOwnAgentLevels(agentNotificationLevelMap({ server: null, agents: snapshot.agents }));
     }
 
     const activeAgent = createMemo(() => {
@@ -423,7 +452,13 @@ const Agents = createSimpleContext({
       forgetHiddenAgent,
       userHiddenAgents,
       userHiddenAgentIds,
+      userHiddenAgentsWork,
+      userPausedAgentIds,
       applyUserHiddenAgents,
+      ownAgentLevels,
+      mutedAgentIds,
+      applyOwnAgentLevels,
+      ownAgentLevelsApplied: () => ownAgentLevelsApplied,
       openAgentSetup,
       cancelAgentSetup,
       updateAgent,

@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "Идёт проверка удалённого рабочего стола. Повторите попытку, когда она закончится.",
   "error.remote.screenRecordingDenied":
     "Хост не разрешил OpenBot записывать экран. Разрешите запись экрана на хосте и повторите попытку.",
+  "error.remote.windowsSessionDisconnected":
+    "Сеанс Windows на хосте отключён, поэтому нет экрана для показа. Войдите в Windows на экране хоста и повторите попытку.",
   "error.remote.teamSessionExpired": "Сессия команды истекла.",
   "error.remote.finishTestBeforeSwitch": "Завершите проверку удалённого рабочего стола, прежде чем переключать экраны.",
   "error.remote.displayNotFound": "Удалённый экран не найден.",
@@ -148,6 +150,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Хост отклонил вложение.",
   "error.remote.attachmentTooLarge": "Вложения должны быть не больше 10 МБ.",
   "error.remote.attachmentBusy": "Дождитесь завершения текущего вложения.",
+  "error.remote.attachmentChanged": "Файл изменился или недоступен. Выберите его снова.",
   "error.remote.uploadTimeout": "Время отправки вложения истекло.",
   "error.remote.hostSessionActive": "У хоста уже есть активная удалённая сессия.",
   "error.remote.tooManyConnections": "Слишком много активных удалённых подключений.",

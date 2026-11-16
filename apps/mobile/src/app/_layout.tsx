@@ -1,7 +1,7 @@
 import "../../global.css";
 
 import { QueryClientProvider } from "@tanstack/react-query";
-import { usePathname } from "expo-router";
+import { usePathname, useSegments } from "expo-router";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "expo-router/react-navigation";
 import { Stack } from "expo-router/stack";
 import { StatusBar } from "expo-status-bar";
@@ -23,19 +23,29 @@ import { loadOnboardingProgress } from "@/features/onboarding/model/onboarding-p
 import { resetNotificationAvatars } from "@/features/push-notifications/notification-avatars";
 import { installNotificationHandler } from "@/features/push-notifications/use-notification-taps";
 import { installQuickActions, resetQuickActions } from "@/features/quick-actions/quick-actions-native";
+import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { loadChatBackground } from "@/features/settings/model/chat-background";
+import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
+import { loadChatPullPreference, loadChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
+import { loadLargeFilePreference } from "@/features/settings/model/large-files";
 import { offerLayoutRestart } from "@/features/settings/model/layout-direction";
 import { loadLiveActivitiesPreference } from "@/features/settings/model/live-activities";
 import { loadMessageColor } from "@/features/settings/model/message-color";
 import { useMotionPreferences } from "@/features/settings/model/motion";
 import { loadMotionPreferences } from "@/features/settings/model/motion-storage";
+import { loadPhotoQualityPreference } from "@/features/settings/model/photo-quality";
 import { loadPushNotificationPreference } from "@/features/settings/model/push-notifications";
 import { loadRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { loadTextSize } from "@/features/settings/model/text-size";
+import { loadFullVisualPreference } from "@/features/settings/model/visual-preview";
 import { resetShareExtension } from "@/features/share/model/share-extension";
+import { resetShortcutDirectory } from "@/features/shortcuts/model/shortcut-directory";
+import { installShortcuts, resetShortcuts } from "@/features/shortcuts/shortcuts-native";
+import { supportLog } from "@/features/support/model/support-log";
 import { installSupportLog } from "@/features/support/model/support-log-capture";
 import { checkRecognitionModels } from "@/features/voice/model/recognition-models";
 import { supertonicModel } from "@/features/voice/model/supertonic-model";
@@ -61,6 +71,7 @@ export const unstable_settings = {
 
 installSupportLog();
 installQuickActions();
+installShortcuts();
 installAppLock();
 installNotificationHandler();
 
@@ -77,6 +88,13 @@ function RootNavigator() {
   const { t } = useText();
   const { loading, session } = useMobileSession();
   const pathname = usePathname();
+  const segments = useSegments();
+  // The screen goes to the support log by its route name, such as `chat/[agentId]`: a report then
+  // shows where the user was. Never the path: it has the IDs of agents and chats.
+  const screen = segments.filter((segment) => !segment.startsWith("(")).join("/") || "start";
+  useEffect(() => {
+    supportLog.add("info", "app", `Screen: ${screen}`);
+  }, [screen]);
   const { setLoadingLabel, isLoaderPresent } = useAppLoadingOverlay();
   const appearanceReady = useAppearance((state) => state.ready);
   // Motion choices are read before the first screen, so no screen starts an animation that Settings turned off.
@@ -116,11 +134,13 @@ function RootNavigator() {
 
   // A quick action stays on the app icon after the session ends, such as one that another device revoked.
   // The share extension keeps its copy of the session and the share sheet its agents, so both go too,
-  // with the agent pictures of the notifications.
+  // with the agents of the shortcuts and the agent pictures of the notifications.
   useEffect(() => {
     if (loading || session) return;
     resetQuickActions();
     resetShareExtension();
+    resetShortcutDirectory();
+    resetShortcuts();
     resetNotificationAvatars();
   }, [loading, session]);
 
@@ -183,6 +203,7 @@ function RootNavigator() {
           ) : null}
         </View>
         <BloubStage nativeSplashHidden={nativeHidden} onLayout={() => reportArtwork("stage")} />
+        <ThemeSweep />
         <AppLockOverlay />
       </View>
     </SplashContentReadyContext.Provider>
@@ -215,8 +236,15 @@ export default function RootLayout() {
     void untilForeground().then(() => {
       void loadAppearance().catch(() => undefined);
       void loadHapticsPreference().catch(() => undefined);
+      void loadLargeFilePreference().catch(() => undefined);
+      void loadPhotoQualityPreference().catch(() => undefined);
       void loadMessageColor().catch(() => undefined);
+      void loadChatBackground().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadFullVisualPreference().catch(() => undefined);
+      void loadChatOrderPreference().catch(() => undefined);
+      void loadChatSwipePreference().catch(() => undefined);
+      void loadChatPullPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);

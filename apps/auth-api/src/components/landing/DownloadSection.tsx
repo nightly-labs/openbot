@@ -1,8 +1,10 @@
 import { type MobilePlatformLogoVariant, PlatformLogo, type PlatformLogoVariant } from "@openbot/brand";
+import type { JSX } from "@solidjs/web";
 import { Link } from "@tanstack/solid-router";
 import { For, Show } from "solid-js";
+import { ANDROID_APK_AVAILABLE } from "../../lib/android-apk";
 import { DOWNLOAD_PLATFORM_ORDER, DOWNLOAD_PLATFORMS } from "../../lib/download-platforms";
-import { EXTERNAL_LINK_REL } from "../../lib/landing-links";
+import { EXTERNAL_LINK_REL, OPENBOT_ANDROID_APK_LINK } from "../../lib/landing-links";
 import { MOBILE_APP_ORDER, MOBILE_APPS } from "../../lib/mobile-apps";
 import { createLandingReveal } from "./createLandingReveal";
 import { LandingIcon } from "./LandingIcon";
@@ -10,6 +12,8 @@ import { useLandingText } from "./LandingText";
 
 interface DownloadCardContentProps {
   action?: string;
+  /** Links of the card's own, in place of `action`, for a card that is not one link. */
+  actions?: JSX.Element;
   description: string;
   platform: PlatformLogoVariant | MobilePlatformLogoVariant;
   status: string;
@@ -26,11 +30,18 @@ function DownloadCardContent(props: DownloadCardContentProps) {
       <div class="landing-download-card-copy">
         <h3>{props.title}</h3>
         <p>{props.description}</p>
-        <Show when={props.action}>
-          <span class="landing-download-action">
-            {props.action}
-            <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
-          </span>
+        <Show
+          when={props.actions}
+          fallback={
+            <Show when={props.action}>
+              <span class="landing-download-action">
+                {props.action}
+                <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+              </span>
+            </Show>
+          }
+        >
+          {(actions) => <div class="landing-download-actions">{actions()}</div>}
         </Show>
       </div>
     </>
@@ -111,6 +122,44 @@ export function DownloadSection() {
           <For each={MOBILE_APP_ORDER}>
             {(platform) => {
               const app = MOBILE_APPS[platform];
+              // Android has two downloads while a version has an APK. A link cannot contain a link,
+              // so the card is a box: the Google Play link covers it, and the APK link is on top.
+              if (platform === "android" && ANDROID_APK_AVAILABLE)
+                return (
+                  <div
+                    class="landing-download-card"
+                    data-download-platform={platform}
+                    data-state="available"
+                    data-revealed={revealState()}
+                  >
+                    <DownloadCardContent
+                      platform={platform}
+                      status={text().available}
+                      title={app.label}
+                      description={text().phone[platform].description}
+                      actions={
+                        <>
+                          <a
+                            class="landing-download-action landing-download-card-link"
+                            href={app.href}
+                            target="_blank"
+                            rel={EXTERNAL_LINK_REL}
+                          >
+                            {text().phone[platform].action}
+                            <LandingIcon name="arrow-up-right" class="landing-download-arrow" />
+                          </a>
+                          <a
+                            class="landing-download-action landing-download-action-apk"
+                            href={OPENBOT_ANDROID_APK_LINK}
+                          >
+                            {text().apk}
+                            <LandingIcon name="download" class="landing-download-action-icon" />
+                          </a>
+                        </>
+                      }
+                    />
+                  </div>
+                );
               return (
                 <a
                   class="landing-download-card"

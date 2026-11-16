@@ -48,6 +48,11 @@ export const messages = {
     "Este host remoto no admite navegar con la barra de direcciones en una pestaña existente.",
   "error.backend.browserUserControlBusy":
     "Esta pestaña del navegador espera un secreto. Responde primero a la solicitud del secreto.",
+  "error.backend.browserTeachBusy":
+    "Otra persona controla esta pestaña del navegador. Inténtalo de nuevo cuando termine.",
+  "error.backend.browserTeachUnavailable":
+    "Esta pestaña del navegador no tiene un agente que pueda aprender una tarea.",
+  "error.backend.browserTeachUnsupported": "Este host remoto no admite la grabación de una tarea.",
   "error.backend.browserUserControlUnsupported":
     "Este host remoto no admite tomar el control de una pestaña del navegador.",
   "error.backend.browserSignInUnsupported": "Este host remoto no puede recibir un inicio de sesión de este equipo.",
@@ -63,6 +68,8 @@ export const messages = {
     "La compactación no reduce este chat: tras dos compactaciones aún usa el {percent}% de la ventana de contexto del modelo, así que OpenBot deja de compactarlo. Las herramientas y las instrucciones usan la mayor parte de la ventana. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita, o elige un modelo con una ventana mayor. Después, inicia un chat nuevo.",
   "error.backend.contextCompactionStopped":
     "Dos compactaciones seguidas de este chat fallaron, así que OpenBot deja de compactarlo automáticamente. Cada intento envía todo el chat al modelo y consume el límite de tu plan. Selecciona «Compactar ahora» para intentarlo de nuevo o inicia un chat nuevo.",
+  "error.backend.providerModelAtCapacity":
+    "El modelo está al límite de su capacidad. El proveedor lo intentará de nuevo en unos minutos. Para continuar ahora, detén el turno y elige otro modelo.",
   "error.backend.providerRetrying":
     "El proveedor falló esta solicitud {attempts} veces y lo vuelve a intentar. Si el agente no continúa, detén el turno.",
   "error.backend.providerRetryingLargeContext":
@@ -82,6 +89,10 @@ export const messages = {
     "Espera a que termine el trabajo en este canal y luego elimina su historial.",
   "error.backend.channelCompactUnavailable":
     "Ningún miembro de este canal puede compactar su contexto ahora. Un miembro debe responder primero en el canal y su proveedor debe admitir la compactación.",
+  "error.backend.channelCompactNoSession":
+    "Los miembros de este canal aún no tienen una conversación que compactar. Compáctalo después de que un miembro responda en el canal.",
+  "error.backend.channelCompactNotSupported":
+    "Ningún miembro de este canal puede compactar a petición. Los miembros que lo admiten compactan su contexto automáticamente cuando está casi lleno.",
   "error.backend.channelArchived": "Restaura este canal antes de enviar mensajes o cambiar tareas.",
   "error.backend.channelReferenceUnavailable": "El mensaje del canal al que se hace referencia no está disponible.",
   "error.backend.channelTaskNotFound": "No se encontró la tarea del canal.",
@@ -116,6 +127,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Falló la operación de memoria. Inténtalo de nuevo.",
   "error.backend.memoryGone": "Este recuerdo ya no existe.",
   "error.backend.routineGone": "Esta rutina ya no existe.",
+  "error.backend.routineRunGone": "Esta ejecución de la rutina ya no existe.",
   "error.backend.turnNotStarted": "El proveedor no inició este turno.",
   "error.backend.routineResultConnectionOff":
     "Esta conexión de mensajería está desactivada o eliminada. Elige otro lugar.",
@@ -165,6 +177,10 @@ export const messages = {
   "error.backend.attachBetween": "Adjunta entre 1 y {limit} archivos.",
   "error.backend.attachmentNotFile": "El adjunto no es un archivo: {path}",
   "error.backend.generatedImageTooLarge": "La imagen generada supera el límite de 100 MB.",
+  "error.backend.generatedVideoTooLarge": "El video generado supera el límite de 100 MB.",
+  "error.backend.videoGenerationFailed": "La generación del video falló.",
+  "error.backend.videoGenerationNoVideo": "La generación del video no devolvió ningún video.",
+  "error.backend.videoGenerationInterrupted": "La generación del video se interrumpió.",
   "error.backend.attachmentNotRegularFile": "Solo se pueden adjuntar archivos normales: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot no pudo copiar {name}.",
   "error.backend.routineNameRequired": "Se requiere un nombre para la rutina.",
@@ -194,6 +210,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agente no puede interrumpirse a sí mismo.",
   "error.backend.interruptOtherWork":
     "Este agente trabaja en una tarea que no inició tu mensaje. Solo el usuario o quien envió esa tarea puede detenerlo.",
+  "error.backend.interruptSharedWork":
+    "El turno de este agente trabaja en tu mensaje y también en un mensaje del usuario o de otro agente. Solo el usuario puede detenerlo, con Detener agente en el chat de ese agente.",
   "error.backend.interruptStarting":
     "Este agente aún está iniciando un turno. Inténtalo de nuevo cuando empiece el turno.",
   "error.backend.interruptNoSession":
@@ -227,15 +245,23 @@ export const messages = {
   "error.backend.messageDeleteBusy":
     "Este mensaje forma parte de un turno en curso. Elimínalo cuando termine el turno.",
   "error.backend.messageDeleteForbidden": "Solo puedes eliminar los mensajes que enviaste.",
+  "error.backend.messagePinNotFound": "Este mensaje no está en el chat.",
+  "error.backend.messagePinLimit": "Este chat tiene 50 mensajes fijados. Desfija uno antes de fijar otro.",
   "error.backend.routineFlowHandoffFailed": "La rutina no pudo pasar el trabajo a este agente.",
   "error.backend.mcpServerLimit": "OpenBot mantiene hasta {limit} servidores MCP.",
   "error.backend.mcpServerNameTaken": "Ya existe un servidor MCP llamado {name}.",
   "error.backend.mcpServerInvalid": "OpenBot no puede guardar esta configuración del servidor MCP.",
   "error.backend.mcpServerNoAnswer": "El servidor no respondió en {seconds} segundos.",
   "error.backend.mcpSignInNotAccepted": "El servidor no aceptó ese inicio de sesión.",
+  "error.backend.mcpSignInAccountRefused":
+    "El servidor rechazó la cuenta con la que iniciaste sesión. Comprueba que esa cuenta puede usar el servicio. Para usar otra cuenta, cierra sesión y vuelve a iniciar sesión.",
   "error.backend.mcpSignInClientRefused":
     "El servidor de inicio de sesión no aceptó a OpenBot al completar el inicio de sesión. Inicia sesión de nuevo: OpenBot se registra otra vez en el servidor.",
+  "error.backend.mcpSignInAppRefused":
+    "El servidor de inicio de sesión no aceptó la app de inicio de sesión de este servidor. Revisa el ID de cliente y el secreto de cliente de la app de inicio de sesión y vuelve a iniciar sesión.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
+  "error.backend.mcpProviderLimit":
+    "Este agente solo puede usar un número limitado de servidores MCP. Para usar este servidor, desactiva un servidor MCP que el agente no necesite.",
   "error.backend.mcpRegistrationRefused":
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
   "error.backend.mcpSignInAbandonedGeneric": "Se abandonó el inicio de sesión.",
@@ -259,10 +285,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "El servidor se detuvo antes de responder. Ejecuta el comando en una terminal para ver su error.",
   "error.backend.mcpServerFailedToStart": "El servidor no se inició: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} dejó de esperar antes de que el servidor se iniciara, así que sus agentes no reciben las herramientas de este servidor.",
+  "error.backend.mcpToolSchemaRefused":
+    "Su herramienta {tool} tiene un formato de entrada que este proveedor no puede leer. Los agentes con otros proveedores siguen recibiendo el servidor.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre los ajustes de MCP y elige Iniciar sesión.",
+    "{provider} no pudo usar el servidor MCP {name} porque el servidor pide iniciar sesión. Abre {name} en Marketplace, Apps, y elige Iniciar sesión.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} no pudo iniciar el servidor MCP {name}. Abre los ajustes de MCP y elige Probar conexión para ver la causa.",
+    "{provider} no pudo iniciar el servidor MCP {name}. Abre {name} en Marketplace, Apps, y elige Probar conexión para ver la causa.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}. Sus herramientas no están disponibles para {provider}. {provider} inicia el servidor por su cuenta, así que la prueba de conexión en OpenBot puede funcionar. Inicia un chat nuevo para intentarlo de nuevo.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} no pudo iniciar el servidor MCP {name}, porque el servidor no respondió a tiempo. Inicia un chat nuevo para intentarlo de nuevo.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot no pudo iniciar su conexión local de inicio de sesión para este servidor. Reinicia OpenBot y vuelve a intentarlo.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -290,6 +324,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "El nombre de la sección es demasiado largo.",
   "error.backend.sidebarFolderTooDeep": "Las carpetas solo pueden tener tres niveles.",
   "error.backend.sidebarFolderMoveInvalid": "Esta carpeta no se puede mover ahí.",
+  "error.backend.libraryFolderName": "El nombre de una carpeta debe tener entre 1 y {limit} caracteres.",
+  "error.backend.libraryFolderLimit": "Un servidor puede tener hasta {limit} carpetas de la Biblioteca.",
+  "error.backend.libraryFolderFileLimit": "Hay demasiados archivos en las carpetas de la Biblioteca.",
+  "error.backend.libraryFolderTooDeep": "Las carpetas de la Biblioteca solo pueden tener {limit} niveles.",
+  "error.backend.libraryFolderGone": "La carpeta no existe o ya se eliminó.",
+  "error.backend.libraryFolderOtherAgent": "Un archivo solo puede ir a una carpeta de su agente.",
+  "error.backend.libraryFolderMoveInvalid": "Esta carpeta no se puede mover ahí.",
   "error.backend.sectionNameDuplicate": "Los nombres de las secciones deben ser únicos.",
   "error.backend.directMessageRequired": "Escribe un mensaje primero.",
   "error.backend.directMessageTooLong": "Un mensaje directo puede tener hasta {limit} caracteres.",
@@ -318,6 +359,8 @@ export const messages = {
   "error.backend.promptInactive": "Esta pregunta ya no está activa.",
   "error.backend.promptAnswerMismatch": "Una respuesta no coincide con ninguna pregunta activa.",
   "error.backend.approvalInactive": "Esta aprobación ya no está activa.",
+  "error.backend.feedbackNeedsPhone":
+    "Solo la app de OpenBot del teléfono puede enviar este informe, porque añade la versión y el registro de soporte del teléfono. Abre este chat en el teléfono. Si ves este mensaje allí, actualiza la app del teléfono.",
   "error.backend.takeoverInactive": "Esta toma de control del navegador ya no está activa.",
   "error.backend.authSubmitting": "Ya se están enviando los datos de autenticación.",
   "error.backend.apiKeySaveFailed": "OpenBot no pudo guardar la clave de API. Inténtalo de nuevo.",
@@ -345,8 +388,12 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "El proxy {name} no responde, así que la página no se abrió.",
   "error.backend.browserProxySignInRefused":
     "El proxy {name} rechazó el inicio de sesión, así que la página no se abrió.",
+  "error.backend.browserSystemProxyFailed":
+    "El proxy de la configuración del ordenador que ejecuta OpenBot no responde o rechazó la conexión, así que la página no se abrió. Revisa la configuración de proxy de ese ordenador.",
   "error.backend.browserProxyComputerUnreachable":
     "El ordenador que usa este perfil no responde, así que la página no se abrió.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "El ordenador que usa este perfil solo abre sitios públicos. No abre direcciones de una red local, por eso la página no se abrió.",
   "error.backend.browserCertificateUntrusted":
     "El certificado de seguridad de este sitio no es de confianza, así que la página no se abrió.",
   "error.backend.browserLowMemory":
@@ -376,6 +423,8 @@ export const messages = {
     "El servidor respondió {status}. Comprueba la clave de API u otras credenciales.",
   "error.backend.mcpServerHttpUrl":
     "El servidor respondió {status}. Comprueba la URL. El enlace puede ser incorrecto, haber caducado o haberse eliminado.",
+  "error.backend.mcpServerBearerKey":
+    "Este servidor usa una clave de API, no un inicio de sesión. En los encabezados, pon Authorization como clave y, como valor, Bearer, un espacio y tu clave de API.",
   "error.backend.mcpSignInAppUrl": "La app de inicio de sesión necesita una URL de servidor válida.",
   "error.backend.mcpSignInAppClientId": "Introduce el ID de cliente de la app de inicio de sesión.",
   "error.backend.mcpSignInAppIssuerChanged":
@@ -397,6 +446,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Detén el turno actual antes de crear una rama de este chat.",
   "error.backend.branchMessageNotFound": "Solo puedes crear una rama desde una respuesta terminada del agente.",
   "error.backend.branchRemoteUnsupported": "Las ramas solo están disponibles para los agentes de este equipo.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Para eliminar este informe, pide al agente que lo elimine.",
   "error.backend.threadMoveRefused":
     "Solo un mensaje que enviaste únicamente a este agente puede ejecutarse en un hilo nuevo.",
   "error.backend.taskTitleRequired": "Dale a la tarea un título corto.",

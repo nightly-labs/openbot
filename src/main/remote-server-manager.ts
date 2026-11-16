@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { open } from "node:fs/promises";
-import { basename } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { isValidAvatarImage } from "@openbot/contracts/avatar-images";
 import { type InviteLinkOptions, type InviteLinkPayload, parseInviteUrl } from "@openbot/contracts/invite-links";
 import type {
@@ -93,11 +93,13 @@ import {
 } from "@openbot/contracts/team-protocol/computer-activity-v1";
 import { TEAM_MEMBER_LEAVE_CAPABILITY, type TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY, FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
+import type { HostAppearanceEvent, ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartEvent } from "@openbot/contracts/team-protocol/host-update-v1";
 import { INSTANCE_TRANSFER_CHUNKS_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_ROUTES } from "@openbot/contracts/team-protocol/instance-transfer-v1";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { MachineAlertEvent } from "@openbot/contracts/team-protocol/machine-resources-v1";
+import { PROVIDER_MODEL_SOURCE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   decodeThreadMessageSearchResponse,
@@ -148,6 +150,7 @@ import {
 import { decodeRemoteDesktopSetupFromHost, decodeRemoteDesktopTestFromHost } from "./remote-desktop-setup-decoding";
 import { decodeRemoteDesktopSession } from "./remote-device-decoding";
 import { acceptEmpty, decodeComputerActivityReply, decodeVoid, type ResponseDecoder } from "./remote-host-decoding";
+import { type RemotePicture, RemotePictureCache } from "./remote-picture-cache";
 import { type RemoteRequestInit, RemoteServerClient } from "./remote-server-client";
 import { RemoteServerConnections } from "./remote-server-connections";
 import { RemoteProtocolError, RemoteRequestError } from "./remote-server-errors";
@@ -302,6 +305,8 @@ const INSTANCE_TRANSFER_PART_TIMEOUT_MS = 3 * 60_000;
 // host that is not back by then is offline, as any other host. A hosted server restarts its whole
 // machine and restores its disk; one took 18 minutes.
 const HOST_RESTART_RETRY_MS = 30 * 60_000;
+/** Beside the server list, in the app's data directory. */
+const REMOTE_PICTURES_DIRECTORY = "remote-pictures";
 export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #scope = Scope.makeUnsafe();
   readonly #platform: Layer.Layer<RemoteRequest>;
@@ -315,6 +320,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   readonly #events: RemoteEventStream;
   readonly #presence: RemotePresenceCache;
   readonly #attachments = new RemoteAttachmentCache();
+  /** The agent and channel pictures of joined servers, on disk, so they show while a host is offline. */
+  readonly #pictures: RemotePictureCache;
   /** The downloads that `stopAttachmentDownload` can end, by server and attachment. */
   readonly #attachmentStops = new Map<string, Deferred.Deferred<never, RemoteWorkflowError>>();
   readonly #localLevels: LocalNotificationLevels | null;
@@ -381,6 +388,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
   ) {
     super();
     this.#store = new RemoteServerStore({ path, cipher });
+    this.#pictures = new RemotePictureCache(join(dirname(path), REMOTE_PICTURES_DIRECTORY));
     this.#appVersion = options.appVersion ?? null;
     this.#connections = new RemoteServerConnections({
       appVersion: this.#appVersion,
@@ -450,6 +458,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         if (this.#presence.has(serverId)) this.emit("presence", serverId, this.getPresence(serverId));
       },
       hasUsageLimits: (serverId) => this.supportsCapability(serverId, AGENT_USAGE_LIMIT_CAPABILITY),
+      hasModelSources: (serverId) => this.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY),
       emit: (serverId, event, bufferedLive) => {
         // Another device of the user changed their levels: the server list shows the new server level.
         if (event.type === "agent-notification-levels-changed")
@@ -489,6 +498,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       onDirectMessage: (serverId, event) => this.emit("directMessage", serverId, event),
       onDirectTyping: (serverId, event) => this.emit("directTyping", serverId, event),
       onHostRestart: (serverId, event) => this.#applyHostRestart(serverId, event),
+      onHostAppearance: (serverId, event) => this.#applyHostAppearance(serverId, event),
       onMachineAlert: (serverId, event) => this.emit("machineAlert", serverId, event),
       onLiveVoice: (serverId, event) => this.emit("liveVoice", serverId, event),
       onOffline: (serverId) => this.#presence.markOffline(serverId),
@@ -501,7 +511,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         })
       : null;
     this.#webrtcTransport?.on("connected", (serverId) => {
-      this.#events.clearReconnectBackoff(serverId);
+      this.#events.transportConnected(serverId);
       this.#events.markSeenOnline(serverId);
       this.#hostRestartAway.delete(serverId);
       const hostedStartAt = this.#hostedStartAt.get(serverId);
@@ -510,14 +520,26 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#clearHostedStart(serverId);
       this.#hostedStartExpired.delete(serverId);
       this.#connections.markConnected(serverId);
-      this.#emitChanged();
       const server = this.#store.find(serverId);
+      const capabilityRead = server ? this.#connections.startCapabilityRead(serverId) : null;
+      this.#emitChanged();
       this.#background(
         this.#owned(
           Effect.gen({ self: this }, function* () {
-            if (server) yield* this.#client.refreshWebRtcCompatibility(server).pipe(Effect.catch(() => Effect.void));
+            if (server && capabilityRead !== null)
+              yield* this.#client.refreshWebRtcCompatibility(server).pipe(
+                Effect.catch(() => Effect.void),
+                // The renderer holds the workspace load until it sees the end of the read, so the end
+                // and its event stay together on each exit.
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    this.#connections.endCapabilityRead(serverId, capabilityRead);
+                    this.#emitChanged();
+                  }),
+                ),
+              );
             this.#connectTrace?.mark(serverId, "compatibility");
-            this.#emitChanged();
+            if (capabilityRead === null) this.#emitChanged();
             yield* Effect.all(
               [
                 // Another device of the user can have changed the levels while this one was away.
@@ -554,8 +576,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.#events.isReconnectSuspended(serverId)) this.#connections.setState(serverId, "offline");
       this.#presence.markOffline(serverId);
       this.#emitChanged();
+      const firstDrop = this.#events.transportDisconnected(serverId);
       this.#events.scheduleReconnect(serverId);
-      if (wasOnline) this.emit("directoryInvalidated");
+      // Each read of the host list is a request to the account service. A connection that drops again
+      // after a few seconds already read it after its first drop.
+      if (wasOnline && firstDrop) this.emit("directoryInvalidated");
     });
     // A failed attempt can end with no error event, such as a timeout. The server then stayed offline
     // with no issue, and the full-window loading screen waits for an issue to end (#5273).
@@ -612,6 +637,9 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
 
   #suspendServer(serverId: string): void {
     this.#events.suspendReconnect(serverId);
+    // The host ended this member's access, so its pictures must not stay on this computer.
+    if (this.#connections.statusFor(serverId).issue?.code === "authentication_required")
+      this.#background(this.#owned(this.#pictures.forget(serverId)));
     if (this.#store.find(serverId)?.transport !== "webrtc-v2") return;
     const transport = this.#webrtcTransport;
     if (transport) this.#background(this.#owned(transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void))));
@@ -1324,6 +1352,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!current) return;
       this.#clearServerConnectionState(serverId);
       if (forget) {
+        this.#forgetPictures(serverId);
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
@@ -1562,6 +1591,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.request(serverId, path, decodeVoid, { method: "POST" }).pipe(Effect.catch(() => Effect.void));
       }
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
       yield* this.#store.remove(serverId);
       this.#emitChanged();
     },
@@ -1787,6 +1817,14 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     this.#attachments.forget(serverId);
   }
 
+  /**
+   * Deletes the picture copies of a server that leaves the list. A server that stops or changes its
+   * transport keeps them: they show its agents while it is offline.
+   */
+  #forgetPictures(serverId: string): void {
+    this.#background(this.#owned(this.#pictures.forget(serverId)));
+  }
+
   // The server comes first because every caller knows which one it means, and the decoder sits next
   // to the path it decodes. `init` is last and optional, so a plain GET reads as three arguments.
 
@@ -1939,6 +1977,20 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       yield* this.#store.update(server.id, { name: identity.serverName, logoVersion: identity.logoVersion });
       this.#emitChanged();
       return yield* remoteDecode(() => requiredServerSummary(this.list(), server.id));
+    },
+    (operation) => this.#owned(operation),
+  ).bind(this);
+
+  /** Saves the shape and colour that a joined host took, so the change shows before its event arrives. */
+  readonly applyAppearance = Effect.fn("RemoteManager.applyAppearance")(
+    function* (
+      this: RemoteServerManager,
+      serverId: string,
+      appearance: ServerAppearance | null,
+    ): Effect.fn.Return<ServerSummary, RemoteWorkflowError> {
+      yield* this.#store.update(serverId, { appearance });
+      this.#emitChanged();
+      return yield* remoteDecode(() => requiredServerSummary(this.list(), serverId));
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -2200,6 +2252,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       requestId?: string,
     ): Effect.fn.Return<DraftAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
+      const keep = this.#attachments.holdUpload(server.id);
       const url = new URL(TEAM_API_ROUTES.attachments, server.apiUrl);
       url.searchParams.set("name", name);
       url.searchParams.set("mime", mimeType || "application/octet-stream");
@@ -2219,12 +2272,16 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         requestId === undefined ? undefined : this.#importProgress(serverId, requestId),
       );
       const json = yield* remoteCall(() => response.json());
-      return yield* remoteDecode(() =>
+      const draft = yield* remoteDecode(() =>
         addRemotePreviewUrls(
           decodeDraftAttachment(decodeTeamProtocolV1CurrentHttpResponse("POST", url.pathname, response.status, json)),
           server.id,
         ),
       );
+      // The thumbnail shows these bytes at once. Without them, it waited for the same image to come back
+      // from the host. The host keeps the name and the type that it answers, as a download of it gives.
+      if (draft.kind === "image") keep(draft.id, { bytes, name: draft.name, mimeType: draft.mimeType });
+      return draft;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -2435,24 +2492,64 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     (operation) => this.#owned(operation),
   ).bind(this);
 
+  /**
+   * The bytes of an agent's picture. A picture with a version comes from this computer's copy when
+   * it has one, so it shows while the host is offline.
+   */
   readonly downloadAgentAvatar = Effect.fn("RemoteManager.downloadAgentAvatar")(
     function* (
       this: RemoteServerManager,
       agentId: string,
       serverId = this.#store.activeServerId,
       version?: string,
-    ): Effect.fn.Return<{ bytes: Uint8Array; mimeType: string }, RemoteWorkflowError, RemoteRequest> {
+    ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
-      if (version) url.searchParams.set("v", version);
-      const response = yield* this.#client.fetch(server, url);
-      return {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-        mimeType: response.headers.get("content-type") ?? "application/octet-stream",
-      };
+      const download = Effect.gen({ self: this }, function* () {
+        const url = new URL(TEAM_API_ROUTES.agent.avatar(agentId), server.apiUrl);
+        if (version) url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        return {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() || "application/octet-stream",
+        };
+      });
+      return version ? yield* this.#savedPicture(server.id, "agent", agentId, version, download) : yield* download;
     },
     (operation) => this.#owned(operation),
   ).bind(this);
+
+  /**
+   * A picture from this computer's copy, or from `download`, which then becomes the copy. With no
+   * signed-in account there is no copy: a copy belongs to one account.
+   */
+  readonly #savedPicture = Effect.fn("RemoteManager.savedPicture")(function* (
+    this: RemoteServerManager,
+    serverId: string,
+    kind: "agent" | "channel",
+    id: string,
+    version: string,
+    download: Effect.Effect<RemotePicture, RemoteWorkflowError, RemoteRequest>,
+  ): Effect.fn.Return<RemotePicture, RemoteWorkflowError, RemoteRequest> {
+    const account = yield* remoteDecode(() => this.#centralAccount.getEmail().trim().toLowerCase()).pipe(
+      Effect.catch(() => Effect.succeed("")),
+    );
+    if (!account) return yield* download;
+    const key = { account, serverId, kind, id, version };
+    const saved = yield* this.#pictures.read(key);
+    if (saved) return saved;
+    const token = this.#pictures.token(serverId);
+    const picture = yield* download;
+    yield* this.#pictures.write(key, picture, token);
+    return picture;
+  });
 
   /**
    * Sets or removes the image of a channel of a server with `channel-picture-v1`: `PUT
@@ -2516,24 +2613,27 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       if (!this.supportsCapability(serverId, CHANNEL_PICTURE_CAPABILITY))
         return yield* new RemoteWorkflowError({ cause: new Error(sourceText("error.team.channelPictureUnsupported")) });
       const server = yield* remoteDecode(() => this.#store.require(serverId));
-      const url = this.#channelImageUrl(server.apiUrl, channelId);
-      url.searchParams.set("v", version);
-      const response = yield* this.#client.fetch(server, url);
-      // The protocol handler answers 404 for any failure, so the host's error text is not read.
-      if (!response.ok)
-        return yield* new RemoteWorkflowError({
-          cause: new RemoteRequestError(
-            response.status,
-            sourceText("error.remote.requestFailedStatus", { status: response.status }),
-          ),
-        });
-      const picture = {
-        bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
-        mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
-      };
-      if (!isValidAvatarImage(picture.mimeType, picture.bytes))
-        return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
-      return picture;
+      const download = Effect.gen({ self: this }, function* () {
+        const url = this.#channelImageUrl(server.apiUrl, channelId);
+        url.searchParams.set("v", version);
+        const response = yield* this.#client.fetch(server, url);
+        // The protocol handler answers 404 for any failure, so the host's error text is not read.
+        if (!response.ok)
+          return yield* new RemoteWorkflowError({
+            cause: new RemoteRequestError(
+              response.status,
+              sourceText("error.remote.requestFailedStatus", { status: response.status }),
+            ),
+          });
+        const picture = {
+          bytes: new Uint8Array(yield* remoteCall(() => response.arrayBuffer())),
+          mimeType: response.headers.get("content-type")?.split(";", 1)[0]?.trim() ?? "",
+        };
+        if (!isValidAvatarImage(picture.mimeType, picture.bytes))
+          return yield* new RemoteWorkflowError({ cause: new Error("Channel image response is invalid.") });
+        return picture;
+      });
+      return yield* this.#savedPicture(server.id, "channel", channelId, version, download);
     },
     (operation) => this.#owned(operation),
   ).bind(this);
@@ -2737,12 +2837,18 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     return this.#webrtcTransport?.hasActiveTransfers() ?? false;
   }
 
+  /** Deletes the picture copies of every server. A signed-out app keeps none. */
+  forgetSavedPictures(): Effect.Effect<void> {
+    return this.#pictures.clear();
+  }
+
   readonly disconnectRemoteSessions = Effect.fn("RemoteManager.disconnectRemoteSessions")(
     function* (this: RemoteServerManager): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const transport = this.#webrtcTransport;
 
       // A copy skips the host's check of the account, so the next account must not see it.
       this.#attachments.clear();
+      yield* this.#pictures.clear();
       if (!transport) return;
       // First: a session kept for the next run belongs to the account that leaves.
       yield* transport.forgetStoredSessions();
@@ -2801,6 +2907,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     for (const serverId of removedHostIds) {
       yield* transport.disconnect(serverId).pipe(Effect.catch(() => Effect.void));
       this.#clearServerConnectionState(serverId);
+      this.#forgetPictures(serverId);
     }
     // Before the store changes, because after it `ensure` answers for the new entry: it branches on
     // the transport it finds and starts the WebRTC one beside an HTTPS controller it never aborts,
@@ -2818,6 +2925,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     } else if (event.type === "team-direct-message") this.emit("directMessage", serverId, event);
     else if (event.type === "team-direct-typing") this.emit("directTyping", serverId, event);
     else if (event.type === "host-restart") this.#applyHostRestart(serverId, event);
+    else if (event.type === "host-appearance") this.#applyHostAppearance(serverId, event);
     else if (event.type === "machine-alert") this.emit("machineAlert", serverId, event);
     else if (event.type === "live-voice") this.emit("liveVoice", serverId, event);
     else this.#background(this.#owned(this.#refresh.forward(serverId, event)));
@@ -2853,6 +2961,19 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
     );
   }
 
+  // Best effort, as the identity is: the host sends the appearance at each connect and change.
+  #applyHostAppearance(serverId: string, { appearance }: HostAppearanceEvent): void {
+    if (sameAppearance(this.#store.find(serverId)?.appearance, appearance)) return;
+    this.#background(
+      this.#owned(
+        this.#store.update(serverId, { appearance }).pipe(
+          Effect.tap(() => Effect.sync(() => this.#emitChanged())),
+          Effect.catch(() => Effect.void),
+        ),
+      ),
+    );
+  }
+
   #emitChanged(): void {
     this.#syncFocusUse();
     this.emit("changed", this.list());
@@ -2867,6 +2988,11 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.supportsCapability(serverId, FOCUS_USE_CAPABILITY);
     this.#focusUse.setTarget(focused ? serverId : null);
   }
+}
+
+function sameAppearance(left: ServerAppearance | null | undefined, right: ServerAppearance | null): boolean {
+  if (!left || !right) return (left ?? null) === right;
+  return left.shape === right.shape && left.color === right.color;
 }
 
 function requiredServerSummary(servers: ServerSummary[], serverId: string): ServerSummary {

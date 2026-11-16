@@ -461,6 +461,12 @@ feature in `apps/auth-api/src/server/mobile-features-config.ts`. The merge deplo
 service. An app with an older version then shows the update header on home. Set it only after the
 store has the build: before, Update opens a store page that cannot install the version.
 
+The Android version in `MOBILE_LATEST_VERSIONS` is also the version of the APK that openbot.run
+offers for a phone with no Google Play. The APK of a store build is a draft GitHub release, which is
+not public. The merge of this step makes it public (the `Publish the Android APK` workflow), before
+the account service deploys. That workflow fails when the version has no draft
+`android-v<version>`: see [Android APK](../apps/mobile/README.md#android-apk).
+
 `scripts/check-release-notes.ts` stops a release when the section is missing, empty or appears two
 times, or when it has an unknown group, a group with no items, an item with no text or outside a
 group, a placeholder such as `TODO`, or a heading with no real date. These steps run it:
@@ -588,6 +594,10 @@ git tag -a vX.Y.Z -m "OpenBot vX.Y.Z"
 # vX.Y.Z now (preflight item 16). Push the tag only after that.
 git push origin vX.Y.Z
 ```
+
+Before the merge of the preparation, the release-upgrade-safety skill starts the `Provider live E2E`
+workflow on that branch (Step 2c). It sends one real message to each provider
+([Live provider test](provider-live-e2e.md)). Do not push the tag when it has a stop.
 
 Pushing the version tag runs `.github/workflows/release.yml`.
 The tag workflow builds nothing until `https://openbot.run/join` and the Apple association file return
@@ -907,6 +917,14 @@ Before creating the first tag or any later release:
 The macOS ZIP must be smaller than 800,000,000 bytes and smaller than the official `0.1.21` ZIP.
 Do not publish when either size gate fails, the `0.1.21` canary update crashes, or Windows starts NSIS
 during shutdown or sign-out.
+
+Each build job also runs `scripts/release-upgrade-e2e.ts` before `publish`. It installs the previous
+public release, starts it on a new profile, makes two agents with an answered chat, two memories, a
+channel and a custom agent, and quits it. It then installs the new build over it as an update does,
+starts it on the same profile, and checks the version, the schema version, every migration, table and
+column, `PRAGMA integrity_check`, the foreign keys, and that the seeded data is still there. A failure
+stops the release before `publish`. The report is `.openbot-build/release-upgrade-e2e/report.json`,
+with counts only. The script does not use the real `electron-updater` download: its header says why.
 
 The unsigned local macOS package is a development artifact. It does not prove Gatekeeper,
 notarization, or auto-update readiness. Those are proven only by the signed release workflow's

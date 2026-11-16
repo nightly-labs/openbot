@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Serve il tuo input",
   "prompt.question.label": "Domande dell'agente",
   "prompt.question.cancelled": "Domande annullate",
   "prompt.question.expired": "Domande scadute",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Avanti",
   "prompt.question.cancel": "Annulla le domande",
   "prompt.question.privatePlaceholder": "Inserisci una risposta privata",
-  "prompt.customPlaceholder": "Scrivi la tua risposta",
   "prompt.question.customAnswerFor": "Risposta personalizzata per: {question}",
   "prompt.question.skip": "Salta",
   "prompt.question.chooseAll": "Scegli tutte le opzioni valide.",
   "prompt.question.somethingElse": "Altro",
   "prompt.question.emptyTitle": "Nessuna domanda in attesa.",
   "prompt.question.emptyBody": "L'agente continuerà quando avrà bisogno di un'altra decisione.",
-  "prompt.choice.hint": "Scegli quella che ti va, oppure scrivi la tua.",
-  "prompt.choice.customLabel": "Risposta personalizzata",
   "prompt.approval.answerFailed": "Impossibile rispondere a questa approvazione. Riprova.",
   "prompt.approval.grantFailed": "Impossibile salvare l'approvazione permanente. Riprova.",
   "prompt.approval.label": "Approvazione dell'agente",
@@ -29,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "Consenti",
   "prompt.approval.alwaysAllow": "Consenti sempre",
   "prompt.approval.deny": "Nega",
+  "prompt.approval.cut":
+    "Questa scheda mostra solo l’inizio della richiesta, quindi offre solo Rifiuta. Se Consenti non appare a breve, aggiorna OpenBot sul server.",
   "prompt.approval.report.bugHeadline": "Hai trovato un bug? Risolviamolo.",
   "prompt.approval.report.ideaHeadline": "Hai un'idea? Realizziamola.",
   "prompt.approval.report.dontSend": "Non ora",
   "prompt.approval.report.send": "Invia al team di OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Apri questa chat nell'app OpenBot del telefono e invia la segnalazione da lì. Il telefono aggiunge la sua versione, il suo sistema e il suo log di assistenza. Se il telefono non riesce a connettersi, apri Impostazioni > Assistenza nell'app del telefono e segnala il problema su GitHub.",
   "prompt.approval.title.command": "Esegui un comando",
   "prompt.approval.title.fileChange": "Modifica file",
   "prompt.approval.title.permissions": "Concedi permessi",
@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Accesso a {host} annullato",
   "prompt.browser.signInBlocked.body":
     "Accedi su questo computer. OpenBot invia solo l’accesso a {host} a {server}, e {name} continua.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} non accetta un accesso dal server. Apri questa chat nell’app desktop di OpenBot sul tuo computer e accedi da lì. Poi {name} continua.",
   "prompt.browser.signInBlocked.cancelledBody": "L’accesso è stato annullato.",
   "prompt.browser.signInBlocked.waiting": "In attesa dell’accesso",
   "prompt.browser.signInBlocked.waitingButton": "In attesa dell’accesso…",

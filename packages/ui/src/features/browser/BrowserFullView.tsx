@@ -1,4 +1,4 @@
-import { Alert, AlertContent, AlertDescription, AlertTitle, Button, Minimize2, Tabs } from "@openbot/ui";
+import { Alert, AlertContent, AlertDescription, AlertTitle, ArrowLeft, Button, Tabs } from "@openbot/ui";
 import { CloseIcon, PlusIcon } from "@openbot/ui/features/conversation/ConversationIcons";
 import { useText } from "@openbot/ui/text";
 import { clamp, holdFlag } from "@openbot/ui/utils";
@@ -7,6 +7,7 @@ import { BrowserAddressRow } from "./BrowserAddressRow";
 import BrowserLiveView from "./BrowserLiveView";
 import { BrowserTabStrip } from "./BrowserTabStrip";
 import { BrowserTabSwitcher } from "./BrowserTabSwitcher";
+import { BrowserTeachBar } from "./BrowserTeachBar";
 import type { BrowserFullViewProps } from "./browser-full-view-types";
 import { BrowserPageCover } from "./browser-page-cover";
 import { type BrowserViewCommand, browserAriaShortcut, browserViewCommand } from "./browser-view-shortcuts";
@@ -47,6 +48,7 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
   });
   const live = () => props.liveViewTabId !== null;
   const canClose = () => props.canCloseTabs !== false;
+  const recording = () => typeof props.teach?.startedAt === "number";
   let hideButton: HTMLButtonElement | undefined;
   let view: HTMLElement | undefined;
   let surfaceElement: HTMLDivElement | undefined;
@@ -170,18 +172,18 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
     },
   );
 
+  /** The way out of the view names where it goes: an X alone reads as "close the browser" (#9979). */
   const hideBrowserButton = () => (
     <Button
-      variant="ghost"
-      size="icon-sm"
+      variant="secondary"
+      size="sm"
       ref={(element) => (hideButton = element)}
       class="no-drag browser-hide"
-      aria-label={t("browser.hide")}
-      title={t("browser.hide")}
       data-cuelume-tap="close"
       onClick={props.onBack}
     >
-      <Minimize2 aria-hidden="true" />
+      <ArrowLeft aria-hidden="true" />
+      {t("browser.backToChat")}
     </Button>
   );
 
@@ -273,9 +275,22 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
               </Button>
             </Alert>
           </Show>
+          <Show when={props.teach}>
+            {(teach) => (
+              <BrowserTeachBar
+                agentName={teach().agentName}
+                startedAt={teach().startedAt}
+                pending={teach().pending}
+                onStart={() => teach().onStart()}
+                onSave={() => teach().onSave()}
+                onClose={() => teach().onClose()}
+              />
+            )}
+          </Show>
           <div
             class="browser-surface browser-full-surface"
             data-live={live() ? "" : undefined}
+            data-teach-recording={recording() ? "" : undefined}
             ref={(element) => (surfaceElement = element)}
           >
             <Show when={props.liveViewTabId}>
@@ -289,7 +304,8 @@ export default function BrowserFullView(props: BrowserFullViewProps) {
                 />
               )}
             </Show>
-            <Show when={props.open && props.tabs.length > 0}>{props.dock}</Show>
+            {/* The teach bar is the only control while the user shows a task. */}
+            <Show when={props.open && props.tabs.length > 0 && !props.teach}>{props.dock}</Show>
             <Show when={props.tabs.length === 0}>
               <div class="browser-empty-state">
                 <strong>{t("browser.empty.title")}</strong>

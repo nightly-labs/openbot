@@ -1,9 +1,11 @@
-import type { BrowserControlSession, BrowserPreview, BrowserTab } from "@openbot/contracts/ipc";
+import type { BrowserControlSession, BrowserPreview, BrowserTab, BrowserTeachStep } from "@openbot/contracts/ipc";
+import { BROWSER_TEACH_CAPABILITY } from "@openbot/contracts/team-protocol/browser-teach-v1";
+import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { classifyFailure } from "@openbot/telemetry";
 import { toast } from "@openbot/ui";
 import type { AgentProfile } from "@openbot/ui/data";
-import { browserAddressUrl } from "@openbot/ui/features/browser/browser-suggestions";
+import { BROWSER_NEW_TAB_URL, browserAddressUrl } from "@openbot/ui/features/browser/browser-suggestions";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, untrack } from "solid-js";
 import { actionToast } from "../../../action-toast";
@@ -225,6 +227,18 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const resolution = untrack(browserTakeoverResolution);
     if (resolution && resolution.messageMarker !== messageMarker) setBrowserTakeoverResolution(null);
   });
+  /**
+   * The tab that the takeover card opened in the full view. The view covers the chat, so when the step on
+   * that tab ends there, the chat shows again with the page beside it (#9979). A view that the user opened
+   * on their own stays open.
+   */
+  let takeoverFullViewTabId: string | null = null;
+  createEffect(
+    () => deps.panels.activeRightPanel() === "browser-expanded",
+    (expanded) => {
+      if (!expanded) takeoverFullViewTabId = null;
+    },
+  );
   const respondToBrowserTakeover = async (decision: "complete" | "cancel") => {
     const request = deps.props.browserTakeover;
     if (!request) return false;
@@ -252,6 +266,14 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         : undefined,
     );
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
+    // The user can be on another tab of the full view by now. Then that page stays.
+    if (
+      completed &&
+      takeoverFullViewTabId === request.tabId &&
+      activeBrowserTab()?.id === request.tabId &&
+      deps.panels.activeRightPanel() === "browser-expanded"
+    )
+      deps.panels.setActiveRightPanel("browser");
     return completed;
   };
   // The browser pane closes with its last tab. A switch to an agent with no tabs closes nothing.
@@ -286,6 +308,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     if (browserTabs().some((entry) => entry.id === tab.id)) {
       if (deps.props.activeBrowserTabId !== tab.id) activateBrowserTab(tab.id);
       deps.panels.setActiveRightPanel("browser-expanded");
+      takeoverFullViewTabId = tab.id;
       return;
     }
     // A tab that this view does not list, such as a channel member's tab of another thread, opens in the chat
@@ -310,6 +333,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     const tab = browserTakeoverTab();
     return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
   };
+
+  /** The web client cannot send a sign-in from this device, so a page that refused the server needs the desktop app (#9783). */
+  const takeoverNeedsDesktopSignIn = () =>
+    deps.props.runtime !== undefined && deps.props.browserTakeover?.reason === "sign-in-blocked";
 
   /** The agent found that the takeover page refused the sign-in from the server, and this computer can sign in. */
   function blockedTakeoverSignIn() {
@@ -683,7 +710,148 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     }
   }
 
+  /**
+   * The teach view of the full browser. `ready`: the user can go to the page of the task, and nothing is
+   * recorded. `recording`: the host records the steps on `tabId`, and `controlled` says whether the host
+   * said that the user controls the tab. The host ends the recording when the control ends, so the teach
+   * view ends after that. `agentId` is the agent that learns: the steps must not go to another chat.
+   */
+  type BrowserTeachState =
+    | { phase: "ready"; pending: boolean }
+    | {
+        phase: "recording";
+        tabId: string;
+        agentId: string | undefined;
+        startedAt: number;
+        controlled: boolean;
+        pending: boolean;
+      };
+  const [teach, setTeach] = createSignal<BrowserTeachState | null>(null);
+  createEffect(
+    () => {
+      const current = teach();
+      if (!current) return undefined;
+      const controlled =
+        current.phase === "recording" && allBrowserTabs().some((tab) => tab.id === current.tabId && tab.userControl);
+      const moved = current.phase === "recording" && deps.props.agent?.id !== current.agentId;
+      return { current, controlled, moved, open: browserExpandedOpen() };
+    },
+    (state) => {
+      if (!state) return;
+      const { current, controlled, moved, open } = state;
+      if (current.phase === "ready") {
+        // Only the full view has the teach bar.
+        if (!open) setTeach(null);
+        return;
+      }
+      if (moved) {
+        // The user went to another agent, for example with a tab of that agent. Save would send the
+        // steps to the wrong chat, so the recording is discarded and the tab goes back.
+        takenBrowserTabIds.delete(current.tabId);
+        setTeach(null);
+        void conversationRuntime(deps.props)
+          .browser.stopTeach({ tabId: current.tabId, save: false })
+          .catch(() => undefined);
+        return;
+      }
+      if (controlled && !current.controlled) setTeach({ ...current, controlled: true });
+      else if (!controlled && current.controlled) setTeach(null);
+    },
+  );
+  const browserTeach = () => {
+    const current = teach();
+    if (!current) return null;
+    return current.phase === "ready"
+      ? { phase: current.phase, pending: current.pending }
+      : { phase: current.phase, pending: current.pending, tabId: current.tabId, startedAt: current.startedAt };
+  };
+  /**
+   * The user can show a task to this agent. The host must record the steps and give the tab to the user.
+   * A phone does not have this action: the user shows a task of many steps on a desktop page.
+   */
+  const canTeachBrowserTask = () =>
+    browserInteractionAvailable() &&
+    Boolean(deps.props.agent) &&
+    serverSupportsCapability(deps.props.server, BROWSER_TEACH_CAPABILITY) &&
+    serverSupportsCapability(deps.props.server, BROWSER_USER_CONTROL_CAPABILITY);
+
+  /** Opens the full view on a tab of this agent, with the teach bar. The recording starts from the bar. */
+  async function openBrowserTeach() {
+    if (!canTeachBrowserTask() || teach()) return;
+    const tab = activeBrowserTab() ?? (await openBrowserAddress(BROWSER_NEW_TAB_URL, true));
+    if (!tab || closingBrowserTabIds.has(tab.id)) return;
+    deps.panels.setActiveRightPanel("browser-expanded");
+    setTeach({ phase: "ready", pending: false });
+  }
+
+  /** Ends the teach view before a recording starts. */
+  function closeBrowserTeach() {
+    if (teach()?.phase === "ready") setTeach(null);
+  }
+
+  /** Gives the shown tab to the user and starts the recording of the steps. */
+  async function startBrowserTeach() {
+    const tab = activeBrowserTab();
+    const current = teach();
+    if (!tab || current?.phase !== "ready" || current.pending) return;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    setTeach({ phase: "ready", pending: true });
+    try {
+      await conversationRuntime(deps.props).browser.startTeach(tab.id);
+      takenBrowserTabIds.add(tab.id);
+      setTeach({
+        phase: "recording",
+        tabId: tab.id,
+        agentId,
+        startedAt: Date.now(),
+        controlled: false,
+        pending: false,
+      });
+    } catch (error) {
+      setTeach({ phase: "ready", pending: false });
+      const text = currentText();
+      deps.setComposerError(text.errorMessage(error, text.t("browser.error.teachStart")), target, error);
+    }
+  }
+
+  /**
+   * Ends the recording and gives the tab back. Resolves with the steps of a saved recording in which the
+   * user did a step. A saved recording closes the full view, so the user sees the chat where the agent
+   * gets the steps, or the notice that the recording has no steps.
+   */
+  async function stopBrowserTeach(save: boolean): Promise<BrowserTeachStep[] | undefined> {
+    const current = teach();
+    if (current?.phase !== "recording" || current.pending) return undefined;
+    const { tabId } = current;
+    const agentId = deps.props.agent?.id;
+    const target = agentId ? { agentId, serverId: deps.props.server?.id ?? "local" } : undefined;
+    setTeach({ ...current, pending: true });
+    try {
+      const steps = await conversationRuntime(deps.props).browser.stopTeach({ tabId, save });
+      takenBrowserTabIds.delete(tabId);
+      setTeach(null);
+      if (!save) return undefined;
+      deps.panels.setActiveRightPanel("none");
+      // The first step is the page where the recording started. With no step after it, the user showed
+      // nothing, so the agent gets no message.
+      if (steps.length > 1) return steps;
+      toast(currentText().t("browser.error.teachEmpty"));
+      return undefined;
+    } catch (error) {
+      setTeach((state) => (state?.phase === "recording" ? { ...state, pending: false } : state));
+      deps.setComposerError(currentText().t("browser.error.teachStop"), target, error);
+      return undefined;
+    }
+  }
+
   return {
+    browserTeach,
+    canTeachBrowserTask,
+    openBrowserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
     browserInteractionAvailable,
     browserSidebarOpen,
     browserExpandedOpen,
@@ -704,6 +872,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       canStartForTakeover: canSignInTakeoverLocally,
       startForTakeover: signInTakeoverTabLocally,
       blockedTakeover: blockedTakeoverSignIn,
+      needsDesktopForTakeover: takeoverNeedsDesktopSignIn,
       reopen: openLocalSignInWindow,
       finish: () => finishLocalSignIn(),
       cancel: cancelLocalSignIn,

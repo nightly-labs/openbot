@@ -372,27 +372,29 @@ export class ConversationRuntime {
         if (other !== cached && other.snapshot.messages === cached.snapshot.messages) committed.delete(other);
       }
     };
+    // The least recently used first. The sort is stable, so of two chats used at the same time, an
+    // agent chat goes before a thread, and each in map order, as before.
+    let byAge: Array<{ kind: "agent" | "execution"; id: string; cached: CachedSnapshot }> | undefined;
     while (this.#cachedSnapshotBytes > CONVERSATION_CACHE_TOTAL_BYTES_LIMIT) {
-      let oldest:
-        | { kind: "agent"; id: string; usedAt: number }
-        | { kind: "execution"; id: string; usedAt: number }
-        | undefined;
-      for (const [id, cached] of this.#cachedSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
+      byAge ??= [
+        ...[...this.#cachedSnapshots].map(([id, cached]) => ({ kind: "agent" as const, id, cached })),
+        ...[...this.#cachedExecutionSnapshots].map(([id, cached]) => ({ kind: "execution" as const, id, cached })),
+      ].sort((left, right) => left.cached.usedAt - right.cached.usedAt);
+      // A full signature is computed only for a chat that is the oldest one left, not for each
+      // cached chat. Each call on a full cache otherwise serialized the whole budget again (#7250).
+      const oldest = byAge.find(({ kind, id, cached }) => {
+        const current = kind === "agent" ? this.#cachedSnapshots.get(id) : this.#cachedExecutionSnapshots.get(id);
+        if (current !== cached || untrimmable.has(cached)) return false;
         if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "agent", id, usedAt: cached.usedAt };
-      }
-      for (const [id, cached] of this.#cachedExecutionSnapshots) {
-        if (!isCommitted(cached) || untrimmable.has(cached)) continue;
-        if (cached.snapshot.messages.every((message) => isActiveMessage(message, cached.snapshot.activeTurnId)))
-          continue;
-        if (!oldest || cached.usedAt < oldest.usedAt) oldest = { kind: "execution", id, usedAt: cached.usedAt };
-      }
+          return false;
+        return isCommitted(cached);
+      });
       if (!oldest) return;
       if (oldest.kind === "agent") {
         const cached = this.#cachedSnapshots.get(oldest.id);
         if (cached?.snapshot.activeTurnId) trim(cached);
+        // SQLite cannot rebuild a request that waits for a teammate, as the idle sweep says.
+        else if (cached?.snapshot.messages.some(hasActiveDelivery)) untrimmable.add(cached);
         else {
           // Keep the same recovery path as idle eviction. A caller may still hold this snapshot
           // while the process budget evicts it; dropping the map entry without a marker would make
@@ -463,7 +465,7 @@ export class ConversationRuntime {
 
   /**
    * Removes from memory each agent snapshot that is idle and that SQLite can rebuild with the same
-   * content. A snapshot stays when it has no thread, has a turn that runs, or is different from
+   * content. A snapshot stays when it has no thread, has a turn that runs, waits for a delivery, or is different from
    * SQLite: streamed text before its flush, and mailbox messages that a read merged, are in memory
    * only. `revision` is not compared: a rebuilt snapshot takes the thread's last event sequence from
    * SQLite, as after a restart.
@@ -476,6 +478,9 @@ export class ConversationRuntime {
       // A snapshot that must stay is read again only after one more idle period.
       this.#snapshotUsedAt.set(agentId, now);
       if (!snapshot.threadId || snapshot.activeTurnId) continue;
+      // A rebuild reads only the latest messages. An older request that a teammate still works on is
+      // in memory only, and when the teammate finishes, the chat must show that the request ended (#9885).
+      if (snapshot.messages.some(hasActiveDelivery)) continue;
       const cached = this.#cachedSnapshots.get(agentId);
       if (cached && cached.signature !== conversationContentSignature(snapshot)) continue;
       this.#dropCachedSnapshot(agentId);
@@ -698,7 +703,7 @@ export class ConversationRuntime {
     }
     if (snapshot.threadId) {
       const cached = this.#cachedSnapshot(snapshot);
-      const changedMessages = this.#changedMessages(snapshot);
+      const changedMessages = this.#changedMessages(snapshot, snapshot.threadId);
       const removedMessageIds = this.#removedMessageIds(snapshot);
       if (
         cached &&
@@ -752,9 +757,12 @@ export class ConversationRuntime {
     return undefined;
   }
 
-  #changedMessages(snapshot: ConversationSnapshot): ConversationMessage[] {
+  #changedMessages(snapshot: ConversationSnapshot, threadId: string): ConversationMessage[] {
     const cached = this.#cachedSnapshot(snapshot);
-    if (!cached) return structuredClone(snapshot.messages);
+    // A caller can keep a snapshot while a provider read, an eviction or another thread replaces the
+    // cached one. Write only what stores differently: writing it whole put every unchanged message in
+    // the event log again (#8166).
+    if (!cached) return this.#store.database.changedConversationMessages(threadId, snapshot.messages);
     const changed = new Set<ConversationMessage>();
     const untracked: ConversationMessage[] = [];
     for (const message of snapshot.messages) {
@@ -765,10 +773,7 @@ export class ConversationRuntime {
     if (untracked.length === 0) return [...changed];
     // A message the cache does not hold can be a stored row that a limit dropped and a sync added
     // back. Write it only when it stores differently, so the same row is never written again.
-    for (const message of snapshot.threadId
-      ? this.#store.database.changedConversationMessages(snapshot.threadId, untracked)
-      : untracked)
-      changed.add(message);
+    for (const message of this.#store.database.changedConversationMessages(threadId, untracked)) changed.add(message);
     return snapshot.messages.filter((message) => changed.has(message));
   }
 

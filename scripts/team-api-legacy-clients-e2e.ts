@@ -15,6 +15,10 @@
 //   client gets the released runtime snapshot (#3584).
 // - reasoning-efforts-v1: a protocol 9 client that asks for it gets `none`, `minimal` and `ultra`; a
 //   protocol 7 or 8 client gets the nearest released level, and the frozen v7 decoder reads it.
+// - usage-tertiary-v1: a protocol 9 client that asks for it gets the third usage window on the usage
+//   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
+// - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
+//   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -24,6 +28,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
+  type AccountUsage,
   type AgentContextState,
   type AgentModelOption,
   BROWSER_SECRET_RESPONSE_PATH,
@@ -63,9 +68,14 @@ import {
 } from "@openbot/contracts/team-protocol";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+} from "@openbot/contracts/team-protocol/current";
+import {
   TEAM_REASONING_EFFORTS,
   TEAM_REASONING_EFFORTS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/reasoning-efforts-v1";
+import { decodeTeamProtocolV8CurrentHttpResponse } from "@openbot/contracts/team-protocol/v8-adapter";
 import { decodeTeamProtocolSupportV8Base } from "@openbot/contracts/team-protocol/v8-base";
 import { decodeTeamProtocolV8BaseCurrentEvent } from "@openbot/contracts/team-protocol/v8-base-adapter";
 import {
@@ -224,6 +234,8 @@ const teamBrowser: TeamApiBrowser = {
   reload: unused,
   stop: unused,
   takeUserControl: unused,
+  startTeach: unused,
+  stopTeach: () => [],
   releaseUserControl: () => {},
   releaseUserControlHeldBy: () => {},
   close: unused,
@@ -915,6 +927,223 @@ try {
     hostAgents.listAgents = listAgents;
   }
 
+  // --- usage-tertiary-v1 ---
+
+  // No provider runs here, so the host reports what OpenCode Go would have reported: a 5-hour, a weekly
+  // and a monthly window. The second limit has a third window that the v1 shape cannot describe.
+  const monthly = { usedPercent: 12, windowDurationMins: 43_200, resetsAt: 1_795_000_000 };
+  const reading: AccountUsage = {
+    limits: [
+      {
+        id: "opencode",
+        primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1_793_000_000 },
+        secondary: { usedPercent: 70, windowDurationMins: 10_080, resetsAt: 1_793_500_000 },
+        tertiary: monthly,
+      },
+      {
+        id: "cursor",
+        primary: { usedPercent: 5, windowDurationMins: null, resetsAt: null },
+        secondary: null,
+        tertiary: { usedPercent: Number.NaN, windowDurationMins: null, resetsAt: null },
+      },
+    ],
+  };
+  const getUsage = hostAgents.getUsage;
+  Object.defineProperty(hostAgents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+  // The plan limit screens read the first route; the model picker reads the second.
+  const usagePaths = ["/v1/agents/usage", `/v1/agents/${source.id}/usage`];
+  const withoutTertiary = (protocol: number) =>
+    teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== TEAM_USAGE_TERTIARY_CAPABILITY);
+
+  /** The first `usage-changed` event on the event socket of a current client that declares `capabilities`. */
+  async function currentUsageEvent(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    // The host sends the runtime snapshot when it has read the scope, so the event after it is for this scope.
+    const scoped = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      await scoped;
+      const usage = nextMessage(opened, (value) => (isRecord(value) && value.type === "usage-changed" ? value : null));
+      hostAgents.emit("event", { type: "usage-changed", usage: reading });
+      return await usage;
+    } finally {
+      opened.close();
+    }
+  }
+
+  try {
+    await step("usage-tertiary-v1: a protocol 9 client that asks for it gets the third window", async () => {
+      const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+      assert.ok(capabilities.includes(TEAM_USAGE_TERTIARY_CAPABILITY), "A v9 client does not ask for it.");
+      const results: { path: string; limits: string[][] }[] = [];
+      for (const usagePath of usagePaths) {
+        const got = await current(TEAM_PROTOCOL_V9, capabilities, usagePath);
+        assert.equal(got.status, 200, `GET ${usagePath}: ${JSON.stringify(got.body)}.`);
+        const limits = record(got.body, "usage").limits;
+        assert.ok(Array.isArray(limits) && limits.length === 2);
+        assert.deepEqual(record(limits[0], "opencode").tertiary, monthly, `GET ${usagePath} has no tertiary.`);
+        assert.ok(!Object.hasOwn(record(limits[1], "cursor"), "tertiary"), "The host sent a window outside v1.");
+        const decoded = record(decodeTeamProtocolV8CurrentHttpResponse("GET", usagePath, 200, got.body), "decoded");
+        assert.ok(Array.isArray(decoded.limits));
+        assert.deepEqual(record(decoded.limits[0], "decoded opencode").tertiary, monthly);
+        // A released protocol 8 or 9 client reads the same body with its frozen decoder, on the frozen path.
+        const frozen = record(decodeTeamProtocolV8HttpResponse("GET", "/v1/agents/usage", 200, got.body), "frozen");
+        assert.ok(Array.isArray(frozen.limits));
+        assert.ok(!Object.hasOwn(record(frozen.limits[0], "frozen opencode"), "tertiary"));
+        results.push({ path: usagePath, limits: limits.map((limit) => Object.keys(record(limit, "limit")).sort()) });
+      }
+      return results;
+    });
+
+    await step("usage-tertiary-v1: a client without it gets the released usage limits", async () => {
+      assert.ok(
+        !teamCapabilitiesForProtocol(8).includes(TEAM_USAGE_TERTIARY_CAPABILITY),
+        "A protocol 8 client asks for usage-tertiary-v1.",
+      );
+      const results: { protocol: number; path: string; keys: string[] }[] = [];
+      for (const protocol of [TEAM_PROTOCOL_V7, 8, TEAM_PROTOCOL_V9]) {
+        for (const usagePath of usagePaths) {
+          const got = await current(protocol, withoutTertiary(protocol), usagePath);
+          assert.equal(got.status, 200, `Protocol ${protocol}, ${usagePath}: ${JSON.stringify(got.body)}.`);
+          const limits = record(got.body, "usage").limits;
+          assert.ok(Array.isArray(limits));
+          const first = record(limits[0], "opencode");
+          assert.ok(!Object.hasOwn(first, "tertiary"), `Protocol ${protocol} got tertiary on ${usagePath}.`);
+          results.push({ protocol, path: usagePath, keys: Object.keys(first).sort() });
+        }
+      }
+      return results;
+    });
+
+    await step("usage-tertiary-v1: the usage-changed event follows the capability", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+      assert.ok(decoded.kind === "known" && decoded.event.type === "usage-changed", JSON.stringify(wire));
+      assert.deepEqual(decoded.event.usage.limits[0]?.tertiary, monthly);
+      assert.equal(decoded.event.usage.limits[1]?.tertiary, undefined);
+      const without = await currentUsageEvent(withoutTertiary(TEAM_PROTOCOL_V9));
+      assert.ok(!JSON.stringify(without).includes("tertiary"), "A client without it got tertiary.");
+      return { withCapability: "tertiary", without: "released" };
+    });
+
+    await step("usage-tertiary-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+      const wire = await currentUsageEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, wire, { usageTertiary: true }));
+      assert.ok(relayed.status === "known" && relayed.event.type === "usage-changed");
+      assert.deepEqual(relayed.event.usage.limits[0]?.tertiary, monthly);
+      const without = createTeamProtocolV8Event(2, wire, {});
+      assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("tertiary"));
+      const usage = record(wire.usage, "usage");
+      assert.ok(Array.isArray(usage.limits));
+      const bad = { ...record(usage.limits[0], "opencode"), tertiary: { usedPercent: "12" } };
+      const malformed = { ...wire, usage: { ...usage, limits: [bad] } };
+      assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+      assert.throws(() => decodeTeamProtocolV8CurrentHttpResponse("GET", "/v1/agents/usage", 200, malformed.usage));
+      return { relayed: relayed.status, malformed: "invalid" };
+    });
+  } finally {
+    Object.defineProperty(hostAgents, "getUsage", { value: getUsage, configurable: true });
+  }
+
+  // --- browser-vault-skip-v1: why a saved login was not filled ---
+
+  const takeover = {
+    requestId: "vault-skip-request",
+    agentId: source.id,
+    threadId: "vault-skip-thread",
+    turnId: "vault-skip-turn",
+    tabId: "vault-skip-tab",
+    secret: { method: "password" as const, origin: "https://app.example.com", digits: 6 },
+    vaultSkip: "agent-script" as const,
+  };
+  const withoutVaultSkip = (protocol: number) =>
+    teamCapabilitiesForProtocol(protocol).filter((capability) => capability !== BROWSER_VAULT_SKIP_CAPABILITY);
+
+  /** The first `browser-takeover-requested` event on the event socket of a client that declares `capabilities`. */
+  async function currentTakeoverEvent(capabilities: readonly string[]): Promise<JsonObject> {
+    const opened = new WebSocket(`ws://127.0.0.1:${port}/v1/events`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${member.token}`,
+    ]);
+    await new Promise<void>((resolveOpen, reject) => {
+      opened.addEventListener("open", () => resolveOpen(), { once: true });
+      opened.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const scoped = nextMessage(opened, (value) =>
+      isRecord(value) && value.type === "runtime-snapshot" ? value : null,
+    );
+    opened.send(
+      encodeTeamProtocolV1CurrentClientEvent({
+        type: "agent-event-scope",
+        includeConversations: false,
+        capabilities: [...capabilities],
+      }),
+    );
+    try {
+      await scoped;
+      const requested = nextMessage(opened, (value) =>
+        isRecord(value) && value.type === "browser-takeover-requested" ? value : null,
+      );
+      hostAgents.emit("event", { type: "browser-takeover-requested", request: takeover });
+      return await requested;
+    } finally {
+      opened.close();
+    }
+  }
+
+  await step("browser-vault-skip-v1: a protocol 9 client that asks for it gets the reason", async () => {
+    const capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9);
+    assert.ok(capabilities.includes(BROWSER_VAULT_SKIP_CAPABILITY), "A v9 client does not ask for it.");
+    assert.ok(
+      !teamCapabilitiesForProtocol(8).includes(BROWSER_VAULT_SKIP_CAPABILITY),
+      "A protocol 8 client asks for browser-vault-skip-v1.",
+    );
+    const wire = await currentTakeoverEvent(capabilities);
+    assert.equal(record(wire.request, "request").vaultSkip, "agent-script", JSON.stringify(wire));
+    const decoded = decodeTeamProtocolV8BaseCurrentEvent(wire);
+    assert.ok(decoded.kind === "known" && decoded.event.type === "browser-takeover-requested", JSON.stringify(wire));
+    assert.equal(decoded.event.request.vaultSkip, "agent-script");
+    assert.equal(decoded.event.request.secret?.origin, "https://app.example.com");
+    return { request: Object.keys(record(wire.request, "request")).sort() };
+  });
+
+  await step("browser-vault-skip-v1: a client without it gets the released takeover request", async () => {
+    const wire = await currentTakeoverEvent(withoutVaultSkip(TEAM_PROTOCOL_V9));
+    const request = record(wire.request, "request");
+    assert.ok(!Object.hasOwn(request, "vaultSkip"), `A client without it got the reason: ${JSON.stringify(wire)}.`);
+    assert.equal(record(request.secret, "secret").origin, "https://app.example.com");
+    return { request: Object.keys(request).sort() };
+  });
+
+  await step("browser-vault-skip-v1: a WebRTC event follows the capability; a bad value fails closed", async () => {
+    const wire = await currentTakeoverEvent(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+    const relayed = decodeTeamProtocolV8CurrentEvent(
+      createTeamProtocolV8Event(1, wire, { preserveBrowserSecrets: true, browserVaultSkip: true }),
+    );
+    assert.ok(relayed.status === "known" && relayed.event.type === "browser-takeover-requested");
+    assert.equal(relayed.event.request.vaultSkip, "agent-script");
+    const without = createTeamProtocolV8Event(2, wire, { preserveBrowserSecrets: true });
+    assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("vaultSkip"));
+    const malformed = { ...wire, request: { ...record(wire.request, "request"), vaultSkip: "stolen-password" } };
+    assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+    return { relayed: relayed.status, malformed: "invalid" };
+  });
+
   // --- v2 over WebRTC frames ---
 
   const clientKeys = generateKeyPairSync("ed25519", {
@@ -1211,6 +1440,53 @@ try {
       "A protocol 8 peer got a protocol 9 capability.",
     );
     return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+  });
+
+  await step("usage-tertiary-v1 RPC: a WebRTC usage read follows the capability", async () => {
+    const reading: AccountUsage = {
+      limits: [
+        {
+          id: "opencode",
+          primary: { usedPercent: 40, windowDurationMins: 300, resetsAt: 1_793_000_000 },
+          secondary: { usedPercent: 70, windowDurationMins: 10_080, resetsAt: 1_793_500_000 },
+          tertiary: { usedPercent: 12, windowDurationMins: 43_200, resetsAt: 1_795_000_000 },
+        },
+      ],
+    };
+    const usage = async (capabilities: readonly string[]) => {
+      const requestId = randomUUID();
+      const from = v2.bridge.sent.length;
+      v2.bridge.emit(
+        "data",
+        "peer-v2",
+        "rpc",
+        encodeTeamProtocolV2Frame(
+          createTeamProtocolV2Request(requestId, "http.request", {
+            method: "GET",
+            path: "/v1/agents/usage",
+            body: null,
+            capabilities: [...capabilities],
+          }),
+        ),
+      );
+      const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+      assert.ok("result" in frame, `The usage frame failed: ${JSON.stringify(frame)}.`);
+      const limits = record(record(frame.result, "RPC result").body, "usage").limits;
+      assert.ok(Array.isArray(limits));
+      return record(limits[0], "opencode");
+    };
+    const getUsage = agents?.getUsage;
+    assert.ok(agents && getUsage);
+    Object.defineProperty(agents, "getUsage", { value: () => Effect.succeed(reading), configurable: true });
+    try {
+      const withCapability = await usage(teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9));
+      assert.deepEqual(withCapability.tertiary, reading.limits[0]?.tertiary, "A protocol 9 peer got no tertiary.");
+      const without = await usage(teamCapabilitiesForProtocol(8));
+      assert.ok(!Object.hasOwn(without, "tertiary"), "A protocol 8 peer got tertiary.");
+      return { protocol9: Object.keys(withCapability).sort(), protocol8: Object.keys(without).sort() };
+    } finally {
+      Object.defineProperty(agents, "getUsage", { value: getUsage, configurable: true });
+    }
   });
 
   await step("v8 RPC: a secure authentication answer over WebRTC reaches the agent (#3949)", async () => {

@@ -3,6 +3,8 @@ import {
   type AgentStatus,
   agentProviderDescriptor,
   type McpSignInRelayPage,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
   type ProviderRelaySignInStatus,
@@ -38,6 +40,20 @@ interface ProviderCodeLoginTarget {
   accountSignIn?: ProviderAccountSignInTarget;
   /** A joined server whose account sign-in page opens in this computer's browser. */
   accountRelay?: ProviderAccountRelayTarget;
+  /** The code sign-in of one account of a provider, where the computer that runs the providers has it. */
+  accountCode?: ProviderAccountCodeTarget;
+}
+
+/**
+ * How the computer that runs the providers signs one account in with a code: a new account when
+ * `accountId` is null. The start names the account; its status and its cancel take that name.
+ */
+interface ProviderAccountCodeTarget {
+  start: (provider: AgentProviderId, accountId: string | null) => Promise<ProviderAccountCodeLoginStart>;
+  /** Sends the code that the page of a `paste` sign-in showed. */
+  submit: (provider: AgentProviderId, accountId: string, code: string) => Promise<void>;
+  status: (provider: AgentProviderId, accountId: string) => Promise<ProviderAccountCodeLoginStatus>;
+  cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
 }
 
 /**
@@ -135,6 +151,8 @@ export interface ProviderConnectionController extends ProviderConnectionApi {
    * otherwise on the host's page. Null signs a new one in.
    */
   connectAccount: (provider: AgentProviderId, accountId: string | null) => void;
+  /** Signs one account of a provider in with a code that the person types on any device. Null signs a new one in. */
+  connectAccountWithCode: (provider: AgentProviderId, accountId: string | null) => void;
 }
 
 export function createProviderConnection(options: ProviderConnectionOptions): ProviderConnectionController {
@@ -154,6 +172,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   let codeLoginMethod: ProviderCodeLoginMethod = "code";
   /** The account that the open sign-in signs in: null for a new one, undefined for the provider's own. */
   let codeLoginAccount: string | null | undefined;
+  /** The account of the open account code sign-in, once the start named it. */
+  let codeLoginAccountId: string | undefined;
 
   /** Runs one of the provider's routes. */
   function run(
@@ -183,6 +203,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     codeLoginTarget = target;
     codeLoginMethod = method;
     codeLoginAccount = accountId;
+    codeLoginAccountId = undefined;
     setCodeLoginOpener(opener);
     setCodeLoginProvider(provider);
     setCodeLoginState({ phase: "starting" });
@@ -221,6 +242,37 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
         await followHostSignIn(provider, host, generation);
         return;
       }
+      if (accountId !== undefined) {
+        const accountCode = target.accountCode;
+        if (!accountCode) throw failed();
+        const account = await accountCode.start(provider, accountId);
+        // The dialog closed before the start named the account, so the cancel had no account to stop.
+        // A newer sign-in of the same account owns the sign-in now, so it stays.
+        if (generation !== codeLoginGeneration) {
+          if (codeLoginProvider() !== provider || codeLoginAccount !== account.accountId)
+            void accountCode.cancel(provider, account.accountId).catch(() => undefined);
+          return;
+        }
+        codeLoginAccountId = account.accountId;
+        if (account.start.kind === "connected") {
+          await followAccountCodeSignIn(provider, accountCode, account.accountId, generation);
+          return;
+        }
+        showCode(account.start);
+        codeLoginExpiry = window.setTimeout(
+          () => {
+            if (generation !== codeLoginGeneration) return;
+            codeLoginExpiry = undefined;
+            // A code that the CLI checks now can still sign the account in: the status ends the dialog.
+            if (!isWaitingPhase(codeLoginState())) return;
+            void accountCode.cancel(provider, account.accountId).catch(() => undefined);
+            endProviderCodeLogin(provider, { kind: "expired" });
+          },
+          Math.max(0, account.start.expiresAt - Date.now()),
+        );
+        await followAccountCodeSignIn(provider, accountCode, account.accountId, generation);
+        return;
+      }
       const started = await target.start(provider);
       // A dialog the user closed while the provider was answering: the login was cancelled with
       // it, so there is nobody left to show a code to.
@@ -230,21 +282,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
         endProviderCodeLogin(provider, { kind: "connected", accountLabel: row?.email ?? null });
         return;
       }
-      flush(() =>
-        setCodeLoginState(
-          started.kind === "paste" || started.kind === "link"
-            ? { phase: started.kind, verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
-            : {
-                phase: "waiting",
-                userCode: started.userCode,
-                verificationUrl: started.verificationUrl,
-                ...(started.verificationUrlComplete === undefined
-                  ? {}
-                  : { verificationUrlComplete: started.verificationUrlComplete }),
-                expiresAt: started.expiresAt,
-              },
-        ),
-      );
+      showCode(started);
       // Main gives up on the same deadline and reports a failure, but the user is looking at a
       // countdown: when it reaches zero the screen has to say so without waiting for a round trip.
       codeLoginExpiry = window.setTimeout(
@@ -267,6 +305,51 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
                 name: agentProviderDescriptor(provider).displayName,
               }),
       });
+    }
+  }
+
+  /** Shows the code, the page to paste a code from, or the link that the provider issued. */
+  function showCode(started: Exclude<ProviderCodeLoginStart, { kind: "connected" }>): void {
+    flush(() =>
+      setCodeLoginState(
+        started.kind === "paste" || started.kind === "link"
+          ? { phase: started.kind, verificationUrl: started.verificationUrl, expiresAt: started.expiresAt }
+          : {
+              phase: "waiting",
+              userCode: started.userCode,
+              verificationUrl: started.verificationUrl,
+              ...(started.verificationUrlComplete === undefined
+                ? {}
+                : { verificationUrlComplete: started.verificationUrlComplete }),
+              expiresAt: started.expiresAt,
+            },
+      ),
+    );
+  }
+
+  /**
+   * Ends the dialog with the result of an account's code sign-in. The provider's own status does
+   * not say how an account's sign-in ended, so the status of the sign-in is read until it ends.
+   */
+  async function followAccountCodeSignIn(
+    provider: AgentProviderId,
+    accountCode: ProviderAccountCodeTarget,
+    accountId: string,
+    generation: number,
+  ): Promise<void> {
+    while (generation === codeLoginGeneration) {
+      const status = await accountCode.status(provider, accountId).catch((error: unknown) => {
+        // Nobody watches the sign-in any more, so it must not stay open until the code expires.
+        if (generation === codeLoginGeneration) void accountCode.cancel(provider, accountId).catch(() => undefined);
+        throw error;
+      });
+      if (generation !== codeLoginGeneration) return;
+      if (status.result) {
+        if (status.result.error) endProviderCodeLogin(provider, { kind: "failed", message: status.result.error });
+        else endProviderCodeLogin(provider, { kind: "connected", accountLabel: signedInLabel(provider) });
+        return;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
     }
   }
 
@@ -311,8 +394,9 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
   function signedInLabel(provider: AgentProviderId): string | null {
     const row = options.agentStatus().providers?.find((candidate) => candidate.id === provider);
     if (codeLoginAccount === undefined) return row?.email ?? null;
-    if (codeLoginAccount === null) return null;
-    return row?.accounts?.find((account) => account.id === codeLoginAccount)?.email ?? null;
+    const accountId = codeLoginAccountId ?? codeLoginAccount;
+    if (accountId === null) return null;
+    return row?.accounts?.find((account) => account.id === accountId)?.email ?? null;
   }
 
   /** Shows the page once the host has it, and ends the dialog with the relayed sign-in's result. */
@@ -368,7 +452,10 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     const provider = codeLoginProvider();
     const state = codeLoginState();
     const target = codeLoginTarget;
-    if (!provider || state.phase !== "paste" || state.submitting || !target?.submit) return;
+    // The status of an account's sign-in, which is read already, ends the dialog.
+    const accountId = codeLoginAccount === undefined ? undefined : codeLoginAccountId;
+    const account = accountId === undefined ? undefined : target?.accountCode;
+    if (!provider || state.phase !== "paste" || state.submitting || !(account ?? target?.submit)) return;
     const generation = codeLoginGeneration;
     setCodeLoginState({
       phase: "paste",
@@ -377,8 +464,14 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       submitting: true,
     });
     try {
-      const status = await target.submit(provider, code);
-      if (generation !== codeLoginGeneration) return;
+      if (account && accountId !== undefined) {
+        await account.submit(provider, accountId, code);
+        if (generation === codeLoginGeneration && codeLoginState().phase === "paste")
+          setCodeLoginState({ phase: "verifying" });
+        return;
+      }
+      const status = await target?.submit?.(provider, code);
+      if (generation !== codeLoginGeneration || !status) return;
       flush(() => {
         setCodeLoginState({ phase: "verifying" });
         options.applyStatus(status);
@@ -408,6 +501,13 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
     const target = codeLoginTarget;
     if (!provider || !target) return;
     options.analytics?.drop(provider);
+    if (codeLoginMethod === "code" && codeLoginAccount !== undefined) {
+      // A start that has not named its account yet cancels itself when it answers.
+      const accountId = codeLoginAccountId;
+      if (accountId && target.accountCode)
+        codeLoginCancellation = target.accountCode.cancel(provider, accountId).catch(() => undefined);
+      return;
+    }
     const cancel =
       codeLoginMethod === "relay" && target.relay
         ? target.relay.cancel
@@ -505,7 +605,8 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       return options.agentStatus().providers?.find((row) => row.id === provider) ?? null;
     },
     (row) => {
-      if (!row) return;
+      // The status of an account's code sign-in says how it ends; the provider's own row does not.
+      if (!row || (codeLoginMethod === "code" && codeLoginAccount !== undefined)) return;
       if (row.connectionState === "connecting") {
         codeLoginStarted = true;
         return;
@@ -552,6 +653,7 @@ export function createProviderConnection(options: ProviderConnectionOptions): Pr
       const relay = options.target().accountRelay?.providers.includes(provider);
       void startProviderCodeLogin(provider, relay ? "relay" : "host-page", null, accountId);
     },
+    connectAccountWithCode: (provider, accountId) => void startProviderCodeLogin(provider, "code", null, accountId),
     alternative: (provider, opener) => run(provider, route(provider).alternative, opener ?? null),
     // Only the browser sign-in of this computer takes the region. A server's sign-in uses the global site.
     mainlandChinaSite: (provider) =>
@@ -594,6 +696,7 @@ function isWaitingPhase(state: ProviderCodeLoginState): boolean {
 function samePage(shown: McpSignInRelayPage | null, page: McpSignInRelayPage): boolean {
   return (
     shown?.authorizeHost === page.authorizeHost &&
+    shown.url === page.url &&
     shown.listening === page.listening &&
     shown.pasteable === page.pasteable
   );

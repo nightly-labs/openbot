@@ -322,6 +322,7 @@ export const messages = {
   "connector.telegram.helpRelayUnavailableHost":
     "لا يستطيع OpenBot على {host} استقبال رسائل Telegram. على {host}، سجّل الدخول، وأعطِ الخادم اسمًا في إعدادات الخادم، وأبقِ OpenBot مفتوحًا.",
   "connector.telegram.helpError": "لا يستطيع OpenBot الوصول إلى هذه الدردشة. أعد الربط، أو اقطع اتصال الدردشة.",
+  "connector.telegram.helpNotLinked": 'هذه الدردشة غير مرتبطة بهذا الخادم. اختر "إعادة الربط" لربطها.',
   "connector.telegram.retryAt": "طلب Telegram من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "connector.telegram.pause": "إيقاف مؤقت",
   "connector.telegram.resume": "استئناف",
@@ -412,6 +413,7 @@ export const messages = {
   "connector.whatsapp.helpLoggedOutHost": "أزال WhatsApp هذا الخادم من الأجهزة المرتبطة. اربط الرقم مرة أخرى.",
   "connector.whatsapp.helpError":
     "لا يستطيع OpenBot الوصول إلى WhatsApp على هذا الرقم. أعد الربط، أو اقطع اتصال الرقم.",
+  "connector.whatsapp.helpKeysUnreadable": "لا يستطيع OpenBot قراءة المفاتيح المحفوظة لهذا الرقم. اربط الرقم مرة أخرى.",
   "connector.whatsapp.retryAt": "طلب WhatsApp من OpenBot الانتظار. سيحاول مرة أخرى في {time}.",
   "connector.whatsapp.pause": "إيقاف مؤقت",
   "connector.whatsapp.resume": "استئناف",
@@ -427,6 +429,12 @@ export const messages = {
   "connector.whatsapp.ownNumber": "رقم شخصي",
   "connector.whatsapp.ownNumberDescription":
     "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+  "connector.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
+  "connector.whatsapp.workingMessageDescription":
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+  "connector.whatsapp.statusReactions": "تفاعلات الحالة",
+  "connector.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",

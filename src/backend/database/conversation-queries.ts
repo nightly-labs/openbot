@@ -18,6 +18,7 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -42,6 +43,7 @@ export interface ConversationMarkerExclusions {
   excludeRoutineRunEvents?: boolean;
   excludeHostedSiteEvents?: boolean;
   excludeRoutineQuietAnswers?: boolean;
+  excludeSettingLinks?: boolean;
 }
 
 /**
@@ -243,6 +245,20 @@ export class ConversationQueries {
     ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
   }
 
+  /** Reads the messages of one thread with one item type, such as the thank-you cards of one report. */
+  readConversationMessagesOfItemType(agentId: string, threadId: string, itemType: string): ConversationMessage[] {
+    return databaseRows(
+      this.#core.connection
+        .prepare(
+          `SELECT message_json FROM projection_thread_messages
+           WHERE thread_id = ? AND item_type = ?
+           AND thread_id IN (SELECT thread_id FROM projection_threads WHERE agent_id = ?)
+           ORDER BY created_at, ordinal, message_id`,
+        )
+        .all(threadId, itemType, agentId),
+    ).map((row) => decodeConversationMessageJson(requiredStringColumn(row, "message_json")));
+  }
+
   /** Reads only messages that restart recovery can change. */
   readConversationRecoveryMessages(
     agentId: string,
@@ -362,6 +378,24 @@ export class ConversationQueries {
     return row ? this.#conversationRowsBefore(threadId, conversationRowCursor(row), options).count : 0;
   }
 
+  /** Whether the reader can see a message after a message of the thread. False when the thread does not hold it. */
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    const row = this.#messageOrderRow(threadId, messageId);
+    if (!row) return false;
+    const next = databaseRow(
+      this.#core.connection
+        .prepare(
+          `${ORDERED_THREAD_MESSAGES}
+           SELECT 1 AS found FROM ordered
+           WHERE (${ORDER_KEY_COLUMNS}) > (?, ?, ?, ?, ?, ?, ?)
+           ${conversationMarkerSqlFilter(options)}
+           LIMIT 1`,
+        )
+        .get(threadId, ...pageKeyValues(conversationRowCursor(row))),
+    );
+    return next !== null;
+  }
+
   #messageOrderRow(threadId: string, messageId: string): DynamicRecord | null {
     return databaseRow(
       this.#core.connection
@@ -445,6 +479,7 @@ export class ConversationQueries {
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
+               AND COALESCE(message.item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'
                AND json_extract(message.message_json, '$.routine') IS NULL
                ${includeSideThreads ? ARCHIVED_SIDE_THREAD_EXCLUSION : SIDE_THREAD_EXCLUSION}
                ${filter}
@@ -789,6 +824,7 @@ function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): 
       ? `AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'`
       : "",
     exclusions.excludeRoutineQuietAnswers ? `AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'` : "",
+    exclusions.excludeSettingLinks ? `AND COALESCE(item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'` : "",
   ]
     .filter(Boolean)
     .join("\n");

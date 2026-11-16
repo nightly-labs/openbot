@@ -44,7 +44,20 @@ const UiErrors = createSimpleContext({
       }));
     }
 
-    return { uiErrors, setUiErrors, appendUiError };
+    /** Removes the errors with `status` from the conversation `errorKey`, or from each conversation without it. */
+    function clearUiErrors(status: string, errorKey?: string): void {
+      setUiErrors((current) => {
+        let next = current;
+        for (const [key, errors] of Object.entries(current)) {
+          if ((errorKey !== undefined && key !== errorKey) || !errors.some((entry) => entry.status === status))
+            continue;
+          next = { ...next, [key]: errors.filter((entry) => entry.status !== status) };
+        }
+        return next;
+      });
+    }
+
+    return { uiErrors, setUiErrors, appendUiError, clearUiErrors };
   },
 });
 

@@ -62,12 +62,13 @@ export class McpHostSignIns {
 
   /**
    * The same sign-in, with no tab: the page address waits in `relayPage` for the administrator's own
-   * computer to open, and the grant comes back through `SignInRelayHost`.
+   * computer to open, and the grant comes back through `SignInRelayHost`. `deepLinkRedirectUrl` is
+   * the link that computer returns to OpenBot on, when it has one (`sign-in-relay-deep-link-v1`).
    */
-  startRelay(input: TestMcpServerInput) {
+  startRelay(input: TestMcpServerInput, deepLinkRedirectUrl?: string) {
     return this.#pages.start(
       signInKey(input.config.url),
-      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage),
+      (openPage) => this.#dependencies.service.signInMcpServer(input, openPage, deepLinkRedirectUrl),
       resultOf,
       "relay",
     );

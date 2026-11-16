@@ -695,13 +695,16 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
  * its own. The vendor icon addresses are left out: the phone loads each icon from the account
  * service's `/plugins/icon/<slug>?app=<id>`, so opening the Marketplace sends no request to a vendor.
  * The Apple apps a server drives are left out too: only the Mac that runs the server can ask for them.
+ * The phone keeps only that such an app needs a Mac, to say so for a server that is not one.
  */
 function renderMobileModule(plugins: PluginDetail[]): string {
   const listings = plugins.map((plugin) => {
     const { iconUrl: _iconUrl, updatedAt: _updatedAt, apps, ...detail } = plugin;
     return {
       ...detail,
-      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation: _macAutomation, ...app }) => app),
+      apps: apps.map(({ iconUrl: _appIconUrl, macAutomation, ...app }) =>
+        macAutomation?.length ? { ...app, needsMac: true } : app,
+      ),
     };
   });
   return `/**
@@ -758,6 +761,8 @@ export interface MobilePluginApp {
   name: string;
   description: string;
   server: MobilePluginServer;
+  /** The app drives Apple apps, so it runs only on a host that is a Mac. */
+  needsMac?: true;
 }
 
 export interface MobilePlugin {

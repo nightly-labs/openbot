@@ -36,9 +36,7 @@
 }
 
 .billing-server-logo {
-  width: 32px;
-  height: 32px;
-  border-radius: var(--openbot-radius-md);
+  --server-plush-logo-size: 32px;
 }
 
 .billing-server-title {
@@ -212,4 +210,16 @@
 .billing-license-users {
   max-height: 320px;
   overflow-y: auto;
+}
+
+/* The billing country and the EU VAT ID, side by side, before the payment page. */
+.billing-details-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  align-items: start;
+  gap: var(--openbot-space-3);
+}
+
+.billing-details-country[data-empty] {
+  color: var(--openbot-text-muted);
 }

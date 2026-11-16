@@ -35,7 +35,9 @@ export type EmailDeliveryBindings = Pick<
   | "EMAIL_SMTP_USERNAME"
   | "EMAIL_SMTP_PASSWORD"
   | "EMAIL_FROM"
+  | "EMAIL_REPLY_TO"
   | "EMAIL_LICENSE_FROM"
+  | "EMAIL_LICENSE_REPLY_TO"
   | "EMAIL_RELAY"
   | "EMAIL_FALLBACK"
   | "EMAIL_DELIVERY_WEBHOOK_URL"
@@ -46,6 +48,11 @@ export type EmailDeliveryBindings = Pick<
 interface EmailSenders {
   smtp: SmtpEmailConfig;
   fallback: SendEmail | null;
+  /**
+   * The team's inbox: `EMAIL_REPLY_TO`, or `EMAIL_FROM` when it is empty. A reply to an automated
+   * email goes here, and so do contact form messages.
+   */
+  inbox: string;
 }
 
 export function createEmailCodeDelivery(
@@ -96,7 +103,7 @@ export function createContactMessageDelivery(
   const senders = readEmailSenders(bindings);
   return senders
     ? {
-        send: (message) => deliver(analytics, "contact", senders, prepareContactMessage(senders.smtp.from, message)),
+        send: (message) => deliver(analytics, "contact", senders, prepareContactMessage(senders.inbox, message)),
       }
     : null;
 }
@@ -111,7 +118,8 @@ export function createWelcomeEmailDelivery(
 
 /**
  * License emails go from `EMAIL_LICENSE_FROM` through the same SMTP account, so that account must be
- * allowed to send as it. An empty value uses `EMAIL_FROM`.
+ * allowed to send as it. An empty value uses `EMAIL_FROM`. A reply goes to `EMAIL_LICENSE_REPLY_TO`,
+ * or to the license sender when it is empty, not to `EMAIL_REPLY_TO`.
  */
 export function createLicenseEmailDelivery(
   bindings: EmailDeliveryBindings,
@@ -119,9 +127,11 @@ export function createLicenseEmailDelivery(
 ): LicenseEmailDelivery | null {
   const senders = readEmailSenders(bindings);
   if (!senders) return null;
+  const from = bindings.EMAIL_LICENSE_FROM?.trim() || senders.smtp.from;
   const licenseSenders = {
     ...senders,
-    smtp: { ...senders.smtp, from: bindings.EMAIL_LICENSE_FROM?.trim() || senders.smtp.from },
+    smtp: { ...senders.smtp, from },
+    inbox: bindings.EMAIL_LICENSE_REPLY_TO?.trim() || from,
   };
   return { send: (message) => deliver(analytics, "license", licenseSenders, prepareLicenseEmail(message)) };
 }
@@ -145,7 +155,7 @@ const deliver = Effect.fn("EmailDelivery.deliver")(function* (
     analytics.track(null, { name: "email_sent", kind, result: "failed" });
     return yield* prepared.failure;
   }
-  const message = prepared.success;
+  const message = withInboxReply(senders, prepared.success);
   const startedAt = Date.now();
   const smtp = yield* Effect.result(tracked(analytics, "email_sent", kind, sendPrivateEmail(senders.smtp, message)));
   if (Result.isSuccess(smtp)) return;
@@ -254,7 +264,18 @@ function sendResult(exit: Exit.Exit<void, { message: string }>): EmailResult {
 
 function readEmailSenders(bindings: EmailDeliveryBindings): EmailSenders | null {
   const smtp = readSmtpConfig(bindings);
-  return smtp ? { smtp, fallback: bindings.EMAIL_FALLBACK ?? null } : null;
+  if (!smtp) return null;
+  const inbox = bindings.EMAIL_REPLY_TO?.trim() || smtp.from;
+  return { smtp, fallback: bindings.EMAIL_FALLBACK ?? null, inbox };
+}
+
+/**
+ * Sends a reply to the team's inbox when the sender is another address, such as a no-reply one. A
+ * message with its own reply address, such as a contact form message, keeps it.
+ */
+function withInboxReply(senders: EmailSenders, message: PreparedEmailMessage): PreparedEmailMessage {
+  if (message.replyTo || senders.inbox === senders.smtp.from) return message;
+  return { ...message, replyTo: senders.inbox };
 }
 
 function readSmtpConfig(bindings: EmailDeliveryBindings): SmtpEmailConfig | null {

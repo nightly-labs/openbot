@@ -11,6 +11,7 @@ import {
   DropdownMenu,
   Eye,
   Moon,
+  MotionTooltip,
   PanelLeft,
   Plus,
   Server,
@@ -61,6 +62,11 @@ export interface ServerMenuProps extends ServerActionCallbacks {
   hiddenLocal?: HiddenLocalServer | undefined;
   /** The compact sidebar hides the server name. The rail stays visible then. */
   compact?: boolean;
+  /**
+   * The form for the page rail: the trigger is the logo of the open server, with the name as a
+   * tooltip, and the menu opens beside it. The value must not change while the menu is mounted.
+   */
+  rail?: boolean;
 }
 
 function isContextMenuKey(event: KeyboardEvent): boolean {
@@ -82,13 +88,14 @@ function CheckCircle(props: { checked: boolean }) {
 let lastShown: { id: string | undefined; name: string } | undefined;
 
 /**
- * The server name on the sidebar title. Its menu sets the server view. In the menu view, it also
+ * The server name on the sidebar title, or the server logo in the page rail. Its menu sets the server view. In the menu view, it also
  * lists the servers and the actions of the active server. A click or Enter on a server
  * row selects that server. Hover or the arrow key on a row opens all actions of that server.
  */
 export function ServerMenu(props: ServerMenuProps) {
   const { t } = useText();
   const [menuOpen, setMenuOpen] = createSignal(false);
+  const rail = untrack(() => props.rail === true);
   // The context menu of the server name opens from this hidden anchor.
   let anchor: HTMLElement | undefined;
   let trigger: HTMLElement | undefined;
@@ -134,59 +141,84 @@ export function ServerMenu(props: ServerMenuProps) {
     });
   }
 
+  const triggerButton = () => (
+    <DropdownMenu.Trigger
+      ref={(element) => (trigger = element)}
+      class={
+        rail
+          ? "window-rail-button window-rail-server"
+          : buttonVariants({ variant: "ghost", size: "sm", class: "sidebar-server-name no-drag" })
+      }
+      aria-label={[
+        t("server.menu.open", { name: props.serverName }),
+        ...(activeSleep() === "sleeping" ? [t("server.state.sleeping")] : []),
+        ...(activeSleep() === "waking" ? [t("server.state.waking")] : []),
+      ].join(", ")}
+      aria-hidden={props.compact ? "true" : undefined}
+      aria-keyshortcuts="Shift+F10"
+      tabindex={props.compact ? -1 : 0}
+      title={rail ? undefined : triggerTitle()}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        openActions(event.clientX, event.clientY);
+      }}
+      onKeyDown={(event) => {
+        if (!isContextMenuKey(event)) return;
+        event.preventDefault();
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (rail) openActions(bounds.right, bounds.top);
+        else openActions(bounds.left, bounds.bottom);
+      }}
+    >
+      {/* Keyed by server, so the logo of a newly selected server springs in. */}
+      <For each={activeServers()} keyed={(server) => server.id}>
+        {(server) => {
+          const id = untrack(() => server().id);
+          const entering = markId !== undefined && markId !== id;
+          markId = id;
+          return (
+            <span
+              class="server-menu-mark sidebar-server-name-mark"
+              data-entering={entering ? "" : undefined}
+              aria-hidden="true"
+            >
+              <ServerMark server={server()} />
+            </span>
+          );
+        }}
+      </For>
+      <Show
+        when={!rail}
+        fallback={
+          <Show when={activeSleep()}>
+            {(sleep) => (
+              <span class="server-menu-sleep window-rail-server-sleep" data-state={sleep()} aria-hidden="true" />
+            )}
+          </Show>
+        }
+      >
+        <SwapLabel class="sidebar-server-name-label" text={props.serverName} from={shownBefore?.name} dir="auto" />
+        <Show when={activeSleep()}>
+          {(sleep) => <Moon class="sidebar-server-name-sleep" data-state={sleep()} aria-hidden="true" />}
+        </Show>
+        <ChevronsUpDown class="sidebar-server-name-chevron" aria-hidden="true" />
+      </Show>
+    </DropdownMenu.Trigger>
+  );
+
   return (
     <>
-      <DropdownMenu.Root open={menuOpen()} onOpenChange={setMenuOpen} placement="bottom-start" gutter={6}>
-        <DropdownMenu.Trigger
-          ref={(element) => (trigger = element)}
-          class={buttonVariants({
-            variant: "ghost",
-            size: "sm",
-            class: "sidebar-server-name no-drag",
-          })}
-          aria-label={[
-            t("server.menu.open", { name: props.serverName }),
-            ...(activeSleep() === "sleeping" ? [t("server.state.sleeping")] : []),
-            ...(activeSleep() === "waking" ? [t("server.state.waking")] : []),
-          ].join(", ")}
-          aria-hidden={props.compact ? "true" : undefined}
-          aria-keyshortcuts="Shift+F10"
-          tabindex={props.compact ? -1 : 0}
-          title={triggerTitle()}
-          onContextMenu={(event) => {
-            event.preventDefault();
-            openActions(event.clientX, event.clientY);
-          }}
-          onKeyDown={(event) => {
-            if (!isContextMenuKey(event)) return;
-            event.preventDefault();
-            const bounds = event.currentTarget.getBoundingClientRect();
-            openActions(bounds.left, bounds.bottom);
-          }}
-        >
-          {/* Keyed by server, so the logo of a newly selected server springs in. */}
-          <For each={activeServers()} keyed={(server) => server.id}>
-            {(server) => {
-              const id = untrack(() => server().id);
-              const entering = markId !== undefined && markId !== id;
-              markId = id;
-              return (
-                <span
-                  class="server-menu-mark sidebar-server-name-mark"
-                  data-entering={entering ? "" : undefined}
-                  aria-hidden="true"
-                >
-                  <ServerMark server={server()} />
-                </span>
-              );
-            }}
-          </For>
-          <SwapLabel class="sidebar-server-name-label" text={props.serverName} from={shownBefore?.name} dir="auto" />
-          <Show when={activeSleep()}>
-            {(sleep) => <Moon class="sidebar-server-name-sleep" data-state={sleep()} aria-hidden="true" />}
-          </Show>
-          <ChevronsUpDown class="sidebar-server-name-chevron" aria-hidden="true" />
-        </DropdownMenu.Trigger>
+      <DropdownMenu.Root
+        open={menuOpen()}
+        onOpenChange={setMenuOpen}
+        placement={rail ? "right-end" : "bottom-start"}
+        gutter={rail ? 10 : 6}
+      >
+        <Show when={rail} fallback={triggerButton()}>
+          <MotionTooltip content={triggerTitle()} suppressed={menuOpen()}>
+            {triggerButton()}
+          </MotionTooltip>
+        </Show>
         <DropdownMenu.Portal>
           <DropdownMenu.Content class="agent-context-menu server-menu" aria-label={t("server.menu.label")}>
             <Show

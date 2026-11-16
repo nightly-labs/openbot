@@ -385,6 +385,25 @@ welcome turn starts. The agent answers it, and that answer shows as usual. A cli
 a host that advertises the capability; an older host still gets the released role text, which stays
 a visible user message there.
 
+The optional `message-pins-v1` capability (protocol 9 only) adds `POST /v1/message-pins/list`
+(`agentId`) and `POST /v1/message-pins/set` (`agentId`, `taskId` as a string or `null` for the
+agent's own chat, `messageId`, `pinned`). The list holds the pins of all chats of the agent (its own
+chat and its side threads, archived ones too), at most 200, the newest pin first. Each pin has its
+side thread and title, the first 1,000 characters of its message, and who pinned it: a person (`null`
+for the user of the host computer) or the agent. The agent pins with its `pin_message` tool. Both
+routes answer the list after the request. A member needs the `chat` level on the agent. A hidden or
+unknown agent gets 404, a message that is not in the chat gets 404, and a pin over the limit of 50
+for one chat gets 409. All members see the same pins. The host sends `message-pins-changed` with the
+agent id after each change, and the client reads the list again. A client opens a pin of another
+chat in the tab of that chat, or in the side panel when the thread is open there. When the thread
+view does not hold the message, `POST /v1/message-pins/read-thread` (`agentId`, `taskId`,
+`messageId`, `limit` 1 to 100) reads one part of the thread around it, oldest first, in the
+`agent-tasks-v1` conversation shape, with `hasOlder` and `hasNewer`. A message that the thread does
+not hold gives no messages. While the view holds a part with `hasNewer`, it skips live deltas and
+read marks, and shows the way to the latest message; a send reads the latest messages first. A host
+without the capability gets no part read: the client opens the newest messages. Channels have no
+pins. `src/main/team-api/route-message-pins.ts` owns the routes.
+
 The optional `agent-waits-v1` capability (protocol 9 only) adds `POST /v1/agent-waits/list`
 (`agentId`) and `POST /v1/agent-waits/cancel` (`agentId`, `waitId`). They show the open waits of an
 agent in the composer of a joined server, with Cancel. `src/main/team-api/route-agent-waits.ts` owns
@@ -392,6 +411,33 @@ the authorization. A hidden or missing agent gets 404; a cancel needs `chat` on 
 The host cuts each request text to 2,000 characters. A wait that is already closed gets 409 with the
 host's sentence. The host sends no event when a wait changes, so a client reads the list again after a
 cancel and when a turn of the agent starts or ends.
+
+The optional `pending-approval-v1` capability (protocol 9 only) adds `POST /v1/agent-approvals/read`
+(`agentId`, `requestId`). It returns `{ approval }`, the whole copy of one approval that the agent waits
+on, as the `approval` event carries it. A runtime snapshot cuts each text of an approval to 240
+characters and sets `truncated`, so a client that did not get the event (a phone that connects
+later, a desktop after a restart) reads the whole copy here before it offers Allow. Each client keeps
+the whole copy when the next snapshot comes (`keepWholeApprovals` in
+`packages/team-client/src/runtime-attention.ts`), and shows a cut copy with Deny only.
+`src/main/team-api/route-pending-approval.ts` owns the authorization: a hidden or missing agent gets
+404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
+another agent, gets 409.
+
+The optional `phone-feedback-v1` capability (protocol 9 only) adds
+`POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
+has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
+the name of the VPN or mesh network that is on, never an address) and `log`, the last redacted lines
+of its support log. An agent's bug report with the surface `Phone app` (`openbot.send_feedback`) waits on an
+approval whose notice is `status.agent.reportPhoneProblem`. This route answers that approval with
+"accept" and gives the phone's data to the report. The agent service refuses a plain "accept" of such
+an approval on each path (`POST /v1/respond/approval`, the local IPC), with
+`error.backend.feedbackNeedsPhone` and 403, and the approval keeps waiting; a decline works on each
+client. So no bug report about the phone app goes out without the phone's version, system and log,
+and the account Worker refuses one too (`feedback_needs_phone`), which also stops a host of an older
+version. The desktop and web cards of such a report have no Send and tell the user to send it from
+the phone app. `src/main/team-api/route-phone-feedback.ts` owns the authorization: `chat` on the
+agent of the request (else 403, or 404 for an agent the member cannot see), the owner only (else
+403), and 409 for a request that no longer waits or that is not such a report.
 
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
@@ -408,7 +454,7 @@ dev server, with Stop. Only owners and admins can use them (else 403). The host 
 line before it leaves `src/main/background-processes.ts`, cuts it to 500 characters, sends at most
 200 programs and 64 ports each, and never sends the environment of a program. `processes` is null on a
 Windows host, which cannot find these programs. Stop signals only a program that is in the list at
-that time; an unknown id does nothing. This computer shows its own programs in Settings > Agents.
+that time; an unknown id does nothing. This computer shows its own programs in the same place.
 
 The optional `provider-use-v1` capability (protocol 9 only) adds `POST /v1/admin/provider-use/list`
 and `POST /v1/admin/provider-use/set` (`provider`, `on`). They are the on/off switch of the host's
@@ -460,6 +506,16 @@ client reads both and puts the models on their account: the model picker of that
 them, as on the host. Only owners and admins can use it (else 403). A client that fails to read it
 keeps the accounts without these models. `src/main/team-api/route-provider-accounts.ts` owns it.
 
+The optional `provider-model-source-v1` capability (protocol 9 only) adds
+`POST /v1/providers/model-sources` (empty request). It lists, for each provider whose own settings give
+its models from another source than the provider's own list, that source: `{ kind: "provider", name }`
+for a model provider such as Ollama, or `{ kind: "catalog" }` for a model list file. Today only Codex
+reports it, from `model_provider` and `model_catalog_json` in `config/read` (#9956). The path, address
+and key of the source stay on the host. Every member reads it: it says no more than the model list. The
+released status routes carry no source, so the desktop remote branch and the web client read both and
+put the source on its status row. A client that fails to read it shows no source.
+`src/main/team-api/route-agents.ts` owns it.
+
 The optional `claude-compact-window-v1` capability (protocol 9 only) adds
 `POST /v1/admin/host/claude-compact-window` and `POST /v1/admin/host/claude-compact-window/update`
 (`tokens`: a whole number from 100,000 to 1,000,000, or `null` for Claude Code's own size). They are
@@ -468,6 +524,16 @@ admins can use them (else 403); the wire codec refuses a size outside the range 
 applies to the Claude processes that start after it, and the host sends the provider status event, so
 open settings pages read it again. `src/main/team-api/route-claude-compact-window.ts` owns them.
 Without the capability a client hides the row for that host.
+
+The optional `provider-environment-v1` capability (protocol 9 only) adds
+`POST /v1/admin/host/provider-environment` (`provider`: `claude`, `codex` or `antigravity`) and
+`POST /v1/admin/host/provider-environment/update` (`provider`, `variables`: at most 32 of `name`,
+`value` or `null`, `sensitive`). The update replaces the whole list; `value: null` keeps a stored
+sensitive value. A response has the variables with `stored`, and an empty `value` for a sensitive one.
+Only owners and admins can use them (else 403). The host refuses an invalid, reserved or repeated name,
+and a kept value that it does not have, with 400 and the reason.
+`src/main/team-api/route-provider-environment.ts` owns them. Without the capability a client hides the
+Environment section for that host.
 
 The optional `agent-thread-queue-v1` capability (protocol 9 only) adds
 `POST /v1/agent-thread-queue/list` (`agentId`) and `POST /v1/agent-thread-queue/reorder` (`agentId`,
@@ -496,6 +562,19 @@ the list again; the desktop main process adds the list to the snapshot that it f
 `src/main/team-api/route-agent-usage-limit.ts` owns them. Without the capability a client does not show
 the usage-limit card for that host. Only an owner or admin sees "Next time, switch without asking" on
 the card, because the backup models use `agent-backup-models-v1`.
+
+The optional `agent-pending-runtime-v1` capability (protocol 9 only) adds
+`POST /v1/agent-pending-runtime/update` (`agentId`, and one or more of `provider`, `model`,
+`reasoningEffort` and `providerAccountId`, where `default` is the provider's own sign-in). It changes the
+runtime as the pickers on the host's computer do: while the agent works, the host keeps the change as
+`pendingRuntime` and applies it before the next turn, where the released `PATCH /v1/agents/:agentId`
+refuses a provider change. It needs a visible agent (else 404) and `manage` on it (else 403); another
+account needs an owner or admin (else 403), except the new provider's own sign-in on a provider change. For a peer with the
+capability, the host also adds `pendingRuntime` to each agent of `GET /v1/agents` and of the
+`bots-changed` event, so the "After this turn" badge shows on the client.
+`src/main/team-api/route-agent-pending-runtime.ts` owns the route. The desktop with a joined server and
+the web client send a runtime change alone on it when the host has the capability; mobile still uses the
+released route. Without the capability a provider change during work is refused as before.
 
 The optional `hermes-import-v1` capability (protocol 9 only) adds `POST /v1/hermes-import/read` (empty
 body), `POST /v1/hermes-import/apply` (`token`, `profiles` with `key` and `allow`) and

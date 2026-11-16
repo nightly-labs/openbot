@@ -117,29 +117,49 @@ export function createSidebarDataStore(deps: {
   });
   const waitingIds = createMemo(() => new Set(waitingKey() ? waitingKey().split("\n") : []));
   const chatWaits = (chatId: string) => waitingIds().has(chatId);
+  /** A hidden agent at work that waits for the user. It shows in "Needs you", not in the "Hidden" group. */
+  const hiddenAgentWaits = (agentId: string) =>
+    props.userHiddenAgentsWork === true && agentIsUserHidden(agentId) && chatWaits(agentId);
   const chatOrder = () => props.chatOrder ?? "manual";
   const activeChatId = () => props.activeChannelId || props.activeAgentId || "";
-  const chatIsUnread = (chatId: string) =>
-    props.agentStates[chatId]?.kind === "unread" || (channelById().get(chatId)?.unreadCount ?? 0) > 0;
   /**
-   * The chats that an unread order puts first: the unread chats, and the open chat when it was in the
-   * set before and the pointer is over the list. The open chat keeps its place while the pointer is
-   * there, so that a row does not move away under the pointer when the user reads it. When the pointer
-   * leaves the list, the read chat goes back to its section. Without this, a chat that the user reads
-   * and keeps open stays in the unread set until the user opens another chat. The manual order has none.
+   * A chat with unread messages of its own. An agent whose only unread messages are in side threads
+   * has an unread mark with no number. Opening its chat does not clear that mark, and a routine thread
+   * sets it again at each run, so the mark alone does not move the agent in an unread order.
+   */
+  const chatIsUnread = (chatId: string) => {
+    const state = props.agentStates[chatId];
+    return (state?.kind === "unread" && state.count > 0) || (channelById().get(chatId)?.unreadCount ?? 0) > 0;
+  };
+  /**
+   * A muted agent keeps its place in its section in each order. The user muted it because its replies
+   * are not important, so its unread replies show only as the badge on its row.
+   */
+  const chatMovesWhenUnread = (chatId: string) => !(props.mutedAgentIds?.has(chatId) ?? false);
+  /**
+   * The chats that an unread order puts first: the unread chats that are not muted, and the open chat
+   * when it was in the set before and the pointer is over the list. The open chat keeps its place
+   * while the pointer is there, so that a row does not move away under the pointer when the user reads
+   * it. When the pointer leaves the list, the read chat goes back to its section. Without this, a chat
+   * that the user reads and keeps open stays in the unread set until the user opens another chat. The
+   * manual and recent activity orders have none.
    *
    * The key is a string and holds still during a drag, for the same reasons as `waitingKey`.
    */
   let heldUnreadKey = "";
   const unreadKey = createMemo(() => {
-    if (chatOrder() === "manual") {
+    if (chatOrder() === "manual" || chatOrder() === "recent") {
       heldUnreadKey = "";
       return "";
     }
     const previous = new Set(heldUnreadKey ? heldUnreadKey.split("\n") : []);
     const active = activeChatId();
     const next = [...props.agents.map((agent) => agent.id), ...channels().map((channel) => channel.id)]
-      .filter((chatId) => chatIsUnread(chatId) || (chatId === active && previous.has(chatId) && deps.pointerInList()))
+      .filter(
+        (chatId) =>
+          chatMovesWhenUnread(chatId) &&
+          (chatIsUnread(chatId) || (chatId === active && previous.has(chatId) && deps.pointerInList())),
+      )
       .sort()
       .join("\n");
     if (!deps.dragActive()) heldUnreadKey = next;
@@ -152,10 +172,13 @@ export function createSidebarDataStore(deps: {
   const filteredAgents = createMemo(() =>
     listedAgents().filter((agent) => !chatWaits(agent.id) && !chatInUnreadGroup(agent.id)),
   );
-  /** The hidden agents, pinned ones included, in their layout order. They are not drag sources. */
+  /**
+   * The hidden agents, pinned ones included, in their layout order. They are not drag sources. One
+   * that waits for the user is in "Needs you" until the wait ends.
+   */
   const userHiddenAgentList = createMemo(() =>
     sortByLayoutOrder(
-      props.agents.filter((agent) => agentIsUserHidden(agent.id)),
+      props.agents.filter((agent) => agentIsUserHidden(agent.id) && !hiddenAgentWaits(agent.id)),
       props.layout.agentOrder,
     ),
   );
@@ -203,7 +226,7 @@ export function createSidebarDataStore(deps: {
     });
   }
   /**
-   * The last activity of each chat, for the unread orders. The key holds still during a drag, for the
+   * The last activity of each chat, for the orders other than "manual". The key holds still during a drag, for the
    * same reasons as `waitingKey`: a reply that arrives during a drag must not move the rows.
    */
   let heldActivityKey = "";
@@ -236,12 +259,14 @@ export function createSidebarDataStore(deps: {
     return [...items].sort((left, right) => (activity.get(right.id) ?? 0) - (activity.get(left.id) ?? 0));
   };
   /**
-   * The chats in the sections. In the "unread first" order, each section shows its unread chats first
-   * and then the others, both by their last activity. The saved `agentOrder` does not change.
+   * The chats in the sections. In the "recent activity" order, each section shows its chats by their
+   * last activity. In the "unread first" order, each section shows its unread chats first and then the
+   * others, both by their last activity. The saved `agentOrder` does not change.
    */
   const filteredChats = createChatItems(
     () => ({ channels: filteredChannels(), agents: filteredAgents() }),
     (items) => {
+      if (chatOrder() === "recent") return byRecent(items);
       if (chatOrder() !== "unread-first") return items;
       const recent = byRecent(items);
       return [
@@ -253,7 +278,11 @@ export function createSidebarDataStore(deps: {
   /** The "Needs you" group, in the order the chats have in the layout. */
   const waitingChats = createChatItems(() => ({
     channels: listedChannels().filter((channel) => chatWaits(channel.id)),
-    agents: listedAgents().filter((agent) => chatWaits(agent.id)),
+    agents: props.agents.filter((agent) =>
+      agentIsUserHidden(agent.id)
+        ? hiddenAgentWaits(agent.id)
+        : chatWaits(agent.id) && !pinnedKeys().has(sidebarPinnedItemKey({ kind: "agent", id: agent.id })),
+    ),
   }));
   /** The "Unread" group of the "unread in a group" order, by last activity. */
   const unreadChats = createChatItems(
@@ -356,6 +385,15 @@ export function createSidebarDataStore(deps: {
     ];
   }
 
+  /**
+   * The chats that a closed section hides, for the count on its header: its own and those of the
+   * folders in it. Pinned chats and the chats in "Needs you" or "Unread" show elsewhere, so they do
+   * not count. Without it, an agent that another agent creates in a closed section shows nowhere (#7982).
+   */
+  function sectionChatCount(sectionId: string): number {
+    return sectionChatIdsDeep(sectionId).length;
+  }
+
   /** The unread messages in a folder and in the folders in it, for the badge on a closed folder. */
   function sectionUnreadCount(sectionId: string): number {
     let count = 0;
@@ -427,6 +465,7 @@ export function createSidebarDataStore(deps: {
     assignedSectionId,
     agentById,
     channelById,
+    chatIsUnread,
     chatKind,
     chatName,
     chatPinnedItems,
@@ -441,6 +480,7 @@ export function createSidebarDataStore(deps: {
     resolvedPinnedItems,
     sectionAcceptsChat,
     sectionCanNest,
+    sectionChatCount,
     sectionChildren,
     sectionIsCollapsed,
     sectionIsInside,

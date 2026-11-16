@@ -165,6 +165,17 @@ export function createReplyJumpStore(deps: ReplyJumpStoreDeps) {
     row.addEventListener("animationend", end);
   }
 
+  /*
+   * A pinned message: the chat scrolls to it and flashes it. A message that is not loaded is loaded
+   * first. False when the chat does not have it; true also when the reader left the chat meanwhile.
+   */
+  async function jumpTo(id: string): Promise<boolean> {
+    const agentId = deps.props.agent?.id;
+    const row = await reveal(id, undefined, agentId);
+    if (row) flash(row);
+    return row !== undefined || !isOpen(agentId);
+  }
+
   /* The way back removes the control that had focus, so focus goes to the quote of the reply. */
   function focusQuote(replyId: string): void {
     messageElement(replyId)?.querySelector<HTMLElement>(".message-reply-open")?.focus({ preventScroll: true });
@@ -247,6 +258,7 @@ export function createReplyJumpStore(deps: ReplyJumpStoreDeps) {
   return {
     returnReplyId,
     reveal,
+    jumpTo,
     openReference,
     returnToReply,
     stayHere,

@@ -9,6 +9,7 @@ export const messages = {
   "startup.archiveChangedBody":
     "另一个程序更改了 OpenBot 的文件 app.asar。OpenBot 现在仍在运行，但退出后将无法再次打开。\n\n要修复 OpenBot，请重新安装。你的本地数据会保留。",
   "startup.archiveChangedDownload": "下载 OpenBot",
+  "startup.filesDamagedBody": "部分 OpenBot 文件已损坏或缺失。\n\n要修复 OpenBot，请重新安装。你的本地数据会保留。",
   "startup.newerDataUpdatingTitle": "正在更新 OpenBot",
   "startup.newerDataUpdatingBody":
     "较新版本的 OpenBot 保存了你的数据。OpenBot 将安装最新版本，然后重新打开。\n\n你的本地数据未被重置或覆盖。",

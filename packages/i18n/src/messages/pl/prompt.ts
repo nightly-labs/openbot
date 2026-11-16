@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Wymagana odpowiedź",
   "prompt.question.label": "Pytania agenta",
   "prompt.question.cancelled": "Pytania anulowane",
   "prompt.question.expired": "Pytania wygasły",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Dalej",
   "prompt.question.cancel": "Anuluj pytania",
   "prompt.question.privatePlaceholder": "Wpisz prywatną odpowiedź",
-  "prompt.customPlaceholder": "Wpisz własną odpowiedź",
   "prompt.question.customAnswerFor": "Własna odpowiedź na: {question}",
   "prompt.question.skip": "Pomiń",
   "prompt.question.chooseAll": "Wybierz wszystkie pasujące.",
   "prompt.question.somethingElse": "Coś innego",
   "prompt.question.emptyTitle": "Brak oczekujących pytań.",
   "prompt.question.emptyBody": "Agent będzie kontynuować, gdy będzie potrzebować kolejnej decyzji.",
-  "prompt.choice.hint": "Wybierz, co pasuje, lub wpisz własną odpowiedź.",
-  "prompt.choice.customLabel": "Własna odpowiedź",
   "prompt.approval.answerFailed": "Nie udało się odpowiedzieć na tę prośbę o zatwierdzenie. Spróbuj ponownie.",
   "prompt.approval.grantFailed": "Nie udało się zapisać stałego zatwierdzenia. Spróbuj ponownie.",
   "prompt.approval.label": "Zatwierdzenie agenta",
@@ -29,10 +25,14 @@ export const messages = {
   "prompt.approval.allow": "Zezwól",
   "prompt.approval.alwaysAllow": "Zawsze zezwalaj",
   "prompt.approval.deny": "Odrzuć",
+  "prompt.approval.cut":
+    "Ta karta pokazuje tylko początek żądania, więc można je tylko odrzucić. Jeśli przycisk Zezwól nie pojawi się wkrótce, zaktualizuj OpenBot na serwerze.",
   "prompt.approval.report.bugHeadline": "Znalazłeś błąd? Naprawmy go.",
   "prompt.approval.report.ideaHeadline": "Masz pomysł? Zróbmy to.",
   "prompt.approval.report.dontSend": "Nie teraz",
   "prompt.approval.report.send": "Wyślij do zespołu OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Otwórz ten czat w aplikacji OpenBot na telefonie i wyślij zgłoszenie stamtąd. Telefon dodaje swoją wersję, system i dziennik pomocy. Jeśli telefon nie może się połączyć, otwórz Ustawienia > Pomoc w aplikacji na telefonie i zgłoś problem na GitHubie.",
   "prompt.approval.title.command": "Uruchom polecenie",
   "prompt.approval.title.fileChange": "Zmień pliki",
   "prompt.approval.title.permissions": "Przyznaj uprawnienia",
@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Logowanie do {host} anulowane",
   "prompt.browser.signInBlocked.body":
     "Zaloguj się na tym komputerze. OpenBot wyśle do {server} tylko logowanie do {host}, a {name} będzie kontynuować.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} nie akceptuje logowania z serwera. Otwórz ten czat w aplikacji OpenBot na komputer i zaloguj się tam. Potem {name} będzie kontynuować.",
   "prompt.browser.signInBlocked.cancelledBody": "Logowanie zostało anulowane.",
   "prompt.browser.signInBlocked.waiting": "Czekam na logowanie",
   "prompt.browser.signInBlocked.waitingButton": "Czekam na logowanie…",

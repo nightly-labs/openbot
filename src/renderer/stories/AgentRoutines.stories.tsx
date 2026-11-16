@@ -137,21 +137,21 @@ function WebhookRoutineStory() {
 
 function FullSettingsPanelStory() {
   const previousApi = window.openbot;
-  const previousWidth = window.localStorage.getItem("openbot:settings-panel-width");
+  const previousWidth = window.localStorage.getItem("openbot:side-panel-width");
   const mock = createMockOpenBot({ routines: { chief: storyRoutines } });
   window.openbot = mock.api;
   mock.api.agent.listRoutineRuns = async (input) =>
     input.routineId === morningBrief.id ? structuredClone(fullPanelRuns) : [];
-  window.localStorage.setItem("openbot:settings-panel-width", "380");
+  window.localStorage.setItem("openbot:side-panel-width", "380");
 
   onCleanup(() => {
     mock.dispose();
     window.openbot = previousApi;
     if (previousWidth === null) {
-      window.localStorage.removeItem("openbot:settings-panel-width");
+      window.localStorage.removeItem("openbot:side-panel-width");
       return;
     }
-    window.localStorage.setItem("openbot:settings-panel-width", previousWidth);
+    window.localStorage.setItem("openbot:side-panel-width", previousWidth);
   });
 
   return (

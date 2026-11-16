@@ -1,4 +1,4 @@
-import type { AgentProviderId } from "./agent-providers";
+import { type AgentProviderId, OPENCODE_DEFAULT_FREE_MODEL } from "./agent-providers";
 import type { AgentModelId, AgentReasoningEffort } from "./ipc-agent-identity";
 
 /** One provider, model and effort a development build can start a new agent on. */
@@ -17,8 +17,8 @@ export interface DevelopmentDefault {
  * and `scripts/seed-dev-state.ts`: the seeded showcase agents and an agent created by hand have to
  * agree, or a dev profile shows two different answers to the same question.
  *
- * Claude Haiku first, for a signed-in Claude. OpenCode's free DeepSeek after it, and in place of
- * Codex: the free tier needs no key and no account, so a developer with no Claude sign-in still
+ * Claude Haiku first, for a signed-in Claude. OpenCode's first recommended free model after it
+ * (`OPENCODE_DEFAULT_FREE_MODEL`), and in place of Codex: the free tier needs no key and no account, so a developer with no Claude sign-in still
  * gets an agent that answers.
  *
  * It is a default, never an override. A recorded preference -- the provider and model setup or
@@ -31,7 +31,7 @@ export const DEVELOPMENT_CLAUDE_DEFAULT: DevelopmentDefault = {
 };
 export const DEVELOPMENT_FREE_DEFAULT: DevelopmentDefault = {
   provider: "opencode",
-  model: "opencode/deepseek-v4.1-flash-free",
+  model: OPENCODE_DEFAULT_FREE_MODEL,
   reasoningEffort: "medium",
 };
 export const DEVELOPMENT_DEFAULTS: readonly DevelopmentDefault[] = [

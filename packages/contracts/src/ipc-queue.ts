@@ -18,10 +18,13 @@ export type QueueDeliveryStatus = (typeof QUEUE_DELIVERY_STATUSES)[number];
 /**
  * What a message sent to a busy agent does. `queue` waits behind the running turn; `steer` joins
  * that turn at the provider's next step. Idle agents start every message the same way.
+ *
+ * `steer` is the default. A stored `queue`, for the app or for one agent, stays `queue`, and a
+ * provider that cannot steer queues the message in either mode.
  */
 export const BUSY_MESSAGE_MODES = ["queue", "steer"] as const;
 export type BusyMessageMode = (typeof BUSY_MESSAGE_MODES)[number];
-export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "queue";
+export const DEFAULT_BUSY_MESSAGE_MODE: BusyMessageMode = "steer";
 
 export function isBusyMessageMode(value: unknown): value is BusyMessageMode {
   return isOneOf(BUSY_MESSAGE_MODES, value);
@@ -88,6 +91,26 @@ export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
     delivery.sender.kind === "agent" &&
     delivery.replyToMessageId !== null &&
     delivery.expectsReply === false
+  );
+}
+
+/**
+ * A routine run has its own provider session, which ends with the run, so the host does not steer a
+ * message into its turn: the message waits for the next turn. A client does not offer Steer then.
+ *
+ * Only a delivery that names the turn counts. A routine that starts has no turn yet, and the turn on
+ * screen can be the user's; if a steer reaches the routine's turn first, the host refuses it.
+ */
+export function routineRunsTurn(
+  deliveries: readonly QueueDelivery[] | undefined,
+  turnId: string | null | undefined,
+): boolean {
+  if (!turnId) return false;
+  return (deliveries ?? []).some(
+    (delivery) =>
+      delivery.sender.kind === "routine" &&
+      (delivery.status === "starting" || delivery.status === "running") &&
+      delivery.turnId === turnId,
   );
 }
 

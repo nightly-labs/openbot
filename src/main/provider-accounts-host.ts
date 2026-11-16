@@ -19,8 +19,14 @@ export interface ProviderAccountsHostDependencies {
     | "listAgents"
     | "updateAgent"
     | "signInProviderAccountOnHost"
+    | "connectProviderAccountKey"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "renameProviderAccount"
     | "removeProviderAccount"
+    | "setProviderAccountPool"
   >;
   browser: Pick<BrowserHost, "openPrivate" | "privateTab" | "close">;
 }
@@ -93,6 +99,18 @@ export class ProviderAccountsHost {
     return { providers };
   }
 
+  /** The providers whose account pool is on, with the accounts left out and the account in use (`provider-account-pool-v1`). */
+  pools() {
+    const pools = (this.#dependencies.service.getStatus().providers ?? []).flatMap((row) =>
+      row.accounts && row.accountPool ? [{ provider: row.id, ...row.accountPool }] : [],
+    );
+    return { pools };
+  }
+
+  setPool(provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) {
+    return this.#dependencies.service.setProviderAccountPool(provider, enabled, leftOut).pipe(Effect.asVoid);
+  }
+
   /** The readings of the accounts after the first. The released usage routes give the provider's own. */
   readonly usage = Effect.fn("ProviderAccountsHost.usage")(function* (this: ProviderAccountsHost) {
     return yield* this.#dependencies.service.getProviderAccountUsage();
@@ -125,6 +143,35 @@ export class ProviderAccountsHost {
 
   signInStatus(provider: AgentProviderId) {
     return this.#pages.status(provider) ?? { tabId: null, result: { error: endedText(provider) } };
+  }
+
+  /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
+  connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
+    return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
+  }
+
+  /**
+   * Starts the code sign-in of an account (`provider-account-code-v1`): a new account when
+   * `accountId` is null. The provider's CLI gives the page and the code; no tab opens on this host.
+   */
+  startCodeSignIn(provider: AgentProviderId, accountId: string | null) {
+    return this.#dependencies.service.startProviderAccountCodeLogin(provider, accountId);
+  }
+
+  /** Types the code of a `paste` sign-in into the provider's CLI. The code is a credential. */
+  submitCodeSignIn(provider: AgentProviderId, accountId: string, code: string): void {
+    this.#dependencies.service.submitProviderAccountCodeLogin(provider, accountId, code);
+  }
+
+  /** How the code sign-in of the account ended; `result` is null while it runs. */
+  codeSignInStatus(provider: AgentProviderId, accountId: string) {
+    const { result } = this.#dependencies.service.providerAccountCodeLoginStatus(provider, accountId);
+    return { result: result && { error: result.error?.slice(0, PROVIDER_ACCOUNTS_MESSAGE_LIMIT) ?? null } };
+  }
+
+  /** Stops the code sign-in: a new account goes, another one shows as signed out. */
+  cancelCodeSignIn(provider: AgentProviderId, accountId: string) {
+    return this.#dependencies.service.cancelProviderAccountSignIn(provider, accountId).pipe(Effect.asVoid);
   }
 
   /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */

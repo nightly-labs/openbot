@@ -6,6 +6,7 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
@@ -29,6 +30,11 @@ import { conversationOwnerId } from "./composer-store";
 
 // Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
+
+/** A setting card asks the agent settings to show one row. */
+export interface AgentSettingRowRequest extends AgentSettingReveal {
+  agentId: string;
+}
 
 export interface RoutineSettingsRequest {
   agentId: string;
@@ -82,6 +88,16 @@ const FILE_PREVIEW_REFRESH_MS = 750;
  */
 const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
+/** True when a panel mode shows the side panel: its pane list, a pane, a file, or a side thread. */
+export function isSidePanelMode(mode: RightPanelMode | undefined): boolean {
+  return (
+    mode === "side-panel" ||
+    mode === "thread" ||
+    mode === "file-preview" ||
+    (mode !== undefined && isSidePanelPane(mode))
+  );
+}
+
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
 export interface PanelsStoreDeps {
@@ -121,6 +137,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setInstructionsSettingsRequest({ agentId });
     setActiveRightPanel("settings", agentId);
   }
+  const [agentSettingRowRequest, setAgentSettingRowRequest] = createSignal<AgentSettingRowRequest | null>(null);
+  let agentSettingRowNonce = 0;
+  /** Opens the settings of the chat's agent at one row, as a setting card asks. Each call shows the row again. */
+  function openAgentSettingRow(agentId: string, settingId: AgentSettingLinkId): void {
+    if (deps.props.agent?.id !== agentId) return;
+    agentSettingRowNonce += 1;
+    setAgentSettingRowRequest({ agentId, settingId, nonce: agentSettingRowNonce });
+    setActiveRightPanel("settings", agentId);
+  }
+  /** The panel showed the row, so the request does not show it again when the panel mounts again. */
+  function handleAgentSettingRowRequest(nonce: number): void {
+    setAgentSettingRowRequest((current) => (current?.nonce === nonce ? null : current));
+  }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
   let routineSettingsRequestNonce = 0;
 
@@ -136,11 +165,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return (agentId && panels.side[agentId]) || SIDE_PANEL_EMPTY;
   };
-  const sidePanelOpen = () =>
-    activeRightPanel() === "side-panel" ||
-    activeRightPanel() === "thread" ||
-    activeRightPanel() === "file-preview" ||
-    isSidePanelPane(activeRightPanel());
+  const sidePanelOpen = () => isSidePanelMode(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
@@ -218,6 +243,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
       setInstructionsSettingsRequest(null);
+      setAgentSettingRowRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
@@ -710,6 +736,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSkillSettings,
     instructionsSettingsRequest,
     openInstructionsSettings,
+    agentSettingRowRequest,
+    openAgentSettingRow,
+    handleAgentSettingRowRequest,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,
