@@ -154,6 +154,17 @@ place, for schedule and webhook routines. A save without `runIn`, or to a host w
 keeps the saved place. The `create_routine`,
 `update_routine`, `create_webhook_routine` and `update_webhook_routine` tools take `runIn` too. A routine set back to `chat` keeps its thread, but new runs,
 the run marker's "Open thread" link, a test run and the routine's reply digest do not use it.
+
+A scheduled run may pause its own routine when its task says to stop (#8963). The tool router then
+records a `routine.paused-by-run` event with the run's `scheduledFor` and makes it the routine's
+`last_event_sequence` (`RoutineStore.markPausedByRun`). The routine lists read that event back as
+`pausedByRun` while the routine stays paused and nothing changes it, so no migration is necessary. The
+Routines list and the routine chat card show "Paused by its 8:00 AM run" (#10048). A run
+that pauses its routine and then reports a failure turns it on again, and that change clears the reason.
+A joined host serves the reasons on the optional `routine-pause-reasons-v1` capability
+(`packages/contracts/src/team-protocol/routine-pause-reasons-v1.ts`, host route `routeRoutinePauseReasons`
+in `src/main/team-api/route-routine-pause-reasons.ts`), which the remote adapters merge into their lists
+as they merge the run places. A client of an older host shows only "Paused".
 `AgentTasks.routineThread` makes the thread on the first run in a thread, with the routine's name as its title and `routine_id` set
 (migration 54; a unique index keeps one thread for each routine of an agent, also when it is
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the

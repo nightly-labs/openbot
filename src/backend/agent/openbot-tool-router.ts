@@ -2394,11 +2394,15 @@ export class OpenBotToolRouter {
       runPause !== null && routineResult?.success
         ? this.#routines.listFor(runPause.agentId).find((routine) => routine.id === runPause.routineId)
         : undefined;
-    if (runPause !== null && pausedRoutine)
+    if (runPause !== null && pausedRoutine) {
+      const { scheduledFor, ...pause } = runPause;
       this.#noteRoutineRunTurn(params.turnId, {
         failed: false,
-        paused: [...(runTurn?.paused ?? []), { ...runPause, updatedAt: pausedRoutine.updatedAt }],
+        paused: [...(runTurn?.paused ?? []), { ...pause, updatedAt: pausedRoutine.updatedAt }],
       });
+      // Routines and the chat card say which run paused the routine (#10048).
+      if (!pausedRoutine.active) this.#routines.notePausedByRun(pause.agentId, pause.routineId, scheduledFor);
+    }
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -3105,17 +3109,19 @@ export class OpenBotToolRouter {
   #runRoutinePause(
     params: DynamicToolCallParams,
     senderAgentId: string,
-  ): { agentId: string; routineId: string } | null {
+  ): { agentId: string; routineId: string; scheduledFor: string } | null {
     if (params.tool !== "update_routine" || !isRecord(params.arguments) || params.arguments.active !== false)
       return null;
     const { agentId, routineId } = params.arguments;
     if ((agentId !== undefined && agentId !== senderAgentId) || !isString(routineId)) return null;
     const ownRun = this.#mailbox
       .findDeliveriesByTurn(senderAgentId, params.turnId)
-      .some(({ delivery }) => delivery.sender.kind === "routine" && delivery.sender.routineId === routineId);
+      .map(({ delivery }) => delivery.sender)
+      .find((sender) => sender.kind === "routine" && sender.routineId === routineId);
     const active =
-      ownRun && this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
-    return active ? { agentId: senderAgentId, routineId } : null;
+      ownRun?.kind === "routine" &&
+      this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
+    return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
   }
 
   #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {

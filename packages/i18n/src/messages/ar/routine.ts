@@ -313,6 +313,7 @@ export const messages = {
   "routine.settings.loading": "جارٍ تحميل المهام الدورية…",
   "routine.settings.empty": "لا توجد مهام دورية بعد.",
   "routine.settings.paused": "متوقفة مؤقتًا",
+  "routine.settings.pausedByRun": "أوقفها تشغيل {time} مؤقتًا",
   "routine.settings.completed": "منجزة · {schedule}",
   "routine.settings.active": "نشطة",
   "routine.settings.pauseFailed": "تعذّر إيقاف هذه المهمة الدورية مؤقتًا.",

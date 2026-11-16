@@ -143,6 +143,7 @@ import {
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -425,6 +426,7 @@ import { routeProviders } from "./team-api/route-providers";
 import { routePushNotifications } from "./team-api/route-push-notifications";
 import { routeRemoteScreen } from "./team-api/route-remote-screen";
 import { routeRoutineFlows } from "./team-api/route-routine-flows";
+import { routeRoutinePauseReasons } from "./team-api/route-routine-pause-reasons";
 import { routeRoutineResults } from "./team-api/route-routine-results";
 import { routeRoutineRunCommand } from "./team-api/route-routine-run-command";
 import { routeRoutineRunPlace } from "./team-api/route-routine-run-place";
@@ -1270,6 +1272,11 @@ export class TeamApiServer {
       if ((await routeRoutineRunCommand(context, this.#options.admin, hidden)) === "handled") return;
       if (
         (await routeRoutineRunPlace(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
+        "handled"
+      )
+        return;
+      if (
+        (await routeRoutinePauseReasons(context, this.#options.agents, this.#options.routineRunPlaces, hidden)) ===
         "handled"
       )
         return;
@@ -2774,6 +2781,7 @@ export class TeamApiServer {
           if (capability === ROUTINE_RUN_COMMAND_CAPABILITY)
             return this.#options.admin?.routineRunCommand !== undefined;
           if (capability === ROUTINE_RUN_PLACE_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
+          if (capability === ROUTINE_PAUSE_REASONS_CAPABILITY) return this.#options.routineRunPlaces !== undefined;
           if (capability === WEBHOOK_TESTS_CAPABILITY) return this.#options.events !== undefined;
           if (capability === WEBHOOK_SENDER_SECRET_CAPABILITY) return this.#options.events !== undefined;
           if (capability === AGENT_IMPORT_CAPABILITY || capability === AGENT_IMPORT_V2_CAPABILITY)

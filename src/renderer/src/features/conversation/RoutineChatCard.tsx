@@ -12,6 +12,7 @@ import {
 } from "@openbot/ui/features/conversation/routine-schedule-saved";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
+import { routinePausedByRunLabel } from "./routine-summary";
 import { agentRoutinesPort } from "./routines-port";
 
 export interface RoutineChatCardProps {
@@ -107,6 +108,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
       errorText={errorText()}
       nextRunLabel={nextRunLabel(routine(), text)}
       timeZoneLabel={timeZoneLabel(routine(), text)}
+      pausedLabel={routinePausedByRunLabel(routine(), text)}
       onChange={(next) => {
         pending = next;
         setDraft(next);
