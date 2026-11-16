@@ -579,6 +579,8 @@ export const messages = {
   "mobile.chat.threads.new": "Nouveau fil",
   "mobile.chat.threads.all": "Tous les fils",
   "mobile.chat.threads.agentInfo": "Infos de l’agent",
+  "mobile.chat.pullInfo.agent": "Infos de l’agent",
+  "mobile.chat.pullInfo.channel": "Infos du canal",
   "mobile.chat.threads.draftNote":
     "Votre premier message démarre un nouveau fil. Le chat principal avec {name} ne change pas.",
   "mobile.chat.threads.draftPlaceholder": "Nouveau fil avec {name}",

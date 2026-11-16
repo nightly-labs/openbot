@@ -153,6 +153,7 @@ export const messages = defineMessages("composer", {
   "composer.picker.section.files": "Files",
   "composer.picker.section.tabs": "Browser tabs",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In messages",
   "composer.token.tab": "Browser tab {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Closed browser tab {name}",

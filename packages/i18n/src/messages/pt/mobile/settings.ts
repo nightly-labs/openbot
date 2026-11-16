@@ -235,6 +235,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Baixar arquivos grandes automaticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Imagens, vídeos e áudios com mais de {small} só são baixados quando você toca neles. Ative para baixá-los na hora, até {large}. Isso pode usar muitos dados móveis.",
+  "mobile.settings.conversations.swipeLeft": "Deslizar para a esquerda no chat",
+  "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
+  "mobile.settings.conversations.swipeThreads": "Tópicos",
+  "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeFooter":
+    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. Deslizar em uma mensagem ainda responde a ela.",
+  "mobile.settings.conversations.pullInfo": "Puxar para cima para ver info",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Em um chat, canal ou tópico, puxe para cima além da última mensagem e solte para abrir as informações.",
   "mobile.settings.conversations.fullQualityPhotos": "Enviar fotos em qualidade máxima",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Quando desativado, o app envia uma cópia menor de cada foto, com até 2048 pixels no lado maior. Ela chega mais rápido em uma conexão lenta. Ative para enviar a foto original.",

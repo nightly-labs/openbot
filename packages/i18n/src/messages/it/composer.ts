@@ -157,6 +157,7 @@ export const messages = {
   "composer.picker.section.files": "File",
   "composer.picker.section.tabs": "Schede del browser",
   "composer.picker.section.threads": "Thread",
+  "composer.picker.section.messages": "Nei messaggi",
   "composer.token.tab": "Scheda del browser {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Scheda del browser {name} chiusa",

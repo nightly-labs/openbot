@@ -399,15 +399,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "Rascunhe um e-mail de redefinição de senha para o novo fluxo.",
   "marketplace.plugin.omnisend.tagline": "Marketing por e-mail e SMS",
   "marketplace.plugin.omnisend.description":
-    "O Omnisend permite que os agentes leiam relatórios de campanhas e formulários, encontrem contatos e segmentos, e criem e editem campanhas, automações, modelos de e-mail, formulários e produtos. Cada usuário entra na própria conta do Omnisend pelo navegador e escolhe o nível de acesso na tela de consentimento. Com acesso de escrita, os agentes também podem enviar campanhas e excluir dados. Escolha acesso somente leitura quando os agentes só precisarem de relatórios.",
+    "O Omnisend permite que os agentes leiam relatórios de campanhas e formulários, encontrem contatos e segmentos, e criem e editem campanhas, automações, modelos de e-mail, formulários e produtos. Cada usuário se conecta com uma chave de API da própria conta do Omnisend. Os agentes podem fazer o que a chave permite, o que pode incluir enviar campanhas e excluir dados.",
   "marketplace.plugin.omnisend.app":
-    "Campanhas, automações, contatos, segmentos, formulários e relatórios, pelo servidor MCP do Omnisend com login no navegador.",
+    "Campanhas, automações, contatos, segmentos, formulários e relatórios, pelo servidor MCP do Omnisend com uma chave de API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Como foram as campanhas da semana passada em comparação com a semana anterior?",
   "marketplace.plugin.omnisend.prompt.segment": "Quantos contatos há no segmento VIP e como ele mudou este mês?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Crie um rascunho de campanha para a nova coleção, mas não a envie.",
   "marketplace.plugin.postiz.tagline": "Agendamento de redes sociais",
+  "marketplace.plugin.omnisend.hint.apiKey": "No Omnisend, abra Store settings > API keys e crie uma chave.",
   "marketplace.plugin.postiz.description":
     "O Postiz permite que os agentes listem os seus canais de redes sociais e redijam, agendem e publiquem posts em mais de 30 redes, como X, LinkedIn, Instagram e TikTok. Os agentes também podem enviar mídia e criar imagens e vídeos com IA. Entre na sua conta do Postiz pelo navegador ou cole a chave de API de Settings › Developers no Postiz. Todos os planos em nuvem do Postiz incluem acesso à API. Os agentes podem publicar um post na hora, então revise cada post antes de aprová-lo.",
   "marketplace.plugin.postiz.app":

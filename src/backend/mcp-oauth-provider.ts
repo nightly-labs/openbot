@@ -70,7 +70,7 @@ import { withTimeout } from "./with-timeout";
 const MCP_CLIENT_METADATA_URL = "https://openbot.run/oauth/mcp-client.json";
 
 /** The `client_name` that OpenBot registers with. */
-export const MCP_CLIENT_NAME = "OpenBot";
+const MCP_CLIENT_NAME = "OpenBot";
 
 /**
  * The second path of the loopback grant listener. Dropbox registers only the loopback paths of the

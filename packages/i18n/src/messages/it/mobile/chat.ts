@@ -572,6 +572,8 @@ export const messages = {
   "mobile.chat.threads.new": "Nuovo thread",
   "mobile.chat.threads.all": "Tutti i thread",
   "mobile.chat.threads.agentInfo": "Info agente",
+  "mobile.chat.pullInfo.agent": "Info agente",
+  "mobile.chat.pullInfo.channel": "Info canale",
   "mobile.chat.threads.draftNote":
     "Il tuo primo messaggio avvia un nuovo thread. La chat principale con {name} non cambia.",
   "mobile.chat.threads.draftPlaceholder": "Nuovo thread con {name}",

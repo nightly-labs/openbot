@@ -1,4 +1,4 @@
-import { providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { agentSteersTurns } from "@openbot/contracts/agent-providers";
 import { rasterImageMimeType } from "@openbot/contracts/attachment-files";
 import {
   attachmentReferenceIds,
@@ -984,9 +984,12 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     void submitMessage();
   }
 
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
   function agentSteers(): boolean {
-    return !deps.props.agent || providerSteersTurns(deps.props.agent.provider);
+    return !deps.props.agent || agentSteersTurns(deps.props.agent, deps.props.modelOptions);
   }
 
   /** The host steers each message sent while this agent works. Not known for a joined server until it answers. */

@@ -27,6 +27,7 @@ import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
+import { loadChatPullPreference, loadChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
 import { loadHapticsPreference } from "@/features/settings/model/haptics";
 import { loadLargeFilePreference } from "@/features/settings/model/large-files";
@@ -232,6 +233,8 @@ export default function RootLayout() {
       void loadRoutineCollapsePreference().catch(() => undefined);
       void loadFullVisualPreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
+      void loadChatSwipePreference().catch(() => undefined);
+      void loadChatPullPreference().catch(() => undefined);
       void loadTextSize().catch(() => undefined);
       void loadLiveActivitiesPreference().catch(() => undefined);
       void loadPushNotificationPreference().catch(() => undefined);

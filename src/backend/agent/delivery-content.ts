@@ -424,7 +424,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     );
     const continuation = [
       HANDOFF_START,
-      "The previous provider reached its usage limit after starting this task.",
+      "The previous provider stopped after starting this task: it reached its usage limit or failed with an error.",
       "Continue the unfinished task from the conversation and captured work steps. The request below is the original goal, not a new task. Do not repeat completed actions. Check the outcome of any interrupted action before you retry it. If the task is already complete, report the result.",
       ...(progress ? ["--- interrupted task progress ---", progress.slice(-8000)] : []),
       "--- captured work steps ---",

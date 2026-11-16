@@ -232,6 +232,15 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Büyük dosyaları otomatik indir",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} üzerindeki görseller, videolar ve sesler yalnızca dokunduğunuzda iner. {large} boyutuna kadar hemen indirmek için bunu açın. Bu çok mobil veri kullanabilir.",
+  "mobile.settings.conversations.swipeLeft": "Ajan sohbetinde sola kaydır",
+  "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
+  "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
+  "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
+  "mobile.settings.conversations.swipeFooter":
+    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Bir mesajda kaydırmak yine ona yanıt verir.",
+  "mobile.settings.conversations.pullInfo": "Bilgi için yukarı çek",
+  "mobile.settings.conversations.pullInfoFooter":
+    "Bir sohbet, kanal veya mesaj dizisinde son mesajın ötesine yukarı çekip bırakarak bilgisini açın.",
   "mobile.settings.conversations.fullQualityPhotos": "Fotoğrafları tam kalitede gönder",
   "mobile.settings.conversations.fullQualityPhotosFooter":
     "Bu kapalıyken uygulama her fotoğrafın daha küçük bir kopyasını gönderir, uzun kenarda en fazla 2048 piksel. Yavaş bağlantıda daha hızlı ulaşır. Orijinal fotoğrafı göndermek için açın.",

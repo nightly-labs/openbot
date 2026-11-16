@@ -238,9 +238,9 @@
     },
     {
       "slug": "omnisend",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "73cd8cb3312090709f3c048b6c4b912c8dff27f96eb530cf36fcaf461eae7d80"
+      "detailSha256": "8697d90f79d5d0c84198497d55424078f81339fe9881d4124d6fba61cbe6df74"
     },
     {
       "slug": "postiz",
@@ -1366,9 +1366,9 @@
     },
     {
       "slug": "tessie",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "featured": false,
-      "detailSha256": "e72121c06335698e56fd223daf677a2742eac0e28a1fd05cc7c53d2d7fd9024b"
+      "detailSha256": "a91a28e7f52f0283d427f6891850a694a3a24881b2a25e430f778756ac30c0ab"
     },
     {
       "slug": "tinyfish",
