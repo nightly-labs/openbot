@@ -27,7 +27,8 @@ export function applyDictationResult(
  * On iOS 18 and later, `expo-speech-recognition` reports a result with a speech duration as final, and
  * Apple's own final result that follows can hold the same text again. A final with no partial result
  * after the last segment, and the text of that segment or of all segments, is that repeat. New speech
- * always sends partial results first, so a sentence that the user says twice stays.
+ * always sends partial results first, so a sentence that the user says twice stays. Only for iOS:
+ * Android can commit a short segment with no partial result.
  */
 export function isRepeatedFinal(transcript: DictationTranscript, result: { isFinal: boolean; text: string }): boolean {
   const text = result.text.trim();

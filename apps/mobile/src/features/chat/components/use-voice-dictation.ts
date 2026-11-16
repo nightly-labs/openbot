@@ -256,7 +256,7 @@ function useSystemDictation({
         if (owner !== id || !current?.native) return;
         current.heard = true;
         const result = { isFinal: event.isFinal, text: event.results[0]?.transcript ?? "" };
-        if (isRepeatedFinal(current.transcript, result)) return;
+        if (isIOS && isRepeatedFinal(current.transcript, result)) return;
         current.transcript = applyDictationResult(current.transcript, result);
         onDraftRef.current(dictationDraft(current.base, spokenText(current.transcript)));
       }),
