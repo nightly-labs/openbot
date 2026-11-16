@@ -2076,6 +2076,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             undefined,
             undefined,
             false,
+            // agentSetup: another agent wrote the first message, so its turn can end with no answer.
             true,
           ).pipe(toToolOperationFailed),
         updateAgent: (input, initiatingAgentId) =>
