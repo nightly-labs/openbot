@@ -181,6 +181,14 @@ export function settleQuietChannelTurn(snapshot: ConversationSnapshot, turnId: s
   return true;
 }
 
+/** Whether each answer of the turn is text alone or a work note: no file, image or question. */
+export function textAnswersOnly(snapshot: ConversationSnapshot, turnId: string): boolean {
+  return snapshot.messages.every(
+    (message) =>
+      message.author !== "assistant" || message.turnId !== turnId || isWorkNote(message) || isTextAnswer(message),
+  );
+}
+
 /** A text answer of a quiet turn that says more than the marker. */
 export function keptQuietAnswer(message: ConversationMessage): boolean {
   return isTextAnswer(message) && message.text.trim() !== "" && !isNoUpdateAnswer(message.text);

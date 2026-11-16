@@ -85,6 +85,7 @@ import {
   settleQuietChannelTurn,
   settleQuietRoutineTurn,
   teammateRequest,
+  textAnswersOnly,
 } from "./routine-quiet-runs";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
@@ -2082,15 +2083,20 @@ export class TurnLifecycle {
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
-      // Only a turn that ran nothing but scheduled, script or webhook runs and teammate updates: a
-      // person who wrote in the same turn, or who started a Test run, waits for the answer. The owner
+      // Only a turn that ran nothing but scheduled, script or webhook runs, teammate updates and
+      // answered teammate requests: a person who wrote in the same turn, or who started a Test run,
+      // waits for the answer. The owner
       // of a channel routine's request that called the no-update tool is quiet too. A failed run is
       // never quiet.
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
         (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled)
-          ? settleQuietRoutineTurn(snapshot, turnId, noUpdateCalled)
+          ? settleQuietRoutineTurn(
+              snapshot,
+              turnId,
+              noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
+            )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
       if (!quiet) this.#quietChannelTurns.delete(turnId);
@@ -2969,6 +2975,20 @@ export class TurnLifecycle {
  * A message that carries an attachment or a generated image is kept whatever its text: the file is
  * what the user was given, and the text is only its caption.
  */
+/**
+ * A quiet turn of teammate requests only, each answered with the agent's own reply (the caller
+ * checks that), and only text in the chat: that text repeats the reply, so the turn is quiet as
+ * after the no-update tool. Claude often does not load that tool, so the turn does not depend on
+ * the model (#7465). A file, an image or a question keeps the whole turn visible.
+ */
+function answeredRequestTurn(
+  deliveries: readonly DeliveryContext[],
+  snapshot: ConversationSnapshot,
+  turnId: string,
+): boolean {
+  return deliveries.every(({ delivery }) => teammateRequest(delivery)) && textAnswersOnly(snapshot, turnId);
+}
+
 function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string): void {
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
     const message = snapshot.messages[index];

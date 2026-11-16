@@ -54,6 +54,21 @@ const failedRoutineDelivery: DeliveryContext = {
   },
 };
 
+const REQUEST_DELIVERY_ID = "teammate-request-delivery";
+const REQUEST_ANSWER = "READY went to the teammate.";
+/** A teammate's request that the agent answered with its own reply (#7465). */
+const teammateRequestDelivery: DeliveryContext = {
+  ...quietRoutineDelivery,
+  delivery: {
+    ...quietRoutineDelivery.delivery,
+    id: REQUEST_DELIVERY_ID,
+    messageId: "teammate-request-message",
+    sender: { kind: "agent", agentId: "teammate-agent" },
+    text: "Reply with READY.",
+    turnId: "claude-request-turn",
+  },
+};
+
 interface Report {
   schemaVersion: 1;
   generatedAt: string;
@@ -98,9 +113,14 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
               ? quietRoutineDelivery
               : deliveryId === FAILED_DELIVERY_ID
                 ? failedRoutineDelivery
-                : null,
+                : deliveryId === REQUEST_DELIVERY_ID
+                  ? teammateRequestDelivery
+                  : null,
           findMessageDelivery: () => null,
           quietRoutineDelivery: (deliveryId) => deliveryId === QUIET_DELIVERY_ID || deliveryId === FAILED_DELIVERY_ID,
+          quietTeammateThread: true,
+          hasOwnReplyFrom: (replyAgentId, messageId) =>
+            replyAgentId === agentId && messageId === teammateRequestDelivery.delivery.messageId,
         }),
       );
     };
@@ -193,6 +213,26 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.filter((message) => message.turnId === failedTurnId && message.author === "assistant");
 
+    // An answered teammate request whose agent wrote text and did not call the no-update tool: the
+    // turn completion made the text quiet, so the import does too (#7465).
+    const requestTurnId = "claude-request-turn";
+    const claudeRequest = await runImport("claude-request-session", "claude", [
+      {
+        turnId: requestTurnId,
+        status: "completed",
+        startedAt: 11,
+        itemOffset: 0,
+        complete: true,
+        items: [
+          { type: "userMessage", id: `${requestTurnId}-prompt`, clientId: REQUEST_DELIVERY_ID, content: [] },
+          { type: "agentMessage", id: `${requestTurnId}-answer`, text: REQUEST_ANSWER, status: "completed" },
+        ],
+      },
+    ]);
+    const requestAnswers = database
+      .readConversation(agentId, threadId)
+      .messages.filter((message) => message.turnId === requestTurnId && message.author === "assistant");
+
     // A turn that an import did not finish keeps `imported = 0` and is imported at the next start.
     database.connection
       .prepare("UPDATE provider_history_turns SET imported = 0 WHERE session_id = ? AND turn_id = ?")
@@ -215,6 +255,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         splitEdited,
         claudeQuiet,
         claudeFailed,
+        claudeRequest,
         unfinished,
       },
       acceptance: {
@@ -241,6 +282,11 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
           failedAnswers.length === 1 &&
           failedAnswers[0]?.text === FAILED_ANSWER &&
           failedAnswers[0]?.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        claudeAnsweredRequestIsQuiet:
+          claudeRequest.turns === 1 &&
+          requestAnswers.length === 1 &&
+          requestAnswers[0]?.text === REQUEST_ANSWER &&
+          requestAnswers[0]?.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE,
         unfinishedTurnImportsAgain: unfinished.turns === 1,
         importCompleted: database.providerHistoryImport("codex-session")?.state === "complete",
       },

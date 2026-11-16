@@ -76,7 +76,7 @@ turn. Its prompt names `routine_no_update`, because a provider such as Claude Co
 write a visible answer, and without the tool each update put filler in the user's chat (#6821). A turn
 of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
-last update of the turn, which starts closed (`teammateUpdateAnswers`).
+last update or request of the turn, which starts closed (`teammateTurnAnswers`).
 
 A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
 for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
@@ -89,8 +89,12 @@ Its prompt names `routine_no_update` for after that reply. Before the reply, the
 agent must send the result first. Only the agent's own reply counts (`MailboxStore.hasOwnReplyFrom`):
 the result that OpenBot relays when the turn ends and the note for a failed request come after the
 turn completion, so they do not count, and the history import decides the same. The tool call counts
-also when it came before the reply, at the turn completion and in the history import. A reply to a
-message of the agent can hold the result that the user asked for, so it is never quiet.
+also when it came before the reply, at the turn completion and in the history import. The turn does
+not need the tool: when only answered requests started it and its answers are text alone, that text
+repeats the reply, so it becomes quiet answers as after the tool call. Claude often does not load
+the tool, which waits behind its tool search. A file, an image or a question keeps the whole turn in
+the chat. A reply to a message of the agent can hold the result that the user asked for, so it is
+never quiet.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the

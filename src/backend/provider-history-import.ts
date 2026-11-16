@@ -8,6 +8,7 @@ import {
   isTextAnswer,
   keptQuietAnswer,
   quietTeammateTurnDelivery,
+  teammateRequest,
 } from "./agent/routine-quiet-runs";
 import { mergeProviderHistoryMessages, messagesFromThreadItems, threadTurnBaseTime } from "./conversation-snapshots";
 import { databaseRow, decodeConversationMessageJson, requiredStringColumn } from "./database/database-rows";
@@ -312,7 +313,8 @@ function importCompletedTurn(
 
 /**
  * How a turn that a quiet routine run, a teammate update or an answered request (`quietTeammateTurnDelivery`) started answered: `quiet` when each answer is only the
- * no-update marker, or the agent called the no-update tool and generated no image, so the turn
+ * no-update marker, or the agent called the no-update tool or ran only answered teammate requests,
+ * and generated no image, so the turn
  * completion kept only its quiet answers; `image` when the agent called the tool
  * and generated an image, so the completion dropped only the text answers; `answered` for any
  * other such turn, and `none` for a turn that no quiet routine run started. A Test run keeps its
@@ -327,6 +329,8 @@ function routineTurnAnswers(
 ): Effect.Effect<RoutineTurnAnswers, ProviderClientOperationError> {
   return Effect.gen(function* () {
     let routine: boolean | undefined;
+    // Only answered teammate requests: the turn completion makes their text answers quiet (#7465).
+    let requestsOnly = true;
     let markers = 0;
     let reported = false;
     let noUpdateCalled = false;
@@ -359,6 +363,7 @@ function routineTurnAnswers(
               )) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
+          requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
           // A completed delivery with an error is a run whose agent reported a failure: never quiet.
           if (delivery?.status === "completed" && delivery.error !== null) failureReported = true;
         }
@@ -377,6 +382,8 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
+    // The import makes text and images only, so an image is the one report that keeps the turn shown.
+    if (requestsOnly) return imageGenerated ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
 }
