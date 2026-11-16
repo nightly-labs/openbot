@@ -332,7 +332,7 @@ export class RoutineScheduler implements RoutineDueSource {
   /**
    * Turns on again the routine that a run paused before it reported a failure (#9856). Its card joins
    * the run's turn, as the card of the pause did. A routine that changed after the pause, such as one
-   * that the user edited, stays as it is ("kept"). "failed" when the routine is gone or the change failed.
+   * that the user edited or deleted, stays as it is ("kept"). "failed" when the change failed.
    */
   resumeAfterFailedRun(
     pause: { agentId: string; routineId: string; updatedAt: string },
@@ -340,8 +340,7 @@ export class RoutineScheduler implements RoutineDueSource {
   ): "resumed" | "kept" | "failed" {
     const { agentId, routineId } = pause;
     const current = this.#routines.get(agentId, routineId);
-    if (current === null) return "failed";
-    if (current.active || current.updatedAt !== pause.updatedAt) return "kept";
+    if (current === null || current.active || current.updatedAt !== pause.updatedAt) return "kept";
     try {
       this.update({ agentId, routineId, active: true }, this.#toolMutationOptions(agentId, agentId, params));
       return "resumed";
