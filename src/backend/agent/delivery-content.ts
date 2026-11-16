@@ -499,6 +499,17 @@ export function compactionContinuationPrompt(): string {
 }
 
 /**
+ * The note for a turn whose provider process exited during the agent's answer (#9729). The rest of the
+ * answer was never made, so the agent continues from what it said before.
+ */
+export function providerExitContinuationPrompt(): string {
+  return [
+    "OpenBot note, not a message from the user. Your last turn stopped because your provider process exited while you wrote your answer, so the user got only its first part.",
+    "Continue now: give the complete answer to the user's last message. Do not repeat finished work. An action that you started before the stop possibly finished or possibly still runs: check its result before you do it again, and if you cannot tell, say so instead of doing it again. This note does not approve a risky action. If you must wait, need the user's input or approval, or are blocked, say so in one short line and end your turn.",
+  ].join("\n");
+}
+
+/**
  * The provider input for a turn that starts with several deliveries: all the answers to one request,
  * or the person's messages that waited together. The texts become one text item, so a history
  * handoff goes in front of all of them. `unanswered` names the teammates whose request ended with no

@@ -50,6 +50,7 @@ import { AGENT_USAGE_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/a
 import { AGENT_WAITS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-waits-v1";
 import { BROWSER_PROFILES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-profiles-v1";
 import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/browser-proxies-v1";
+import { TEAM_BROWSER_VIEW_CAPABILITY } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { CHANNEL_BROWSER_CAPABILITY } from "@openbot/contracts/team-protocol/channel-browser-v1";
 import { CHANNEL_ISOLATION_CAPABILITY } from "@openbot/contracts/team-protocol/channel-isolation-v1";
 import { CHANNEL_PICTURE_CAPABILITY } from "@openbot/contracts/team-protocol/channel-picture-v1";
@@ -79,6 +80,7 @@ import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted
 import { INSTANCE_TRANSFER_CHUNKS_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-chunks-v1";
 import { INSTANCE_TRANSFER_FULL_COPY_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-full-copy-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { MCP_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/message-pins-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -1301,7 +1303,12 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (unsupported) setHostPage(null);
     },
   );
-  const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest);
+  const marketplaceCalls = createWebMarketplaceCalls(props.accountFetch, hostRequest, {
+    canAdminister: () => serverRoleCanAdminister(server()),
+    hostTab: () =>
+      workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
+      workspace.state.capabilities.includes(TEAM_BROWSER_VIEW_CAPABILITY),
+  });
   // The host's connectors, for an owner or admin. The web client has no computer of its own.
   const connectorTarget = createMemo(() => remoteAdminServer(server(), CONNECTORS_CAPABILITY));
   const githubPort = webGitHubConnectorPort(() => hostRequest());
@@ -3063,6 +3070,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                           open={page() === "marketplace"}
                           onOpenChange={setMarketplaceOpen}
                           calls={marketplaceCalls}
+                          browserRuntime={workspace.runtime.browser}
                           connectors={connectors}
                           server={server()}
                           agents={workspace.shownAgents()}

@@ -27,6 +27,7 @@ export const messages = {
     "Accedi al tuo account {name}. OpenBot ottiene i tool raggiungibili da quell'account, senza password.",
   "mcp.signIn.waiting": "In attesa del browser…",
   "mcp.signIn.continue": "Continua su {name}",
+  "mcp.signIn.pageDescription": "Questa pagina è aperta nel browser su {host}. Accedi da lì.",
   "mcp.test.connected": { one: "Connesso · {count} tool", other: "Connesso · {count} tool" },
   "mcp.status.testing": "Test in corso…",
   "mcp.status.failed": "Non riuscito",

@@ -26,6 +26,7 @@ export const messages = defineMessages("mcp", {
     "Sign in to your {name} account. OpenBot gets the tools that account can reach, and no password.",
   "mcp.signIn.waiting": "Waiting for the browser…",
   "mcp.signIn.continue": "Continue to {name}",
+  "mcp.signIn.pageDescription": "This page is open in the browser on {host}. Sign in here.",
   "mcp.test.connected": { one: "Connected · {count} tool", other: "Connected · {count} tools" },
   "mcp.status.testing": "Testing…",
   "mcp.status.failed": "Failed",

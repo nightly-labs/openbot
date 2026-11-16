@@ -80,7 +80,13 @@ const editSchema = z
   })
   .strict();
 const deleteSchema = z.object({ workflowId: identifier }).strict();
-const runSchema = z.object({ workflowId: identifier, fromNodeId: identifier.optional() }).strict();
+const runSchema = z
+  .object({
+    workflowId: identifier,
+    fromNodeId: identifier.optional(),
+    input: z.string().trim().min(1).max(INPUT_LIMITS.workflowStepInput).optional(),
+  })
+  .strict();
 const runsSchema = z
   .object({ workflowId: identifier, runId: identifier.optional(), limit: z.number().int().min(1).max(5).optional() })
   .strict();
@@ -110,7 +116,7 @@ export const WORKFLOW_TOOL_DEFINITIONS = [
   },
   {
     name: "run_workflow",
-    description: "Start a run of a workflow, or from one node with the newest answers of the nodes before it.",
+    description: "Run a workflow, or from one node with the newest answers before it. Triggers output input.",
     shape: runSchema.shape,
   },
   {
@@ -683,11 +689,23 @@ export const handleWorkflowTool = Effect.fn("WorkflowTools.handle")(function* (
     }
     if (tool === "run_workflow") {
       const input = yield* toolStep(() => runSchema.parse(args));
-      const detail = yield* workflows.startRun({
-        workflowId: input.workflowId,
-        requestId: callKey,
-        ...(input.fromNodeId === undefined ? {} : { fromNodeId: input.fromNodeId }),
-      });
+      if (input.input !== undefined && input.fromNodeId !== undefined) {
+        // A run from a later node gives the earlier answer of its trigger again, so the input would not
+        // reach the next steps. A run from a trigger runs that trigger with the input.
+        const from = (yield* workflows.get(input.workflowId)).graph.nodes.find((node) => node.id === input.fromNodeId);
+        if (from !== undefined && from.kind !== "trigger")
+          return openBotToolFailure(
+            "input needs a full run or a run from a trigger. Leave out fromNodeId, or leave out input.",
+          );
+      }
+      const detail = yield* workflows.startRun(
+        {
+          workflowId: input.workflowId,
+          requestId: callKey,
+          ...(input.fromNodeId === undefined ? {} : { fromNodeId: input.fromNodeId }),
+        },
+        input.input,
+      );
       return openBotToolResult({ runId: detail.run.id, number: detail.run.number, status: detail.run.status });
     }
     const input = yield* toolStep(() => runsSchema.parse(args));
