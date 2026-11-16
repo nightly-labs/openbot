@@ -167,8 +167,9 @@ const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "u
 
 /**
  * Checkout puts the VAT rate on each subscription, so a change of the billing details must also change
- * the subscriptions that run. A subscription with Stripe Tax is not changed: `scripts/stripe-vat-migrate.ts`
- * moves it.
+ * the subscriptions that run. Only a subscription with a VAT treatment in its metadata changes: Checkout
+ * and `scripts/stripe-vat-migrate.ts` write it. A subscription with Stripe Tax, or a plan from before VAT,
+ * keeps its tax.
  */
 const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function* (
   stripe: StripeClient,
@@ -176,7 +177,10 @@ const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function
   treatment: VatTreatment,
 ): Effect.fn.Return<void, BillingError | BillingOperationError> {
   const subscriptions = (yield* stripeCall(() => stripe.listCustomerSubscriptions(customerId))).filter(
-    (subscription) => OPEN_SUBSCRIPTION_STATUSES.has(subscription.status) && !subscription.automatic_tax?.enabled,
+    (subscription) =>
+      OPEN_SUBSCRIPTION_STATUSES.has(subscription.status) &&
+      !subscription.automatic_tax?.enabled &&
+      subscription.metadata[VAT_METADATA.treatment] !== undefined,
   );
   if (subscriptions.length === 0) return;
   const rateId =
@@ -190,8 +194,9 @@ const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function
   const rateIds = rateId ? [rateId] : [];
   for (const subscription of subscriptions) {
     const current = (subscription.default_tax_rates ?? []).map((rate) => rate.id);
-    if (current.length === rateIds.length && current.every((id, index) => id === rateIds[index])) continue;
-    yield* stripeCall(() => stripe.setSubscriptionTaxRates(subscription.id, rateIds));
+    const sameRates = current.length === rateIds.length && current.every((id, index) => id === rateIds[index]);
+    if (sameRates && subscription.metadata[VAT_METADATA.treatment] === treatment) continue;
+    yield* stripeCall(() => stripe.setSubscriptionTaxRates(subscription.id, rateIds, treatment));
   }
 });
 

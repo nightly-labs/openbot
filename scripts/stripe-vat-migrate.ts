@@ -2,13 +2,15 @@ import { VAT_SELLER_COUNTRY, VAT_TAX_RATE } from "@openbot/contracts/billing-det
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 import { billingDetailsOf, type VatTreatment, vatTreatment } from "../apps/auth-api/src/server/billing-tax";
-import { STRIPE_API_VERSION, type StripeCustomerTax } from "../apps/auth-api/src/server/stripe-client";
+import { STRIPE_API_VERSION, type StripeCustomerTax, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 
 /**
  * One-off move of the open subscriptions from Stripe Tax to the Tax Rate of Polish VAT. Each subscription
  * with `automatic_tax` gets the VAT that a new Checkout page of its customer gets (`billing-tax.ts`):
  * the Tax Rate for `standard`, no rate for `reverse` and `none`. The customer's tax exemption follows, so
  * that the invoice of a reverse charge says so. The next invoice uses the new VAT; no invoice is made now.
+ * The subscription also gets its VAT treatment in its metadata, so that a later change of the billing details
+ * changes its rate as it does for a Checkout subscription.
  *
  *   STRIPE_SECRET_KEY=sk_test_... bun scripts/stripe-vat-migrate.ts [--apply] [--live]
  *
@@ -166,6 +168,7 @@ async function main(args: readonly string[]): Promise<void> {
     exemptions.set(plan.customerId, plan.treatment === "reverse" ? "reverse" : "none");
     if (!apply) continue;
     const body = new URLSearchParams({ "automatic_tax[enabled]": "false", proration_behavior: "none" });
+    body.set(`metadata[${VAT_METADATA.treatment}]`, plan.treatment);
     if (plan.treatment === "standard") body.set("default_tax_rates[0]", rateId);
     else body.set("default_tax_rates", "");
     await stripe(secretKey, "POST", `/v1/subscriptions/${encodeURIComponent(plan.subscriptionId)}`, body, idSchema);

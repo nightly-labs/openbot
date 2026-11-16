@@ -68,6 +68,7 @@ import {
   subscriptionPaymentMethodId,
   subscriptionPeriodEnd,
   subscriptionServerItem,
+  VAT_METADATA,
 } from "./stripe-client";
 
 /** Prices change only when `stripe-bootstrap.ts` runs, so each isolate reads the price once in this time. */
@@ -637,6 +638,7 @@ export class LicenseService {
         ? Math.max(ordered.trialEndSeconds, nowSeconds + 3_600)
         : Math.floor(periodEnd / 1_000);
       const customerId = subscriptionCustomerId(subscription);
+      const vatTreatmentMark = subscription.metadata[VAT_METADATA.treatment];
       const listed = yield* this.#stripeCall(() => dependencies.stripe.listCustomerSubscriptions(customerId));
       const readAt = dependencies.now();
       const license =
@@ -658,6 +660,9 @@ export class LicenseService {
                   [BILLING_METADATA.userId]: ownerId,
                   ...licenseMetadata(licensePlanFromPrice(price)),
                   [LICENSE_METADATA.orderSubscription]: subscription.id,
+                  // Only a subscription with a VAT treatment sends it, so the retry of an older split keeps
+                  // the body of its idempotency key.
+                  ...(vatTreatmentMark === undefined ? {} : { [VAT_METADATA.treatment]: vatTreatmentMark }),
                 },
               },
               `license-split:${subscription.id}`,

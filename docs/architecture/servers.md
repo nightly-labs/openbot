@@ -1378,8 +1378,10 @@ creates them and the Customer Portal settings.
     `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
     customer metadata `openbot_vies_request` keeps as proof.
   - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.
-  - A `PUT` of new details also sets the Tax Rate of each open subscription without Stripe Tax, so
-    that the next invoice of a plan that runs gets the new VAT.
+  - A `PUT` of new details also sets the Tax Rate of each open subscription with the metadata
+    `openbot_vat_treatment`, so that the next invoice of a plan that runs gets the new VAT. Checkout,
+    the license split and `scripts/stripe-vat-migrate.ts` write that metadata. A plan from before VAT
+    has none and keeps its tax.
   - A customer with no country gets 409 `billing_country_required`: a client from before this step
     must update. Checkout requires the billing address; when its country differs from the saved
     one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)

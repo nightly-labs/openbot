@@ -525,6 +525,9 @@ export class StripeClient {
     if (input.tax.rateId) body.set("subscription_data[default_tax_rates][0]", input.tax.rateId);
     body.set(`metadata[${VAT_METADATA.country}]`, input.tax.country);
     body.set(`metadata[${VAT_METADATA.treatment}]`, input.tax.treatment);
+    // The subscription keeps its VAT treatment, so that a change of the billing details changes only the
+    // subscriptions that got their VAT from OpenBot (`billing-tax.ts`).
+    body.set(`subscription_data[metadata][${VAT_METADATA.treatment}]`, input.tax.treatment);
     for (const prefix of ["metadata", "subscription_data[metadata]"]) {
       body.set(`${prefix}[${BILLING_METADATA.userId}]`, input.userId);
       if (input.serverId) body.set(`${prefix}[${BILLING_METADATA.serverId}]`, input.serverId);
@@ -623,14 +626,15 @@ export class StripeClient {
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
   }).bind(this);
 
-  /** Sets the VAT rates of the next invoices of a subscription. No rate removes them. */
+  /** Sets the VAT rates of the next invoices of a subscription and its VAT treatment. No rate removes them. */
 
   readonly setSubscriptionTaxRates = Effect.fn("StripeClient.setSubscriptionTaxRates")(function* (
     this: StripeClient,
     subscriptionId: string,
     rateIds: readonly string[],
+    treatment: string,
   ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
-    const body = new URLSearchParams();
+    const body = new URLSearchParams({ [`metadata[${VAT_METADATA.treatment}]`]: treatment });
     if (rateIds.length === 0) body.set("default_tax_rates", "");
     for (const [index, id] of rateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
     yield* this.#requestEffect(

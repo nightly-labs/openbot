@@ -109,7 +109,7 @@ import {
 } from "@openbot/contracts/license";
 import { type Browser, chromium } from "playwright-core";
 import { z } from "zod";
-import { STRIPE_API_VERSION } from "../apps/auth-api/src/server/stripe-client";
+import { STRIPE_API_VERSION, VAT_METADATA } from "../apps/auth-api/src/server/stripe-client";
 import { developmentChildEnvironment, loadSharedDevelopmentEnvironment } from "./development-environment";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -3760,7 +3760,15 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       "items[0][price]": await priceId("standard", "month"),
       currency: "eur",
       "default_tax_rates[0]": vatRate.id,
+      [`metadata[${VAT_METADATA.treatment}]`]: "standard",
       payment_behavior: "error_if_incomplete",
+    });
+    // A plan from before VAT has no rate and no VAT treatment. A change of the details must not add VAT to it.
+    const older = await stripe("POST", "/v1/subscriptions", idSchema, {
+      customer: account.customer,
+      "items[0][price]": await priceId("standard", "month"),
+      currency: "eur",
+      trial_period_days: "7",
     });
     const invoice = await stripe(
       "GET",
@@ -3775,29 +3783,42 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       return rows[0] ?? null;
     });
     // Checkout puts the rate on the subscription, so a change of the details must change it there too.
-    const subscriptionRates = async () =>
-      (
-        await stripe(
-          "GET",
-          `/v1/subscriptions/${paid.id}`,
-          z.object({ default_tax_rates: z.array(z.object({ id: z.string() })) }),
-        )
-      ).default_tax_rates.map((rate) => rate.id);
+    const subscriptionTax = async (id: string) => {
+      const read = await stripe(
+        "GET",
+        `/v1/subscriptions/${id}`,
+        z.object({
+          default_tax_rates: z.array(z.object({ id: z.string() })),
+          metadata: z.record(z.string(), z.string()),
+        }),
+      );
+      return { rates: read.default_tax_rates.map((rate) => rate.id), treatment: read.metadata[VAT_METADATA.treatment] };
+    };
     const movedOut = await save({ country: "US" });
-    const outsideRates = await subscriptionRates();
+    const outsideTax = await subscriptionTax(paid.id);
     const movedBack = await save({ country: "DE" });
-    const backRates = await subscriptionRates();
+    const back = await subscriptionTax(paid.id);
+    const olderTax = await subscriptionTax(older.id);
     record(
       "vat",
       "a change of the billing details also changes the VAT of a running subscription: no rate in the United States, the Polish rate again in Germany",
       movedOut.status === 200 &&
-        outsideRates.length === 0 &&
+        outsideTax.rates.length === 0 &&
+        outsideTax.treatment === "none" &&
         movedBack.status === 200 &&
-        backRates.length === 1 &&
-        backRates[0] === vatRate.id,
-      { movedOut: movedOut.status, outsideRates, movedBack: movedBack.status, backRates },
+        back.rates.length === 1 &&
+        back.rates[0] === vatRate.id &&
+        back.treatment === "standard",
+      { movedOut: movedOut.status, outsideTax, movedBack: movedBack.status, back },
+    );
+    record(
+      "vat",
+      "a plan from before VAT keeps no VAT when the billing details change",
+      olderTax.rates.length === 0 && olderTax.treatment === undefined,
+      olderTax,
     );
     await stripe("DELETE", `/v1/subscriptions/${paid.id}`, idSchema);
+    await stripe("DELETE", `/v1/subscriptions/${older.id}`, idSchema);
     record(
       "vat",
       "a paid invoice of a consumer in Germany adds its net amount, not the VAT, to the One Stop Shop count",
