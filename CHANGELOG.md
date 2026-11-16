@@ -203,6 +203,8 @@ All notable changes to OpenBot will be documented here. The project follows
 - Choose how long you can pause in a voice conversation before your words go to the agent, in
   Settings > Voice > Pause before sending. Before, a pause of 1.2 seconds to think always sent a
   half sentence as its own message. The default is now 1.5 seconds, the same as in the phone app.
+- Connect many pictures to one input on the Workflows Canvas. Select the nodes, then drag a line from
+  one of them to the input: a line goes from each selected node. Undo removes all of them.
 
 ### Changed
 
@@ -1118,6 +1120,10 @@ All notable changes to OpenBot will be documented here. The project follows
 - An OpenCode chat whose history has an image that OpenCode cannot send again now continues in a new
   session with the chat history. Before, each later message failed at once with "Media strings must
   be base64", and a channel showed the same failure again and again.
+- A Hermes agent now answers when more MCP servers are turned on than Hermes accepts. Before, each
+  message failed with "Internal error: invalid_params". Hermes now gets the MCP servers that fit,
+  and a message names each server that it did not get, so you can turn off the servers that you do
+  not need.
 
 ## [0.71.0] - 2026-11-14
 
