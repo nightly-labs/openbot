@@ -613,7 +613,10 @@ async function verifyHistoryKeepsRequests(agentId: string) {
   const client = clients.at(-1);
   const session = database.listProviderSessions(threadId).find((session) => session.state === "active");
   assert.ok(client && session);
-  const imported = await runCauseEffect(
+  // After each restart, boot recovery imports history in the background, and an import skips the
+  // turns that an earlier import committed. Thus this import can find no new turn. Check the stored
+  // result, not which import did the work.
+  await runCauseEffect(
     importProviderHistory({
       database,
       readHistory: client.readHistory.bind(client),
@@ -628,8 +631,14 @@ async function verifyHistoryKeepsRequests(agentId: string) {
       quietRoutineDelivery: () => false,
     }),
   );
-  assert.ok(imported.turns > 0, "The provider's saved transcript was read and imported.");
+  assert.equal(
+    database.providerHistoryImport(session.id)?.state,
+    "complete",
+    "The provider's saved transcript was read and imported.",
+  );
   assert.deepEqual(users(), before, "History import keeps one user request after independent continuation turn IDs.");
+  const texts = users().map((message) => message.text);
+  assert.equal(new Set(texts).size, texts.length, "Each user request shows once, whichever import ran first.");
 }
 
 try {
