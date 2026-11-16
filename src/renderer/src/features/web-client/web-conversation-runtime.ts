@@ -175,7 +175,8 @@ export function createWebConversationRuntime(
   const routinesOnceEnabled = () => hasCapability?.(ROUTINES_ONCE_CAPABILITY) === true;
   const webLiveVoice = useWebLiveVoice();
   const listeners = new Set<(event: AttachmentImportEvent) => void>();
-  const files = createWebAttachmentFiles(remote, hostId);
+  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
+  const files = createWebAttachmentFiles(remote, hostId, attachmentMedia);
   let importing: { cancelled: boolean; serverId: string } | undefined;
   // A new upload cancels the one in flight (`uploadGeneration` in web-runtime.ts), so one import runs
   // at a time. Each chat sends on its own while another chat imports, so a second import fails, as a
@@ -300,7 +301,6 @@ export function createWebConversationRuntime(
   const emit = (event: AttachmentImportEvent) => {
     for (const listener of listeners) listener(event);
   };
-  const attachmentMedia = createWebAttachmentMedia(remote, hostId);
   onCleanup(() => {
     void cancelImportFiles();
     attachmentMedia.dispose();
