@@ -257,7 +257,7 @@ export const messages = {
   "mobile.chat.attachment.hostRejects": "{name}: لا يقبل الحاسوب المضيف هذه الملفات. حدّث OpenBot هناك لإرفاقها.",
   "mobile.chat.attachment.nameTooLong": "اختر ملفًا باسم أقصر.",
   "mobile.chat.attachment.damaged": "المرفق تالف. اختره مرة أخرى.",
-  "mobile.chat.attachment.tooLarge": "{name} أكبر من 100 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} أكبر من {limit}.",
   "mobile.chat.attachment.cameraPermission": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة.",
   "mobile.chat.composer.send": "إرسال الرسالة",
   "mobile.chat.composer.stop": "إيقاف {name}",

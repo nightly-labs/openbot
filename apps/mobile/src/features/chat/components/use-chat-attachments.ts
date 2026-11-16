@@ -21,6 +21,7 @@ import { isAndroid } from "@/shared/lib/platform";
 import { readFileBase64 } from "@/shared/lib/read-file-base64";
 import { useText } from "@/shared/lib/text";
 import { type ImageDimensions, imageDimensions } from "../model/image-dimensions";
+import { fileLimitText } from "../model/large-files";
 import { smallerPhoto } from "../model/smaller-photo";
 
 /**
@@ -131,7 +132,10 @@ export function useChatAttachments(
   /** What the receiving host accepts. Read on each selection, because it loads with the connection. */
   support?: () => AttachmentSupport,
 ) {
-  const { t, errorMessage } = useText();
+  const text = useText();
+  const { t, errorMessage } = text;
+  const tooLarge = (name: string, bytes: number) =>
+    new Error(t("mobile.chat.attachment.tooLarge", { name, limit: fileLimitText(text, bytes) }));
   const limitMessage = () => t("mobile.chat.attachment.limit", { limit: INPUT_LIMITS.attachments });
   // The plus's rect while the attachment card is open, and null while it is
   // not: one value, so the card can never be open without an anchor to grow
@@ -188,7 +192,7 @@ export function useChatAttachments(
       throw new Error(t("mobile.chat.attachment.nameTooLong"));
     if (input.file) {
       if (input.file.size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
-        throw new Error(t("mobile.chat.attachment.tooLarge", { name: input.name }));
+        throw tooLarge(input.name, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
       return { ...input, size: input.file.size, id: `mobile-draft-attachment-${++sequence.current}` };
     }
     if (input.base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/u.test(input.base64))
@@ -196,7 +200,7 @@ export function useChatAttachments(
     const size =
       Math.floor((input.base64.length * 3) / 4) -
       (input.base64.endsWith("==") ? 2 : input.base64.endsWith("=") ? 1 : 0);
-    if (size > MOBILE_ATTACHMENT_BYTES) throw new Error(t("mobile.chat.attachment.tooLarge", { name: input.name }));
+    if (size > MOBILE_ATTACHMENT_BYTES) throw tooLarge(input.name, MOBILE_ATTACHMENT_BYTES);
     const dimensions = input.mimeType.startsWith("image/") ? imageDimensions(input.base64) : null;
     return {
       ...input,
@@ -225,8 +229,7 @@ export function useChatAttachments(
     const safeName = name.replace(/[/\\]/gu, "_");
     const size = file.size;
     // Check before reading: a rejected file should not be copied into memory first.
-    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
-      throw new Error(t("mobile.chat.attachment.tooLarge", { name: safeName }));
+    if (size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES) throw tooLarge(safeName, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
     assertSupported(safeName);
     const mimeType = attachmentMimeTypeForName(safeName);
     // A large file stays on disk. The upload reads it in parts, so it is never in memory as one string.

@@ -176,7 +176,7 @@ export const messages = defineMessages("mobile.chat", {
     "{name}: the host computer does not accept these files. Update OpenBot there to attach them.",
   "mobile.chat.attachment.nameTooLong": "Choose a file with a shorter name.",
   "mobile.chat.attachment.damaged": "The attachment is damaged. Select it again.",
-  "mobile.chat.attachment.tooLarge": "{name} is larger than 100 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} is larger than {limit}.",
   "mobile.chat.attachment.cameraPermission": "Allow camera access in Settings to take a photo.",
   "mobile.chat.composer.send": "Send message",
   "mobile.chat.composer.stop": "Stop {name}",

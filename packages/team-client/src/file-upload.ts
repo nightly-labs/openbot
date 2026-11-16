@@ -63,8 +63,11 @@ export function createRemoteFileSender<E, R>(
     input: RemoteFileUpload,
     onProgress?: (sent: number, total: number) => void,
   ) {
+    const busy = () => new FileTransferError({ message: sourceText("error.remote.attachmentBusy") });
+    // Check before the digest too: a device file can take seconds to read.
+    if (pending.size !== 0) return yield* busy();
     const source = yield* uploadSource(input);
-    if (pending.size !== 0) return yield* new FileTransferError({ message: sourceText("error.remote.attachmentBusy") });
+    if (pending.size !== 0) return yield* busy();
     const transferId = createId();
     const acknowledged = Deferred.makeUnsafe<void, FileTransferError>();
     const opened = () => {
@@ -135,27 +138,23 @@ export function createRemoteFileSender<E, R>(
   });
   const uploadSource = Effect.fn("RemoteFileSender.source")(function* (input: RemoteFileUpload) {
     const tooLarge = () => new FileTransferError({ message: sourceText("error.remote.attachmentTooLarge") });
+    const unavailable = () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") });
     const file = input.file;
     if (file) {
-      const maxBytes = Math.min(input.maxBytes ?? TEAM_PROTOCOL_V2_MAX_FILE_BYTES, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);
-      if (!reader) return yield* new FileTransferError({ message: "This client cannot read device files." });
-      if (!Number.isSafeInteger(file.size) || file.size < 0)
-        return yield* new FileTransferError({ message: "Invalid file size." });
-      if (file.size > maxBytes)
+      if (!reader || !Number.isSafeInteger(file.size) || file.size < 0) return yield* unavailable();
+      if (input.maxBytes !== undefined && file.size > input.maxBytes) return yield* tooLarge();
+      if (file.size > TEAM_PROTOCOL_V2_MAX_FILE_BYTES)
         return yield* new FileTransferError({ message: sourceText("error.remote.fileTooLarge") });
       const digest = yield* reader.digest(file.ref);
-      if (!SHA256_HEX.test(digest)) return yield* new FileTransferError({ message: "Invalid file digest." });
+      if (!SHA256_HEX.test(digest)) return yield* unavailable();
       return {
         size: file.size,
         sha256: digest,
         // A part with a different length means that the file changed after it was selected.
         read: (offset: number, length: number) =>
-          reader.read(file.ref, offset, length).pipe(
-            Effect.filterOrFail(
-              (bytes) => bytes.length === length,
-              () => new FileTransferError({ message: sourceText("error.remote.attachmentChanged") }),
-            ),
-          ),
+          reader
+            .read(file.ref, offset, length)
+            .pipe(Effect.filterOrFail((bytes) => bytes.length === length, unavailable)),
       };
     }
     const maxBytes = Math.min(input.maxBytes ?? MOBILE_ATTACHMENT_BYTES, TEAM_PROTOCOL_V2_MAX_FILE_BYTES);

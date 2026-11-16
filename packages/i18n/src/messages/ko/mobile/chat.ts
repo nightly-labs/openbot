@@ -177,7 +177,7 @@ export const messages = {
     "{name}: 호스트 컴퓨터가 이 파일을 받지 않아요. 첨부하려면 호스트의 OpenBot을 업데이트해 주세요.",
   "mobile.chat.attachment.nameTooLong": "이름이 더 짧은 파일을 선택해 주세요.",
   "mobile.chat.attachment.damaged": "첨부 파일이 손상됐어요. 다시 선택해 주세요.",
-  "mobile.chat.attachment.tooLarge": "{name} 파일이 100MB보다 커요.",
+  "mobile.chat.attachment.tooLarge": "{name} 파일이 {limit}보다 커요.",
   "mobile.chat.attachment.cameraPermission": "사진을 찍으려면 설정에서 카메라 접근을 허용해 주세요.",
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",

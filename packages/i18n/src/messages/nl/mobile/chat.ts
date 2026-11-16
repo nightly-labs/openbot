@@ -172,7 +172,7 @@ export const messages = {
     "{name}: de hostcomputer accepteert deze bestanden niet. Werk OpenBot daar bij om ze bij te voegen.",
   "mobile.chat.attachment.nameTooLong": "Kies een bestand met een kortere naam.",
   "mobile.chat.attachment.damaged": "De bijlage is beschadigd. Selecteer de bijlage opnieuw.",
-  "mobile.chat.attachment.tooLarge": "{name} is groter dan 100 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} is groter dan {limit}.",
   "mobile.chat.attachment.cameraPermission": "Sta cameratoegang toe in Instellingen om een foto te maken.",
   "mobile.chat.composer.send": "Verstuur bericht",
   "mobile.chat.composer.stop": "Stop {name}",

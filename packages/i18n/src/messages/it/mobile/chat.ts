@@ -179,7 +179,7 @@ export const messages = {
     "{name}: il computer host non accetta questi file. Aggiorna OpenBot lì per allegarli.",
   "mobile.chat.attachment.nameTooLong": "Scegli un file con un nome più corto.",
   "mobile.chat.attachment.damaged": "L'allegato è danneggiato. Selezionalo di nuovo.",
-  "mobile.chat.attachment.tooLarge": "{name} supera i 100 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} supera i {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Consenti l'accesso alla fotocamera nelle Impostazioni per scattare una foto.",
   "mobile.chat.composer.send": "Invia messaggio",

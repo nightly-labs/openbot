@@ -30,7 +30,7 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
-import { File } from "expo-file-system";
+import { File, FileMode } from "expo-file-system";
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type {
@@ -439,7 +439,7 @@ export const RemoteTeamTransport = memo(
     const [actions] = useState(() => ({
       digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
       readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
-        const handle = uploadFile(ref).open();
+        const handle = uploadFile(ref).open(FileMode.ReadOnly);
         try {
           handle.offset = offset;
           return bytesToBase64(await handle.readBytes(length));

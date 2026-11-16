@@ -180,7 +180,7 @@ export const messages = {
     "{name}: Der Host-Computer akzeptiert diese Dateien nicht. Aktualisiere OpenBot dort, um sie anzuhängen.",
   "mobile.chat.attachment.nameTooLong": "Wähle eine Datei mit einem kürzeren Namen.",
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
-  "mobile.chat.attachment.tooLarge": "{name} ist größer als 100 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
