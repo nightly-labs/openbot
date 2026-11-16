@@ -147,6 +147,13 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
 ]);
 
 /**
+ * The provider errors that end a turn after work started, and that a backup model continues with the
+ * turn's work steps (#5423): a spent quota, and a spent balance or a billing refusal, such as the
+ * credit balance of an Anthropic API key. Other errors after work show, as before.
+ */
+const CONTINUATION_CAUSES: ReadonlySet<CauseCode> = new Set(["usage_limit", "billing"]);
+
+/**
  * The provider errors during a turn's own compaction that end the turn but can pass when it continues:
  * a connection that failed or stopped answering (#5822). A server error keeps the provider's text.
  */
@@ -921,12 +928,12 @@ export class TurnLifecycle {
 
   /**
    * Whether a provider error waits for the end of its turn, which can move the turn to a backup
-   * model. A spent quota after work started waits also when the agent is set to ask.
+   * model. A spent quota or balance after work started waits also when the agent is set to ask.
    */
   #mayHoldError(agentId: string, turnId: string, causeCode: CauseCode): boolean {
     return (
       this.#hooks.mayFailOver(agentId) ||
-      (causeCode === "usage_limit" &&
+      (CONTINUATION_CAUSES.has(causeCode) &&
         this.#carriesWork(agentId, turnId, this.#runningTurns.get(turnId)) &&
         this.#hooks.mayContinueOnBackup(agentId))
     );
@@ -1761,12 +1768,15 @@ export class TurnLifecycle {
       // neither is compacted.
       // A routine run's own session closes after this turn, so it is not compacted either. Nor is a
       // turn that a provider error ended before it did work: it can run again on a backup model. Nor
-      // is a turn that a spent quota ended after work started: a backup model can continue it.
+      // is a turn that a spent quota or balance ended after work started: a backup model can
+      // continue it.
       const routineSession = this.#conversation.isRoutineSession(threadId);
       const failedOnProvider = failover !== undefined && !limited && status === "failed" && running !== undefined;
       const mayRunAgain = failedOnProvider && !running.acted;
       const mayContinue =
-        failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
+        failedOnProvider &&
+        CONTINUATION_CAUSES.has(failover.context.causeCode) &&
+        this.#carriesWork(agentId, turnId, running);
       const shouldCompact =
         !refused &&
         !limited &&
@@ -1851,8 +1861,8 @@ export class TurnLifecycle {
       // The same for a provider error, when the agent moves to a backup model. Only the agent's own
       // chat moves it: a task or a channel task fails as before. A message runs again once for each
       // provider account and model that failed it, so a move that does not happen cannot run it on
-      // the same one again. A turn that a spent quota ended after work started continues on a backup,
-      // as after a plan limit, also when the agent is set to ask: there is no moment to ask.
+      // the same one again. A turn that a spent quota or balance ended after work started continues
+      // on a backup, as after a plan limit, also when the agent is set to ask: there is no moment to ask.
       const failedKey = this.#usageLimits.failureKey(agentId, model);
       const failedOver =
         (mayRunAgain || mayContinue) &&
