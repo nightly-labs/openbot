@@ -441,12 +441,20 @@ export function toLogValue(value: unknown): LogValue {
   return convertSafely(value);
 }
 
+/**
+ * `toLogValue` without the email rule, as `redactSecrets` is for text: for a record that the
+ * agent's own chat shows to the user who gave it the text, such as an answer or a history item.
+ */
+export function toSecretSafeValue(value: unknown): LogValue {
+  return convertSafely(value, false);
+}
+
 // The last line of defence for both public entry points: whatever a caller
 // hands over, converting it must never become the exception that hides the one
 // being logged.
-function convertSafely<T>(value: T): LogValue {
+function convertSafely<T>(value: T, emails = true): LogValue {
   try {
-    return convertValue(value, new Set<object>(), true);
+    return convertValue(value, new Set<object>(), emails);
   } catch {
     return UNSERIALIZABLE;
   }

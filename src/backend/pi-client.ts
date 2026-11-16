@@ -7,7 +7,7 @@ import { dirname, isAbsolute, join, resolve } from "node:path";
 import { agentProviderName, type KeyOnlyProviderId } from "@openbot/contracts/agent-providers";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { createOpenBotLogger, type LogValue, redactText } from "@openbot/logging";
+import { createOpenBotLogger, type LogValue, redactSecrets, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { Cause, Effect, Exit, Option, Schema, Scope, Semaphore } from "effect";
 import { withoutTurnContext } from "./agent/developer-instructions";
@@ -993,7 +993,9 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
 
   #addUserMessage(turn: PiTurn, message: string): void {
     const id = `${turn.id}:user:${randomUUID()}`;
-    turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text: this.#redact(message) }] });
+    // The user's own message, so an email address in it stays, as in the agent's answer (#9988).
+    const text = redactMcpValues(redactSecrets(message), this.#secretValues(), redactSecrets);
+    turn.items.set(id, { id, type: "userMessage", content: [{ type: "text", text }] });
   }
 
   #notify(method: string, thread: PiThread, params: DynamicRecord): void {
