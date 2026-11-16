@@ -25,10 +25,6 @@ import {
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import {
-  PROVIDER_MODEL_SOURCE_CAPABILITY,
-  PROVIDER_MODEL_SOURCE_ROUTES,
-} from "@openbot/contracts/team-protocol/provider-model-source-v1";
-import {
   SIDEBAR_FOLDERS_CAPABILITY,
   SIDEBAR_FOLDERS_ROUTES,
 } from "@openbot/contracts/team-protocol/sidebar-folders-v1";
@@ -55,7 +51,6 @@ import {
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
-  decodeProviderModelSources,
   decodeSaveAgentProfileResult,
   decodeSaveSkillSuggestionResult,
   hostAnalyticsQuery,
@@ -81,7 +76,6 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withModelListings,
-  withModelSources,
   withSteeringModels,
   withUsageCredits,
   withWorkspaceOnlyLimit,
@@ -191,7 +185,6 @@ import {
   decodeAgentAnalyticsFromHost,
   decodeAgentModelOptions,
   decodeAgentSessionSettingsFromHost,
-  decodeAgentStatusFromHost,
   decodeAgentSummaries,
   decodeAgentSummary,
   decodeHiddenAgentsFromHost,
@@ -262,6 +255,7 @@ import {
   parseWithdrawFeedback,
 } from "./agent-inputs";
 import type { IpcGroupHandlers } from "./define-ipc-group";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 
 /** The fields of a move to another model at a usage limit. */
@@ -442,25 +436,7 @@ export function agentIpcHandlers({
     agent: {
       getStatus: scopedQueryHandler({
         local: () => service.getStatus(),
-        remote: (serverId) =>
-          runCauseEffect(
-            Effect.gen(function* () {
-              const status = remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost);
-              // `provider-model-source-v1` says where a provider's models come from, such as the
-              // Ollama models of a Codex that its settings point to Ollama. A host without it, or a
-              // failed read, leaves the rows as they are: the picker then shows no source.
-              const sources = remoteServers.supportsCapability(serverId, PROVIDER_MODEL_SOURCE_CAPABILITY)
-                ? remoteServers
-                    .request(serverId, PROVIDER_MODEL_SOURCE_ROUTES.list, decodeProviderModelSources, {
-                      method: "POST",
-                      body: {},
-                    })
-                    .pipe(Effect.orElseSucceed(() => []))
-                : Effect.succeed([]);
-              const [rows, listed] = yield* Effect.all([status, sources], { concurrency: "unbounded" });
-              return withModelSources(rows, listed);
-            }),
-          ),
+        remote: (serverId) => runCauseEffect(readRemoteAgentStatus(remoteServers, serverId)),
       }),
       getRuntimeSnapshot: scopedQueryHandler({
         local: () => service.getRuntimeSnapshot(),

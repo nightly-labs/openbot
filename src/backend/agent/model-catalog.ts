@@ -57,9 +57,10 @@ export class ModelCatalog {
   }
 
   /**
-   * Reads the source again after a good list from the same client, and answers whether it changed. A
-   * failed read keeps the source that the last good read gave: the list did not change because a
-   * settings read failed.
+   * Reads the source again from the client that lists the models, and answers whether it changed. A
+   * failed read clears the source: a wrong "Uses Ollama" line is worse than none, and with none the
+   * picker shows the version line as before. A client that another one replaced during the read
+   * changes nothing: the new client reads its own source.
    */
   readonly #readSource = Effect.fn("ModelCatalog.readSource")(function* (
     this: ModelCatalog,
@@ -69,14 +70,13 @@ export class ModelCatalog {
   ) {
     if (!catalog.source) return false;
     const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
-    if (Result.isFailure(result)) {
-      logger.warn("A provider did not give the source of its models.", { provider });
-      return false;
-    }
+    if (this.#options.client(provider) !== client) return false;
+    if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
+    const source = Result.isSuccess(result) ? result.success : null;
     const before = JSON.stringify(this.#sources.get(provider) ?? null);
-    if (result.success) this.#sources.set(provider, result.success);
+    if (source) this.#sources.set(provider, source);
     else this.#sources.delete(provider);
-    return JSON.stringify(result.success) !== before;
+    return JSON.stringify(source) !== before;
   });
 
   /**
@@ -192,7 +192,11 @@ export class ModelCatalog {
           if (!client) return { provider, models: previous, fresh: false, timedOut: false, failed: false };
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
-            const { models: sorted, listed } = yield* this.read(client, catalog);
+            // The source comes from the settings, not from the list, so both reads run at once.
+            const [{ models: sorted, listed }, sourceChanged] = yield* Effect.all(
+              [this.read(client, catalog), this.#readSource(provider, client, catalog)],
+              { concurrency: "unbounded" },
+            );
             // For a provider with a fallback, a successful but empty response is no more useful to
             // the picker than a timeout: it must not erase the built-in free tier on first
             // discovery. It is not a fresh catalog, so callers must not treat it as proof that
@@ -203,9 +207,15 @@ export class ModelCatalog {
               durationMs: Math.round(performance.now() - startedAt),
             });
             if (catalog.fallback && listed === 0) {
-              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false, failed: false };
+              return {
+                provider,
+                models: catalog.fallback(previous),
+                fresh: false,
+                timedOut: false,
+                failed: false,
+                sourceChanged,
+              };
             }
-            const sourceChanged = yield* this.#readSource(provider, client, catalog);
             return { provider, models: sorted, fresh: true, timedOut: false, failed: false, sourceChanged };
           }).pipe(
             Effect.catch((failure) => {

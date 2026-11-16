@@ -46,7 +46,7 @@ function builtInName(providerId: string): string {
   return BUILT_IN_NAMES.get(providerId) ?? providerId;
 }
 
-/** Reads the source from the running Codex. Fails as `config/read` fails, so the caller keeps what it knew. */
+/** Reads the source from the running Codex. Fails as `config/read` fails. */
 export const readCodexModelSource = Effect.fn("Agent.readCodexModelSource")(function* (
   client: AgentClient,
   timeoutMs: number,

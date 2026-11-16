@@ -819,7 +819,7 @@ interface ProviderModelCatalog {
   /**
    * Where the CLI's own settings say its models come from, when that is not the provider's own list,
    * such as a Codex model provider or model list file (#9956). Read with each list. A failed read
-   * keeps the source that the last good read gave.
+   * clears it, so the picker never shows a source that it could not check.
    */
   source?(client: AgentClient, timeoutMs: number): Effect.Effect<ProviderModelSource | null, unknown>;
 }

@@ -4749,8 +4749,12 @@ export class ProviderRuntime implements ProviderPort {
     );
     if (providers.length === 0) return;
     const errorSerialAtStart = this.#errorSerial;
+    // The source of the models is part of the row too (#9956), so a changed source also sends the status.
     const listOf = (provider: AgentProvider) =>
-      JSON.stringify(this.#modelCatalog.list().filter((model) => model.provider === provider));
+      JSON.stringify([
+        this.#modelCatalog.list().filter((model) => model.provider === provider),
+        this.#modelCatalog.source(provider) ?? null,
+      ]);
     let changed = false;
     for (const provider of providers) this.#relisting.add(provider);
     yield* Effect.forEach(
