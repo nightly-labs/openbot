@@ -8021,6 +8021,22 @@ try {
         isDeepStrictEqual(otherProvider.body, { provider: "codex", variables: [] }),
       [summary(kept), summary(otherProvider)],
     );
+    const big = "x".repeat(8_000);
+    const tooLarge = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
+      ...setup,
+      json: {
+        provider: "codex",
+        variables: Array.from({ length: 8 }, (_, index) => ({ name: `BIG_${index}`, value: big, sensitive: true })),
+      },
+    });
+    check(
+      "the host refuses sensitive values that would make the key file too large to read, and keeps the saved values and names",
+      errorIs(tooLarge, 400, sourceText("error.provider.environmentSecretsTooLarge")) &&
+        providerCredentials.secret(providerEnvironmentSecret("claude", "ANTHROPIC_AUTH_TOKEN")) === secret &&
+        providerCredentials.secret(providerEnvironmentSecret("codex", "BIG_0")) === null &&
+        isDeepStrictEqual(providerEnvironment.get("codex"), { provider: "codex", variables: [] }),
+      [summary(tooLarge)],
+    );
     const member = await call("POST", PROVIDER_ENVIRONMENT_ROUTES.update, {
       ...setup,
       token: bobToken,

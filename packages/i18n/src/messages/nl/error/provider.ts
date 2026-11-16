@@ -51,6 +51,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} staat meer dan één keer in de lijst.",
   "error.provider.environmentValueTooLong": "De waarde van {name} is te lang.",
   "error.provider.environmentTooMany": "Een provider kan hoogstens {limit} variabelen hebben.",
+  "error.provider.environmentSecretsTooLarge":
+    "De gevoelige waarden zijn samen te lang. Sla kortere of minder waarden op.",
   "error.provider.archiveSpecialFile": "Het runtime-archief bevat een link of speciaal bestand.",
   "error.provider.archiveUnsafePath": "Het runtime-archief bevat een onveilig pad.",
   "error.provider.runtimeSpecialFile": "De runtime bevat een link of speciaal bestand.",

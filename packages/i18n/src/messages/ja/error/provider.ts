@@ -53,6 +53,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} がリストに複数あります。",
   "error.provider.environmentValueTooLong": "{name} の値が長すぎます。",
   "error.provider.environmentTooMany": "プロバイダーの変数は最大 {limit} 個です。",
+  "error.provider.environmentSecretsTooLarge":
+    "機密の値が合計で長すぎます。短い値にするか、値を減らして保存してください。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
   "error.provider.archiveUnsafePath": "ランタイムのアーカイブに安全でないパスが含まれています。",
   "error.provider.runtimeSpecialFile": "ランタイムにリンクまたは特殊ファイルが含まれています。",

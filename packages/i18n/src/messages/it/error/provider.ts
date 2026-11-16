@@ -50,6 +50,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} compare più di una volta nell’elenco.",
   "error.provider.environmentValueTooLong": "Il valore di {name} è troppo lungo.",
   "error.provider.environmentTooMany": "Un provider può avere al massimo {limit} variabili.",
+  "error.provider.environmentSecretsTooLarge":
+    "I valori sensibili sono troppo lunghi nel complesso. Salva valori più brevi o meno valori.",
   "error.provider.archiveSpecialFile": "L'archivio del runtime contiene un link o un file speciale.",
   "error.provider.archiveUnsafePath": "L'archivio del runtime contiene un percorso non sicuro.",
   "error.provider.runtimeSpecialFile": "Il runtime contiene un link o un file speciale.",

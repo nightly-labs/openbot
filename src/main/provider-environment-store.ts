@@ -12,7 +12,12 @@ import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Schema, Semaphore } from "effect";
 import { PreferenceStore } from "./preference-file";
-import type { OpenBotSecretName, ProviderCredentialStore } from "./provider-credential-store";
+import {
+  CredentialFileTooLarge,
+  type CredentialStoreFailure,
+  type OpenBotSecretName,
+  type ProviderCredentialStore,
+} from "./provider-credential-store";
 
 /** A variable as the file keeps it. A sensitive value is not here: it is in the provider key file. */
 interface StoredVariable {
@@ -96,6 +101,13 @@ export function providerEnvironmentControl(
   // One change at a time: the names and the sensitive values are two files, and each change reads both.
   const changes = Semaphore.makeUnsafe(1);
   const fail = (cause: unknown) => new ProviderEnvironmentChangeFailed({ cause });
+  // Values that would make the key file too large to read are the request's fault, not the host's.
+  const failSecrets = (error: CredentialStoreFailure) =>
+    fail(
+      error.cause instanceof CredentialFileTooLarge
+        ? new ProviderEnvironmentRefused(sourceText("error.provider.environmentSecretsTooLarge"))
+        : error.cause,
+    );
   const stored = (provider: ProviderEnvironmentProvider) => store.get().providers[provider] ?? [];
   const secret = (provider: ProviderEnvironmentProvider, name: string) =>
     credentials.secret(providerEnvironmentSecret(provider, name));
@@ -136,7 +148,7 @@ export function providerEnvironmentControl(
               ? [[providerEnvironmentSecret(provider, variable.name), variable.value] as const]
               : [],
           );
-          if (written.length > 0) yield* credentials.setSecrets(written).pipe(Effect.mapError(fail));
+          if (written.length > 0) yield* credentials.setSecrets(written).pipe(Effect.mapError(failSecrets));
           const list: StoredVariable[] = next.map((variable) =>
             variable.sensitive
               ? { name: variable.name, sensitive: true }
@@ -149,7 +161,7 @@ export function providerEnvironmentControl(
               ? [[providerEnvironmentSecret(provider, variable.name), null] as const]
               : [],
           );
-          if (removed.length > 0) yield* credentials.setSecrets(removed).pipe(Effect.mapError(fail));
+          if (removed.length > 0) yield* credentials.setSecrets(removed).pipe(Effect.mapError(failSecrets));
           if (JSON.stringify(before) !== JSON.stringify(resolve(provider))) yield* changed(provider);
           return get(provider);
         }),

@@ -2078,15 +2078,15 @@ function EnvironmentSection(props: {
   const rowsOf = (environment: ProviderEnvironment | null): EnvironmentRow[] =>
     (environment?.variables ?? []).map((variable) => ({ ...variable, id: nextId++ }));
   const [draft, setDraft] = createSignal<EnvironmentRow[]>([]);
-  const [baseline, setBaseline] = createSignal<string>("[]");
   const [leaving, setLeaving] = createSignal<ReadonlySet<number>>(new Set());
   const [saved, setSaved] = createSignal(false);
   const removeButtons = new Map<number, HTMLButtonElement>();
   let addButton: HTMLButtonElement | undefined;
-  const snapshot = (rows: readonly EnvironmentRow[]) =>
+  const snapshot = (rows: readonly Omit<EnvironmentRow, "id">[]) =>
     JSON.stringify(rows.map(({ name, value, sensitive, stored }) => ({ name, value, sensitive, stored })));
   const kept = () => draft().filter((row) => !leaving().has(row.id));
-  const dirty = () => snapshot(kept()) !== baseline();
+  // Compared with what the host keeps now, so Discard after a new answer leaves no change.
+  const dirty = () => snapshot(kept()) !== snapshot(props.control.value?.variables ?? []);
   // An answer of the host starts the draft again from what the host keeps, but not while the user has
   // a change: each status event reads the variables again, also while the user types. The answer to a
   // save of this page does start it again.
@@ -2098,7 +2098,6 @@ function EnvironmentSection(props: {
       const rows = rowsOf(environment);
       setLeaving(new Set<number>());
       setDraft(rows);
-      setBaseline(snapshot(rows));
     },
   );
   const busy = () => Boolean(props.disabled || props.control.pending || props.control.value === null);

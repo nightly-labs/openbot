@@ -50,6 +50,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} встречается в списке больше одного раза.",
   "error.provider.environmentValueTooLong": "Значение {name} слишком длинное.",
   "error.provider.environmentTooMany": "У провайдера может быть не больше {limit} переменных.",
+  "error.provider.environmentSecretsTooLarge":
+    "Секретные значения вместе слишком длинные. Сохраните более короткие значения или меньше значений.",
   "error.provider.archiveSpecialFile": "Архив среды выполнения содержит ссылку или специальный файл.",
   "error.provider.archiveUnsafePath": "Архив среды выполнения содержит небезопасный путь.",
   "error.provider.runtimeSpecialFile": "Среда выполнения содержит ссылку или специальный файл.",

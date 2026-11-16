@@ -45,6 +45,7 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "يرد {name} في القائمة أكثر من مرة.",
   "error.provider.environmentValueTooLong": "قيمة {name} طويلة جدًا.",
   "error.provider.environmentTooMany": "يمكن أن يكون للمزوّد {limit} متغيرًا كحد أقصى.",
+  "error.provider.environmentSecretsTooLarge": "القيم الحساسة طويلة جدًا مجتمعة. احفظ قيمًا أقصر أو أقل عددًا.",
   "error.provider.archiveSpecialFile": "يحتوي أرشيف بيئة التشغيل على رابط أو ملف خاص.",
   "error.provider.archiveUnsafePath": "يحتوي أرشيف بيئة التشغيل على مسار غير آمن.",
   "error.provider.runtimeSpecialFile": "تحتوي بيئة التشغيل على رابط أو ملف خاص.",

@@ -37,6 +37,17 @@ const envelopeSchema = z.object({
 
 const MAX_ENVELOPE_BYTES = 64 * 1024;
 
+/**
+ * A file that `#read` would refuse. The write stops before it, so the saved keys stay readable: a file
+ * over the limit would make every provider and account key unreadable at the next start.
+ */
+export class CredentialFileTooLarge extends Error {
+  constructor() {
+    super(sourceText("error.provider.credentialFileTooLarge"));
+    this.name = "CredentialFileTooLarge";
+  }
+}
+
 export interface SecretCipher {
   encrypt: (value: string) => Buffer;
   decrypt: (value: Buffer) => string;
@@ -241,7 +252,10 @@ export class ProviderCredentialStore {
     const content = yield* credentialSync(() => {
       const credentials: Record<string, string> = {};
       for (const [provider, key] of keys) credentials[provider] = this.#cipher.encrypt(key).toString("base64");
-      return `${JSON.stringify({ version: 1, credentials })}\n`;
+      const text = `${JSON.stringify({ version: 1, credentials })}\n`;
+      // The same measure as `#read`.
+      if (text.length > MAX_ENVELOPE_BYTES) throw new CredentialFileTooLarge();
+      return text;
     });
     yield* writeFileAtomically(this.#path, content, { createDirectory: true }).pipe(
       Effect.mapError(({ cause }) => new CredentialStoreFailure({ cause })),

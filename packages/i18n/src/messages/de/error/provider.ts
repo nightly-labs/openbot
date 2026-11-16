@@ -52,6 +52,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} steht mehr als einmal in der Liste.",
   "error.provider.environmentValueTooLong": "Der Wert von {name} ist zu lang.",
   "error.provider.environmentTooMany": "Ein Anbieter kann höchstens {limit} Variablen haben.",
+  "error.provider.environmentSecretsTooLarge":
+    "Die vertraulichen Werte sind zusammen zu lang. Speichere kürzere oder weniger Werte.",
   "error.provider.archiveSpecialFile": "Das Laufzeitarchiv enthält einen Link oder eine spezielle Datei.",
   "error.provider.archiveUnsafePath": "Das Laufzeitarchiv enthält einen unsicheren Pfad.",
   "error.provider.runtimeSpecialFile": "Die Laufzeit enthält einen Link oder eine spezielle Datei.",

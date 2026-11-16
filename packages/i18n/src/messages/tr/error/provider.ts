@@ -51,6 +51,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} listede birden fazla kez var.",
   "error.provider.environmentValueTooLong": "{name} değeri çok uzun.",
   "error.provider.environmentTooMany": "Bir sağlayıcının en fazla {limit} değişkeni olabilir.",
+  "error.provider.environmentSecretsTooLarge":
+    "Gizli değerler toplamda çok uzun. Daha kısa ya da daha az değer kaydedin.",
   "error.provider.archiveSpecialFile": "Çalışma zamanı arşivi bir bağlantı veya özel dosya içeriyor.",
   "error.provider.archiveUnsafePath": "Çalışma zamanı arşivi güvenli olmayan bir yol içeriyor.",
   "error.provider.runtimeSpecialFile": "Çalışma zamanı bir bağlantı veya özel dosya içeriyor.",

@@ -50,6 +50,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name}이(가) 목록에 두 번 이상 있어요.",
   "error.provider.environmentValueTooLong": "{name}의 값이 너무 길어요.",
   "error.provider.environmentTooMany": "공급자는 변수를 최대 {limit}개까지 가질 수 있어요.",
+  "error.provider.environmentSecretsTooLarge":
+    "민감한 값들을 합치면 너무 길어요. 더 짧게 하거나 개수를 줄여 저장하세요.",
   "error.provider.archiveSpecialFile": "런타임 아카이브에 링크 또는 특수 파일이 있어요.",
   "error.provider.archiveUnsafePath": "런타임 아카이브에 안전하지 않은 경로가 있어요.",
   "error.provider.runtimeSpecialFile": "런타임에 링크 또는 특수 파일이 있어요.",

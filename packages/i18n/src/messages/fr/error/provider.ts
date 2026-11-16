@@ -50,6 +50,8 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} figure plus d’une fois dans la liste.",
   "error.provider.environmentValueTooLong": "La valeur de {name} est trop longue.",
   "error.provider.environmentTooMany": "Un fournisseur peut avoir au plus {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "Les valeurs sensibles sont trop longues au total. Enregistrez des valeurs plus courtes ou moins nombreuses.",
   "error.provider.archiveSpecialFile":
     "L’archive de l’environnement d’exécution contient un lien ou un fichier spécial.",
   "error.provider.archiveUnsafePath": "L’archive de l’environnement d’exécution contient un chemin non sûr.",

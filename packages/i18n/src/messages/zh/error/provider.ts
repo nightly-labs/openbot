@@ -44,6 +44,7 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} 在列表中出现了多次。",
   "error.provider.environmentValueTooLong": "{name} 的值太长。",
   "error.provider.environmentTooMany": "一个提供方最多可以有 {limit} 个变量。",
+  "error.provider.environmentSecretsTooLarge": "敏感值加起来太长。请保存更短或更少的值。",
   "error.provider.archiveSpecialFile": "运行时压缩包中包含链接或特殊文件。",
   "error.provider.archiveUnsafePath": "运行时压缩包中包含不安全的路径。",
   "error.provider.runtimeSpecialFile": "运行时中包含链接或特殊文件。",

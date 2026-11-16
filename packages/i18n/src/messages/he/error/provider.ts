@@ -48,6 +48,7 @@ export const messages = {
   "error.provider.environmentNameDuplicate": "{name} מופיע ברשימה יותר מפעם אחת.",
   "error.provider.environmentValueTooLong": "הערך של {name} ארוך מדי.",
   "error.provider.environmentTooMany": "לספק יכולים להיות עד {limit} משתנים.",
+  "error.provider.environmentSecretsTooLarge": "הערכים הרגישים ארוכים מדי ביחד. שמרו ערכים קצרים יותר או פחות ערכים.",
   "error.provider.archiveSpecialFile": "ארכיון סביבת ההרצה מכיל קישור או קובץ מיוחד.",
   "error.provider.archiveUnsafePath": "ארכיון סביבת ההרצה מכיל נתיב לא בטוח.",
   "error.provider.runtimeSpecialFile": "סביבת ההרצה מכילה קישור או קובץ מיוחד.",
