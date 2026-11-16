@@ -7,8 +7,9 @@
 // into the Vault. The keys for every agent also stay at the shared path of earlier versions,
 // `.vault/<NAME>`, and come back there at start after 0.70.0 deleted them (#8983). The key file of one
 // agent from such a build becomes a link to its Vault copy, and comes back at start after 0.70.0
-// deleted it (#9313). A key file that OpenBot did not write stays, also with a key name (#10077). With a Vault, the form saves the key there for every agent by default, and "Only this
-// agent" saves it there for the agent only. Logins, cards and contacts for chosen agents are hidden
+// deleted it (#9313). A key file that OpenBot did not write stays, also with a key name (#10077).
+// With a Vault, the form saves the key there for every agent by default, and "Only this agent" saves
+// it there for the agent only. Logins, cards and contacts for chosen agents are hidden
 // from the other agents. A login that an agent saves for one subdomain never changes the password of a
 // login for another subdomain.
 // No provider or account is used.
