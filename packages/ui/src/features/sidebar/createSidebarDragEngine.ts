@@ -65,7 +65,7 @@ export interface SidebarDragEngineDeps {
 /** A drag that rests this long on a closed folder opens it. */
 const SPRING_OPEN_MS = 700;
 
-/** A drag aims at nothing until the pointer moves this far from where the drag started. */
+/** After the empty pin area opens, a drag aims at nothing until the pointer moves this far from its start. */
 const DRAG_AIM_DISTANCE_PX = 6;
 
 export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
@@ -100,7 +100,7 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
 
   let dragPoint: SidebarDragPoint | null = null;
 
-  /** Where the drag started, until the pointer moves away from it. */
+  /** Where a drag that opened the empty pin area started, until the pointer moves away from it. */
   let dragOrigin: SidebarDragPoint | null = null;
 
   let dragTarget: SidebarDropTarget | null = null;
@@ -215,7 +215,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
     dragSession = { source: options.source, startScrollTop: deps.getAgentList()?.scrollTop ?? 0 };
     dragPoint = { clientX: event.clientX, clientY: event.clientY };
-    dragOrigin = dragPoint;
     dragTarget = null;
     dragState.beginDrag(options.source);
     measureSidebarDragTargets();
@@ -289,10 +288,6 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
     };
   }
 
-  /**
-   * The empty pin area opens at drag start and pushes every row down under a still pointer. Until the
-   * pointer moves, the drag aims at nothing, so a drop in place keeps the order.
-   */
   function resolveSidebarDropTarget(point: SidebarDragPoint): SidebarDropTarget | null {
     const session = dragSession;
     if (dragOrigin) {
@@ -443,6 +438,9 @@ export function createSidebarDragEngine(deps: SidebarDragEngineDeps) {
       chatKind(dragSession.source.id) !== null
     ) {
       const activeSession = dragSession;
+      // The area pushes every row down under a still pointer. Until the pointer moves, the drag aims at
+      // nothing, so a drop in place keeps the order. `dragPoint` is still the drag start here.
+      dragOrigin = dragPoint;
       dragState.setEmptyPinnedDropVisible(true);
       queueMicrotask(() => {
         if (dragSession !== activeSession) return;
