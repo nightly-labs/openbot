@@ -132,31 +132,35 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   const channelWriters = createMemo(() => new Set(deps.props.channel?.workers().map((worker) => worker.id) ?? []));
   /*
    * An agent chat can keep an answer "streaming" after its turn ends, as when a joined server misses
-   * a refresh (#5847). The chat shows that text when the agent has had no turn for a short time. A
-   * joined server sends the final copy after the turn ends, so the final copy usually comes first.
+   * a refresh (#5847). The chat shows that text a short time after its turn ends. A joined server
+   * sends the final copy after the turn ends, so the final copy usually comes first.
    */
-  const [turnSettled, setTurnSettled] = createSignal(untrack(() => !deps.props.activeTurnId));
+  const [endingTurnId, setEndingTurnId] = createSignal<string | undefined>(
+    untrack(() => deps.props.activeTurnId ?? undefined),
+  );
   createEffect(
-    () => Boolean(deps.props.activeTurnId),
-    (turnActive) => {
-      if (turnActive) {
-        setTurnSettled(false);
+    () => deps.props.activeTurnId,
+    (turnId) => {
+      if (turnId) {
+        setEndingTurnId(turnId);
         return;
       }
-      const timer = setTimeout(() => setTurnSettled(true), STALE_STREAM_MS);
+      const timer = setTimeout(() => setEndingTurnId(undefined), STALE_STREAM_MS);
       return () => clearTimeout(timer);
     },
   );
   /*
    * Only the text of a member that works waits. A view keeps the copy of an older message that it
    * loaded, so a copy loaded while it streamed can stay "streaming" after its task ends (#4846), and
-   * it must not stay hidden.
+   * it must not stay hidden. In an agent chat, only the text of the turn that runs now, or that just
+   * ended, waits: an older answer that kept its "streaming" mark showed and hid at each turn (#10092).
    */
   const held = (message: AgentMessage): boolean =>
     heldWhileWritten(message) &&
     (deps.props.channel
       ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
-      : Boolean(deps.props.activeTurnId) || !turnSettled());
+      : message.turnId !== undefined &&
+        (message.turnId === deps.props.activeTurnId || message.turnId === endingTurnId()));
   /* The quiet answers of a teammate update or request show under its marker, so they have no row of their own. */
   const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
