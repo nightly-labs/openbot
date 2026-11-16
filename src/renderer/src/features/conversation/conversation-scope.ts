@@ -369,9 +369,10 @@ export function createConversationViewScope(props: ConversationProps) {
    * Save on a skill question: the host writes the skill in the background, not in a turn of the
    * agent. When the host saved nothing or cannot be asked, the user's yes (`reply`) goes to the agent.
    * The yes goes to the chat of the click, because the user can open another chat while the host
-   * writes (#7593). False when the chat cannot send the yes now.
+   * writes (#7593). `saved` when the host saved the skill, `sent` when the yes went to the agent,
+   * and null when the chat cannot send the yes now.
    */
-  async function saveSkillSuggestion(messageId: string, reply: string): Promise<boolean> {
+  async function saveSkillSuggestion(messageId: string, reply: string): Promise<"saved" | "sent" | null> {
     const target = currentTarget();
     const agentId = props.agent?.id;
     if (agentId) {
@@ -381,9 +382,9 @@ export function createConversationViewScope(props: ConversationProps) {
         : conversationPort().agent.saveSkillSuggestion(input, props.server?.id);
       // A failed request falls back to the yes, so the lesson is not lost.
       const result = await save?.catch(() => null);
-      if (result?.saved === true) return true;
+      if (result?.saved === true) return "saved";
     }
-    return sendCardMessage(reply, target);
+    return sendCardMessage(reply, target) ? "sent" : null;
   }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
