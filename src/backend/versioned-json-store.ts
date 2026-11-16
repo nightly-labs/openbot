@@ -22,9 +22,9 @@ export interface VersionedJsonFormat<Value> {
  * - `kept`: JSON that this build cannot read, such as the file of a newer release. It stays unchanged.
  * - `unreadable`: the read failed, for example on a permission error. It stays unchanged.
  */
-export type VersionedJsonFileState = "missing" | "loaded" | "damaged" | "kept" | "unreadable";
+type VersionedJsonFileState = "missing" | "loaded" | "damaged" | "kept" | "unreadable";
 
-export interface VersionedJsonLoad<Value> {
+interface VersionedJsonLoad<Value> {
   /** Null when there is no file that this build can read: the store starts from its defaults. */
   readonly value: Value | null;
   /** The file that this build writes, and deletes when the user deletes the data. */
