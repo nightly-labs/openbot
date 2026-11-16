@@ -160,12 +160,20 @@
   outline-offset: 2px;
 }
 
+/* The table frame is a ScrollEdges. The fade masks the scroll area, so the ring is on the frame. */
+.message-table-frame {
+  width: 100%;
+  border-radius: var(--openbot-radius-lg);
+}
+
+.message-markdown-table-frame {
+  border-radius: var(--openbot-radius-md);
+  box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
+}
+
 .message-markdown-table-scroll {
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  border-radius: var(--openbot-radius-md);
-  box-shadow: 0 0 0 1px var(--openbot-data-table-ring);
 }
 
 /* Each column keeps the data table minimum, so a narrow message scrolls sideways and does not
@@ -883,9 +891,6 @@
 .message-data-table-scroll {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
-  border-radius: var(--openbot-radius-lg);
-  overscroll-behavior-inline: contain;
 }
 
 .message-data-table-frame {
@@ -899,11 +904,6 @@
   justify-content: flex-end;
   gap: var(--openbot-space-1);
   margin-top: var(--openbot-space-1);
-}
-
-.message-data-table-scroll:focus-visible {
-  outline: 2px solid var(--openbot-border-focus);
-  outline-offset: 2px;
 }
 
 .message-data-table {
