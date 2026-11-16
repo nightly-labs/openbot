@@ -323,6 +323,7 @@ import type { SidebarLayoutStore } from "./sidebar-layout-store";
 import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
+import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
@@ -2959,22 +2960,43 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
-    return { sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null };
+    return {
+      sunra: this.#mcp.serviceSignIn(SUNRA_MCP_HOST) !== null,
+      higgsfield: this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST) !== null,
+    };
   }
 
   /** The credits of the media services that a workflow step can spend now. A failed read has none. */
   readonly workflowMediaCredits = Effect.fn("AgentService.workflowMediaCredits")(function* (this: AgentService) {
-    const signIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
-    if (!signIn || this.#stopping) return { sunra: null } satisfies WorkflowMediaCredits;
-    const sunra = yield* readSunraCredits(signIn).pipe(
-      Effect.catch((failure) =>
-        Effect.sync(() => {
-          logger.warn("Could not read the Sunra credits.", { error: failure.message });
-          return null;
-        }),
-      ),
+    if (this.#stopping) return { sunra: null, higgsfield: null } satisfies WorkflowMediaCredits;
+    const sunraSignIn = this.#mcp.serviceSignIn(SUNRA_MCP_HOST);
+    const higgsfieldSignIn = this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST);
+    const [sunra, higgsfield] = yield* Effect.all(
+      [
+        sunraSignIn
+          ? readSunraCredits(sunraSignIn).pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("Could not read the Sunra credits.", { error: failure.message });
+                  return null;
+                }),
+              ),
+            )
+          : Effect.succeed(null),
+        higgsfieldSignIn
+          ? readHiggsfieldCredits(higgsfieldSignIn).pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() => {
+                  logger.warn("Could not read the Higgsfield credits.", { error: failure.message });
+                  return null;
+                }),
+              ),
+            )
+          : Effect.succeed(null),
+      ],
+      { concurrency: "unbounded" },
     );
-    return { sunra } satisfies WorkflowMediaCredits;
+    return { sunra, higgsfield } satisfies WorkflowMediaCredits;
   }).bind(this);
 
   /**
@@ -2987,9 +3009,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       input: {
         kind: GeneratedMediaKind;
         provider: WorkflowMediaProvider;
-        /** The id of the model at its provider. Sunra reads it; Codex and Grok use their default. */
+        /** The id of the model at its provider. Sunra and Higgsfield read it; Codex and Grok use their default. */
         model: string;
-        /** The account of the provider that pays. Null is its own sign-in; Sunra ignores it. */
+        /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
         account: string | null;
         specs: WorkflowMediaSpecs;
         prompt: string;
@@ -3010,6 +3032,24 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() => logger.warn("Could not make workflow media with Sunra.", { error: failure.message })),
+          ),
+          Effect.mapError((failure) => failed(failure.message)),
+        );
+      }
+      if (input.provider === "higgsfield") {
+        if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        return yield* generateHiggsfieldMedia(
+          {
+            signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
+            resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
+            store: (file) => this.#mailbox.storeGeneratedAttachment(file),
+          },
+          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+        ).pipe(
+          Effect.tapError((failure) =>
+            Effect.sync(() =>
+              logger.warn("Could not make workflow media with Higgsfield.", { error: failure.message }),
+            ),
           ),
           Effect.mapError((failure) => failed(failure.message)),
         );

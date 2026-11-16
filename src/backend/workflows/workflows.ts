@@ -414,9 +414,9 @@ interface WorkflowsShape {
    * asset step. Answers its file id. The draft goes away.
    */
   keepPicture(draftId: string): Effect.Effect<string, WorkflowFailed>;
-  /** Whether this host can use Sunra for an image step now. */
+  /** Whether this host can use Sunra and Higgsfield for an image step now. */
   mediaProviders(): WorkflowMediaProviders;
-  /** The credits that this host's Sunra sign-in can spend now. A failed read has none. */
+  /** The credits that this host's Sunra and Higgsfield sign-ins can spend now. A failed read has none. */
   mediaCredits(): Effect.Effect<WorkflowMediaCredits>;
   /** Runs one node alone, with the newest answers of the nodes before it. */
   runStep(input: RunWorkflowStepInput): Effect.Effect<WorkflowStep, WorkflowFailed>;
@@ -1909,9 +1909,10 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           return kept;
         });
 
-        const mediaProviders = (): WorkflowMediaProviders => dependencies.mediaProviders?.() ?? { sunra: false };
+        const mediaProviders = (): WorkflowMediaProviders =>
+          dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
         const mediaCredits = (): Effect.Effect<WorkflowMediaCredits> =>
-          dependencies.mediaCredits?.() ?? Effect.succeed({ sunra: null });
+          dependencies.mediaCredits?.() ?? Effect.succeed({ sunra: null, higgsfield: null });
 
         const runStep = Effect.fn("Workflows.runStep")(function* (input: RunWorkflowStepInput) {
           return yield* locked(

@@ -1380,6 +1380,17 @@ of that account, with Sunra's `get_balance` tool, which spends no credits. It sh
 in the page rail, and each member of a joined server who can use workflows can see it. Sunra's own
 privacy policy covers what Sunra keeps.
 
+A step with a Higgsfield model uses the Higgsfield sign-in of that computer's Apps in the same way.
+The computer sends the prompt, the model, the size settings and the input pictures to Higgsfield's
+MCP server (`mcp.higgsfield.ai`): it puts each input picture in Higgsfield's upload storage first,
+then asks Higgsfield to make the file, and downloads the result only from Higgsfield's file hosts.
+Higgsfield keeps the file in the history of the signed-in Higgsfield account, and the credits of that
+account pay for it. OpenBot never spends an unlimited-generation allowance of that account. While the
+Canvas page is open, the computer also asks Higgsfield for the credits of that account, with
+Higgsfield's `balance` tool, which spends no credits. It shows the number only in the page rail, and
+each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
+covers what Higgsfield keeps.
+
 Deleting an agent keeps the workflows and their step history without the agent. Deleting a
 workflow deletes its versions, runs, steps, and receipts.
 

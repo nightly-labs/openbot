@@ -1319,7 +1319,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     githubConnector: githubPort,
     attachmentMedia: runtime.attachmentMedia,
   });
-  // As on desktop: the rail shows the Sunra credits of the host while the Canvas page is open.
+  // As on desktop: the rail shows the Sunra and Higgsfield credits of the host while the Canvas page is open.
   const mediaCredits = createWorkflowMediaCredits(
     () => (page() === "workflows" && workspace.state.status === "online" ? (server()?.id ?? null) : null),
     () => workflowHost.workflows.mediaCredits(),
