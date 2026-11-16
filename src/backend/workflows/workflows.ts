@@ -53,6 +53,7 @@ import {
   type WorkflowMediaKind,
   type WorkflowMediaProvider,
   type WorkflowMediaProviders,
+  type WorkflowMediaSize,
   type WorkflowMediaSpecs,
   type WorkflowNode,
   type WorkflowNodeKind,
@@ -266,6 +267,12 @@ export interface WorkflowsDependencies {
    * the user can read. Absent where this host cannot make media: image steps then fail.
    */
   generateMedia?: (request: WorkflowMediaRequest) => Effect.Effect<string, { readonly message: string }>;
+  /**
+   * Crops the centre of a generated picture to the shape of `size`, scales it to exactly that size and
+   * keeps it as a new PNG attachment. Answers its id. Absent where this host cannot change pictures:
+   * an image step with a custom size then keeps the picture that the model made.
+   */
+  sizePicture?: (attachmentId: string, size: WorkflowMediaSize) => Effect.Effect<string, { readonly message: string }>;
   /**
    * Keeps an attachment draft of `types` as a picture of this host and answers its file id, `missing`
    * when there is no such draft, or `type` for a draft of another type. Absent where this host cannot
@@ -630,6 +637,19 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const model = workflowMediaModel(node.fields);
           const specs = workflowMediaSpecs(node.fields, kind, model);
           const generateMedia = dependencies.generateMedia;
+          const sizePicture = dependencies.sizePicture;
+          /** The picture at the custom size of the step. When that fails, the step keeps the model's picture. */
+          const sized = (attachmentId: string) =>
+            specs.size && sizePicture
+              ? sizePicture(attachmentId, specs.size).pipe(
+                  Effect.catch((failure) =>
+                    Effect.sync(() => {
+                      logger.warn("A workflow image could not be cropped to its size.", { error: failure.message });
+                      return attachmentId;
+                    }),
+                  ),
+                )
+              : Effect.succeed(attachmentId);
           // The pictures of the image steps before it: the run's newest files, or for a step that runs
           // alone, the newest files of the workflow.
           const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
@@ -655,7 +675,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                         prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
                         images,
                         voice: mediaVoice(node.fields, kind, model),
-                      }),
+                      }).pipe(Effect.flatMap(sized)),
                     )
                     .pipe(Effect.result);
             if (Result.isFailure(result)) settle(step, { status: "failed", error: result.failure.message });

@@ -138,6 +138,12 @@ export interface WorkflowCatalogs {
   /** The open OpenBot channels of the host. Only this computer gives them. */
   channels?: readonly WorkflowChannel[] | undefined;
   imageModels: readonly WorkflowImageModel[];
+  /**
+   * Whether an image step can have a custom size in pixels, which the host crops and scales the picture
+   * of the model to, or the aspect ratios 4:5 and 5:4 (`workflows-media-size-v1`). An older host reads
+   * them as the first aspect ratio of the model.
+   */
+  mediaSize?: boolean | undefined;
   /** The workspace files that an asset node can take, and the images that image steps made. */
   files: readonly StoredFileRow[];
   /**

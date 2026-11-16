@@ -24,6 +24,7 @@ import {
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
@@ -280,6 +281,7 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
     mediaSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY),
     mediaAccountSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY),
     mediaTransparentSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY),
+    mediaSizeSupported: () => has(WORKFLOWS_MEDIA_CAPABILITY) && has(WORKFLOWS_MEDIA_SIZE_CAPABILITY),
     mediaUrl(attachmentId, kind) {
       const media = options.attachmentMedia;
       if (!media) return undefined;

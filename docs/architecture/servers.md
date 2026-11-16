@@ -467,6 +467,19 @@ another model and any other value keep the model's own background. The capabilit
 client shows the Background chip only on a host that advertises it, because an older host ignores
 the field.
 
+`workflows-media-size-v1` lets an image step have a size of its own. With `aspect` set to `custom`,
+the node reads two more fields, `width` and `height`: whole pixels from 64 to 4096. The host asks the
+model for the nearest aspect ratio it makes, at the smallest resolution that is at least the longer
+side (else the largest). When the file is made, the host crops its centre to the shape of the size and
+scales it to exactly `width` × `height` as a PNG, then deletes the model's file. When the host cannot
+decode the file (Electron decodes PNG and JPEG, not WebP), the step keeps the model's file. A video
+and a side out of range keep the model's size. The capability adds no route. A client shows Custom
+in the aspect ratio menu only on a host that advertises it, because an older host reads `custom` as
+the model's first aspect ratio. The same capability adds the aspect ratios `4:5` and `5:4` for an
+image: the host asks the model for that ratio, and a client offers them only on a host that
+advertises the capability, for the same reason. A video model without its own list of aspect ratios
+does not make them.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

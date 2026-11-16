@@ -11,6 +11,7 @@ import {
   type WorkflowMediaKind,
 } from "@openbot/contracts/ipc";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import type {
   WorkflowChannel,
@@ -99,6 +100,12 @@ export interface WorkflowHost {
    */
   mediaTransparentSupported(): boolean;
   /**
+   * Whether an image step can have a custom size in pixels or the aspect ratios 4:5 and 5:4: this
+   * computer always, and a joined server only when it advertises `workflows-media-size-v1`. An older
+   * host reads them as the first aspect ratio of the model.
+   */
+  mediaSizeSupported(): boolean;
+  /**
    * The pictures of the host's Library that an asset step can use: this computer's, or a joined
    * server's when it serves `storage-v1`. The host gives a member only the files of the agents that
    * they see. A host without image and video steps gives none.
@@ -181,6 +188,8 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
   const mediaTransparentSupported = () =>
     mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+  const mediaSizeSupported = () =>
+    mediaSupported() && (local() || serverSupportsCapability(server(), WORKFLOWS_MEDIA_SIZE_CAPABILITY));
   // A joined server without GitHub workflows gets no call: its port rejects before main.
   const hostGitHub = hostGitHubConnectorPort(() => (githubSupported() ? serverId : undefined));
   // A joined server's attachment comes through main, which downloads it from the host.
@@ -326,6 +335,7 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
     mediaSupported,
     mediaAccountSupported,
     mediaTransparentSupported,
+    mediaSizeSupported,
     mediaUrl,
     get githubConnector() {
       return local() ? githubConnectorPort() : hostGitHub;
