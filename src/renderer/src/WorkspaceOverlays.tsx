@@ -599,6 +599,8 @@ function ServerSettings() {
     openServerSettings,
     serverSettingsTarget,
     serverSettingsSection,
+    setServerSettingsShownSection,
+    serverSettingsOpenRequest,
     serverSettingsOpen,
     setServerSettingsOpen,
     serverSettingsRestoreTarget,
@@ -971,6 +973,8 @@ function ServerSettings() {
           serverAudit={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           agentDefaults={{ listAgents: () => appPort().agent.listAgents(server().id) }}
           initialSection={serverSettingsSection()}
+          initialSectionRequest={serverSettingsOpenRequest()}
+          onSectionChange={setServerSettingsShownSection}
           // Any member imports into this computer or a remote host with `agent-import-v1`.
           agentImport={
             serverSupportsCapability(server(), "agent-import-v1")
