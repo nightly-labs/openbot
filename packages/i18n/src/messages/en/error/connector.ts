@@ -28,15 +28,26 @@ export const messages = defineMessages("error.connector", {
     "OpenBot could not install the 1Password CLI. Check the connection to the internet, then try again.",
   "error.connector.onePasswordCliSignedOut":
     "The 1Password CLI is not signed in. Turn on its integration in the 1Password app, then connect again.",
+  "error.connector.onePasswordAppUnreachable":
+    "OpenBot cannot reach the 1Password app. Open 1Password and unlock it. In Settings > Developer, make sure that “Integrate with 1Password CLI” is on. Then try again.",
   "error.connector.onePasswordCliFailed": "The 1Password CLI failed: {detail}",
+  "error.connector.onePasswordCliForbidden":
+    "Your 1Password account does not let you create the shared vault or a service account. Ask an owner or administrator of the account for this permission, or ask them for a service account token and click “Use token”.",
   "error.connector.onePasswordUnexpected": "1Password sent an unexpected answer: {detail}",
   "error.connector.onePasswordTokenRejected": "1Password did not accept the service account token.",
+  "error.connector.onePasswordUnreachable":
+    "OpenBot cannot reach 1Password. Check the internet connection, then try again.",
+  "error.connector.onePasswordRateLimited": "1Password received too many requests. Wait a few minutes, then try again.",
   "error.connector.onePasswordNoVault":
     "The service account cannot read a vault. Give it access to a vault, then try again.",
   "error.connector.onePasswordFileUnreadable": "The 1Password connection file is unreadable.",
   "error.connector.onePasswordFileTooLarge": "The 1Password connection file is too large.",
   "error.connector.bitwardenFailed":
     "Could not read Bitwarden. Install the bw CLI, sign in, unlock it, and create one folder named Shared with OpenBot. Connect with a new session key.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot cannot find the Bitwarden CLI. Install bw, make sure that it works in a new terminal, then connect again.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden must have exactly one folder named Shared with OpenBot. Create it or remove the extra one, then connect again.",
   "error.connector.bitwardenHostInput":
     "Enter an HTTPS server address, the API key client_id and client_secret, and the master password.",
   "error.connector.bitwardenHostFailed":

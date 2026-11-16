@@ -229,6 +229,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Nie udało się połączyć ponownie.",
   "provider.account.add": "Dodaj konto",
   "provider.account.addLabel": "Dodaj kolejne konto {name}",
+  "provider.account.addWithCode": "Dodaj konto kodem",
   "provider.account.count": {
     one: "{count} konto",
     few: "{count} konta",
@@ -308,6 +309,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "Domyślne Claude Code",
   "provider.settings.compactWindowTokens": "{size} tokenów",
   "provider.settings.compactWindowLoadFailed": "Nie udało się wczytać rozmiaru kompaktowania tego serwera.",
+  "provider.settings.environment": "Środowisko",
+  "provider.settings.environmentVariables": "Zmienne",
+  "provider.settings.environmentDescription":
+    "Klucze API, bazowe adresy URL i inne ustawienia, które dostaje każdy proces {name}. Zmiana działa po zakończeniu bieżących tur.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL z kluczem OPENAI_API_KEY wysyła zapytania ChatGPT do modeli pod ten adres.",
+  "provider.settings.environmentShellNote": "Polecenia uruchamiane przez agentów mogą odczytać te wartości.",
+  "provider.settings.environmentAdd": "Dodaj zmienną",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Wartość",
+  "provider.settings.environmentSaved": "Zapisana",
+  "provider.settings.environmentSensitive": "Poufna",
+  "provider.settings.environmentNameLabel": "Nazwa zmiennej {index}",
+  "provider.settings.environmentValueLabel": "Wartość {name}",
+  "provider.settings.environmentSensitiveLabel": "Zachowaj {name} w tajemnicy",
+  "provider.settings.environmentRemoveLabel": "Usuń {name}",
+  "provider.settings.environmentUnnamed": "zmienna {index}",
+  "provider.settings.environmentPending":
+    "Zapis uruchomi ponownie {name} po zakończeniu bieżących tur. Poufne wartości zostają na serwerze.",
+  "provider.settings.environmentDone": "Zapisano. {name} uruchomi się ponownie po zakończeniu bieżących tur.",
+  "provider.settings.environmentDiscard": "Odrzuć",
+  "provider.settings.environmentSave": "Zapisz",
+  "provider.settings.environmentLoadFailed": "Nie udało się wczytać zmiennych {name}.",
   "provider.settings.models": "Modele",
   "provider.settings.modelsDescription": {
     one: "{shown} z {count} modelu jest w wyborze modelu.",

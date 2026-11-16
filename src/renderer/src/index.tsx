@@ -7,6 +7,8 @@ import "./selection-copy";
 import { App } from "./App";
 import { startActionSounds } from "./action-sounds";
 import { syncAppearance } from "./appearance-choice";
+// A dev build shows the color and the branch of its worktree.
+import "./dev-worktree";
 import { readChatWindowTarget } from "./features/window/chat-window";
 import { syncLogoColor } from "./logo-color";
 import { startRendererTiming } from "./renderer-timing";

@@ -7,6 +7,7 @@ import { bytesToBase64 } from "./base64";
 // whose path, body and decoding are the same in both are here. A request that differs in one of them
 // stays at its call site.
 
+import type { FeedbackPhone } from "@openbot/contracts/feedback";
 import {
   type AgentApproval,
   type AgentImportPreview,
@@ -131,6 +132,8 @@ import {
   decodePendingApprovalResponse,
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
+import { PHONE_FEEDBACK_ROUTES } from "@openbot/contracts/team-protocol/phone-feedback-v1";
+import { ROUTINE_FLOW_STOP_ROUTES } from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_ROUTES } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import {
   decodeRoutineRunPlace,
@@ -841,6 +844,23 @@ export const readPendingApproval = Effect.fn("TeamClient.readPendingApproval")(f
   );
 });
 
+/**
+ * Sends a bug report about the phone app that an agent waits on, with the phone's version, system
+ * and support log (`phone-feedback-v1`). It answers the approval: the host takes no plain "accept"
+ * of such a report.
+ */
+export const sendPhoneFeedback = Effect.fn("TeamClient.sendPhoneFeedback")(function* (
+  request: TeamApiRequest,
+  input: { requestId: string | number; phone: FeedbackPhone },
+): Effect.fn.Return<void, TeamRequestError> {
+  return yield* teamCall(() =>
+    request("POST", PHONE_FEEDBACK_ROUTES.send, ignoreResponse, {
+      requestId: input.requestId,
+      phone: { ...input.phone },
+    }),
+  );
+});
+
 export const respondToBrowserTakeover = Effect.fn("TeamClient.respondToBrowserTakeover")(function* (
   request: TeamApiRequest,
   input: RespondToBrowserTakeoverInput,
@@ -1044,7 +1064,10 @@ export function teamAgentRoutinesApi(
   };
 }
 
-/** The routine canvas calls of the desktop IPC surface. Send them only to a host that serves `routine-flows-v1`. */
+/**
+ * The routine canvas calls of the desktop IPC surface. Send them only to a host that serves
+ * `routine-flows-v1`, and `stopRun` only to one that also serves `routine-flow-stop-v1`.
+ */
 export type TeamRoutineFlowsApi = OpenBotDesktopApi["routineFlows"];
 
 const decodeRoutineFlowCanvas = guardedDecoder(isRoutineFlowCanvas, "routine flow canvas");
@@ -1061,6 +1084,7 @@ export function teamRoutineFlowsApi(request: TeamApiRequest): TeamRoutineFlowsAp
     connect: (input) => post(ROUTINE_FLOWS_ROUTES.connect, decodeRoutineFlowLink, input),
     disconnect: (input) => post(ROUTINE_FLOWS_ROUTES.disconnect, ignoreResponse, input),
     updateLink: (input) => post(ROUTINE_FLOWS_ROUTES.updateLink, decodeRoutineFlowLink, input),
+    stopRun: (input) => post(ROUTINE_FLOW_STOP_ROUTES.stopRun, ignoreResponse, input),
   };
 }
 /** An Effect request lets the desktop reuse its managed request lifetime. */

@@ -54,9 +54,13 @@
     "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
-    "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-    "EMAIL_FROM": "hello@openbot.run",
-    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+    "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+    "EMAIL_FROM": "no_reply@openbot.run",
+    "EMAIL_REPLY_TO": "hello@openbot.run",
+    "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+    // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+    // license emails from EMAIL_FROM.
+    "EMAIL_LICENSE_FROM": "",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
@@ -99,7 +103,7 @@
   "send_email": [
     {
       "name": "EMAIL_FALLBACK",
-      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+      "allowed_sender_addresses": ["no_reply@openbot.run"]
     }
   ],
   "d1_databases": [
@@ -180,9 +184,13 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -280,9 +288,13 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",

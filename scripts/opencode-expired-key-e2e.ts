@@ -6,8 +6,9 @@
 // key; that with no stored key the config names no key, so the user's own sign-in stays in use;
 // that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; that the stored
 // key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
-// models (#7550); and that a model whose provider has no sign-in names that provider and its fix
-// (#2746).
+// models (#7550); that a model whose provider has no sign-in names that provider and its fix
+// (#2746); and that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
+// sign-in (#9095).
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -40,6 +41,7 @@ interface Report {
   noStoredKey?: { configKey: string | null; key: string | null };
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
+  refusedV2?: { saved: string; notSaved: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -152,6 +154,26 @@ try {
     "A provider with no sign-in names itself and its fix.",
   );
   report.authRequired = { error: authError };
+
+  // 6. OpenCode 2.2.5 sends a refused OpenCode Go key as `-32000` with no reason. With a saved key the
+  // error names that key and its fix. With no saved key OpenBot cannot tell a refused key from a
+  // missing one, so the error stays the missing sign-in.
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "expired-v2";
+  const sixth = open(cli);
+  const { error: saved } = await runTurn(sixth, await startThread(sixth, { cwd: workspace }));
+  assert.equal(saved, sourceText("error.provider.opencodeKeyRefused"), "A refused saved key names its fix.");
+  await runCauseEffect(sixth.stop());
+  storedKey = null;
+  process.env.FAKE_AUTH_KEY = "expired-v2";
+  const seventh = open(cli);
+  const { error: notSaved } = await runTurn(seventh, await startThread(seventh, { cwd: workspace }));
+  assert.equal(
+    notSaved,
+    sourceText("error.provider.opencodeAuthRequired", { provider: "opencode-go" }),
+    "With no saved key, the error stays the missing sign-in.",
+  );
+  report.refusedV2 = { saved, notSaved };
   report.passed = true;
 } finally {
   await stopClients(clients);

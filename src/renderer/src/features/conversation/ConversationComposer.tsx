@@ -1,4 +1,4 @@
-import { type AgentProviderId, isKnownAgentProvider, providerSteersTurns } from "@openbot/contracts/agent-providers";
+import { type AgentProviderId, agentSteersTurns, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { supportedAttachmentExtensions } from "@openbot/contracts/attachment-files";
 import {
   type AccountUsageLimit,
@@ -129,10 +129,8 @@ export function ConversationComposer() {
     sideQuestionAvailable,
     openSideQuestion,
     voiceConversationAvailable,
-    openSidePanelPane,
-    closeSidePanelPane,
-    activeRightPanel,
-    sidePanel,
+    voiceConversationOpen,
+    toggleVoiceConversation,
     sendStarting,
     channel,
     providerSilentMinutes,
@@ -167,9 +165,9 @@ export function ConversationComposer() {
       openSideQuestion(text);
     };
   };
-  const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
-  /** The voice conversation runs while its tab is in the side panel, also when another tab shows. */
-  const voiceTabOpen = () => sidePanel().panes.includes("voice");
+  /** The + menu starts a voice conversation. While one runs, the pill and Send end it. */
+  const openVoiceConversation = () =>
+    voiceConversationAvailable() && !voiceConversationOpen() ? toggleVoiceConversation : undefined;
   /**
    * With nothing to send, Send starts a voice conversation, as on mobile. While the conversation runs,
    * the same button ends it. When Send cannot send to the agent, Send stays and is disabled.
@@ -179,13 +177,9 @@ export function ConversationComposer() {
     if (composerHasContent() || editingDeliveryId() || voicePhase() !== "idle") return undefined;
     if (attachmentBusy() || uploadFailed() || submitting() || !agentReady() || providerUpdateRequired())
       return undefined;
-    if (voiceTabOpen()) return "end";
+    if (voiceConversationOpen()) return "end";
     // Between a send and its turn, Send stays, so the voice icon does not show for a moment before Stop.
     return sendStarting() ? undefined : "start";
-  };
-  const toggleVoiceConversation = () => {
-    if (voiceTabOpen()) closeSidePanelPane("voice");
-    else openSidePanelPane("voice");
   };
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
@@ -229,13 +223,13 @@ export function ConversationComposer() {
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
-  /** The reply of this agent that is read aloud. The voice pane shows its own. */
+  /** The reply of this agent that is read aloud. The voice pill shows its own. */
   const speaking = () => {
     const reading = speechReading();
     return reading &&
       reading.agentId === props.agent?.id &&
       reading.serverId === (props.server?.id ?? "local") &&
-      activeRightPanel() !== "voice"
+      !voiceConversationOpen()
       ? reading
       : null;
   };
@@ -265,14 +259,17 @@ export function ConversationComposer() {
     return status?.state === "sign-in-required" ? status : null;
   });
   /**
-   * An expired OpenCode key is replaced in this server's Providers settings, so its banner opens
-   * them (#2544). The banner holds the error in the reader's language, and that text has no
-   * placeholder, so it is compared whole.
+   * An expired or refused OpenCode key is replaced in this server's Providers settings, so its
+   * banner opens them (#2544, #9095). The banner holds the error in the reader's language, and
+   * these texts have no placeholder, so each is compared whole.
    */
   const updateOpenCodeKey = () => {
     if (props.agent?.provider !== "opencode") return undefined;
-    const expired = localizeSourceText(sourceText("error.provider.opencodeKeyExpired"));
-    return currentChatError() === expired ? props.onManageProviders : undefined;
+    const error = currentChatError();
+    const keyError = (["error.provider.opencodeKeyExpired", "error.provider.opencodeKeyRefused"] as const).some(
+      (key) => error === localizeSourceText(sourceText(key)),
+    );
+    return keyError ? props.onManageProviders : undefined;
   };
   /** The button of the error banner: the fix that the error names, or none. */
   const errorBannerAction = () => {
@@ -310,8 +307,11 @@ export function ConversationComposer() {
       );
     return undefined;
   };
-  /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
-  const steers = () => !props.agent || providerSteersTurns(props.agent.provider);
+  /**
+   * An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). A
+   * custom agent steers when its model reports it (#4977).
+   */
+  const steers = () => !props.agent || agentSteersTurns(props.agent, props.modelOptions);
   /** Steer for a provider that can steer; else Send now, which stops the turn and runs the message next. */
   const sendQueued = () => (steers() ? props.onSteerQueuedMessage : props.onSendQueuedMessageNow);
   /** Tab sends the draft into the running turn, in place of Send and then Steer on its queue row. */
@@ -764,6 +764,7 @@ export function ConversationComposer() {
               onOpenQuote={openQuote}
               browserTabs={taggableBrowserTabs()}
               threads={taggableThreads()}
+              onSearchThreads={props.onSearchThreads}
               onOpenTag={openTaggedReference}
               onValueChange={(text) => {
                 updateCurrentDraft({ text });
@@ -839,6 +840,7 @@ export function ConversationComposer() {
                   onStart={() => void startVoiceRecording()}
                   onCancel={cancelVoiceRecording}
                   onFinish={stopVoiceRecording}
+                  onSend={submitComposer}
                   send={<SendControl />}
                 />
               </Show>

@@ -83,6 +83,7 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Esta conexão não pode importar perfis do Hermes do servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexão não pode encontrar os servidores de modelos e os agentes do servidor.",
+  "error.team.routineFlowStopUnsupported": "Esta conexão não pode parar a execução de uma rotina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexão não oferece suporte a pastas dentro de pastas.",
   "error.team.libraryFoldersUnsupported": "Esta conexão não oferece suporte a pastas da Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -131,6 +132,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexão não oferece suporte à duração do cache de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexão não suporta a opção de configuração do Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexão não oferece suporte ao tamanho de compactação do Claude.",
+  "error.team.providerEnvironmentUnsupported": "Esta conexão não oferece suporte a variáveis de provedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexão não oferece suporte à lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexão não oferece suporte ao provedor padrão.",
   "error.team.attachmentNameRequired": "É necessário informar um nome seguro para o anexo.",
@@ -185,6 +187,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Esta conexão não suporta a personalidade do servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexão não suporta esperas abertas.",
   "error.team.pendingApprovalUnsupported": "Esta conexão não permite ler uma aprovação completa.",
+  "error.team.phoneFeedbackUnsupported": "Esta conexão não permite enviar um relato pelo app do celular.",
   "error.team.messagePinsUnsupported": "Esta conexão não oferece suporte a mensagens fixadas.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexão não suporta executar uma mensagem na fila como um novo tópico.",

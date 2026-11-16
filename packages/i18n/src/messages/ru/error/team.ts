@@ -80,6 +80,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "Это подключение не может показать или изменить лимиты использования агентов.",
   "error.team.hermesImportUnsupported": "Это подключение не может импортировать профили Hermes с сервера.",
   "error.team.providerDetectionUnsupported": "Это подключение не может найти серверы моделей и агентов на сервере.",
+  "error.team.routineFlowStopUnsupported": "Это подключение не может остановить запуск регулярной задачи.",
   "error.team.sidebarFoldersUnsupported": "Это подключение не поддерживает папки в папках.",
   "error.team.libraryFoldersUnsupported": "Это подключение не поддерживает папки Библиотеки.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -127,6 +128,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Это подключение не поддерживает время кэша промптов.",
   "error.team.claudeUserSetupUnsupported": "Это подключение не поддерживает переключатель настроек Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Это подключение не поддерживает размер сжатия Claude.",
+  "error.team.providerEnvironmentUnsupported": "Это подключение не поддерживает переменные провайдера.",
   "error.team.modelVisibilityUnsupported": "Это подключение не поддерживает список моделей.",
   "error.team.providerDefaultUnsupported": "Это подключение не поддерживает провайдера по умолчанию.",
   "error.team.attachmentNameRequired": "Нужно безопасное имя вложения.",
@@ -178,6 +180,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Это подключение не поддерживает характер сервера.",
   "error.team.agentWaitsUnsupported": "Это подключение не поддерживает открытые ожидания.",
   "error.team.pendingApprovalUnsupported": "Это подключение не позволяет прочитать запрос на подтверждение целиком.",
+  "error.team.phoneFeedbackUnsupported": "Это подключение не позволяет отправить отчёт из приложения на телефоне.",
   "error.team.messagePinsUnsupported": "Это подключение не поддерживает закреплённые сообщения.",
   "error.team.queuedMessageThreadUnsupported":
     "Это подключение не поддерживает запуск сообщения из очереди в новой ветке.",

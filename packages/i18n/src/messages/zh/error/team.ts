@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "当前连接无法显示或更改助手的用量限制。",
   "error.team.hermesImportUnsupported": "当前连接无法从服务器导入 Hermes 配置文件。",
   "error.team.providerDetectionUnsupported": "当前连接无法查找服务器上的模型服务器和智能体。",
+  "error.team.routineFlowStopUnsupported": "此连接无法停止自动化任务的运行。",
   "error.team.sidebarFoldersUnsupported": "当前连接不支持文件夹嵌套。",
   "error.team.libraryFoldersUnsupported": "当前连接不支持资料库文件夹。",
   "error.team.agentNotificationLevelsUnsupported":
@@ -121,6 +122,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "当前连接不支持提示缓存时间。",
   "error.team.claudeUserSetupUnsupported": "当前连接不支持 Claude Code 配置开关。",
   "error.team.claudeCompactWindowUnsupported": "此连接不支持 Claude 压缩大小。",
+  "error.team.providerEnvironmentUnsupported": "此连接不支持提供方变量。",
   "error.team.modelVisibilityUnsupported": "当前连接不支持模型列表。",
   "error.team.providerDefaultUnsupported": "当前连接不支持默认服务商。",
   "error.team.agentAccessUnsupported": "当前连接不支持角色。",
@@ -176,6 +178,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "此连接不支持服务器个性。",
   "error.team.agentWaitsUnsupported": "此连接不支持未关闭的等待。",
   "error.team.pendingApprovalUnsupported": "此连接不支持读取完整的批准请求。",
+  "error.team.phoneFeedbackUnsupported": "此连接不支持从手机应用发送报告。",
   "error.team.messagePinsUnsupported": "此连接不支持置顶消息。",
   "error.team.queuedMessageThreadUnsupported": "此连接不支持将排队的消息作为新线程运行。",
   "error.team.backgroundProcessesUnsupported": "此连接不支持后台进程。",

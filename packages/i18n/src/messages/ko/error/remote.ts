@@ -21,6 +21,8 @@ export const messages = {
   "error.remote.testActive": "원격 데스크톱 테스트가 진행 중이에요. 테스트가 끝난 후에 다시 시도해 주세요.",
   "error.remote.screenRecordingDenied":
     "호스트에서 OpenBot의 화면 녹화를 허용하지 않았어요. 호스트에서 화면 녹화 권한을 허용한 다음 다시 시도해 주세요.",
+  "error.remote.windowsSessionDisconnected":
+    "호스트의 Windows 세션 연결이 끊겨 공유할 화면이 없어요. 호스트 화면에서 Windows에 로그인한 다음 다시 시도해 주세요.",
   "error.remote.teamSessionExpired": "팀 세션이 만료되었어요.",
   "error.remote.finishTestBeforeSwitch": "디스플레이를 전환하기 전에 원격 데스크톱 테스트를 끝내 주세요.",
   "error.remote.displayNotFound": "원격 디스플레이를 찾을 수 없어요.",

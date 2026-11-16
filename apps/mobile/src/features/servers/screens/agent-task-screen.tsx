@@ -23,15 +23,17 @@ import {
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
 import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
 import { dictationVoice } from "@/features/chat/components/composer-voice";
-import { useMarkThreadRead } from "@/features/chat/components/use-agent-thread-reads";
+import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
@@ -42,6 +44,7 @@ import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
   type ChatBubbleMessage,
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
   withQuestionContext,
@@ -54,6 +57,7 @@ import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
+import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -262,7 +266,45 @@ function AgentTaskChat({
       : undefined;
   // The message that the thread opens at, until the list shows it.
   const [focus, setFocus] = useState(focusMessageId);
-  const clearFocus = useCallback(() => setFocus(null), []);
+  // The NEW line of this visit, as in the agent's chat. The open thread reads itself, so the line
+  // keeps the first unread message that the thread had when it opened.
+  const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
+  const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
+  // While the server connects or resumes, the host marks are not read yet, and the thread can show
+  // the messages that the phone kept.
+  const connecting = Boolean(server?.initialConnectionPending) || (online && server?.state !== "online");
+  if (unreadLine === null && openingUnread.firstUnread !== undefined && !connecting && (isDraft || conversation.data))
+    setUnreadLine({ messageId: openingUnread.firstUnread });
+  const unreadLineMessageId = unreadLine?.messageId ?? null;
+  // The line shows above the first of these messages that has a row. The set stays the same object
+  // while its ids stay, as the list asks: a streamed reply changes the messages on each chunk.
+  const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
+  const unreadLineMessageIds = useMemo(() => {
+    const entries = conversation.data?.messages ?? [];
+    const start = unreadLineMessageId ? entries.findIndex((message) => message.id === unreadLineMessageId) : -1;
+    lastUnreadLineIds.current =
+      start < 0
+        ? null
+        : keptIdSet(
+            lastUnreadLineIds.current,
+            entries.slice(start).map((message) => message.id),
+          );
+    return lastUnreadLineIds.current;
+  }, [unreadLineMessageId, conversation.data?.messages]);
+  // The thread opens at the NEW line once, after a message that it opens at. A thread that showed
+  // before the line does not move to it later, under the reader. While the marks of this visit load,
+  // the list waits only when the kept marks show the thread as unread, and not while the server
+  // connects or resumes: the thread then shows the messages that the phone kept.
+  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
+  const opensAtUnread =
+    focus === null &&
+    unreadOpening === "pending" &&
+    online &&
+    (unreadLine === null ? !isDraft && !connecting && openingUnread.keptUnread : unreadLineMessageIds !== null);
+  const clearFocus = useCallback(() => {
+    setFocus(null);
+    setUnreadOpening("done");
+  }, []);
   // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
@@ -293,6 +335,12 @@ function AgentTaskChat({
   // The composer answers only after the person chooses it in the form. A private answer has its own field.
   const answersQuestion = Boolean(questionForm.question && !questionForm.question.isSecret && questionForm.replyInChat);
   const threadId = conversation.data?.threadId ?? null;
+  // A draft has no provider thread yet, so it shows no ring.
+  const contextMeter = useComposerContextMeter({
+    serverId,
+    agentId,
+    task: { taskId, threadId: isDraft ? null : threadId },
+  });
   const browserRequests = useBrowserRequests(serverId);
   // Only the browser requests of the task's own thread; the agent's chat shows those of its thread.
   const taskBrowserRequests = useMemo(
@@ -351,7 +399,8 @@ function AgentTaskChat({
     serverId,
     agentId,
     task ? taskId : null,
-    isFocused && appActive && conversation.data
+    // The mark waits for the NEW line, which reads the mark that the thread had when it opened.
+    isFocused && appActive && conversation.data && unreadLine !== null
       ? (latestReadBoundaryMessage(conversation.data.messages)?.id ?? null)
       : null,
     task?.updatedAt ?? null,
@@ -377,13 +426,21 @@ function AgentTaskChat({
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
     // As a chat that opens at a message from search: the list does not take the latest message first.
-    focus !== null,
+    focus !== null || opensAtUnread,
   );
   // A message that the thread shows no row for opens the thread at its latest message.
   const focusMissing = focus !== null && Boolean(conversation.data) && chatRowIndex(messages, focus) < 0;
   useEffect(() => {
-    if (focusMissing) setFocus(null);
+    if (!focusMissing) return;
+    setFocus(null);
+    setUnreadOpening("done");
   }, [focusMissing]);
+  // The list showed without the NEW line, such as at the latest message while the line's message
+  // was not loaded. A line that comes later does not move the list under the reader.
+  const shownWithoutFocus = motion.historyVisible && focus === null && !opensAtUnread;
+  useEffect(() => {
+    if (shownWithoutFocus) setUnreadOpening("done");
+  }, [shownWithoutFocus]);
   const closed = task?.state === "closed";
   const canSend = online && !closed && (!isDraft || enabled);
   const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
@@ -404,6 +461,18 @@ function AgentTaskChat({
     onSend: (text) => void send(text),
   });
   const voiceOpen = voice.stage !== "closed";
+  // As in the agent's chat: a pull past the latest message opens the agent's info sheet on top of
+  // this thread, unless Settings turns the pull off.
+  const pullOn = useChatPullPreference((state) => state.enabled);
+  const openInfo = useCallback(
+    () => router.push({ pathname: "/agent-info/[agentId]", params: { agentId, serverId } }),
+    [agentId, serverId],
+  );
+  const endPull = useChatEndPull({
+    motion,
+    enabled: pullOn && !attachments.menuOpen && !voiceOpen,
+    onOpen: openInfo,
+  });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
   const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
@@ -596,6 +665,8 @@ function AgentTaskChat({
           accessibilityHidden={voiceOpen}
         />
         <ChatMessageList
+          pullGesture={endPull.gesture}
+          pullShift={endPull.shift}
           agents={serverAgents}
           rowsShown={rowsShown}
           target={target}
@@ -650,7 +721,10 @@ function AgentTaskChat({
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
           onOpenBranchSource={openBranchSource}
-          focusMessageId={focus}
+          unreadLineMessageIds={unreadLineMessageIds}
+          // The NEW line waits for its message, as in the agent's chat.
+          focusMessageId={focus ?? (opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null)}
+          focusUnread={focus === null && opensAtUnread}
           onFocusPlaced={clearFocus}
           muted={muted}
           showStarter={false}
@@ -676,6 +750,7 @@ function AgentTaskChat({
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
+          {pullOn ? <ChatEndPullRing pull={endPull} target={target} /> : null}
           <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
             <ConnectionStatus server={server} />
           </View>
@@ -789,6 +864,7 @@ function AgentTaskChat({
               keyboardProgress={motion.keyboardProgress}
               voice={dictationVoice(voice, t)}
               voiceAccent={accent}
+              contextMeter={contextMeter}
             />
           )}
         </Animated.View>
@@ -799,6 +875,7 @@ function AgentTaskChat({
           anchor={attachments.menuAnchor}
           appActive={appActive}
           attachments={attachments}
+          context={contextMeter}
           fallbackBackground={fieldBackground}
           foreground={foreground}
           keyboardHeight={motion.keyboardHeight}

@@ -112,6 +112,12 @@ export const messages = {
   "composer.error.holdQueued": "Не удалось удержать сообщение в очереди для редактирования.",
   "composer.error.cancelEdit": "Не удалось отменить редактирование сообщения в очереди. Повторите попытку.",
   "composer.error.updateQueued": "Не удалось обновить сообщение в очереди. Повторите попытку.",
+  "composer.queueEdit.received": "Агент уже получил это сообщение, поэтому редактирование завершено.",
+  "composer.queueEdit.receivedKept":
+    "Агент уже получил это сообщение, поэтому редактирование завершено. Ваши изменения остались в поле сообщения.",
+  "composer.queueEdit.deletedKept":
+    "Это сообщение удалено, поэтому редактирование завершено. Ваши изменения остались в поле сообщения.",
+  "composer.queueEdit.endedKept": "Редактирование завершилось до сохранения. Ваши изменения остались в поле сообщения.",
   "composer.voice.prepareFailed": "Не удалось подготовить голосовую модель. Повторите попытку.",
   "composer.voice.noSpeechRecorded": "Речь не записана.",
   "composer.voice.noSpeechDetected": "Речь не обнаружена.",
@@ -157,6 +163,7 @@ export const messages = {
   "composer.picker.section.files": "Файлы",
   "composer.picker.section.tabs": "Вкладки браузера",
   "composer.picker.section.threads": "Ветки",
+  "composer.picker.section.messages": "В сообщениях",
   "composer.token.tab": "Вкладка браузера {name}",
   "composer.token.thread": "Ветка {name}",
   "composer.token.unavailableTab": "Закрытая вкладка браузера {name}",

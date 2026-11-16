@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} n’a pas répondu à temps, OpenBot a donc arrêté son processus.",
   "error.provider.acpSignInLost":
     "{provider} a perdu sa connexion, OpenBot a donc arrêté son processus. Renvoyez votre message.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} a refusé un message, OpenBot a donc arrêté son processus. Renvoyez votre message.",
+  "error.provider.acpSettingsTimedOut": "{provider} n’a pas répondu à temps. Réessayez dans un instant.",
   "error.provider.acpPlanUsedUp":
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
   "error.provider.acpMcpNotLoaded":
@@ -41,6 +44,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Il y a trop d’adresses ou de dossiers.",
   "error.provider.credentialFileUnreadable": "Le fichier d’identifiants du fournisseur est illisible.",
   "error.provider.credentialFileTooLarge": "Le fichier d’identifiants du fournisseur est trop volumineux.",
+  "error.provider.environmentNameInvalid":
+    "{name} n’est pas un nom de variable valide. Utilisez des lettres, des chiffres et _, sans commencer par un chiffre.",
+  "error.provider.environmentNameReserved": "OpenBot définit {name} pour ce fournisseur. Retirez cette variable.",
+  "error.provider.environmentNameDuplicate": "{name} figure plus d’une fois dans la liste.",
+  "error.provider.environmentValueTooLong": "La valeur de {name} est trop longue.",
+  "error.provider.environmentTooMany": "Un fournisseur peut avoir au plus {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "Les valeurs sensibles sont trop longues au total. Enregistrez des valeurs plus courtes ou moins nombreuses.",
   "error.provider.archiveSpecialFile":
     "L’archive de l’environnement d’exécution contient un lien ou un fichier spécial.",
   "error.provider.archiveUnsafePath": "L’archive de l’environnement d’exécution contient un chemin non sûr.",
@@ -222,6 +233,8 @@ export const messages = {
     "Le point de terminaison « {provider} » a besoin d’une clé d’API. Ajoutez la clé dans Réglages du serveur → Fournisseurs, puis réessayez.",
   "error.provider.opencodeKeyExpired":
     "Votre clé d’API OpenCode a expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go a refusé votre clé d’API enregistrée. La clé a peut-être expiré. Créez une nouvelle clé dans OpenCode Console, collez-la dans les réglages d’OpenCode, puis réessayez.",
   "error.provider.opencodeServiceFailure":
     "OpenCode n’a pas pu terminer ce tour, car son service local a échoué. Réessayez. Si l’erreur continue, reconnectez OpenCode dans les réglages.",
   "error.provider.opencodeRateLimited":
@@ -240,6 +253,8 @@ export const messages = {
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode n'a pas pu lire le raisonnement de ce modèle avec cet effort. Sélectionnez un effort plus faible ou un autre modèle, puis renvoyez votre message.",
   "error.provider.opencodeNetwork":
     "OpenCode n’a pas pu se connecter au fournisseur du modèle. Vérifiez la connexion réseau de l’ordinateur qui exécute OpenBot, puis réessayez.\n{detail}",
   "error.provider.codexStateBusy":
@@ -275,6 +290,8 @@ export const messages = {
     "Le serveur Gemini de OPENBOT_ANTIGRAVITY_PATH est introuvable ou n’est pas exécutable. Corrigez le chemin ou supprimez la variable, puis redémarrez OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Impossible de lire la version du serveur Gemini.",
   "error.provider.antigravitySignIn": "Connectez-vous avec Google pour utiliser Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google n’a pas de capacité libre pour ce modèle Gemini en ce moment. Le quota de votre abonnement n’est pas en cause. Réessayez dans quelques minutes ou choisissez un autre modèle.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini a refusé la requête, car une limite de débit ou le quota de l’abonnement est atteint. Attendez quelques minutes ou choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -285,8 +302,14 @@ export const messages = {
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini a perdu la connexion avec son agent et s’est arrêté. Envoyez un message pour continuer.",
+  "error.provider.grokServiceFailure":
+    "Le service Grok est surchargé ou rencontre une erreur. Réessayez dans quelques minutes ou choisissez un autre modèle.",
+  "error.provider.grokConnectionFailed":
+    "Grok ne parvient pas à se connecter à son service. Vérifiez votre connexion internet, puis renvoyez le message.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Sur un hôte Windows, Gemini ouvre la page Google sur l’hôte lui-même. Connectez Gemini sur l’ordinateur hôte.",
   "error.provider.cursorArchivePath": "L’archive Cursor contient un fichier inattendu.",
@@ -326,7 +349,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Connectez-vous avec Nous Portal ou exécutez `hermes setup` dans un terminal pour utiliser Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Réglages du serveur › MCP, puis renvoyez votre message.",
+    "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Marketplace, Apps, puis renvoyez votre message.",
+  "error.provider.hermesRefused":
+    "Hermes a refusé ce message avant de commencer. Renvoyez-le. Si Hermes refuse chaque message, redémarrez OpenBot sur l’ordinateur qui exécute cet agent.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot n’a pas pu utiliser ce modèle : le modèle n’a pas accepté son réglage de réflexion. Sélectionnez un autre modèle pour cet agent, puis renvoyez votre message.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",
@@ -334,6 +359,8 @@ export const messages = {
     "Cette conversation est devenue trop longue pour Claude. OpenBot a ouvert une nouvelle session Claude Code avec l’historique de la conversation. Réessayez.",
   "error.provider.claudeApiKeyNoCredit":
     "La clé API Anthropic n'a pas de crédit API. Un forfait Claude ne paie pas les requêtes faites avec une clé API. Ajoutez du crédit dans l'Anthropic Console, ou connectez-vous à Claude dans les réglages et sélectionnez le compte Claude dans le menu des modèles de l'agent.",
+  "error.provider.claudeServiceBlocked":
+    "Le service de Claude a bloqué cette requête. C'est en général un problème passager chez Claude, pas un problème avec votre compte. Renvoyez le message dans quelques minutes.",
   "error.provider.foreignReasoning":
     "{provider} n’a pas accepté le raisonnement précédent de cette conversation, car un autre compte ou une autre clé API l’a reçu. OpenBot a ouvert une nouvelle session {provider} avec l’historique de la conversation. Réessayez.",
   "error.provider.imageTooSmall":
@@ -342,6 +369,8 @@ export const messages = {
     "Le modèle n'a pas accepté une image de ce chat, car l'image est trop grande. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.imageCountLimit":
     "Le modèle n'a pas accepté ce chat, car il contient trop d'images. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
+  "error.provider.requestTooLarge":
+    "Ce chat est devenu trop volumineux pour être envoyé au modèle. Les images du chat en sont souvent la cause. OpenBot a démarré une nouvelle session {provider} avec l'historique du chat. Réessayez.",
   "error.provider.opencodeSessionRejected":
     "OpenCode a refusé la requête sans en donner la cause. Cela peut arriver dans une longue conversation ou après un changement de modèle. OpenBot a démarré une nouvelle session OpenCode avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle ou un effort plus faible.",
   "error.provider.opencodeCompactionFailed":
@@ -359,6 +388,8 @@ export const messages = {
     "Gemini n’a pas pu ouvrir la page de connexion dans votre navigateur. Vérifiez votre navigateur par défaut, puis reconnectez-vous.",
   "error.provider.acpSignInFailed": "La connexion n’a pas abouti.",
   "error.provider.acpSignInFailedReason": "La connexion n’a pas abouti : {reason}",
+  "error.provider.acpSignInNetwork":
+    "La connexion n’a pas pu joindre le serveur du fournisseur. Vérifiez la connexion réseau et les réglages DNS de l’ordinateur qui exécute OpenBot, puis réessayez.",
   "error.provider.acpSignOutFailed": "La déconnexion n’a pas abouti.",
   "error.provider.acpSignOutFailedReason": "La déconnexion n’a pas abouti : {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -366,6 +397,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "Seuls les liens de connexion HTTPS peuvent s’ouvrir dans le navigateur.",
   "error.provider.geminiKeyRefused":
     "Gemini a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis reconnectez-vous.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini a refusé la requête, car votre clé d’API Gemini enregistrée a atteint une limite de débit ou son quota. La clé est utilisée à la place de votre abonnement Google. Attendez quelques minutes ou choisissez un autre modèle, puis réessayez. Pour utiliser votre abonnement Google, supprimez la clé dans les Réglages.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Votre clé d’API Gemini enregistrée n’a aucun quota pour ce modèle. La clé est utilisée à la place de votre abonnement Google. Choisissez un autre modèle, ou supprimez la clé dans les Réglages pour utiliser votre abonnement Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini ne peut pas ouvrir le fichier de réglages de ce compte, donc il ne peut pas se connecter. Supprimez ce compte, puis ajoutez-le à nouveau.",
   "error.provider.geminiSettingsUnreadable":
@@ -376,6 +411,8 @@ export const messages = {
     "{provider} a refusé la clé d’API enregistrée. Remplacez ou supprimez la clé dans les Réglages, puis réessayez.",
   "error.provider.keyProviderNoBalance":
     "Le compte {provider} de la clé d’API enregistrée n’a pas de solde. Ajoutez du crédit au compte, puis réessayez.",
+  "error.provider.keyProviderLowCredit":
+    "Le compte {provider} de la clé d’API enregistrée n’a pas assez de crédit pour une réponse de ce modèle. Ajoutez du crédit au compte ou sélectionnez un autre modèle, puis réessayez.",
   "error.provider.modelServiceRefused":
     "Le service du modèle a refusé la requête. Choisissez un autre modèle ou vérifiez votre accès à ce modèle auprès du service.",
   "error.provider.modelServiceRefusedReason":
@@ -456,6 +493,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Le fichier de session Pi n’est pas disponible sur cet ordinateur.",
   "error.provider.piResumeCancelled": "Pi a annulé la reprise de la session. Réessayez.",
   "error.provider.piSessionIdentity": "Pi a renvoyé une autre session. La session enregistrée n’a pas été remplacée.",
+  "error.provider.piExtensionFailed":
+    "Pi s’est arrêté, car il n’a pas pu charger une extension. Supprimez ou mettez à jour cette extension, puis réessayez. {detail}",
   "error.provider.piModelInvalid": "Sélectionnez un modèle Pi qui inclut son fournisseur.",
   "error.provider.piToolInvalid": "L’outil a renvoyé un résultat non valide.",
   "error.provider.piSignIn": "Utilisez /login dans Pi sur l’ordinateur hôte. Fermez Pi une fois la connexion terminée.",

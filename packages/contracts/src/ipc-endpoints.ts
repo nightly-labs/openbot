@@ -32,7 +32,7 @@ import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from ".
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
-import type { BillingPortalRequest, BillingState } from "./billing";
+import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -119,6 +119,8 @@ import type {
   ConnectProviderAccountKeyInput,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   ProviderHostSignInStatus,
@@ -130,6 +132,7 @@ import type {
   ResetProviderUsageInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
+  SubmitProviderAccountCodeLoginInput,
   SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
 import type {
@@ -467,6 +470,11 @@ import type {
   ProviderDetectionSettings,
 } from "./ipc-provider-detection";
 import type {
+  ProviderEnvironment,
+  ProviderEnvironmentProvider,
+  ProviderEnvironmentUpdate,
+} from "./ipc-provider-environment";
+import type {
   AcknowledgeFailedTurnInput,
   BusyMessageModePreference,
   CancelQueuedMessageInput,
@@ -496,6 +504,7 @@ import type {
   RoutineFlowCanvas,
   RoutineFlowLink,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
@@ -1201,6 +1210,23 @@ export const IPC_ENDPOINTS = {
     connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
       "provider-admin:connect-account-key",
     ),
+    // A code sign-in of an account: the provider's CLI gives a page and a code, and the person opens
+    // the page on any device. This computer runs it for its own accounts; a joined server's host
+    // needs `provider-account-code-v1`. `start` adds an account when `accountId` is null and answers
+    // with its id. `submitAccountCodeLogin` sends the code of a `paste` sign-in.
+    // `accountCodeLoginStatus` tells how the sign-in ended.
+    startAccountCodeLogin: scopedRequest<ConnectProviderAccountInput, ProviderAccountCodeLoginStart, "required">()(
+      "provider-admin:start-account-code-login",
+    ),
+    submitAccountCodeLogin: scopedRequest<SubmitProviderAccountCodeLoginInput, void, "required">()(
+      "provider-admin:submit-account-code-login",
+    ),
+    accountCodeLoginStatus: scopedRequest<RemoveProviderAccountInput, ProviderAccountCodeLoginStatus, "required">()(
+      "provider-admin:account-code-login-status",
+    ),
+    cancelAccountCodeLogin: scopedRequest<RemoveProviderAccountInput, void, "required">()(
+      "provider-admin:cancel-account-code-login",
+    ),
     // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
     // This computer's own is `app.saveSetup`.
     hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
@@ -1455,6 +1481,14 @@ export const IPC_ENDPOINTS = {
     setClaudeCompactWindow: scopedRequest<number | null, ClaudeCompactWindowSetting, "required">()(
       "host-admin:set-claude-compact-window",
     ),
+    // The environment variables that each process of one provider of the server starts with
+    // (`provider-environment-v1`). A sensitive value goes to the host only. An owner or admin sets them.
+    getProviderEnvironment: scopedRequest<ProviderEnvironmentProvider, ProviderEnvironment, "required">()(
+      "host-admin:get-provider-environment",
+    ),
+    setProviderEnvironment: scopedRequest<ProviderEnvironmentUpdate, ProviderEnvironment, "required">()(
+      "host-admin:set-provider-environment",
+    ),
     // The models that the model picker of the server shows for one provider. An owner or admin sets them.
     getModelVisibility: scopedRequest<AgentProviderRef, ProviderModelVisibility, "required">()(
       "host-admin:get-model-visibility",
@@ -1600,6 +1634,7 @@ export const IPC_ENDPOINTS = {
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
+    buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
@@ -1910,6 +1945,8 @@ export const IPC_ENDPOINTS = {
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
     updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** Stops a run that has not ended. A joined server answers through `routine-flow-stop-v1`. */
+    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
   },
   /**
    * Workflows: graphs of steps drawn on a canvas, their versions and their runs. The agent event

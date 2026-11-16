@@ -114,6 +114,12 @@ export const messages = {
   "composer.error.holdQueued": "Kuyruktaki mesaj düzenleme için bekletilemedi.",
   "composer.error.cancelEdit": "Kuyruk düzenlemesi iptal edilemedi. Tekrar deneyin.",
   "composer.error.updateQueued": "Kuyruktaki mesaj güncellenemedi. Tekrar deneyin.",
+  "composer.queueEdit.received": "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi.",
+  "composer.queueEdit.receivedKept":
+    "Ajan bu mesajı zaten aldı, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.deletedKept":
+    "Bu mesaj silindi, bu yüzden düzenlemeniz sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
+  "composer.queueEdit.endedKept": "Bu düzenleme kaydedilmeden önce sona erdi. Değişiklikleriniz hâlâ mesaj kutusunda.",
   "composer.voice.prepareFailed": "Ses modeli hazırlanamadı. Tekrar deneyin.",
   "composer.voice.noSpeechRecorded": "Hiçbir konuşma kaydedilmedi.",
   "composer.voice.noSpeechDetected": "Hiçbir konuşma algılanmadı.",
@@ -158,6 +164,7 @@ export const messages = {
   "composer.picker.section.files": "Dosyalar",
   "composer.picker.section.tabs": "Tarayıcı sekmeleri",
   "composer.picker.section.threads": "Mesaj dizileri",
+  "composer.picker.section.messages": "Mesajlarda",
   "composer.token.tab": "Tarayıcı sekmesi {name}",
   "composer.token.thread": "Mesaj dizisi {name}",
   "composer.token.unavailableTab": "Kapalı tarayıcı sekmesi {name}",

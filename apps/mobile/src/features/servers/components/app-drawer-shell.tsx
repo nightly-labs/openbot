@@ -23,7 +23,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
-import { AppDrawerShownContext, AppDrawerShownOnUIContext } from "@/features/servers/components/app-drawer-activity";
+import { AppDrawerShownOnUIContext } from "@/features/servers/components/app-drawer-activity";
 import { ServerDrawerContent } from "@/features/servers/components/server-drawer-content";
 import {
   useMobileWorkspaceActions,
@@ -288,91 +288,85 @@ export function AppDrawerShell({ children }: PropsWithChildren) {
 
   return (
     <AppDrawerContext.Provider value={contextValue}>
-      <AppDrawerShownContext.Provider value={drawerPhase !== "closed"}>
-        <AppDrawerShownOnUIContext.Provider value={drawerShownOnUI}>
-          <GestureDetector gesture={closingGesture}>
-            <View className="flex-1 bg-sidebar">
-              <Animated.View
-                style={[
-                  {
-                    bottom: 0,
-                    left: 0,
-                    paddingBottom: Math.max(insets.bottom, 12),
-                    paddingLeft: drawerSideInset,
-                    position: "absolute",
-                    top: 0,
-                    width: drawerWidth,
-                  },
-                  drawerStyle,
-                ]}
-                accessibilityElementsHidden={!drawerOpen}
-                importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
-                // Android: while the drawer moves, its fading content draws from one cached layer.
-                renderToHardwareTextureAndroid={isAndroid && drawerPhase === "moving"}
-              >
-                <ServerDrawerContent
-                  activeServerId={activeServerId}
-                  muted={muted}
-                  open={drawerSettled}
-                  servers={servers}
-                  session={session}
-                  sideInset={drawerSideInset}
-                  topInset={insets.top}
-                  onNavigate={navigateAfterClosing}
-                  onLeave={leaveServer}
-                  onRemove={removeServer}
-                  onDelete={deleteLocalServer}
-                  localServerKind={localServerKind}
-                  onReorder={reorderServers}
-                  onSelectServer={selectServerAndClose}
-                />
-              </Animated.View>
+      <AppDrawerShownOnUIContext.Provider value={drawerShownOnUI}>
+        <GestureDetector gesture={closingGesture}>
+          <View className="flex-1 bg-sidebar">
+            <Animated.View
+              style={[
+                {
+                  bottom: 0,
+                  left: 0,
+                  paddingBottom: Math.max(insets.bottom, 12),
+                  paddingLeft: drawerSideInset,
+                  position: "absolute",
+                  top: 0,
+                  width: drawerWidth,
+                },
+                drawerStyle,
+              ]}
+              accessibilityElementsHidden={!drawerOpen}
+              importantForAccessibility={drawerOpen ? "auto" : "no-hide-descendants"}
+              // Android: while the drawer moves, its fading content draws from one cached layer.
+              renderToHardwareTextureAndroid={isAndroid && drawerPhase === "moving"}
+            >
+              <ServerDrawerContent
+                activeServerId={activeServerId}
+                muted={muted}
+                open={drawerSettled}
+                servers={servers}
+                session={session}
+                sideInset={drawerSideInset}
+                topInset={insets.top}
+                onNavigate={navigateAfterClosing}
+                onLeave={leaveServer}
+                onRemove={removeServer}
+                onDelete={deleteLocalServer}
+                localServerKind={localServerKind}
+                onReorder={reorderServers}
+                onSelectServer={selectServerAndClose}
+              />
+            </Animated.View>
 
-              <GestureDetector gesture={openingGesture}>
-                <Animated.View
-                  className="flex-1 overflow-hidden bg-background"
-                  style={
-                    isAndroid
-                      ? [{ borderCurve: "continuous" }, androidSurfaceEdgeStyle, surfaceStyle]
-                      : [
-                          {
-                            borderCurve: "continuous",
-                            // The shadow falls on the drawer, at the start edge of the surface.
-                            boxShadow: `${-12 * END_X}px 0 32px rgba(0, 0, 0, 0.28)`,
-                          },
-                          surfaceStyle,
-                        ]
-                  }
-                >
-                  <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
-                    {children}
-                  </Animated.View>
-                  <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
-                    {/* Android: without a blur method this view is only a tint, one more full-screen layer to
-                    draw on each frame. The scrim keeps the dimming. */}
-                    {isAndroid ? null : (
-                      <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
-                        <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />
-                      </Animated.View>
-                    )}
-                    <Animated.View
-                      className="absolute inset-0 bg-drawer-scrim"
-                      pointerEvents="none"
-                      style={scrimStyle}
-                    />
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t("mobile.server.drawer.close")}
-                      className="flex-1"
-                      onPress={closeDrawer}
-                    />
-                  </Animated.View>
+            <GestureDetector gesture={openingGesture}>
+              <Animated.View
+                className="flex-1 overflow-hidden bg-background"
+                style={
+                  isAndroid
+                    ? [{ borderCurve: "continuous" }, androidSurfaceEdgeStyle, surfaceStyle]
+                    : [
+                        {
+                          borderCurve: "continuous",
+                          // The shadow falls on the drawer, at the start edge of the surface.
+                          boxShadow: `${-12 * END_X}px 0 32px rgba(0, 0, 0, 0.28)`,
+                        },
+                        surfaceStyle,
+                      ]
+                }
+              >
+                <Animated.View collapsable={false} className="flex-1" style={contentTouchStyle}>
+                  {children}
                 </Animated.View>
-              </GestureDetector>
-            </View>
-          </GestureDetector>
-        </AppDrawerShownOnUIContext.Provider>
-      </AppDrawerShownContext.Provider>
+                <Animated.View className="absolute inset-0" style={scrimTouchStyle}>
+                  {/* Android: without a blur method this view is only a tint, one more full-screen layer to
+                    draw on each frame. The scrim keeps the dimming. */}
+                  {isAndroid ? null : (
+                    <Animated.View className="absolute inset-0" pointerEvents="none" style={blurStyle}>
+                      <BlurView intensity={5} style={{ flex: 1 }} tint="systemThickMaterial" />
+                    </Animated.View>
+                  )}
+                  <Animated.View className="absolute inset-0 bg-drawer-scrim" pointerEvents="none" style={scrimStyle} />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("mobile.server.drawer.close")}
+                    className="flex-1"
+                    onPress={closeDrawer}
+                  />
+                </Animated.View>
+              </Animated.View>
+            </GestureDetector>
+          </View>
+        </GestureDetector>
+      </AppDrawerShownOnUIContext.Provider>
     </AppDrawerContext.Provider>
   );
 }

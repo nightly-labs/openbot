@@ -27,4 +27,8 @@ export const messages = {
   "common.download": "다운로드",
   "common.removing": "제거 중…",
   "common.sending": "보내는 중…",
+  "common.scrollLeft": "왼쪽으로 스크롤",
+  "common.scrollRight": "오른쪽으로 스크롤",
+  "common.scrollUp": "위로 스크롤",
+  "common.scrollDown": "아래로 스크롤",
 } as const satisfies PartialTranslation<typeof source>;

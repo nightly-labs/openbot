@@ -32,6 +32,10 @@ export interface ChatAttachmentAnchor {
   left: number;
   bottom: number;
   size: number;
+  /** The start edge of the composer card, from the same edge as `left`. The menu and the camera align to it. */
+  barStart: number;
+  /** The top of the composer card, from the screen's bottom edge. The menu and the camera open above it. */
+  barTop: number;
 }
 
 export interface ChatAttachment extends RemoteFileUpload {

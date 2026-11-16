@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Atualizou suas instruções",
   "status.agent.modelSwitchedForLimit": "Limite de uso atingido. O modelo mudou para {model}.",
   "status.agent.modelReturnedAfterLimit": "O limite de uso terminou. O modelo voltou para {model}.",
+  "status.agent.routineSkippedRunOpen": "Pulada: a última execução ainda não tinha terminado",
+  "status.agent.routineSkippedUsageLimit": "Pulada: o limite de uso foi atingido",
   "status.agent.modelSwitchedForError": "Erro do provedor. O modelo mudou para {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
@@ -29,6 +31,8 @@ export const messages = {
     "Capturar a área da tela em {x}, {y}, {width} × {height} pontos e enviar a imagem ao modelo do agente.",
   "status.agent.reportProblem":
     "Isto será uma issue pública no GitHub, com a versão do app e o seu sistema. O seu nome não aparece.",
+  "status.agent.reportPhoneProblem":
+    "Isto será uma issue pública no GitHub, com a versão do app, o seu sistema e a versão, o sistema e o registro de suporte do seu celular. O seu nome não aparece.",
   "status.agent.sendIdea": "Isto vira uma issue pública no GitHub. Seu nome não aparece.",
   "status.agent.feedbackRecentErrors": "Erros recentes no chat:",
   "status.agent.feedbackSameAs": "Adiciona à issue #{issue}",
@@ -36,9 +40,18 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Criar um comando de uso único que instala o OpenBot em outro computador como o servidor {name} e o conecta à sua conta. O agente o executa lá.",
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",
+  "status.agent.browserProfileNamed":
+    "Mover {agents} para o perfil do navegador {profile}. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.browserProfileNew":
+    "Criar o novo perfil do navegador {profile} e mover {agents} para ele. Ele não tem logins. As abas abertas deles fecham.",
+  "status.agent.browserProfileShared":
+    "Mover {agents} para o perfil do navegador compartilhado. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.browserProfileOwn":
+    "Dar a cada um de {agents} um perfil do navegador próprio. As abas abertas deles fecham.",
   "status.agent.feedbackSending": "Enviando seu feedback para a equipe do OpenBot…",
   "status.agent.workflowDelete":
     "Excluir o fluxo de trabalho {title} com suas execuções e versões. Suas etapas abertas param.",
+  "status.agent.deleteAgents": "Excluir {agents} com seus chats e arquivos. Não é possível desfazer.",
   "status.agent.screenCaptureProgress": "Pedindo para capturar a tela…",
   "status.agent.screenCaptureReviewing": "Analisando a captura de tela…",
   "status.agent.browserOpening": "Abrindo uma página da web…",
@@ -86,8 +99,11 @@ export const messages = {
   "status.agent.memoryChanges": "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas.",
   "status.agent.memoryChangesWithConflicts":
     "Memórias: {saved} salvas, {updated} atualizadas, {forgotten} esquecidas, {notChanged} não alteradas porque outro tópico as alterou antes.",
+  "status.agent.mcpToolCall": "Executar a ferramenta {tool} do servidor MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Fechado por uma nova mensagem",
   "status.agent.nextStepContinues": "O agente parou antes da próxima etapa. Ele continua ({current} de {limit}).",
   "status.agent.planContinues": "O plano tem etapas abertas. O agente continua ({current} de {limit}).",
   "status.agent.compactionContinues": "A conexão parou enquanto o agente compactava o contexto. O agente continua.",
+  "status.agent.providerExitContinues": "O agente parou antes de terminar a resposta. O agente continua.",
   "status.agent.branchTitle": "Chat ramificado",
 } as const satisfies PartialTranslation<typeof source>;

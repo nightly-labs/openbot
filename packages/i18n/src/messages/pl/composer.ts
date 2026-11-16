@@ -112,6 +112,12 @@ export const messages = {
   "composer.error.holdQueued": "Nie udało się wstrzymać wiadomości z kolejki do edycji.",
   "composer.error.cancelEdit": "Nie udało się anulować edycji w kolejce. Spróbuj ponownie.",
   "composer.error.updateQueued": "Nie udało się zaktualizować wiadomości z kolejki. Spróbuj ponownie.",
+  "composer.queueEdit.received": "Agent już otrzymał tę wiadomość, więc edycja została zakończona.",
+  "composer.queueEdit.receivedKept":
+    "Agent już otrzymał tę wiadomość, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.deletedKept":
+    "Ta wiadomość została usunięta, więc edycja została zakończona. Twoje zmiany nadal są w polu wiadomości.",
+  "composer.queueEdit.endedKept": "Ta edycja zakończyła się przed zapisaniem. Twoje zmiany nadal są w polu wiadomości.",
   "composer.voice.prepareFailed": "Nie udało się przygotować modelu głosowego. Spróbuj ponownie.",
   "composer.voice.noSpeechRecorded": "Nie nagrano mowy.",
   "composer.voice.noSpeechDetected": "Nie wykryto mowy.",
@@ -156,6 +162,7 @@ export const messages = {
   "composer.picker.section.files": "Pliki",
   "composer.picker.section.tabs": "Karty przeglądarki",
   "composer.picker.section.threads": "Wątki",
+  "composer.picker.section.messages": "W wiadomościach",
   "composer.token.tab": "Karta przeglądarki {name}",
   "composer.token.thread": "Wątek {name}",
   "composer.token.unavailableTab": "Zamknięta karta przeglądarki {name}",

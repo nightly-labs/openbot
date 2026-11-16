@@ -288,6 +288,14 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um seinen Namen und sein Logo hier zu ändern.",
   "mobile.server.settings.identityOffline": "Verbinde dich mit diesem Server, um seinen Namen und sein Logo zu ändern.",
+  "mobile.server.settings.appearance": "Form und Farbe",
+  "mobile.server.settings.appearanceShape": "Form",
+  "mobile.server.settings.appearanceShapeOption": "Form {number}",
+  "mobile.server.settings.appearanceColor": "Serverfarbe",
+  "mobile.server.settings.appearanceAutomatic": "Automatisch",
+  "mobile.server.settings.appearanceReset": "Zurücksetzen",
+  "mobile.server.settings.appearanceSaveFailed":
+    "Form und Farbe des Servers konnten nicht gespeichert werden. Versuche es erneut.",
   "mobile.server.route.cropLogo": "Logo zuschneiden",
   "mobile.server.members.remove": "Mitglied entfernen",
   "mobile.server.members.invitePeople": "Personen einladen",
@@ -790,6 +798,8 @@ export const messages = {
     "OpenBot kann die gespeicherten Tokens auf {host} nicht lesen. Trenne den Arbeitsbereich und verbinde ihn erneut.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot auf {host} kann keine Slack-Ereignisse empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Dieser Workspace ist nicht mit {host} verknüpft. Tippe auf „Neu verbinden“, um ihn zu verknüpfen.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Dieser Agent erhält jede Anfrage aus Slack. Kurze Anfragen beantwortet er selbst. Andere Aufgaben gibt er an den passenden Agenten weiter und veröffentlicht die Antwort im Thread.",
@@ -837,6 +847,8 @@ export const messages = {
     "OpenBot kann die gespeicherten Tokens auf {host} nicht lesen. Trenne den Discord-Server und verbinde ihn erneut.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot auf {host} kann keine Discord-Ereignisse empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Dieser Discord-Server ist nicht mit {host} verknüpft. Tippe auf „Neu verbinden“, um ihn zu verknüpfen.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Dieser Agent erhält jede Anfrage aus Discord. Kurze Anfragen beantwortet er selbst. Andere Aufgaben gibt er an den passenden Agenten weiter und sendet die Antwort im Kanal.",
@@ -875,6 +887,8 @@ export const messages = {
     "OpenBot auf {host} kann keine Telegram-Nachrichten empfangen. Melde dich auf {host} an, gib dem Server in den Servereinstellungen einen Namen und lass OpenBot geöffnet.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot kann diesen Chat nicht erreichen. Verbinde ihn erneut oder trenne den Chat.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Dieser Chat ist nicht mit {host} verknüpft. Tippe auf „Neu verbinden“, um ihn zu verknüpfen.",
   "mobile.server.connectors.telegram.retryAt": "Telegram hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Chat verknüpfen",
   "mobile.server.connectors.telegram.linkAnother": "Weiteren Chat verknüpfen",
@@ -916,6 +930,8 @@ export const messages = {
     "WhatsApp hat diesen Server aus den verknüpften Geräten entfernt. Verknüpfe die Nummer erneut.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot kann WhatsApp unter dieser Nummer nicht erreichen. Verbinde sie erneut oder trenne die Nummer.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot kann die gespeicherten Schlüssel dieser Nummer nicht lesen. Verknüpfe die Nummer erneut.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp hat OpenBot gebeten zu warten. Neuer Versuch um {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Neu verknüpfen",
   "mobile.server.connectors.whatsapp.ownNumber": "Private Nummer",
@@ -1158,6 +1174,22 @@ export const messages = {
   "mobile.server.providers.compactWindowTokens": "{size} Tokens",
   "mobile.server.providers.compactWindowLoadFailed":
     "Die Komprimierungsgröße dieses Servers konnte nicht geladen werden.",
+  "mobile.server.environment.row": "Variablen",
+  "mobile.server.environment.title": "Umgebung",
+  "mobile.server.environment.hint":
+    "API-Schlüssel, Basis-URLs und andere Einstellungen, die jeder {name}-Prozess erhält. Eine Änderung gilt, wenn die laufenden Durchgänge enden.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL sendet mit OPENAI_API_KEY als Schlüssel die Modellanfragen von ChatGPT an diese Adresse.",
+  "mobile.server.environment.shellNote": "Die Befehle, die Agenten ausführen, können diese Werte lesen.",
+  "mobile.server.environment.add": "Variable hinzufügen",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Wert",
+  "mobile.server.environment.saved": "Gespeichert",
+  "mobile.server.environment.sensitive": "Vertraulich",
+  "mobile.server.environment.remove": "Entfernen",
+  "mobile.server.environment.save": "Speichern",
+  "mobile.server.environment.loadFailed": "Die Variablen von {name} konnten nicht geladen werden.",
+  "mobile.server.environment.invalid": "Korrigiere zuerst die Namen.",
   "mobile.server.providers.disconnect": "Trennen",
   "mobile.server.providers.disconnectTitle": "{name} trennen?",
   "mobile.server.providers.disconnectBody":

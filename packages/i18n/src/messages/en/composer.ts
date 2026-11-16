@@ -109,6 +109,12 @@ export const messages = defineMessages("composer", {
   "composer.error.holdQueued": "Could not hold the queued message for editing.",
   "composer.error.cancelEdit": "Could not cancel the queue edit. Try again.",
   "composer.error.updateQueued": "Could not update the queued message. Try again.",
+  "composer.queueEdit.received": "The agent already received this message, so your edit ended.",
+  "composer.queueEdit.receivedKept":
+    "The agent already received this message, so your edit ended. Your changes are still in the message box.",
+  "composer.queueEdit.deletedKept":
+    "This message was deleted, so your edit ended. Your changes are still in the message box.",
+  "composer.queueEdit.endedKept": "This edit ended before it was saved. Your changes are still in the message box.",
   "composer.voice.prepareFailed": "Could not prepare the voice model. Try again.",
   "composer.voice.noSpeechRecorded": "No speech was recorded.",
   "composer.voice.noSpeechDetected": "No speech was detected.",
@@ -153,6 +159,7 @@ export const messages = defineMessages("composer", {
   "composer.picker.section.files": "Files",
   "composer.picker.section.tabs": "Browser tabs",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In messages",
   "composer.token.tab": "Browser tab {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Closed browser tab {name}",

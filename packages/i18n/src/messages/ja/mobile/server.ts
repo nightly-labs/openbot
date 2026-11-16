@@ -279,6 +279,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "ここで名前とロゴを変更するには、このサーバーの OpenBot をアップデートしてください。",
   "mobile.server.settings.identityOffline": "名前とロゴを変更するには、このサーバーに接続してください。",
+  "mobile.server.settings.appearance": "形と色",
+  "mobile.server.settings.appearanceShape": "形",
+  "mobile.server.settings.appearanceShapeOption": "形 {number}",
+  "mobile.server.settings.appearanceColor": "サーバーの色",
+  "mobile.server.settings.appearanceAutomatic": "自動",
+  "mobile.server.settings.appearanceReset": "リセット",
+  "mobile.server.settings.appearanceSaveFailed": "サーバーの形と色を保存できませんでした。もう一度お試しください。",
   "mobile.server.route.cropLogo": "ロゴを切り抜く",
   "mobile.server.members.remove": "メンバーを削除",
   "mobile.server.members.invitePeople": "ユーザーを招待",
@@ -758,6 +765,8 @@ export const messages = {
     "OpenBot は {host} に保存されたトークンを読み取れません。ワークスペースを切断してから、もう一度接続してください。",
   "mobile.server.connectors.slack.helpRelay":
     "{host} の OpenBot は Slack のイベントを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "このワークスペースは {host} にリンクされていません。リンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "このエージェントは Slack からのすべてのリクエストを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、回答をスレッドに投稿します。",
@@ -796,6 +805,8 @@ export const messages = {
     "OpenBot は {host} に保存されたトークンを読み取れません。Discord サーバーを切断してから、もう一度接続してください。",
   "mobile.server.connectors.discord.helpRelay":
     "{host} の OpenBot は Discord のイベントを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "この Discord サーバーは {host} にリンクされていません。リンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "このエージェントは Discord からのすべてのリクエストを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、チャンネルで回答を返信します。",
@@ -827,6 +838,8 @@ export const messages = {
     "{host} の OpenBot は Telegram のメッセージを受信できません。{host} でサインインし、サーバー設定でサーバーに名前を付けて、OpenBot を開いたままにしてください。",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot はこのチャットに接続できません。再接続するか、チャットを切断してください。",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "このチャットは {host} にリンクされていません。リンクするには「再接続」をタップしてください。",
   "mobile.server.connectors.telegram.retryAt": "Telegram から待機するよう求められました。{time} に再試行します。",
   "mobile.server.connectors.telegram.linkTitle": "チャットをリンク",
   "mobile.server.connectors.telegram.linkAnother": "別のチャットをリンク",
@@ -863,6 +876,8 @@ export const messages = {
     "WhatsApp がこのサーバーをリンク済みデバイスから削除しました。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot はこの番号で WhatsApp に接続できません。再接続するか、番号を切断してください。",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot はこの番号の保存済みキーを読み取れません。番号をもう一度リンクしてください。",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp から待機するよう求められました。{time} に再試行します。",
   "mobile.server.connectors.whatsapp.linkAgain": "再リンク",
   "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",
@@ -1101,6 +1116,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code の既定",
   "mobile.server.providers.compactWindowTokens": "{size} トークン",
   "mobile.server.providers.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
+  "mobile.server.environment.row": "変数",
+  "mobile.server.environment.title": "環境",
+  "mobile.server.environment.hint":
+    "{name} の各プロセスが受け取る API キー、ベース URL などの設定です。変更は進行中のターンが終わると適用されます。",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL と、そのキーとしての OPENAI_API_KEY で、ChatGPT のモデルへのリクエストをそのアドレスに送ります。",
+  "mobile.server.environment.shellNote": "エージェントが実行するコマンドはこれらの値を読めます。",
+  "mobile.server.environment.add": "変数を追加",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "値",
+  "mobile.server.environment.saved": "保存済み",
+  "mobile.server.environment.sensitive": "機密",
+  "mobile.server.environment.remove": "削除",
+  "mobile.server.environment.save": "保存",
+  "mobile.server.environment.loadFailed": "{name} の変数を読み込めませんでした。",
+  "mobile.server.environment.invalid": "先に名前を修正してください。",
   "mobile.server.providers.disconnect": "接続を解除",
   "mobile.server.providers.disconnectTitle": "{name} の接続を解除しますか？",
   "mobile.server.providers.disconnectBody":

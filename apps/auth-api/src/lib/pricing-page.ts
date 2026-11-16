@@ -10,10 +10,10 @@ export const PRICING_ROUTE = "/pricing";
 export const PRICING_SOCIAL_IMAGE_PATH = "/social/pricing.jpg";
 
 /** The plans that no new server can take. Servers that have one keep it. */
-export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set(["starter"]);
+export const SOLD_OUT_PLANS: ReadonlySet<BillingPlanId> = new Set<BillingPlanId>();
 
 /** The sitemap date of the page. Change it when its text changes. */
-export const PRICING_PAGE_UPDATED_AT = "2026-10-29";
+export const PRICING_PAGE_UPDATED_AT = "2026-11-14";
 
 /** The EU member states, as the ISO 3166-1 alpha-2 codes of the `CF-IPCountry` header. */
 const EU_COUNTRIES: ReadonlySet<string> = new Set([

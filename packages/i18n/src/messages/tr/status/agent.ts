@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Talimatlarını güncelledi",
   "status.agent.modelSwitchedForLimit": "Kullanım sınırına ulaşıldı. {model} modeline geçildi.",
   "status.agent.modelReturnedAfterLimit": "Kullanım sınırı bitti. {model} modeline geri dönüldü.",
+  "status.agent.routineSkippedRunOpen": "Atlandı: son çalıştırma henüz bitmemişti",
+  "status.agent.routineSkippedUsageLimit": "Atlandı: kullanım sınırına ulaşıldı",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
@@ -29,6 +31,8 @@ export const messages = {
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.reportProblem":
     "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
+  "status.agent.reportPhoneProblem":
+    "Bu; uygulama sürümü, sisteminiz ve telefonunuzun sürümü, sistemi ve destek günlüğüyle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
   "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
   "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",
@@ -36,9 +40,18 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "OpenBot'u başka bir bilgisayara {name} sunucusu olarak kuran ve hesabınızda oturum açan tek kullanımlık bir komut oluştur. Ajan onu orada çalıştırır.",
   "status.agent.serverInstallCard": "{name} sunucusu için kurulum komutu",
+  "status.agent.browserProfileNamed":
+    "{agents} ajanlarını {profile} tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileNew":
+    "Yeni {profile} tarayıcı profilini oluştur ve {agents} ajanlarını oraya taşı. Hiç oturum açma bilgisi yoktur. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileShared":
+    "{agents} ajanlarını paylaşılan tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileOwn":
+    "{agents} ajanlarının her birine kendi tarayıcı profilini ver. Açık sekmeleri kapanır.",
   "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",
+  "status.agent.deleteAgents": "{agents} ajanlarını sohbetleri ve dosyalarıyla birlikte silin. Bu işlem geri alınamaz.",
   "status.agent.screenCaptureProgress": "Ekranı yakalamak için izin isteniyor…",
   "status.agent.screenCaptureReviewing": "Ekran görüntüsü inceleniyor…",
   "status.agent.browserOpening": "Web sayfası açılıyor…",
@@ -86,8 +99,11 @@ export const messages = {
   "status.agent.memoryChanges": "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu.",
   "status.agent.memoryChangesWithConflicts":
     "Bellek: {saved} kaydedildi, {updated} güncellendi, {forgotten} unutuldu, {notChanged} değiştirilmedi çünkü önce başka bir mesaj dizisi değiştirdi.",
+  "status.agent.mcpToolCall": "{name} MCP sunucusunun {tool} aracını çalıştır.",
+  "status.agent.uiBlockClosedByMessage": "Yeni bir mesajla kapatıldı",
   "status.agent.nextStepContinues": "Ajan bir sonraki adımdan önce durdu. Devam ediyor ({current}/{limit}).",
   "status.agent.planContinues": "Planda açık adımlar var. Ajan devam ediyor ({current}/{limit}).",
   "status.agent.compactionContinues": "Ajan bağlamını sıkıştırırken bağlantı kesildi. Ajan devam ediyor.",
+  "status.agent.providerExitContinues": "Ajan yanıtını bitirmeden durdu. Ajan devam ediyor.",
   "status.agent.branchTitle": "Dallandırılmış sohbet",
 } as const satisfies PartialTranslation<typeof source>;

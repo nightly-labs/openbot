@@ -217,6 +217,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "{name} 열기",
   "routine.calendar.completed": "완료됨",
+  "routine.calendar.new": "새 루틴",
+  "routine.calendar.newOn": "{day}에 새 루틴",
+  "routine.calendar.agent": "에이전트",
+  "routine.calendar.agentChoice": "에이전트: {name}",
 
   "routine.settings.loadFailed": "루틴을 불러올 수 없어요.",
   "routine.settings.loadRunsFailed": "실행 기록을 불러올 수 없어요.",

@@ -458,6 +458,18 @@ function AuthenticatedStack() {
         }}
       />
       <Stack.Screen
+        name="context-usage/[agentId]"
+        // The context ring of the composer opens it. The header comes from the route's `_layout.tsx`.
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.6, 0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
         name="channel-actions/[channelId]"
         // The header comes from the route's `_layout.tsx`: Android draws no header on a formSheet route.
         options={{
@@ -760,6 +772,28 @@ function AuthenticatedStack() {
       />
       <Stack.Screen
         name="turn-thinking"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="subagent"
+        options={{
+          contentStyle: { backgroundColor: sheetBackground },
+          headerShown: false,
+          scrollEdgeEffects: { top: "hidden", bottom: "soft" },
+          presentation: "formSheet",
+          sheetAllowedDetents: [0.85],
+          sheetGrabberVisible: true,
+        }}
+      />
+      <Stack.Screen
+        name="memory-changes"
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,

@@ -148,11 +148,14 @@ import {
   type PromptCacheTtlSetting,
   type ProviderAccountStatus,
   type ProviderDetectionSettings,
+  type ProviderEnvironment,
+  type ProviderEnvironmentProvider,
   type ProviderModelVisibility,
   parseAgentAccessChange,
   parseBrowserProxyAddress,
   parseProviderModelVisibilityChange,
   parseSetMcpAccessInput,
+  providerEnvironmentProblem,
   type QueueDelivery,
   type QueuedMessageReceipt,
   type QueueSnapshot,
@@ -526,6 +529,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let promptCacheTtl: PromptCacheTtlSetting = { ...DEFAULT_PROMPT_CACHE_TTL };
   let claudeUserSetup: ClaudeUserSetupSetting = { ...DEFAULT_CLAUDE_USER_SETUP };
   let claudeCompactWindow: ClaudeCompactWindowSetting = { ...DEFAULT_CLAUDE_COMPACT_WINDOW };
+  /** The variables of each provider; a sensitive one keeps its value here, as the host keeps it encrypted. */
+  const providerVariables = new Map<
+    ProviderEnvironmentProvider,
+    { name: string; value: string; sensitive: boolean }[]
+  >();
   /** The models each provider's picker shows, after the user changed the list. Unchanged providers show all. */
   const shownModels = new Map<string, readonly string[]>();
   let agentAccess: AgentAccessChange = { revision: 0, everyone: {}, roles: [] };
@@ -1955,6 +1963,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       connectAccountKey: async (input) => {
         await api.connectProviderAccountKey(input);
       },
+      // The preview has no provider to finish a code sign-in: the code stays until the dialog closes.
+      startAccountCodeLogin: async ({ provider, accountId }) => {
+        const status = await api.connectProviderAccount({ provider, accountId });
+        const accounts = status.providers?.find((row) => row.id === provider)?.accounts ?? [];
+        return {
+          accountId: accountId ?? accounts.at(-1)?.id ?? "a0000000000000001",
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://example.com/device",
+            expiresAt: Date.now() + 15 * 60_000,
+          },
+        };
+      },
+      submitAccountCodeLogin: async () => undefined,
+      accountCodeLoginStatus: async () => ({ result: null }),
+      cancelAccountCodeLogin: async () => undefined,
       renameAccount: async (input) => {
         await api.renameProviderAccount(input);
       },
@@ -3015,11 +3040,25 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       cancelMessageLink: async () => undefined,
       searchConversationMessages: async (input) => {
         const query = input.query.trim().replace(/\s+/g, " ").toLocaleLowerCase();
-        const results = agents.flatMap((agent) =>
-          getSnapshot(agent.id)
-            .messages.filter((message) => message.text.replace(/\s+/g, " ").toLocaleLowerCase().includes(query))
-            .map((message) => ({ agentId: agent.id, message: clone(message) })),
-        );
+        const matches = (message: ConversationMessage) =>
+          message.text.replace(/\s+/g, " ").toLocaleLowerCase().includes(query);
+        const results = agents
+          .filter((agent) => input.agentId === undefined || agent.id === input.agentId)
+          .flatMap((agent) => [
+            ...getSnapshot(agent.id)
+              .messages.filter(matches)
+              .map((message) => ({ agentId: agent.id, message: clone(message) })),
+            // As the backend does: side threads only when asked, and not an archived one.
+            ...(input.includeSideThreads ? (tasks.get(agent.id) ?? []) : [])
+              .filter((task) => task.closedAt === null)
+              .flatMap((task) =>
+                taskConversation(task)
+                  .messages.filter(matches)
+                  .map((message) => ({ agentId: agent.id, message: clone(message), taskId: task.id })),
+              ),
+          ])
+          // Newest first, as the backend returns them.
+          .sort((left, right) => right.message.createdAt.localeCompare(left.message.createdAt));
         return { results: results.slice(0, input.limit ?? 100), total: results.length, nextCursor: null };
       },
       searchConversationFiles: async (input) => {
@@ -3677,7 +3716,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // Preview has one host, so every server's name and logo are this computer's.
     hostAdmin: {
       updateIdentity: async (input, serverId) => {
-        await mockTeam.host.updateIdentity(input);
+        const { appearance, ...identity } = input;
+        if (identity.serverName !== undefined || identity.logo !== undefined)
+          await mockTeam.host.updateIdentity(identity);
+        // The look belongs to the server that the admin changes, as on a joined host.
+        if (appearance !== undefined) mockTeam.setServerAppearance(serverId, appearance);
         const server = (await mockTeam.servers.list()).find((candidate) => candidate.id === serverId);
         if (!server) throw new Error("Server not found");
         return server;
@@ -3741,6 +3784,39 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         if (!isClaudeCompactWindowTokens(tokens)) throw new Error("Invalid Claude compaction size.");
         claudeCompactWindow = { tokens };
         return clone(claudeCompactWindow);
+      },
+      getProviderEnvironment: async (provider): Promise<ProviderEnvironment> => ({
+        provider,
+        variables: (providerVariables.get(provider) ?? []).map((variable) => ({
+          name: variable.name,
+          value: variable.sensitive ? "" : variable.value,
+          sensitive: variable.sensitive,
+          stored: variable.sensitive,
+        })),
+      }),
+      setProviderEnvironment: async ({ provider, variables }): Promise<ProviderEnvironment> => {
+        const previous = providerVariables.get(provider) ?? [];
+        const names = variables.map((variable) => variable.name.trim());
+        const next = variables.map((variable, index) => {
+          const name = names[index] ?? "";
+          const problem = providerEnvironmentProblem(provider, name, names);
+          if (problem === "reserved") throw new Error(sourceText("error.provider.environmentNameReserved", { name }));
+          if (problem === "duplicate") throw new Error(sourceText("error.provider.environmentNameDuplicate", { name }));
+          if (problem) throw new Error(sourceText("error.provider.environmentNameInvalid", { name }));
+          const value = variable.value ?? previous.find((item) => item.name === name && item.sensitive)?.value;
+          if (value === undefined) throw new Error(sourceText("error.provider.customAgentEnvValueMissing", { name }));
+          return { name, value, sensitive: variable.sensitive };
+        });
+        providerVariables.set(provider, next);
+        return {
+          provider,
+          variables: next.map((variable) => ({
+            name: variable.name,
+            value: variable.sensitive ? "" : variable.value,
+            sensitive: variable.sensitive,
+            stored: variable.sensitive,
+          })),
+        };
       },
       // Preview has one host, so every server shares one model list.
       getModelVisibility: async (provider) => modelVisibility(provider),

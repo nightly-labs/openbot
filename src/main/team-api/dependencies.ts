@@ -31,6 +31,7 @@ import type { PromptCacheTtlPreferenceStore } from "../prompt-cache-ttl-preferen
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderDetection } from "../provider-detection";
 import type { ProviderDetectionSettingsStore } from "../provider-detection-settings-store";
+import type { ProviderEnvironmentControl } from "../provider-environment-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import type { RemoteWorkflowError } from "../remote-service-effects";
 import type { RequestedUpdate } from "../requested-update";
@@ -303,6 +304,10 @@ export type TeamApiProviderAccounts = Pick<
   | "signInStatus"
   | "cancelSignIn"
   | "connectKey"
+  | "startCodeSignIn"
+  | "submitCodeSignIn"
+  | "codeSignInStatus"
+  | "cancelCodeSignIn"
   | "rename"
   | "remove"
   | "setAgentAccount"
@@ -433,7 +438,7 @@ export type TeamApiInstanceTransfer = Pick<
  */
 export type TeamApiRoutineFlows = Pick<
   RoutineFlowsHandle,
-  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf"
+  "canvas" | "savePosition" | "removePosition" | "connect" | "disconnect" | "updateLink" | "agentsOf" | "stopRun"
 >;
 
 /**
@@ -590,6 +595,8 @@ export interface TeamApiAdmin {
   claudeUserSetup?: ClaudeUserSetupControl;
   /** `claude-compact-window-v1`: the size at which Claude Code compacts the chats of this computer's agents. */
   claudeCompactWindow?: ClaudeCompactWindowControl;
+  /** `provider-environment-v1`: the variables that each process of a provider of this computer starts with. */
+  providerEnvironment?: Pick<ProviderEnvironmentControl, "get" | "set">;
   /** `provider-detection-v1`: the local model servers and ACP agent commands that this computer finds. */
   providerDetection?: {
     detection: Pick<ProviderDetection, "scanModelServers" | "scanAgents" | "discoverModels">;
@@ -676,7 +683,7 @@ export type TeamApiBrowser = Pick<
   | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
-  // Behind `browser-sign-in`.
+  // Behind `browser-sign-in` and `browser-sign-in-storage-v1`.
   | "importSignIn"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.

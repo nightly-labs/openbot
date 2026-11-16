@@ -8,6 +8,9 @@ export const messages = {
   "error.billing.restartUnavailable": "Este servidor não pode reiniciar por aqui. Fale com o suporte.",
   "error.billing.planRequired": "O plano deste servidor terminou. Renove-o para iniciar o servidor.",
   "error.billing.planSoldOut": "Este plano está esgotado. Escolha outro plano.",
+  "error.billing.storageUnavailable": "Este armazenamento não está disponível para este servidor.",
+  "error.billing.storagePaymentFailed":
+    "O pagamento do armazenamento falhou. Atualize a forma de pagamento e tente novamente.",
   "error.billing.licenseExists": "Esta conta já tem uma licença. Altere os usuários dela em vez disso.",
   "error.billing.licenseCurrency": "A licença precisa usar a moeda dos seus outros planos.",
   "error.billing.planCurrency": "Um novo plano precisa usar a moeda dos seus outros planos.",

@@ -92,7 +92,7 @@ function apiKeyRequestOf(block: ConversationUiBlock): ApiKeyRequest | undefined 
  * reads both alike. A skip answers every question with nothing.
  */
 export function UiBlockPrompt(props: UiBlockPromptProps) {
-  const { t, format, errorMessage } = useText();
+  const { t, format, errorMessage, sourceText } = useText();
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal<string>();
   // What this client sent, shown frozen until the host's stored state replaces it.
@@ -103,6 +103,8 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
   // The host stores the outcome with English list commas; draw it again in the reader's language.
   const state = (): UiBlockState => {
     const current = stored();
+    // Only the host gives a closed block an outcome, as English source text, such as "Closed by a new message".
+    if (current.status === "closed" && current.outcome) return { ...current, outcome: sourceText(current.outcome) };
     if (current.status !== "answered" || !current.response) return current;
     const outcome = uiBlockOutcomeText(props.block.spec, current.response, format.list);
     return outcome.trim() ? { ...current, outcome } : current;
@@ -214,6 +216,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
           scope={apiKeyRequest()?.scope}
           keyPlaceholder={apiKeyRequest()?.placeholder}
           status={state().status}
+          closedOutcome={state().outcome}
           saved={props.block.vault?.saved}
           values={state().response?.values}
           error={error()}

@@ -607,6 +607,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "סימון הכול כנקרא",
   "mobile.agent.home.sort.title": "מיון צ'אטים",
   "mobile.agent.home.sort.manual": "ידני",
+  "mobile.agent.home.sort.recent": "פעילות אחרונה",
   "mobile.agent.home.sort.unreadGroup": "לא נקראו בקבוצה",
   "mobile.agent.home.sort.unreadFirst": "לא נקראו ראשונים בתיקיות",
   "mobile.agent.route.appearance": "מראה",

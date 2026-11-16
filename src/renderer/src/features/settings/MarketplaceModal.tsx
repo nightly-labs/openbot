@@ -9,6 +9,8 @@ import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPag
 import { PluginUninstallDialog } from "@openbot/ui/features/settings/PluginUninstallDialog";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
+import { McpServerControls } from "../servers/McpServerControls";
+import { McpServerForm } from "../servers/McpServerForm";
 import {
   createMarketplaceController,
   type MarketplaceControllerProps,
@@ -45,7 +47,10 @@ export interface MarketplaceModalProps extends MarketplaceControllerProps {
 export function MarketplaceModal(props: MarketplaceModalProps) {
   const { t } = useText();
   const nav = createMarketplaceNavigation();
-  const controller = createMarketplaceController(props);
+  const controller = createMarketplaceController(props, (tools) => ({
+    form: (form) => <McpServerForm tools={tools} id={form.id} onClose={form.onClose} />,
+    controls: (controls) => <McpServerControls tools={tools} id={controls.id} />,
+  }));
   const skillConfirmTitle = (confirm: PendingSkillConfirm) =>
     t(confirm.kind === "replace" ? "skill.confirm.replaceTitle" : "skill.confirm.removeTitle");
   const skillConfirmBody = (confirm: PendingSkillConfirm) =>
@@ -114,6 +119,23 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             draft.missingListing = link.kind;
           });
       });
+    },
+  );
+
+  /* Sign in on an agent's card opens the row's page once the rows are read. A custom row's card
+     then starts the sign-in; an app's page has its own Reconnect. The page id, not an object, so a
+     new read of the rows does not open the page again. */
+  createEffect(
+    () => {
+      const id = props.open ? props.mcpSignInRequest : undefined;
+      return id ? controller.mcpServerApp(id) : undefined;
+    },
+    (app) => {
+      if (app === undefined) return;
+      nav.reset();
+      if (app) nav.go({ kind: "app", id: app });
+      // Only a custom row's card takes the request; another page, or no row, ends it here.
+      if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 
@@ -192,6 +214,19 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
             description={skillConfirmBody(confirm)}
             tone={skillConfirmTone(confirm)}
             confirmLabel={skillConfirmLabel(confirm)}
+            initialFocus="cancel"
+          />
+        )}
+      </Show>
+      <Show when={controller.serverReplace()} keyed>
+        {(replace) => (
+          <ConfirmDialog
+            open={true}
+            onCancel={() => replace.settle(false)}
+            onConfirm={() => replace.settle(true)}
+            title={t("marketplace.app.replace.title", { server: replace.server })}
+            description={t("marketplace.app.replace.description", { server: replace.server, name: replace.app })}
+            confirmLabel={t("marketplace.app.replace.action")}
             initialFocus="cancel"
           />
         )}

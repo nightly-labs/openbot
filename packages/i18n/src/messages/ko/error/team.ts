@@ -78,6 +78,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "이 연결에서는 에이전트의 사용 한도를 표시하거나 변경할 수 없어요.",
   "error.team.hermesImportUnsupported": "이 연결에서는 서버의 Hermes 프로필을 가져올 수 없어요.",
   "error.team.providerDetectionUnsupported": "이 연결에서는 서버의 모델 서버와 에이전트를 찾을 수 없어요.",
+  "error.team.routineFlowStopUnsupported": "이 연결에서는 루틴 실행을 중지할 수 없어요.",
   "error.team.sidebarFoldersUnsupported": "이 연결에서는 폴더 안의 폴더를 지원하지 않아요.",
   "error.team.libraryFoldersUnsupported": "이 연결에서는 라이브러리 폴더를 지원하지 않아요.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -124,6 +125,7 @@ export const messages = {
   "error.team.browsingMemoryUnsupported": "이 연결은 브라우징 학습을 지원하지 않습니다.",
   "error.team.claudeUserSetupUnsupported": "이 연결은 Claude Code 설정 스위치를 지원하지 않아요.",
   "error.team.claudeCompactWindowUnsupported": "이 연결은 Claude 압축 크기를 지원하지 않아요.",
+  "error.team.providerEnvironmentUnsupported": "이 연결은 공급자 변수를 지원하지 않아요.",
   "error.team.modelVisibilityUnsupported": "이 연결에서는 모델 목록을 지원하지 않아요.",
   "error.team.providerDefaultUnsupported": "이 연결에서는 기본 제공자를 지원하지 않아요.",
   "error.team.agentAccessUnsupported": "이 연결에서는 역할을 지원하지 않아요.",
@@ -179,6 +181,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "이 연결은 서버 성격을 지원하지 않아요.",
   "error.team.agentWaitsUnsupported": "이 연결에서는 열린 대기를 지원하지 않아요.",
   "error.team.pendingApprovalUnsupported": "이 연결에서는 승인 요청 전체를 읽을 수 없어요.",
+  "error.team.phoneFeedbackUnsupported": "이 연결에서는 휴대폰 앱에서 신고를 보낼 수 없어요.",
   "error.team.messagePinsUnsupported": "이 연결은 고정된 메시지를 지원하지 않습니다.",
   "error.team.queuedMessageThreadUnsupported": "이 연결에서는 대기 중인 메시지를 새 스레드로 실행할 수 없어요.",
   "error.team.backgroundProcessesUnsupported": "이 연결에서는 백그라운드 프로세스를 지원하지 않아요.",

@@ -89,6 +89,10 @@ export const messages = {
     "Attendez la fin du travail dans ce canal, puis supprimez son historique.",
   "error.backend.channelCompactUnavailable":
     "Aucun membre de ce canal ne peut compacter son contexte maintenant. Un membre doit d’abord répondre dans le canal, et son fournisseur doit prendre en charge la compaction.",
+  "error.backend.channelCompactNoSession":
+    "Les membres de ce canal n’ont pas encore de conversation à compacter. Compactez-le après la réponse d’un membre dans le canal.",
+  "error.backend.channelCompactNotSupported":
+    "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
@@ -125,6 +129,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "L’opération sur le souvenir a échoué. Réessayez.",
   "error.backend.memoryGone": "Ce souvenir n’existe plus.",
   "error.backend.routineGone": "Cette routine n’existe plus.",
+  "error.backend.routineRunGone": "Cette exécution de la routine n’existe plus.",
   "error.backend.turnNotStarted": "Le fournisseur n’a pas démarré ce tour.",
   "error.backend.routineResultConnectionOff":
     "Cette connexion de messagerie est désactivée ou supprimée. Choisissez un autre emplacement.",
@@ -211,6 +216,8 @@ export const messages = {
   "error.backend.interruptSelf": "Un agent ne peut pas s’interrompre lui-même.",
   "error.backend.interruptOtherWork":
     "Cet agent travaille sur une tâche que votre message n’a pas lancée. Seul l’utilisateur ou l’expéditeur de cette tâche peut l’arrêter.",
+  "error.backend.interruptSharedWork":
+    "Le tour de cet agent traite votre message et aussi un message de l’utilisateur ou d’un autre agent. Seul l’utilisateur peut l’arrêter, avec Arrêter l’agent dans le chat de cet agent.",
   "error.backend.interruptStarting": "Cet agent démarre encore un tour. Réessayez après le début du tour.",
   "error.backend.interruptNoSession":
     "OpenBot ne peut pas interrompre cet agent, car sa session de fournisseur est indisponible.",
@@ -251,6 +258,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot ne peut pas enregistrer cette configuration de serveur MCP.",
   "error.backend.mcpServerNoAnswer": "Le serveur n’a pas répondu en {seconds} secondes.",
   "error.backend.mcpSignInNotAccepted": "Le serveur n’a pas accepté cette connexion.",
+  "error.backend.mcpSignInAccountRefused":
+    "Le serveur a refusé le compte avec lequel vous vous êtes connecté. Vérifiez que ce compte peut utiliser le service. Pour utiliser un autre compte, déconnectez-vous, puis reconnectez-vous.",
   "error.backend.mcpSignInClientRefused":
     "Le serveur de connexion n’a pas accepté OpenBot à la fin de la connexion. Connectez-vous à nouveau : OpenBot s’enregistre de nouveau auprès du serveur.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
@@ -279,12 +288,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",
   "error.backend.mcpToolSchemaRefused":
     "Son outil {tool} a un format d’entrée que ce fournisseur ne peut pas lire. Les agents des autres fournisseurs reçoivent toujours le serveur.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} n’a pas pu utiliser le serveur MCP {name}, car ce serveur demande une connexion. Ouvrez les réglages MCP et choisissez Se connecter.",
+    "{provider} n’a pas pu utiliser le serveur MCP {name}, car ce serveur demande une connexion. Ouvrez {name} dans Marketplace, Apps, et choisissez Se connecter.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} n’a pas pu démarrer le serveur MCP {name}. Ouvrez les réglages MCP et choisissez Tester la connexion pour voir la cause.",
+    "{provider} n’a pas pu démarrer le serveur MCP {name}. Ouvrez {name} dans Marketplace, Apps, et choisissez Tester la connexion pour voir la cause.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}. Ses outils ne sont pas disponibles pour {provider}. {provider} démarre le serveur lui-même, donc le test de connexion dans OpenBot peut réussir. Commencez une nouvelle discussion pour réessayer.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} n’a pas pu démarrer le serveur MCP {name}, car le serveur n’a pas répondu à temps. Commencez une nouvelle discussion pour réessayer.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -352,6 +367,8 @@ export const messages = {
   "error.backend.promptInactive": "Cette question n’est plus active.",
   "error.backend.promptAnswerMismatch": "Une réponse ne correspond à aucune question active.",
   "error.backend.approvalInactive": "Cette approbation n’est plus active.",
+  "error.backend.feedbackNeedsPhone":
+    "Seule l'app OpenBot du téléphone peut envoyer ce rapport, car elle ajoute la version et le journal d'assistance du téléphone. Ouvre cette discussion sur le téléphone. Si tu y vois ce message, mets à jour l'app du téléphone.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",
@@ -377,6 +394,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "Le proxy {name} ne répond pas, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxySignInRefused":
     "Le proxy {name} a refusé l’identification, la page ne s’est donc pas ouverte.",
+  "error.backend.browserSystemProxyFailed":
+    "Le proxy des réglages de l’ordinateur qui exécute OpenBot ne répond pas ou a refusé la connexion, la page ne s’est donc pas ouverte. Vérifiez les réglages de proxy de cet ordinateur.",
   "error.backend.browserProxyComputerUnreachable":
     "L’ordinateur de ce profil ne répond pas, la page ne s’est donc pas ouverte.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -409,6 +428,8 @@ export const messages = {
     "Le serveur a répondu {status}. Vérifiez la clé d’API ou les autres identifiants.",
   "error.backend.mcpServerHttpUrl":
     "Le serveur a répondu {status}. Vérifiez l’URL. Le lien est peut-être erroné, expiré ou supprimé.",
+  "error.backend.mcpServerBearerKey":
+    "Ce serveur utilise une clé d’API, pas une connexion. Dans En-têtes, mettez Authorization comme clé et, comme valeur, Bearer, une espace, puis votre clé d’API.",
   "error.backend.mcpSignInAppUrl": "L’app de connexion nécessite une URL de serveur valide.",
   "error.backend.mcpSignInAppClientId": "Saisissez l’ID client de l’app de connexion.",
   "error.backend.mcpSignInAppIssuerChanged":

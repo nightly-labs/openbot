@@ -61,6 +61,10 @@ import { recordRestartActivity } from "./restart-activity";
 const MAX_ATTACHMENTS = INPUT_LIMITS.attachments;
 /** How much of a delivery's error the note for a failed request quotes. */
 const FAILED_REQUEST_REASON_LIMIT = 2_000;
+/** The key of the note for a failed request (`answerFailedRequest`). Stored keys use it. */
+const FAILED_REQUEST_KEY_PREFIX = "failed-request:";
+/** The key of the result that OpenBot relays when a requested turn ends. Stored keys use it. */
+export const AUTO_RESULT_KEY_PREFIX = "auto-result:";
 /** A welcome in these states is still to come, so the queue reports it (`QueueSnapshot.welcome`). */
 const WELCOME_PENDING_STATUSES: ReadonlySet<QueueDeliveryStatus> = new Set(["queued", "starting", "running"]);
 /**
@@ -267,6 +271,14 @@ export interface CommittedChannelAttachments {
 export const MAILBOX_CONVERSATION_MESSAGE_LIMIT = 100;
 
 /**
+ * How long a queue edit keeps its message from starting. The editor can close or lose its edit with no
+ * Save or Cancel, and a message that waits for that edit stops all of its lane (#7750). After this
+ * time the message starts with its original text, and the edit ends as cancelled. An edit from before
+ * a restart gets this time again from the start, so an editor that comes back with it can still save.
+ */
+export const QUEUE_EDIT_HOLD_MS = 10 * 60_000;
+
+/**
  * A lane id for the channel thread of one channel. A task id never starts with this control
  * character, so a lane id names a task or a channel without a second field.
  */
@@ -286,6 +298,8 @@ export class MailboxStore {
   readonly #files: AttachmentFiles;
   readonly #database: OpenBotDatabase;
   readonly #queueUpdates = new Set<string>();
+  /** When each edit began, or when this run found it, by delivery id. Only memory. */
+  readonly #editHolds = new Map<string, { editId: string; startedAt: number }>();
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
@@ -338,11 +352,11 @@ export class MailboxStore {
         yield* this.#database.backupLegacyFile(this.#statePath);
         this.#persist("mailbox.legacy-imported", "legacy-import:mailbox:v1", [], true);
       }
-      const activeEdits = new Set(
-        this.#state.deliveries
-          .filter((delivery) => delivery.status === "queued" && delivery.editId)
-          .map((delivery) => delivery.editId),
-      );
+      const startedAt = Date.now();
+      for (const delivery of this.#state.deliveries)
+        if (delivery.status === "queued" && delivery.editId)
+          this.#editHolds.set(delivery.id, { editId: delivery.editId, startedAt });
+      const activeEdits = new Set([...this.#editHolds.values()].map((hold) => hold.editId));
       const retainedDrafts = this.#state.drafts.filter(
         (draft) => draft.preserveOnRestart || (draft.ownerEditId && activeEdits.has(draft.ownerEditId)),
       );
@@ -1554,8 +1568,12 @@ export class MailboxStore {
         const delivery = this.#publicDelivery(storedDelivery, positions, message);
         messages.push({
           id: delivery.id,
-          // A plan continuation keeps the request in its first turn, like `syncDeliveryMessage`.
-          turnId: storedDelivery.planContinuation?.turnIds[0] ?? storedDelivery.turnId ?? undefined,
+          // A plan continuation and continued work keep the request in its first turn, like `syncDeliveryMessage`.
+          turnId:
+            storedDelivery.planContinuation?.turnIds[0] ??
+            storedDelivery.resumeAfterUsageLimit?.previousTurnIds[0] ??
+            storedDelivery.turnId ??
+            undefined,
           author: message.sender.kind === "agent" ? "agent" : "user",
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
@@ -1822,7 +1840,24 @@ export class MailboxStore {
   }
 
   #mayStart(delivery: StoredDelivery): boolean {
-    return !delivery.editId && !this.#queueUpdates.has(delivery.id);
+    return !this.#isHeldByEdit(delivery) && !this.#queueUpdates.has(delivery.id);
+  }
+
+  /** The agents with a queued message that an edit holds now. */
+  agentsWithEditHolds(): string[] {
+    return [
+      ...new Set(
+        this.#state.deliveries
+          .filter((delivery) => delivery.status === "queued" && this.#isHeldByEdit(delivery))
+          .map((delivery) => delivery.recipientAgentId),
+      ),
+    ];
+  }
+
+  /** True while an edit that began, or that this run found, less than `QUEUE_EDIT_HOLD_MS` ago holds the message. */
+  #isHeldByEdit(delivery: StoredDelivery): boolean {
+    const hold = delivery.editId ? this.#editHolds.get(delivery.id) : undefined;
+    return hold !== undefined && hold.editId === delivery.editId && Date.now() - hold.startedAt < QUEUE_EDIT_HOLD_MS;
   }
 
   /**
@@ -1833,13 +1868,8 @@ export class MailboxStore {
   #isHeldReply(delivery: StoredDelivery): boolean {
     const reply = this.#requireMessage(delivery.messageId);
     if (!isAnswer(reply)) return false;
-    const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
-    if (
-      request?.sender.kind !== "agent" ||
-      request.sender.agentId !== delivery.recipientAgentId ||
-      request.expectsReply === false
-    )
-      return false;
+    const request = this.#answeredRequestOf(delivery.recipientAgentId, reply);
+    if (!request) return false;
     const answeredBy = reply.sender.agentId;
     return this.#state.deliveries.some(
       (candidate) =>
@@ -1984,6 +2014,16 @@ export class MailboxStore {
           delivery.recipientAgentId === agentId &&
           delivery.turnId === turnId &&
           (delivery.status === "starting" || delivery.status === "running"),
+      ),
+    );
+  }
+
+  /** The deliveries of this agent that completed in the turn `turnId`. */
+  completedDeliveriesOfTurn(agentId: string, turnId: string): DeliveryContext[] {
+    return this.#contexts(
+      this.#state.deliveries.filter(
+        (delivery) =>
+          delivery.recipientAgentId === agentId && delivery.turnId === turnId && delivery.status === "completed",
       ),
     );
   }
@@ -2161,6 +2201,20 @@ export class MailboxStore {
     return this.#state.deliveries.find((delivery) => delivery.id === id)?.messageId ?? null;
   }
 
+  /** The request of `agentId` that asked for an answer and that `reply` answers, if any. */
+  #answeredRequestOf(agentId: string, reply: { replyToMessageId: string }): StoredMessage | undefined {
+    const request = this.#state.messages.find((message) => message.id === reply.replyToMessageId);
+    return request?.sender.kind === "agent" && request.sender.agentId === agentId && request.expectsReply !== false
+      ? request
+      : undefined;
+  }
+
+  /** Whether the message is a teammate's answer to a request that `agentId` sent and that asked for an answer. */
+  answersRequestOf(agentId: string, messageId: string): boolean {
+    const reply = this.#state.messages.find((message) => message.id === messageId);
+    return reply !== undefined && isAnswer(reply) && this.#answeredRequestOf(agentId, reply) !== undefined;
+  }
+
   /** Whether the message's sender waits for an answer. Unknown messages count as expecting one. */
   expectsReply(messageId: string): boolean {
     return this.#state.messages.find((message) => message.id === messageId)?.expectsReply !== false;
@@ -2175,6 +2229,36 @@ export class MailboxStore {
     return this.#state.messages.some(
       (message) =>
         message.sender.kind === "agent" && message.sender.agentId === agentId && message.replyToMessageId === messageId,
+    );
+  }
+
+  /**
+   * Whether the recipient answered this teammate request with its own `send_message` reply in the turn
+   * that ran it (or an earlier turn of a run that resumed after a usage limit). The result that OpenBot
+   * relays when the turn ends and the note for a failed request do not count, and neither does a reply
+   * from a later turn, so the turn completion and a later history import decide the same.
+   */
+  hasOwnReplyFrom(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery?.turnId) return false;
+    const replies = new Set(
+      this.#state.messages
+        .filter(
+          (message) =>
+            message.sender.kind === "agent" &&
+            message.sender.agentId === delivery.recipientAgentId &&
+            message.replyToMessageId === delivery.messageId,
+        )
+        .map((message) => message.id),
+    );
+    if (replies.size === 0) return false;
+    const turnIds = new Set([delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
+    return Object.entries(this.#state.idempotency).some(
+      ([key, messageId]) =>
+        replies.has(messageId) &&
+        !key.startsWith(AUTO_RESULT_KEY_PREFIX) &&
+        !key.startsWith(FAILED_REQUEST_KEY_PREFIX) &&
+        turnIds.has(key.split(":").at(-2) ?? ""),
     );
   }
 
@@ -2220,7 +2304,7 @@ export class MailboxStore {
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
       expectsReply: false,
-      idempotencyKey: `failed-request:${deliveryId}`,
+      idempotencyKey: `${FAILED_REQUEST_KEY_PREFIX}${deliveryId}`,
     });
     return requesterId;
   }, Effect.uninterruptible).bind(this);
@@ -2279,6 +2363,10 @@ export class MailboxStore {
     deliveryId: string,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+      // An edit that no longer holds its message ends here: the message starts with its original text.
+      if (delivery?.status === "queued" && delivery.editId && !this.#isHeldByEdit(delivery))
+        this.#finishCancellation(delivery, false);
       this.#assertQueueNotEditing(deliveryId);
       this.#clearSteerFallback(deliveryId);
       yield* this.#updateDeliveryEffect(deliveryId, ["queued"], { status: "starting", error: null });
@@ -2326,17 +2414,36 @@ export class MailboxStore {
     error: string | null = null,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
+      // A teammate that already sent its answer to this request did answer it, also when its turn
+      // then failed or stopped. The request ends completed, so the agent that asked does not see it
+      // as failed (#7259). The turn keeps its own failure.
+      const answered = status !== "completed" && this.#answeredRequest(deliveryId);
       // Redacted here, not at the call site: this text is written to the database and read back by
       // the renderer through the queue. A provider CLI quotes what it was given, so a failure against
       // a custom endpoint can carry that endpoint's API key or a header value.
       yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
-        status,
-        error: error === null ? null : redactText(error),
+        status: answered ? "completed" : status,
+        error: answered || error === null ? null : redactText(error),
       });
     } catch (cause) {
       return yield* new StoredStateFailure({ cause });
     }
   }, Effect.uninterruptible).bind(this);
+
+  /** Whether the delivery is a teammate request outside a channel that its recipient has answered. */
+  #answeredRequest(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery) return false;
+    const request = this.#state.messages.find((message) => message.id === delivery.messageId);
+    if (request?.sender.kind !== "agent" || request.channelId) return false;
+    // A linked question from this agent is not an answer.
+    return this.#state.messages.some(
+      (message) =>
+        isAnswer(message) &&
+        message.sender.agentId === delivery.recipientAgentId &&
+        message.replyToMessageId === request.id,
+    );
+  }
 
   cancel = Effect.fn("MailboxStore.cancel")(function* (
     this: MailboxStore,
@@ -2391,6 +2498,8 @@ export class MailboxStore {
       else delivery.editId = previous;
       throw error;
     }
+    // A Begin again from the same editor, as each Save sends, gives it the full time again.
+    this.#editHolds.set(delivery.id, { editId, startedAt: Date.now() });
   }
 
   retainQueueEditAttachments(agentId: string, deliveryId: string, editId: string, draftIds: string[]): void {
@@ -2493,6 +2602,7 @@ export class MailboxStore {
       });
       throw error;
     }
+    this.#editHolds.delete(delivery.id);
   }
 
   #assertQueueNotUpdating(deliveryId: string): void {
@@ -2817,15 +2927,19 @@ export class MailboxStore {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** A refused delivery, or unfinished work that a backup continues, back at its place in the queue. */
+  /**
+   * A refused delivery, or unfinished work that a backup continues, back at its place in the queue.
+   * `finished`: the delivery completed, and work that its turn started in the background goes on.
+   */
 
   requeueRefused = Effect.fn("MailboxStore.requeueRefused")(function* (
     this: MailboxStore,
     deliveryId: string,
     resumeAfterUsageLimit?: UsageLimitContinuation,
+    finished = false,
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
-      yield* this.#updateDeliveryEffect(deliveryId, ["starting", "running"], {
+      yield* this.#updateDeliveryEffect(deliveryId, finished ? ["completed"] : ["starting", "running"], {
         status: "queued",
         turnId: null,
         error: null,

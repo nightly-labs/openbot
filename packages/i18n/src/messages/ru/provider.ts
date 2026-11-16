@@ -228,6 +228,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Не удалось переподключиться.",
   "provider.account.add": "Добавить аккаунт",
   "provider.account.addLabel": "Добавить ещё один аккаунт {name}",
+  "provider.account.addWithCode": "Добавить аккаунт по коду",
   "provider.account.count": {
     one: "{count} аккаунт",
     few: "{count} аккаунта",
@@ -306,6 +307,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "По умолчанию Claude Code",
   "provider.settings.compactWindowTokens": "{size} токенов",
   "provider.settings.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
+  "provider.settings.environment": "Окружение",
+  "provider.settings.environmentVariables": "Переменные",
+  "provider.settings.environmentDescription":
+    "Ключи API, базовые адреса и другие настройки, которые получает каждый процесс {name}. Изменение действует, когда закончатся текущие ходы.",
+  "provider.settings.environmentCodexHint":
+    "OPENAI_BASE_URL с ключом OPENAI_API_KEY отправляет запросы ChatGPT к моделям по этому адресу.",
+  "provider.settings.environmentShellNote": "Команды, которые запускают агенты, могут читать эти значения.",
+  "provider.settings.environmentAdd": "Добавить переменную",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "Значение",
+  "provider.settings.environmentSaved": "Сохранено",
+  "provider.settings.environmentSensitive": "Секретная",
+  "provider.settings.environmentNameLabel": "Имя переменной {index}",
+  "provider.settings.environmentValueLabel": "Значение {name}",
+  "provider.settings.environmentSensitiveLabel": "Держать {name} в секрете",
+  "provider.settings.environmentRemoveLabel": "Удалить {name}",
+  "provider.settings.environmentUnnamed": "переменная {index}",
+  "provider.settings.environmentPending":
+    "Сохранение перезапустит {name}, когда закончатся текущие ходы. Секретные значения остаются на сервере.",
+  "provider.settings.environmentDone": "Сохранено. {name} перезапустится, когда закончатся текущие ходы.",
+  "provider.settings.environmentDiscard": "Отменить",
+  "provider.settings.environmentSave": "Сохранить",
+  "provider.settings.environmentLoadFailed": "Не удалось загрузить переменные {name}.",
   "provider.settings.models": "Модели",
   "provider.settings.modelsDescription": {
     one: "{shown} из {count} модели видно в выборе модели.",

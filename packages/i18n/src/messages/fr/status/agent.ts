@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "A mis à jour ses instructions",
   "status.agent.modelSwitchedForLimit": "Limite d’utilisation atteinte. Passage à {model}.",
   "status.agent.modelReturnedAfterLimit": "Limite d’utilisation terminée. Retour à {model}.",
+  "status.agent.routineSkippedRunOpen": "Non exécutée : la dernière exécution n’était pas terminée",
+  "status.agent.routineSkippedUsageLimit": "Non exécutée : limite d’utilisation atteinte",
   "status.agent.modelSwitchedForError": "Erreur du fournisseur. Passage à {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} n’a plus de crédits. Passage à {model}. Pour l’utiliser à nouveau, ajoutez des crédits, puis sélectionnez-le.",
@@ -29,6 +31,8 @@ export const messages = {
     "Capturer la zone de l’écran à {x}, {y}, {width} × {height} points et envoyer l’image au modèle de l’agent.",
   "status.agent.reportProblem":
     "Ceci devient une issue GitHub publique, avec la version de l'app et ton système. Ton nom n'apparaît pas.",
+  "status.agent.reportPhoneProblem":
+    "Ceci devient une issue GitHub publique, avec la version de l'app, ton système, ainsi que la version, le système et le journal d'assistance de ton téléphone. Ton nom n'apparaît pas.",
   "status.agent.sendIdea": "Ceci devient une issue GitHub publique. Votre nom n'est pas affiché.",
   "status.agent.feedbackRecentErrors": "Erreurs récentes dans le chat :",
   "status.agent.feedbackSameAs": "S'ajoute à l'issue #{issue}",
@@ -36,9 +40,19 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Créer une commande à usage unique qui installe OpenBot sur un autre ordinateur comme serveur {name} et le connecte à ton compte. L'agent l'exécute là-bas.",
   "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",
+  "status.agent.browserProfileNamed":
+    "Déplacer {agents} vers le profil de navigateur {profile}. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileNew":
+    "Créer le nouveau profil de navigateur {profile} et y déplacer {agents}. Il n'a aucune connexion. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileShared":
+    "Déplacer {agents} vers le profil de navigateur partagé. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.browserProfileOwn":
+    "Donner à {agents} un profil de navigateur propre à chacun. Leurs onglets ouverts se ferment.",
   "status.agent.feedbackSending": "Envoi de vos commentaires à l’équipe OpenBot…",
   "status.agent.workflowDelete":
     "Supprimer le workflow {title} avec ses exécutions et ses versions. Ses étapes en cours s'arrêtent.",
+  "status.agent.deleteAgents":
+    "Supprimer {agents} avec leurs discussions et leurs fichiers. Cette action est irréversible.",
   "status.agent.screenCaptureProgress": "Demande de capture d’écran…",
   "status.agent.screenCaptureReviewing": "Analyse de la capture d’écran…",
   "status.agent.browserOpening": "Ouverture d’une page web…",
@@ -86,9 +100,12 @@ export const messages = {
   "status.agent.memoryChanges": "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés.",
   "status.agent.memoryChangesWithConflicts":
     "Souvenirs : {saved} enregistrés, {updated} mis à jour, {forgotten} oubliés, {notChanged} non modifiés, car un autre fil les a modifiés avant.",
+  "status.agent.mcpToolCall": "Exécuter l’outil {tool} du serveur MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Fermé par un nouveau message",
   "status.agent.nextStepContinues": "L’agent s’est arrêté avant l’étape suivante. Il continue ({current} sur {limit}).",
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
+  "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
 } as const satisfies PartialTranslation<typeof source>;

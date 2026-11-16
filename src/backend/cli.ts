@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, stat } from "node:fs/promises";
+import { access, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -33,6 +33,11 @@ interface ResolvedCli {
    * too, when the resolver runs the CLI. Absent on Windows, which has no login shell.
    */
   launchPath?: string;
+  /**
+   * The user's CLI starts, but a part that some models need is missing, such as the code-mode host of
+   * a bare `codex` program (#9139). OpenBot's own copy wins over it.
+   */
+  incomplete?: true;
 }
 
 export interface CodexCliInfo extends ResolvedCli {
@@ -118,6 +123,10 @@ export const resolveCodexCli: (input?: {
     const failures: CodexCliError[] = [];
     // The copy that OpenBot tried first. The message for it tells the user which copy to repair.
     let firstFailedSource: "system" | "managed" | undefined;
+    // A Codex of the user's without its code-mode host runs only when no complete one starts. A path
+    // that the user set stays under their control.
+    const configured = input.systemCandidates === undefined ? configuredCliPath("codex") : null;
+    let incomplete: CodexCliInfo | undefined;
 
     for (const candidate of candidates) {
       if (!(yield* isExecutable(candidate.executable))) continue;
@@ -133,10 +142,20 @@ export const resolveCodexCli: (input?: {
           return { executable: candidate.executable, version, source: candidate.source, ...launch };
         }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
       );
-      if (Result.isSuccess(attempt)) return attempt.success;
+      if (Result.isSuccess(attempt)) {
+        const cli = attempt.success;
+        if (cli.source === "managed" || cli.executable === configured || (yield* hasCodeModeHost(cli.executable))) {
+          return cli;
+        }
+        incomplete ??= { ...cli, incomplete: true };
+        continue;
+      }
       const error = attempt.failure.cause;
 
-      if (isCliTimeout(error)) throw error;
+      if (isCliTimeout(error)) {
+        if (incomplete) return incomplete;
+        throw error;
+      }
       firstFailedSource ??= candidate.source;
       failures.push(
         error instanceof CodexCliError
@@ -145,6 +164,7 @@ export const resolveCodexCli: (input?: {
       );
     }
 
+    if (incomplete) return incomplete;
     const outdated = failures.find((failure) => failure.code === "outdated");
     if (outdated) throw outdated;
     if (failures.length > 0) {
@@ -170,6 +190,44 @@ function bundledCodexExecutable(
 ): string | null {
   return bundledProviderExecutable("codex", platform, architecture, resourcesPath);
 }
+
+/** Version-manager shims that start a full Codex package, by the name of their real program. */
+const CODEX_LAUNCHER = /^(?:volta-shim|mise|aqua-proxy)(?:\.exe)?$/iu;
+
+/**
+ * Whether Codex can start `codex-code-mode-host`, which code-mode models such as GPT-6 need for MCP
+ * tools. Codex looks beside its real program and in `codex-resources` of its package
+ * (`code_mode_host_program` in codex-rs). A bare `codex` copied alone has neither (#9139). A launcher,
+ * such as npm's `codex.js`, a version-manager shim or a bun or Scoop shim on Windows, starts a full
+ * package. A file that cannot be read counts as complete.
+ */
+const hasCodeModeHost = Effect.fn("Cli.hasCodeModeHost")((executable: string) =>
+  providerCall(async () => {
+    const program = await realpath(executable);
+    if (CODEX_LAUNCHER.test(basename(program))) return true;
+    const isFile = (path: string) =>
+      stat(path).then(
+        (info) => info.isFile(),
+        () => false,
+      );
+    if (process.platform === "win32") {
+      if (extname(program).toLowerCase() !== ".exe") return true;
+      const stem = program.slice(0, -".exe".length);
+      if ((await isFile(`${stem}.bunx`)) || (await isFile(`${stem}.shim`))) return true;
+    } else {
+      const file = await open(program, "r");
+      try {
+        const { buffer, bytesRead } = await file.read(Buffer.alloc(2), 0, 2, 0);
+        if (bytesRead === 2 && buffer.toString("latin1") === "#!") return true;
+      } finally {
+        await file.close();
+      }
+    }
+    const host = process.platform === "win32" ? "codex-code-mode-host.exe" : "codex-code-mode-host";
+    const folder = dirname(program);
+    return (await isFile(join(folder, host))) || (await isFile(join(folder, "..", "codex-resources", host)));
+  }).pipe(Effect.orElseSucceed(() => true)),
+);
 
 export const resolveClaudeCli: (input?: {
   systemCandidates?: string[];
@@ -938,9 +996,11 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
   const choose = (resolved: Cli, installed: Cli | null): InstalledFirstChoice<Cli> => {
     if (resolved.source !== "managed" || installed?.source !== "system") return { cli: resolved, passedOver: null };
     const asNew = installed.version === resolved.version || olderVersion(resolved.version, installed.version);
-    if (preferInstalled && (asNew || installedChosen)) {
-      const copyNewer = olderVersion(installed.version, resolved.version);
-      return { cli: installed, passedOver: copyNewer ? { source: "managed", version: resolved.version } : null };
+    // An incomplete CLI of the user's runs over the copy only when the user chose it. It stays a choice.
+    if (preferInstalled && (installedChosen || (asNew && !installed.incomplete))) {
+      // The copy stays a choice over an incomplete CLI, also when the copy is older.
+      const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
+      return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
     }
     return { cli: resolved, passedOver: { source: "system", version: installed.version } };
   };
@@ -1330,9 +1390,19 @@ export function cliSpawnTarget(
 /**
  * A busy computer can take many seconds to start a CLI, so the limit is generous. A timeout is
  * reported apart from a failure: the CLI is not broken, and reinstalling it does not help. The
- * provider runtime tries again later, so this limit only has to cover one slow answer.
+ * provider runtime tries again later, with `SLOW_CLI_VERSION_TIMEOUT_MS`.
  */
 const CLI_VERSION_TIMEOUT_MS = 10_000;
+/**
+ * The limit of a version read after a read of the same CLI timed out. The first read from a cold disk
+ * cache took 85 s, and 3 reads with `CLI_VERSION_TIMEOUT_MS` in a row stopped the provider (#8548). The
+ * longer limit stays after a read in time: the files can leave the disk cache again. A read that also
+ * times out with this limit is from a CLI that does not answer, and the next read has the short limit
+ * again: a hung CLI does not hold a start for 2 minutes each time.
+ */
+const SLOW_CLI_VERSION_TIMEOUT_MS = 120_000;
+/** The executables whose next version read waits `SLOW_CLI_VERSION_TIMEOUT_MS`. */
+const slowVersionReads = new Set<string>();
 
 /**
  * A busy computer makes every candidate slow, so the resolvers report the first timeout and do not
@@ -1355,36 +1425,44 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
   const launchPath = yield* cliLaunchPath(candidate, source);
   const launch = launchPath ? { launchPath } : {};
   const target = process.platform === "win32" && [".bat", ".cmd"].includes(extname(candidate).toLowerCase());
-  const timeout = providerCheckTimeoutMs(CLI_VERSION_TIMEOUT_MS);
-  const output = yield* providerCall(() =>
-    target
-      ? execFileAsync(
-          process.env.ComSpec?.trim() || "cmd.exe",
-          ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
-          {
+  const slow = slowVersionReads.has(candidate);
+  const timeout = providerCheckTimeoutMs(slow ? SLOW_CLI_VERSION_TIMEOUT_MS : CLI_VERSION_TIMEOUT_MS);
+  // The signal stops the process when the start that waits for it ends.
+  const output = yield* Effect.tryPromise({
+    try: (signal) =>
+      target
+        ? execFileAsync(
+            process.env.ComSpec?.trim() || "cmd.exe",
+            ["/d", "/s", "/c", `""${candidate.replaceAll("%", "%%")}" ${args.join(" ")}"`],
+            {
+              signal,
+              timeout,
+              maxBuffer: 64 * 1024,
+              windowsHide: true,
+              windowsVerbatimArguments: true,
+            },
+          )
+        : execFileAsync(candidate, [...args], {
+            signal,
             timeout,
             maxBuffer: 64 * 1024,
-            windowsHide: true,
-            windowsVerbatimArguments: true,
-          },
-        )
-      : execFileAsync(candidate, [...args], {
-          timeout,
-          maxBuffer: 64 * 1024,
-          windowsHide: process.platform === "win32",
-          env: { ...process.env, ...cliPathEnvironment(launch) },
-        }),
-  ).pipe(
-    Effect.mapError((failure) =>
-      isDynamicRecord(failure.cause) && failure.cause.killed === true
-        ? providerFailure(
-            new CodexCliError(
-              sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
-              "timeout",
-            ),
-          )
-        : failure,
-    ),
+            windowsHide: process.platform === "win32",
+            env: { ...process.env, ...cliPathEnvironment(launch) },
+          }),
+    catch: providerFailure,
+  }).pipe(
+    Effect.mapError((failure) => {
+      if (!(isDynamicRecord(failure.cause) && failure.cause.killed === true)) return failure;
+      // The timeout changes the limit of the next read (`SLOW_CLI_VERSION_TIMEOUT_MS`).
+      if (slow) slowVersionReads.delete(candidate);
+      else slowVersionReads.add(candidate);
+      return providerFailure(
+        new CodexCliError(
+          sourceText("error.provider.cliTimedOutRefresh", { provider: agentProviderName(provider) }),
+          "timeout",
+        ),
+      );
+    }),
   );
   return { stdout: output.stdout, launch };
 });

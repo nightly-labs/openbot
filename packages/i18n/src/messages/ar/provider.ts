@@ -234,6 +234,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "تعذّرت إعادة الاتصال.",
   "provider.account.add": "إضافة حساب",
   "provider.account.addLabel": "إضافة حساب {name} آخر",
+  "provider.account.addWithCode": "إضافة حساب برمز",
   "provider.account.count": {
     zero: "لا حسابات",
     one: "حساب واحد",
@@ -376,6 +377,29 @@ export const messages = {
   "provider.settings.compactWindowDefault": "الافتراضي في Claude Code",
   "provider.settings.compactWindowTokens": "{size} رمز",
   "provider.settings.compactWindowLoadFailed": "تعذّر تحميل حجم الضغط لهذا الخادم.",
+  "provider.settings.environment": "البيئة",
+  "provider.settings.environmentVariables": "المتغيرات",
+  "provider.settings.environmentDescription":
+    "مفاتيح API وعناوين URL الأساسية وإعدادات أخرى يحصل عليها كل عملية لـ {name}. يسري التغيير عند انتهاء الأدوار الجارية.",
+  "provider.settings.environmentCodexHint":
+    "يرسل OPENAI_BASE_URL، مع OPENAI_API_KEY كمفتاح له، طلبات نماذج ChatGPT إلى ذلك العنوان.",
+  "provider.settings.environmentShellNote": "يمكن للأوامر التي يشغّلها الوكلاء قراءة هذه القيم.",
+  "provider.settings.environmentAdd": "إضافة متغير",
+  "provider.settings.environmentNamePlaceholder": "VARIABLE_NAME",
+  "provider.settings.environmentValuePlaceholder": "القيمة",
+  "provider.settings.environmentSaved": "محفوظة",
+  "provider.settings.environmentSensitive": "حساس",
+  "provider.settings.environmentNameLabel": "اسم المتغير {index}",
+  "provider.settings.environmentValueLabel": "قيمة {name}",
+  "provider.settings.environmentSensitiveLabel": "إبقاء {name} سرًا",
+  "provider.settings.environmentRemoveLabel": "إزالة {name}",
+  "provider.settings.environmentUnnamed": "المتغير {index}",
+  "provider.settings.environmentPending":
+    "يعيد الحفظ تشغيل {name} عند انتهاء أدواره الجارية. تبقى القيم الحساسة على الخادم.",
+  "provider.settings.environmentDone": "تم الحفظ. يعاد تشغيل {name} عند انتهاء أدواره الجارية.",
+  "provider.settings.environmentDiscard": "تجاهل",
+  "provider.settings.environmentSave": "حفظ",
+  "provider.settings.environmentLoadFailed": "تعذّر تحميل متغيرات {name}.",
   "provider.settings.models": "النماذج",
   "provider.settings.modelsDescription": {
     zero: "لا تتوفر نماذج لعرضها في منتقي النماذج.",

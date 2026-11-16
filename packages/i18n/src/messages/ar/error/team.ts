@@ -79,6 +79,7 @@ export const messages = {
   "error.team.usageLimitUnsupported": "لا يمكن لهذا الاتصال عرض حدود استخدام الوكلاء أو تغييرها.",
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",
   "error.team.providerDetectionUnsupported": "لا يمكن لهذا الاتصال العثور على خوادم النماذج والوكلاء على الخادم.",
+  "error.team.routineFlowStopUnsupported": "لا يمكن لهذا الاتصال إيقاف تشغيل مهمة دورية.",
   "error.team.sidebarFoldersUnsupported": "المجلدات داخل المجلدات غير مدعومة في هذا الاتصال.",
   "error.team.libraryFoldersUnsupported": "مجلدات المكتبة غير مدعومة في هذا الاتصال.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -124,6 +125,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "مدة ذاكرة التخزين المؤقت للموجّه غير مدعومة في هذا الاتصال.",
   "error.team.claudeUserSetupUnsupported": "هذا الاتصال لا يدعم مفتاح إعداد Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "هذا الاتصال لا يدعم حجم ضغط Claude.",
+  "error.team.providerEnvironmentUnsupported": "لا يدعم هذا الاتصال متغيرات المزوّد.",
   "error.team.modelVisibilityUnsupported": "قائمة النماذج غير مدعومة في هذا الاتصال.",
   "error.team.providerDefaultUnsupported": "المزوّد الافتراضي غير مدعوم في هذا الاتصال.",
   "error.team.agentAccessUnsupported": "الأدوار غير مدعومة في هذا الاتصال.",
@@ -181,6 +183,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "هذا الاتصال لا يدعم شخصية الخادم.",
   "error.team.agentWaitsUnsupported": "هذا الاتصال لا يدعم الانتظارات المفتوحة.",
   "error.team.pendingApprovalUnsupported": "هذا الاتصال لا يدعم قراءة طلب الموافقة كاملًا.",
+  "error.team.phoneFeedbackUnsupported": "هذا الاتصال لا يدعم إرسال بلاغ من تطبيق الهاتف.",
   "error.team.messagePinsUnsupported": "هذا الاتصال لا يدعم الرسائل المثبتة.",
   "error.team.queuedMessageThreadUnsupported": "هذا الاتصال لا يدعم تشغيل رسالة في قائمة الانتظار كسلسلة جديدة.",
   "error.team.backgroundProcessesUnsupported": "هذا الاتصال لا يدعم العمليات في الخلفية.",

@@ -8,6 +8,8 @@ export const messages = {
   "status.agent.instructionsChanged": "Ha aggiornato le sue istruzioni",
   "status.agent.modelSwitchedForLimit": "Limite di utilizzo raggiunto. Passato a {model}.",
   "status.agent.modelReturnedAfterLimit": "Limite di utilizzo terminato. Tornato a {model}.",
+  "status.agent.routineSkippedRunOpen": "Saltata: l'ultima esecuzione non era finita",
+  "status.agent.routineSkippedUsageLimit": "Saltata: limite di utilizzo raggiunto",
   "status.agent.modelSwitchedForError": "Errore del provider. Passato a {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
@@ -33,6 +35,8 @@ export const messages = {
     "Acquisizione dell'area dello schermo a {x}, {y}, {width} × {height} punti e invio dell'immagine al modello dell'agente.",
   "status.agent.reportProblem":
     "Diventerà una issue pubblica su GitHub, con la versione dell'app e il tuo sistema. Il tuo nome non viene mostrato.",
+  "status.agent.reportPhoneProblem":
+    "Diventerà una issue pubblica su GitHub, con la versione dell'app, il tuo sistema e la versione, il sistema e il log di assistenza del tuo telefono. Il tuo nome non viene mostrato.",
   "status.agent.sendIdea": "Diventa una issue pubblica su GitHub. Il tuo nome non viene mostrato.",
   "status.agent.feedbackRecentErrors": "Errori recenti nella chat:",
   "status.agent.feedbackSameAs": "Si aggiunge alla issue #{issue}",
@@ -40,9 +44,18 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "Crea un comando monouso che installa OpenBot su un altro computer come server {name} e lo collega al tuo account. L'agente lo esegue lì.",
   "status.agent.serverInstallCard": "Comando di installazione per il server {name}",
+  "status.agent.browserProfileNamed":
+    "Sposta {agents} nel profilo del browser {profile}. Ricevono i suoi accessi e cookie. Le loro schede aperte si chiudono.",
+  "status.agent.browserProfileNew":
+    "Crea il nuovo profilo del browser {profile} e sposta {agents} lì. Non ha accessi. Le loro schede aperte si chiudono.",
+  "status.agent.browserProfileShared":
+    "Sposta {agents} nel profilo del browser condiviso. Ricevono i suoi accessi e cookie. Le loro schede aperte si chiudono.",
+  "status.agent.browserProfileOwn":
+    "Dai a {agents} un profilo del browser proprio per ciascuno. Le loro schede aperte si chiudono.",
   "status.agent.feedbackSending": "Invio del tuo feedback al team di OpenBot…",
   "status.agent.workflowDelete":
     "Elimina il flusso di lavoro {title} con le sue esecuzioni e versioni. I suoi passaggi aperti si fermano.",
+  "status.agent.deleteAgents": "Elimina {agents} con le loro chat e i loro file. Non puoi annullare l'operazione.",
   "status.agent.screenCaptureProgress": "Richiesta di acquisizione dello schermo…",
   "status.agent.screenCaptureReviewing": "Analisi dell'acquisizione dello schermo…",
   "status.agent.browserOpening": "Apertura di una pagina web…",
@@ -90,10 +103,13 @@ export const messages = {
   "status.agent.memoryChanges": "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate.",
   "status.agent.memoryChangesWithConflicts":
     "Memorie: {saved} salvate, {updated} aggiornate, {forgotten} dimenticate, {notChanged} non modificate perché un altro thread le ha modificate prima.",
+  "status.agent.mcpToolCall": "Eseguire lo strumento {tool} del server MCP {name}.",
+  "status.agent.uiBlockClosedByMessage": "Chiuso da un nuovo messaggio",
   "status.agent.nextStepContinues":
     "L'agente si è fermato prima del passaggio successivo. Continua ({current} di {limit}).",
   "status.agent.planContinues": "Il piano ha passaggi aperti. L'agente continua ({current} di {limit}).",
   "status.agent.compactionContinues":
     "La connessione si è interrotta mentre l'agente compattava il contesto. L'agente continua.",
+  "status.agent.providerExitContinues": "L'agente si è fermato prima di finire la risposta. L'agente continua.",
   "status.agent.branchTitle": "Chat ramificata",
 } as const satisfies PartialTranslation<typeof source>;
