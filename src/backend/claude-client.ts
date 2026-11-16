@@ -2206,19 +2206,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.resumedUsage = false;
       runtime.requestUsage.clear();
     }
-    const turn = runtime.activeTurn;
-    // The CLI can first end a turn of its own, such as for a background task's notification. The
-    // message's turn goes on, and its own result ends it (#9812).
-    if (turn?.prompt && isOtherTurnResult(message, turn.messageIds)) {
-      queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
-      return;
-    }
     const fallback = message.subtype === "success" ? message.result : "";
     const errors = message.errors ?? [];
     const interrupted =
       message.terminal_reason === "aborted_streaming" ||
       message.terminal_reason === "aborted_tools" ||
       errors.some((error) => /interrupt|abort/i.test(error));
+    const turn = runtime.activeTurn;
+    /* The CLI can first end a turn of its own, such as for a background task's notification. The
+       message's turn goes on, and its own result ends it (#9812). A stop ends the turn at once. */
+    if (turn?.prompt && !interrupted && isOtherTurnResult(message, turn.messageIds)) {
+      queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
+      return;
+    }
     // "success" with `is_error` is a turn that ended on an API error, and `result` holds its text.
     const apiError = message.subtype === "success" && message.is_error === true;
     if (turn) {
