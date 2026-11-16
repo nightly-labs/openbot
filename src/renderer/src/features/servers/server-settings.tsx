@@ -108,6 +108,8 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsMcpSignInRequest, setServerSettingsMcpSignInRequest] = createSignal<string | null>(null);
     /** Set when the Marketplace asked for the form that adds a server, until the MCP section opens it. */
     const [serverSettingsMcpAddRequest, setServerSettingsMcpAddRequest] = createSignal(false);
+    /** The MCP row whose Edit the Marketplace asked for, until the MCP section opens its form. */
+    const [serverSettingsMcpEditRequest, setServerSettingsMcpEditRequest] = createSignal<string | null>(null);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     /**
@@ -233,6 +235,7 @@ const ServerSettings = createSimpleContext({
       setServerSettingsMcpSignIns({});
       setServerSettingsMcpSignInRequest(null);
       setServerSettingsMcpAddRequest(false);
+      setServerSettingsMcpEditRequest(null);
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -247,6 +250,12 @@ const ServerSettings = createSimpleContext({
     function openMcpAdd(serverId: string, trigger: HTMLElement | null): void {
       openServerSettings(serverId, trigger, "mcp");
       setServerSettingsMcpAddRequest(true);
+    }
+
+    /** Opens the MCP section of a server on the form that edits one of its rows, as its Edit item does. */
+    function openMcpEdit(serverId: string, mcpServerId: string): void {
+      openServerSettings(serverId, null, "mcp");
+      setServerSettingsMcpEditRequest(mcpServerId);
     }
 
     async function saveServerIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
@@ -822,6 +831,9 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcpAddRequest,
       clearMcpAddRequest: () => setServerSettingsMcpAddRequest(false),
       openMcpAdd,
+      serverSettingsMcpEditRequest,
+      clearMcpEditRequest: () => setServerSettingsMcpEditRequest(null),
+      openMcpEdit,
       serverSettingsMcpSignInPages,
       serverSettingsMcpSignInRelays,
       openMcpSignInRelay,
