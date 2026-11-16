@@ -12,7 +12,6 @@ import {
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
 
-/** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 /**
  * OpenCode 2.2.5 to 2.3.0 wait 300 s for a model's response headers, the stall limit, then retry.
  * They report each retry as `_meta["opencode/retry"]` on a `session_info_update`, and a failed
@@ -28,6 +27,7 @@ function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
   return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
 }
 
+/** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
   return (
     error instanceof RequestError &&

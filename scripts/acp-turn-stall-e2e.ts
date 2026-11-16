@@ -191,8 +191,10 @@ try {
   assert.ok(forever.elapsedMs < RETRY_MS * 4, "Later retries did not keep the turn open.");
 
   // Retries after a rate limit come sooner than the limit, and each one keeps the turn open as before.
+  // A new session: the fake still sends the notices of `retry-forever` to the session before.
+  const rateThread = await startThread(retrying, { cwd: workspace });
   const rateLimited = await timed(() =>
-    runTurn(retrying, retryThread, { text: "retry-rate-limit", timeoutMs: RETRY_STALL_MS * 10 }),
+    runTurn(retrying, rateThread, { text: "retry-rate-limit", timeoutMs: RETRY_STALL_MS * 10 }),
   );
   report.rateLimitRetry = {
     status: rateLimited.value.status,
