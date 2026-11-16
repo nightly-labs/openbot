@@ -3,14 +3,19 @@
 // task names a service that has no connected app in the test profile, but that the agent can reach
 // with its shell or its browser. The test records each step of the turn and the answer. The mail task
 // loads the session of the team's test Google account into the OpenBot browser, as a user who is signed
-// in to Gmail there, and runs only when that session file exists. On a Mac with the Mail app set up, an
-// agent can also read the developer's own mail; the report then holds it, and stays on this computer.
+// in to Gmail there, and runs only when that session file exists. An agent can also read the developer's
+// own mail, such as Grok with a Gmail MCP server from Cursor settings; the report then holds it, and stays
+// on this computer.
 // `bun run test:provider-live --bench`. Writes .openbot-build/provider-live-bench/<provider>-<task>.json.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { type Browser, test } from "@e2e-dev/web";
-import { MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX } from "@openbot/contracts/ipc";
+import {
+  CONVERSATION_PLAN_ITEM_TYPE,
+  CONVERSATION_SUBAGENTS_ITEM_TYPE,
+  MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX,
+} from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { expect } from "e2e";
 import { WebSocket } from "ws";
@@ -27,6 +32,7 @@ const TURN_MS = 360_000;
 const QUIET_MS = 90_000;
 
 interface Step {
+  author: string;
   source: string | null;
   itemType: string | null;
   status: string;
@@ -46,6 +52,7 @@ async function readSteps(browser: Browser, agentId: string) {
       revision: conversation.revision,
       activeTurnId: conversation.activeTurnId,
       steps: conversation.messages.map((message) => ({
+        author: message.author,
         source: message.source ?? null,
         itemType: message.itemType ?? null,
         status: message.status,
@@ -87,9 +94,7 @@ async function runTask(
         lastChange = Date.now();
       }
       if (read.activeTurnId !== null) started = true;
-      const answered = read.steps.some(
-        (step) => step.source !== "user" && step.itemType !== "commentary" && step.status === "completed",
-      );
+      const answered = read.steps.some((step) => isAnswer(step) && step.status === "completed");
       if (read.activeTurnId === null && (started || answered)) return { steps: read.steps, stopped: false };
       const quiet = Date.now() - lastChange > QUIET_MS;
       if (read.activeTurnId !== null && (quiet || Date.now() > deadline)) {
@@ -140,14 +145,23 @@ function connectCards(steps: Step[]): string[] {
   );
 }
 
-function answer(steps: Step[]): string {
+/** What the agent said to the user: as `isAgentAnswer` of the contracts, and not tool output or a card. */
+function isAnswer(step: Step): boolean {
   return (
-    steps
-      // Agent steps have no source; only the user's message has one.
-      .filter((step) => step.source !== "user" && step.itemType !== "commentary")
-      .map((step) => step.text)
-      .join("\n")
+    step.author === "assistant" &&
+    step.text.trim() !== "" &&
+    !["commentary", "question_prompt", CONVERSATION_PLAN_ITEM_TYPE, CONVERSATION_SUBAGENTS_ITEM_TYPE].includes(
+      step.itemType ?? "",
+    ) &&
+    !step.itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)
   );
+}
+
+function answer(steps: Step[]): string {
+  return steps
+    .filter(isAnswer)
+    .map((step) => step.text)
+    .join("\n");
 }
 
 /** The DevTools parameters that the bench sends. */
@@ -223,7 +237,7 @@ async function signInToGmail(browser: Browser, provider: LiveProvider): Promise<
     const page = await waitFor(
       "the Gmail tab",
       30_000,
-      async () => (await appPages(provider)).find((candidate) => candidate.url.includes("google.com")),
+      async () => (await appPages(provider)).find((candidate) => candidate.url.startsWith("https://mail.google.com/")),
       (found) => found !== undefined,
     );
     if (!page) throw new Error("No Gmail tab.");
@@ -243,9 +257,10 @@ async function signInToGmail(browser: Browser, provider: LiveProvider): Promise<
             ? { host: value.host, subject: value.subject.trim() }
             : { host: "", subject: "" };
         },
-        (value) => value.subject !== "" || value.host === "accounts.google.com",
+        // A signed-out session leaves Gmail, such as for accounts.google.com or workspace.google.com.
+        (value) => value.subject !== "" || (value.host !== "" && value.host !== "mail.google.com"),
       );
-      if (read.host === "accounts.google.com")
+      if (read.host !== "mail.google.com")
         throw new Error("The test Google session has expired. Save it again (AGENTS.md, development data).");
       return read.subject;
     });

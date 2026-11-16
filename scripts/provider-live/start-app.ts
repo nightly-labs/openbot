@@ -26,7 +26,7 @@ import {
 const [provider, portText] = process.argv.slice(2);
 const rendererPort = Number(portText);
 if (!isLiveProvider(provider) || !Number.isInteger(rendererPort) || rendererPort <= 0) {
-  throw new Error("Usage: start-app.ts <codex|claude|antigravity> <renderer port>");
+  throw new Error("Usage: start-app.ts <codex|claude|antigravity|grok> <renderer port>");
 }
 
 const rendererRoot = join(PROJECT_ROOT, "out", "renderer");

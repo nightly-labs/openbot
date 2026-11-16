@@ -12,7 +12,7 @@ import { rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { readDevStackRecords } from "./dev-automation/stack-registry";
 import { withoutElectronRuntimeFlags } from "./electron-spawn-env";
-import { BENCH_ENV, BENCH_TAG, isLiveProvider } from "./provider-live/targets";
+import { BENCH_ENV, BENCH_PROVIDERS, BENCH_TAG, LIVE_PROVIDERS } from "./provider-live/targets";
 import { readScriptArguments } from "./script-arguments";
 
 const ROOT = resolve(import.meta.dirname, "..");
@@ -25,8 +25,10 @@ const parsed = readScriptArguments({
 });
 if (!parsed) process.exit(0);
 const target = parsed.values.target;
-if (target !== undefined && !isLiveProvider(target)) throw new Error(`Unknown provider: ${target}`);
 const bench = parsed.values.bench === true;
+const providers: readonly string[] = bench ? BENCH_PROVIDERS : LIVE_PROVIDERS;
+if (target !== undefined && !providers.includes(target))
+  throw new Error(`Unknown provider: ${target}. Use one of: ${providers.join(", ")}.`);
 
 const environment = withoutElectronRuntimeFlags(process.env);
 
