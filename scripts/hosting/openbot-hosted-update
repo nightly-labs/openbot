@@ -5,8 +5,8 @@
 #                                 the release manifest, copies it to /opt/OpenBot/staged, and installs
 #                                 the packages that it needs. OpenBot keeps running.
 #   openbot-hosted-update check   openbot-update.timer. Runs `stage`. When OpenBot stopped its start
-#                                 loop, it also runs `apply` and starts OpenBot, so a new release ends
-#                                 the loop with no restart of the server.
+#                                 loop, it also starts OpenBot again, after `apply` when a release is
+#                                 staged, so a new release or a temporary failure ends the loop.
 #   openbot-hosted-update boot    openbot-update-apply.service, at boot before openbot.service. Runs
 #                                 `apply` when the disk of the server is complete. After a boat wake,
 #                                 boat restores the disk for some minutes, and OpenBot does not wait
@@ -220,16 +220,21 @@ start_loop_stopped() {
   [ "$(systemctl show --property=ExecMainStatus --value openbot.service 2>/dev/null)" = "$START_LOOP_STATUS" ]
 }
 
-# `stage`, and then `apply` and a start when OpenBot stopped its start loop. Only a new release
-# starts it: the same release would fail again. The release can also be one that an earlier `stage`
-# made before the loop. `stage` exits on a failure, as before.
+# `stage`, and then a start when OpenBot stopped its start loop: with the staged release when there
+# is one (also one that an earlier `stage` made before the loop), else with the same release. A
+# hosted owner cannot run `openbot restart`, and a failure can be temporary (a full disk, no
+# network), so each run of the timer (about each 6 hours) tries once more. A failure that does not
+# go away costs one start in each run. `stage` exits on a failure, as before.
 check() {
   stage
-  if start_loop_stopped && [ -n "$(staged_version)" ]; then
+  start_loop_stopped || return 0
+  if [ -n "$(staged_version)" ]; then
     echo "OpenBot stopped its start loop. Installing the staged release and starting OpenBot."
     apply
-    systemctl start --no-block openbot.service
+  else
+    echo "OpenBot stopped its start loop. Starting OpenBot again."
   fi
+  systemctl start --no-block openbot.service
 }
 
 set_state() {

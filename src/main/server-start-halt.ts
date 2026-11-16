@@ -10,7 +10,8 @@ import { DatabaseMigrationError, NewerDatabaseError } from "../backend/openbot-d
  * user data folder and exits with `START_LOOP_EXIT_CODE`. `RestartPreventExitStatus=` of the unit
  * then does not start it again. These start it again, and the next start tries once more:
  * - a restart of the server (a boat wake works like a reboot), `openbot restart`, or `openbot start`,
- * - a newer release that the update timer installs (`openbot-hosted-update check`), or `openbot update`.
+ * - the update timer (`openbot-hosted-update check`, about each 6 hours), with a newer release when one
+ *   is staged, or `openbot update`.
  *
  * A server stops the loop at once when a restart cannot help: data from a newer OpenBot, or a
  * failed migration. For each other failure, it stops after the failures in a row that start the

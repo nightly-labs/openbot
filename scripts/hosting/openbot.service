@@ -26,8 +26,9 @@ Restart=always
 RestartSec=10
 # OpenBot exits with 78 when it stops its start loop: a restart cannot help, or its start failed
 # three times in a row (src/main/server-start-halt.ts). It then stays stopped, and clients show it
-# offline, until a restart of the server, `openbot restart`, or an update: `openbot-hosted-update
-# check` installs a newer release and starts it. The next start tries once more.
+# offline, until a restart of the server, `openbot restart`, `openbot update`, or the next run of
+# `openbot-hosted-update check` (about each 6 hours), which starts it again, with a staged release
+# when there is one. The next start tries once more.
 RestartPreventExitStatus=78
 TimeoutStopSec=60
 # Memory guards. The machine is small, and this unit holds OpenBot, its browser tabs and every agent

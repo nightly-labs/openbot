@@ -633,9 +633,11 @@ start stops the loop again. These start OpenBot again:
 
 - a restart or a resume of the server, or `sudo openbot restart` or `start`;
 - `sudo openbot update`;
-- `check` of `openbot-update.timer`: when `openbot.service` is stopped with status 78 and a newer
-  release is staged, it runs `apply` and starts the service. It reads only the state of the unit
-  (`ActiveState`, `ExecMainStatus`), never a file of the service user.
+- `check` of `openbot-update.timer`, about each 6 hours: when `openbot.service` is stopped with
+  status 78, it starts the service again, after `apply` when a newer release is staged. A hosted
+  owner has no shell, and a failure can be temporary (a full disk, no network), so each run tries
+  once more. It reads only the state of the unit (`ActiveState`, `ExecMainStatus`), never a file of
+  the service user.
 
 When OpenBot is not running, `openbot` commands that need the control socket say that the start
 loop stopped it, and name `openbot logs`, `sudo openbot update` and `sudo openbot restart`.
