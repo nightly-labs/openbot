@@ -226,9 +226,9 @@ function CustomAgentUsageButton(props: { row: CustomAgentUsageRailRow; onOpen: (
   );
 }
 
-/** The credits of a media service that a canvas step spends, such as Sunra. */
+/** The credits of a media service that a canvas step spends, such as Sunra or Higgsfield. */
 export interface MediaCreditsRailRow {
-  provider: "sunra";
+  provider: "sunra" | "higgsfield";
   name: string;
   /** The credits that the account can spend now. */
   available: number;

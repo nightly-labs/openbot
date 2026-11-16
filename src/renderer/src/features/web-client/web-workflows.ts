@@ -19,6 +19,10 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_GITHUB_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-github-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -45,6 +49,8 @@ import {
   uploadAttachmentDraft,
 } from "@openbot/team-client/team-api-requests";
 import {
+  decodeRemoteHiggsfieldCredits,
+  decodeRemoteHiggsfieldProviders,
   decodeRemoteWorkflowDetail,
   decodeRemoteWorkflowGitHubCatalog,
   decodeRemoteWorkflowGitHubHistory,
@@ -156,15 +162,30 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
       githubRunLastEvent: (input) =>
         postGitHub(WORKFLOWS_GITHUB_ROUTES.runLastEvent, decodeRemoteWorkflowRunDetail, input),
       keepPicture: (draftId) => postMedia(WORKFLOWS_MEDIA_ROUTES.keepPicture, decodeRemoteWorkflowPicture, { draftId }),
-      // A host without `workflows-sunra-v1` does not run the Sunra models.
-      mediaProviders: async () =>
-        has(WORKFLOWS_SUNRA_CAPABILITY)
-          ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
-          : { sunra: false },
-      mediaCredits: async () =>
-        has(WORKFLOWS_SUNRA_CAPABILITY)
-          ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
-          : { sunra: null },
+      // A host without `workflows-sunra-v1` does not run the Sunra models, and a host without
+      // `workflows-higgsfield-v1` does not run the Higgsfield models.
+      mediaProviders: async () => {
+        const [sunra, higgsfield] = await Promise.all([
+          has(WORKFLOWS_SUNRA_CAPABILITY)
+            ? post(WORKFLOWS_SUNRA_ROUTES.providers, decodeRemoteWorkflowMediaProviders, {})
+            : { sunra: false },
+          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.providers, decodeRemoteHiggsfieldProviders, {})
+            : { higgsfield: false },
+        ]);
+        return { ...sunra, ...higgsfield };
+      },
+      mediaCredits: async () => {
+        const [sunra, higgsfield] = await Promise.all([
+          has(WORKFLOWS_SUNRA_CAPABILITY)
+            ? post(WORKFLOWS_SUNRA_ROUTES.credits, decodeRemoteWorkflowMediaCredits, {})
+            : { sunra: null },
+          has(WORKFLOWS_HIGGSFIELD_CAPABILITY)
+            ? post(WORKFLOWS_HIGGSFIELD_ROUTES.credits, decodeRemoteHiggsfieldCredits, {})
+            : { higgsfield: null },
+        ]);
+        return { ...sunra, ...higgsfield };
+      },
     },
     onChanged(changed) {
       const events = options.onHostEvent((event) => {

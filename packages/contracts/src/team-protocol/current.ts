@@ -196,6 +196,7 @@ import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
+import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
@@ -441,6 +442,7 @@ export {
   WORKFLOWS_CHANNELS_CAPABILITY,
   WORKFLOWS_CHATS_CAPABILITY,
   WORKFLOWS_GITHUB_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
@@ -672,6 +674,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -913,7 +916,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
     capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-    capability !== PHONE_FEEDBACK_CAPABILITY,
+    capability !== PHONE_FEEDBACK_CAPABILITY &&
+    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1031,6 +1035,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   PHONE_FEEDBACK_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1231,6 +1236,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
       capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-      capability !== PHONE_FEEDBACK_CAPABILITY,
+      capability !== PHONE_FEEDBACK_CAPABILITY &&
+      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
   );
 }

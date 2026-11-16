@@ -108,6 +108,12 @@ const teamCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", 
 /** A personal Sunra account has no quota of its own. */
 const personalCredits: MediaCreditsRailRow[] = [{ provider: "sunra", name: "Sunra", available: 2140, quota: null }];
 
+/** Sunra and Higgsfield both signed in on the host: one button for each service. */
+const bothCredits: MediaCreditsRailRow[] = [
+  ...teamCredits,
+  { provider: "higgsfield", name: "Higgsfield", available: 860, quota: null },
+];
+
 /** The page rail as the desktop window shows it, with the menu of the open server at its end. Hover a button, or move to it with Tab, to see its tooltip. */
 function RailPreview(props: {
   updateReady?: boolean;
@@ -226,4 +232,9 @@ export const MediaCreditsQuota: Story = {
 /** The Canvas page with a personal Sunra account: the logo with no ring. The card has the number. */
 export const MediaCreditsPersonal: Story = {
   args: { mediaCredits: personalCredits },
+};
+
+/** The Canvas page with Sunra and Higgsfield: a button for each service. */
+export const MediaCreditsTwoServices: Story = {
+  args: { mediaCredits: bothCredits },
 };
