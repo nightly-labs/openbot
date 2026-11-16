@@ -123,11 +123,19 @@ export function BrowserTakeoverCard({
     }
   };
   const reload = request.secret?.requiresReload ? ` ${t("mobile.chat.browserSecret.takeoverReload")}` : "";
+  // The site refused the server's address. Only the desktop app sends a sign-in from the user's own device (#9783).
+  const signInBlocked = request.reason === "sign-in-blocked";
   return (
     <BrowserRequestCard
       icon={<Globe color={String(muted)} size={14} strokeWidth={2.2} />}
-      title={t("mobile.chat.browserSecret.takeoverTitle")}
-      body={`${t("mobile.chat.browserSecret.takeoverBody")}${reload}`}
+      title={t(
+        signInBlocked ? "mobile.chat.browserSecret.signInBlockedTitle" : "mobile.chat.browserSecret.takeoverTitle",
+      )}
+      body={
+        signInBlocked
+          ? t("mobile.chat.browserSecret.signInBlockedBody")
+          : `${t("mobile.chat.browserSecret.takeoverBody")}${reload}`
+      }
       busy={pending}
       onCancel={() => void finish("cancel")}
     >

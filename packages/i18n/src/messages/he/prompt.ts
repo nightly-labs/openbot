@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "ההתחברות אל {host} בוטלה",
   "prompt.browser.signInBlocked.body":
     "יש להתחבר במחשב הזה. OpenBot שולח אל {server} רק את ההתחברות אל {host}, ו-{name} ממשיך.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם. לאחר מכן {name} ממשיך.",
   "prompt.browser.signInBlocked.cancelledBody": "ההתחברות בוטלה.",
   "prompt.browser.signInBlocked.waiting": "ממתין להתחברות",
   "prompt.browser.signInBlocked.waitingButton": "ממתין להתחברות…",

@@ -374,6 +374,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "Prise de contrôle du navigateur",
   "mobile.chat.browserSecret.takeoverBody":
     "Terminez cette étape dans le navigateur de l’ordinateur qui exécute OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Connectez-vous sur votre ordinateur",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Ce site n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là.",
   "mobile.chat.browserSecret.takeoverReload": "Rechargez ensuite la page avant de choisir « J’ai terminé ».",
   "mobile.chat.browserSecret.takeoverFailed": "La demande n’a pas pu aboutir.",
   "mobile.chat.browserSecret.done": "J’ai terminé",

@@ -313,6 +313,10 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
     return tab !== undefined && browserTabs().some((entry) => entry.id === tab.id) && canSignInLocally(tab);
   };
 
+  /** The web client cannot send a sign-in from this device, so a page that refused the server needs the desktop app (#9783). */
+  const takeoverNeedsDesktopSignIn = () =>
+    deps.props.runtime !== undefined && deps.props.browserTakeover?.reason === "sign-in-blocked";
+
   /** The agent found that the takeover page refused the sign-in from the server, and this computer can sign in. */
   function blockedTakeoverSignIn() {
     const tab = browserTakeoverTab();
@@ -847,6 +851,7 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
       canStartForTakeover: canSignInTakeoverLocally,
       startForTakeover: signInTakeoverTabLocally,
       blockedTakeover: blockedTakeoverSignIn,
+      needsDesktopForTakeover: takeoverNeedsDesktopSignIn,
       reopen: openLocalSignInWindow,
       finish: () => finishLocalSignIn(),
       cancel: cancelLocalSignIn,
