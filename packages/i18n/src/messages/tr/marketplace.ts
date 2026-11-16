@@ -136,6 +136,10 @@ export const messages = {
   "marketplace.app.remove.action": "Kaldır",
   "marketplace.app.remove.confirmTitle": "{name} kaldırılsın mı?",
   "marketplace.app.remove.keep": "Koru",
+  "marketplace.app.replace.title": "{server} değiştirilsin mi?",
+  "marketplace.app.replace.description":
+    "{server} adlı bir sunucunuz zaten var, ancak bu {name} değil. {name} ile değiştirilsin mi? Adresi ve kayıtlı anahtarları silinir.",
+  "marketplace.app.replace.action": "Değiştir",
   "marketplace.app.connection": "Bağlantı",
   "marketplace.app.access.use": "Kullanabilir",
   "marketplace.app.access.noAgents": "Ajan yok",

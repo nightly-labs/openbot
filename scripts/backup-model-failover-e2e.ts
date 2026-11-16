@@ -12,6 +12,9 @@
 //   5. After a restart, the agent goes back to its own model, with a note.
 // Also checks continuation after a usage limit interrupts partial work: on a backup, or with no
 // ready backup on the same model when its limit ends (#6660).
+// A spent credit balance moves to a backup with a note that names the spent model and what to do (#7965).
+// A message runs again after its Claude process closed and resumed the saved session, and a message
+// whose uuid the saved session holds runs with a new uuid (#9270).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -121,7 +124,7 @@ const turn = (message) => {
   const fails = failing.includes(model);
   const input = JSON.stringify(message);
   const acts = input.includes("act-then-fail");
-  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input }) + "\\n");
+  fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: fails, input, pid: process.pid }) + "\\n");
   if ((input.includes("usage-work") || input.includes("usage-chain") || input.includes("usage-exhausted")) &&
       (model === ${JSON.stringify(PRIMARY)} || input.includes("usage-exhausted"))) {
     if (!input.includes("usage-chain-empty")) assistant("Checkpoint saved. Only the final step remains.");
@@ -145,6 +148,14 @@ const turn = (message) => {
 };
 // As in Claude Code, a message whose uuid this process already took does not run, and gets no result (#6676).
 const taken = new Set();
+// Claude Code also skips a uuid that the saved session holds with a reply after it, such as the error
+// reply of a refused turn, and only reports it completed (#9270). This stand-in reads each message
+// of the saved session as answered. "session-holds" acts as a message that an earlier run of
+// OpenBot sent, so the session holds its first uuid. "session-skips" is skipped with each uuid.
+const saved = new Set(previous.map((row) => row.uuid));
+let heldOnce = false;
+const lifecycle = (uuid, state) =>
+  process.stdout.write(JSON.stringify({ type: "command_lifecycle", command_uuid: uuid, state, uuid: randomUUID(), session_id: sessionId }) + "\\n");
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -161,7 +172,15 @@ process.stdin.on("data", (chunk) => {
       write({ type: "control_response", response: { subtype: "success", request_id: message.request_id, response: {} } });
     } else if (message.type === "user" && !taken.has(message.uuid)) {
       taken.add(message.uuid);
+      const held = !heldOnce && line.includes("session-holds");
+      if (held) heldOnce = true;
+      if (held || saved.has(message.uuid) || line.includes("session-skips")) {
+        lifecycle(message.uuid, "completed");
+        continue;
+      }
+      lifecycle(message.uuid, "started");
       turn(message);
+      lifecycle(message.uuid, "completed");
     }
   }
 });
@@ -228,7 +247,9 @@ const answer = (request) => {
         }
         if (current.includes("usage-wait")) return;
         if (limited) {
-          const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
+          const error = current.includes("usage-spent")
+            ? { message: "Your credit balance is too low to continue.", codexErrorInfo: "usageLimitExceeded" }
+            : { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           turn.error = error;
           write({ method: "error", params: { threadId: thread.id, turnId: turn.id, error, willRetry: false } });
           finish("failed");
@@ -283,6 +304,7 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
   /** The provider thread of the last turn that started. */
   lastThread: string | null = null;
   readonly toolAnswers = new Map<RequestId, unknown>();
+  readonly #started = new Set<string>();
 
   constructor(cli: ClaudeCliInfo) {
     super();
@@ -338,6 +360,15 @@ class ClaudeStandIn extends EventEmitter<ClientEvents> implements AgentClient {
             ],
           }),
         );
+      case "turn/start": {
+        const messageId = isDynamicRecord(params) ? params.clientUserMessageId : undefined;
+        const again = typeof messageId === "string" && this.#started.has(messageId);
+        if (typeof messageId === "string") this.#started.add(messageId);
+        if (!again || !closeBeforeRunAgain) return this.#real.request(method, params, decoder, timeoutMs);
+        return this.#real
+          .releaseIdleThreads()
+          .pipe(Effect.andThen(this.#real.request(method, params, decoder, timeoutMs)));
+      }
       default:
         return this.#real.request(method, params, decoder, timeoutMs);
     }
@@ -410,7 +441,7 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
   }
 }
 
-function turns(): { model: string; failed: boolean; input: string }[] {
+function turns(): { model: string; failed: boolean; input: string; pid: number }[] {
   try {
     return readFileSync(turnLog, "utf8")
       .split("\n")
@@ -422,6 +453,9 @@ function turns(): { model: string; failed: boolean; input: string }[] {
 }
 
 const failing = (models: string[]) => writeFileSync(failingFile, JSON.stringify(models));
+
+/** Closes the idle Claude processes before a message runs again, as the 5-minute idle close does (#9270). */
+let closeBeforeRunAgain = false;
 
 function readLog<T>(path: string): T[] {
   try {
@@ -798,6 +832,26 @@ try {
     });
   }
 
+  await check("a spent balance names the model it left and what to do", async () => {
+    await restart();
+    const agent = await createCodex("Spent balance", automaticBackups);
+    const outcome = await send(agent.id, "usage-spent case:spent");
+    assert.equal(outcome.status, "completed", `The task completes on its backup: ${outcome.error}`);
+    const moved = agentOf(agent.id);
+    assert.equal(moved.provider, "claude", "The agent is on its backup model.");
+    assert.equal(moved.usageLimitReturn ?? null, null, "The agent does not go back to a spent balance by itself.");
+    const spent =
+      service.listModels().find((option) => option.provider === "codex" && option.id === CODEX_MODEL)?.name ??
+      CODEX_MODEL;
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["provider-error"]);
+    assert.deepEqual(
+      notes,
+      [sourceText("status.agent.modelSwitchedForSpentBalance", { previous: spent, model: modelName(moved.model) })],
+      "The note names the spent model, the backup, and what to do.",
+    );
+    return { notes };
+  });
+
   await check("without a backup, partial work waits and continues when the limit ends", async () => {
     await restart();
     const agent = await createCodex("No fallback", { automatic: true, order: [] });
@@ -1051,6 +1105,61 @@ try {
       return outcome;
     });
   }
+
+  await check("a message runs again after its Claude process closed", async () => {
+    await restart();
+    const agent = await create("Reopened");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    failing([PRIMARY]);
+    closeBeforeRunAgain = true;
+    const before = turns().length;
+    const outcome = await send(agent.id, "work after close");
+    closeBeforeRunAgain = false;
+    failing([]);
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    const ran = turns().slice(before);
+    assert.deepEqual(
+      ran.map((turn) => turn.model),
+      [PRIMARY, BACKUP],
+    );
+    assert.notEqual(ran[0]?.pid, ran[1]?.pid, "The message ran again in a new process that resumed the session.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return { ran };
+  });
+
+  await check("a message whose uuid the saved session holds runs with a new uuid", async () => {
+    const agent = await create("Holder");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-holds");
+    assert.equal(outcome.status, "completed", `The message completes: ${outcome.error}`);
+    assert.equal(turns().length, before + 1, "The message runs once.");
+    await verifyHistoryKeepsRequests(agent.id);
+    return outcome;
+  });
+
+  await check("a message that Claude skips with each uuid fails with a reason", async () => {
+    const agent = await create("Skipper");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    const before = turns().length;
+    const outcome = await send(agent.id, "session-skips");
+    assert.equal(outcome.status, "failed", "The turn ends.");
+    assert.equal(outcome.error, sourceText("error.provider.acpNoAnswer", { provider: "Claude" }));
+    assert.equal(turns().length, before, "The message did not run.");
+    return outcome;
+  });
 
   report.passed = true;
 } catch (error) {

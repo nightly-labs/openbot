@@ -133,6 +133,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       detailSha256: "414a33dd79f7318638bc68e56ecaeb81c77762666a9bd6f11a0e228c0323fcf1",
     },
     {
+      slug: "appsignal",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "06ac0cae59af375996995d2ba631b0cae72c22031e74ba20f6e1d1d393e27a1f",
+    },
+    {
       slug: "gitlab",
       version: "1.0.0",
       featured: false,
@@ -185,6 +191,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "6f49588f09b44f27f82958b558efd0d8521a5784e35f55c755337ed4b07e4b42",
+    },
+    {
+      slug: "cloud66",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "a587a713c4a697281b8169d1067ee7d4ed02ca534d9e9264bbcc7a6e6868c7cd",
     },
     {
       slug: "context7",
@@ -299,6 +311,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "b3240d4ee6c9aea1eaad99aecd02e92773657b48918776f07a9cb25d0ab76e8b",
+    },
+    {
+      slug: "adobe-analytics",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "152f37abfb2a3b385ad46fc03ba0405cd48cc9230f8c513b5c11b9b8dc526943",
     },
     {
       slug: "adspirer",
@@ -1025,12 +1043,6 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       version: "1.0.0",
       featured: false,
       detailSha256: "d2aece992ac04b73ed82f7ad8bf318a30b4ff1829d835987dce81af836f6ec6f",
-    },
-    {
-      slug: "mongodb",
-      version: "1.0.0",
-      featured: false,
-      detailSha256: "cc895db953c8ace5f3fd438a5d4b7ff9365c142ef84ce2621d6b37afc3670587",
     },
     {
       slug: "moomoo",
@@ -2287,6 +2299,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     termsUrl: "https://sentry.io/terms/",
     skills: [],
   },
+  appsignal: {
+    slug: "appsignal",
+    name: "AppSignal",
+    tagline: "Errors, performance and logs",
+    description:
+      "AppSignal lets agents search error incidents and stack traces, find slow actions and traces, read logs, metrics, check-ins and uptime monitors, and build dashboards. Each user signs in to their own AppSignal account through the browser. The sign-in gives all read and write tools, so agents can also change the state, severity and assignee of an incident and add notes.",
+    category: "coding",
+    creatorName: "AppSignal",
+    iconUrl: "https://www.appsignal.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-new-errors", text: "Which new errors did my production app get since the last deploy?" },
+      { id: "prompt-slow-actions", text: "Which actions were the slowest this week, and why?" },
+      { id: "prompt-uptime", text: "Did any uptime monitor or check-in fail in the last 24 hours?" },
+    ],
+    apps: [
+      {
+        id: "app-appsignal-mcp",
+        name: "AppSignal",
+        description:
+          "Error incidents, performance, logs, metrics and dashboards, over AppSignal's MCP server with browser sign-in.",
+        iconUrl: "https://www.appsignal.com/favicon.ico",
+        server: {
+          name: "appsignal",
+          transport: "http",
+          url: "https://appsignal.com/api/mcp",
+          auth: [{ id: "appsignal-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.appsignal.com",
+    privacyPolicyUrl: "https://www.appsignal.com/privacy-policy",
+    termsUrl: "https://www.appsignal.com/terms",
+    skills: [],
+  },
   gitlab: {
     slug: "gitlab",
     name: "GitLab",
@@ -2615,6 +2662,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://render.com",
     privacyPolicyUrl: "https://render.com/privacy",
     termsUrl: "https://render.com/terms",
+    skills: [],
+  },
+  cloud66: {
+    slug: "cloud66",
+    name: "Cloud 66",
+    tagline: "Applications, deploys and servers",
+    description:
+      "Cloud 66 lets agents list accounts, applications, servers and clouds, read deployments and their logs, start deployments, manage deployment profiles, and create Deploy v3 clusters. Each user signs in to their own Cloud 66 account through the browser and selects the permissions on the consent page. Agents cannot do more than the user's Cloud 66 role permits. Deploying and creating servers can cost money. To delete an application or a deployment profile, or to add a cloud, Cloud 66 asks the agent to show a confirmation link. When the chat cannot show it, do these actions in the Cloud 66 dashboard.",
+    category: "coding",
+    creatorName: "Cloud 66",
+    iconUrl: "https://app.cloud66.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-applications", text: "Which applications are in my Cloud 66 accounts?" },
+      { id: "prompt-failed-deploy", text: "Why did the last deployment of my app fail? Read its logs." },
+      { id: "prompt-deploy", text: "Deploy my staging application and tell me when it is done." },
+    ],
+    apps: [
+      {
+        id: "app-cloud66-mcp",
+        name: "Cloud 66",
+        description:
+          "Applications, deployments, servers, clouds and clusters, over Cloud 66's MCP server with browser sign-in.",
+        iconUrl: "https://app.cloud66.com/favicon.ico",
+        server: {
+          name: "cloud66",
+          transport: "http",
+          url: "https://app.cloud66.com/mcp",
+          auth: [{ id: "cloud66-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://www.cloud66.com",
+    privacyPolicyUrl: "https://www.cloud66.com/privacy",
+    termsUrl: "https://www.cloud66.com/terms",
     skills: [],
   },
   context7: {
@@ -3393,6 +3475,41 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://2chat.co",
     privacyPolicyUrl: "https://2chat.co/privacy-policy",
     termsUrl: "https://2chat.co/terms-of-service",
+    skills: [],
+  },
+  "adobe-analytics": {
+    slug: "adobe-analytics",
+    name: "Adobe Analytics",
+    tagline: "Web analytics reports and segments",
+    description:
+      "Adobe Analytics lets agents find report suites, dimensions, metrics, segments and Workspace projects, and run ranked and trended reports. Each user signs in with their own Adobe ID through the browser and selects an organization. An Adobe administrator must first give the account MCP Read-only Access or MCP Full Access. With MCP Full Access, agents can also create and update segments, calculated metrics, date ranges and Workspace projects.",
+    category: "data-analytics",
+    creatorName: "Adobe",
+    iconUrl: "https://www.adobe.com/favicon.ico",
+    version: "1.0.0",
+    prompts: [
+      { id: "prompt-top-pages", text: "Which pages had the most visits last week?" },
+      { id: "prompt-trend", text: "Show the daily orders for this month and compare them with last month." },
+      { id: "prompt-segment", text: "Which segments do we have for mobile visitors, and how are they defined?" },
+    ],
+    apps: [
+      {
+        id: "app-adobe-analytics-mcp",
+        name: "Adobe Analytics",
+        description:
+          "Report suites, reports, segments and Workspace projects, over Adobe's MCP server with browser sign-in.",
+        iconUrl: "https://www.adobe.com/favicon.ico",
+        server: {
+          name: "adobe-analytics",
+          transport: "http",
+          url: "https://aa-mcp.adobe.io/mcp",
+          auth: [{ id: "adobe-analytics-oauth", kind: "link", label: "Sign in" }],
+        },
+      },
+    ],
+    websiteUrl: "https://business.adobe.com/products/analytics/adobe-analytics.html",
+    privacyPolicyUrl: "https://www.adobe.com/privacy/policy.html",
+    termsUrl: "https://www.adobe.com/legal/terms.html",
     skills: [],
   },
   adspirer: {
@@ -7608,40 +7725,6 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://monday.com",
     privacyPolicyUrl: "https://monday.com/l/privacy/privacy-policy/",
     termsUrl: "https://monday.com/l/legal/tos/",
-    skills: [],
-  },
-  mongodb: {
-    slug: "mongodb",
-    name: "MongoDB Atlas",
-    tagline: "Atlas clusters and databases",
-    description:
-      "MongoDB Atlas lets agents list projects and clusters, inspect databases and collections, and run queries, in read-only or read-write mode as the organization owner allows. Each user signs in to their own MongoDB Atlas account through the browser.",
-    category: "coding",
-    creatorName: "MongoDB",
-    iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-    version: "1.0.0",
-    prompts: [
-      { id: "prompt-clusters", text: "List the clusters in my Atlas projects and their status." },
-      { id: "prompt-schema", text: "Describe the schema of the orders collection." },
-      { id: "prompt-query", text: "Find the ten most recent orders with a status of pending." },
-    ],
-    apps: [
-      {
-        id: "app-mongodb-mcp",
-        name: "MongoDB Atlas",
-        description: "Cluster, database, and collection access, over MongoDB's MCP server with browser sign-in.",
-        iconUrl: "https://avatars.githubusercontent.com/u/45120?s=256&v=4",
-        server: {
-          name: "mongodb",
-          transport: "http",
-          url: "https://mcp.mongodb.com",
-          auth: [{ id: "mongodb-oauth", kind: "link", label: "Sign in" }],
-        },
-      },
-    ],
-    websiteUrl: "https://www.mongodb.com",
-    privacyPolicyUrl: "https://www.mongodb.com/legal/privacy/privacy-policy",
-    termsUrl: "https://www.mongodb.com/legal/terms-of-use",
     skills: [],
   },
   moomoo: {

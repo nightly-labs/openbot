@@ -452,6 +452,9 @@ export class AttachmentGateway {
         reasons.push(sourceFailureReason(error));
       }
     }
+    if (lostBackslashes(value)) {
+      reasons.unshift("the path lost its backslashes; write it with forward slashes, such as C:/Users/…");
+    }
     return yield* attachmentFailure(
       new Error(
         `${
@@ -462,6 +465,15 @@ export class AttachmentGateway {
       ),
     );
   });
+}
+
+/**
+ * A Windows path that a JavaScript string changed: OpenCode's `execute` turns `"C:\Users\…"` into
+ * `C:Users…`, and `\r`, `\n` or `\t` into a control character (#8635). The reason says so, without
+ * the path, so that the agent writes the path again.
+ */
+function lostBackslashes(path: string): boolean {
+  return /^[a-z]:(?![\\/])/iu.test(path) || [...path].some((character) => character.charCodeAt(0) < 0x20);
 }
 
 /** A Node error names its code and call, not the path, so the reason does not repeat a local path. */

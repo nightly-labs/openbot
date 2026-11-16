@@ -255,6 +255,14 @@ export const CODEX_DEFERRED_MCP_NOTE =
 export const OPENCODE_DEFERRED_MCP_NOTE =
   "The tools of your MCP servers are not in this catalog. They are in execute: when one is not listed there, find it with search(...) inside execute and call the path that it returns.";
 
+/**
+ * Antigravity 1.5 gives the model only the MCP tools that fit its schema budget, and leaves the others
+ * out of the tool list and of `<mcp_servers>`, with no `call_mcp_tool` for them (#7427). It still
+ * writes each schema to `<appDataDir>/mcp/<server>/<tool>.json`, and tool_call runs the tool.
+ */
+export const ANTIGRAVITY_DEFERRED_MCP_NOTE =
+  'The tools of your MCP servers are not in this catalog. When one is not in your tool list, read its schema in <appDataDir>/mcp/<server>/<tool>.json and run it with openbot.tool_call: {"name":"<server>.<tool>","arguments":{...}}.';
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -271,6 +279,13 @@ const READY_SEARCH_RESULTS = 3;
  * such as "create workflow routine" does not also load the routine schemas and guidance.
  */
 const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+/**
+ * The release notes call the board of the Workflows page the Canvas, so users ask an agent for a
+ * canvas. Without these words a search found no workflow tool, and the agent said that it could not
+ * make one (#9367). A canvas can also be the Routines canvas or a canvas on a web page, so these words
+ * add the workflow tools and keep the other results.
+ */
+const CANVAS_WORDS = new Set(["canvas", "canvases"]);
 const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
   (entry) =>
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
@@ -433,19 +448,20 @@ function callsDiscoveryTool(envelope: unknown): boolean {
  * The error for a `tool_call` that `resolveDeferredTool` refused, or null when no specific error
  * applies. A general error made the agent send the same call again: an agent that loaded a schema
  * through tool_call never got it (#6754), and a routine's browser calls failed until the run ended
- * (#7955). No supplied values are echoed: a suggested name comes from the catalog. `unknownToolNote`
- * follows the error for a name outside the catalog, which can be a tool of the user's MCP servers.
+ * (#7955). No supplied values are echoed: a suggested name comes from the catalog. The text of
+ * `unknownToolNote`, read only when needed, follows the error for a name outside the catalog, which can be a tool of the user's MCP servers.
  */
 export function deferredCallArgumentsError(
   params: DynamicToolCallParams,
   provider: AgentProviderId,
-  unknownToolNote: string | null = null,
+  unknownToolNote: () => string | null = () => null,
 ): string | null {
   if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
   const error = refusedCallError(params, provider);
-  if (error === null || !unknownToolNote) return error;
   const named = bridgedName(params.arguments);
-  return named !== null && catalogEntry(catalogFor(provider), named) ? error : `${error} ${unknownToolNote}`;
+  if (error === null || (named !== null && catalogEntry(catalogFor(provider), named))) return error;
+  const note = unknownToolNote();
+  return note ? `${error} ${note}` : error;
 }
 
 function refusedCallError(params: DynamicToolCallParams, provider: AgentProviderId): string | null {
@@ -484,6 +500,15 @@ export function resolveDeferredTool(
   const entry = catalogEntry(catalogFor(provider), calledName(parsed.data));
   if (!entry) return null;
   return { ...params, namespace: entry.namespace, tool: entry.tool, arguments: parsed.data.arguments };
+}
+
+/** The name and the arguments of a `tool_call`, read as `resolveDeferredTool` reads them, or `null`. */
+export function deferredCall(
+  params: DynamicToolCallParams,
+): { name: string; arguments: z.infer<typeof callShape.arguments> } | null {
+  const parsed = parseCall(params);
+  const name = parsed.success ? (parsed.data.name ?? parsed.data.tool)?.trim() : undefined;
+  return parsed.success && name ? { name, arguments: parsed.data.arguments } : null;
 }
 
 /** The lowercase queries of a tool search and their words, or `null` for invalid arguments. */
@@ -540,10 +565,11 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
         .map(({ entry }) => entry),
     );
     const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
-    if (workflowSearch) {
+    if (workflowSearch)
       // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
       for (const entry of ready)
         if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
+    if (workflowSearch || [...terms].some((term) => CANVAS_WORDS.has(term))) {
       for (const entry of WORKFLOW_TOOLS) {
         if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
         ready.add(entry);

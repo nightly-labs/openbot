@@ -145,6 +145,9 @@ export const messages = {
     "検索結果と検索メッセージは、変わるときに短いぼかしでフェードイン・フェードアウトします。動きを減らしているときはフェードのみです。オフにすると、すぐに切り替わります。",
   "mobile.settings.feedback.footer": "このデバイスでのアプリ操作の触覚フィードバックです。",
   "mobile.settings.feedback.haptics": "触覚フィードバック",
+  "mobile.settings.feedback.replies": "返信の触覚フィードバック",
+  "mobile.settings.feedback.repliesFooter":
+    "チャットにエージェントの返信が表示される間の振動です。ほかの触覚フィードバックはオンのままです。",
   "mobile.settings.feedback.retry": "触覚フィードバックの設定をもう一度保存",
   "mobile.settings.liveActivities.title": "ライブアクティビティ",
   "mobile.settings.liveActivities.footer":
@@ -229,6 +232,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.fullQualityPhotos": "写真を元の画質で送信",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "オフの場合、アプリは各写真の小さいコピー(長辺 最大 2048 ピクセル)を送信します。遅い接続でも早く届きます。元の写真を送信するにはオンにしてください。",
   "mobile.settings.profile.nameUnsafe": "名前から改行と制御文字を削除してください。",
   "mobile.settings.profile.nameLength": "表示名は 3〜20 文字にしてください。",
   "mobile.settings.profile.saveFailed": "変更を保存できませんでした。もう一度お試しください。",
@@ -484,4 +490,25 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "プロセスを停止できませんでした。",
   "mobile.settings.agents.processes.stopTitle": "このプログラムを停止しますか？",
   "mobile.settings.agents.processes.stopLabel": "プロセス {pid} を停止",
+  "mobile.settings.shortcuts.title": "ショートカット",
+  "mobile.settings.shortcuts.agent": "エージェント",
+  "mobile.settings.shortcuts.none": "なし",
+  "mobile.settings.shortcuts.unsupported": "ショートカットには iOS 26 以降が必要です。",
+  "mobile.settings.shortcuts.card.agents": "エージェント",
+  "mobile.settings.shortcuts.card.noAgents": "エージェントはまだありません",
+  "mobile.settings.shortcuts.card.setUp.title": "OpenBot を開いてショートカットを設定してください",
+  "mobile.settings.shortcuts.card.setUp.action": "OpenBot を開く",
+  "mobile.settings.shortcuts.card.noAgent.title": "ショートカット用のエージェントを選んでください",
+  "mobile.settings.shortcuts.card.noAgent.detail": "ショートカットは 1 つのエージェントに送ります。",
+  "mobile.settings.shortcuts.card.noAgent.action": "エージェントを選ぶ",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot はロックされています",
+  "mobile.settings.shortcuts.card.locked.action": "OpenBot を開く",
+  "mobile.settings.shortcuts.footer":
+    "ショートカットアプリの Send Message はこのエージェントに送信します。アプリは開きません。",
+  "mobile.settings.shortcuts.send.sent": "送信済み",
+  "mobile.settings.shortcuts.send.failed": "OpenBot はこれを送信できませんでした。",
+  "mobile.settings.shortcuts.send.unconfirmed":
+    "サーバーから応答がありません。メッセージはチャットにある可能性があります。",
+  "mobile.settings.shortcuts.send.inApp": "OpenBot で送信",
+  "mobile.settings.shortcuts.send.openChat": "チャットを開く",
 } as const satisfies PartialTranslation<typeof source>;

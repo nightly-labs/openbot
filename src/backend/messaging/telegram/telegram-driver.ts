@@ -22,6 +22,7 @@ import {
   type MessagingDriverOptions,
   type MessagingIngress,
   type MessagingPlace,
+  type RecentMessages,
   type StatusReaction,
   TelegramCallError,
   type TelegramGateway,
@@ -191,6 +192,7 @@ class TelegramAdapter implements MessagingAdapter {
     files: MessagingAnswerFile[],
   ) {
     const skipped: string[] = [];
+    let firstId: string | null = null;
     for (const file of files) {
       const sent = yield* Effect.result(
         Effect.gen({ self: this }, function* () {
@@ -207,12 +209,13 @@ class TelegramAdapter implements MessagingAdapter {
           if (!ticket.uploadToken) return yield* new MessagingAdapterError({ cause: new Error("no_upload_token") });
           const messageId = yield* this.#gateway.upload(ticket.uploadToken, file.path);
           this.#state.rememberThread(messageId, telegramThreadKey(target));
+          firstId ??= String(messageId);
           return true;
         }),
       );
       if (Result.isFailure(sent) || !sent.success) skipped.push(file.name);
     }
-    return skipped;
+    return { skipped, firstId };
   });
 
   history(
@@ -229,8 +232,8 @@ class TelegramAdapter implements MessagingAdapter {
     _platformChannelId: string,
     threadKey: string | null,
     limit: number,
-  ): Effect.Effect<ContextEntry[], MessagingAdapterError> {
-    return Effect.sync(() => this.#state.recent(threadKey, limit));
+  ): Effect.Effect<RecentMessages, MessagingAdapterError> {
+    return Effect.sync(() => ({ messages: this.#state.recent(threadKey, limit) }));
   }
 
   readonly download = Effect.fnUntraced(function* (

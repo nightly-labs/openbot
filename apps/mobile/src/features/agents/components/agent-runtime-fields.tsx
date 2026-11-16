@@ -320,7 +320,8 @@ function useSpentLimitText(
   const spent = provider
     ? spentUsageWindow(usage?.limits, provider, accountId || DEFAULT_PROVIDER_ACCOUNT_ID, model, now)
     : null;
-  const spentWindow = spent?.covers ? spent.window : null;
+  // An account on credits keeps working, so its model is not stopped.
+  const spentWindow = spent?.covers && !spent.onCredits ? spent.window : null;
   const resetsAt = spentWindow?.resetsAt ?? null;
   useEffect(() => {
     if (resetsAt === null) return;

@@ -776,8 +776,9 @@
   scale: -1 1;
 }
 
-/* The dock is above the other apps. Its loops run only while the user uses the dock. */
-.agent-dock[data-ambient-motion="paused"] :is(.ui-spinner, .agent-row-thinking-dots i) {
+/* The dock is above the other apps. Its loops run only while the user uses the dock. The spinner
+   always turns: a stopped spinner looks as if the agent stopped. */
+.agent-dock[data-ambient-motion="paused"] .agent-row-thinking-dots i {
   animation-play-state: paused;
 }
 

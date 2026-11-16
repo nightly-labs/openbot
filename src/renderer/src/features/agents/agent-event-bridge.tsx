@@ -62,7 +62,7 @@ export function AgentEventBridge() {
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
   const { openServerSettings } = useServerSettings();
-  const { applyAccountUsage } = useAuth();
+  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage } = useAuth();
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const {
     agentList,
@@ -161,6 +161,12 @@ export function AgentEventBridge() {
       case "usage-changed":
         applyAccountUsage(event.usage);
         return;
+      case "usage-credits-changed": {
+        // A joined server's usage event does not say whether an account works on credits: read it again.
+        const target = accountUsageTargetKey();
+        if (target) void refreshAccountUsage(target).catch(() => undefined);
+        return;
+      }
       case "agents-changed":
         applyStoredAgents(event.agents);
         return;
@@ -291,13 +297,14 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
+        // A detached question outlives its turn: the host keeps it until the user answers.
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
             pending?.type === "prompt" &&
-            promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey
+            (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)
           ) {
             return current;
           }

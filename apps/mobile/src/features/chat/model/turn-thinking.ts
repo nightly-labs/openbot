@@ -1,5 +1,6 @@
 import { type ChannelMessage, type ConversationMessage, isAgentAnswer } from "@openbot/contracts/ipc";
 import { isTurnThought, type TurnStepLine, type TurnStepLines } from "@/features/workspace/model/turn-step-lines";
+import { messageTime } from "./message-time";
 
 export type TurnThinkingStep =
   | { id: string; kind: "thought"; text: string; createdAt: string; streaming: boolean }
@@ -128,7 +129,7 @@ function tallyTurns<T>(
       turn.thoughts += 1;
     } else if (answer) turn.answerId ??= message.id;
     else if (silentAnswer(message)) turn.silent = true;
-    const at = Date.parse(message.createdAt);
+    const at = messageTime(message.createdAt);
     if (!Number.isFinite(at)) continue;
     turn.startedAt = Math.min(turn.startedAt ?? at, at);
     if (thought || answer) turn.endedAt = Math.max(turn.endedAt ?? at, at);

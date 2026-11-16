@@ -175,6 +175,12 @@ export const messages = {
   "provider.claudeKey.description":
     "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーの API クレジットに請求し、Claude のプランには請求しません。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
   "provider.claudeKey.label": "Anthropic API キー",
+  "provider.cursorKey.title": "Cursor API キー",
+  "provider.cursorKey.description":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
+  "provider.cursorKey.descriptionHost":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
+  "provider.cursorKey.label": "Cursor API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":
     "Mercury モデルを使うには、このコンピューターに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
@@ -208,6 +214,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "再接続できませんでした。",
   "provider.account.add": "アカウントを追加",
   "provider.account.addLabel": "別の {name} アカウントを追加",
+  "provider.account.addWithCode": "コードでアカウントを追加",
   "provider.account.count": { other: "アカウント {count} 件" },
   "provider.account.numbered": "アカウント {number}",
   "provider.account.apiKey": "APIキー",

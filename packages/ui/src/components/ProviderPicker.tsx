@@ -33,7 +33,7 @@ import { createEffect, createSignal, createStore, createUniqueId, For, Show } fr
 import { useText } from "../text";
 import { MoreProvidersDialog } from "./MoreProvidersDialog";
 import { ProviderAccountList } from "./ProviderAccountList";
-import type { ProviderAccountActions, ProviderPickerAccount } from "./provider-accounts";
+import { hasKeyAccounts, type ProviderAccountActions, type ProviderPickerAccount } from "./provider-accounts";
 import {
   createProviderRow,
   PROVIDER_ACTION_LABEL,
@@ -491,6 +491,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 accountsOffered,
                 accountError,
                 addAccount,
+                accountCodeOffered,
+                addAccountWithCode,
                 installOffered,
                 signInOffered,
                 apiKeyOffered,
@@ -499,6 +501,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () =>
                 alternative() !== null ||
                 mainlandChinaSite() !== null ||
+                (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
                 diagnosticsOffered();
@@ -627,7 +630,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                   <div class="provider-picker-actions">
                     {/* An off provider has no process to act on, so the switch is its only action. */}
                     <Show when={!off()}>
-                      <Show when={accountsOffered()}>
+                      {/* An account that is an API key is added in the provider's settings page. */}
+                      <Show when={accountsOffered() && !hasKeyAccounts(option().id)}>
                         <Button
                           type="button"
                           variant="outline"
@@ -809,6 +813,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                     {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
+                              </Show>
+                              <Show when={accountCodeOffered() && !hasKeyAccounts(option().id)}>
+                                <DropdownMenu.Item onSelect={addAccountWithCode}>
+                                  <Smartphone aria-hidden="true" />
+                                  {t("provider.account.addWithCode")}
+                                </DropdownMenu.Item>
                               </Show>
                               <Show when={diagnosticsOffered()}>
                                 <DropdownMenu.Item

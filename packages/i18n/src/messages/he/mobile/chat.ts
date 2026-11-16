@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.composer.send": "שליחת הודעה",
   "mobile.chat.composer.stop": "עצירת {name}",
   "mobile.chat.composer.dictate": "הכתבת הודעה",
+  "mobile.chat.composer.voiceSettings": "הגדרות קול",
   "mobile.chat.composer.stopDictation": "עצירת ההכתבה",
   "mobile.chat.composer.mention": "אזכור {name}",
   "mobile.chat.composer.skills": "מיומנויות",
@@ -342,6 +343,17 @@ export const messages = {
   "mobile.chat.browserSecret.done": "סיימתי",
   "mobile.chat.browserSecret.submitOnce": "שליחה חד-פעמית אל {origin}. הערך הזה לא מתווסף לצ'אט.",
   "mobile.chat.browserSecret.submitFailed": "לא ניתן להשלים את הבקשה. יש לבדוק את החיבור ולנסות שוב.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן הריץ סקריפט בדף הזה. כדי להשתמש בהם, צריך לבקש מהסוכן לטעון מחדש את הדף ולנסות שוב.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind": "OpenBot לא השתמש בפרטי ההתחברות השמורים כי הסוכן בחר שדה שגוי בדף.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי הסוכן לא בחר אף אחד מפרטי ההתחברות השמורים לאתר הזה. צריך לומר לסוכן באיזה חשבון להשתמש.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם סיסמה לאתר הזה.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot לא השתמש בפרטי ההתחברות השמורים כי אין בהם מפתח של אפליקציית אימות.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot לא השתמש בפרטי התחברות שמורים כי לא הצליח לקרוא את מנהל הסיסמאות.",
   "mobile.chat.browserSecret.submit": "שליחה",
   "mobile.chat.browserSecret.takeOver": "השתלטות",
   "mobile.chat.starter.title": "על מה נעבוד קודם?",
@@ -410,7 +422,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "אישור נותן ל-{name} את ההרשאות האלה ב-{server}. דחייה משאירה את ההרשאות הנוכחיות.",
   "mobile.chat.approval.partial":
-    "הבקשה הזו ארוכה מדי להצגה בטלפון. כדי לאשר אותה, יש לפתוח את OpenBot ב-{server}. אפשר לדחות אותה כאן.",
+    "{server} שולח לטלפון רק את תחילת הבקשה. כדי לאשר אותה, יש לעדכן את OpenBot ב-{server}, או לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב. אפשר לדחות אותה כאן.",
+  "mobile.chat.approval.loading": "טוען את הבקשה המלאה…",
+  "mobile.chat.approval.loadFailed": "לא ניתן לטעון את הבקשה המלאה. אפשר לדחות אותה כאן.",
+  "mobile.chat.approval.retry": "ניסיון חוזר",
+  "mobile.chat.approval.report.bugHeadline": "מצאת באג? בוא נתקן אותו.",
+  "mobile.chat.approval.report.ideaHeadline": "יש לך רעיון? בוא נגשים אותו.",
+  "mobile.chat.approval.report.dontSend": "לא עכשיו",
+  "mobile.chat.approval.report.send": "שליחה לצוות OpenBot",
   "mobile.chat.approval.allow": "אישור",
   "mobile.chat.approval.deny": "דחייה",
   "mobile.chat.approval.reconnect": "יש להתחבר אל {server} כדי להשיב לבקשה הזו.",

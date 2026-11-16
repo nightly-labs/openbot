@@ -14,6 +14,7 @@ import {
   type CustomAgentSummary,
   type CustomProviderResult,
   type CustomProviderSummary,
+  DEFAULT_PROVIDER_ACCOUNT_ID,
   type DownloadableProviderId,
   decodeRegistryEntries,
   decodeRegistryInstallResult,
@@ -56,6 +57,7 @@ import {
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -96,6 +98,7 @@ import {
   checkProviderRuntimeUpdates,
   clearProviderApiKey,
   completeSignInRelay,
+  connectProviderAccountKey,
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
@@ -241,6 +244,19 @@ export function providerSignOutOffered(row: ProviderRow): boolean {
   );
 }
 
+/**
+ * Whether each account of the provider after the first is one API key of the provider
+ * (`accountSignIn: "key"`), as for Cursor: its CLI holds one browser sign-in for each computer user.
+ */
+export function providerAccountsAreKeys(provider: AgentProviderId): boolean {
+  return agentProviderDescriptor(provider).accountSignIn === "key";
+}
+
+/** An account that is an API key: no browser sign-in, no plan usage, and no place in a pool. */
+export function isProviderKeyAccount(provider: AgentProviderId, accountId: string): boolean {
+  return providerAccountsAreKeys(provider) && accountId !== DEFAULT_PROVIDER_ACCOUNT_ID;
+}
+
 export interface ProviderRow {
   id: AgentProviderId;
   name: string;
@@ -374,8 +390,8 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `custom-provider-edit-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1` and
- * `provider-account-pool-v1`), with the newest
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1`,
+ * `provider-account-pool-v1` and `provider-account-keys-v1`), with the newest
  * route set that the host serves. The
  * host checks the role on every route.
  */
@@ -497,9 +513,22 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
             runTeamRequest(renameProviderAccount(request, { provider, accountId, label })),
           remove: (provider: AgentProviderId, accountId: string): Promise<void> =>
             runTeamRequest(removeProviderAccount(request, { provider, accountId })),
-          /** The phone signs in an account of the provider only on a page that the host relays. */
+          /**
+           * The phone signs in an account of the provider only on a page that the host relays. A
+           * provider whose accounts are keys has no such page.
+           */
           canSignIn: (provider: AgentProviderId): boolean =>
-            accountRelay !== null && isOneOf(accountRelay.providers, provider),
+            !providerAccountsAreKeys(provider) && accountRelay !== null && isOneOf(accountRelay.providers, provider),
+          /**
+           * Gives an account of a provider whose accounts are keys its API key
+           * (`provider-account-keys-v1`), or null on an older host. `accountId: null` adds an account.
+           * It fails with the host's reason when the provider refuses the key. The phone does not keep
+           * the key.
+           */
+          connectKey: has(PROVIDER_ACCOUNT_KEYS_CAPABILITY)
+            ? (provider: AgentProviderId, accountId: string | null, key: string): Promise<void> =>
+                runTeamRequest(connectProviderAccountKey(request, { provider, accountId, key }))
+            : null,
           /** `accountId: null` adds an account. A cancel removes a new account that did not sign in. */
           startRelay: async (provider: AgentProviderId, accountId: string | null): Promise<string> => {
             if (!accountRelay || !isOneOf(accountRelay.providers, provider))

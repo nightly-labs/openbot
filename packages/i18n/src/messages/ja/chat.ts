@@ -335,8 +335,6 @@ export const messages = {
   "chat.video.pause": "動画を一時停止",
   "chat.video.position": "再生位置",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "動画をダウンロード",
-  "chat.video.open": "動画を開く",
   "chat.video.mute": "動画をミュート",
   "chat.video.unmute": "動画のミュートを解除",
   "chat.message.you": "あなた",

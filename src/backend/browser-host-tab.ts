@@ -35,6 +35,11 @@ export interface BrowserHostTab {
    */
   secretDocument?: boolean;
   /**
+   * The kept document of `secretDocument` can still show the secret: its fields did not empty, or the
+   * page copied the value. Images of the tab stay blocked, as for `filledCard`, until it navigates.
+   */
+  secretShown?: boolean;
+  /**
    * `fill_card` typed a saved card into the current document. Its fields show the number and the
    * security code, and page code can read them, so screenshots, previews, evaluation and recording
    * stay blocked until a main-frame navigation replaces the document.
@@ -118,6 +123,12 @@ export interface BrowserHostTab {
    * preview frame stand in for the page until `pendingRestore` loads it again.
    */
   sleeping?: { title: string; preview: BrowserPreview | null } | undefined;
+  /**
+   * Set when the idle unload closes the page: the threads that a tool result has told so since. The tab
+   * keeps its address and title, so without this note an agent cannot tell that its scripts and page
+   * state are gone. Each thread that can use the tab, its owner and a thread it was shared with, reads it once.
+   */
+  idleUnloadNoted?: Set<string>;
   /** When a person or an agent last used the tab. A preview request does not count as use. */
   lastUsedAt: number;
   focusOnVisible: boolean;
@@ -176,7 +187,11 @@ export function toPublicTab(tab: BrowserHostTab): BrowserTab {
       : tab.environment;
   return {
     id: tab.id,
-    title: tab.secret ? "Secure authentication" : restoredTabTitle(tab) || tab.contents.getTitle() || "New tab",
+    // A page can put a typed card value or password in its title. The address stays as it is: the
+    // app loads it again and looks up saved logins with it.
+    title: tab.secret
+      ? "Secure authentication"
+      : restoredTabTitle(tab) || tab.engine.scrubText(tab.contents.getTitle()) || "New tab",
     url: tab.secret?.origin ?? currentTabUrl(tab),
     loading: tab.contents.isLoading(),
     ownerThreadId: tab.ownerThreadId,

@@ -8,6 +8,8 @@ import {
   type BillingCurrency,
   type BillingInterval,
   type BillingPlanId,
+  type BillingStorageTier,
+  hostedPlanStorageGb,
   isBillingAmount,
   isStorageGb,
   isStripeCheckoutUrl,
@@ -36,6 +38,33 @@ export const HOSTED_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>>
   standard: "default",
   pro: "large",
 };
+
+/**
+ * The boat sandbox of each plan. Starter runs on a VPS 1 of the operator. When no VPS 1 is free, it starts
+ * on `default`, because `small` has less disk than the Starter storage. A move to a VPS 1 sets
+ * `HOSTED_PLAN_SIZE` again.
+ */
+export const HOSTED_BOAT_PLAN_SIZE: Readonly<Record<BillingPlanId, HostedServerSize>> = {
+  ...HOSTED_PLAN_SIZE,
+  starter: "default",
+};
+
+/**
+ * The storage in GB of a hosted server: the plan storage with its storage tier on a VPS of the operator,
+ * and in a boat sandbox not more than its disk. A Starter sandbox from before `HOSTED_BOAT_PLAN_SIZE` is
+ * `small` and keeps 12 GB. `size` is the machine after a resize that waits (`pending_size`), else the
+ * current one, and null when the server has no row or no boat sandbox yet.
+ */
+export function hostedServerStorageGb(
+  plan: BillingPlanId,
+  onOperatorHost: boolean,
+  size: HostedServerSize | null,
+  storageTier: BillingStorageTier,
+): number {
+  const storageGb = hostedPlanStorageGb(plan, onOperatorHost, storageTier);
+  if (onOperatorHost || size === null) return storageGb;
+  return Math.min(storageGb, HOSTED_SERVER_SIZES[size].diskGb);
+}
 
 /**
  * The disk of a hosted server that the system and the preinstalled tools use, in GB (measured on the

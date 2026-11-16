@@ -36,6 +36,11 @@ export function createWebBillingCalls(
       return state;
     },
     openPortal: (portal) => openStripe("v1/me/billing/portal", JSON.stringify(portal)),
+    async buyStorage(storage) {
+      const state = await request("v1/me/billing/storage", parseBillingState, JSON.stringify(storage));
+      if (!state) throw new Error(currentText().sourceText("error.billing.invalidResponse"));
+      return state;
+    },
   };
 }
 

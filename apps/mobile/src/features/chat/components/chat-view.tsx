@@ -45,6 +45,7 @@ import {
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -91,7 +92,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { useComposerDictation } from "./use-composer-dictation";
+import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -112,6 +113,8 @@ export interface ChatViewProps {
   canSend: boolean;
   /** A note in place of the composer that says why the person cannot write here. */
   notice?: string | null;
+  /** Lines above the composer that say why a request does not start, such as a busy channel member. */
+  statusNotes?: readonly string[];
   /** The chat only shows its history, such as a deleted channel: no replies, answers or browser steps. */
   readOnly?: boolean;
   activity?: MobileAgentActivity;
@@ -181,6 +184,11 @@ export interface ChatViewProps {
   loadOlder: () => void;
   /** A message from search that the chat opens at, once its page is loaded. */
   focusMessageId?: string | null;
+  /**
+   * `focusMessageId` is the first unread message: the chat opens at the NEW line, without the
+   * highlight of a message from search.
+   */
+  focusUnread?: boolean;
   /** True while the chat opens at a message from search, also before its page loads. */
   holdOpening?: boolean;
   /** True while the chat shows the messages that the phone kept and reads its latest page. */
@@ -253,6 +261,7 @@ export function ChatView({
   historyLoadFailed,
   canSend,
   notice = null,
+  statusNotes,
   readOnly = false,
   activity,
   activities,
@@ -288,6 +297,7 @@ export function ChatView({
   olderError,
   loadOlder,
   focusMessageId = null,
+  focusUnread = false,
   holdOpening = false,
   catchingUp = false,
   onFocusPlaced,
@@ -515,7 +525,8 @@ export function ChatView({
   const messages = useMemo(
     () =>
       presentChatMessages(
-        projectedMessages.filter((item) => !queuedMessageIds.has(item.id)),
+        // Most chats have no queued message: the rows then need no copy on each streamed chunk.
+        queuedMessageIds.size ? projectedMessages.filter((item) => !queuedMessageIds.has(item.id)) : projectedMessages,
         pendingMessages,
         messageAliases,
       ),
@@ -534,6 +545,8 @@ export function ChatView({
         for (const message of received) if (message.messageId) next.set(message.messageId, outboxRowId(message));
         return next;
       });
+    // This effect runs on each streamed chunk. Only a message with a receipt reads the drawn rows.
+    if (!received.length) return;
     const drawn = [...projectedMessages, ...queueReceiptMessages(queue?.deliveries ?? [])];
     const settled = received.filter(
       (message) =>
@@ -638,12 +651,18 @@ export function ChatView({
   );
   const atLatest = motion.atLatest;
   // The end of a window around a searched message is not the latest message.
-  const showLatest = () => {
+  // `pin` is the button: the chat then also keeps the end in view while a reply grows. A sent
+  // message takes its own place.
+  const showLatest = (pin: boolean) => {
     if (!detached || !showLatestMessages) {
-      motion.scrollToLatest();
+      if (pin) motion.pinToLatest();
+      else motion.scrollToLatest();
       return;
     }
-    void showLatestMessages().then(motion.returnToLatest, () => undefined);
+    void showLatestMessages().then(
+      () => motion.returnToLatest(pin),
+      () => undefined,
+    );
   };
   const liquidGlassAvailable = isLiquidGlassAvailable() && !reducedTransparency;
   // A quiet return to the app counts as online: the chat keeps its look, and its requests wait.
@@ -657,6 +676,25 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
+  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
+  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
+  const voiceMissing = !speechNative;
+  const composerDictation = useMemo(
+    (): ComposerDictation =>
+      voiceMissing && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
+              Keyboard.dismiss();
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [voiceMissing, dictation],
+  );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
@@ -705,13 +743,90 @@ export function ChatView({
   // channel has no one conversation to follow, so there only the dictation mic beside it listens.
   // With no voice ready, the tap opens Settings > Voice, where the user downloads Supertonic 3 or adds
   // an ElevenLabs key.
-  const composerVoice: ComposerVoice | undefined =
-    live.available || live.open
-      ? {
-          ...liveVoice(live, voiceAgent?.name ?? target.name, t),
-          start: () => (usesGptLive || replyVoiceReady() ? live.start() : router.push("/settings/voice")),
-        }
-      : undefined;
+  // One object while the conversation says the same: the composer is in `memo`, and a new object on
+  // each render of the chat, such as on each streamed chunk, rendered the whole composer again.
+  const {
+    available: liveAvailable,
+    open: liveOpen,
+    exit: liveExit,
+    phase: livePhase,
+    muted: liveMuted,
+    micOpen: liveMicOpen,
+    level: liveLevel,
+    presence: livePresence,
+    start: liveStart,
+    toggleMute: liveToggleMute,
+    interrupt: liveInterrupt,
+    end: liveEnd,
+    error: liveError,
+    caption: liveCaption,
+  } = live;
+  const voiceName = voiceAgent?.name ?? target.name;
+  // Only an agent chat or a channel has a live conversation; see `useLiveConversation`. A boolean, because
+  // both objects change with each message, and the memo below must not.
+  const liveVoiceMissing = voiceMissing && (conversation !== null || liveChannel !== null);
+  const composerVoice = useMemo((): ComposerVoice | undefined => {
+    if (!liveAvailable && !liveOpen && !liveVoiceMissing) return undefined;
+    const source = {
+      available: liveAvailable,
+      open: liveOpen,
+      exit: liveExit,
+      phase: livePhase,
+      muted: liveMuted,
+      micOpen: liveMicOpen,
+      level: liveLevel,
+      presence: livePresence,
+      start: liveStart,
+      toggleMute: liveToggleMute,
+      interrupt: liveInterrupt,
+      end: liveEnd,
+      error: liveError,
+      caption: liveCaption,
+    };
+    const openSettings = () => router.push("/settings/voice");
+    if (!liveAvailable && !liveOpen)
+      return { ...liveVoice(source, voiceName, t), available: true, start: openSettings };
+    return {
+      ...liveVoice(source, voiceName, t),
+      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : openSettings()),
+    };
+  }, [
+    liveAvailable,
+    liveOpen,
+    liveExit,
+    livePhase,
+    liveMuted,
+    liveMicOpen,
+    liveLevel,
+    livePresence,
+    liveStart,
+    liveToggleMute,
+    liveInterrupt,
+    liveEnd,
+    liveError,
+    liveCaption,
+    voiceName,
+    usesGptLive,
+    liveVoiceMissing,
+    t,
+  ]);
+  const voiceAgentId = voiceAgent?.id;
+  const voiceAvatarSeed = voiceAgent?.avatarSeed;
+  const voiceAvatarHue = voiceAgent?.avatarHue;
+  const voiceAvatarColor = voiceAgent?.avatarColor;
+  const voiceAvatar = useMemo(
+    () =>
+      voiceAgentId !== undefined && voiceAvatarSeed !== undefined ? (
+        <VoiceAgentAvatar
+          agentId={voiceAgentId}
+          serverId={target.serverId}
+          seed={voiceAvatarSeed}
+          hue={voiceAvatarHue ?? null}
+          color={voiceAvatarColor ?? null}
+        />
+      ) : undefined,
+    [voiceAgentId, target.serverId, voiceAvatarSeed, voiceAvatarHue, voiceAvatarColor],
+  );
   // A live conversation keeps the chat in view and turns the composer into a call bar.
   const voiceOpen = live.open;
   const dictating = dictation.active;
@@ -903,7 +1018,7 @@ export function ChatView({
     setSendError(null);
     setSelection(null);
     // The reply comes at the latest message, which a window around a searched message does not show.
-    if (detached) showLatest();
+    if (detached) showLatest(false);
     // The send animation starts from the loaded history. Without it, as offline, the row shows at once:
     // the animation would hide the first message until a history that does not load.
     if (!sendsToQueue && ready) motion.beginSend();
@@ -1025,6 +1140,10 @@ export function ChatView({
   const respondToApproval = useCallback(
     (approval: PendingApproval, decision: ApprovalDecision) =>
       workspace().respondToApproval(target.serverId, { requestId: approval.requestId, decision }),
+    [workspace, target.serverId],
+  );
+  const loadWholeApproval = useCallback(
+    (approval: PendingApproval) => workspace().readWholeApproval(target.serverId, approval),
     [workspace, target.serverId],
   );
   const react = useCallback(
@@ -1157,6 +1276,8 @@ export function ChatView({
               browserRequests={chatBrowserRequests}
               serverName={server?.name ?? ""}
               onRespondApproval={respondToApproval}
+              readsWholeApprovals={workspace().readsWholeApprovals(target.serverId)}
+              onLoadWholeApproval={loadWholeApproval}
               foreground={foreground}
               messages={messages}
               messageAliases={messageAliases}
@@ -1189,6 +1310,7 @@ export function ChatView({
               topInset={insets.top}
               onRetryHistory={fetchHistory}
               focusMessageId={focusMessageId}
+              focusUnread={focusUnread}
               onFocusPlaced={onFocusPlaced}
               upload={listUpload}
               outboxStatuses={outboxStatuses}
@@ -1204,7 +1326,7 @@ export function ChatView({
                     accessibilityLabel={t("mobile.chat.scrollToLatest")}
                     fallbackBackground={fieldBackground}
                     liquidGlassAvailable={liquidGlassAvailable}
-                    onPress={showLatest}
+                    onPress={() => showLatest(true)}
                   >
                     <ArrowDown color={String(foreground)} size={22} />
                   </ChatGlassIconButton>
@@ -1268,6 +1390,20 @@ export function ChatView({
                   {t("mobile.chat.outbox.saveFailed")}
                 </Typography.Paragraph>
               ) : null}
+              {notice
+                ? null
+                : statusNotes?.map((note) => (
+                    <Typography.Paragraph
+                      key={note}
+                      type="body-xs"
+                      numberOfLines={2}
+                      accessibilityLiveRegion="polite"
+                      className="bg-background py-1.5 text-text-secondary"
+                      style={{ paddingLeft: insets.left + 16, paddingRight: insets.right + 16 }}
+                    >
+                      {note}
+                    </Typography.Paragraph>
+                  ))}
               {queue && !notice ? (
                 <ChatQueueButton
                   queue={queue}
@@ -1366,21 +1502,11 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
-                  dictation={dictation}
+                  dictation={composerDictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}
-                  voiceAvatar={
-                    voiceAgent ? (
-                      <VoiceAgentAvatar
-                        agentId={voiceAgent.id}
-                        serverId={target.serverId}
-                        seed={voiceAgent.avatarSeed}
-                        hue={voiceAgent.avatarHue}
-                        color={voiceAgent.avatarColor}
-                      />
-                    ) : undefined
-                  }
+                  voiceAvatar={voiceAvatar}
                 />
               )}
             </Animated.View>

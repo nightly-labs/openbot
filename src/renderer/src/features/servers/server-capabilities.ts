@@ -87,6 +87,7 @@ export function serverSupportsCapability(
       capability === "host-timezone-v1" ||
       capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
+      capability === "host-appearance-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
@@ -106,6 +107,7 @@ export function serverSupportsCapability(
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
+      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||

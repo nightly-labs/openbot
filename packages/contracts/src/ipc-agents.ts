@@ -366,6 +366,12 @@ export interface AgentSummary {
    */
   pendingRuntime?: AgentPendingRuntime;
   /**
+   * Local-only. The account that an agent chose for this agent, `default` for the provider's own
+   * sign-in. While the agent is on it and it is ready, a pool of the provider's accounts does not move
+   * the agent. Absent means the pool chooses the account.
+   */
+  pinnedAccountId?: string;
+  /**
    * ISO 8601 time when a user hid the agent. Local-only, like `access`: a remote client reads the
    * hidden agents through `agent-hidden-v1`. Absent means the agent is not hidden.
    */
@@ -439,6 +445,7 @@ function hasAgentSummaryFields(value: DynamicRecord): boolean {
     (value.backupModels === undefined || isAgentBackupModels(value.backupModels)) &&
     (value.usageLimitReturn === undefined || isAgentUsageLimitReturn(value.usageLimitReturn)) &&
     (value.pendingRuntime === undefined || isAgentPendingRuntime(value.pendingRuntime)) &&
+    (value.pinnedAccountId === undefined || isProviderAccountId(value.pinnedAccountId)) &&
     (value.hiddenAt === undefined || isHiddenAt(value.hiddenAt)) &&
     (value.threadId === null || isIdentifier(value.threadId)) &&
     isBoundedString(value.workspacePath, INPUT_LIMITS.path) &&

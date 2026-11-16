@@ -13,6 +13,14 @@ import { ProviderRuntimeFailure, runtimeIO } from "./provider-runtime-effects";
 const execFileAsync = promisify(execFile);
 
 const MAX_ARCHIVE_LIST_BYTES = 16 * 1024 * 1024;
+/**
+ * The tar program for runtime archives. On Windows, a bare `tar` can find the GNU tar of Git for
+ * Windows, MSYS2 or Cygwin before the Windows one, and GNU tar reads `C:\...` as a remote host.
+ */
+export function tarExecutable(): string {
+  if (process.platform !== "win32") return "tar";
+  return join(process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows", "System32", "tar.exe");
+}
 /** tar writes `./` before each name when the archive was made from `.`. */
 export function archiveEntryName(name: string): string {
   return name.replace(/^(?:\.\/)+/u, "");
@@ -47,10 +55,14 @@ export const assertSafeArchive = Effect.fn("ProviderArchive.assertSafeArchive")(
   const [{ stdout: namesValue }, { stdout: detailsValue }] = yield* Effect.all(
     [
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
       ),
       runtimeIO((signal) =>
-        execFileAsync("tar", ["-tvzf", path], { encoding: "utf8", maxBuffer: MAX_ARCHIVE_LIST_BYTES, signal }),
+        execFileAsync(tarExecutable(), ["-tvzf", path], {
+          encoding: "utf8",
+          maxBuffer: MAX_ARCHIVE_LIST_BYTES,
+          signal,
+        }),
       ),
     ],
     { concurrency: "unbounded" },
@@ -92,7 +104,7 @@ export const extractArchive = Effect.fn("ProviderArchive.extractArchive")(functi
   destination: string,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   yield* runtimeIO((signal) =>
-    execFileAsync("tar", ["-xzf", archive, "-C", destination, "--no-same-owner"], {
+    execFileAsync(tarExecutable(), ["-xzf", archive, "-C", destination, "--no-same-owner"], {
       encoding: "utf8",
       maxBuffer: MAX_ARCHIVE_LIST_BYTES,
       signal,

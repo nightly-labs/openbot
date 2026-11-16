@@ -162,6 +162,7 @@ export const messages = {
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
   "mobile.chat.composer.dictate": "Nachricht diktieren",
+  "mobile.chat.composer.voiceSettings": "Spracheinstellungen",
   "mobile.chat.composer.stopDictation": "Diktat beenden",
   "mobile.chat.composer.mention": "{name} erwähnen",
   "mobile.chat.composer.skills": "Fähigkeiten",
@@ -353,6 +354,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "Einmal an {origin} senden. Dieser Wert wird nicht zum Chat hinzugefügt.",
   "mobile.chat.browserSecret.submitFailed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent das falsche Feld auf der Seite gewählt hat.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil der Agent keine der für diese Website gespeicherten Zugangsdaten gewählt hat. Sag dem Agenten, welches Konto er verwenden soll.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie kein Passwort für diese Website enthalten.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie keinen Authenticator-Schlüssel enthalten.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil dein Passwort-Manager nicht gelesen werden konnte.",
   "mobile.chat.browserSecret.submit": "Senden",
   "mobile.chat.browserSecret.takeOver": "Übernehmen",
   "mobile.chat.starter.title": "Woran sollen wir zuerst arbeiten?",
@@ -422,7 +435,15 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "Mit „Erlauben“ erhält {name} diese Berechtigungen auf {server}. Mit „Ablehnen“ bleiben die aktuellen Berechtigungen.",
   "mobile.chat.approval.partial":
-    "Diese Anfrage ist zu lang für das Telefon. Öffne OpenBot auf {server}, um sie zu erlauben. Ablehnen kannst du sie hier.",
+    "{server} sendet nur den Anfang dieser Anfrage an das Telefon. Um sie zu erlauben, aktualisiere OpenBot auf {server} oder öffne diesen Chat in der OpenBot-Desktop-App. Ablehnen kannst du sie hier.",
+  "mobile.chat.approval.loading": "Vollständige Anfrage wird geladen …",
+  "mobile.chat.approval.loadFailed":
+    "Die vollständige Anfrage konnte nicht geladen werden. Ablehnen kannst du sie hier.",
+  "mobile.chat.approval.retry": "Erneut",
+  "mobile.chat.approval.report.bugHeadline": "Einen Fehler gefunden? Lass ihn uns beheben.",
+  "mobile.chat.approval.report.ideaHeadline": "Eine Idee? Lass sie uns umsetzen.",
+  "mobile.chat.approval.report.dontSend": "Nicht jetzt",
+  "mobile.chat.approval.report.send": "An das OpenBot-Team senden",
   "mobile.chat.approval.allow": "Erlauben",
   "mobile.chat.approval.deny": "Ablehnen",
   "mobile.chat.approval.reconnect": "Verbinde dich mit {server}, um diese Anfrage zu beantworten.",
