@@ -49,6 +49,7 @@ import type {
   ComposerDraft,
   ConversationProps,
   ConversationTarget,
+  RightPanelMode,
   SidePanelPane,
 } from "./conversation-types";
 import {
@@ -66,7 +67,7 @@ import { conversationOwnerId, createComposerStore, currentConversationTarget } f
 import { createMcpServersStore } from "./stores/mcp-servers-store";
 import { createMessageActions } from "./stores/message-actions";
 import { createMessagePinsStore } from "./stores/message-pins-store";
-import { createPanelsStore } from "./stores/panels-store";
+import { createPanelsStore, isSidePanelMode } from "./stores/panels-store";
 import { PENDING_SEND_ID_PREFIX, type PendingSend, pendingSendMessage } from "./stores/pending-send-store";
 import { createQueueStore } from "./stores/queue-store";
 import { createReplyJumpStore } from "./stores/reply-jump-store";
@@ -240,6 +241,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setSideQuestions,
     sidePanels,
     setSidePanels,
+    sidePanelShown,
+    setSidePanelShown,
     resources,
   } = controller;
   const drafts = channel ? channelDrafts : agentDrafts;
@@ -634,10 +637,11 @@ export function createConversationViewScope(props: ConversationProps) {
    * until the file shows, so the panel opens also when the read fails.
    */
   function toggleSidePanel() {
-    if (sidePanelOpen()) {
-      hideBrowserPanel();
-      return;
-    }
+    if (sidePanelOpen()) hideBrowserPanel();
+    else showSidePanel();
+  }
+  /** Opens the side panel of this chat at its last file, pane or side thread, or at the list of panes. */
+  function showSidePanel() {
     const { panes, selected, files, file } = sidePanel();
     const pane = selected && panes.includes(selected) ? selected : null;
     const thread = shownPanelThreadId() ?? sideThreadIds()[0];
@@ -2118,7 +2122,8 @@ export function createConversationViewScope(props: ConversationProps) {
     },
   );
 
-  function resetPanelsForAgent(agentId: string | undefined, panel: string | undefined): void {
+  /** Returns the panel mode of the agent after the reset. A read of `rightPanels` gives the new value after the flush only. */
+  function resetPanelsForAgent(agentId: string | undefined, panel: RightPanelMode | undefined): RightPanelMode {
     const previousAgentId = lastPanelAgentId;
     lastPanelAgentId = agentId;
     clearRoutineSettingsRequest();
@@ -2128,8 +2133,21 @@ export function createConversationViewScope(props: ConversationProps) {
       setSidebarFilePreview(null);
       setRightPanels((current) => ({ ...current, [preview.ownerAgentId]: "none" }));
     }
-    if (!previousAgentId || !agentId || (panel !== "settings" && panel !== "file-preview" && panel !== "files")) return;
+    if (!previousAgentId || !agentId || (panel !== "settings" && panel !== "file-preview" && panel !== "files"))
+      return panel ?? "none";
     setRightPanels((current) => ({ ...current, [agentId]: "none" }));
+    return "none";
+  }
+
+  /**
+   * The side panel stays open or closed when another agent or channel opens. An open panel shows the last tab
+   * of the new chat, or the list of panes. The browser full view and picture in picture stay as they are.
+   */
+  function keepSidePanelShown(agentId: string | undefined, panel: RightPanelMode): void {
+    if (!agentId) return;
+    if (untrack(sidePanelShown)) {
+      if (panel === "none") showSidePanel();
+    } else if (isSidePanelMode(panel)) setActiveRightPanel("none", agentId);
   }
 
   // One effect, so a settings request that selects the agent opens its panel after the agent change
@@ -2143,12 +2161,15 @@ export function createConversationViewScope(props: ConversationProps) {
       const settingsRequested =
         request !== null && agentId === request.agentId && !handledSettingsRequests.has(request);
       if (agentId !== lastPanelAgentId) {
-        resetPanelsForAgent(agentId, panel);
+        const reset = resetPanelsForAgent(agentId, panel);
+        if (!settingsRequested) keepSidePanelShown(agentId, reset);
         // The user can type to the agent they opened. Edit agent leaves the focus where it is, and a touch
         // screen does not open its keyboard over the transcript.
         if (agentId && !channel && !settingsRequested && !usesTouchLayout())
           setComposerFocusRequest((value) => value + 1);
       }
+      // Only a change of this chat's panel records the state: the panels of other chats do not show.
+      else if (panel === "none" || isSidePanelMode(panel)) setSidePanelShown(isSidePanelMode(panel));
       if (!request || !settingsRequested) return;
       handledSettingsRequests.add(request);
       if (request.routine) openRoutineSettings(request.routine);

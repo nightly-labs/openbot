@@ -82,6 +82,16 @@ const FILE_PREVIEW_REFRESH_MS = 750;
  */
 const FILE_PREVIEW_REFRESH_BYTES = 8 * 1024 * 1024;
 
+/** True when a panel mode shows the side panel: its pane list, a pane, a file, or a side thread. */
+export function isSidePanelMode(mode: RightPanelMode | undefined): boolean {
+  return (
+    mode === "side-panel" ||
+    mode === "thread" ||
+    mode === "file-preview" ||
+    (mode !== undefined && isSidePanelPane(mode))
+  );
+}
+
 const SIDE_PANEL_EMPTY: SidePanelState = { panes: [], selected: null, files: [], file: null, maximized: false };
 
 export interface PanelsStoreDeps {
@@ -136,11 +146,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     const agentId = conversationOwnerId(deps.props);
     return (agentId && panels.side[agentId]) || SIDE_PANEL_EMPTY;
   };
-  const sidePanelOpen = () =>
-    activeRightPanel() === "side-panel" ||
-    activeRightPanel() === "thread" ||
-    activeRightPanel() === "file-preview" ||
-    isSidePanelPane(activeRightPanel());
+  const sidePanelOpen = () => isSidePanelMode(activeRightPanel());
   function updateSidePanel(agentId: string, update: (state: SidePanelState) => SidePanelState) {
     setPanels((draft) => {
       draft.side[agentId] = update(draft.side[agentId] ?? SIDE_PANEL_EMPTY);
