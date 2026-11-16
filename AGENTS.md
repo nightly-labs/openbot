@@ -27,7 +27,10 @@ and state which default you set aside. Do not argue by citing this file.
 
 - **Migrations are irreversible.** No backup of `openbot.db` is made before an upgrade. Preserve all
   user data and support every shipped source schema. Never assume a backup exists.
-- **Released Team API adapters are permanent.** Do not change a shipped wire protocol's meaning.
+- **Team API support window.** Hosts and clients support the releases of the last 14 days; mobile has
+  the longer window of the minimum-version policy. Do not change the meaning of a wire protocol that
+  a release in the window speaks. A peer outside the window gets "update required", and its adapter,
+  capabilities and fixtures can be deleted. Decided by the developer on 2026-11-17 (plan 011).
 - **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
   policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.
@@ -71,7 +74,7 @@ windows, its OS dialogs or its native notifications.
   gate, for a feature that can work on a server. When a part must stay local, write the reason at
   the gate and in the PR.
 - Gate the client on the host capability. Hide the action while the host does not have it; do not
-  show an action that then fails. An older host keeps working without the feature.
+  show an action that then fails. A host in the support window keeps working without the feature.
 - Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
   local IPC path.
 - A server installs a staged release only at its next boot, or when an owner, an admin or a permitted

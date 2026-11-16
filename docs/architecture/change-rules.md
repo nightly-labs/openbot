@@ -68,7 +68,7 @@ safe to replay. Keep domain retry and recovery rules at their existing owners.
    domains it renders and nothing else; `WorkspaceShell` reads only what decides *which* pane
    renders, and passes a value down as a prop when two of them would otherwise derive it twice. A
    component that assembles another one's props is how the god controller grew back last time.
-9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Released Team API protocol adapters are permanent by default and follow the policy below.
+9. Do not add temporary compatibility paths without a removal condition and a test for that condition. Team API protocol adapters stay while a release in the support window speaks their protocol (root `AGENTS.md`, `packages/contracts/AGENTS.md`).
 10. Log through `@openbot/logging` (`ts-log` Logger), never bare `console.*` - Biome's `noConsole`
     enforces this in `src`, `scripts` and `packages`. The remote-desktop build recipe scripts that the
     `noConsole` override in `biome.json` excludes are exempt. The `Require a recipe version bump` step

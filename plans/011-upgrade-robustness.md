@@ -24,6 +24,20 @@
   offer a release that cannot open the migrated database.
 - No code reads or writes a format version for several JSON stores and for the agent-data database.
 
+## Support window (developer decision, 2026-11-17)
+
+- **Apps and protocols**: desktop, hosts and the web client support the releases of the last 14
+  days. Mobile has a longer window. A peer outside the window gets "update required". Its adapters,
+  codecs, fixtures and capabilities can be deleted. The rule is in `AGENTS.md` and
+  `packages/contracts/AGENTS.md`; it replaces "Released Team API adapters are permanent".
+- **Migrations**: not in the window. A database from any shipped release still upgrades with no
+  data loss. Every migration and its fixtures stay.
+- **Forced update**: the account service publishes a minimum version for each surface. An older app
+  shows a blocking "Update required" screen and installs the update (item 24).
+- **Pre-migration copy**: approved. Item 15 changes the no-backup rule.
+
+All releases since v0.55.0 (2026-10-30) speak protocol 9, so protocols 1 to 8 are outside the window.
+
 ## Database size data (for item 15)
 
 No central source has the database size of users: analytics and the account service do not report
@@ -47,12 +61,14 @@ image; no reflink). Only one database was measured.
 
 | # | Item | State |
 |---|---|---|
-| 1 | The bootstrap capability list stays at 64; one size check per protocol | TODO |
+| 1 | The bootstrap capability list stays at 64; one size check per protocol | SUPERSEDED by item 2 (PR #10777 closed) |
+| 2 | Minimum protocol 9; delete protocols 1 to 8 and the bootstrap list | TODO |
 | 3 | A server stops a start loop and reports the reason through the Team API | TODO |
 | 4 | Desktop start recovery offers only a release that can open the database | TODO |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | TODO |
-| 15 | Copy `openbot.db` before a migration (PR #7150) | BLOCKED: rule change needs a developer decision |
+| 15 | Copy `openbot.db` before a migration (PR #7150) | TODO: rule change approved |
+| 24 | Minimum app version for each surface; blocking "Update required" screen | TODO |
 
 ### 1. Bootstrap list stays at 64
 
@@ -67,10 +83,19 @@ make a contract test fail when a list is larger than the limit of its protocol.
 
 STOP: if a bootstrap capability is necessary for a released client, report before you remove it.
 
-### 2. Protocol 10 with a fixed baseline (after item 1)
+### 2. Minimum protocol 9, then protocol 10 with a fixed baseline
 
-A new protocol version where all capabilities shipped up to now are implied by the version.
-Only new capabilities go in the list. Old peers keep protocol 9 behavior.
+Step 1 (now): the host and every client (desktop, web client, mobile) set the minimum protocol to 9.
+A host refuses an older client with `client_update_required`; a client refuses an older host with
+`host_update_required`. Delete the codecs, adapters, fixtures and the bootstrap list of protocols 1
+to 8. Keep the size limit table of PR #10777 if it is still useful.
+
+STOP: if a mobile store build in the mobile window, without an over-the-air update, speaks a protocol
+below 9.
+
+Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by the version. Only
+new capabilities go in the list. When no release in the window speaks protocol 9, delete those
+capabilities from the lists.
 
 ### 3. Server start-loop guard and safe mode
 
@@ -114,10 +139,17 @@ bash function must also pass. Fix the hosted auto-install docs if they disagree 
 ### 15. Pre-migration copy
 
 PR #7150 (draft) runs `VACUUM INTO` before the first pending migration, keeps 2 copies, and skips
-the copy when the disk is too full. The NorbiAI P1 finding is the conflict with the
-non-negotiable "No backup of `openbot.db` is made before an upgrade" (`AGENTS.md`,
-`src/backend/AGENTS.md`). The measured cost is 0.46 s for 385 MB. To merge it, the developer must
-decide to change that rule.
+the copy when the disk is too full. The measured cost is 0.46 s for 385 MB. The developer approved
+the rule change on 2026-11-17: the PR changes "No backup of `openbot.db` is made before an upgrade"
+(`AGENTS.md`) and "No automatic full-database backups" (`src/backend/AGENTS.md`), and fixes its open
+review findings. Migrations stay irreversible; the copy is a recovery aid, not a rollback path.
+
+### 24. Minimum app version for each surface
+
+The account service publishes a minimum version for desktop, host and mobile. Desktop and hosts use
+the 14-day window; mobile uses a longer one. An app below its minimum shows a blocking "Update
+required" screen and starts the update. A server installs the staged release. The check must not
+send new user data (`PRIVACY.md` if outbound data changes).
 
 ## Phase 2: make migrations and capabilities hard to break
 
