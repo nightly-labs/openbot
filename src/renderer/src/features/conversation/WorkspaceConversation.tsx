@@ -87,8 +87,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const connectors = useConnectors();
   const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
-  const { serverSettingsOpen, openServerSettings, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } =
-    useServerSettings();
+  const {
+    serverSettingsOpen,
+    openServerSettings,
+    openMcpSignIn,
+    serverSettingsTargetId,
+    serverSettingsMcpSignIns,
+    refreshMcpSignIns,
+  } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
@@ -545,6 +551,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         mcpSignedIn={(mcpServerId) =>
           serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
         }
+        refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
         serverInstall={{
           get servers() {
             return servers();

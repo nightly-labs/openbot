@@ -598,6 +598,18 @@ const ServerSettings = createSimpleContext({
       return result;
     }
 
+    /**
+     * Reads the sign-in states again for the Sign in cards in a chat of the server that Server settings
+     * last read. Another server keeps no states here, so it is not read.
+     */
+    function refreshMcpSignIns(serverId: string | undefined): void {
+      const server = serverSettingsTarget();
+      if (!server || server.id !== serverId) return;
+      void listMcpSignIns(server).then((signIns) => {
+        if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(signIns);
+      });
+    }
+
     /** Which http rows the server holds a sign-in for. A host without `mcp-sign-in-v1` answers none. */
     async function listMcpSignIns(server: ServerSummary): Promise<Record<string, McpSignInState>> {
       // A badge beside the list, not the list: a failed read shows no badge rather than failing the
@@ -824,6 +836,7 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcp,
       serverSettingsMcpError,
       serverSettingsMcpSignIns,
+      refreshMcpSignIns,
       serverSettingsTargetId,
       serverSettingsMcpSignInRequest,
       clearMcpSignInRequest: () => setServerSettingsMcpSignInRequest(null),
