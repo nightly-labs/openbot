@@ -453,6 +453,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "スキル {name} を更新",
   "chat.suggestion.update": "更新",
   "chat.suggestion.updated": "更新済み",
+  "chat.suggestion.saving": "保存中…",
+  "chat.suggestion.updating": "更新中…",
   "chat.suggestion.saveReply": "はい、スキルとして保存して。",
   "chat.suggestion.updateReply": "はい、スキルに追加して。",
   "chat.suggestion.detailsNamed": "マーケットプレイスで {name} を開く",

@@ -104,7 +104,8 @@ async function run() {
         kind: "file",
         stored: "application/octet-stream",
       },
-      { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "application/octet-stream" },
+      // #9880: OGG audio takes its type from the name, so the chat plays it.
+      { name: "song.ogg", mimeType: "audio/ogg", bytes: binary, kind: "file", stored: "audio/ogg" },
       { name: "screenshot.png", mimeType: "image/png", bytes: png, kind: "image", stored: "image/png" },
       // #9752: a HEIF photo with a JPEG name is a file, because no provider decodes HEIF. AVIF uses the
       // same container and stays an image.

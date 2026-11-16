@@ -660,11 +660,52 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
   }
   const parsed = describeSchema.safeParse(params.arguments);
   if (!parsed.success) throw new Error(sourceText("error.agent.toolRequestInvalid"));
-  const names = [...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])];
-  const entries = [...new Set(names)].map((name) => requireTool(name, catalog));
+  const names = [...new Set([...(parsed.data.names ?? []), ...(parsed.data.name ? [parsed.data.name] : [])])];
+  // The MCP names of a catalog tool, such as mcp__openbot__list_agents, count, as they do in tool_call.
+  const entries = new Set<(typeof catalog)[number]>();
+  const notFound: string[] = [];
+  for (const name of names) {
+    const entry = catalogEntry(catalog, name);
+    if (entry) entries.add(entry);
+    else notFound.push(name);
+  }
+  if (entries.size === 0) throw new UnknownToolNamesError(notFound);
   return {
     call: CALL_NOTE,
-    tools: entries.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
-    guidance: toolGuidanceFor(entries),
+    tools: [...entries].map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+    guidance: toolGuidanceFor([...entries]),
+    ...(notFound.length > 0 ? { notFound, note: unknownToolNamesText(notFound) } : {}),
   };
+}
+
+/** True for OpenBot's discovery tools. They are not catalog tools, so tool_describe does not describe them. */
+function isDiscoveryTool(name: string): boolean {
+  return /^openbot\.tool_(?:search|describe|call)$/.test(qualifiedToolName(name));
+}
+
+/** True when a name that tool_describe did not find can be a tool of the user's MCP servers. */
+export function mayNameMcpTool(names: readonly string[]): boolean {
+  return names.some((name) => !isDiscoveryTool(name));
+}
+
+/** A tool_describe call that named no catalog tool. The message names each refused name. */
+export class UnknownToolNamesError extends Error {
+  constructor(readonly names: readonly string[]) {
+    super(unknownToolNamesText(names));
+  }
+}
+
+/**
+ * The text for the names that tool_describe did not find. One general error for the whole call did not
+ * tell the agent which name to correct, so it tried the same wrong names again (#9930).
+ */
+function unknownToolNamesText(names: readonly string[]): string {
+  const discovery = names.filter(isDiscoveryTool);
+  const other = names.filter((name) => !isDiscoveryTool(name));
+  return [
+    ...(other.length > 0 ? [sourceText("error.agent.toolDescribeUnknownNames", { names: other.join(", ") })] : []),
+    ...(discovery.length > 0
+      ? [sourceText("error.agent.toolDescribeDiscoveryNames", { names: discovery.join(", ") })]
+      : []),
+  ].join(" ");
 }

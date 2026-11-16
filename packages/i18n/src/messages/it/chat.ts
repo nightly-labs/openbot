@@ -475,6 +475,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "Aggiorna la skill {name}",
   "chat.suggestion.update": "Aggiorna",
   "chat.suggestion.updated": "Aggiornata",
+  "chat.suggestion.saving": "Salvataggio…",
+  "chat.suggestion.updating": "Aggiornamento…",
   "chat.suggestion.saveReply": "Sì, salvalo come skill.",
   "chat.suggestion.updateReply": "Sì, aggiungilo alla skill.",
   "chat.suggestion.detailsNamed": "Apri {name} nel Marketplace",

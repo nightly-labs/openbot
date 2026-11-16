@@ -40,6 +40,7 @@ import {
   channelLane,
   type DeliveryContext,
   type MailboxStore,
+  MESSAGING_LANE,
   type UsageLimitContinuation,
 } from "../mailbox-store";
 import {
@@ -274,6 +275,8 @@ export interface TurnHooks {
   quietRoutineDelivery(deliveryId: string): boolean;
   /** The task whose thread this is, or null for any other thread. */
   taskForThread(threadId: string): string | null;
+  /** Whether the turns of this public thread run in the lane of the agent's external conversations. */
+  inMessagingLane(agentId: string, threadId: string): boolean;
   /** Whether this public thread is the side thread of a routine, which takes that routine's runs. */
   isRoutineThread(threadId: string): boolean;
   /** Whether this task's thread exists and is not archived. */
@@ -405,8 +408,8 @@ export class TurnLifecycle {
   readonly #capacityNotices = new Set<string>();
   /**
    * The client, provider thread and start time of each running turn, from its `turn/started`.
-   * `produced` is set by the first item or delta: a refused turn is run again only without one. A
-   * completed answer item with no text does not count.
+   * `produced` is set by the first item or delta other than the echo of the user's message: a
+   * refused turn is run again only without one. A completed answer item with no text does not count.
    * `acted` is narrower: a tool step or answer text, which a turn run again would repeat. Thinking
    * and the echo of the user's message do not count. `sentAt` (when the message that started the
    * turn was sent) and `firstOutputAt` split a slow reply into OpenBot's wait and the provider's.
@@ -750,12 +753,17 @@ export class TurnLifecycle {
     return this.#conversation.isTaskThread(threadId) ? this.#hooks.taskForThread(threadId) : null;
   }
 
-  /** The mailbox lane of a provider thread: its task, its channel, or null for the agent's own chat. */
+  /**
+   * The mailbox lane of a provider thread: its task, its channel, the agent's external conversations,
+   * or null for the agent's own chat.
+   */
   #laneForThread(agentId: string, externalThreadId: string): string | null {
     const taskId = this.#taskForThread(agentId, externalThreadId);
     if (taskId !== null) return taskId;
-    const channelId = this.#conversation.channelForThread(this.#conversation.publicThreadId(agentId, externalThreadId));
-    return channelId === null ? null : channelLane(channelId);
+    const threadId = this.#conversation.publicThreadId(agentId, externalThreadId);
+    const channelId = this.#conversation.channelForThread(threadId);
+    if (channelId !== null) return channelLane(channelId);
+    return this.#hooks.inMessagingLane(agentId, threadId) ? MESSAGING_LANE : null;
   }
 
   /**
@@ -1137,7 +1145,7 @@ export class TurnLifecycle {
         if (started && reports && unprompted) started.reports = reports;
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
-        if (laneId === null) this.#failedTurns.delete(agentId);
+        if (laneId === null || laneId === MESSAGING_LANE) this.#failedTurns.delete(agentId);
         const origin = starting?.sender.kind ?? "unknown";
         if (!unprompted) {
           const association = Deferred.makeUnsafe<void, TurnOperationFailed>();
@@ -1188,9 +1196,11 @@ export class TurnLifecycle {
         const itemId = getString(item, "id");
         if (itemId) this.#itemTurns.set(itemId, turnId);
         if (itemId && item.failureReport === true) this.#runningTurns.get(turnId)?.failureReports.add(itemId);
-        // Claude completes each failed turn with an empty answer. It is not output, so a turn that
-        // Claude refused before it did work, such as on a session that it cannot find, runs again (#9928).
-        if (notification.method !== "item/completed" || !isEmptyAnswer(item))
+        // Codex starts each turn with the echo of the user's message, which the model did not produce.
+        // Counted, it blocked the one run again of each refused Codex turn (#9915). Claude completes
+        // each failed turn with an empty answer, which is not output either: a session that Claude
+        // cannot find then also runs again (#9928).
+        if (item.type !== "userMessage" && (notification.method !== "item/completed" || !isEmptyAnswer(item)))
           this.#markProduced(turnId, isRepeatedWork(item));
         const running = this.#runningTurns.get(turnId);
         if (running && item.type === "agentMessage" && item.phase === "commentary") {
@@ -2249,7 +2259,12 @@ export class TurnLifecycle {
               answer: latestAssistant?.text,
             })
           : null);
-      if (!continuation) this.#planContinuation.cancel(agentId, laneTaskId);
+      // An external conversation's turn ends only the plan continuation of its own lane.
+      if (!continuation)
+        this.#planContinuation.cancel(
+          agentId,
+          laneTaskId ?? (this.#laneForThread(agentId, threadId) === MESSAGING_LANE ? MESSAGING_LANE : null),
+        );
       if (deliveries.length > 0) {
         const terminal = outcome === "failed" ? "failed" : outcome === "interrupted" ? "interrupted" : "completed";
         for (const delivery of deliveries) {

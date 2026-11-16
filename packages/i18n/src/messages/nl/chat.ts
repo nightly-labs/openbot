@@ -469,6 +469,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "Vaardigheid {name} bijwerken",
   "chat.suggestion.update": "Bijwerken",
   "chat.suggestion.updated": "Bijgewerkt",
+  "chat.suggestion.saving": "Opslaan…",
+  "chat.suggestion.updating": "Bijwerken…",
   "chat.suggestion.saveReply": "Ja, sla het op als vaardigheid.",
   "chat.suggestion.updateReply": "Ja, voeg het toe aan de vaardigheid.",
   "chat.suggestion.detailsNamed": "{name} openen in de marktplaats",

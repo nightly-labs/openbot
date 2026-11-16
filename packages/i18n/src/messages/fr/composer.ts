@@ -24,6 +24,11 @@ export const messages = {
   "composer.update.manual": "Mettez à jour {provider} sur l’ordinateur qui l’exécute pour continuer.",
   "composer.update.pending": "Mise à jour…",
   "composer.update.action": "Mettre à jour",
+  "composer.imageInput.body":
+    "{model} reçoit uniquement du texte et ne voit donc pas les images que vous joignez. Si ce modèle peut lire des images, activez les images pour lui.",
+  "composer.imageInput.label": "Activer les images pour {model}",
+  "composer.imageInput.pending": "Activation…",
+  "composer.imageInput.action": "Activer les images",
   "composer.usageLimit.credits":
     "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent maintenant vos crédits.",
   "composer.usageLimit.creditsResets":

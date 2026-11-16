@@ -476,6 +476,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "{name} becerisini güncelle",
   "chat.suggestion.update": "Güncelle",
   "chat.suggestion.updated": "Güncellendi",
+  "chat.suggestion.saving": "Kaydediliyor…",
+  "chat.suggestion.updating": "Güncelleniyor…",
   "chat.suggestion.saveReply": "Evet, beceri olarak kaydet.",
   "chat.suggestion.updateReply": "Evet, beceriye ekle.",
   "chat.suggestion.detailsNamed": "{name} uygulamasını Pazaryerinde aç",

@@ -22,6 +22,11 @@ export const messages = {
   "composer.update.manual": "계속하려면 {provider}이(가) 실행되는 컴퓨터에서 업데이트하세요.",
   "composer.update.pending": "업데이트 중…",
   "composer.update.action": "업데이트",
+  "composer.imageInput.body":
+    "{model}은(는) 텍스트만 받으므로 첨부한 이미지를 볼 수 없습니다. 이 모델이 이미지를 읽을 수 있다면 이미지를 켜세요.",
+  "composer.imageInput.label": "{model}의 이미지 켜기",
+  "composer.imageInput.pending": "켜는 중…",
+  "composer.imageInput.action": "이미지 켜기",
   "composer.usageLimit.credits": "{provider} 플랜 한도를 모두 사용했어요. 이제 에이전트가 크레딧을 사용해요.",
   "composer.usageLimit.creditsResets":
     "{provider} 플랜 한도를 모두 사용했어요. {reset}에 초기화될 때까지 에이전트가 크레딧을 사용해요.",

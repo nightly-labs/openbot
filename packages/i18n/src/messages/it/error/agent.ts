@@ -18,6 +18,10 @@ export const messages = {
     "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Usa il nome qualificato esatto fornito da tool_search, ad esempio openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Il tool non è stato eseguito. tool_call non ha trovato nessun tool con questo nome. Il nome qualificato è forse {name}. Se è così, invia di nuovo la chiamata con quel nome.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe non ha trovato nessuno strumento OpenBot chiamato {names}. Descrive solo gli strumenti di OpenBot e del browser elencati da openbot.tool_search, non gli strumenti MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Chiama {names} direttamente. tool_describe non descrive gli strumenti di ricerca.",
   "error.agent.routineScheduleArgumentsInvalid":
     "La pianificazione della routine non è valida: {detail} Correggi la pianificazione e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",

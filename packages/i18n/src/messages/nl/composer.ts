@@ -23,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.imageInput.body":
+    "{model} krijgt alleen tekst en ziet de afbeeldingen die je bijvoegt dus niet. Als dit model afbeeldingen kan lezen, zet afbeeldingen ervoor aan.",
+  "composer.imageInput.label": "Afbeeldingen aanzetten voor {model}",
+  "composer.imageInput.pending": "Aanzetten…",
+  "composer.imageInput.action": "Afbeeldingen aan",
   "composer.usageLimit.credits":
     "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
   "composer.usageLimit.creditsResets":

@@ -466,6 +466,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "Atualizar a habilidade {name}",
   "chat.suggestion.update": "Atualizar",
   "chat.suggestion.updated": "Atualizada",
+  "chat.suggestion.saving": "Salvando…",
+  "chat.suggestion.updating": "Atualizando…",
   "chat.suggestion.saveReply": "Sim, salve como habilidade.",
   "chat.suggestion.updateReply": "Sim, adicione à habilidade.",
   "chat.suggestion.detailsNamed": "Abrir {name} na loja",

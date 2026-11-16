@@ -18,6 +18,10 @@ export const messages = {
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. tool_search'ün verdiği tam nitelikli adı kullanın, örneğin openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Araç çalışmadı. tool_call bu adla bir araç bulamadı. Nitelikli ad büyük olasılıkla {name}. Öyleyse çağrıyı bu adla yeniden gönderin.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe, {names} adında bir OpenBot aracı bulamadı. Yalnızca openbot.tool_search'ün listelediği OpenBot ve tarayıcı araçlarını açıklar, MCP araçlarını açıklamaz.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "{names} araçlarını doğrudan çağır. tool_describe arama araçlarını açıklamaz.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Rutin zamanlaması geçersiz: {detail} Zamanlamayı düzeltip yeniden deneyin. openbot.tool_describe şemayı verir.",
   // Agent errors that the main process and the backend send.

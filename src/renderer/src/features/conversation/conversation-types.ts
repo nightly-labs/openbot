@@ -17,6 +17,7 @@ import type {
   ClientAgentModelOption,
   ConversationSnapshot,
   CustomAgentSummary,
+  CustomProviderRestart,
   CustomProviderSummary,
   DraftAttachment,
   FilePreview,
@@ -28,6 +29,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
+  UpdateCustomProviderInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -200,6 +202,12 @@ export interface ConversationProps {
    * path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[] | undefined;
+  /**
+   * Saves an edit of one of `customProviders`. Only for this computer: a Team API list and edit keep
+   * the released model fields, id and name, so a joined server's host does not show or take what a
+   * model accepts.
+   */
+  onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;

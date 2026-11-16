@@ -619,6 +619,8 @@ export const messages = {
   "chat.suggestion.updateNamed": "تحديث المهارة {name}",
   "chat.suggestion.update": "تحديث",
   "chat.suggestion.updated": "تم التحديث",
+  "chat.suggestion.saving": "جارٍ الحفظ…",
+  "chat.suggestion.updating": "جارٍ التحديث…",
   "chat.suggestion.saveReply": "نعم، احفظه كمهارة.",
   "chat.suggestion.updateReply": "نعم، أضفه إلى المهارة.",
   "chat.suggestion.detailsNamed": "فتح {name} في المتجر",

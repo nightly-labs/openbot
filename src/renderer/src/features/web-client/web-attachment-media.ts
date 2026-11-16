@@ -33,6 +33,8 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "audio/mp4",
   "audio/wav",
   "audio/aac",
+  "audio/ogg",
+  "audio/flac",
   "video/quicktime",
   "video/mp4",
 ]);

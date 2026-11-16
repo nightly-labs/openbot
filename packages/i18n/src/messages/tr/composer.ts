@@ -23,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Devam etmek için {provider} uygulamasını çalıştığı bilgisayarda güncelleyin.",
   "composer.update.pending": "Güncelleniyor…",
   "composer.update.action": "Güncelle",
+  "composer.imageInput.body":
+    "{model} yalnızca metin alır, bu yüzden eklediğiniz görselleri görmez. Bu model görselleri okuyabiliyorsa görselleri açın.",
+  "composer.imageInput.label": "{model} için görselleri aç",
+  "composer.imageInput.pending": "Açılıyor…",
+  "composer.imageInput.action": "Görselleri aç",
   "composer.usageLimit.credits":
     "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız artık kredilerinizi kullanıyor.",
   "composer.usageLimit.creditsResets":
