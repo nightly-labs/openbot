@@ -43,6 +43,7 @@ import { LOCAL_SERVERS_ROUTES } from "@openbot/contracts/team-protocol/local-ser
 import { MACHINE_RESOURCES_ROUTES } from "@openbot/contracts/team-protocol/machine-resources-v1";
 import { MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import { MODEL_VISIBILITY_ROUTES } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PENDING_APPROVAL_ROUTES } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROMPT_CACHE_TTL_ROUTES } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
@@ -108,6 +109,7 @@ const PASSIVE_ROUTES: ReadonlySet<string> = new Set([
   CLAUDE_COMPACT_WINDOW_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.settings,
   MODEL_VISIBILITY_ROUTES.listing,
+  MODEL_STEERING_ROUTES.list,
   PROVIDER_ACCOUNT_MODELS_ROUTES.list,
   PROVIDER_ACCOUNT_POOL_ROUTES.list,
   PROVIDER_DEFAULT_ROUTES.settings,

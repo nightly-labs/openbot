@@ -2,7 +2,7 @@ import { Effect, Schema } from "effect";
 // Computer Use, local scripts, the busy-message mode, the backup models, the task limit, the agent's
 // own new chats, the plan card and the fast mode of one agent, as this computer holds them. The
 // `agent-host-settings-v1`, `agent-backup-models-v1`, `agent-task-limit-v1`, `agent-new-chat-v1`,
-// `agent-plan-card-v1`, `agent-fast-mode-v1` and `agent-speed-v1` host routes use this, and they write through `AgentService.updateAgent`, the
+// `agent-plan-card-v1`, `agent-fast-mode-v1`, `agent-speed-v1` and `model-steering-v1` host routes use this, and they write through `AgentService.updateAgent`, the
 // writer of the local window, so a remote admin changes the same state.
 
 import {
@@ -13,6 +13,7 @@ import {
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
   type AgentSpeedSettings,
+  type AgentSteeringModel,
   type AgentSummary,
   type AgentTaskLimitSettings,
   agentAutomationAllowed,
@@ -63,6 +64,8 @@ export interface AgentHostSettingsService {
   updateSpeed(input: UpdateAgentSpeedInput): Effect.Effect<AgentSpeedSettings, AgentHostSettingsFailure>;
   /** `listFastModels` with the Ultrafast tiers and the Claude models, for `agent-speed-v1`. */
   listSpeedModels(): AgentFastModel[];
+  /** The models of this computer whose custom agent steers a running turn, for `model-steering-v1`. */
+  listSteeringModels(): AgentSteeringModel[];
 }
 
 export function createAgentHostSettings({
@@ -210,6 +213,8 @@ export function createAgentHostSettings({
             ? [{ provider, id, fastServiceTier, ...(ultrafastServiceTier ? { ultrafastServiceTier } : {}) }]
             : [],
         ),
+    listSteeringModels: () =>
+      agents.listModels().flatMap(({ provider, id, steersTurns }) => (steersTurns ? [{ provider, id }] : [])),
   };
 }
 

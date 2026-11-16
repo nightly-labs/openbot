@@ -285,6 +285,7 @@ import {
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
@@ -591,7 +592,8 @@ function startDisk(volumes: Json | undefined): boolean {
 
 // A Codex model with fast and Ultrafast tiers, a Codex model without a tier, and a Claude model with a
 // fast tier. The fast-mode models route lists only the first, with no Ultrafast tier; the speed route
-// lists the first and the Claude model.
+// lists the first and the Claude model. Two custom agent models have no tier: the first steers, so the
+// model-steering route lists only it.
 const FAST_MODE_MODELS: AgentModelOption[] = [
   {
     provider: "codex",
@@ -616,6 +618,23 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     provider: "codex",
     id: "gpt-standard",
     name: "GPT Standard",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+  },
+  {
+    provider: "acp",
+    id: "steering-agent/default",
+    name: "Steering agent",
+    description: "",
+    defaultReasoningEffort: "medium",
+    supportedReasoningEfforts: ["medium"],
+    steersTurns: true,
+  },
+  {
+    provider: "acp",
+    id: "plain-agent/default",
+    name: "Plain agent",
     description: "",
     defaultReasoningEffort: "medium",
     supportedReasoningEfforts: ["medium"],
@@ -5234,6 +5253,40 @@ try {
       "a member cannot set the speed of an agent that the client protocol does not show",
       errorIs(hiddenSet, 404, sourceText("error.team.agentNotFound")) && callsOf("updateAgent").length === writes + 3,
       summary(hiddenSet),
+    );
+  }
+
+  // ---- Steering models (model-steering-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises model-steering-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MODEL_STEERING_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MODEL_STEERING_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", MODEL_STEERING_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY],
+    });
+    check(
+      "the steering models route without the capability gets 400 modelVisibilityUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.modelVisibilityUnsupported")),
+      summary(unsupported),
+    );
+    const steering = await call("POST", MODEL_STEERING_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [AGENT_HIDDEN_CAPABILITY, TEAM_QUEUE_EDIT_CAPABILITY, MODEL_STEERING_CAPABILITY],
+    });
+    check(
+      "a member reads only the custom agent models that steer",
+      steering.status === 200 &&
+        isDeepStrictEqual(steering.body, { models: [{ provider: "acp", id: "steering-agent/default" }] }),
+      summary(steering),
     );
   }
 

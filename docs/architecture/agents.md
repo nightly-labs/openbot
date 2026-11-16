@@ -833,9 +833,21 @@ exists only after the user changes the setting, so a stored "queue" stays "queue
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
 "queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
 own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
-(`steerOpenCode`). An OpenCode release before the extension does not report
-`_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
-waits in the queue. `scripts/opencode-steer-e2e.ts` checks both.
+(`steerAcpSession` in `src/backend/acp-session-steering.ts`). An OpenCode release before the
+extension does not report `_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the
+steer and the message waits in the queue. `scripts/opencode-steer-e2e.ts` checks both.
+
+A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
+agent process reports at `initialize` whether it steers, so the provider alone does not tell.
+`AcpAgentClient` adds `steersTurns` to its `model/list` answer, `CustomAcpAgentsClient` puts it on
+each model of that agent, and the catalog keeps it as `AgentModelOption.steersTurns`.
+`agentSteersTurns(runtime, models)` reads it for the agent's model: the host gates
+(`#steerWhenBusy`, `QueueControls.steer`) and the composer, the queue and the agent settings use it.
+A custom agent that does not steer keeps "Send now", and a steer stays in the queue with the reason.
+A remote client reads the steering models from `model-steering-v1`, because the released model list
+does not carry the flag. A host before it does not advertise the capability, so the client keeps
+"Send now" and the host queues the message. `scripts/custom-agent-steer-e2e.ts` checks the catalog,
+a steer, a `promptRequired` answer and an agent without the extension.
 
 A steered message joins work that the model already does, and a model that gets it as plain user
 text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block
