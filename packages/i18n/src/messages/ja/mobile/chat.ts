@@ -161,6 +161,7 @@ export const messages = {
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
+  "mobile.chat.composer.voiceSettings": "音声設定",
   "mobile.chat.composer.stopDictation": "音声入力を停止",
   "mobile.chat.composer.mention": "{name} をメンション",
   "mobile.chat.composer.skills": "スキル",

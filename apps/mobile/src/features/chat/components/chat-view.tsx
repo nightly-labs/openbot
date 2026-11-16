@@ -45,6 +45,7 @@ import {
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -91,7 +92,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { useComposerDictation } from "./use-composer-dictation";
+import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -675,6 +676,23 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
+  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
+  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
+  const voiceMissing = !speechNative;
+  const composerDictation = useMemo(
+    (): ComposerDictation =>
+      voiceMissing && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [voiceMissing, dictation],
+  );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
@@ -743,7 +761,9 @@ export function ChatView({
   } = live;
   const voiceName = voiceAgent?.name ?? target.name;
   const composerVoice = useMemo((): ComposerVoice | undefined => {
-    if (!liveAvailable && !liveOpen) return undefined;
+    // Only an agent chat or a channel has a live conversation; see `useLiveConversation`.
+    const missing = voiceMissing && (conversation !== null || liveChannel !== null);
+    if (!liveAvailable && !liveOpen && !missing) return undefined;
     const source = {
       available: liveAvailable,
       open: liveOpen,
@@ -760,6 +780,8 @@ export function ChatView({
       error: liveError,
       caption: liveCaption,
     };
+    if (!liveAvailable && !liveOpen)
+      return { ...liveVoice(source, voiceName, t), available: true, start: () => router.push("/settings/voice") };
     return {
       ...liveVoice(source, voiceName, t),
       start: () => (usesGptLive || replyVoiceReady() ? liveStart() : router.push("/settings/voice")),
@@ -781,6 +803,9 @@ export function ChatView({
     liveCaption,
     voiceName,
     usesGptLive,
+    voiceMissing,
+    conversation,
+    liveChannel,
     t,
   ]);
   const voiceAgentId = voiceAgent?.id;
@@ -1475,7 +1500,7 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
-                  dictation={dictation}
+                  dictation={composerDictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}

@@ -154,6 +154,7 @@ export const messages = {
   "mobile.chat.composer.send": "发送消息",
   "mobile.chat.composer.stop": "停止 {name}",
   "mobile.chat.composer.dictate": "口述消息",
+  "mobile.chat.composer.voiceSettings": "语音设置",
   "mobile.chat.composer.stopDictation": "停止听写",
   "mobile.chat.composer.mention": "提及 {name}",
   "mobile.chat.composer.skills": "技能",

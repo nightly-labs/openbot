@@ -158,6 +158,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.composer.send": "Send message",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dictate message",
+  "mobile.chat.composer.voiceSettings": "Voice settings",
   "mobile.chat.composer.stopDictation": "Stop dictation",
   "mobile.chat.composer.mention": "Mention {name}",
   "mobile.chat.composer.skills": "Skills",
