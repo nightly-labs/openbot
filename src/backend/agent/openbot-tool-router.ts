@@ -129,7 +129,7 @@ import {
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
-import { handleSetCommitCoAuthorTool } from "./commit-co-author-tool";
+import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
@@ -467,8 +467,8 @@ export interface OpenBotToolRouterOptions {
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
   visualPreview?: ChatVisualPreviewHost | null | undefined;
-  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`; null where this process has none. */
-  setCommitCoAuthor?: ((enabled: boolean) => Effect.Effect<unknown, { readonly cause: unknown }>) | undefined;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
@@ -533,7 +533,7 @@ export class OpenBotToolRouter {
   readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
-  readonly #setCommitCoAuthor: ((enabled: boolean) => Effect.Effect<unknown, { readonly cause: unknown }>) | null;
+  readonly #setCommitCoAuthor: SetCommitCoAuthor | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
   readonly #fitImage: ImageFitter | null;

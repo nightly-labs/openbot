@@ -14,11 +14,13 @@ export const setCommitCoAuthorToolSchema = z.strictObject({
 /** Where the user changes the setting, for an agent that tells the user. */
 const SETTING_PLACE = "Server settings > Agent defaults > Git commits > Credit OpenBot in commits";
 
+/** Saves the `commitCoAuthor` agent default, as Server settings > Agent defaults does, and gives it to every agent. */
+export type SetCommitCoAuthor = (enabled: boolean) => Effect.Effect<unknown, { readonly cause: unknown }>;
+
 export interface SetCommitCoAuthorToolOptions {
   /** The `commitCoAuthor` agent default now. */
   current(): boolean;
-  /** Saves the agent default, as Server settings > Agent defaults does, and gives it to every agent. */
-  set(enabled: boolean): Effect.Effect<unknown, { readonly cause: unknown }>;
+  set: SetCommitCoAuthor;
   /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
   /** Waits for the owner's answer to a card with this text. */
@@ -41,7 +43,7 @@ export const handleSetCommitCoAuthorTool = Effect.fn("SetCommitCoAuthorTool.hand
     // setting of every agent.
     if (!options.requestedByPerson)
       return openBotToolFailure(
-        `Only a person's message, in your OpenBot chat or a thread they opened, can change this setting. Tell the user that they can change it in ${SETTING_PLACE}.`,
+        `Only a message from the owner of this OpenBot, in your chat or a thread they opened, can change this setting. When a person asked for it, tell them that the owner can change it in ${SETTING_PLACE}.`,
       );
     const decision = yield* options.approve(
       sourceText(enabled ? "status.agent.commitCoAuthorOn" : "status.agent.commitCoAuthorOff"),

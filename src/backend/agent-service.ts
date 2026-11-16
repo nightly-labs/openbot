@@ -188,6 +188,7 @@ import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
+import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -395,7 +396,7 @@ export interface AgentServiceOptions {
   /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
   visualPreview?: ChatVisualPreviewHost | null;
   /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
-  setCommitCoAuthor?: ((enabled: boolean) => Effect.Effect<unknown, { readonly cause: unknown }>) | undefined;
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /**
    * Decodes a picture, makes its flat background clear (`clearFlatBackground`) and gives it back as a
    * PNG; null when the picture has no flat background. Without it a transparent Grok image keeps the
