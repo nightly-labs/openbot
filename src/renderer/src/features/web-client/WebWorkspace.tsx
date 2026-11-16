@@ -1352,6 +1352,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (id) void openHostPage(id, "library", button);
     };
   }
+  /** The Providers button of the page rail, only when this account manages the providers. Not a ternary prop. */
+  function providersRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!providerSettings()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (id) void openServerSettings(id, button, "providers");
+    };
+  }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
   function workflowsRailAction(): (() => void) | undefined {
     if (!workflowsSupported()) return undefined;
@@ -2947,7 +2955,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               }}
               onWorkflows={workflowsRailAction()}
               onLibrary={libraryRailAction()}
-              onProviders={providerSettings() ? openProviderSettings : undefined}
+              onProviders={providersRailAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
