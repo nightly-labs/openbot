@@ -1,0 +1,390 @@
+/* The web pricing page (`apps/auth-api/src/components/pricing/PricingPage.css`) in the app window. The values come
+   from the web page, so the layout is the same. The outer glow of the strips is left out. */
+
+/* In the app window, the page fills the card below the top row, as the usage page does. */
+.hosted-pricing-page {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* In the web client, the page covers the app frame. */
+.hosted-pricing-page[data-overlay] {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  height: auto;
+  background: var(--openbot-bg-sidebar);
+}
+
+/* The app's page header (`PageHeader`) takes the place of the site header. In the app window, `window.css` puts it
+   in the top row. */
+.hosted-pricing-header {
+  padding: var(--openbot-space-2) var(--openbot-space-4);
+}
+
+/* The switches of the order form (`OrderForm`), small and flat as the other controls of a page header. The
+   form's own variables do not reach the header. */
+.hosted-pricing-header-controls {
+  --order-move: 300ms;
+  --order-spring: cubic-bezier(0.34, 1.36, 0.64, 1);
+  display: flex;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.hosted-pricing-header-controls .order-form-controls {
+  flex-wrap: nowrap;
+  gap: var(--openbot-space-2);
+}
+
+.hosted-pricing-header-controls .order-form-segment {
+  padding: 2px;
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-tabs-bar-bg);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.hosted-pricing-header-controls .order-form-segment::before {
+  top: 2px;
+  bottom: 2px;
+  inset-inline-start: 2px;
+  width: calc((100% - 4px) / var(--order-count, 2));
+  border-radius: var(--openbot-radius-sm);
+  background: var(--openbot-tabs-pill-bg);
+}
+
+.hosted-pricing-header-controls .order-form-segment-label {
+  min-height: calc(var(--openbot-control-sm) - 4px);
+  padding: 0 var(--openbot-space-3);
+  border-radius: var(--openbot-radius-sm);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+}
+
+.hosted-pricing-header-controls .order-form-segment-option[data-checked] .order-form-segment-label {
+  color: var(--openbot-text-primary);
+}
+
+/* The currency menu: the same height and flat look as the switch beside it. It takes only the width of its text,
+   so the switch keeps its width. */
+.hosted-pricing-header-controls .order-form-currency-select {
+  width: auto;
+}
+
+.hosted-pricing-header-controls .order-form-currency-select .ui-select-trigger {
+  width: auto;
+  height: var(--openbot-control-sm);
+  padding-inline: var(--openbot-space-3) var(--openbot-space-2);
+  border: 0;
+  border-radius: var(--openbot-radius-md);
+  background: var(--openbot-tabs-bar-bg);
+  box-shadow: inset 0 0 0 1px var(--openbot-border);
+  color: var(--openbot-text-primary);
+}
+
+/* The menu of the add-server dialog, in the header and not in the corner of a dialog. */
+.hosted-pricing-header .add-server-other {
+  position: static;
+}
+
+/* The same height as the switches beside it, and flat as the other controls of a page header. */
+.hosted-pricing-header .add-server-other .ui-button {
+  height: var(--openbot-control-sm);
+  padding-inline: var(--openbot-space-3);
+  border-radius: var(--openbot-radius-md);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+/* The page is in the middle of the card, with the same space above and below it. A small window scrolls it. */
+.hosted-pricing-scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden auto;
+}
+
+/* `.landing-hero` and `.pricing-hero` of the web page. The spacing is
+   smaller than on the web page, so the whole page fits in the app window without a scroll. */
+.hosted-pricing-hero {
+  position: relative;
+  isolation: isolate;
+  width: min(100%, 1280px);
+  margin: auto;
+  padding: 16px clamp(20px, 4vw, 48px);
+}
+
+.hosted-pricing-hero .order-form {
+  --order-accent: var(--openbot-price-accent);
+  --order-pad: 16px;
+  --order-text-line: 20px;
+}
+
+.hosted-pricing-hero .order-form-frame {
+  margin-top: 0;
+}
+
+.hosted-pricing-hero .order-form-choices {
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.hosted-pricing-hero .order-form-choice-label {
+  padding-block: 8px;
+}
+
+.hosted-pricing-hero .order-form-stepper {
+  padding-block-end: 12px;
+}
+
+.hosted-pricing-hero .order-form-summary-lines:has([data-open]) {
+  padding-block: 8px;
+}
+
+.hosted-pricing-hero .order-form-total {
+  padding-block: 10px;
+}
+
+.hosted-pricing-hero::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(
+    36% 26% at 50% 34%,
+    color-mix(in srgb, var(--openbot-price-accent) 14%, var(--openbot-transparent)),
+    var(--openbot-transparent) 70%
+  );
+  content: "";
+  pointer-events: none;
+}
+
+/* `.landing-button-md` with `.landing-button-primary`. */
+.hosted-pricing-pill {
+  height: 42px;
+  gap: 8px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-surface-light);
+  color: var(--openbot-text-on-light);
+  font-size: var(--openbot-text-lg);
+  font-weight: 500;
+}
+
+.hosted-pricing-pill:hover:not(:disabled) {
+  background: var(--openbot-text-primary);
+  color: var(--openbot-text-on-light);
+}
+
+.hosted-pricing-pill-secondary {
+  border: 1px solid var(--openbot-border-strong);
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-primary);
+}
+
+.hosted-pricing-pill-secondary:hover:not(:disabled) {
+  background: var(--openbot-bg-surface);
+  color: var(--openbot-text-primary);
+}
+
+.hosted-pricing-cta {
+  min-width: 240px;
+}
+
+.hosted-pricing-cta:disabled {
+  background: var(--openbot-surface-light);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.hosted-pricing-consent-action {
+  display: flex;
+  max-width: 420px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.hosted-pricing-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: var(--openbot-text-md);
+  line-height: 1.45;
+}
+
+/* Centered on the first line of the sentence, also when the sentence wraps. */
+.hosted-pricing-consent .ui-checkbox {
+  margin-top: calc((1lh - var(--openbot-icon-md)) / 2);
+}
+
+.hosted-pricing-consent label {
+  color: var(--openbot-text-secondary);
+  cursor: pointer;
+}
+
+/* The two links of the consent sentence. The app opens them in the browser. */
+.hosted-pricing-link {
+  display: inline;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: var(--openbot-transparent);
+  color: var(--openbot-text-primary);
+  font: inherit;
+  vertical-align: baseline;
+  text-decoration: underline;
+  text-decoration-color: var(--openbot-border-focus);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.hosted-pricing-alert {
+  margin-bottom: 20px;
+}
+
+/* `.pricing-enterprise`: a band of light crosses the strip every 6 s. */
+@keyframes hosted-pricing-sweep {
+  0% {
+    background-position: 120% 0;
+  }
+
+  45%,
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+@keyframes hosted-pricing-glint {
+  0%,
+  22% {
+    background-position: 160% 0;
+  }
+
+  38%,
+  100% {
+    background-position: -60% 0;
+  }
+}
+
+.hosted-pricing-strip {
+  --hosted-pricing-band: linear-gradient(
+    105deg,
+    var(--openbot-price-sheen-cool-clear) 38%,
+    var(--openbot-price-sheen-cool-soft) 46%,
+    var(--openbot-price-sheen-light) 50%,
+    var(--openbot-price-sheen-warm-soft) 54%,
+    var(--openbot-price-sheen-warm-clear) 62%
+  );
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 10px;
+  padding: 12px 20px;
+  border: 1px solid var(--openbot-price-rim-under);
+  border-radius: var(--openbot-radius-grouped);
+  background:
+    linear-gradient(
+      90deg,
+      var(--openbot-price-sheen-cool-clear),
+      var(--openbot-price-sheen-cool) 35%,
+      var(--openbot-price-sheen-light) 50%,
+      var(--openbot-price-sheen-warm) 65%,
+      var(--openbot-price-sheen-warm-clear)
+    )
+    top center / 70% 1px no-repeat,
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--openbot-price-rim-under) 35%, var(--openbot-transparent)),
+      var(--openbot-transparent) 70%
+    );
+  box-shadow: inset 0 1px 0 var(--openbot-price-rim-under);
+  overflow: hidden;
+}
+
+.hosted-pricing-strip::after {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--hosted-pricing-band) 0 0 / 250% 100% no-repeat;
+  content: "";
+  opacity: 0.45;
+  pointer-events: none;
+  animation: hosted-pricing-sweep 6s ease-in-out infinite;
+}
+
+.hosted-pricing-strip::before {
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--hosted-pricing-band) 0 0 / 250% 100% no-repeat;
+  content: "";
+  pointer-events: none;
+  mask:
+    linear-gradient(var(--openbot-mask-solid) 0 0) content-box exclude,
+    linear-gradient(var(--openbot-mask-solid) 0 0);
+  animation: hosted-pricing-sweep 6s ease-in-out infinite;
+}
+
+.hosted-pricing-strip .hosted-pricing-pill {
+  background:
+    linear-gradient(
+      105deg,
+      var(--openbot-price-sheen-cool-clear) 35%,
+      color-mix(in srgb, var(--openbot-price-sheen-cool) 50%, var(--openbot-price-sheen-cool-clear)) 47%,
+      color-mix(in srgb, var(--openbot-price-sheen-warm) 50%, var(--openbot-price-sheen-warm-clear)) 53%,
+      var(--openbot-price-sheen-warm-clear) 65%
+    )
+    0 0 / 300% 100% no-repeat,
+    var(--openbot-surface-light);
+  animation: hosted-pricing-glint 6s ease-in-out infinite;
+}
+
+.hosted-pricing-strip .hosted-pricing-pill:hover {
+  background-color: var(--openbot-text-primary);
+}
+
+.hosted-pricing-strip h2 {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.hosted-pricing-strip p {
+  margin: 2px 0 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-lg);
+  line-height: 1.45;
+}
+
+@container (max-width: 760px) {
+  .hosted-pricing-cta,
+  .hosted-pricing-consent-action {
+    width: 100%;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hosted-pricing-strip::before,
+  .hosted-pricing-strip::after,
+  .hosted-pricing-strip .hosted-pricing-pill {
+    animation: none;
+  }
+}

@@ -7,7 +7,11 @@ export const messages = defineMessages("status.agent", {
   "status.agent.instructionsChanged": "Updated its instructions",
   "status.agent.modelSwitchedForLimit": "Usage limit reached. Switched to {model}.",
   "status.agent.modelReturnedAfterLimit": "Usage limit ended. Switched back to {model}.",
+  "status.agent.routineSkippedRunOpen": "Skipped: the last run had not finished",
+  "status.agent.routineSkippedUsageLimit": "Skipped: usage limit reached",
   "status.agent.modelSwitchedForError": "Provider error. Switched to {model}.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
@@ -35,6 +39,13 @@ export const messages = defineMessages("status.agent", {
   "status.agent.serverInstallCommand":
     "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
   "status.agent.serverInstallCard": "Install command for the server {name}",
+  "status.agent.browserProfileNamed":
+    "Move {agents} to the browser profile {profile}. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.browserProfileNew":
+    "Make the new browser profile {profile} and move {agents} to it. It has no sign-ins. Their open tabs close.",
+  "status.agent.browserProfileShared":
+    "Move {agents} to the shared browser profile. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.browserProfileOwn": "Give {agents} each a browser profile of its own. Their open tabs close.",
   "status.agent.feedbackSending": "Sending your feedback to the OpenBot team…",
   "status.agent.workflowDelete": "Delete the workflow {title} with its runs and versions. Its open steps stop.",
   "status.agent.vaultCardFillFrames": "The card fields are in frames from {origins}.",
@@ -93,7 +104,9 @@ export const messages = defineMessages("status.agent", {
   "status.agent.mcpServerEnable": "Turn on the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerDisable": "Turn off the MCP server {name} for every agent on this server.",
   "status.agent.mcpServerRemove": "Remove the MCP server {name} and its sign-in from every agent on this server.",
-  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Server settings, MCP.",
+  "status.agent.mcpToolCall": "Run the tool {tool} of the MCP server {name}.",
+  "status.agent.mcpSignInRequested": "The MCP server {name} needs a sign-in. Sign in from Marketplace, Apps, {name}.",
+  "status.agent.uiBlockClosedByMessage": "Closed by a new message",
   "status.agent.vaultAdded": "Saved to Vault: {name}",
   "status.agent.vaultUpdated": "Changed in Vault: {name}",
   "status.agent.vaultDeleted": "Deleted from Vault: {name}",

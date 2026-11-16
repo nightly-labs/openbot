@@ -21,6 +21,11 @@ export const messages = {
   "composer.update.manual": "Mettez à jour {provider} sur l’ordinateur qui l’exécute pour continuer.",
   "composer.update.pending": "Mise à jour…",
   "composer.update.action": "Mettre à jour",
+  "composer.usageLimit.credits":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent maintenant vos crédits.",
+  "composer.usageLimit.creditsResets":
+    "Vous avez utilisé toute la limite de votre forfait {provider}. Vos agents utilisent vos crédits jusqu’à sa réinitialisation {reset}.",
+  "composer.usageLimit.creditsTitle": "Crédits utilisés",
   "composer.usageLimit.resets": "Vous avez utilisé toute votre limite {provider}. Elle se réinitialise {reset}.",
   "composer.usageLimit.selectModel":
     "Vous avez utilisé toute votre limite {provider}. Sélectionnez un autre modèle pour continuer.",
@@ -156,6 +161,7 @@ export const messages = {
   "composer.picker.section.files": "Fichiers",
   "composer.picker.section.tabs": "Onglets du navigateur",
   "composer.picker.section.threads": "Fils",
+  "composer.picker.section.messages": "Dans les messages",
   "composer.token.tab": "Onglet du navigateur {name}",
   "composer.token.thread": "Fil {name}",
   "composer.token.unavailableTab": "Onglet du navigateur fermé {name}",

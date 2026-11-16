@@ -147,6 +147,10 @@ export const messages = {
   "marketplace.app.remove.action": "إزالة",
   "marketplace.app.remove.confirmTitle": "إزالة {name}؟",
   "marketplace.app.remove.keep": "إبقاء",
+  "marketplace.app.replace.title": "استبدال {server}؟",
+  "marketplace.app.replace.description":
+    "لديك بالفعل خادم باسم {server}، لكنه ليس {name}. هل تريد استبداله بـ {name}؟ سيتم حذف عنوانه ومفاتيحه المحفوظة.",
+  "marketplace.app.replace.action": "استبدال",
   "marketplace.app.connection": "الاتصال",
   "marketplace.app.access.use": "يمكنه الاستخدام",
   "marketplace.app.access.noAgents": "لا يوجد وكلاء",
@@ -265,6 +269,14 @@ export const messages = {
   "marketplace.plugin.higgsfield.prompt.credits": "كم لديّ من أرصدة Higgsfield؟",
   "marketplace.plugin.higgsfield.prompt.productShot": "أنشئ في Higgsfield صورة منتج لكوب خزفي على طاولة خشبية.",
   "marketplace.plugin.higgsfield.prompt.clip": "أنشئ في Higgsfield فيديو مدته 5 ثوانٍ لأمواج عند الغروب.",
+  "marketplace.plugin.sunra.tagline": "صور وفيديو وصوت ونماذج ثلاثية الأبعاد بالذكاء الاصطناعي",
+  "marketplace.plugin.sunra.description":
+    "يتيح Sunra للوكلاء إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد بنماذج مثل GPT Image وNano Banana وSeedream وFLUX وSeedance وKling وVeo، والتحقق من رصيد الأرصدة، وقراءة النتائج. تُحفظ النتائج في مشروع داخل حساب المستخدم في Sunra. يسجّل كل مستخدم الدخول إلى حسابه في Sunra عبر المتصفح. يعرض Sunra تكلفة كل عملية إنشاء أولًا، ولا يستهلك أرصدة ذلك الحساب إلا بعد تأكيدها.",
+  "marketplace.plugin.sunra.app":
+    "إنشاء الصور والفيديو والصوت والنماذج ثلاثية الأبعاد، والأرصدة والنتائج، عبر خادم MCP الخاص بـ Sunra مع تسجيل الدخول في المتصفح.",
+  "marketplace.plugin.sunra.prompt.balance": "كم لديّ من أرصدة Sunra؟",
+  "marketplace.plugin.sunra.prompt.poster": "أنشئ في Sunra ملصقًا لسوق ليلي تحت المطر، بتنسيق عمودي.",
+  "marketplace.plugin.sunra.prompt.clip": "أنشئ في Sunra فيديو مدته 5 ثوانٍ لقارب ورقي على نهر. أخبرني بالتكلفة أولًا.",
   "marketplace.plugin.elevenlabs.tagline": "الكلام والأصوات ووكلاء الصوت",
   "marketplace.plugin.elevenlabs.description":
     "يتيح ElevenLabs للوكلاء تحويل النص إلى كلام، والعمل مع الأصوات، وإنشاء وكلاء صوت ElevenLabs واختبارهم ومراجعتهم ومراجعة محادثاتهم. يعود الصوت المُنشأ كرابط تنزيل صالح لمدة قصيرة. يسجّل كل مستخدم الدخول إلى حساب ElevenLabs الخاص به عبر المتصفح، وكل عملية إنشاء تستهلك أرصدة ذلك الحساب.",
@@ -396,13 +408,14 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "صُغ رسالة بريد لإعادة تعيين كلمة المرور للمسار الجديد.",
   "marketplace.plugin.omnisend.tagline": "التسويق عبر البريد الإلكتروني والرسائل النصية",
   "marketplace.plugin.omnisend.description":
-    "يتيح Omnisend للوكلاء قراءة تقارير الحملات والنماذج، والعثور على جهات الاتصال والشرائح، وإنشاء الحملات والأتمتة وقوالب البريد والنماذج والمنتجات وتعديلها. يسجّل كل مستخدم الدخول إلى حسابه في Omnisend عبر المتصفح ويختار مستوى الوصول في شاشة الموافقة. مع صلاحية الكتابة، يستطيع الوكلاء أيضًا إرسال الحملات وحذف البيانات. اختر الوصول للقراءة فقط إذا كان الوكلاء يحتاجون إلى التقارير فقط.",
+    "يتيح Omnisend للوكلاء قراءة تقارير الحملات والنماذج، والعثور على جهات الاتصال والشرائح، وإنشاء الحملات والأتمتة وقوالب البريد والنماذج والمنتجات وتعديلها. يتصل كل مستخدم بمفتاح API من حسابه الخاص في Omnisend. يمكن للوكلاء فعل ما يسمح به المفتاح، وقد يشمل ذلك إرسال الحملات وحذف البيانات.",
   "marketplace.plugin.omnisend.app":
-    "الحملات والأتمتة وجهات الاتصال والشرائح والنماذج والتقارير، عبر خادم MCP الخاص بـ Omnisend مع تسجيل الدخول في المتصفح.",
+    "الحملات والأتمتة وجهات الاتصال والشرائح والنماذج والتقارير، عبر خادم MCP الخاص بـ Omnisend مع مفتاح API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign": "كيف كان أداء حملات الأسبوع الماضي مقارنة بالأسبوع الذي قبله؟",
   "marketplace.plugin.omnisend.prompt.segment": "كم عدد جهات الاتصال في شريحة VIP، وكيف تغيّرت هذا الشهر؟",
   "marketplace.plugin.omnisend.prompt.draftCampaign": "اكتب مسودة حملة للمجموعة الجديدة، لكن لا ترسلها.",
   "marketplace.plugin.postiz.tagline": "جدولة منشورات التواصل الاجتماعي",
+  "marketplace.plugin.omnisend.hint.apiKey": "في Omnisend، افتح Store settings > API keys وأنشئ مفتاحًا.",
   "marketplace.plugin.postiz.description":
     "يتيح Postiz للوكلاء عرض قنواتك على وسائل التواصل الاجتماعي، وكتابة المسودات وجدولة المنشورات ونشرها على أكثر من 30 شبكة، مثل X وLinkedIn وInstagram وTikTok. ويمكن للوكلاء أيضًا رفع الوسائط وإنشاء صور ومقاطع فيديو بالذكاء الاصطناعي. سجّل الدخول إلى حسابك في Postiz عبر المتصفح، أو الصق مفتاح API من Settings › Developers في Postiz. كل خطط Postiz السحابية تتضمن الوصول إلى API. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
   "marketplace.plugin.postiz.app":
@@ -410,6 +423,14 @@ export const messages = {
   "marketplace.plugin.postiz.prompt.channels": "ما قنوات التواصل الاجتماعي المتصلة بـ Postiz؟",
   "marketplace.plugin.postiz.prompt.week": "ما المنشورات المجدولة للأسبوع القادم؟",
   "marketplace.plugin.postiz.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.tagline": "جدولة وسائل التواصل الاجتماعي",
+  "marketplace.plugin.trypost.description":
+    "يتيح TryPost للوكلاء عرض قنواتك المتصلة، وكتابة المنشورات وجدولتها وإضافتها إلى قائمة الانتظار ونشرها على X وLinkedIn وInstagram وFacebook وTikTok وYouTube وThreads وBluesky وMastodon وPinterest وغيرها. ويمكن للوكلاء أيضًا قراءة التحليلات وإدارة الأفكار والموافقات وتحديد أوقات النشر. سجّل الدخول إلى حسابك في TryPost عبر المتصفح واختر مساحة عمل. يمكن للوكلاء نشر منشور فورًا، لذا راجع كل منشور قبل الموافقة عليه.",
+  "marketplace.plugin.trypost.app":
+    "القنوات والمنشورات وقائمة الانتظار والأفكار والتحليلات، عبر خادم MCP الخاص بـ TryPost مع تسجيل الدخول من المتصفح.",
+  "marketplace.plugin.trypost.prompt.week": "ما المنشورات المجدولة لهذا الأسبوع؟",
+  "marketplace.plugin.trypost.prompt.draft": "اكتب مسودة منشور على LinkedIn عن إصدارنا الجديد، لكن لا تجدوله.",
+  "marketplace.plugin.trypost.prompt.analytics": "أي من منشوراتي في الشهر الماضي حصل على أكبر تفاعل؟",
   "marketplace.plugin.composio.tagline": "Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر",
   "marketplace.plugin.composio.description":
     "يربط Composio وكلاءك بـ Gmail وSlack وGitHub وأكثر من 1000 تطبيق آخر عبر خادم MCP واحد. سجّل الدخول بحساب Composio. عندما يحتاج وكيل إلى تطبيق، يطلب منك ربط ذلك التطبيق.",
@@ -568,6 +589,13 @@ export const messages = {
   "marketplace.skills.origin.local": "أُنشئت على هذا الحاسوب",
   "marketplace.skills.origin.workspace": "في مجلد هذا الوكيل",
   "marketplace.skills.origin.marketplace": "من المتجر · الإصدار {version}",
+  "marketplace.skills.origin.github": "من GitHub · {repository}",
+  "marketplace.skills.github.search": "ابحث أو الصق رابط GitHub",
+  "marketplace.skills.github.reading": "جارٍ البحث عن مهارات في المستودع",
+  "marketplace.skills.github.trust": "لم يراجع OpenBot المهارات من GitHub. اقرأ المهارة قبل إضافتها.",
+  "marketplace.skills.github.source": "GitHub · {repository} عند {commit}",
+  "marketplace.skills.github.open": "GitHub",
+  "marketplace.skills.github.openName": "فتح {repository} على GitHub",
   "marketplace.skills.status.notAdded": "غير مضافة",
   "marketplace.skills.status.on": "على {agents}",
   "marketplace.skills.agentCount": {

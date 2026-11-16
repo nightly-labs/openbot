@@ -91,6 +91,18 @@ export const messages = {
   "browser.secret.submitting": "Gönderiliyor…",
   "browser.secret.takeOver": "Devral",
   "browser.secret.failed": "İstek tamamlanamadı. Bağlantıyı kontrol edin ve tekrar deneyin.",
+  "browser.secret.vaultSkip.agentScript":
+    "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
+  "browser.secret.vaultSkip.fieldKind":
+    "Ajan sayfada yanlış alanı seçtiği için OpenBot kayıtlı oturum bilgilerinizi kullanmadı.",
+  "browser.secret.vaultSkip.loginChoice":
+    "Ajan bu site için kayıtlı oturum bilgilerinden birini seçmediği için OpenBot kayıtlı bir oturum bilgisi kullanmadı. Ajana hangi hesabı kullanacağını söyleyin.",
+  "browser.secret.vaultSkip.noPassword":
+    "Kayıtlı oturum bilgilerinizde bu site için şifre olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "Kayıtlı oturum bilgilerinizde kimlik doğrulayıcı anahtarı olmadığı için OpenBot bunları kullanmadı.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "Şifre yöneticiniz okunamadığı için OpenBot kayıtlı bir oturum bilgisi kullanmadı.",
   "browser.error.openAddress": "Adres bu sekmede açılamadı.",
   "browser.error.channelNoBrowserMember": "Bu kanalda hiçbir üye yeni sekme açamaz.",
   "browser.error.closeTab": "Tarayıcı sekmesi kapatılamadı.",

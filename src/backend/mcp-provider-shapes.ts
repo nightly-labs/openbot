@@ -545,7 +545,8 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * arguments and an environment, so a server that names a directory is left out rather than started
  * in the provider's own. A server told to open `./data.db` would otherwise pass its test and then
  * create a second, empty database beside the agent's workspace. The form says so before the save,
- * the row says so afterwards, and the hand-off reports it as a drop.
+ * the row says so afterwards, and the hand-off reports it as a drop. A client that starts stdio
+ * servers itself (`relayStdioMcpServers`) takes the directory as `cwd`, which stays in OpenBot.
  *
  * **Names travel as `providerMcpServerName`.** Antigravity refuses `session/new` with `invalid
  * params` when one name has a space, so a server the user named "My Server" failed every Gemini
@@ -555,7 +556,7 @@ function withUserAgent(headers: Record<string, string>, userAgent: string | unde
  * **A name the agent's own files already use travels as `openbot_<name>`.** See `acpMcpServerName`.
  */
 export type AcpMcpServer =
-  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }> }
+  | { name: string; command: string; args: string[]; env: Array<{ name: string; value: string }>; cwd?: string }
   | { type: "http"; name: string; url: string; headers: Array<{ name: string; value: string }> };
 
 /**
@@ -563,18 +564,39 @@ export type AcpMcpServer =
  * in place of a session server with the same name, with the user's `enabledTools` list, so the
  * agent could not call the other tools of OpenBot's server (#7785). A name in `own`, the agent's
  * own files, travels as `openbot_<name>`, as for Codex (`codexMcpServerKey`). Computer Use keeps its
- * name, and so does a server whose renamed form is the user's too or is reserved.
+ * name, and so does a server whose renamed form is the user's too or is reserved. `form` is the
+ * agent's own name rule (`AcpFlavor.mcpServerName`), applied after `providerMcpServerName`.
  */
-export function acpMcpServerName(config: McpServerConfig, own: readonly string[] = []): string {
-  const name = providerMcpServerName(config.name);
+export function acpMcpServerName(
+  config: McpServerConfig,
+  own: readonly string[] = [],
+  form: (name: string) => string = (name) => name,
+): string {
+  const name = form(providerMcpServerName(config.name));
   if (config.id === COMPUTER_USE_MCP_SERVER_ID || !own.includes(name)) return name;
-  const renamed = `openbot_${name}`;
+  const renamed = form(`openbot_${name}`);
   return own.includes(renamed) || isReservedMcpServerName(renamed) ? name : renamed;
+}
+
+/**
+ * A `providerMcpServerName` result in the form that Grok CLI 1.0.77 accepts. Grok names a tool
+ * `<server>__<tool>` and skips each tool of a server whose name has `__`, ends with `_`, or does not
+ * start with a letter or `_`. A server that the user named "Google pessoal — leitura" became
+ * `Google_pessoal___leitura`, and the agent got none of its tools (#9545). A name that Grok accepts
+ * stays the same, so no server that works is renamed.
+ */
+export function grokMcpServerName(name: string): string {
+  const joined = name.replace(/_{2,}/gu, "_").replace(/_+$/u, "");
+  if (joined === "") return "server";
+  return /^[A-Za-z_]/u.test(joined) ? joined : `_${joined}`;
 }
 
 export function acpMcpServers(
   servers: readonly UsableMcpServer[],
   own: readonly string[] = [],
+  form?: (name: string) => string,
+  /** OpenBot starts the stdio servers itself (`relayStdioMcpServers`), so it can use their directory. */
+  relaysStdio = false,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -585,7 +607,7 @@ export function acpMcpServers(
       continue;
     }
     const { config } = server;
-    const name = acpMcpServerName(config, own);
+    const name = acpMcpServerName(config, own, form);
     if (
       entries.some((entry) => entry.name === name) ||
       (name !== config.name && (configured.has(name) || isReservedMcpServerName(name)))
@@ -594,7 +616,7 @@ export function acpMcpServers(
       continue;
     }
     if (config.transport === "stdio") {
-      if (config.workingDirectory) {
+      if (config.workingDirectory && !relaysStdio) {
         dropped.push({
           name: config.name,
           reason: "working_directory_unsupported",
@@ -607,6 +629,7 @@ export function acpMcpServers(
         command: server.command,
         args: server.args,
         env: Object.entries(mcpLaunchEnvironment(server)).map(([name, value]) => ({ name, value })),
+        ...(config.workingDirectory ? { cwd: server.workingDirectory } : {}),
       });
     } else {
       entries.push({

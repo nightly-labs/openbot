@@ -157,17 +157,29 @@ interface WorkspacePathAccess {
   allowedRoots?: readonly string[];
 }
 
+/** A link that misses looks in at most this many work folders. */
+const WORK_FOLDER_LIMIT = 50;
+
+/** What the agent's tools touched in its threads: the files that it read or wrote, and the folders where it worked. */
+interface ToolHistory {
+  fileHistory?: readonly string[];
+  workFolders?: readonly string[];
+}
+
 /** Resolves a path that a message or the model wrote to a real path, with the workspace containment check. */
 const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: WorkspacePathAccess & { allowRoot?: boolean; fileHistory?: readonly string[] },
+  options: WorkspacePathAccess & { allowRoot?: boolean; exactPath?: boolean } & ToolHistory,
 ) {
   const workspaceRoot = yield* attachmentCall(() => realpath(agent.workspacePath));
   const candidatePath = workspacePathFromInput(agent.workspacePath, agent.id, inputPath);
   // A member reads one sentence for a path that is missing and for a path outside the workspace, so
   // the answer does not tell whether a path exists on the host.
   const memberMessage = sourceText("error.backend.workspacePathMissingForMember", { path: inputPath });
+  // A file in the workspace does not read the added folders, so a stale network share among them does
+  // not delay it. A path that is missing reads them once, for the search and for the access check.
+  const readAllowedRoots = yield* Effect.cached(realRoots(options.allowedRoots ?? []));
   const resolvedPath = yield* realpathWithLegacyRoot(agent, candidatePath).pipe(
     Effect.catch((error) => {
       // The literal path goes first, so a real file named `notes:2` still opens.
@@ -176,26 +188,13 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
       return realpathWithLegacyRoot(agent, withoutLocation);
     }),
     Effect.catch((error) => {
-      if (!isMissing(error) || !options.allowOutside) return Effect.fail(error);
+      if (!isMissing(error) || options.exactPath) return Effect.fail(error);
       const requestedPath = decodePath(inputPath.trim());
       // An explicit target must not select a different document with the same name.
       if (isAbsolute(requestedPath) || requestedPath.replaceAll("\\", "/").startsWith("~/")) return Effect.fail(error);
-      const name = basename(candidatePath);
-      const withoutLocation = name.replace(LOCATION_SUFFIX, "");
-      const history = [...(options.fileHistory ?? [])].reverse();
-      // The newest file with the name goes first; a file that is gone does not hide an older one.
-      const historyPaths = new Set([
-        ...history.filter((path) => basename(path) === name),
-        ...history.filter((path) => basename(path) === withoutLocation),
-      ]);
-      return Effect.gen(function* () {
-        for (const historyPath of historyPaths) {
-          const found = yield* Effect.result(attachmentCall(() => realpath(historyPath)));
-          if (Result.isSuccess(found)) return found.success;
-          if (!isMissing(found.failure)) return yield* Effect.fail(found.failure);
-        }
-        return yield* Effect.fail(error);
-      });
+      return findOutsideWorkspace(agent, workspaceRoot, candidatePath, readAllowedRoots, options).pipe(
+        Effect.flatMap((found) => (found === null ? Effect.fail(error) : Effect.succeed(found))),
+      );
     }),
     Effect.catch((error) =>
       isMissing(error)
@@ -212,25 +211,97 @@ const resolveWorkspacePath = Effect.fn("Workspace.resolveWorkspacePath")(functio
   );
   const insideWorkspace =
     isWithin(workspaceRoot, resolvedPath) || (options.allowRoot === true && resolvedPath === workspaceRoot);
-  // Only a path outside the workspace reads the added folders, so a stale network share among them
-  // does not delay a workspace file. A folder that was moved or deleted allows nothing.
-  const allowedRoots =
-    insideWorkspace || options.allowOutside
-      ? []
-      : (yield* Effect.forEach(
-          options.allowedRoots ?? [],
-          (root) => attachmentCall(() => realpath(root)).pipe(Effect.orElseSucceed(() => null)),
-          { concurrency: "unbounded" },
-        )).filter((root): root is string => root !== null);
-  const mayAccess = (path: string) =>
-    options.allowOutside === true ||
-    isWithin(workspaceRoot, path) ||
-    allowedRoots.some((root) => root === path || isWithin(root, path));
+  // A folder that was moved or deleted allows nothing.
+  const allowedRoots = insideWorkspace || options.allowOutside ? [] : yield* readAllowedRoots;
+  const mayAccess = accessCheck(workspaceRoot, allowedRoots, options);
   if (!insideWorkspace && !mayAccess(resolvedPath)) {
     return yield* refuse("outside", sourceText("error.backend.workspaceFileOutside"), memberMessage);
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));
   return { workspaceRoot, mayAccess, resolvedPath, insideWorkspace, metadata };
+});
+
+/** The real paths of the added folders. A folder that was moved or deleted is left out. */
+function realRoots(roots: readonly string[]) {
+  return Effect.forEach(roots, (root) => attachmentCall(() => realpath(root)).pipe(Effect.orElseSucceed(() => null)), {
+    concurrency: "unbounded",
+  }).pipe(Effect.map((found) => found.filter((root): root is string => root !== null)));
+}
+
+function accessCheck(workspaceRoot: string, allowedRoots: readonly string[], options: WorkspacePathAccess) {
+  return (path: string) =>
+    options.allowOutside === true ||
+    isWithin(workspaceRoot, path) ||
+    allowedRoots.some((root) => root === path || isWithin(root, path));
+}
+
+/**
+ * The file that a relative path names when the workspace has nothing there. Agents cite files of the
+ * other folders where they work, relative to those folders. First the same path in the added folders,
+ * but only when exactly one added folder has it, so a link does not open a different file with the
+ * same name. Then the newest file with the name from the thread's tool history. A path that the caller
+ * may not open is skipped, so it does not hide one that the caller may open.
+ */
+const findOutsideWorkspace = Effect.fn("Workspace.findOutsideWorkspace")(function* (
+  agent: Pick<AgentSummary, "workspacePath">,
+  workspaceRoot: string,
+  candidatePath: string,
+  readAllowedRoots: Effect.Effect<string[]>,
+  options: WorkspacePathAccess & ToolHistory,
+): Effect.fn.Return<string | null, AttachmentOperationError> {
+  const allowedRoots = yield* readAllowedRoots;
+  const mayAccess = accessCheck(workspaceRoot, allowedRoots, options);
+  // A path that leaves the workspace, such as `../notes.md`, names no file of an added folder.
+  const relativePath = isWithin(agent.workspacePath, candidatePath)
+    ? relative(agent.workspacePath, candidatePath)
+    : null;
+  const relativePaths =
+    relativePath === null ? [] : [...new Set([relativePath, relativePath.replace(LOCATION_SUFFIX, "")])];
+  const inAddedFolder = yield* onlyMatch(allowedRoots, relativePaths, mayAccess);
+  if (inAddedFolder !== null) return inAddedFolder;
+  const name = basename(candidatePath);
+  const withoutLocation = name.replace(LOCATION_SUFFIX, "");
+  const history = [...(options.fileHistory ?? [])].reverse();
+  // The newest file with the name goes first; a file that is gone does not hide an older one.
+  const historyPaths = new Set([
+    ...history.filter((path) => basename(path) === name),
+    ...history.filter((path) => basename(path) === withoutLocation),
+  ]);
+  for (const historyPath of historyPaths) {
+    const found = yield* Effect.result(attachmentCall(() => realpath(historyPath)));
+    if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
+    // Without Full access, a path that the agent read outside its folders does not stop the search.
+    if (Result.isFailure(found) && !isMissing(found.failure) && options.allowOutside)
+      return yield* Effect.fail(found.failure);
+  }
+  // Last, the same path in the folders where the agent listed files or ran commands, such as
+  // `build-app.md` after `ls /tmp/kskills`. Only when exactly one folder has it, as for added folders.
+  // Only the newest folders, which include those of the current thread: each folder costs a lookup.
+  const workFolders = [...new Set([...(options.workFolders ?? [])].reverse())].slice(0, WORK_FOLDER_LIMIT);
+  return yield* onlyMatch(workFolders, relativePaths, mayAccess);
+});
+
+/** The one real file that a relative path names in the folders, or null when none or several have it. */
+const onlyMatch = Effect.fn("Workspace.onlyMatch")(function* (
+  folders: readonly string[],
+  relativePaths: readonly string[],
+  mayAccess: (path: string) => boolean,
+) {
+  if (relativePaths.length === 0) return null;
+  const matches = yield* Effect.forEach(
+    folders,
+    (folder) =>
+      Effect.gen(function* () {
+        for (const path of relativePaths) {
+          const found = yield* Effect.result(attachmentCall(() => realpath(join(folder, path))));
+          if (Result.isSuccess(found) && mayAccess(found.success)) return found.success;
+        }
+        return null;
+      }),
+    { concurrency: "unbounded" },
+  );
+  const files = new Set(matches.filter((path): path is string => path !== null));
+  return files.size === 1 ? ([...files][0] ?? null) : null;
 });
 
 /**
@@ -250,7 +321,7 @@ function isMissing(error: AttachmentOperationError): boolean {
 export const resolveWorkspaceFile = Effect.fn("Workspace.resolveWorkspaceFile")(function* (
   agent: Pick<AgentSummary, "id" | "workspacePath">,
   inputPath: string,
-  options: WorkspacePathAccess & { fileHistory?: readonly string[] } = {},
+  options: WorkspacePathAccess & { exactPath?: boolean } & ToolHistory = {},
 ): Effect.fn.Return<ResolvedWorkspaceFile, AttachmentOperationError> {
   const { resolvedPath, insideWorkspace, metadata } = yield* resolveWorkspacePath(agent, inputPath, options);
   if (!metadata.isFile()) return yield* refuse("not-file", sourceText("error.backend.workspacePathNotFile"));

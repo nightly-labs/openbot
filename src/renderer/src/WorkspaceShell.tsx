@@ -35,7 +35,7 @@ import { WorkspaceServerRail } from "./features/servers/WorkspaceServerRail";
 import { useSettings } from "./features/settings/settings-context";
 import { WorkspaceSidebar } from "./features/sidebar/WorkspaceSidebar";
 import { TasksPanel } from "./features/tasks/TasksPanel";
-import { createHostRestartToasts, type HostRestartView } from "./features/updates/host-restart-toast";
+import { createHostRestartToasts, type HostRestartView, noteServerAgents } from "./features/updates/host-restart-toast";
 import { useUsage } from "./features/usage/usage-context";
 import { WindowPageView } from "./features/window/WindowPageView";
 import { WorkspacePageRail } from "./features/window/WorkspacePageRail";
@@ -300,6 +300,19 @@ export function WorkspaceShell(props: {
     />
   );
 
+  // A server that this window saw with no agents stays in its first run after the owner leaves it.
+  createEffect(
+    () => {
+      const server = activeServer();
+      return server?.kind === "remote" && agentListSettled()
+        ? { id: server.id, empty: agentList().length === 0 }
+        : null;
+    },
+    (seen) => {
+      if (seen) noteServerAgents(seen.id, seen.empty);
+    },
+  );
+
   const remoteHosts = (): HostRestartView[] =>
     servers().flatMap((server) =>
       server.kind === "remote"
@@ -310,6 +323,10 @@ export function WorkspaceShell(props: {
               online: server.id === activeServer()?.id ? scope.loaded() : server.state === "online",
               restart: server.hostRestart?.state ?? null,
               version: server.hostRestart?.version ?? null,
+              // Until the agents load, the open server could be new; a notice that waits shows after them.
+              ...(server.id === activeServer()?.id
+                ? { firstRun: !agentListSettled() || agentList().length === 0 }
+                : {}),
             },
           ]
         : [],

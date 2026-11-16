@@ -4,18 +4,13 @@
   font-family: var(--openbot-font-sans);
 }
 
-.ui-server-gradient-logo {
-  width: var(--server-gradient-logo-size, 40px);
-  height: var(--server-gradient-logo-size, 40px);
+.ui-server-plush-logo {
+  width: var(--server-plush-logo-size, 40px);
+  height: var(--server-plush-logo-size, 40px);
   display: block;
   flex: 0 0 auto;
-  overflow: hidden;
-  border-radius: var(--server-gradient-logo-radius, var(--openbot-radius-lg));
-  background-color: var(--server-gradient-base);
-  background-image: var(--server-gradient-layers);
-  background-repeat: no-repeat;
-  outline: 1px solid var(--openbot-image-outline);
-  outline-offset: -1px;
+  object-fit: contain;
+  user-select: none;
 }
 
 :where(.ui-text)[data-tone="secondary"],
@@ -3013,6 +3008,12 @@ button.ui-bubble-content {
 /* Keep notification actions usable while a Kobalte modal blocks the page. */
 .ui-toast-layer {
   pointer-events: auto;
+}
+
+/* Not `display: none`: Sonner measures the height of a toast when it mounts, so a hidden toast keeps
+ * its layout and the stack is correct when the layer shows again. */
+.ui-toast-layer-hidden {
+  visibility: hidden;
 }
 
 /* The toasts float over areas that move the window: the window headers, and the full window on the

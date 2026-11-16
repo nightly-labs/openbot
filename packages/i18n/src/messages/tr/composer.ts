@@ -20,6 +20,11 @@ export const messages = {
   "composer.update.manual": "Devam etmek için {provider} uygulamasını çalıştığı bilgisayarda güncelleyin.",
   "composer.update.pending": "Güncelleniyor…",
   "composer.update.action": "Güncelle",
+  "composer.usageLimit.credits":
+    "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız artık kredilerinizi kullanıyor.",
+  "composer.usageLimit.creditsResets":
+    "{provider} plan sınırınızın tamamını kullandınız. Ajanlarınız sınır sıfırlanana kadar ({reset}) kredilerinizi kullanır.",
+  "composer.usageLimit.creditsTitle": "Krediler kullanılıyor",
   "composer.usageLimit.resets": "{provider} sınırınızın tamamını kullandınız. Sıfırlanma zamanı: {reset}.",
   "composer.usageLimit.selectModel":
     "{provider} sınırınızın tamamını kullandınız. Devam etmek için farklı bir model seçin.",
@@ -153,6 +158,7 @@ export const messages = {
   "composer.picker.section.files": "Dosyalar",
   "composer.picker.section.tabs": "Tarayıcı sekmeleri",
   "composer.picker.section.threads": "Mesaj dizileri",
+  "composer.picker.section.messages": "Mesajlarda",
   "composer.token.tab": "Tarayıcı sekmesi {name}",
   "composer.token.thread": "Mesaj dizisi {name}",
   "composer.token.unavailableTab": "Kapalı tarayıcı sekmesi {name}",

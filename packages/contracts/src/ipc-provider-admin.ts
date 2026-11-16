@@ -17,6 +17,8 @@ import {
   isProviderAccountStatus,
   MAX_PROVIDER_ACCOUNTS,
   PROVIDER_USAGE_RESET_OUTCOMES,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
@@ -41,6 +43,7 @@ import {
 } from "./ipc-custom-providers";
 import { decodeMcpSignInRelayPage } from "./ipc-mcp-servers";
 import { isDynamicRecord, isHttpsUrl, isNumber, isOneOf, isString } from "./runtime-values";
+import { PROVIDER_ACCOUNTS_MESSAGE_LIMIT } from "./team-protocol/provider-accounts-v1";
 import { PROVIDER_HOST_SIGN_IN_ERROR_LIMIT } from "./team-protocol/provider-host-sign-in-v1";
 
 /** Each URL becomes a link the admin opens, so it is held to https here as well. */
@@ -63,6 +66,21 @@ export function decodeProviderCodeLoginStart(value: unknown): ProviderCodeLoginS
     ...(value.verificationUrlComplete === undefined ? {} : { verificationUrlComplete: value.verificationUrlComplete }),
     expiresAt: value.expiresAt,
   };
+}
+
+/** A started code sign-in of an account (`provider-account-code-v1`). */
+export function decodeProviderAccountCodeLoginStart(value: unknown): ProviderAccountCodeLoginStart {
+  if (!isDynamicRecord(value) || !isProviderAccountId(value.accountId)) throw new Error("Invalid code login.");
+  return { accountId: value.accountId, start: decodeProviderCodeLoginStart(value.start) };
+}
+
+export function decodeProviderAccountCodeLoginStatus(value: unknown): ProviderAccountCodeLoginStatus {
+  const invalid = () => new Error("Invalid sign-in response.");
+  if (!isDynamicRecord(value)) throw invalid();
+  if (value.result === null) return { result: null };
+  if (!isDynamicRecord(value.result) || !isNullableBoundedString(value.result.error, PROVIDER_ACCOUNTS_MESSAGE_LIMIT))
+    throw invalid();
+  return { result: { error: value.result.error } };
 }
 
 export function decodeProviderHostSignInStatus(value: unknown): ProviderHostSignInStatus {

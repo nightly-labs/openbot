@@ -2,6 +2,7 @@ import { type AnalyticsTotals, analyticsTokens, type HostAnalytics } from "@open
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, SlidingTabs } from "@openbot/ui";
 import { createMemo, createStore, For, onSettled, Show } from "solid-js";
+import { ScrollEdges } from "../../components/ScrollEdges";
 import { useText } from "../../text";
 import { UsageChart } from "./UsageChart";
 import { UsageProviderMark } from "./UsageProviderMark";
@@ -248,7 +249,7 @@ export function AgentUsageReport(props: {
             The hidden panels also get no height, so the open table alone sets the height. */}
         <SlidingTabs.ContentSlot class="agent-usage-breakdown">
           <SlidingTabs.Content value="model">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byModel")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byModel")}</caption>
                 <thead>
@@ -275,10 +276,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="agent">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byAgent")}>
               <table>
                 <caption class="sr-only">{t("usage.breakdown.byAgent")}</caption>
                 <thead>
@@ -300,10 +301,10 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <SlidingTabs.Content value="day">
-            <div class="agent-usage-table">
+            <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.byDay")}>
               <table ref={dailyTable} tabindex={-1}>
                 <caption class="sr-only">{t("usage.breakdown.byDay")}</caption>
                 <thead>
@@ -325,12 +326,12 @@ export function AgentUsageReport(props: {
                   </For>
                 </tbody>
               </table>
-            </div>
+            </ScrollEdges>
           </SlidingTabs.Content>
           <Show when={props.result.skills}>
             {(skills) => (
               <SlidingTabs.Content value="skill">
-                <div class="agent-usage-table">
+                <ScrollEdges axis="x" viewClass="agent-usage-table" label={t("usage.breakdown.bySkill")}>
                   <table>
                     <caption class="sr-only">{t("usage.breakdown.bySkill")}</caption>
                     <thead>
@@ -373,7 +374,7 @@ export function AgentUsageReport(props: {
                       </For>
                     </tbody>
                   </table>
-                </div>
+                </ScrollEdges>
               </SlidingTabs.Content>
             )}
           </Show>

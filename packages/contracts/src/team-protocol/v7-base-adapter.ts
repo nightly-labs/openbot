@@ -23,6 +23,7 @@ import {
   type TeamProtocolV7BaseJsonObject,
   type TeamProtocolV7BaseJsonValue,
 } from "./v7-base";
+import { withConversationVideoGeneration } from "./video-generation-v1";
 
 export type TeamProtocolV7BaseCurrentEventDecodeResult =
   | { kind: "known"; event: AgentEvent | TeamRealtimeEvent }
@@ -44,8 +45,10 @@ export function decodeTeamProtocolV7BaseCurrentEvent(value: unknown): TeamProtoc
       withEventConversationPlans(
         restoreBrowserSecretMetadata(toCurrentAgentKeys(decodedValue), value),
         value,
-        // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, and
-        // a multi-select flag only under prompt-multi-select-v1, so a present one is always kept.
+        // A host sends a UI block only under ui-blocks-v1, the subagents only under subagents-v1, a
+        // video request only under video-generation-v1, and a multi-select flag only under
+        // prompt-multi-select-v1, so a present one is always kept.
+        value,
         value,
         value,
       ),
@@ -67,6 +70,7 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
     uiBlocks?: boolean;
     subagents?: boolean;
     promptMultiSelect?: boolean;
+    videoGeneration?: boolean;
   } = {},
 ): string | null {
   // `turn-progress` bypasses the frozen codec, so it needs the vocabulary swap applied by hand.
@@ -80,13 +84,14 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
   const promptMultiSelect = options.promptMultiSelect === true && eventHasPromptQuestions(event.type);
   if (!encoded || (!options.preserveBrowserSecrets && !eventConversationKey(event.type) && !promptMultiSelect))
     return encoded;
-  // The block and the subagents go as written: the key swap would rename a response value under a
-  // field id such as `agentId`.
+  // The block, the subagents and the video request go as written: the key swap would rename a
+  // response value under a field id such as `agentId`.
   const withPlans = withEventConversationPlans(
     JSON.parse(encoded),
     wireValue,
     options.uiBlocks ? currentValue : null,
     options.subagents ? currentValue : null,
+    options.videoGeneration ? currentValue : null,
   );
   const output = promptMultiSelect ? withEventPromptMultiSelect(withPlans, currentValue) : withPlans;
   return JSON.stringify(options.preserveBrowserSecrets ? restoreBrowserSecretMetadata(output, wireValue) : output);
@@ -94,15 +99,17 @@ export function encodeTeamProtocolV7BaseCurrentEvent(
 
 /**
  * Puts the plans and the senders of a conversation event beside its frozen projection, the UI blocks
- * of `uiBlockSource` when it is not null, and the subagents of `subagentSource` when it is not null.
- * See `withConversationPlans`, `withConversationSenders`, `withConversationUiBlocks` and
- * `withConversationSubagents`.
+ * of `uiBlockSource` when it is not null, the subagents of `subagentSource` when it is not null, and
+ * the video requests of `videoSource` when it is not null. See `withConversationPlans`,
+ * `withConversationSenders`, `withConversationUiBlocks`, `withConversationSubagents` and
+ * `withConversationVideoGeneration`.
  */
 function withEventConversationPlans(
   projected: TeamProtocolV7BaseJsonValue,
   source: unknown,
   uiBlockSource: unknown,
   subagentSource: unknown,
+  videoSource: unknown,
 ): TeamProtocolV7BaseJsonValue {
   if (projected === null || Array.isArray(projected) || typeof projected !== "object") return projected;
   if (!isDynamicRecord(source)) return projected;
@@ -113,9 +120,14 @@ function withEventConversationPlans(
   const withBlocks = isDynamicRecord(uiBlockSource)
     ? withConversationUiBlocks(withPlans, uiBlockSource[key])
     : withPlans;
+  const withSubagents = isDynamicRecord(subagentSource)
+    ? withConversationSubagents(withBlocks, subagentSource[key])
+    : withBlocks;
   return {
     ...projected,
-    [key]: isDynamicRecord(subagentSource) ? withConversationSubagents(withBlocks, subagentSource[key]) : withBlocks,
+    [key]: isDynamicRecord(videoSource)
+      ? withConversationVideoGeneration(withSubagents, videoSource[key])
+      : withSubagents,
   };
 }
 

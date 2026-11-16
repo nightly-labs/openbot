@@ -8,6 +8,8 @@ export const messages = {
   "error.billing.restartUnavailable": "אי אפשר להפעיל מחדש את השרת הזה מכאן. יש לפנות לתמיכה.",
   "error.billing.planRequired": "התוכנית של השרת הזה הסתיימה. יש לחדש אותה כדי להפעיל את השרת.",
   "error.billing.planSoldOut": "התוכנית הזו אזלה. יש לבחור תוכנית אחרת.",
+  "error.billing.storageUnavailable": "האחסון הזה אינו זמין לשרת הזה.",
+  "error.billing.storagePaymentFailed": "התשלום עבור האחסון נכשל. יש לעדכן את אמצעי התשלום ולנסות שוב.",
   "error.billing.licenseExists": "לחשבון הזה כבר יש רישיון. יש לשנות את מספר המשתמשים שלו במקום זאת.",
   "error.billing.licenseCurrency": "הרישיון חייב להשתמש במטבע של התוכניות האחרות שלך.",
   "error.billing.planCurrency": "תוכנית חדשה חייבת להשתמש במטבע של התוכניות האחרות שלך.",

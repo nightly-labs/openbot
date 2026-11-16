@@ -167,6 +167,11 @@ export interface ChannelTask {
   revision: number;
   assignmentCount: number;
   error: string | null;
+  /**
+   * On a page only, for a `waiting` task: the dependencies whose results one of its earlier turns
+   * already had. Never stored. Absent from a host without channel-seen-subtasks-v1.
+   */
+  seenDependencies?: string[];
 }
 
 export interface ChannelMessage {
@@ -214,6 +219,15 @@ export interface ChannelSummary extends Channel {
   threads?: ChannelThread[];
 }
 
+/**
+ * Why a queued task that has an owner does not start. `agent-busy`: the owner works on a task in
+ * another channel, and an agent does one channel task at a time. `channel-full`: the channel already
+ * runs `CHANNEL_PARALLEL_LIMIT` tasks.
+ */
+export type ChannelTaskWait =
+  | { taskId: string; agentId: string; reason: "agent-busy"; channelId: string; channelName: string }
+  | { taskId: string; agentId: string; reason: "channel-full" };
+
 export interface ChannelPage {
   channel: Channel;
   messages: ChannelMessage[];
@@ -223,6 +237,8 @@ export interface ChannelPage {
   /** As in `ConversationPageInfo`: the unloaded length, for the scroll rail. Absent from a remote host. */
   olderCount?: number;
   oldestAt?: string;
+  /** The queued tasks that wait for other work. Absent when none waits, and from a remote host. */
+  waits?: ChannelTaskWait[];
 }
 
 export type ChannelCommand =
@@ -299,10 +315,22 @@ export function normalizeChannelDraft(value: unknown): DynamicRecord | undefined
  * with such an icon is still refused.
  */
 function normalizeSavedChannel(value: unknown): DynamicRecord | undefined {
-  const channel = readableBrowser(normalizeChannelDraft(value));
+  const channel = readableLead(readableBrowser(normalizeChannelDraft(value)));
   if (!channel || channel.icon === undefined || channel.icon === null || isChannelIcon(channel.icon)) return channel;
   const { icon: _unreadable, ...rest } = channel;
   return rest;
+}
+
+/**
+ * A lead that is not a member reads as the first member, as `removeDeletedMembers` moves it, or as no
+ * lead when no member is left. Such a row made the channel unreadable, and startup reads every
+ * channel, so no provider started (#9141). A command with such a lead is still refused.
+ */
+function readableLead(channel: DynamicRecord | undefined): DynamicRecord | undefined {
+  if (!channel || !isIdentifier(channel.leadAgentId) || !Array.isArray(channel.members)) return channel;
+  const members = channel.members.filter(isChannelMember);
+  if (members.some((member) => member.agentId === channel.leadAgentId)) return channel;
+  return { ...channel, leadAgentId: members[0]?.agentId ?? null };
 }
 
 /**
@@ -432,7 +460,8 @@ export function isChannelTask(value: unknown): value is ChannelTask {
     isOneOf(["queued", "running", "waiting", "paused", "completed", "failed", "cancelled"] as const, value.state) &&
     sequence(value.revision) &&
     sequence(value.assignmentCount) &&
-    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText))
+    (value.error === null || isBoundedString(value.error, INPUT_LIMITS.messageText)) &&
+    (value.seenDependencies === undefined || identifiers(value.seenDependencies))
   );
 }
 
@@ -470,7 +499,11 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     !Array.isArray(value.tasks) ||
     !value.tasks.every(isChannelTask) ||
     !(value.olderCursor === null || sequence(value.olderCursor)) ||
-    !sequence(value.throughSequence)
+    !sequence(value.throughSequence) ||
+    !(
+      value.waits === undefined ||
+      (Array.isArray(value.waits) && value.waits.length <= value.tasks.length && value.waits.every(isChannelTaskWait))
+    )
   ) {
     throw new Error("Invalid channel conversation response.");
   }
@@ -481,7 +514,18 @@ export function decodeChannelPage(value: unknown): ChannelPage {
     olderCursor: value.olderCursor,
     throughSequence: value.throughSequence,
     ...optionalHistoryExtent(value),
+    ...(value.waits === undefined ? {} : { waits: value.waits }),
   };
+}
+
+function isChannelTaskWait(value: unknown): value is ChannelTaskWait {
+  if (!isDynamicRecord(value) || !isIdentifier(value.taskId) || !isIdentifier(value.agentId)) return false;
+  if (value.reason === "channel-full") return true;
+  return (
+    value.reason === "agent-busy" &&
+    isIdentifier(value.channelId) &&
+    isBoundedString(value.channelName, INPUT_LIMITS.agentName)
+  );
 }
 
 export function decodeChannelSummaries(value: unknown): ChannelSummary[] {

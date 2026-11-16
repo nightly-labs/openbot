@@ -3,7 +3,6 @@ import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
   "error.mcp.redirectByName": "הכתובת הזו אינה נגישה לפי שם.",
-  "error.mcp.redirectGetOnly": "הכתובת הזו מקבלת בקשות GET בלבד.",
   "error.mcp.redirectNotSignIn": "הכתובת הזו אינה חלק מהתחברות.",
   "error.mcp.redirectRefused": "ההתחברות נדחתה. יש לחזור אל OpenBot ולנסות שוב.",
   "error.mcp.redirectNoSignIn": "אין התחברות שממתינה לזה. ייתכן שהיא הסתיימה.",

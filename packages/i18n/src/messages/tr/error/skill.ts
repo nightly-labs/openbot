@@ -52,6 +52,8 @@ export const messages = {
   "error.skill.localNotFound": "Bu yerel beceri yok. Kimliğini yerel beceriler listesinden kontrol edin.",
   "error.skill.localRevisionNotFound": "Bu yerel becerinin {revision} revizyonu yok. En son revizyonu {latest}.",
   "error.skill.localNameTaken": "Bu ada sahip yerel bir beceri zaten mevcut. Bunun yerine revize edin.",
+  "error.skill.localNameClash":
+    'Bu ad ve "{name}" yerel becerisi aynı "{slug}" değerine dönüşüyor. O beceriyi değiştirmek için revize edin. Yeni bir beceri eklemek için bu addaki Latin harflerini veya rakamları değiştirin.',
   "error.skill.localKeepName": "Revize ederken beceri adını değiştirmeden tutun.",
   "error.skill.localRelativeFolder": "Mevcut ajan çalışma alanı içinde göreli bir beceri klasörü kullanın.",
   "error.skill.localSourceOutside": "Beceri kaynağı ajan çalışma alanının içinde olmalıdır.",
@@ -59,4 +61,14 @@ export const messages = {
   "error.skill.localMissingSkillFile": "Beceri klasörü kök dizininde SKILL.md gerektirir.",
   "error.skill.pathSymlink": "Beceri yolları sembolik bağlantılar içeremez.",
   "error.skill.folderNotRead": "{provider}, {folder} klasörünü okumuyor. Bu klasörü {target} konumuna kopyalayın.",
+  "error.skill.githubLinkInvalid": "Bir GitHub deposunun veya klasörünün bağlantısını yapıştırın.",
+  "error.skill.githubNotFound": "OpenBot {repository} deposunu açamıyor. Depo özel ya da mevcut değil.",
+  "error.skill.githubNoSkills": "{folder} içinde SKILL.md yok.",
+  "error.skill.githubUnavailable": "OpenBot şu anda GitHub'ı okuyamıyor. Daha sonra yeniden deneyin.",
+  "error.skill.githubRateLimited":
+    "GitHub, OpenBot'un hesap olmadan ne sıklıkla okuyabileceğini sınırlıyor. Bir saat sonra yeniden deneyin.",
+  "error.skill.githubTooLarge": "OpenBot, {repository} deposunun tüm dosyalarını okuyamıyor. Depo çok büyük.",
+  "error.skill.githubHostTooOld": "GitHub'dan beceri eklemek için bu sunucuyu güncelleyin.",
+  "error.skill.publishGithub":
+    "{name} GitHub'dan geliyor. Yalnızca kendi oluşturduğunuz becerileri yayımlayabilirsiniz.",
 } as const satisfies PartialTranslation<typeof source>;

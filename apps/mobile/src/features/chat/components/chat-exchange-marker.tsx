@@ -3,7 +3,6 @@ import type { MobileTranslate } from "@openbot/i18n/mobile";
 import { Link } from "expo-router";
 import { Typography } from "heroui-native";
 import ChevronDown from "lucide-react-native/icons/chevron-down";
-import { useState } from "react";
 import { Pressable, View, type ViewStyle } from "react-native";
 import { BloubAvatarThumbnail } from "@/features/agents/components/bloub-avatar";
 import { ChatLinkPressable } from "@/features/agents/components/chat-link-pressable";
@@ -11,6 +10,7 @@ import type { ChatMessage, ExchangeGroup, ExchangeMarker } from "@/features/chat
 import type { MobileAgent } from "@/features/workspace/context/mobile-workspace-context";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
+import { useKeptOpen } from "./use-kept-open";
 
 type RoutingMarker = Extract<ChatMessage, { kind: "channel-routing" }>;
 
@@ -44,7 +44,7 @@ export function ChatExchangeMarker({
   muted,
 }: MarkerContext & { message: ExchangeMarker | RoutingMarker }) {
   const { t } = useText();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useKeptOpen(`marker:${message.id}`, false);
   const label =
     message.kind === "channel-routing"
       ? message.event.action === "assigned"
@@ -121,7 +121,7 @@ export function ChatExchangeMarker({
  */
 export function ChatExchangeGroup({ group, agents, agentsById, muted }: MarkerContext & { group: ExchangeGroup }) {
   const { t } = useText();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useKeptOpen(`group:${group.id}`, false);
   const ids = [...new Set(group.exchanges.flatMap(({ exchange }) => exchangeAgentIds(exchange)))];
   const participants = ids.map((id) => agentsById.get(id));
   const count = group.exchanges.length;

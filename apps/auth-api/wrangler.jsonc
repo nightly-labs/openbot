@@ -10,8 +10,10 @@
     "enabled": true,
     "cross_version_cache": false
   },
+  // Workers Logs stay off: they kept one event for each request, and their cost was larger than the cost of
+  // the requests. `wrangler tail` still shows live events. `false` turns off a setting made earlier.
   "observability": {
-    "enabled": true
+    "enabled": false
   },
   // The Cloudflare Vite plugin emits and uploads Worker source maps unless this is false. The Worker
   // bundles the web app, and its maps pass the 60 MiB upload limit, so every deploy fails.
@@ -52,9 +54,10 @@
     "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
     "EMAIL_SMTP_HOST": "mail.privateemail.com",
     "EMAIL_SMTP_PORT": "465",
-    "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-    "EMAIL_FROM": "hello@openbot.run",
-    "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+    "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+    "EMAIL_FROM": "no_reply@openbot.run",
+    "EMAIL_REPLY_TO": "hello@openbot.run",
+    "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
@@ -97,7 +100,7 @@
   "send_email": [
     {
       "name": "EMAIL_FALLBACK",
-      "allowed_sender_addresses": ["hello@openbot.run", "licenses@openbot.run"]
+      "allowed_sender_addresses": ["no_reply@openbot.run"]
     }
   ],
   "d1_databases": [
@@ -178,9 +181,10 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -278,9 +282,10 @@
         "AUTH_EXPOSE_DEVELOPMENT_CODE": "false",
         "EMAIL_SMTP_HOST": "mail.privateemail.com",
         "EMAIL_SMTP_PORT": "465",
-        "EMAIL_SMTP_USERNAME": "hello@openbot.run",
-        "EMAIL_FROM": "hello@openbot.run",
-        "EMAIL_LICENSE_FROM": "licenses@openbot.run",
+        "EMAIL_SMTP_USERNAME": "no_reply@openbot.run",
+        "EMAIL_FROM": "no_reply@openbot.run",
+        "EMAIL_REPLY_TO": "hello@openbot.run",
+        "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",

@@ -4,8 +4,11 @@
 // Checks that an expired key reads as the expired-key error, not "Internal error"; that a replaced
 // key reaches a new process and the same thread there, although `auth.json` still holds the old
 // key; that with no stored key the config names no key, so the user's own sign-in stays in use;
-// that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; and that a model
-// whose provider has no sign-in names that provider and its fix (#2746).
+// that a custom endpoint saved as `opencode-go` keeps its URL when a key is stored; that the stored
+// key reaches neither the free tier nor `OPENCODE_API_KEY`, so a refused key cannot fail the free
+// models (#7550); that a model whose provider has no sign-in names that provider and its fix
+// (#2746); and that OpenCode 2's `-32000` for a refused saved key names the saved key, not a missing
+// sign-in (#9095).
 // `bun run test:opencode-expired-key`. Writes .openbot-build/opencode-expired-key-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -26,6 +29,7 @@ interface LogEntry {
   configKey?: string | null;
   baseURL?: string | null;
   zenKey?: string | null;
+  envKey?: string | null;
   sessionId?: string;
   key?: string | null;
 }
@@ -33,10 +37,11 @@ interface LogEntry {
 interface Report {
   passed: boolean;
   expired?: { error: string };
-  replaced?: { thread: string; loaded: boolean; key: string | null };
+  replaced?: { thread: string; loaded: boolean; key: string | null; zenKey: string | null; envKey: string | null };
   noStoredKey?: { configKey: string | null; key: string | null };
   endpoint?: { baseURL: string | null; zenKey: string | null };
   authRequired?: { error: string };
+  refusedV2?: { saved: string; notSaved: string };
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-expired-key-e2e-"));
@@ -87,7 +92,16 @@ try {
   assert.equal(prompt?.key, "fresh", "The stored key wins over the key in auth.json.");
   const loaded = entries.some((entry) => entry.event === "load" && entry.sessionId === thread);
   assert.ok(loaded, "The new process loads the same thread.");
-  report.replaced = { thread, loaded, key: prompt?.key ?? null };
+  const keySpawn = entries.filter((entry) => entry.event === "spawn").at(-1);
+  assert.equal(keySpawn?.zenKey, null, "The free tier gets no stored key (#7550).");
+  assert.equal(keySpawn?.envKey, null, "OPENCODE_API_KEY does not carry the stored key (#7550).");
+  report.replaced = {
+    thread,
+    loaded,
+    key: prompt?.key ?? null,
+    zenKey: keySpawn?.zenKey ?? null,
+    envKey: keySpawn?.envKey ?? null,
+  };
   await runCauseEffect(second.stop());
 
   // 3. With no stored key the config names no key, so the user's own `auth.json` key stays in use.
@@ -106,7 +120,7 @@ try {
   await runCauseEffect(third.stop());
 
   // 4. A custom endpoint saved as `opencode-go` replaces that built-in provider, so the stored key
-  // must not drop its URL. The `opencode` provider still gets the key.
+  // must not drop its URL. The free `opencode` provider gets no key.
   storedKey = "fresh";
   endpoints = [
     {
@@ -124,7 +138,7 @@ try {
   assert.ok(endpointSpawn, "The fake OpenCode started.");
   assert.equal(endpointSpawn.baseURL, "http://127.0.0.1:1234/v1", "The endpoint keeps its URL.");
   assert.equal(endpointSpawn.configKey, null, "The stored key does not replace the endpoint's options.");
-  assert.equal(endpointSpawn.zenKey, "fresh", "The OpenCode provider gets the stored key.");
+  assert.equal(endpointSpawn.zenKey, null, "The free tier gets no stored key (#7550).");
   report.endpoint = { baseURL: endpointSpawn.baseURL ?? null, zenKey: endpointSpawn.zenKey ?? null };
 
   // 5. A model whose provider has no sign-in names that provider and how to connect it, not the
@@ -140,6 +154,26 @@ try {
     "A provider with no sign-in names itself and its fix.",
   );
   report.authRequired = { error: authError };
+
+  // 6. OpenCode 2.2.5 sends a refused OpenCode Go key as `-32000` with no reason. With a saved key the
+  // error names that key and its fix. With no saved key OpenBot cannot tell a refused key from a
+  // missing one, so the error stays the missing sign-in.
+  delete process.env.FAKE_PROVIDER_AUTH;
+  storedKey = "expired-v2";
+  const sixth = open(cli);
+  const { error: saved } = await runTurn(sixth, await startThread(sixth, { cwd: workspace }));
+  assert.equal(saved, sourceText("error.provider.opencodeKeyRefused"), "A refused saved key names its fix.");
+  await runCauseEffect(sixth.stop());
+  storedKey = null;
+  process.env.FAKE_AUTH_KEY = "expired-v2";
+  const seventh = open(cli);
+  const { error: notSaved } = await runTurn(seventh, await startThread(seventh, { cwd: workspace }));
+  assert.equal(
+    notSaved,
+    sourceText("error.provider.opencodeAuthRequired", { provider: "opencode-go" }),
+    "With no saved key, the error stays the missing sign-in.",
+  );
+  report.refusedV2 = { saved, notSaved };
   report.passed = true;
 } finally {
   await stopClients(clients);

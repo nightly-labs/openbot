@@ -27,4 +27,8 @@ export const messages = {
   "common.download": "הורדה",
   "common.removing": "מסיר…",
   "common.sending": "שולח…",
+  "common.scrollLeft": "גלילה שמאלה",
+  "common.scrollRight": "גלילה ימינה",
+  "common.scrollUp": "גלילה למעלה",
+  "common.scrollDown": "גלילה למטה",
 } as const satisfies PartialTranslation<typeof source>;

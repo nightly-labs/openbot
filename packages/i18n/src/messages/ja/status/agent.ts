@@ -8,7 +8,11 @@ export const messages = {
   "status.agent.instructionsChanged": "指示を更新しました",
   "status.agent.modelSwitchedForLimit": "使用量の上限に達しました。{model} に切り替えました。",
   "status.agent.modelReturnedAfterLimit": "使用量の上限が解除されました。{model} に戻しました。",
+  "status.agent.routineSkippedRunOpen": "スキップ: 前回の実行がまだ終わっていませんでした",
+  "status.agent.routineSkippedUsageLimit": "スキップ: 使用量の上限に達しました",
   "status.agent.modelSwitchedForError": "プロバイダーのエラーが発生しました。{model} に切り替えました。",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",
@@ -36,6 +40,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
+  "status.agent.browserProfileNamed":
+    "{agents} をブラウザープロファイル {profile} に移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.browserProfileNew":
+    "新しいブラウザープロファイル {profile} を作成し、{agents} を移動します。ログイン情報はありません。開いているタブは閉じます。",
+  "status.agent.browserProfileShared":
+    "{agents} を共有のブラウザープロファイルに移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.browserProfileOwn":
+    "{agents} にそれぞれ専用のブラウザープロファイルを与えます。開いているタブは閉じます。",
   "status.agent.feedbackSending": "フィードバックを OpenBot チームに送信しています…",
   "status.agent.workflowDelete":
     "ワークフロー {title} を実行履歴とバージョンごと削除します。実行中のステップは停止します。",
@@ -82,6 +94,8 @@ export const messages = {
   "status.agent.memoryChanges": "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却。",
   "status.agent.memoryChangesWithConflicts":
     "メモリー: {saved} 件保存、{updated} 件更新、{forgotten} 件忘却、{notChanged} 件は別のスレッドが先に変更したため未変更。",
+  "status.agent.mcpToolCall": "MCP サーバー {name} のツール {tool} を実行します。",
+  "status.agent.uiBlockClosedByMessage": "新しいメッセージで閉じられました",
   "status.agent.nextStepContinues": "エージェントが次のステップの前で止まりました。続けます（{current}/{limit}）。",
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.compactionContinues":

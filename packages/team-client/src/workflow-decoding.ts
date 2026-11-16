@@ -11,6 +11,7 @@ import {
   isWorkflowGitHubHistory,
   isWorkflowGitHubRepositoryOptions,
   isWorkflowGraph,
+  isWorkflowMediaCreditBalance,
   isWorkflowRunDetail,
   isWorkflowRunPage,
   isWorkflowSaveResult,
@@ -29,6 +30,7 @@ import {
   WORKFLOW_STEP_STATUSES,
   WORKFLOW_TRIGGER_TYPES,
   WORKFLOW_VERSION_KINDS,
+  type WorkflowMediaCreditBalance,
 } from "@openbot/contracts/ipc";
 import { guardedDecoder, guardedListDecoder } from "@openbot/contracts/ipc-decoding";
 import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
@@ -143,6 +145,46 @@ export const decodeRemoteWorkflowSecret = guardedDecoder(isWorkflowWebhookSecret
 const decodeVersionGraph = guardedDecoder(isWorkflowGraph, "remote workflow version");
 const decodeWorkflowSummaries = guardedListDecoder(isWorkflowSummary, "remote workflow list");
 const decodeWorkflowVersions = guardedListDecoder(isWorkflowVersion, "remote workflow versions");
+
+/** The `workflows-media-v1` keep-picture route answers `{ fileId }`; the app keeps only the id. */
+export function decodeRemoteWorkflowPicture(value: unknown): string {
+  if (!isDynamicRecord(value) || typeof value.fileId !== "string" || !value.fileId)
+    throw new Error("Invalid remote workflow picture.");
+  return value.fileId;
+}
+
+/** The `workflows-sunra-v1` providers route answers `{ sunra }`. */
+export function decodeRemoteWorkflowMediaProviders(value: unknown): { sunra: boolean } {
+  if (!isDynamicRecord(value) || typeof value.sunra !== "boolean")
+    throw new Error("Invalid remote workflow providers.");
+  return { sunra: value.sunra };
+}
+
+/** The `workflows-higgsfield-v1` providers route answers `{ higgsfield }`. */
+export function decodeRemoteHiggsfieldProviders(value: unknown): { higgsfield: boolean } {
+  if (!isDynamicRecord(value) || typeof value.higgsfield !== "boolean")
+    throw new Error("Invalid remote workflow providers.");
+  return { higgsfield: value.higgsfield };
+}
+
+/** One service's credits in a credits route answer: null when the host has no credits to show. */
+function remoteCreditBalance(value: unknown): WorkflowMediaCreditBalance | null {
+  if (value === null) return null;
+  if (!isWorkflowMediaCreditBalance(value)) throw new Error("Invalid remote workflow credits.");
+  return { available: value.available, quota: value.quota };
+}
+
+/** The `workflows-sunra-v1` credits route answers `{ sunra }`, with null when the host has no credits to show. */
+export function decodeRemoteWorkflowMediaCredits(value: unknown): { sunra: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { sunra: remoteCreditBalance(value.sunra) };
+}
+
+/** The `workflows-higgsfield-v1` credits route answers `{ higgsfield }`, as the Sunra route does. */
+export function decodeRemoteHiggsfieldCredits(value: unknown): { higgsfield: WorkflowMediaCreditBalance | null } {
+  if (!isDynamicRecord(value)) throw new Error("Invalid remote workflow credits.");
+  return { higgsfield: remoteCreditBalance(value.higgsfield) };
+}
 
 /** The `workflows-v1` list route wraps its list as `{ workflows }`. */
 export function decodeRemoteWorkflowList(value: unknown) {

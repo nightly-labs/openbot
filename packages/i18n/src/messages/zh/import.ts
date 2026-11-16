@@ -142,7 +142,7 @@ export const messages = {
   "import.hermes.reason.invalidSkill": "它的 SKILL.md 没有有效的名称和描述。",
   "import.hermes.reason.duplicateSkill": "该配置文件中的另一个技能有相同的名称。",
   "import.hermes.reason.builtIn": "它们随 Hermes 一起提供。OpenBot 有自己的技能。",
-  "import.hermes.reason.mcpOff": "它会以关闭状态添加。检查后，在 MCP 设置中开启。",
+  "import.hermes.reason.mcpOff": "它会以关闭状态添加。检查后，在 市场、应用 中开启。",
   "import.hermes.reason.mcpNameTaken": "这里已有同名的服务器。",
   "import.hermes.reason.routineSchedule": "OpenBot 无法运行它的计划，或其时间已过。",
   "import.hermes.reason.routineScript": "它运行的是脚本，而不是助手。",

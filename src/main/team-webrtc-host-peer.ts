@@ -5,13 +5,17 @@ import { dirname, join } from "node:path";
 import { BROWSER_SECRET_RESPONSE_PATH } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import { AGENT_PENDING_RUNTIME_CAPABILITY } from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
 import { AGENT_TASK_UI_BLOCKS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-task-ui-blocks-v1";
 import { browserViewStreamSessionId } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
   CHANNEL_PICTURE_CAPABILITY,
+  CHANNEL_SEEN_SUBTASKS_CAPABILITY,
+  CHANNEL_TASK_WAITS_CAPABILITY,
   isAgentProfileRoute,
   supportsTeamSemanticTags,
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
@@ -19,9 +23,12 @@ import {
   TEAM_CONTEXT_USAGE_CAPABILITY,
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { toWireAgentKeysObjectForPath } from "@openbot/contracts/team-protocol/current-agent-keys";
 import { MCP_MANY_SERVERS_CAPABILITY } from "@openbot/contracts/team-protocol/mcp-many-servers-v1";
@@ -796,7 +803,7 @@ export class TeamWebRtcHostPeer {
             };
           }
           // A variable, not a literal: only the V7 and V8 encoders declare `historyExtent`, `uiBlocks`,
-          // `subagents` and `promptMultiSelect`.
+          // `subagents`, `promptMultiSelect` and `videoGeneration`.
           const responseOptions = {
             preserveSemanticTags,
             historyExtent: peerCapabilities.has(TEAM_HISTORY_EXTENT_CAPABILITY),
@@ -804,11 +811,17 @@ export class TeamWebRtcHostPeer {
             channelIsolation: peerCapabilities.has(CHANNEL_ISOLATION_CAPABILITY),
             channelPicture: peerCapabilities.has(CHANNEL_PICTURE_CAPABILITY),
             channelBrowser: peerCapabilities.has(CHANNEL_BROWSER_CAPABILITY),
+            channelSeenSubtasks: peerCapabilities.has(CHANNEL_SEEN_SUBTASKS_CAPABILITY),
+            channelTaskWaits: peerCapabilities.has(CHANNEL_TASK_WAITS_CAPABILITY),
             mcpManyServers: peerCapabilities.has(MCP_MANY_SERVERS_CAPABILITY),
             agentTaskUiBlocks: peerCapabilities.has(AGENT_TASK_UI_BLOCKS_CAPABILITY),
             uiBlocks: peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
             subagents: peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
             promptMultiSelect: peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+            videoGeneration: peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+            memoryChanges: peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
+            usageTertiary: peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+            agentPendingRuntime: peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
           };
           return yield* remoteDecode(() => ({
             status: response.status,
@@ -898,11 +911,16 @@ export class TeamWebRtcHostPeer {
                 preserveBrowserSecrets: this.#peerCapabilities.has("browser-secret-handoff"),
                 // Only the V8 event reads them.
                 browserSignIn: this.#peerCapabilities.has(BROWSER_SIGN_IN_CAPABILITY),
+                browserVaultSkip: this.#peerCapabilities.has(BROWSER_VAULT_SKIP_CAPABILITY),
                 contextUsage: this.#peerCapabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
+                usageTertiary: this.#peerCapabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
+                agentPendingRuntime: this.#peerCapabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
                 // Only the V7 and V8 events read them.
                 uiBlocks: this.#peerCapabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
                 subagents: this.#peerCapabilities.has(TEAM_SUBAGENTS_CAPABILITY),
                 promptMultiSelect: this.#peerCapabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY),
+                videoGeneration: this.#peerCapabilities.has(TEAM_VIDEO_GENERATION_CAPABILITY),
+                memoryChanges: this.#peerCapabilities.has(TEAM_MEMORY_CHANGES_CAPABILITY),
               }),
         );
         if (this.#peerCapabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY))

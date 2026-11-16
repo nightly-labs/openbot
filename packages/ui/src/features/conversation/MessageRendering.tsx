@@ -70,6 +70,7 @@ import {
   sameStreamingTailOffsets,
   streamingTrailReach,
 } from "./streamingReveal";
+import { VideoGeneration } from "./VideoGeneration";
 
 let lastContentBlocks: { body: string; streaming: boolean; blocks: MessageContentBlock[] } | undefined;
 
@@ -102,7 +103,8 @@ function messagePreview(text: string): string {
 
 export function conversationBubbleVariant(message: AgentMessage): BubbleVariant {
   if (message.author === "you") return "secondary";
-  if (message.imageGeneration || (!message.body.trim() && message.attachments?.length)) return "ghost";
+  if (message.imageGeneration || message.videoGeneration || (!message.body.trim() && message.attachments?.length))
+    return "ghost";
   const contentBlocks = sharedContentBlocks(message.body, message.streaming === true);
   if (contentBlocks.some((block) => block.type === "table" || block.type === "comparison-table")) return "muted";
   return contentBlocks.some((block) => block.type !== "text") ? "ghost" : "muted";
@@ -412,6 +414,19 @@ export function MessageBody(props: {
       imageGenerationStatus(props.message.streaming, props.message.status) !== "completed"
     );
   });
+  /* A finished video that this client cannot read shows as a file card instead. */
+  const generatedVideoShown = createMemo(() => {
+    if (!props.message.videoGeneration) return false;
+    const attachment = props.message.attachments?.[0];
+    if (
+      !attachment ||
+      attachment.previewUrl ||
+      imageGenerationStatus(props.message.streaming, props.message.status) !== "completed"
+    )
+      return true;
+    const source = props.mediaSource;
+    return Boolean(source && attachment.size <= source.mediaLimit);
+  });
   const referencedAttachmentIds = createMemo(
     () =>
       new Set(
@@ -455,7 +470,8 @@ export function MessageBody(props: {
   );
   const standaloneAttachments = createMemo(() => {
     const referencedIds = referencedAttachmentIds();
-    const generatedAttachmentId = generatedImageShown() ? props.message.attachments?.[0]?.id : undefined;
+    const generatedAttachmentId =
+      generatedImageShown() || generatedVideoShown() ? props.message.attachments?.[0]?.id : undefined;
     // An image that a person's message names inline also shows as a thumbnail, as a picked image does.
     const showsReferencedImages = props.message.author === "you";
     return shownAttachments().filter(
@@ -511,13 +527,16 @@ export function MessageBody(props: {
      while the file arrives, so the chat does not grow when the image shows. An image that does not
      load shows as a card. */
   const [unloadedImages, setUnloadedImages] = createSignal<ReadonlySet<string>>(new Set());
+  /* A generated image is what the user asked to see, so it loads up to a larger limit than a thumbnail. */
+  const loadLimit = (attachment: AttachmentSummary) =>
+    props.message.imageGeneration && props.message.attachments?.[0]?.id === attachment.id ? "generated" : "thumbnail";
   const arrivingImage = (attachment: AttachmentSummary) => {
     const source = props.mediaSource;
     return (
       source !== undefined &&
       attachment.previewKind === "image" &&
       !attachment.previewUrl &&
-      attachment.size <= source.thumbnailLimit &&
+      attachment.size <= (loadLimit(attachment) === "generated" ? source.generatedImageLimit : source.thumbnailLimit) &&
       !unloadedImages().has(attachment.id)
     );
   };
@@ -532,6 +551,9 @@ export function MessageBody(props: {
     const images = new Set(standaloneImageAttachments());
     return standaloneAttachments().filter((attachment) => !images.has(attachment));
   });
+  /* A full cache removes the oldest image. A shown image that lost its file this way shows as a card
+     and does not load again: a new load would remove the next image, and the downloads would not stop. */
+  const loadedImages = new Set<string>();
   createEffect(
     () => standaloneImageAttachments().filter((attachment) => !attachment.previewUrl),
     (arriving) => {
@@ -539,9 +561,14 @@ export function MessageBody(props: {
       const unloaded = (attachment: AttachmentSummary) =>
         setUnloadedImages((current) => new Set(current).add(attachment.id));
       for (const attachment of arriving) {
-        void source?.load(attachment).then(
+        if (loadedImages.has(attachment.id)) {
+          unloaded(attachment);
+          continue;
+        }
+        void source?.load(attachment, loadLimit(attachment)).then(
           (shown) => {
-            if (!shown) unloaded(attachment);
+            if (shown) loadedImages.add(attachment.id);
+            else unloaded(attachment);
           },
           () => unloaded(attachment),
         );
@@ -866,6 +893,22 @@ export function MessageBody(props: {
             attachment={props.message.attachments?.[0]}
             error={imageGeneration().error}
             onPreview={openAttachment}
+            onDownload={props.onDownload}
+          />
+        )}
+      </Show>
+      <Show when={generatedVideoShown() && props.message.videoGeneration}>
+        {(videoGeneration) => (
+          <VideoGeneration
+            status={imageGenerationStatus(props.message.streaming, props.message.status)}
+            prompt={videoGeneration().prompt}
+            aspectRatio={videoGeneration().aspectRatio}
+            durationSeconds={videoGeneration().durationSeconds}
+            resolution={videoGeneration().resolution}
+            attachment={props.message.attachments?.[0]}
+            error={videoGeneration().error}
+            mediaSource={props.mediaSource}
+            onOpen={(attachment) => openAttachment(attachment)}
             onDownload={props.onDownload}
           />
         )}

@@ -97,6 +97,14 @@ export const messages = {
   "browser.secret.submitting": "正在提交…",
   "browser.secret.takeOver": "接管",
   "browser.secret.failed": "无法完成该请求，请检查连接后重试。",
+  "browser.secret.vaultSkip.agentScript":
+    "由于助手在此页面上运行了脚本，OpenBot 没有使用你保存的登录信息。如需使用，请让助手重新加载页面后再试一次。",
+  "browser.secret.vaultSkip.fieldKind": "由于助手在页面上选择了错误的字段，OpenBot 没有使用你保存的登录信息。",
+  "browser.secret.vaultSkip.loginChoice":
+    "由于助手没有选择此网站已保存的任何一个登录信息，OpenBot 没有使用已保存的登录信息。请告诉助手要使用哪个账户。",
+  "browser.secret.vaultSkip.noPassword": "由于你保存的登录信息中没有此网站的密码，OpenBot 没有使用它。",
+  "browser.secret.vaultSkip.noAuthenticatorKey": "由于你保存的登录信息中没有身份验证器密钥，OpenBot 没有使用它。",
+  "browser.secret.vaultSkip.vaultUnreadable": "由于无法读取你的密码管理器，OpenBot 没有使用已保存的登录信息。",
   "browser.error.openAddress": "无法在该标签页中打开该地址。",
   "browser.error.channelNoBrowserMember": "此频道中没有成员可以打开新标签页。",
   "browser.error.closeTab": "无法关闭浏览器标签页。",
