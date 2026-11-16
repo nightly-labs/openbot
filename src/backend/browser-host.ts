@@ -941,7 +941,11 @@ export class BrowserHost {
     return this.#activeTabId === tab.id || this.#tabBusy(tab);
   }
 
-  /** A task, a recording, a live view or a person uses the tab now, also when the panel does not show it. */
+  /**
+   * A task, a recording, a live view or a person uses the tab now, also when the panel does not show it.
+   * Sound is not a use: `#createView` mutes each tab, and Chromium still counts a muted page as audible,
+   * so a hidden video or live stream would never pause or unload (#9913).
+   */
   #tabBusy(tab: BrowserHostTab): boolean {
     return (
       // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
@@ -952,10 +956,7 @@ export class BrowserHost {
       tab.secretDocument === true ||
       tab.filledCard === true ||
       this.#takeoverTabIds.has(tab.id) ||
-      this.#userControlTabIds.has(tab.id) ||
-      // Chromium counts a muted page as audible. Nobody hears a muted tab, so its sound is not a use:
-      // a hidden video or live stream must still pause and unload (#9913).
-      (tab.contents.isCurrentlyAudible() && !tab.contents.isAudioMuted())
+      this.#userControlTabIds.has(tab.id)
     );
   }
 
