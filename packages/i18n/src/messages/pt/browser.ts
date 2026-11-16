@@ -39,7 +39,6 @@ export const messages = {
   "browser.tab.closeNamed": "Fechar {name}",
   "browser.tab.closeUnnamed": "Fechar aba do navegador",
   "browser.newTab": "Nova aba do navegador",
-  "browser.hide": "Ocultar navegador",
   "browser.backToChat": "Voltar ao chat",
   "browser.goBack": "Voltar",
   "browser.goForward": "Avançar",

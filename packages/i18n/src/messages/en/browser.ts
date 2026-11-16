@@ -38,7 +38,6 @@ export const messages = defineMessages("browser", {
   "browser.tab.closeNamed": "Close {name}",
   "browser.tab.closeUnnamed": "Close browser tab",
   "browser.newTab": "New browser tab",
-  "browser.hide": "Hide browser",
   "browser.backToChat": "Back to chat",
   "browser.goBack": "Go back",
   "browser.goForward": "Go forward",

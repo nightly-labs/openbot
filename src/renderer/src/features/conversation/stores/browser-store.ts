@@ -266,7 +266,13 @@ export function createBrowserStore(deps: BrowserStoreDeps) {
         : undefined,
     );
     if (completed && latestMessageMarker() === resolution.messageMarker) setBrowserTakeoverResolution(resolution);
-    if (completed && takeoverFullViewTabId === request.tabId && deps.panels.activeRightPanel() === "browser-expanded")
+    // The user can be on another tab of the full view by now. Then that page stays.
+    if (
+      completed &&
+      takeoverFullViewTabId === request.tabId &&
+      activeBrowserTab()?.id === request.tabId &&
+      deps.panels.activeRightPanel() === "browser-expanded"
+    )
       deps.panels.setActiveRightPanel("browser");
     return completed;
   };

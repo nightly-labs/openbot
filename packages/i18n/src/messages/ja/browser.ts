@@ -39,7 +39,6 @@ export const messages = {
   "browser.tab.closeNamed": "{name} を閉じる",
   "browser.tab.closeUnnamed": "ブラウザーのタブを閉じる",
   "browser.newTab": "新しいブラウザーのタブ",
-  "browser.hide": "ブラウザーを隠す",
   "browser.backToChat": "チャットに戻る",
   "browser.goBack": "戻る",
   "browser.goForward": "進む",
