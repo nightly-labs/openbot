@@ -302,7 +302,9 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
 
   /** Sign in is offered for an http server, where this computer or the joined host can sign in. */
   const canSignIn = (config: McpServerConfig) => Boolean(props.signIn) && config.transport === "http";
-  const testMessage = (test: McpTestState) => mcpTestMessage(test, t, props.signIn?.remote?.hostName);
+  // A relayed sign-in opens its page in this computer's browser, so only an older host names itself.
+  const testMessage = (test: McpTestState) =>
+    mcpTestMessage(test, t, props.signIn?.remote?.relay ? undefined : props.signIn?.remote?.hostName);
 
   /**
    * Counts each row's tests and sign-ins. A row can start a second one while the first still waits
@@ -413,6 +415,7 @@ export function ServerMcpPanel(props: ServerMcpPanelProps) {
       equals: (previous, next) =>
         previous?.tabId === next?.tabId &&
         previous?.relay?.authorizeHost === next?.relay?.authorizeHost &&
+        previous?.relay?.url === next?.relay?.url &&
         previous?.relay?.listening === next?.relay?.listening,
     },
   );

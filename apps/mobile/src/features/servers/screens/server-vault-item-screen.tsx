@@ -12,9 +12,10 @@ import {
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
-import { Children, type ReactNode, useEffect, useRef, useState } from "react";
-import { Alert, View } from "react-native";
+import { Children, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { Alert, StyleSheet, View } from "react-native";
 import { useUniwind } from "uniwind";
+import { VaultTwoStepSection } from "@/features/servers/components/vault-two-step-section";
 import { useServerVault } from "@/features/servers/model/use-server-vault";
 import {
   type VaultDraft,
@@ -38,6 +39,7 @@ import { SheetFormField } from "@/shared/components/sheet-form-field";
 import type { SheetFormFieldProps } from "@/shared/components/sheet-form-field.types";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
+import { isIOS } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 
 const KINDS: readonly VaultItemKind[] = ["login", "card", "contact", "apiKey"];
@@ -63,10 +65,20 @@ function FieldRow({ children }: { children: ReactNode }) {
 }
 
 type FieldProps = Partial<Omit<SheetFormFieldProps, "label" | "value" | "onChangeText">>;
-type TextKey = Exclude<keyof VaultDraft, "fillSites">;
+type TextKey = Exclude<keyof VaultDraft, "fillSites" | "twoStepKey">;
 
 function isKind(value: string | undefined): value is VaultItemKind {
   return KINDS.some((kind) => kind === value);
+}
+
+/** A line of the sign-in card: its label at the start, and the field with no frame of its own. */
+function LoginLine({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View className="flex-row items-center ps-4">
+      <Typography.Paragraph className="w-28 py-2 pe-2 text-grouped-secondary">{label}</Typography.Paragraph>
+      <View className="min-w-0 flex-1">{children}</View>
+    </View>
+  );
 }
 
 /**
@@ -162,6 +174,7 @@ export function VaultItemForm({
   const example = vaultAddressExample(draft.country);
   const dirty = JSON.stringify(draft) !== JSON.stringify(initial);
   const locked = action.isPending;
+  const formId = useId();
 
   usePreventRemove(!discarding && (dirty || locked) && !leaving, ({ repeat }) => {
     if (locked) return;
@@ -295,16 +308,38 @@ export function VaultItemForm({
               placeholder: WEBSITE_PLACEHOLDER,
               hint: t("mobile.server.vault.websiteHint"),
             })}
-            {field("username", t("mobile.server.vault.username"), {
-              autoCapitalize: "none",
-              placeholder: EMAIL_PLACEHOLDER,
-            })}
-            {secret("password", t("mobile.server.vault.password"), {
-              secureTextEntry: true,
-              placeholder: PASSWORD_PLACEHOLDER,
-              maxLength: VAULT_PASSWORD_LIMIT,
-              hint: t("mobile.server.vault.secretHint", { host }),
-            })}
+            <View className="gap-2">
+              {/* One card for the sign-in, as a password manager shows it: a label at the start of each line. */}
+              <View
+                // The radius of `SheetFormField` on each platform, so the card matches the other fields.
+                className={`overflow-hidden border border-border bg-grouped ${isIOS ? "" : "rounded-2xl"}`}
+                style={isIOS ? { borderRadius: 16, borderCurve: "continuous" } : undefined}
+              >
+                <LoginLine label={t("mobile.server.vault.username")}>
+                  {field("username", t("mobile.server.vault.username"), {
+                    autoCapitalize: "none",
+                    placeholder: EMAIL_PLACEHOLDER,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+                <View className="ms-4 bg-border" style={{ height: StyleSheet.hairlineWidth }} />
+                <LoginLine label={`${t("mobile.server.vault.password")}${saved ? "" : " *"}`}>
+                  {secret("password", t("mobile.server.vault.password"), {
+                    secureTextEntry: true,
+                    placeholder: PASSWORD_PLACEHOLDER,
+                    maxLength: VAULT_PASSWORD_LIMIT,
+                    hideLabel: true,
+                    appearance: "soft",
+                  })}
+                </LoginLine>
+              </View>
+              <View className="px-1">
+                <Typography.Paragraph type="body-xs" className="text-text-secondary">
+                  {t("mobile.server.vault.secretHint", { host })}
+                </Typography.Paragraph>
+              </View>
+            </View>
             {request
               ? null
               : field("notes", t("mobile.server.vault.notes"), {
@@ -430,6 +465,19 @@ export function VaultItemForm({
           </Typography.Paragraph>
         </View>
       </View>
+      {/* An agent's request form has no two-step key: an agent saves one only from a person's message. */}
+      {kind === "login" && !request && vault.canManageTwoStep ? (
+        <VaultTwoStepSection
+          formId={formId}
+          serverId={serverId}
+          host={host}
+          website={draft.website}
+          saved={saved?.kind === "login" ? saved : undefined}
+          twoStepKey={draft.twoStepKey}
+          disabled={locked}
+          onChange={(twoStepKey) => edit({ twoStepKey })}
+        />
+      ) : null}
       {kind === "card" && !request ? (
         <SettingsSection title={t("mobile.server.vault.billingContact")}>
           <SettingsRow

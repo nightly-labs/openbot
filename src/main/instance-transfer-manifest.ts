@@ -22,6 +22,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Result, Schema } from "effect";
+import { ServerPreferencesInFile, type TransferServerPreferences } from "./instance-transfer-server-preferences";
 import { TRANSFER_WORKFLOWS } from "./instance-transfer-workflows";
 import { isUnsafeArchivePath } from "./skill-package";
 
@@ -30,8 +31,20 @@ export const INSTANCE_TRANSFER_FORMAT = "openbot-instance-transfer";
 export const INSTANCE_TRANSFER_VERSION = 1;
 /** Where the files of `~/OpenBot/Shared` are in the archive. */
 export const SHARED_FOLDER = "shared";
+/** Where the server's logo is in the archive. */
+export const SERVER_FOLDER = "server";
+/** Where the shared skills that no agent has are in the archive. */
+export const LIBRARY_FOLDER = "library";
+/** The most members whose choices a file carries. */
+const TRANSFER_MEMBERS = 1000;
+/** The most shared skills a file carries. */
+export const TRANSFER_SHARED_SKILLS = 1000;
+/** The largest skill bundle the import reads: the limit of a skill package (`skill-package.ts`). */
+export const SHARED_SKILL_BYTES = 10 * 1024 * 1024;
 /** The most channels a file carries. An export with more keeps the first ones and says so. */
 export const TRANSFER_CHANNELS = 1000;
+/** The most files a channel's messages carry: the file limit of a whole transfer file. */
+const INSTANCE_TRANSFER_CHANNEL_FILES = 50_000;
 
 const text = (limit: number) => Schema.String.check(Schema.isMaxLength(limit));
 const name = (limit: number) => text(limit).check(Schema.isMinLength(1));
@@ -50,6 +63,8 @@ const Routine = Schema.Struct({
   limitPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_LIMIT_POLICIES)),
   missedPolicy: Schema.optionalKey(Schema.Literals(ROUTINE_MISSED_POLICIES)),
   runIn: Schema.optionalKey(Schema.Literals(ROUTINE_RUN_PLACES)),
+  /** Added with the full copy: the newest runs, checked by `decodeRuns` (`instance-transfer-runs.ts`). */
+  runs: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INPUT_LIMITS.routineRunsPage))),
 });
 
 const Memory = Schema.Struct({
@@ -211,6 +226,11 @@ const Channel = Schema.Struct({
   ),
   /** Added with the channels: the archive paths of the message parts, inside `channels/<key>/`. */
   messages: Schema.optionalKey(Schema.Array(text(512)).check(Schema.isMaxLength(10_000))),
+  /**
+   * Added with the full copy: the files of the messages, each `{ id, path, name, mimeType }` with a
+   * path inside `channels/<key>/files/`. The import checks each one (`decodeChannelFiles`).
+   */
+  files: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(INSTANCE_TRANSFER_CHANNEL_FILES))),
 });
 
 const Manifest = Schema.Struct({
@@ -225,6 +245,27 @@ const Manifest = Schema.Struct({
   channels: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_CHANNELS))),
   /** Added with the channels: the channel member id of the person who exported, for their own messages. */
   exporter: Schema.optionalKey(text(128)),
+  /**
+   * Added with the full copy: the host-wide preferences, each as its store reads it. The import checks
+   * each value with the parser of its Settings screen (`instance-transfer-server-preferences.ts`).
+   */
+  serverPreferences: Schema.optionalKey(ServerPreferencesInFile),
+  /**
+   * Added with the full copy: `{ name, logo: { path, mimeType } | null }`, with the logo in
+   * `server/`. The import checks both with the parser of Server settings > General.
+   */
+  serverIdentity: Schema.optionalKey(Schema.Unknown),
+  /**
+   * Added with the full copy: the shared skills that no agent had, each `{ slug, name, path, files }`
+   * with the files at `path/<file>` in `library/`. The import checks each one.
+   */
+  sharedSkills: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_SHARED_SKILLS))),
+  /**
+   * Added with the full copy: the notification levels and pins of the members other than the owner,
+   * each `{ accountId, server, agents: [{ agentId, level }], pins: [{ kind, id }] }` with the agents and
+   * channels named by their keys in the file. The import checks each entry.
+   */
+  memberPreferences: Schema.optionalKey(Schema.Array(Schema.Unknown).check(Schema.isMaxLength(TRANSFER_MEMBERS))),
 });
 
 export type TransferAgent = typeof Agent.Type;
@@ -240,6 +281,10 @@ export interface TransferManifest {
   signedIn: readonly (typeof Provider.Type)[];
   channels: TransferChannel[];
   exporter: string | null;
+  serverPreferences: typeof ServerPreferencesInFile.Type | null;
+  serverIdentity: unknown;
+  sharedSkills: readonly unknown[];
+  memberPreferences: readonly unknown[];
 }
 
 /** What the export writes. The same shape that `decodeTransferManifest` reads. */
@@ -253,6 +298,18 @@ export interface TransferManifestFile {
   signedIn: (typeof Provider.Type)[];
   channels?: TransferChannel[];
   exporter?: string;
+  serverPreferences?: TransferServerPreferences;
+  // `undefined` is left out of the JSON, as an absent field.
+  serverIdentity?: { name: string; logo: { path: string; mimeType: string } | null } | undefined;
+  sharedSkills?: { slug: string; name: string; path: string; files: string[] }[];
+  memberPreferences?:
+    | {
+        accountId: string;
+        server: string | null;
+        agents: { agentId: string; level: string }[];
+        pins: { kind: string; id: string }[];
+      }[]
+    | undefined;
 }
 
 const decodeManifest = Schema.decodeUnknownResult(Manifest);
@@ -290,7 +347,8 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
     if (Result.isSuccess(result)) settings = result.success;
     else warnings.push(sourceText("error.import.transferSettingsInvalid"));
   }
-  if (agents.length === 0 && settings === null) throw new Error(sourceText("error.import.transferEmpty"));
+  if (agents.length === 0 && settings === null && !file.serverPreferences)
+    throw new Error(sourceText("error.import.transferEmpty"));
   return {
     manifest: {
       appVersion: file.source.appVersion || "unknown",
@@ -302,6 +360,10 @@ export function decodeTransferManifest(bytes: Uint8Array): { manifest: TransferM
       signedIn: file.signedIn,
       channels: decodeChannels(file.channels ?? [], keys, warnings),
       exporter: file.exporter ?? null,
+      serverPreferences: file.serverPreferences ?? null,
+      serverIdentity: file.serverIdentity ?? null,
+      sharedSkills: file.sharedSkills ?? [],
+      memberPreferences: file.memberPreferences ?? [],
     },
     warnings,
   };

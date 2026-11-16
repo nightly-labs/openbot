@@ -1,5 +1,6 @@
 import {
   BROWSER_DOCK_LIMITS,
+  BROWSER_DOCK_OVERLAY_WIDTH,
   type BrowserDockAction,
   type BrowserDockFrame,
   type BrowserDockGlass,
@@ -79,22 +80,24 @@ export function BrowserDockSurface() {
         if (shape) glass.push(shape);
       }
     }
-    // A menu needs room above the dock, so the overlay takes the whole page while one is open.
-    // The dock is in a bottom corner, so the overlay needs only the space from that side: of the box, or of
-    // its tab when the user hid the box. A menu needs the whole page.
+    // The dock is at the bottom centre, so the page at its sides gets the clicks. A menu needs the whole page.
+    // The box takes its width from the overlay, so the overlay of the box has a fixed width: a width measured
+    // from the box would keep a narrow overlay narrow. The overlay of the tab, when the user hid the box, is
+    // only as wide as the tab. An even width keeps the centre on a whole pixel.
     const tab = dock.hasAttribute("data-tucked") ? dock.querySelector(".browser-dock-tab") : null;
     const box = (tab ?? dock).getBoundingClientRect();
     const limit = BROWSER_DOCK_LIMITS.frameSize;
     const needed = open.length > 0 ? limit : viewport - box.top;
     const height = clamp(Math.ceil(needed + SHADOW_ROOM), 0, limit);
-    const side = getComputedStyle(dock).direction === "rtl" ? "left" : "right";
-    const reach = side === "left" ? box.right : window.innerWidth - box.left;
-    const width = open.length > 0 ? limit : clamp(Math.ceil(reach + SHADOW_ROOM), 0, limit);
+    const centre = window.innerWidth / 2;
+    const reach = Math.max(centre - box.left, box.right - centre);
+    const width =
+      open.length > 0 ? limit : tab ? clamp(2 * Math.ceil(reach + SHADOW_ROOM), 0, limit) : BROWSER_DOCK_OVERLAY_WIDTH;
     // Main places the glass in an overlay of the new width before this view has that width. The dock stays
-    // at the right edge, so a glass shape keeps its distance from that edge.
-    const shift = side === "right" ? width - window.innerWidth : 0;
+    // at the centre, so a glass shape keeps its distance from the centre.
+    const shift = (width - window.innerWidth) / 2;
     for (const shape of glass) shape.left = clamp(shape.left + shift, -limit, limit);
-    return { height, glass, anchor: { side, width } };
+    return { height, glass, anchor: { width } };
   }
 
   function report() {

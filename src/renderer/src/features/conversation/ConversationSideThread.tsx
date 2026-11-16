@@ -11,9 +11,11 @@ import { createEffect, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
@@ -75,6 +77,7 @@ export function ConversationSideThread(props: { threadId: string }) {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactMessageActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const { appFocused } = usePlatform();
   // The person reads the thread in the side panel while the window has focus.
   createEffect(
@@ -115,6 +118,8 @@ export function ConversationSideThread(props: { threadId: string }) {
     ) : undefined;
   /** Continue on a sign-in card goes to this thread, as the person's next message there. */
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
+  /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
+  const visualReplyCard = useThreadVisualReplyCard(draftKey);
   /** Branches this thread through an answer. The branch opens as a chat tab. */
   const branch = () => {
     if (!view.threads?.onBranch) return undefined;
@@ -211,7 +216,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCompactContext={current().thread.onCompactContext}
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
-            messageCard={mcpSignInCard}
+            messageCard={(message, quote) => visualReplyCard(message, quote) ?? mcpSignInCard(message)}
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}
             focusMessage={current().thread.focusMessage}
@@ -222,6 +227,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onCopyMessage={(message) => void copyMessage(message)}
             copiedMessageId={copiedMessageId()}
             compactMessageActions={compactMessageActions()}
+            bubbleStyle={bubbleStyle()}
             onBranch={branch()}
             onDeleteMessage={deleteMessage()}
             messagePins={threadPins(current().thread.task.id)}

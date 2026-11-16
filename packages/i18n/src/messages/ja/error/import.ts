@@ -70,6 +70,17 @@ export const messages = {
   "error.import.transferModelMissing":
     "{name}: モデル「{model}」はまだここで利用できないため、エージェントはデフォルトのモデルを使います。プロバイダーの準備ができたら、モデルを選択し直してください。",
   "error.import.transferSettingSkipped": "{name} はインポートされません。{reason}",
+  "error.import.transferRunsSkipped": "{name}: ルーティン「{routine}」の実行履歴はインポートされません。",
+  "error.import.transferSharedSkillsSkipped": "共有スキルを読み込めなかったため、ファイルに含まれていません。",
+  "error.import.transferSharedSkillsNotAdded": "ファイル内の共有スキルをこのサーバーに追加できませんでした。",
+  "error.import.transferMemberPreferencesSkipped": {
+    other: "{count} 人のメンバーの選択を保存できませんでした。",
+  },
+  "error.import.transferSharedSkillExists":
+    "同じ名前で異なるファイルを持つ共有スキルが、このサーバーにすでにあります。",
+  "error.import.transferServerPreferencesSkipped": {
+    other: "ファイル内のサーバーの環境設定 {count} 件はここでは無効なため、インポートされません。",
+  },
   "error.import.transferRoutineFlowSkipped": "インポートでルーティンフローが 1 つ除外されました。{reason}",
   "error.import.transferCustomAgentCommand":
     "{name}: カスタムエージェントはコマンドを実行するため、インポートされません。コマンド「{command}」を確認し、設定でエージェントを追加し直してください。",

@@ -594,6 +594,7 @@ function isWaitingPhase(state: ProviderCodeLoginState): boolean {
 function samePage(shown: McpSignInRelayPage | null, page: McpSignInRelayPage): boolean {
   return (
     shown?.authorizeHost === page.authorizeHost &&
+    shown.url === page.url &&
     shown.listening === page.listening &&
     shown.pasteable === page.pasteable
   );

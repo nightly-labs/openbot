@@ -203,6 +203,26 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
+  // Users call the Workflows board the Canvas. A canvas search found no workflow tool (#9367).
+  const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
+  check(
+    "a canvas search gives all 6 workflow tools with schemas",
+    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    canvas.tools.map((tool) => tool.name),
+  );
+  // A canvas can also be on a web page or be the Routines canvas, so those schemas stay.
+  const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
+    discoverTools(params("tool_search", { query }), "claude")
+      .tools.filter((tool) => "inputSchema" in tool)
+      .map((tool) => tool.name),
+  );
+  check(
+    "a canvas search keeps the browser and routine schemas that it finds",
+    ["openbot_browser.click", "openbot.connect_routine_agents", "openbot.edit_workflow"].every((name) =>
+      otherReady.includes(name),
+    ),
+    otherReady,
+  );
   const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }), "codex");
   check(
     "a workflow search keeps the schema of a tool that another query names exactly",

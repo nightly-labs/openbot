@@ -76,8 +76,12 @@ export const messages = {
   "error.agent.endpointRemoved": "أُزيلت نقطة النهاية التي استخدمها هذا الوكيل. اختر نموذجًا آخر له.",
   "error.agent.turnStalled":
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.toolLoopStopped":
+    "كرر {provider} خطوة فاشلة مرات كثيرة، لذلك أوقف OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
   "error.agent.compactionConnectionLost":
     "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت، ثم أرسل رسالة للمتابعة.",
+  "error.agent.compactionLoopStopped":
+    "ضغط {provider} السياق مرارًا، وبقي ممتلئًا جدًا في كل مرة فلم يستطع المتابعة، لذلك أوقف OpenBot هذا الدور. أوقف خوادم MCP أو استخدام الكمبيوتر التي لا يحتاجها هذا الوكيل، ثم أرسل رسالة. إذا غيّرت أنت أو الوكيل وقت ضغط {provider}، فتراجع عن هذا التغيير.",
   "error.agent.selectedGone": "لم يعد الوكيل المحدد موجودًا.",
   "error.agent.profileEndpointsChanged": "تغيّرت نقاط النهاية المخصصة أثناء الإنشاء. أعد المحاولة.",
   "error.agent.profileInvalid": "أعاد المزوّد ملفًا تعريفيًا غير صالح. جرّب تعديل المطالبة.",
@@ -127,6 +131,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "ذاكرة هذا الخادم منخفضة. تنتظر رسالتك في قائمة الانتظار وتبدأ عند توفر الذاكرة.",
   "error.agent.workspaceOnlyToolMissing":
     "يحتاج خيار «مساحة العمل فقط» إلى {tool}، ولم يجده OpenBot. ثبّته، أو اختر الوصول الكامل في إعدادات الوكيل.",
+  "error.agent.codexSandboxUnavailable":
+    "يحتاج خيار «مساحة العمل فقط» إلى بيئة Codex المعزولة، ولا يستطيع Codex تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر «السؤال أولًا» أو «وصول كامل» في إعدادات الوكيل.",
   "error.agent.claudeSandboxUnavailable":
     "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب: {reason}. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
   "error.agent.screenCaptureOff":

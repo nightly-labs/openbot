@@ -252,6 +252,7 @@ const ingress: MessagingIngress = {
   telegram: { available: () => false, call: unused, download: unused, upload: unused },
   reconnect: () => {},
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
   discord: (request, decode) => {
     // An older Signal does not know `listRoles` and refuses it as an invalid request.
     if (request.op === "listRoles" && request.guildId === GUILD_TWO)
@@ -812,7 +813,7 @@ try {
         const prompt = await promptOf(services, GUILD_ONE, id, CHANNEL_ONE);
         assert.match(
           prompt,
-          /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Attached files: crash\.png\)\n/u,
+          /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Attached files: crash\.png\)\n/u,
         );
         assert.match(
           prompt,
@@ -937,7 +938,7 @@ try {
         await received(asked);
         assert.match(
           await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
-          /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Forwarded message\)\nReport: the export button does nothing\.\n/u,
+          /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Forwarded message\)\nReport: the export button does nothing\.\n/u,
         );
       } finally {
         channelOne.length = 0;
@@ -1021,7 +1022,7 @@ try {
           await received(asked);
           assert.match(
             await promptOf(services, GUILD_ONE, asked, CHANNEL_ONE),
-            /--- earlier messages \(context, oldest first\) ---\n\[2026-10-19T11:46:00\.000Z\] tomek: \(Embed\)\nLogin fails after the update\nLink: https:\/\/github\.com\/nightly-labs\/openbot\/issues\/1\nThe app closes at start\.\n/u,
+            /--- earlier messages \(context, oldest first, with their message id\) ---\n\[2026-10-19T11:46:00\.000Z\] \(id \d+\) tomek: \(Embed\)\nLogin fails after the update\nLink: https:\/\/github\.com\/nightly-labs\/openbot\/issues\/1\nThe app closes at start\.\n/u,
           );
         } finally {
           channelOne.length = 0;

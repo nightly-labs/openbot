@@ -94,6 +94,7 @@ export class LibraryFoldersStore {
   readonly #path: string;
   #snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
+  readonly #listeners = new Set<() => void>();
 
   constructor(path: string) {
     this.#path = path;
@@ -123,6 +124,17 @@ export class LibraryFoldersStore {
       yield* storedIO(() => rename(this.#path, backupPath)).pipe(Effect.catch(() => Effect.void));
       this.#snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
     });
+  }
+
+  /**
+   * Calls `listener` after each saved change, from any source: a member, an agent tool, or the removal
+   * of the folders of deleted agents and files. Returns the call that stops it.
+   */
+  onChanged(listener: () => void): () => void {
+    this.#listeners.add(listener);
+    return () => {
+      this.#listeners.delete(listener);
+    };
   }
 
   getSnapshot(): LibraryFoldersSnapshot {
@@ -268,6 +280,14 @@ export class LibraryFoldersStore {
       Effect.mapError(({ cause }) => new StoredStateFailure({ cause })),
     );
     this.#snapshot = next;
+    // The change is saved: a listener that fails must not report it as failed.
+    for (const listener of this.#listeners) {
+      try {
+        listener();
+      } catch {
+        // The next change or read brings the client up to date.
+      }
+    }
   });
 }
 

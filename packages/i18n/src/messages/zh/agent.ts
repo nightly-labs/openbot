@@ -78,6 +78,7 @@ export const messages = {
   "agent.error.settingsFailed": "无法保存助手设置",
   "agent.error.adminOnly": "只有服务器管理员可以更改助手设置。",
   "agent.error.continueFailed": "助手无法继续，请重试。",
+  "agent.error.copyDetails": "复制详情",
   "agent.error.mcpNotStarted": "MCP 服务器未启动",
   "agent.error.openMcpSettings": "打开 MCP 设置",
   "agent.error.provider": "服务商错误",

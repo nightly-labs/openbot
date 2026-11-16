@@ -269,7 +269,7 @@ private final class SpeechCapture {
     // and the converter follows the buffers it gets. A route that changes during the start can
     // still make the tap raise; caught, the start fails and the app continues.
     var converter: AVAudioConverter?
-    try EXUtilities.catchException {
+    try EXUtilities.catchException { [self] in
       input.installTap(onBus: 0, bufferSize: 4_096, format: nil) { [weak self] buffer, _ in
         guard let self else { return }
         if converter?.inputFormat != buffer.format { converter = AVAudioConverter(from: buffer.format, to: self.target) }
@@ -599,7 +599,7 @@ public class SpeechModule: Module {
 
     Events("onSpeechStart", "onSpeechDone", "onSpeechError", "onCaptureLevel", "onCaptureAudio", "onCaptureText", "onCaptureEnd")
 
-    OnCreate {
+    OnCreate { [self] in
       let center = NotificationCenter.default
       // A phone call or another app takes the microphone, or the route changes, such as headphones
       // that connect: the engine stops, and the session ends with what it heard.

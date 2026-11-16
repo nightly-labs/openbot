@@ -14,6 +14,7 @@ export const messages = {
   "channel.stoppedTask.assignmentLoopMembers":
     "De leden gaven deze taak te vaak aan elkaar door. De taak is gestopt om een lus te voorkomen.",
   "channel.conversation.noMembers": "Voeg agents toe in de kanaalinstellingen om te beginnen.",
+  "channel.conversation.waitFull": "Wachten - {name} begint als een lopende taak klaar is",
   "channel.conversation.archivedNotice": "Verwijderd kanaal. Alleen voorvertoning.",
   "channel.composer.label": "Bericht aan kanaal",
   "channel.composer.placeholder": "Bericht aan {name}",

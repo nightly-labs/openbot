@@ -199,6 +199,8 @@ export function hostDefaults(
   kind: WorkflowNodeKind,
   catalogs: WorkflowCatalogs,
   features: WorkflowFeatures,
+  /** The fields that the new node starts with, such as `media` of a video. */
+  initial?: WfnFields,
 ): WfnFields {
   switch (kind) {
     case "agent": {
@@ -218,7 +220,8 @@ export function hostDefaults(
         : {};
     }
     case "image": {
-      const model = catalogs.imageModels[0];
+      const media = initial?.media === "video" ? "video" : "image";
+      const model = catalogs.imageModels.find((choice) => choice.kinds.includes(media));
       return model ? { model: model.id } : {};
     }
     case "trigger": {

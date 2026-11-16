@@ -19,6 +19,7 @@ export interface ProviderAccountsHostDependencies {
     | "listAgents"
     | "updateAgent"
     | "signInProviderAccountOnHost"
+    | "connectProviderAccountKey"
     | "renameProviderAccount"
     | "removeProviderAccount"
     | "setProviderAccountPool"
@@ -138,6 +139,11 @@ export class ProviderAccountsHost {
 
   signInStatus(provider: AgentProviderId) {
     return this.#pages.status(provider) ?? { tabId: null, result: { error: endedText(provider) } };
+  }
+
+  /** Gives an account its API key (`provider-account-keys-v1`): a new account when `accountId` is null. */
+  connectKey(provider: AgentProviderId, accountId: string | null, key: string) {
+    return this.#dependencies.service.connectProviderAccountKey(provider, accountId, key).pipe(Effect.asVoid);
   }
 
   /** The interrupt ends the sign-in, and a new account that did not sign in goes with it. */

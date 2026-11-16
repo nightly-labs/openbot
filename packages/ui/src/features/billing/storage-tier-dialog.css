@@ -1,0 +1,70 @@
+/* The choice of a larger storage tier for a hosted server. It uses the hosted upsell modal, a little
+ * wider for three actions, and the radio rows of the Billing delete timing. */
+.storage-tier-modal {
+  width: min(480px, 100%);
+}
+
+.storage-tier-meter {
+  display: grid;
+  gap: var(--openbot-space-1-5);
+  margin: var(--openbot-space-1) 0;
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+}
+
+.storage-tier-meter .ui-progress-fill {
+  background: var(--openbot-warning);
+}
+
+.storage-tier-meter[data-level="full"] .ui-progress-fill {
+  background: var(--openbot-danger);
+}
+
+.storage-tier-options.billing-lifecycle-timing {
+  margin: var(--openbot-space-2) 0 0;
+}
+
+/* The label fills the row, so a click on the price also selects the tier. */
+.storage-tier-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--openbot-space-3);
+  min-width: 0;
+}
+
+.storage-tier-option-size {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--openbot-space-2);
+  min-width: 0;
+  color: var(--openbot-text-primary);
+}
+
+.storage-tier-option-price {
+  color: var(--openbot-text-primary);
+  font-weight: var(--openbot-weight-medium);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The storage now is shown for comparison and cannot be chosen. */
+.storage-tier-options .billing-lifecycle-timing-option[data-disabled] label {
+  cursor: default;
+}
+
+.storage-tier-options .billing-lifecycle-timing-option[data-disabled] .billing-lifecycle-radio {
+  visibility: hidden;
+}
+
+.storage-tier-error {
+  margin: 0;
+  color: var(--openbot-danger);
+  font-size: var(--openbot-text-sm);
+}
+
+/* Three actions do not fit at phone width, so they go to a second line. */
+.storage-tier-modal .hosted-upsell-modal-actions {
+  flex-wrap: wrap;
+}

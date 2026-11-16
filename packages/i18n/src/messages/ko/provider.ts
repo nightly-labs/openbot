@@ -167,22 +167,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API 키",
   "provider.geminiKey.description":
     "이 컴퓨터에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
+  "provider.geminiKey.descriptionHost":
+    "호스트에 Gemini API 키를 저장하세요. 저장된 키가 Google 계정보다 우선 사용돼요. Google로 로그인하려면 키를 제거하고 Gemini 행에서 연결을 선택하세요.",
   "provider.geminiKey.label": "Gemini API 키",
   "provider.claudeKey.title": "Anthropic API 키",
   "provider.claudeKey.description":
     "호스트에 Anthropic API 키를 저장하세요. Anthropic이 각 요청을 Claude 플랜이 아닌 키의 API 크레딧으로 청구해요. 에이전트에서 사용하려면 에이전트의 모델 메뉴에서 'API 키' 계정을 선택하세요. Claude에 로그인하지 않은 경우 모든 에이전트가 키를 사용해요.",
   "provider.claudeKey.label": "Anthropic API 키",
+  "provider.cursorKey.title": "Cursor API 키",
+  "provider.cursorKey.description":
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 이 컴퓨터에 저장돼요.",
+  "provider.cursorKey.descriptionHost":
+    "두 번째부터의 Cursor 계정은 API 키를 사용해요. Cursor 대시보드의 Integrations에서 키를 만들어 여기에 붙여넣으세요. 키는 호스트에 저장돼요.",
+  "provider.cursorKey.label": "Cursor API 키",
   "provider.inceptionKey.title": "Inception API 키",
   "provider.inceptionKey.description":
     "Mercury 모델을 사용하려면 이 컴퓨터에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury 모델을 사용하려면 호스트에 Inception API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.inceptionKey.label": "Inception API 키",
   "provider.deepseekKey.title": "DeepSeek API 키",
   "provider.deepseekKey.description":
     "DeepSeek 모델을 사용하려면 이 컴퓨터에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek 모델을 사용하려면 호스트에 DeepSeek API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.deepseekKey.label": "DeepSeek API 키",
   "provider.openrouterKey.title": "OpenRouter API 키",
   "provider.openrouterKey.description":
     "OpenRouter 모델을 사용하려면 이 컴퓨터에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter 모델을 사용하려면 호스트에 OpenRouter API 키를 저장하세요. OpenBot은 다운로드한 Pi CLI에서 모델을 실행해요.",
   "provider.openrouterKey.label": "OpenRouter API 키",
 
   "provider.openCodeKey.title": "OpenCode Go에 로그인",
@@ -288,6 +302,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · {available} 사용 가능",
   "provider.settings.versionInstalledByUser": "{version} · 직접 설치함",
   "provider.settings.versionDownloaded": "{version} · OpenBot이 다운로드함",
+  "provider.settings.otherVersionInstalledByUser": "사용 안 함: {version} · 직접 설치함",
+  "provider.settings.otherVersionDownloaded": "사용 안 함: {version} · OpenBot이 다운로드함",
+  "provider.settings.useInstalledVersion": "설치한 버전 사용",
+  "provider.settings.useDownloadedVersion": "OpenBot 버전 사용",
   "provider.settings.update": "업데이트",
   "provider.settings.downloadLabel": "{name} 다운로드",
   "provider.settings.diagnostics": "진단",

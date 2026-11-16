@@ -71,8 +71,12 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.toolLoopStopped":
+    "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.compactionConnectionLost":
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
+  "error.agent.compactionLoopStopped":
+    "{provider} 反复压缩上下文，但每次压缩后仍然太满，无法继续，因此 OpenBot 停止了这一轮。请关闭此智能体不需要的 MCP 服务器或电脑操控，然后发送一条消息。如果你或智能体更改过 {provider} 的压缩时机，请撤销该更改。",
   "error.agent.selectedGone": "所选的助手已不存在。",
   "error.agent.profileEndpointsChanged": "生成期间自定义端点发生了变更，请重试。",
   "error.agent.profileInvalid": "服务商返回了无效的资料，请试着修改提示词。",
@@ -119,6 +123,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "该服务器内存不足。你的消息会在队列中等待，内存释放后自动开始。",
   "error.agent.workspaceOnlyToolMissing":
     "“仅工作区”需要 {tool}，但 OpenBot 没有找到它。请安装它，或在助手设置中选择完全访问。",
+  "error.agent.codexSandboxUnavailable":
+    "“仅工作区”需要 Codex 沙盒，但 Codex 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择先询问或完全访问。",
   "error.agent.claudeSandboxUnavailable":
     "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",

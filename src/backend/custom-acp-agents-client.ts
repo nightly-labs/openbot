@@ -24,6 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AcpHistoryPersistence } from "./acp-client";
+import { customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
@@ -255,6 +256,13 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
       { concurrency: "unbounded", discard: true },
     );
   });
+
+  /** The rule of the custom agent that the session belongs to, from its command, as its process uses. */
+  readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean => {
+    const agentId = sessionAgent(externalThreadId);
+    const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
+    return config !== undefined && customAgentFlavor(config.command).mcpToolsFixedAtStart === true;
+  };
 
   readonly releaseThread = Effect.fn("CustomAcp.releaseThread")(function* (
     this: CustomAcpAgentsClient,

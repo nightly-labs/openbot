@@ -162,7 +162,8 @@ agent deletion removes it. A duplicate agent starts with no usage history.
 Authenticated members of a host team can also see that host's storage through the Team API: how
 much disk space each location, agent and chat uses, and the name, size, type, date and chat title of
 each sent or generated file. They can also read the free and total size of the disk that holds the
-host's OpenBot data. The response contains no file paths, and workspace and download files
+host's OpenBot data, and, on a hosted server, the total size of the files in the home folder and the
+temporary folders of the server's user. The response contains no file paths, and workspace and download files
 are counted only as totals. Only owners and admins can delete a file or clear caches and logs. A
 deleted file is removed from the host's disk; the message that sent it stays and shows that the file
 is not available.
@@ -180,7 +181,7 @@ completed or was cancelled, for a plan, a license or the billing portal. The con
 name and email are not sent to analytics.
 The production desktop app records application, sign-in, onboarding, agent, message, turn, prompt,
 approval, queue, routine, workflow, team, browser, search, Remote Desktop, update, marketplace, memory,
-provider, voice transcription, Voice pane, spoken reply, voice model download, spoken reply setting,
+provider, voice transcription, voice conversation, spoken reply, voice model download, spoken reply setting,
 reaction, Hosted Site, hosted server offer, hosted server plans, plan and member limits, license,
 contact sales, provider usage limit, agent template, phone connection, connector, Computer Use
 permission, help link, channel, server export and import, Usage view, and confirmed
@@ -487,7 +488,9 @@ the avatar without an account session.
 ## Hosted servers
 
 Each account can buy hosted servers. A hosted server is a Linux
-OpenBot computer that runs in a [boat](https://boat.dev) sandbox in the EU (Germany, Finland or
+OpenBot computer. It runs on a virtual server that OpenBot rents from
+[Leaseweb](https://www.leaseweb.com) when one is free at the purchase (see below), and otherwise in a
+[boat](https://boat.dev) sandbox in the EU (Germany, Finland or
 France). The sandbox holds the server's workspaces, conversations, attachments, browser data and
 team data, the same as your own computer would. The server stops 15 to 30 minutes after its last use and
 starts again when you press a key or click in an app that shows it, when a Slack, Discord or
@@ -519,6 +522,25 @@ The account service gives each sandbox a name in boat, so that an operator can f
 boat dashboard: `openbot-`, the plan, your account email with each other character as `-`, and the
 first 8 characters of the server ID, such as `openbot-starter-ada-example-com-1a2b3c4d`. boat keeps
 the name with the sandbox.
+
+A new hosted server of each plan starts on a virtual server that OpenBot rents from
+[Leaseweb](https://www.leaseweb.com) when one is free at the purchase. For a purchase in euros or
+złotys, it is in Amsterdam, the Netherlands. For a purchase in US dollars or Brazilian reais, it is
+near Washington, D.C., in the United States, or in Amsterdam when none is free there. When no
+virtual server is free, the server starts in a boat sandbox. An operator can also move a
+server from boat to such a virtual server: the operator copies the server's disk over SSH, and
+deletes the copy after the move. The virtual server holds the server's
+workspaces, conversations, attachments, browser data and team data, as a sandbox does, and runs
+all the time, with no stop after the last use. A server that started on the virtual server has no
+boat sandbox. For a moved server, boat keeps the old sandbox until the server is
+deleted. A free virtual server asks the account service each 10 seconds whether it has a server; the
+account service stores a hash of the token of that request and the time of the last request, and
+no customer data. The account service stores the Leaseweb server ID with the server. So that an operator can
+find the server in the Leaseweb portal, the operator gives it a reference in Leaseweb: your account
+email and the first 8 characters of the server ID, such as `ada@example.com 1a2b3c4d`. When you
+delete the server, or 30 days after its plan ends with no renewal, the account service deletes the old
+sandbox when the server has one, and within a day an operator reinstalls the virtual server, which erases its disk, and sets
+its reference to `pool-free`.
 
 ## Central data retention
 
@@ -774,6 +796,13 @@ change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Str
 customer, invoices and payment records under its own policy, also after the subscription ends.
 Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
 
+When a server plan or a license starts or ends, when you cancel or resume its renewal, and when a
+payment for it succeeds, fails, or goes back (a refund or a dispute), the account service sends one
+message to a private Discord channel of the OpenBot team, through a Discord webhook. The message has
+your account email, the plan or the license tier and its number of users, the billing period, the
+currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
+server ID. Discord keeps the message under its own policy.
+
 ## Data stored on the OpenBot computer
 
 Saved agent memories, their inclusion settings, and their full-text search index stay in the local
@@ -911,7 +940,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   two-step key, and one of the first four goes to them only when they show or copy it. A server with
   `vault-v3` also sends the current two-step codes, each valid for its short period. The iPhone app shows the same list and never
   asks for a password, a card number, a security code or an API key: a new one that the owner or admin types on
-  the phone goes once to the server, and the phone does not keep it. Other team members cannot read it. An agent gets the login sites and usernames, the card names with their last
+  the phone goes once to the server, and the phone does not keep it. The same applies to a two-step key that the
+  owner or admin pastes, scans with the camera or reads from a screenshot on the phone: the phone keeps it in memory
+  only, makes the first codes from it so the user can check it on the site, and sends it once to the server on save.
+  The camera picture and the screenshot stay on the phone. Other team members cannot read it. An agent gets the login sites and usernames, the card names with their last
   four digits and expiry, and the contact info; it never gets a password, a card number, a security
   code, two-step key or login notes. It can enter a two-step code into a sign-in page with the secure
   sign-in card, as it does a password, and save a setup key that a site shows when the user asks it to
@@ -919,9 +951,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   its site) and the name, expiry and billing address of a card, and delete items, with no approval: the
   chat shows each change, and an item that an agent adds keeps the agent's name. Agents cannot see,
   add, change or delete a Vault API key as an item. When an agent lists its API keys, OpenBot writes
-  each Vault key, readable only by the user, to
-  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<NAME>`, outside every workspace, and
-  gives the agent the path; every agent on the server can read these files in its commands. A changed
+  each Vault key that the agent can use, readable only by the user, to
+  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<agentId>/<NAME>`, outside every
+  workspace, and gives the agent the path. All agents run as the same system user, so every agent on
+  the server can read these files in its commands, also the files of a key that is for other agents
+  or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
+  not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
   start. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
@@ -971,6 +1006,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   command lines or paths. It is kept to two files of 1 MB each and is never sent.
   `~/Library/Application Support/OpenBot/openbot-resource-summary-v1.json` holds the totals of
   today and of the previous day for the daily analytics summary and the diagnostics export.
+- `~/Library/Application Support/OpenBot/logs/stall-profiles.ndjson` holds one line for a minute in
+  which the main process froze for 2 seconds or more, twice in a row: the functions of OpenBot's code
+  that used the time, and their callers. A line holds function names, the file name of an OpenBot
+  file, package names and Node module names. It holds no directories, arguments, values, queries or
+  text of the user. It is kept to two files of 256 KB each. The five heaviest functions of a line
+  also go out as one product analytics event, at most once in 6 hours.
 - `~/Library/Application Support/OpenBot/openbot-push-notifications-v1.json` holds, for each member
   phone that gets notifications from this host, the session ID, the member ID, the Apple or Firebase
   push token, the secret that seals the notifications, the interface language, and the notification
@@ -1066,24 +1107,30 @@ Network traffic can also occur when:
   change. Nothing else about the user's agents, conversations or files is sent in those requests. The
   registration names OpenBot's logo at `openbot.run`; an authorization service that shows it on its
   sign-in page can make the browser load it from `openbot.run`;
+- an owner or admin pastes a GitHub link into the Marketplace Skills search. The computer that runs
+  OpenBot, or the joined server, reads that public repository from `api.github.com` and
+  `raw.githubusercontent.com` without a GitHub account, with `User-Agent: OpenBot`. It reads the
+  commit, the file list and each `SKILL.md`, and when the user adds a skill, the files of that skill
+  folder. The requests carry the repository, the folder and the commit, and no other user data. The
+  skill is kept with the agent like a Marketplace skill;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
-- the user dictates or opens the Voice pane for the first time, or presses Download in **Settings →
+- the user dictates or starts a voice conversation for the first time, or presses Download in **Settings →
   Voice**. OpenBot downloads the speech model that it pins, Parakeet TDT, Parakeet Unified EN,
   Underdog Bark 3.0 Plus, Whisper turbo or Cohere Transcribe, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
   the application data folder. The request carries no user data. Dictation audio from these models
   stays on the computer, and the chosen model and language are saved in `voice-preference.json` in
   the same folder;
 - the user selects ElevenLabs Scribe v2 Realtime in **Settings → Voice** and dictates or talks in
-  the Voice pane. While the microphone records, or when a Voice pane turn ends, OpenBot streams the
+  a voice conversation. While the microphone records, or when a voice conversation turn ends, OpenBot streams the
   audio and the chosen language to `api.elevenlabs.io` with the user's own API key, and receives the
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
 - the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
-  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  dictates or talks in a voice conversation. When the recording stops, or when a voice conversation turn ends,
   OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
   `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
   conversation, file or agent instruction. Groq handles the audio and the text under its own policy
@@ -1101,7 +1148,7 @@ Network traffic can also occur when:
   the recording in memory, writes it as a WAV file to the app's cache folder only while the request
   runs, and deletes it after. The address and the choices are saved in the phone's keychain, and the
   API key in a separate keychain entry. **Remove voice server** deletes both;
-- the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
+- the user turns on Read replies aloud, starts a voice conversation for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
   in the application data folder. The request carries no user data. When Supertonic reads a reply
@@ -1112,7 +1159,7 @@ Network traffic can also occur when:
   `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
   sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
   provider handles the text and the audio under its own policy and the user's plan.
-  In the Voice pane, the spoken reply runs on this
+  In a voice conversation, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
   **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
@@ -1121,7 +1168,7 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
-- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of an agent on
+- the user turns on Codex live voice in **Settings → Voice** and starts a voice conversation with an agent on
   this computer, with any provider. OpenBot starts a separate Codex App Server process for the
   session. The app window sends a WebRTC offer to it, and it opens a realtime voice session with
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
@@ -1319,6 +1366,20 @@ Members of a joined server can read, change, and run a workflow when they can se
 agent in it (`workflows-v1`). The graph and the step text then go to their computer. Only owners
 and administrators see a webhook URL or make a new signing secret.
 
+An image or video step sends its prompt and its input pictures to the provider of its model, as an
+agent turn does, and keeps the result on the computer that runs the workflow. A picture that a member
+uploads to an asset step goes to that computer and stays in its Library.
+
+A step with a Sunra model uses the Sunra sign-in of that computer's Apps. The computer sends the
+prompt, the model, the size settings and the input pictures to Sunra's MCP server (`mcp.sunra.ai`):
+it puts each input picture in Sunra's upload storage first, then asks Sunra to make the file, and
+downloads the result only from Sunra's file hosts. Sunra keeps the file in a project named "OpenBot"
+of the signed-in Sunra account, and the credits of that account pay for it. OpenBot does not change
+which Sunra account pays. While the Canvas page is open, the computer also asks Sunra for the credits
+of that account, with Sunra's `get_balance` tool, which spends no credits. It shows the number only
+in the page rail, and each member of a joined server who can use workflows can see it. Sunra's own
+privacy policy covers what Sunra keeps.
+
 Deleting an agent keeps the workflows and their step history without the agent. Deleting a
 workflow deletes its versions, runs, steps, and receipts.
 
@@ -1498,10 +1559,16 @@ restrict or block a number that it sees as automated.
   holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
   that the owner allowed, and one row per conversation that an agent answers. The messages of that
   conversation are kept as a conversation of that agent, and files people send are kept with the
-  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
-  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
-  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
-  allowed senders.
+  agent's attachments. The messages of the allowed chats that OpenBot sees, also those that do not
+  mention the number, are kept in the database for 90 days after they arrive, so that an agent can
+  read and search them. The files of these messages are downloaded when they arrive, up to 100 MB
+  each, to `<userData>/whatsapp/files/`, readable only by the user, and are deleted with their
+  message. The copies of one number use at most 2 GB: when they use more, the copies of the oldest
+  messages are deleted first, and those messages keep only the names of their files. A message that
+  its author deletes for everyone is deleted with its files, and a changed message keeps the new text. Names are kept in memory until OpenBot quits. Pairing requests are kept in memory for at
+  most an hour. Disconnect logs the device out (when OpenBot is connected), deletes its keys, the saved
+  messages and their files, and keeps the conversations, the workspace memories and the allowed
+  senders.
 - **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
   only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
   the groups the owner allowed, where a request starts only from a mention of the number or a reply in
@@ -1686,6 +1753,15 @@ from the Keychain item `cursor-access-token`, else from the CLI's `auth.json`. O
 token only to Cursor (`api2.cursor.sh`, or `CURSOR_API_ENDPOINT` when you set it for the CLI), in
 the same usage request that the CLI sends. The request contains no conversation, file, or model
 data. OpenBot does not store, log, or send the token or the usage to its maintainer.
+
+A Cursor account after the first is a Cursor API key that you type under Providers › Cursor › Add
+account. OpenBot keeps the key encrypted on the OpenBot computer, in the same file as the other
+provider API keys, and deletes it when you remove the account. For a joined server, the key goes to
+that server's host over the encrypted Team channel and is kept there. To check a key, OpenBot sends
+it to Cursor (`api2.cursor.sh`, or `CURSOR_API_ENDPOINT`), in the request with which the CLI signs a
+key in, and does not keep the answer. The CLI processes of the agents on that account get the key in
+their environment. Those processes keep their sign-in in memory only: they do not read or change the
+CLI's own login. OpenBot does not log the key or send it to its maintainer.
 
 ### Cline
 

@@ -183,6 +183,8 @@ export const messages = {
   "provider.geminiKey.title": "مفتاح Gemini API",
   "provider.geminiKey.description":
     "احفظ مفتاح Gemini API على هذا الحاسوب. يُستخدم المفتاح المحفوظ بدلًا من حسابك في Google. لتسجيل الدخول باستخدام Google، أزل المفتاح واختر «اتصال» في صف Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "احفظ مفتاح Gemini API على المضيف. يُستخدم المفتاح المحفوظ بدلًا من حسابك في Google. لتسجيل الدخول باستخدام Google، أزل المفتاح واختر «اتصال» في صف Gemini.",
   "provider.geminiKey.label": "مفتاح Gemini API",
   "provider.claudeKey.title": "مفتاح Anthropic API",
   "provider.claudeKey.description":
@@ -194,17 +196,29 @@ export const messages = {
   "provider.codexKey.descriptionHost":
     "يحفظ Codex المفتاح على المضيف. تحتسب OpenAI كل طلب على المفتاح، لا على خطة ChatGPT. لاستخدام الخطة مرة أخرى، افصل الحساب ووصّل ChatGPT.",
   "provider.codexKey.label": "مفتاح OpenAI API",
+  "provider.cursorKey.title": "مفتاح Cursor API",
+  "provider.cursorKey.description":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على هذا الحاسوب.",
+  "provider.cursorKey.descriptionHost":
+    "كل حساب Cursor بعد الأول يستخدم مفتاح API. أنشئ مفتاحًا في لوحة تحكم Cursor ضمن Integrations، ثم الصقه هنا. يُحفظ المفتاح على المضيف.",
+  "provider.cursorKey.label": "مفتاح Cursor API",
   "provider.inceptionKey.title": "مفتاح Inception API",
   "provider.inceptionKey.description":
     "احفظ مفتاح Inception API على هذا الحاسوب لاستخدام نماذج Mercury. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.inceptionKey.descriptionHost":
+    "احفظ مفتاح Inception API على المضيف لاستخدام نماذج Mercury. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.inceptionKey.label": "مفتاح Inception API",
   "provider.deepseekKey.title": "مفتاح DeepSeek API",
   "provider.deepseekKey.description":
     "احفظ مفتاح DeepSeek API على هذا الحاسوب لاستخدام نماذج DeepSeek. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.deepseekKey.descriptionHost":
+    "احفظ مفتاح DeepSeek API على المضيف لاستخدام نماذج DeepSeek. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.deepseekKey.label": "مفتاح DeepSeek API",
   "provider.openrouterKey.title": "مفتاح OpenRouter API",
   "provider.openrouterKey.description":
     "احفظ مفتاح OpenRouter API على هذا الحاسوب لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
+  "provider.openrouterKey.descriptionHost":
+    "احفظ مفتاح OpenRouter API على المضيف لاستخدام النماذج التي يقدمها OpenRouter. يشغّلها OpenBot في Pi CLI الذي ينزّله.",
   "provider.openrouterKey.label": "مفتاح OpenRouter API",
   "provider.openCodeKey.title": "تسجيل الدخول إلى OpenCode Go",
   "provider.openCodeKey.description": "لا تحتاج النماذج المجانية إلى حساب. يفتح المفتاح نماذج Go المدفوعة.",
@@ -334,6 +348,10 @@ export const messages = {
   "provider.settings.versionAvailable": "{installed} · يتوفر {available}",
   "provider.settings.versionInstalledByUser": "{version} · ثبّته أنت",
   "provider.settings.versionDownloaded": "{version} · نزّله OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "غير مستخدم: {version} · ثبّته أنت",
+  "provider.settings.otherVersionDownloaded": "غير مستخدم: {version} · نزّله OpenBot",
+  "provider.settings.useInstalledVersion": "استخدم الإصدار المثبّت",
+  "provider.settings.useDownloadedVersion": "استخدم إصدار OpenBot",
   "provider.settings.update": "تحديث",
   "provider.settings.downloadLabel": "تنزيل {name}",
   "provider.settings.diagnostics": "التشخيص",

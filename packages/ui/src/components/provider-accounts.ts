@@ -1,3 +1,4 @@
+import { agentProviderDescriptor, isAgentProvider } from "@openbot/contracts/agent-providers";
 import {
   type AgentProviderId,
   type ClientAgentModelOption,
@@ -21,6 +22,12 @@ export interface ProviderPickerAccount extends ProviderAccountStatus {
 export interface ProviderAccountActions {
   /** Signs a new account in when `accountId` is null, or signs that account in again. */
   connect: (provider: AgentProviderId, accountId: string | null) => Promise<void>;
+  /**
+   * Gives an account of a provider whose accounts are API keys its key: a new account when
+   * `accountId` is null. It answers when the provider accepted the key, and rejects with the reason
+   * when it did not. Absent where the computer that runs the providers cannot take such a key.
+   */
+  connectKey?: ((provider: AgentProviderId, accountId: string | null, key: string) => Promise<void>) | undefined;
   /** Stops a `connecting` account's sign-in. A new account goes; another one shows as signed out. */
   cancel: (provider: AgentProviderId, accountId: string) => Promise<void>;
   /** A null label returns the account to its email. */
@@ -72,9 +79,24 @@ export function isAgentAccount(agentAccountId: string | undefined | null, accoun
   return (agentAccountId || DEFAULT_PROVIDER_ACCOUNT_ID) === accountId;
 }
 
-/** Whether the account is the one of the saved Claude key: it has no sign-in and no plan usage. */
-export function isApiKeyAccount(accountId: string): boolean {
-  return accountId === CLAUDE_API_KEY_ACCOUNT_ID;
+/**
+ * Whether the account is an API key: it has no sign-in and no plan usage. That is the account of the
+ * saved Claude key, and each account after the first of a `provider` whose accounts are keys.
+ */
+export function isApiKeyAccount(accountId: string, provider?: string): boolean {
+  return (
+    accountId === CLAUDE_API_KEY_ACCOUNT_ID || (provider !== undefined && isProviderKeyAccount(provider, accountId))
+  );
+}
+
+/** Whether each account after the first of the provider is one API key (`accountSignIn: "key"`). */
+export function hasKeyAccounts(provider: string): boolean {
+  return isAgentProvider(provider) && agentProviderDescriptor(provider).accountSignIn === "key";
+}
+
+/** Whether the account is one API key of such a provider. The user adds, changes and removes it. */
+export function isProviderKeyAccount(provider: string, accountId: string): boolean {
+  return accountId !== DEFAULT_PROVIDER_ACCOUNT_ID && hasKeyAccounts(provider);
 }
 
 /**

@@ -20,6 +20,12 @@ export const messages = {
   "error.workflow.conditionUnclear": "Le modèle n’a pas répondu oui ou non.",
   "error.workflow.modelFailed": "Le modèle n’a pas pu répondre. Relancez l’étape.",
   "error.workflow.modelBusy": "Une autre requête au modèle est en cours. Relancez l’étape bientôt.",
+  "error.workflow.mediaFailed": "Le modèle n’a pas pu créer l’image ou la vidéo. Relancez l’étape.",
+  "error.workflow.pictureMissing": "L’image n’est plus sur le serveur. Envoyez-la de nouveau.",
+  "error.workflow.pictureType": "Utilisez une image PNG, JPEG ou WebP.",
+  "error.workflow.mediaInputMissing": "Une image d’une étape précédente n’est pas disponible. Relancez cette étape.",
+  "error.workflow.mediaInputNotImage":
+    "Cette étape n’accepte que des images, pas des vidéos. Supprimez la connexion depuis la vidéo.",
   "error.workflow.stepMissing": "Cette étape n’existe plus.",
   "error.workflow.nodeMissing": "Cette étape n’est pas dans le workflow.",
   "error.workflow.runMissing": "Cette exécution n’existe plus.",
@@ -68,4 +74,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "La modification s’est arrêtée en chemin. Elle peut déjà être sur GitHub. Vérifiez avant de relancer l’étape.",
   "error.workflow.githubNoEvent": "GitHub n’a aucune issue ni pull request sur laquelle ce déclencheur démarre.",
+  "error.workflow.sunraSignIn": "Connectez-vous à Sunra dans Apps pour utiliser les modèles Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Votre compte Sunra n'a pas assez de crédits. Ajoutez des crédits sur sunra.ai/pricing, puis relancez l'étape.",
+  "error.workflow.sunraNeedsPlan":
+    "Ce modèle Sunra nécessite un abonnement Sunra. Choisissez un abonnement sur sunra.ai/pricing ou un autre modèle.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra utilise les images d'entrée uniquement avec un compte personnel. Sélectionnez votre compte personnel dans Sunra ou retirez les connexions d'images.",
+  "error.workflow.sunraFailed": "Sunra n'a pas pu créer le fichier : {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra n'a pas terminé le fichier à temps. Regardez le projet OpenBot sur sunra.ai avant de relancer l'étape.",
 } as const satisfies PartialTranslation<typeof source>;
