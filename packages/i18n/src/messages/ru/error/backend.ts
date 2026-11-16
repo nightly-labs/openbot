@@ -252,6 +252,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "Сервер входа не принял приложение входа этого сервера. Проверьте ID клиента и секрет клиента приложения входа, затем войдите снова.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
+  "error.backend.mcpProviderLimit":
+    "Этот агент может использовать только ограниченное число серверов MCP. Чтобы использовать этот сервер, выключите сервер MCP, который агенту не нужен.",
   "error.backend.mcpRegistrationRefused":
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
   "error.backend.mcpSignInAbandonedGeneric": "Вход прерван.",

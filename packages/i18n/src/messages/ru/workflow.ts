@@ -24,6 +24,18 @@ export const messages = {
   "workflow.board.refusal.noOutput": "Нет выхода: {type}",
   "workflow.board.live.connected": "Связь от {from} к {to}.",
   "workflow.board.live.connectedLoop": "Связь от {from} к {to}. Получился цикл.",
+  "workflow.board.live.connectedMany": {
+    one: "Подключён {count} узел.",
+    few: "Подключено {count} узла.",
+    many: "Подключено {count} узлов.",
+    other: "Подключено {count} узла.",
+  },
+  "workflow.board.live.connectedManyLoop": {
+    one: "Подключён {count} узел. Получился цикл.",
+    few: "Подключено {count} узла. Получился цикл.",
+    many: "Подключено {count} узлов. Получился цикл.",
+    other: "Подключено {count} узла. Получился цикл.",
+  },
   "workflow.board.live.disconnected": "Связь удалена.",
   "workflow.board.live.deleted": "Удалено: {name}.",
   "workflow.board.live.deletedMany": {

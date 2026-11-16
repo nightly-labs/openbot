@@ -246,6 +246,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "Oturum açma sunucusu bu sunucunun oturum açma uygulamasını kabul etmedi. Oturum açma uygulamasının istemci kimliğini ve istemci gizli anahtarını kontrol edip yeniden oturum açın.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",
+  "error.backend.mcpProviderLimit":
+    "Bu ajan yalnızca sınırlı sayıda MCP sunucusu kullanabilir. Bu sunucuyu kullanmak için ajanın ihtiyaç duymadığı bir MCP sunucusunu kapatın.",
   "error.backend.mcpRegistrationRefused":
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
   "error.backend.mcpSignInAbandonedGeneric": "Oturum açma yarıda bırakıldı.",

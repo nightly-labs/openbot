@@ -261,6 +261,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "O servidor de login não aceitou o app de login deste servidor. Confira o ID do cliente e o segredo do cliente do app de login e entre de novo.",
   "error.backend.mcpCommandNotFound": "Comando não encontrado: {command}",
+  "error.backend.mcpProviderLimit":
+    "Este agente só pode usar um número limitado de servidores MCP. Para usar este servidor, desative um servidor MCP de que o agente não precisa.",
   "error.backend.mcpRegistrationRefused":
     "O servidor de login ainda não aceita o OpenBot como aplicativo. Sua conta não é a causa. Use outra forma de conexão, como um servidor MCP local.",
   "error.backend.mcpSignInAbandonedGeneric": "O login foi abandonado.",

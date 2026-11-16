@@ -260,6 +260,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "El servidor de inicio de sesión no aceptó la app de inicio de sesión de este servidor. Revisa el ID de cliente y el secreto de cliente de la app de inicio de sesión y vuelve a iniciar sesión.",
   "error.backend.mcpCommandNotFound": "No se encontró el comando: {command}",
+  "error.backend.mcpProviderLimit":
+    "Este agente solo puede usar un número limitado de servidores MCP. Para usar este servidor, desactiva un servidor MCP que el agente no necesite.",
   "error.backend.mcpRegistrationRefused":
     "El servidor de inicio de sesión aún no acepta OpenBot como aplicación. Tu cuenta no es la causa. Usa otra forma de conexión, como un servidor MCP local.",
   "error.backend.mcpSignInAbandonedGeneric": "Se abandonó el inicio de sesión.",
