@@ -285,6 +285,11 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
+      // Without the email rule, the text goes back to the agent's own chat (`redactSecrets`,
+      // `toSecretSafeValue`), and the provider already received it. Code or a list of links has far
+      // more than 16 bracket runs, and a cut reply made the agent send broken code again (#10122).
+      // The tail stays: registered secrets were already masked in it, and the text rules still run.
+      if (!emails) return result + value.slice(index);
       // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
       // shown either: text before the bound is kept, and everything from the unread payload on is
       // dropped. A truncated line is a smaller loss than a credential that survived the limit.
