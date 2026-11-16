@@ -1,4 +1,4 @@
-import { BILLING_PLAN_IDS } from "@openbot/contracts/billing";
+import { BILLING_PLAN_IDS, storageTierOf } from "@openbot/contracts/billing";
 import {
   HOST_KEY_HANDOVER_LIMIT,
   type HostKeyHandover,
@@ -156,15 +156,18 @@ function removedAtAfterChange(change: { revoke: boolean; leave: boolean; activat
 export type { RemoteMemberRole };
 
 /**
- * The plan storage of a hosted server, in GB. A server on a machine of the operator has more.
- * Nothing for a server without a known plan.
+ * The plan storage of a hosted server, in GB. A server on a machine of the operator has more, and its
+ * storage tier adds to it. Nothing for a server without a known plan.
  */
 function hostedStorage(
   plan: string | null,
   onOperatorHost: boolean,
   size: HostedServerSize | null,
+  storageTier: number | null,
 ): { storageGb: number } | Record<string, never> {
-  return isOneOf(BILLING_PLAN_IDS, plan) ? { storageGb: hostedServerStorageGb(plan, onOperatorHost, size) } : {};
+  return isOneOf(BILLING_PLAN_IDS, plan)
+    ? { storageGb: hostedServerStorageGb(plan, onOperatorHost, size, storageTierOf(storageTier)) }
+    : {};
 }
 
 export class RemoteControlPlaneError extends Schema.TaggedError<RemoteControlPlaneError>()("RemoteControlPlaneError", {
@@ -927,7 +930,9 @@ export class RemoteControlPlane {
              AND s.desired_state NOT IN ('deleted', 'stopped')) AS operator_host,
            (SELECT CASE WHEN s.provider_template IS NULL THEN NULL ELSE COALESCE(s.pending_size, s.size) END
              FROM hosted_servers s WHERE s.server_id = h.host_id
-             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_size,
+           (SELECT s.storage_tier FROM hosted_servers s WHERE s.server_id = h.host_id
+             AND s.desired_state NOT IN ('deleted', 'stopped')) AS hosted_storage_tier
          FROM remote_memberships m
          JOIN remote_hosts h ON h.host_id = m.host_id
          WHERE m.user_id = ? AND m.status = 'active'
@@ -947,6 +952,7 @@ export class RemoteControlPlane {
             hosted_plan: string | null;
             operator_host: string | null;
             hosted_size: HostedServerSize | null;
+            hosted_storage_tier: number | null;
           }>(),
       );
       const keyHandovers = yield* this.#keyHandoversByHost({
@@ -978,7 +984,7 @@ export class RemoteControlPlane {
               // the restart. A client from before this field shows it, and gets the refusal of the restart.
               ...(row.operator_host === null ? {} : { restartAvailable: false }),
               // The storage that the plan of a hosted server gives, so a client warns before the plan is full.
-              ...hostedStorage(row.hosted_plan, row.operator_host !== null, row.hosted_size),
+              ...hostedStorage(row.hosted_plan, row.operator_host !== null, row.hosted_size, row.hosted_storage_tier),
             };
           }),
         { concurrency: "unbounded" },

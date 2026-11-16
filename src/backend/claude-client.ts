@@ -887,6 +887,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
   }
 
+  /** A background subagent or command of this thread ends when its query closes. */
+  holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
+    return Effect.sync(() => (this.#threads.get(threadId)?.backgroundTasks ?? 0) > 0);
+  }
+
   /**
    * Closes one thread runtime and keeps the rest of the client. The SDK query owns the MCP servers
    * of that thread, so the close is what ends those child processes. The caller releases an idle
@@ -2315,6 +2320,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           typeof input.file_path === "string"
             ? [input.file_path]
             : undefined,
+        // The folder that a finished search worked in, so a chip that names a file from its result finds it.
+        folderPaths:
+          completed && failure === null && ["Glob", "Grep", "LS"].includes(name) && isRecord(input)
+            ? [input.path].filter((path) => typeof path === "string")
+            : undefined,
         item: {
           id,
           type: "toolCall",
@@ -2572,7 +2582,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // A sign-in failure moves the turn to a backup model, as an invalid key does, and so do spent
       // usage credits and a billing refusal. The shared classifier does not find these causes in
       // all CLI texts, such as "Credit balance is too low", so the client names them.
-      const signInFailed = turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error));
+      // Cloudflare's block page in front of the Claude API arrives as `authentication_failed`, but the
+      // request never reached Claude, so the sign-in is not the cause (#8811).
+      const blocked = CLAUDE_CLOUDFLARE_BLOCK.test(String(error));
+      if (blocked) queryLogger.warn("Cloudflare blocked a Claude request.", { error: redactText(String(error)) });
+      const signInFailed = !blocked && (turn.authenticationFailed || CLAUDE_NOT_LOGGED_IN.test(String(error)));
       const billing = turn.billingFailed || (turn.balanceSpent && isBalanceDiagnostic(String(error)));
       this.emit("notification", {
         method: "error",
@@ -2580,7 +2594,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
           threadId: runtime.id,
           turnId: turn.id,
           message: claudeTurnError(error, this.#usesApiKey()),
-          ...(signInFailed ? { causeCode: "authentication" } : billing ? { causeCode: "billing" } : {}),
+          ...(blocked
+            ? { causeCode: "provider_unavailable" }
+            : signInFailed
+              ? { causeCode: "authentication" }
+              : billing
+                ? { causeCode: "billing" }
+                : {}),
         },
       });
     }
@@ -3032,6 +3052,14 @@ const CLAUDE_API_CREDIT_EMPTY = /\bcredit balance (?:is )?too low\b/iu;
 const CLAUDE_NOT_LOGGED_IN = /\bnot logged in\b\s*·\s*please run \/login\b/iu;
 
 /**
+ * A 403 that Cloudflare, not Claude, sent: "Failed to authenticate. API Error: 403 Attention
+ * Required! | Cloudflare" (Claude Code 2.1.323, #8811). Only a 403 with a block marker matches, so
+ * any other 403 stays a sign-in failure.
+ */
+const CLAUDE_CLOUDFLARE_BLOCK =
+  /\b403\b[\s\S]*(?:attention required!? \| cloudflare|sorry, you have been blocked|cf-browser-verification|__cf_chl|cdn-cgi\/challenge-platform)/iu;
+
+/**
  * The chat text for a fast mode turn that Claude Code ran at the standard speed. `pending` and
  * `sdk_opt_in_required` are states of the client itself, so only the log keeps them.
  */
@@ -3059,6 +3087,7 @@ function claudeFastModeWarning(reason: string): string | null {
 function claudeTurnError(error: unknown, apiKey: boolean): string {
   const text = String(error);
   if (apiKey && CLAUDE_API_CREDIT_EMPTY.test(text)) return sourceText("error.provider.claudeApiKeyNoCredit");
+  if (CLAUDE_CLOUDFLARE_BLOCK.test(text)) return sourceText("error.provider.claudeServiceBlocked");
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
@@ -3553,6 +3582,8 @@ function claudeStepTarget(name: string, input: unknown): Record<string, string> 
 function completedToolInput(input: unknown): Record<string, string> {
   const kept: Record<string, string> = {};
   if (!isRecord(input)) return kept;
-  for (const key of ["skill", "command", "file_path"]) if (typeof input[key] === "string") kept[key] = input[key];
+  // `path` is the folder of a Glob or Grep search, for the thread's work folders.
+  for (const key of ["skill", "command", "file_path", "path"])
+    if (typeof input[key] === "string") kept[key] = input[key];
   return kept;
 }

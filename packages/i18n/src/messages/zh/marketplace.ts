@@ -121,6 +121,10 @@ export const messages = {
   "marketplace.app.remove.action": "移除",
   "marketplace.app.remove.confirmTitle": "移除 {name}？",
   "marketplace.app.remove.keep": "保留",
+  "marketplace.app.replace.title": "替换 {server}?",
+  "marketplace.app.replace.description":
+    "你已有一个名为 {server} 的服务器,但它不是 {name}。要用 {name} 替换它吗?它的地址和已保存的密钥将被删除。",
+  "marketplace.app.replace.action": "替换",
   "marketplace.app.connection": "连接",
   "marketplace.app.access.use": "可使用",
   "marketplace.app.access.noAgents": "无助手",

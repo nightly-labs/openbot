@@ -1,5 +1,4 @@
 import type { AttachmentSummary, ImageGenerationAspectRatio } from "@openbot/contracts/ipc";
-import { Button, Download, Maximize2 } from "@openbot/ui";
 import { createEffect, createStore, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import type { AttachmentMediaSource } from "./AttachmentCards";
@@ -13,6 +12,7 @@ import {
 } from "./media-generation-frame";
 import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { VideoPlayer } from "./VideoPlayer";
+import { VideoStage, type VideoStageMenu } from "./VideoStage";
 
 export interface VideoGenerationProps {
   status: MediaGenerationStatus;
@@ -42,7 +42,7 @@ interface VideoPlayerState {
 
 /** A video that an agent made: the frame while it is made, then a player with its own controls. */
 export function VideoGeneration(props: VideoGenerationProps) {
-  const { t, errorMessage } = useText();
+  const { t, format, errorMessage } = useText();
   // A video that loaded before in this window has its shape before its metadata loads again.
   const remembered = untrack(() => rememberedMediaSize(props.attachment?.id));
   const [player, setPlayer] = createStore<VideoPlayerState>({
@@ -112,6 +112,28 @@ export function VideoGeneration(props: VideoGenerationProps) {
           props.status === "interrupted" ? t("chat.video.wasInterrupted") : t("chat.video.didNotComplete"),
         );
 
+  // A finished video shows only its player. Its details show on hover, and its actions on a right click.
+  const menu = (): VideoStageMenu | undefined => {
+    const attachment = props.attachment;
+    if (!ready() || !attachment) return undefined;
+    const actions = [];
+    const { onOpen, onDownload } = props;
+    if (onOpen)
+      actions.push({
+        label: t("chat.preview.preview"),
+        onSelect: () => {
+          video?.pause();
+          onOpen(attachment);
+        },
+      });
+    if (onDownload) actions.push({ label: t("common.download"), onSelect: () => onDownload(attachment) });
+    return {
+      // The same details as a video file. The length is in the controls.
+      details: [attachment.name, format.fileSize(attachment.size), size()],
+      actions,
+    };
+  };
+
   /** The web client loads the file on Play, then the video plays at once. */
   const load = async () => {
     const attachment = props.attachment;
@@ -136,7 +158,7 @@ export function VideoGeneration(props: VideoGenerationProps) {
       aria-live={generating() ? "polite" : undefined}
       aria-busy={generating() ? "true" : undefined}
     >
-      <div class="media-generation-stage" style={{ "--media-generation-ratio": stageRatio() }}>
+      <VideoStage ratio={stageRatio()} menu={menu()}>
         <Show when={generating()}>
           <MediaGenerationCanvas />
           <MediaGenerationSpecs class="media-generation-chip" values={[lengthText(), props.resolution]} />
@@ -170,56 +192,25 @@ export function VideoGeneration(props: VideoGenerationProps) {
             ref={(element) => {
               video = element;
             }}
-          >
-            <Show when={props.attachment && props.onDownload}>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                aria-label={t("chat.video.download")}
-                title={t("chat.video.download")}
-                onClick={() => {
-                  if (props.attachment) props.onDownload?.(props.attachment);
-                }}
-              >
-                <Download aria-hidden="true" />
-              </Button>
-            </Show>
-            <Show when={props.attachment && props.onOpen}>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                type="button"
-                aria-label={t("chat.video.open")}
-                title={t("chat.video.open")}
-                data-attachment-id={props.attachment?.id}
-                onClick={() => {
-                  video?.pause();
-                  if (props.attachment) props.onOpen?.(props.attachment);
-                }}
-              >
-                <Maximize2 aria-hidden="true" />
-              </Button>
-            </Show>
-          </VideoPlayer>
+            fullControls
+          />
         </Show>
-      </div>
-      <figcaption class="media-generation-meta">
-        <span class="media-generation-label" data-shine={generating() ? "" : undefined}>
-          {label()}
-          <Show when={ready()}>
-            <MediaGenerationSpecs class="media-generation-specs" values={[lengthText(), size()]} />
-          </Show>
-        </span>
-        <Show when={failed()}>
-          <span class="media-generation-error" role="alert">
-            {failure()}
+      </VideoStage>
+      <Show when={!ready()}>
+        <figcaption class="media-generation-meta">
+          <span class="media-generation-label" data-shine={generating() ? "" : undefined}>
+            {label()}
           </span>
-        </Show>
-        <Show when={props.prompt}>
-          <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
-        </Show>
-      </figcaption>
+          <Show when={failed()}>
+            <span class="media-generation-error" role="alert">
+              {failure()}
+            </span>
+          </Show>
+          <Show when={props.prompt}>
+            <span class="media-generation-prompt">{t("chat.image.prompt", { prompt: props.prompt ?? "" })}</span>
+          </Show>
+        </figcaption>
+      </Show>
     </figure>
   );
 }

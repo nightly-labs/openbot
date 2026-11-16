@@ -250,12 +250,18 @@ export const messages = {
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} הפסיק לחכות לפני שהשרת התחיל, ולכן הסוכנים שלו לא מקבלים את הכלים של השרת הזה.",
   "error.backend.mcpToolSchemaRefused":
     "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את הגדרות ה-MCP ולבחור Test connection כדי לראות את הסיבה.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
@@ -342,6 +348,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "הפרוקסי הזה השתנה אחרי שפתחת אותו. יש לעיין בו שוב ולנסות שוב.",
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
+  "error.backend.browserSystemProxyFailed":
+    "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxyComputerLocalAddress":
     "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",
@@ -372,6 +380,8 @@ export const messages = {
     "הטקסט נמצא בשדה, אבל הדף העביר את המוקד, ולכן Enter לא נשלח. אין להקליד את הטקסט שוב. יש לצלם snapshot חדש.",
   "error.backend.mcpServerHttpCredentials": "השרת ענה {status}. יש לבדוק את מפתח ה-API או פרטי גישה אחרים.",
   "error.backend.mcpServerHttpUrl": "השרת ענה {status}. יש לבדוק את ה-URL. ייתכן שהקישור שגוי, פג תוקפו או נמחק.",
+  "error.backend.mcpServerBearerKey":
+    "השרת הזה משתמש במפתח API, לא בהתחברות. בכותרות, הגדר את המפתח ל-Authorization ואת הערך ל-Bearer, רווח, ומפתח ה-API שלך.",
   "error.backend.mcpSignInAppUrl": "אפליקציית ההתחברות דורשת כתובת שרת תקינה.",
   "error.backend.mcpSignInAppClientId": "יש להזין את מזהה הלקוח של אפליקציית ההתחברות.",
   "error.backend.mcpSignInAppIssuerChanged":

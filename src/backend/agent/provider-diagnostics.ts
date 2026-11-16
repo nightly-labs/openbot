@@ -39,6 +39,16 @@ export function isMcpSignInDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether an MCP diagnostic says that the server did not answer in time. A provider can wait less
+ * than OpenBot's connection test, so a server that downloads packages at its start can pass the
+ * test and still time out in the provider. `deadline has elapsed` is the Rust `tokio` timeout text.
+ * A bare `timeout` does not count: a server name or a quoted option such as `--timeout` can hold it.
+ */
+export function isMcpTimeoutDiagnostic(message: string): boolean {
+  return /\btimed out\b|\bdeadline has elapsed\b/i.test(message);
+}
+
+/**
  * Whether a provider diagnostic is about the CLI's own telemetry export rather than about the
  * agent's work.
  *
@@ -375,6 +385,18 @@ export function isImageCountDiagnostic(message: string): boolean {
   return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
     message,
   );
+}
+
+/**
+ * Whether the model endpoint refused the request because its body is larger than the endpoint
+ * accepts. The ChatGPT backend that Codex uses writes "request body exceeds 67108864 bytes", or
+ * "decompressed request body exceeds 67108864 bytes" for a compressed request. Codex counts each
+ * image of the session at a small fixed token cost, so a session with many images grows past this
+ * byte limit before its token-based compaction starts, and each later turn fails the same way until
+ * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ */
+export function isRequestBodyLimitDiagnostic(message: string): boolean {
+  return /\brequest body exceeds \d+ bytes\b/iu.test(message);
 }
 
 /**

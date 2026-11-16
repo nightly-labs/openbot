@@ -270,12 +270,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
   "error.backend.mcpToolSchemaRefused":
     "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz ustawienia MCP i wybierz Zaloguj się.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} nie może uruchomić serwera MCP {name}. Otwórz ustawienia MCP i wybierz Testuj połączenie, aby zobaczyć przyczynę.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}. Jego narzędzia nie są dostępne dla {provider}. {provider} uruchamia serwer samodzielnie, więc test połączenia w OpenBot może się udać. Rozpocznij nowy czat, aby spróbować ponownie.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} nie może uruchomić serwera MCP {name}, ponieważ serwer nie odpowiedział na czas. Rozpocznij nowy czat, aby spróbować ponownie.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -364,6 +370,8 @@ export const messages = {
     "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
   "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserSystemProxyFailed":
+    "Proxy w ustawieniach komputera, na którym działa OpenBot, nie odpowiada lub odrzuciło połączenie, więc strona się nie otworzyła. Sprawdź ustawienia proxy tego komputera.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -394,6 +402,8 @@ export const messages = {
     "Serwer odpowiedział {status}. Sprawdź klucz API lub inne dane uwierzytelniające.",
   "error.backend.mcpServerHttpUrl":
     "Serwer odpowiedział {status}. Sprawdź URL. Link może być błędny, wygasły lub usunięty.",
+  "error.backend.mcpServerBearerKey":
+    "Ten serwer używa klucza API, a nie logowania. W Nagłówkach ustaw klucz na Authorization, a wartość na Bearer, spację i swój klucz API.",
   "error.backend.mcpSignInAppUrl": "Aplikacja logowania wymaga prawidłowego adresu URL serwera.",
   "error.backend.mcpSignInAppClientId": "Wpisz identyfikator klienta aplikacji logowania.",
   "error.backend.mcpSignInAppIssuerChanged":

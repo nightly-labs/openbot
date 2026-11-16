@@ -12,6 +12,12 @@ export const messages = {
     "ツールは実行されませんでした。tool_call の arguments はテキストではなく JSON オブジェクトにする必要があります。arguments をオブジェクトにして、もう一度呼び出してください。",
   "error.agent.toolCallDiscoveryTool":
     "ツールは実行されませんでした。tool_call では openbot.tool_search と openbot.tool_describe を実行できません。同じ引数で直接呼び出してください。",
+  "error.agent.toolCallEnvelopeKeys":
+    "ツールは実行されませんでした。tool_call が受け付けるのは name と arguments だけです。ツールの引数をオブジェクトとして arguments に入れ、もう一度呼び出してください。",
+  "error.agent.toolCallUnknownTool":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。tool_search が返す正確な完全修飾名（例: openbot_browser.snapshot）を使ってください。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "ツールは実行されませんでした。tool_call はこの名前のツールを見つけられませんでした。完全修飾名は {name} の可能性があります。その場合は、その名前でもう一度呼び出してください。",
   "error.agent.routineScheduleArgumentsInvalid":
     "ルーティンのスケジュールが無効です: {detail} スケジュールを修正して再試行してください。スキーマは openbot.tool_describe で取得できます。",
   "error.agent.approvalWhileDeleting": "エージェントの削除中は承認できません。",
@@ -154,6 +160,8 @@ export const messages = {
     "このサーバーはメモリーが不足しています。メッセージはキューで待機し、メモリーが空くと開始します。",
   "error.agent.workspaceOnlyToolMissing":
     "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.codexSandboxUnavailable":
+    "「ワークスペースのみ」には Codex のサンドボックスが必要ですが、このコンピューターでは Codex がサンドボックスを開始できないため、エージェントのコマンドが失敗します。エージェントの設定で「事前に確認」か「フルアクセス」を選んでください。",
   "error.agent.claudeSandboxUnavailable":
     "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できません: {reason}。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
   "error.agent.screenCaptureOff":
@@ -163,6 +171,8 @@ export const messages = {
     "画面キャプチャは Slack、Discord、Telegram の会話では使えません。ほかの人がそのファイルを受け取るためです。",
   "error.agent.screenCaptureDeclined":
     "ユーザーはこの画面キャプチャを許可しませんでした。何もキャプチャされていません。",
+  "error.agent.mcpToolDeclined":
+    "ユーザーはこの MCP ツールの呼び出しを許可しませんでした。ツールは実行されていません。",
   "error.agent.screenCaptureWindowMissing":
     "そのウィンドウは現在開いていません。list_capture_sources を呼び出して、現在のウィンドウ ID を取得してください。",
   "error.agent.screenCaptureDisplayMissing":

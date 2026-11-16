@@ -19,6 +19,7 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -45,6 +46,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentProfileDraft,
+  decodeAgentSteeringModels,
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
@@ -73,6 +75,7 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withSteeringModels,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -513,11 +516,21 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              // The three requests go to the same host at the same time.
-              const [options, fastModels, listed] = yield* Effect.all([models, fast, listings], {
+              // `model-steering-v1` lists the custom agent models that steer. A host without it, or a
+              // failed read, leaves them unmarked: the composer then shows Send now for them.
+              const steering = remoteServers.supportsCapability(serverId, MODEL_STEERING_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              // The four requests go to the same host at the same time.
+              const [options, fastModels, listed, steered] = yield* Effect.all([models, fast, listings, steering], {
                 concurrency: "unbounded",
               });
-              return withModelListings(withFastServiceTiers(options, fastModels), listed);
+              return withSteeringModels(withModelListings(withFastServiceTiers(options, fastModels), listed), steered);
             }),
           );
         },

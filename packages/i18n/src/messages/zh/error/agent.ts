@@ -11,6 +11,12 @@ export const messages = {
     "工具未运行。在 tool_call 中，arguments 必须是 JSON 对象，而不是文本。请将 arguments 作为对象，再次发送调用。",
   "error.agent.toolCallDiscoveryTool":
     "工具未运行。tool_call 无法运行 openbot.tool_search 或 openbot.tool_describe。请使用相同的参数直接调用它们。",
+  "error.agent.toolCallEnvelopeKeys":
+    "工具未运行。tool_call 只接受 name 和 arguments。请将工具的参数作为对象放入 arguments，再次发送调用。",
+  "error.agent.toolCallUnknownTool":
+    "工具未运行。tool_call 找不到此名称的工具。请使用 tool_search 给出的准确完整名称，例如 openbot_browser.snapshot。",
+  "error.agent.toolCallUnknownToolSuggest":
+    "工具未运行。tool_call 找不到此名称的工具。完整名称可能是 {name}。如果是，请使用该名称再次发送调用。",
   "error.agent.routineScheduleArgumentsInvalid":
     "自动化任务的时间表无效：{detail} 请更正时间表后重试。openbot.tool_describe 可提供架构。",
   // Agent errors that the main process and the backend send.
@@ -123,6 +129,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "该服务器内存不足。你的消息会在队列中等待，内存释放后自动开始。",
   "error.agent.workspaceOnlyToolMissing":
     "“仅工作区”需要 {tool}，但 OpenBot 没有找到它。请安装它，或在助手设置中选择完全访问。",
+  "error.agent.codexSandboxUnavailable":
+    "“仅工作区”需要 Codex 沙盒，但 Codex 无法在这台电脑上启动它，所以助手的命令会失败。请在助手设置中选择先询问或完全访问。",
   "error.agent.claudeSandboxUnavailable":
     "“仅工作区”需要 Claude 沙盒，但 Claude 无法在这台电脑上启动它：{reason}。请在助手设置中选择完全访问或其他服务商。",
   "error.agent.screenCaptureOff": "该助手的截屏功能已关闭，用户可以在助手设置中开启 Computer Use。",
@@ -130,6 +138,7 @@ export const messages = {
   "error.agent.screenCaptureShared": "在 Slack、Discord、Telegram 对话中无法使用截屏，因为其他人也会收到这些文件。",
   "error.agent.screenCaptureDeclined": "用户未允许本次截屏，没有截取任何内容。",
   "error.agent.mcpServerDeclined": "用户未允许这次 MCP 服务器更改，未做任何更改。",
+  "error.agent.mcpToolDeclined": "用户未允许这次 MCP 工具调用，工具没有运行。",
   "error.agent.mcpServerNotSaved": "该 MCP 服务器没有响应，因此未保存。{error}",
   "error.agent.mcpServerKeysMove":
     "MCP 服务器 {name} 保存着当前服务器的密钥。请让用户在“服务器设置 → MCP”中更改它的地址、命令、参数或传输方式。",

@@ -1955,6 +1955,23 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       connectAccountKey: async (input) => {
         await api.connectProviderAccountKey(input);
       },
+      // The preview has no provider to finish a code sign-in: the code stays until the dialog closes.
+      startAccountCodeLogin: async ({ provider, accountId }) => {
+        const status = await api.connectProviderAccount({ provider, accountId });
+        const accounts = status.providers?.find((row) => row.id === provider)?.accounts ?? [];
+        return {
+          accountId: accountId ?? accounts.at(-1)?.id ?? "a0000000000000001",
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://example.com/device",
+            expiresAt: Date.now() + 15 * 60_000,
+          },
+        };
+      },
+      submitAccountCodeLogin: async () => undefined,
+      accountCodeLoginStatus: async () => ({ result: null }),
+      cancelAccountCodeLogin: async () => undefined,
       renameAccount: async (input) => {
         await api.renameProviderAccount(input);
       },

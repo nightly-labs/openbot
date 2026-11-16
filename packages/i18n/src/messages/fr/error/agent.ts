@@ -12,6 +12,12 @@ export const messages = {
     "L’outil ne s’est pas exécuté. Dans tool_call, arguments doit être un objet JSON, pas du texte. Renvoyez l’appel avec arguments sous forme d’objet.",
   "error.agent.toolCallDiscoveryTool":
     "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
+  "error.agent.toolCallEnvelopeKeys":
+    "L’outil ne s’est pas exécuté. tool_call accepte seulement name et arguments. Mettez les arguments de l’outil dans arguments, sous forme d’objet, puis renvoyez l’appel.",
+  "error.agent.toolCallUnknownTool":
+    "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Utilisez le nom qualifié exact que donne tool_search, par exemple openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "L’outil ne s’est pas exécuté. tool_call n’a trouvé aucun outil avec ce nom. Le nom qualifié est peut-être {name}. Si c’est le cas, renvoyez l’appel avec ce nom.",
   "error.agent.routineScheduleArgumentsInvalid":
     "La planification de la routine n’est pas valide : {detail} Corrigez la planification et réessayez. openbot.tool_describe donne le schéma.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
@@ -157,6 +163,8 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.codexSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Codex, que Codex ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Demander d’abord » ou « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":
@@ -165,6 +173,7 @@ export const messages = {
   "error.agent.screenCaptureShared":
     "La capture d’écran ne fonctionne pas dans une conversation Slack, Discord ou Telegram, car d’autres personnes reçoivent ses fichiers.",
   "error.agent.screenCaptureDeclined": "L’utilisateur n’a pas autorisé cette capture d’écran. Rien n’a été capturé.",
+  "error.agent.mcpToolDeclined": "L’utilisateur n’a pas autorisé cet appel d’outil MCP. L’outil n’a pas été exécuté.",
   "error.agent.screenCaptureWindowMissing":
     "Cette fenêtre n’est pas ouverte. Appelez list_capture_sources pour obtenir les identifiants actuels des fenêtres.",
   "error.agent.screenCaptureDisplayMissing":

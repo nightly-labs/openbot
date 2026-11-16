@@ -5618,11 +5618,11 @@ const HIGHLEVEL: MarketplacePluginDetail = {
   name: "HighLevel",
   tagline: "CRM and marketing workspace",
   description:
-    "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in the signed-in HighLevel sub-account. Each user signs in to their own HighLevel account through the browser.",
+    "HighLevel lets agents read and update contacts, conversations, opportunities, and calendars in one HighLevel sub-account. Each user connects with a Private Integration token and the location ID of their own sub-account.",
   category: "productivity",
   creatorName: "HighLevel",
   iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
-  version: "1.0.0",
+  version: "1.1.0",
   prompts: [
     { id: "prompt-new-leads", text: "List the contacts that were added this week." },
     { id: "prompt-pipeline", text: "Summarize the opportunities in my sales pipeline by stage." },
@@ -5633,13 +5633,37 @@ const HIGHLEVEL: MarketplacePluginDetail = {
       id: "app-highlevel-mcp",
       name: "HighLevel",
       description:
-        "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with browser sign-in.",
+        "Contact, conversation, opportunity, and calendar access, over HighLevel's MCP server with a Private Integration token.",
       iconUrl: "https://storage.googleapis.com/msgsndr/knES3eSWYIsc5YSZ3YLl/media/62b48689c85eccb36ca941fc.png",
       server: {
         name: "highlevel",
         transport: "http",
         url: "https://services.leadconnectorhq.com/mcp",
-        auth: [{ id: "highlevel-oauth", kind: "link", label: "Sign in" }],
+        auth: [
+          {
+            id: "highlevel-key",
+            kind: "key",
+            label: "Private Integration token",
+            fields: [
+              {
+                id: "token",
+                label: "Private Integration token",
+                header: "Authorization",
+                prefix: "Bearer ",
+                placeholder: "pit-…",
+                hint: "In your HighLevel sub-account, open Settings > Private Integrations and create a token.",
+              },
+              {
+                id: "location-id",
+                label: "Location ID",
+                header: "locationId",
+                hint: "In your HighLevel sub-account, open Settings > Business Profile and copy the Location ID.",
+              },
+            ],
+            docsUrl: "https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html",
+            docsLabel: "Create a token",
+          },
+        ],
       },
     },
   ],
@@ -5732,6 +5756,65 @@ const HOSTINGER: MarketplacePluginDetail = {
   featured: false,
   updatedAt: "2026-11-10T00:00:00.000Z",
   shareUrl: "https://openbot.run/plugins/hostinger",
+};
+
+const HUBSPOT: MarketplacePluginDetail = {
+  id: "plugin-hubspot",
+  slug: "hubspot",
+  name: "HubSpot",
+  tagline: "CRM records, deals and notes",
+  description:
+    "HubSpot lets agents search and read contacts, companies, deals and tickets, and create or update records, associations, notes and tasks. HubSpot's own local server runs with a service key from your HubSpot account. The scopes of the key set what agents can read and change. The server has no delete tools.",
+  category: "productivity",
+  creatorName: "HubSpot",
+  iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+  version: "1.0.0",
+  prompts: [
+    { id: "prompt-deals", text: "Summarize my open deals by stage and amount." },
+    { id: "prompt-contact", text: "What do we know about the contacts at this company?" },
+    { id: "prompt-note", text: "Add a note about today's call to this contact in HubSpot." },
+  ],
+  apps: [
+    {
+      id: "app-hubspot-mcp",
+      name: "HubSpot",
+      description:
+        "CRM search, record and association updates, notes and tasks, over HubSpot's local MCP server with a service key.",
+      iconUrl: "https://www.hubspot.com/hubfs/HubSpot_Logos/HubSpot-Inversed-Favicon.png",
+      server: {
+        name: "hubspot",
+        transport: "stdio",
+        command: "npx",
+        args: ["-y", "@hubspot/mcp-server@0.4.0"],
+        auth: [
+          {
+            id: "hubspot-key",
+            kind: "key",
+            label: "Service key",
+            fields: [
+              {
+                id: "token",
+                label: "Service key",
+                env: "PRIVATE_APP_ACCESS_TOKEN",
+                hint: "In HubSpot, open Development > Keys > Service keys, create a key with the CRM scopes you need, and copy it. A private app access token also works.",
+              },
+            ],
+            docsUrl:
+              "https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys",
+            docsLabel: "Create a key",
+          },
+        ],
+      },
+    },
+  ],
+  websiteUrl: "https://www.hubspot.com",
+  privacyPolicyUrl: "https://legal.hubspot.com/privacy-policy",
+  termsUrl: "https://legal.hubspot.com/terms-of-service",
+  skills: [],
+  installs: 0,
+  featured: false,
+  updatedAt: "2026-11-10T00:00:00.000Z",
+  shareUrl: "https://openbot.run/plugins/hubspot",
 };
 
 const IBKR: MarketplacePluginDetail = {
@@ -10657,6 +10740,7 @@ export const MARKETPLACE_PLUGINS: MarketplacePluginDetail[] = [
   HIGHLEVEL,
   HOSPITABLE,
   HOSTINGER,
+  HUBSPOT,
   IBKR,
   IFTTT,
   INCIDENTIO,

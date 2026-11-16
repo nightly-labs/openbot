@@ -269,12 +269,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Сервер остановился, не ответив. Запустите команду в терминале, чтобы увидеть ошибку.",
   "error.backend.mcpServerFailedToStart": "Сервер не запустился: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} перестал ждать до запуска сервера, поэтому его агенты не получают инструменты этого сервера.",
   "error.backend.mcpToolSchemaRefused":
     "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте настройки MCP и выберите «Войти».",
   "error.backend.mcpServerFailedForProvider":
     "{provider} не может запустить MCP-сервер {name}. Откройте настройки MCP и выберите «Проверить подключение», чтобы увидеть причину.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} не может запустить MCP-сервер {name}. Его инструменты недоступны для {provider}. {provider} запускает сервер сам, поэтому проверка подключения в OpenBot может пройти успешно. Начните новый чат, чтобы попробовать снова.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} не может запустить MCP-сервер {name}, потому что сервер не ответил вовремя. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -364,6 +370,8 @@ export const messages = {
     "Этот прокси изменился после того, как вы его открыли. Проверьте его ещё раз и повторите попытку.",
   "error.backend.browserProxyUnreachable": "Прокси {name} не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxySignInRefused": "Прокси {name} отклонил вход, поэтому страница не открылась.",
+  "error.backend.browserSystemProxyFailed":
+    "Прокси в настройках компьютера, на котором работает OpenBot, не отвечает или отклонил подключение, поэтому страница не открылась. Проверьте настройки прокси этого компьютера.",
   "error.backend.browserProxyComputerUnreachable":
     "Компьютер этого профиля не отвечает, поэтому страница не открылась.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -393,6 +401,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "Сервер ответил {status}. Проверьте API-ключ или другие учётные данные.",
   "error.backend.mcpServerHttpUrl":
     "Сервер ответил {status}. Проверьте URL. Ссылка может быть неверной, устаревшей или удалённой.",
+  "error.backend.mcpServerBearerKey":
+    "Этот сервер использует ключ API, а не вход. В разделе «Заголовки» укажите ключ Authorization, а в значении — Bearer, пробел и ваш ключ API.",
   "error.backend.mcpSignInAppUrl": "Для приложения входа нужен правильный URL сервера.",
   "error.backend.mcpSignInAppClientId": "Введите ID клиента приложения входа.",
   "error.backend.mcpSignInAppIssuerChanged":

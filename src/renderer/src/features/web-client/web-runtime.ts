@@ -70,6 +70,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeAgentSteeringModels,
   decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
@@ -86,6 +87,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withSteeringModels,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
@@ -160,6 +162,7 @@ import {
   MESSAGE_PINS_CAPABILITY,
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -359,7 +362,7 @@ export interface WebWorkspaceRuntime {
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
-  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
+  conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
@@ -1415,10 +1418,10 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
-    async conversationAround(id, messageId) {
+    async conversationAround(id, messageId, limit = 50) {
       if (!capabilities.includes("conversation-pagination"))
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
-      const query = new URLSearchParams({ limit: "50", around: messageId });
+      const query = new URLSearchParams({ limit: String(limit), around: messageId });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
@@ -1711,9 +1714,9 @@ export function createWebWorkspaceRuntime(
         isClientAgentModelOption,
         "models",
       )(await request("GET", TEAM_API_ROUTES.agents.models));
-      // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
-      // models with no Fast switch or listing.
-      const [fast, listings] = await Promise.all([
+      // The fast tiers, the picker listing and the steering models are optional: when a route fails,
+      // the picker gets the models with no Fast switch or listing, and a custom agent shows Send now.
+      const [fast, listings, steering] = await Promise.all([
         // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
         capabilities.includes(AGENT_SPEED_CAPABILITY)
           ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
@@ -1723,8 +1726,11 @@ export function createWebWorkspaceRuntime(
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],
+        capabilities.includes(MODEL_STEERING_CAPABILITY)
+          ? request("POST", MODEL_STEERING_ROUTES.list, {}).then(decodeAgentSteeringModels, () => [])
+          : [],
       ]);
-      return withModelListings(withFastServiceTiers(models, fast), listings);
+      return withSteeringModels(withModelListings(withFastServiceTiers(models, fast), listings), steering);
     },
     async status() {
       const value = await request("GET", TEAM_API_ROUTES.agents.status);

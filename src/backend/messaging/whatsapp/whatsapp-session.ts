@@ -21,6 +21,7 @@ import {
 } from "@openbot/whatsapp/baileys";
 import { Effect } from "effect";
 import { MessagingAdapterError, WhatsAppRefusedError } from "../messaging-types";
+import type { WhatsAppUpsertWindow } from "./whatsapp-events";
 
 const logger = createOpenBotLogger("whatsapp");
 
@@ -189,6 +190,13 @@ export class WhatsAppSession {
   /** A QR code was shown in this session, so a 408 means that the codes ran out. */
   #codeShown = false;
   #openedAt = 0;
+  /**
+   * WhatsApp sent this number its history already: a socket opened with the account before. Only the
+   * first socket after a link gets the history; the store was linked when an earlier run started.
+   */
+  #historySent = false;
+  /** The value of `#historySent` when the socket last opened. */
+  #historySentAtOpen = false;
   #lastFrameAt = 0;
   #retryTimer: ReturnType<typeof setTimeout> | null = null;
   #watchdog: ReturnType<typeof setInterval> | null = null;
@@ -210,6 +218,11 @@ export class WhatsAppSession {
   /** When the socket last opened, in milliseconds; 0 before the first open. */
   get openedAt(): number {
     return this.#openedAt;
+  }
+
+  /** The facts that tell a message that WhatsApp held for this device from history, at this time. */
+  upsertWindow(): WhatsAppUpsertWindow {
+    return { openedAt: this.#openedAt, synced: this.#historySentAtOpen, now: this.#now() };
   }
 
   get store(): WhatsAppAuthStore {
@@ -253,6 +266,7 @@ export class WhatsAppSession {
   start(options: { codeLink?: boolean } = {}): void {
     if (this.#started) return;
     this.#started = true;
+    this.#historySent = this.#store.linked;
     this.#browserName = options.codeLink ? "Chrome" : "OpenBot";
     this.#attempt = 0;
     this.#setState("connecting");
@@ -426,6 +440,8 @@ export class WhatsAppSession {
     }
     if (update.connection === "open") {
       this.#openedAt = this.#now();
+      this.#historySentAtOpen = this.#historySent;
+      if (this.#store.linked) this.#historySent = true;
       this.#lastFrameAt = this.#openedAt;
       this.#startWatchdog();
       this.#setState("open");

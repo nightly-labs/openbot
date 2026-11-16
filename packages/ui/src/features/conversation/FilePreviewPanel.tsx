@@ -410,7 +410,7 @@ export default function FilePreviewPanel(props: FilePreviewPanelProps) {
         <Show when={previewUrl()}>
           <MediaFilePreview
             kind={previewKind() === "audio" ? "audio" : previewKind() === "video" ? "video" : null}
-            src={previewUrl() ?? ""}
+            src={previewUrl() ?? undefined}
             name={title()}
             class={previewKind() === "audio" ? "file-preview-audio" : "file-preview-video"}
           />

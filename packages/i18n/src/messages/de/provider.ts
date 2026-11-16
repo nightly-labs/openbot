@@ -217,6 +217,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Die Verbindung konnte nicht wiederhergestellt werden.",
   "provider.account.add": "Konto hinzufügen",
   "provider.account.addLabel": "Weiteres {name}-Konto hinzufügen",
+  "provider.account.addWithCode": "Konto mit Code hinzufügen",
   "provider.account.count": { one: "{count} Konto", other: "{count} Konten" },
   "provider.account.numbered": "Konto {number}",
   "provider.account.apiKey": "API-Schlüssel",

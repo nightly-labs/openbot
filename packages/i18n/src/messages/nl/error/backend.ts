@@ -277,12 +277,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpToolSchemaRefused":
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -377,6 +383,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxySignInRefused":
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserSystemProxyFailed":
+    "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -410,6 +418,8 @@ export const messages = {
     "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
   "error.backend.mcpServerHttpUrl":
     "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpServerBearerKey":
+    "Deze server gebruikt een API-sleutel, geen aanmelding. Zet bij Headers de sleutel op Authorization en de waarde op Bearer, een spatie en je API-sleutel.",
   "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
   "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
   "error.backend.mcpSignInAppIssuerChanged":

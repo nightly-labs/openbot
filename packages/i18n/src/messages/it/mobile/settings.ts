@@ -127,6 +127,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",
+  "mobile.settings.appearance.fullVisuals": "Mostra anteprime visive complete",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "Un elemento visivo di un agente appare nella chat a piena altezza. Se è disattivato, un elemento alto viene tagliato: toccalo per vederlo tutto.",
   "mobile.settings.animations.title": "Animazioni",
   "mobile.settings.animations.footer":
     "Disattiva le animazioni per ridurre il movimento in tutta l'app. Se «Riduci movimento» è attivo nelle impostazioni del telefono, anche l'app riduce il movimento. Le animazioni qui sotto restano allora disattivate.",

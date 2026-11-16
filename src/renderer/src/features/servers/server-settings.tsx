@@ -108,6 +108,8 @@ const ServerSettings = createSimpleContext({
     const [serverSettingsMcpSignInRequest, setServerSettingsMcpSignInRequest] = createSignal<string | null>(null);
     /** Set when the Marketplace asked for the form that adds a server, until the MCP section opens it. */
     const [serverSettingsMcpAddRequest, setServerSettingsMcpAddRequest] = createSignal(false);
+    /** The MCP row whose Edit the Marketplace asked for, until the MCP section opens its form. */
+    const [serverSettingsMcpEditRequest, setServerSettingsMcpEditRequest] = createSignal<string | null>(null);
     /** Bumped by every open and refresh, so a slower earlier load cannot paint over a newer one. */
     let serverSettingsRequest = 0;
     /**
@@ -233,6 +235,7 @@ const ServerSettings = createSimpleContext({
       setServerSettingsMcpSignIns({});
       setServerSettingsMcpSignInRequest(null);
       setServerSettingsMcpAddRequest(false);
+      setServerSettingsMcpEditRequest(null);
       setServerSettingsError(null);
       void refreshServerSettings(serverId);
     }
@@ -247,6 +250,12 @@ const ServerSettings = createSimpleContext({
     function openMcpAdd(serverId: string, trigger: HTMLElement | null): void {
       openServerSettings(serverId, trigger, "mcp");
       setServerSettingsMcpAddRequest(true);
+    }
+
+    /** Opens the MCP section of a server on the form that edits one of its rows, as its Edit item does. */
+    function openMcpEdit(serverId: string, mcpServerId: string): void {
+      openServerSettings(serverId, null, "mcp");
+      setServerSettingsMcpEditRequest(mcpServerId);
     }
 
     async function saveServerIdentity(input: { serverName: string; logo?: AvatarImageInput | null }): Promise<void> {
@@ -589,6 +598,18 @@ const ServerSettings = createSimpleContext({
       return result;
     }
 
+    /**
+     * Reads the sign-in states again for the Sign in cards in a chat of the server that Server settings
+     * last read. Another server keeps no states here, so it is not read.
+     */
+    function refreshMcpSignIns(serverId: string | undefined): void {
+      const server = serverSettingsTarget();
+      if (!server || server.id !== serverId) return;
+      void listMcpSignIns(server).then((signIns) => {
+        if (serverSettingsTargetId() === server.id) setServerSettingsMcpSignIns(signIns);
+      });
+    }
+
     /** Which http rows the server holds a sign-in for. A host without `mcp-sign-in-v1` answers none. */
     async function listMcpSignIns(server: ServerSummary): Promise<Record<string, McpSignInState>> {
       // A badge beside the list, not the list: a failed read shows no badge rather than failing the
@@ -650,7 +671,12 @@ const ServerSettings = createSimpleContext({
             .catch(() => null);
           if (!waiting()) return;
           const current = serverSettingsMcpSignInRelays()[url];
-          if (current?.authorizeHost !== page?.authorizeHost || current?.listening !== page?.listening) set(page);
+          if (
+            current?.authorizeHost !== page?.authorizeHost ||
+            current?.url !== page?.url ||
+            current?.listening !== page?.listening
+          )
+            set(page);
           await new Promise((resolve) => setTimeout(resolve, MCP_SIGN_IN_PAGE_POLL_MS));
         }
       } finally {
@@ -810,6 +836,7 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcp,
       serverSettingsMcpError,
       serverSettingsMcpSignIns,
+      refreshMcpSignIns,
       serverSettingsTargetId,
       serverSettingsMcpSignInRequest,
       clearMcpSignInRequest: () => setServerSettingsMcpSignInRequest(null),
@@ -817,6 +844,9 @@ const ServerSettings = createSimpleContext({
       serverSettingsMcpAddRequest,
       clearMcpAddRequest: () => setServerSettingsMcpAddRequest(false),
       openMcpAdd,
+      serverSettingsMcpEditRequest,
+      clearMcpEditRequest: () => setServerSettingsMcpEditRequest(null),
+      openMcpEdit,
       serverSettingsMcpSignInPages,
       serverSettingsMcpSignInRelays,
       openMcpSignInRelay,

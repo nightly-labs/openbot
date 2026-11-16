@@ -440,11 +440,30 @@ export class DrainScheduler {
     });
   }
 
+  /** Why a new message in the agent's own chat waits now, or null when it can start at once. */
+  ownChatHold(agentId: string): string | null {
+    return this.#heldBy({ agentId, taskId: null });
+  }
+
   /** Why the next message of this task waits, or null when it can start or nothing waits. */
   taskHold(agentId: string, taskId: string): string | null {
     const lane = { agentId, taskId };
     if (!this.#mailbox.nextQueued(agentId, taskId)) return null;
-    return this.#heldBy(lane) ?? (this.#slotWaiters.has(laneKey(lane)) ? "machine" : null);
+    // In the order of the drain. `#heldByMachine` is not called here: it records the lane as waiting.
+    const heldByMachine = !this.#memory.mayDrain(agentId) || this.#slotWaiters.has(laneKey(lane));
+    return this.#heldBy(lane) ?? this.#providerHold(agentId) ?? (heldByMachine ? "machine" : null);
+  }
+
+  /**
+   * The provider checks of the drain: the providers have started, and no CLI of the agent's
+   * deliveries is replaced. The drain and `taskHold` both read this, so a thread names the hold
+   * that keeps it from starting (#8915).
+   */
+  #providerHold(agentId: string): "providers-not-ready" | "provider-cli-replaced" | null {
+    if (!this.#providers.isReady()) return "providers-not-ready";
+    if (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)))
+      return "provider-cli-replaced";
+    return null;
   }
 
   /** `followUsageLimit` is false after a move that failed, so that the drain does not try it again. */
@@ -593,8 +612,7 @@ export class DrainScheduler {
     return (
       !this.#hooks.isStopping() &&
       !this.#drainingLanes.has(laneKey(lane)) &&
-      this.#providers.isReady() &&
-      !this.#deliveryProviders(lane.agentId).some((provider) => this.#providers.isReplacingCli(provider)) &&
+      this.#providerHold(lane.agentId) === null &&
       this.#heldBy(lane) === null
     );
   }
@@ -611,11 +629,9 @@ export class DrainScheduler {
     const hold =
       (this.#drainingLanes.has(key) && "drain-running") ||
       this.#heldBy(lane) ||
-      (!this.#providers.isReady() && "providers-not-ready") ||
       // Before the try, so the delivery is not rescheduled in a loop while the CLI is replaced.
       // ProviderRuntime schedules this agent again once the new client is ready.
-      (this.#deliveryProviders(agentId).some((provider) => this.#providers.isReplacingCli(provider)) &&
-        "provider-cli-replaced") ||
+      this.#providerHold(agentId) ||
       // Last, because it records the lane as waiting. Another drain can take the last slot
       // between the schedule and this start.
       (this.#heldByMachine(lane) && "machine");

@@ -358,3 +358,58 @@ Troubleshooting:
   Sign out, sign in, and select it.
 - HTTP 429 when the connection opens: the user has 10 open sessions. Wait for old sessions to end.
 - Deleting needs 2FA on the Cloud 66 account.
+
+## HighLevel
+
+The listing connects to HighLevel's MCP server at `https://services.leadconnectorhq.com/mcp` with a
+Private Integration token (<https://marketplace.gohighlevel.com/docs/Authorization/PrivateIntegrationsToken/index.html>)
+in `Authorization: Bearer pit-…` and the sub-account ID in a `locationId` header. Some tools take
+`locationId` as an argument, and other tools have no location input.
+
+The listing has no browser sign-in (#7595). The server's metadata lists 154 scopes, and its
+authorization page refuses 8 of them ("Invalid scope(s): emails/templates.readonly, …"), so a
+sign-in with the published scope list never finishes. The per-client addresses in HighLevel's guide
+(`/mcp/anthropic/v2`, `/mcp/openai/v2`, `/mcp/cursor/v2`) list the same 8 scopes and refuse a client
+that they do not recognize (#7753). Add a `link` flow again only when a sign-in with the published
+scopes finishes.
+
+Troubleshooting:
+
+- A tool answers "Invalid Private Integration token": the token is wrong, was rotated, or belongs to
+  another sub-account. Create a new token and connect again.
+- HighLevel refuses one tool but not others: the token may not have the scope that the tool needs.
+  Edit the Private Integration in HighLevel and select that scope.
+
+## HubSpot
+
+The listing starts HubSpot's own local server, `@hubspot/mcp-server`
+(<https://www.npmjs.com/package/@hubspot/mcp-server>, MIT), through `npx`. The version is pinned
+because the server can write to the CRM. To update it, review the release, change the version in
+`args`, and increase the listing `version`. The server is in beta under HubSpot's Early Adopter
+Program terms.
+
+The server reads one token from `PRIVATE_APP_ACCESS_TOKEN` and sends it as a `Bearer` token to
+`https://api.hubspot.com`. HubSpot stopped the creation of new legacy private apps on 2026-10-26, so
+the connect dialog asks for a service key
+(<https://developers.hubspot.com/docs/apps/developer-platform/build-apps/authentication/account-service-keys>).
+Only a Super admin can create one. An existing private app token also works. Not confirmed with a
+HubSpot account: that the server accepts a service key. HubSpot documents service keys for REST API
+requests with a `Bearer` header, which is what the server sends.
+
+The tools search, read, create and update CRM objects, associations and properties, create and
+update notes and tasks, and read workflows. There are no delete tools. The scopes of the key limit
+the objects that agents can read and change.
+
+HubSpot's remote server, `https://mcp.hubspot.com/`, is not in the listing. Its authorization server
+has no registration endpoint and no client metadata document, and its token endpoint needs a client
+secret (`client_secret_post`), so the smoke refuses a `link` flow. A user who wants it creates an MCP
+connector in HubSpot (Development > MCP Connectors) with the callback URL
+`http://127.0.0.1:28417/mcp-auth`, adds `https://mcp.hubspot.com/` in the MCP servers settings, enters
+the connector in the Sign-in app section, and selects Sign in.
+
+Troubleshooting:
+
+- "HubSpot access token is required": the key is empty. Connect again and paste the key.
+- A tool answers 401: the key was rotated or deleted. Create a new key and connect again.
+- A tool answers 403: the key does not have the scope for that object. Edit the key in HubSpot and
+  add the scope.

@@ -90,6 +90,7 @@ import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
+import { windowsSessionDisconnected } from "./windows-session-state";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
 
@@ -369,6 +370,7 @@ export class HostService extends EventEmitter<HostEvents> {
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
+      sessionDisconnected: windowsSessionDisconnected,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -1114,6 +1116,21 @@ export class HostService extends EventEmitter<HostEvents> {
     yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
     // `automatic`: the account service refuses a host that its owner removed (#5273).
     yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()), true);
+  }).bind(this);
+
+  /**
+   * Registers the running host again when the user asks for it, as a start does. A start of a running
+   * host does not register, so this sends a key change whose answer was lost and the current key (#9369).
+   */
+  readonly refreshRegistration = Effect.fn("HostService.refreshRegistration")(function* (this: HostService) {
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const publicKey = this.#options.store.getIdentity()?.publicKey;
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()));
+    const identity = this.#options.store.getIdentity();
+    if (identity && identity.publicKey !== publicKey && this.#isActiveHost(identity.serverId))
+      this.#api.refreshIdentity();
   }).bind(this);
 
   /**

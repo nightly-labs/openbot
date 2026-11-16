@@ -154,6 +154,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Melde dich in deinem Browser auf {page} an und schließe die Anmeldung dort ab. {host} erkennt die Anmeldung selbst.",
   "mcp.signIn.relayOpen": "Anmeldeseite öffnen",
+  "mcp.signIn.relayCopy": "Link kopieren",
   "mcp.signIn.relayPasteHint":
     "Wenn der Browser nicht zu OpenBot zurückkehrt, kopiere die angezeigte Adresse und füge sie hier ein.",
   "mcp.signIn.relayPasteRequired":

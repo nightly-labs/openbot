@@ -155,9 +155,6 @@ export const messages = {
   "server.upgrade.description":
     "На {server} осталось мало свободного места. Перейдите на старший план, чтобы агенты работали без перерывов.",
   "server.upgrade.used": "Занято {used} из {total}",
-  "server.upgrade.current": "{plan} (сейчас)",
-  "server.upgrade.price": "Цена",
-  "server.upgrade.action": "Перейти на {plan}",
   "server.hosted.progressTitle": "Настройка {name}",
   "server.hosted.paymentTitle": "Завершите оплату в браузере",
   "server.hosted.paymentDescription": "Настройка начнётся, когда Stripe подтвердит оплату.",

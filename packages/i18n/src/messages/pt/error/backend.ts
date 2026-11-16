@@ -279,12 +279,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "O servidor parou antes de responder. Execute o comando em um terminal para ver o erro.",
   "error.backend.mcpServerFailedToStart": "O servidor não iniciou: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} parou de esperar antes de o servidor iniciar, por isso os agentes dele não recebem as ferramentas deste servidor.",
   "error.backend.mcpToolSchemaRefused":
     "A ferramenta {tool} dele tem um formato de entrada que este provedor não consegue ler. Agentes de outros provedores continuam recebendo o servidor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} não conseguiu usar o servidor MCP {name} porque o servidor pede que você entre. Abra as configurações de MCP e escolha Entrar.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} não conseguiu iniciar o servidor MCP {name}. Abra as configurações de MCP e escolha Testar conexão para ver a causa.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} não conseguiu iniciar o servidor MCP {name}. As ferramentas dele não estão disponíveis para o {provider}. O {provider} inicia o servidor por conta própria, então o teste de conexão no OpenBot pode funcionar. Inicie um novo chat para tentar de novo.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} não conseguiu iniciar o servidor MCP {name}, porque o servidor não respondeu a tempo. Inicie um novo chat para tentar de novo.",
   "error.backend.mcpAppReconnect":
     "{name} no ChatGPT pede que você entre de novo. Reconecte {name} no ChatGPT e peça de novo ao agente.",
   "error.backend.mcpServerSignInPage":
@@ -380,6 +386,8 @@ export const messages = {
     "Este proxy mudou depois que você o abriu. Verifique-o novamente e tente de novo.",
   "error.backend.browserProxyUnreachable": "O proxy {name} não responde, por isso a página não abriu.",
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
+  "error.backend.browserSystemProxyFailed":
+    "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -411,6 +419,8 @@ export const messages = {
     "O servidor respondeu com {status}. Verifique a chave de API ou outras credenciais.",
   "error.backend.mcpServerHttpUrl":
     "O servidor respondeu com {status}. Verifique a URL. O link pode estar incorreto, expirado ou excluído.",
+  "error.backend.mcpServerBearerKey":
+    "Este servidor usa uma chave de API, não um login. Em Cabeçalhos, defina a chave como Authorization e o valor como Bearer, um espaço e sua chave de API.",
   "error.backend.mcpSignInAppUrl": "O app de login precisa de uma URL de servidor válida.",
   "error.backend.mcpSignInAppClientId": "Digite o ID do cliente do app de login.",
   "error.backend.mcpSignInAppIssuerChanged":

@@ -17,6 +17,9 @@
 //       continue, at most 2 times for one request. A long report that ends on a next step does not.
 //       A Portuguese next step ("Vou consultar o conector agora.") or a status ("I'm checking …")
 //       continues too; one that waits for the user, a later time or a send does not.
+//   4c. A turn that reads a teammate's answer to the agent's own request continues when its answer
+//       ends on a next step, also before a closing "De você, nada." (#9392). A turn that reads a
+//       teammate's request does not continue.
 //   5. A turn that opens a wait does not continue.
 //   6. Stop during a continuation ends the chain. The next message works.
 //   7. A message that waits in the queue stops the continuation and runs next.
@@ -70,10 +73,12 @@ interface FakeTurn {
   answer?: string;
   delayMs?: number;
   holdUntil?: string;
-  calls?: { tool: string; arguments: Record<string, string> }[];
+  calls?: { tool: string; arguments: Record<string, string | string[] | boolean> }[];
 }
 
-const plan = (...turns: FakeTurn[]) => `<<PLAN${JSON.stringify(turns)}PLAN>>`;
+/** The turns as a marker. Escaped angle brackets let a plan hold another plan, as a teammate's answer. */
+const plan = (...turns: FakeTurn[]) =>
+  `<<PLAN${JSON.stringify(turns).replaceAll("<", "\\u003c").replaceAll(">", "\\u003e")}PLAN>>`;
 
 const FAKE_CODEX = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -632,6 +637,87 @@ try {
       );
     }
     return { answers: answers.length };
+  });
+
+  await check("a teammate's answer to the agent's request continues on a next step", async () => {
+    const lead = await createAgent("Lead");
+    const reviewer = await createAgent("Reviewer");
+    const mark = loggedTurns().length;
+    const since = current.events.length;
+    // The reviewer's result is its answer, and it names the lead's next turns.
+    const review = plan({
+      steps: [],
+      answer: `Review done: fix the parser. ${plan(
+        { steps: [], answer: "Estou corrigindo agora. De você, nada." },
+        { steps: [], answer: "Corrigi o parser." },
+      )}`,
+    });
+    const id = await send(
+      lead.id,
+      `Ship the parser. ${plan({
+        steps: [],
+        answer: "Pedi a revisão ao Reviewer.",
+        calls: [{ tool: "send_message", arguments: { recipientAgentIds: [reviewer.id], text: review } }],
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    const done = await waitFor("the lead's last answer", () =>
+      chatMessages(lead.id).some((message) => message.text === "Corrigi o parser."),
+    );
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Ship the parser."))?.threadId;
+    const leadTurns = turnsSince(mark).filter((turn) => turn.threadId === leadThread);
+    assert.deepEqual(
+      leadTurns.map((turn) => turn.note),
+      [false, false, true],
+      "The answer turn continues once with the next-step note.",
+    );
+    assert.equal(continuationLines(lead.id).length, 1, "One continuation line shows.");
+    assert.equal(errorsFor(lead.id, since).length, 0, "No error shows.");
+    return { done, turns: leadTurns.length };
+  });
+
+  await check("a teammate's request that ends on a next step does not continue", async () => {
+    const lead = await createAgent("Owner");
+    const asker = await createAgent("Asker");
+    const mark = loggedTurns().length;
+    // The update tells the asker to send the owner a request, which names the owner's turn.
+    const request = plan({ steps: [], answer: "Estou corrigindo agora. De você, nada." });
+    const update = plan({
+      steps: [],
+      answer: "Pedi a correção.",
+      calls: [{ tool: "send_message", arguments: { recipientAgentIds: [lead.id], text: request } }],
+    });
+    const id = await send(
+      lead.id,
+      `Tell Asker. ${plan({
+        steps: [],
+        answer: "Avisei o Asker.",
+        calls: [
+          {
+            tool: "send_message",
+            arguments: { recipientAgentIds: [asker.id], text: update, expectsReply: false },
+          },
+        ],
+      })}`,
+    );
+    assert.equal(await settled(id), "completed");
+    await waitFor("the owner's answer to the request", () =>
+      chatMessages(lead.id).some((message) => message.text === "Estou corrigindo agora. De você, nada."),
+    );
+    // The result goes back to the asker only when the owner's turn does not continue.
+    const leadThread = turnsSince(mark).find((turn) => turn.text.includes("Tell Asker."))?.threadId;
+    await waitFor(
+      "the result for the asker",
+      () => turnsSince(mark).filter((turn) => turn.threadId !== leadThread).length === 2,
+    );
+    const leadTurns = turnsSince(mark).filter((turn) => turn.threadId === leadThread);
+    assert.deepEqual(
+      leadTurns.map((turn) => turn.note),
+      [false, false],
+      "No continuation turn runs.",
+    );
+    assert.equal(continuationLines(lead.id).length, 0, "No continuation line shows.");
+    return { turns: leadTurns.length };
   });
 
   await check("a request with no plan continues at most 2 times for a next step", async () => {

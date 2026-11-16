@@ -11,7 +11,6 @@ export const messages = {
   "app.action.unavailable": "Action indisponible",
   "app.error.actionFailed": "Impossible de terminer l’action. Réessayez.",
   "app.errorStatus.queueLoad": "Impossible de charger les messages en file d’attente",
-  "app.errorStatus.waitsLoad": "Impossible de charger les attentes en cours",
   "app.errorStatus.answer": "Impossible d’envoyer votre réponse",
   "app.errorStatus.approval": "Impossible d’envoyer votre décision",
   "app.errorStatus.browserTakeover": "Impossible de terminer la prise de contrôle du navigateur",

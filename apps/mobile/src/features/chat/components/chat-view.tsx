@@ -30,6 +30,7 @@ import { ChatGlassIconButton } from "@/features/chat/components/chat-glass-icon-
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import type { ChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
+import type { ComposerContextMeter } from "@/features/chat/components/composer-context-ring";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import type { QuestionPromptController } from "@/features/chat/components/use-question-prompt";
@@ -45,6 +46,7 @@ import {
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { useVoiceSettings } from "@/features/voice/model/voice-settings";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -91,7 +93,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { useComposerDictation } from "./use-composer-dictation";
+import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -168,6 +170,8 @@ export interface ChatViewProps {
   activityAccessory?: ReactNode;
   /** The agent's threads, in the menu of the agent's name in the header. */
   threadMenu?: ChatThreadMenu;
+  /** How full the agent chat's context is, as a ring in the open composer. A channel has none. */
+  contextMeter?: ComposerContextMeter;
   /** This chat's thread. Browser requests of the agent's other threads, such as its tasks, do not show here. */
   threadId?: string | null;
   /** The threads of a channel's member agents, from a host with `channel-attention-v1`. */
@@ -285,6 +289,7 @@ export function ChatView({
   channelTurnSummaries,
   activityAccessory,
   threadMenu,
+  contextMeter,
   threadId = null,
   channelThreadIds = null,
   approvals,
@@ -483,6 +488,23 @@ export function ChatView({
     },
     [thinkingAgentId],
   );
+  const openMemoryChanges = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({ pathname: "/memory-changes", params: { agentId: thinkingAgentId, messageId } });
+    },
+    [thinkingAgentId],
+  );
+  const openSubagents = useCallback(
+    (messageId: string) => {
+      if (thinkingAgentId)
+        router.push({
+          pathname: "/subagent",
+          params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
+        });
+    },
+    [thinkingAgentId, target.serverId],
+  );
   const queuedMessageIds = useMemo(
     () =>
       new Set(
@@ -675,6 +697,25 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
+  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
+  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
+  const voiceMissing = !speechNative;
+  const composerDictation = useMemo(
+    (): ComposerDictation =>
+      voiceMissing && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
+              Keyboard.dismiss();
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [voiceMissing, dictation],
+  );
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
@@ -742,8 +783,11 @@ export function ChatView({
     caption: liveCaption,
   } = live;
   const voiceName = voiceAgent?.name ?? target.name;
+  // Only an agent chat or a channel has a live conversation; see `useLiveConversation`. A boolean, because
+  // both objects change with each message, and the memo below must not.
+  const liveVoiceMissing = voiceMissing && (conversation !== null || liveChannel !== null);
   const composerVoice = useMemo((): ComposerVoice | undefined => {
-    if (!liveAvailable && !liveOpen) return undefined;
+    if (!liveAvailable && !liveOpen && !liveVoiceMissing) return undefined;
     const source = {
       available: liveAvailable,
       open: liveOpen,
@@ -760,9 +804,12 @@ export function ChatView({
       error: liveError,
       caption: liveCaption,
     };
+    const openSettings = () => router.push("/settings/voice");
+    if (!liveAvailable && !liveOpen)
+      return { ...liveVoice(source, voiceName, t), available: true, start: openSettings };
     return {
       ...liveVoice(source, voiceName, t),
-      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : router.push("/settings/voice")),
+      start: () => (usesGptLive || replyVoiceReady() ? liveStart() : openSettings()),
     };
   }, [
     liveAvailable,
@@ -781,6 +828,7 @@ export function ChatView({
     liveCaption,
     voiceName,
     usesGptLive,
+    liveVoiceMissing,
     t,
   ]);
   const voiceAgentId = voiceAgent?.id;
@@ -1240,6 +1288,8 @@ export function ChatView({
               activeTurnId={activeTurnId}
               turnSummaries={turnSummaries}
               onOpenTurn={thinkingAgentId ? openTurn : undefined}
+              onOpenSubagents={thinkingAgentId ? openSubagents : undefined}
+              onOpenMemoryChanges={thinkingAgentId ? openMemoryChanges : undefined}
               // The form is a new object on each render. Without a question the list does not read it,
               // so it is left out and does not draw the list again.
               questionForm={questionForm?.messageId ? questionForm : undefined}
@@ -1475,11 +1525,12 @@ export function ChatView({
                   menuProgress={menuProgress}
                   stopping={stopping}
                   voice={composerVoice}
-                  dictation={dictation}
+                  dictation={composerDictation}
                   // An agent's own colour; a channel keeps the default controls.
                   voiceAccent={target.kind === "agent" ? accent : undefined}
                   voicePalette={palette}
                   voiceAvatar={voiceAvatar}
+                  contextMeter={contextMeter}
                 />
               )}
             </Animated.View>
@@ -1495,6 +1546,7 @@ export function ChatView({
             anchor={attachments.menuAnchor}
             appActive={appActive}
             attachments={attachments}
+            context={contextMeter}
             fallbackBackground={fieldBackground}
             foreground={foreground}
             keyboardHeight={motion.keyboardHeight}

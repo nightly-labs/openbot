@@ -55,7 +55,8 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
   const auth = useAuth();
   const { teamPresence, currentTeamMember } = usePresence();
   const { activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
-  const { serverSettingsOpen, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns } = useServerSettings();
+  const { serverSettingsOpen, openMcpSignIn, serverSettingsTargetId, serverSettingsMcpSignIns, refreshMcpSignIns } =
+    useServerSettings();
   const { appSettingsOpen, skillsMarketplaceOpen, generalSettings } = useSettings();
   const { agentStatus, agentList, updateAgent, setAgentAvatar, userPausedAgentIds } = useAgents();
   const { approvals, pendingPrompts, usageLimits } = useTurns();
@@ -211,6 +212,7 @@ function DesktopChannelConversation(props: { channelId: string; account: () => C
       mcpSignedIn={(mcpServerId) =>
         serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
       }
+      refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
     />
   );
 }

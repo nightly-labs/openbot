@@ -127,6 +127,9 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
+  "mobile.settings.appearance.fullVisualsFooter":
+    "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",
   "mobile.settings.animations.title": "アニメーション",
   "mobile.settings.animations.footer":
     "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",

@@ -195,7 +195,7 @@ export interface McpOAuthOptions {
  * resolve every token before they connect, so an authorization server that accepts a connection
  * but never finishes its response would otherwise stall either past its own deadline.
  */
-const MCP_TOKEN_TIMEOUT_MS = 10_000;
+export const MCP_TOKEN_TIMEOUT_MS = 10_000;
 
 /**
  * An access token is refreshed this long before it is due to expire, so a thread that starts at the
@@ -253,6 +253,12 @@ export interface McpSignIn {
    * request with a bare sentence about dynamic client registration.
    */
   registrationUnsupported: () => boolean;
+  /**
+   * Whether this attempt had to register, no registration came back, and discovery found no OAuth
+   * metadata at all. The SDK then registers at a guessed address: a server that takes only a
+   * token, such as Coolify, has no sign-in to find there (#9176).
+   */
+  signInServerMissing: () => boolean;
   /**
    * The HTTP status of this attempt's last registration answer, or `null`. The SDK keeps the status
    * only when the body is not an OAuth error, and turns a code it does not know into a
@@ -599,6 +605,7 @@ export class McpOAuth implements McpOAuthAuthority {
       secrets: () => provider.secrets(),
       registrationFailed: () => provider.registrationPending,
       registrationUnsupported: () => provider.registrationUnsupported,
+      signInServerMissing: () => provider.signInServerMissing,
       registrationStatus: () => provider.registrationStatus,
       registrationRedirectRefused: () => provider.redirectRefused,
       watchRegistration: (fetch) => provider.watchRegistration(fetch),
@@ -1147,6 +1154,21 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     return this.#registrationPending && metadata !== undefined && !metadata.registration_endpoint;
   }
 
+  /**
+   * No client, the server answered the registration, and discovery found neither resource nor
+   * authorization server metadata. A registration that got no answer is a network failure.
+   */
+  get signInServerMissing(): boolean {
+    const discovery = this.#discoveryState;
+    return (
+      this.#registrationPending &&
+      this.#registrationStatus !== null &&
+      discovery !== undefined &&
+      !discovery.authorizationServerMetadata &&
+      !discovery.resourceMetadata
+    );
+  }
+
   get registrationStatus(): number | null {
     return this.#registrationStatus;
   }
@@ -1640,11 +1662,14 @@ function mcpOAuthServerUrl(key: string): string {
 }
 
 /**
- * The first authorization server that the server's protected-resource metadata names, or `null`. A
- * sign-in needs one to open a page. Any answer below 500 that is not such metadata says no: a
- * 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server (408,
- * 429) says nothing about the server, so it fails: a sign-in must not end as if the server asked for
- * none, which left the row showing the result of the earlier test, with no page and no words.
+ * The first authorization server that the server's protected-resource metadata names, or, without
+ * such a document, the server's origin when authorization server metadata is there; else `null`. A
+ * sign-in needs one to open a page. Any answer below 500 that is not resource metadata goes on to the
+ * origin: a 404, a refusal, or a page that is not metadata. No answer, a server error, or a busy server
+ * (408, 429) at the resource metadata says nothing about the server, so it fails: a sign-in must not
+ * end as if the server asked for none, which left the row showing the result of the earlier test, with
+ * no page and no words. The read at the origin can only add a yes: when it fails, the answer is `null`,
+ * as it was before that read, so a server that takes no sign-in does not get an error.
  */
 export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: string, fetchFn: FetchLike) {
   let metadataStatus: number | null = null;
@@ -1663,7 +1688,15 @@ export const namesAuthorizationServer = Effect.fnUntraced(function* (resource: s
       return Effect.fail(new Error(sourceText("error.backend.mcpSignInMetadataUnreadable")));
     }),
   );
-  return metadata?.authorization_servers?.[0] ?? null;
+  if (metadata) return metadata.authorization_servers?.[0] ?? null;
+  // A server on the 2025-03 MCP authorization spec has no resource metadata: its origin is its
+  // authorization server, the issuer that the SDK's sign-in uses too. Only metadata found there
+  // counts, so nothing is guessed. A read that fails is a no, as a missing resource document was (#8733).
+  const origin = String(new URL("/", resource));
+  return yield* mcpCall(() => discoverAuthorizationServerMetadata(origin, { fetchFn })).pipe(
+    Effect.map((found) => (found ? origin : null)),
+    Effect.catch(() => Effect.succeed(null)),
+  );
 });
 
 /**

@@ -49,6 +49,8 @@ export const messages = {
   "sidebar.section.nameUnique": "Os nomes das pastas devem ser únicos.",
   "sidebar.section.saveFailed": "Não foi possível salvar esta pasta. Tente novamente.",
   "sidebar.section.unassigned": "Sem seção",
+  "sidebar.section.chatCount": { one: "{count} conversa", other: "{count} conversas" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "Pessoas",
   "sidebar.section.fallback": "Pasta",
   "sidebar.folder.newInside": "Nova subpasta",

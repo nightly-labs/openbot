@@ -93,6 +93,18 @@ export const messages = {
   "browser.secret.takeOver": "Übernehmen",
   "browser.secret.failed":
     "Die Anfrage konnte nicht abgeschlossen werden. Prüfe die Verbindung und versuche es erneut.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent ein Skript auf dieser Seite ausgeführt hat. Bitte den Agenten, die Seite neu zu laden und es noch einmal zu versuchen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil der Agent das falsche Feld auf der Seite gewählt hat.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil der Agent keine der für diese Website gespeicherten Zugangsdaten gewählt hat. Sag dem Agenten, welches Konto er verwenden soll.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie kein Passwort für diese Website enthalten.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot hat deine gespeicherten Zugangsdaten nicht verwendet, weil sie keinen Authenticator-Schlüssel enthalten.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot hat keine gespeicherten Zugangsdaten verwendet, weil dein Passwort-Manager nicht gelesen werden konnte.",
   "browser.error.openAddress": "Die Adresse konnte in diesem Tab nicht geöffnet werden.",
   "browser.error.channelNoBrowserMember": "Kein Mitglied kann in diesem Kanal einen neuen Tab öffnen.",
   "browser.error.closeTab": "Der Browser-Tab konnte nicht geschlossen werden.",

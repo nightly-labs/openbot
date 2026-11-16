@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "사용할 수 없는 동작",
   "app.error.actionFailed": "작업을 완료할 수 없어요. 다시 시도해 주세요.",
   "app.errorStatus.queueLoad": "대기 중인 메시지를 불러올 수 없어요",
-  "app.errorStatus.waitsLoad": "열려 있는 대기를 불러올 수 없어요",
   "app.errorStatus.answer": "답변을 보낼 수 없어요",
   "app.errorStatus.approval": "결정을 보낼 수 없어요",
   "app.errorStatus.browserTakeover": "브라우저 직접 진행을 끝낼 수 없어요",

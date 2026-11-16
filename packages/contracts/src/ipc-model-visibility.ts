@@ -115,3 +115,33 @@ export function withModelListings<Model extends { provider: string; id: string; 
     return listing ? { ...model, listing } : model;
   });
 }
+
+/** A model of a host whose agent takes a message into its running turn (`model-steering-v1`). */
+export interface AgentSteeringModel {
+  provider: AgentProviderRef;
+  id: AgentModelId;
+}
+
+export function decodeAgentSteeringModels(value: unknown): AgentSteeringModel[] {
+  if (
+    !isDynamicRecord(value) ||
+    !Array.isArray(value.models) ||
+    value.models.length > MODEL_VISIBILITY_LIMIT ||
+    !value.models.every(
+      (model: unknown) => isDynamicRecord(model) && isAgentProviderRef(model.provider) && isAgentModel(model.id),
+    )
+  )
+    throw new Error("Invalid model list.");
+  return value.models.map((model: AgentSteeringModel) => ({ provider: model.provider, id: model.id }));
+}
+
+/** Marks each model of `models` that the `model-steering-v1` route lists, as `withModelListings` gives the listing. */
+export function withSteeringModels<Model extends { provider: string; id: string; steersTurns?: boolean }>(
+  models: readonly Model[],
+  steering: readonly AgentSteeringModel[],
+): Model[] {
+  const keys = new Set(steering.map((entry) => `${entry.provider}\u0000${entry.id}`));
+  return models.map((model) =>
+    keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, steersTurns: true } : model,
+  );
+}

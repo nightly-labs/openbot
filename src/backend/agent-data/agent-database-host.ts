@@ -81,7 +81,13 @@ let protectedTables = new Set<string>();
  * text. Denying `SQLITE_ATTACH` alone closes both `ATTACH DATABASE` and `VACUUM INTO '<path>'` --
  * the only two ways statement text can name a file.
  */
-function authorize(action: number, first: string | null, second: string | null): number {
+function authorize(
+  action: number,
+  first: string | null,
+  second: string | null,
+  _database: string | null,
+  triggerOrView: string | null,
+): number {
   switch (action) {
     case constants.SQLITE_ATTACH:
     case constants.SQLITE_DETACH:
@@ -103,8 +109,12 @@ function authorize(action: number, first: string | null, second: string | null):
     case constants.SQLITE_DELETE:
       // The owner record. An agent may read it -- that is how `list_tables` reports the owner
       // without a PRAGMA -- but nothing an agent writes may reassign or erase it. `provisioning` is
-      // set only while `AgentTables` writes the record itself, from SQL no agent supplied.
-      return first === METADATA_TABLE && !provisioning ? constants.SQLITE_DENY : constants.SQLITE_OK;
+      // set only while `AgentTables` writes the record itself, from SQL no agent supplied. A trigger
+      // that such a statement fires, for example through a foreign-key cascade of `DROP TABLE`, is
+      // SQL an agent wrote, so it gets no such trust.
+      return first === METADATA_TABLE && !(provisioning && triggerOrView === null)
+        ? constants.SQLITE_DENY
+        : constants.SQLITE_OK;
     // Every agent may change the rows in every table, but only the agent that made a table may
     // remove or reshape it. SQLite reports the target table itself, so the rule is decided on the
     // compiled statement rather than on a guess about what the SQL text means. The two actions name
@@ -115,6 +125,16 @@ function authorize(action: number, first: string | null, second: string | null):
       return tableOwnedByAnother(first);
     case constants.SQLITE_ALTER_TABLE:
       return tableOwnedByAnother(second);
+    // A trigger runs inside every write to its table, so adding or removing one reshapes the table
+    // as ALTER does. The actions name the table in the second argument.
+    case constants.SQLITE_CREATE_TRIGGER:
+    case constants.SQLITE_DROP_TRIGGER:
+    case constants.SQLITE_DROP_TEMP_TRIGGER:
+      return tableOwnedByAnother(second);
+    // A TEMP trigger would live only on the one cached connection that every agent shares, and stop
+    // with no notice when that connection closes.
+    case constants.SQLITE_CREATE_TEMP_TRIGGER:
+      return constants.SQLITE_DENY;
     default:
       return constants.SQLITE_OK;
   }
@@ -307,7 +327,7 @@ function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDataba
     return {
       kind: "not-authorized",
       message:
-        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped or altered.",
+        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, extensions, and TEMP triggers are not available, and a table another agent created cannot be dropped, altered, or given a trigger.",
       ...(code === undefined ? {} : { sqliteCode: code }),
     };
   }

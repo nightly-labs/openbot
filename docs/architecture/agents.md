@@ -83,6 +83,16 @@ for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only af
 `routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
 request always shows.
 
+A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
+or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
+desktop, the web client and the phone show no notification for it and play no completion sound
+(`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
+approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
+the same origin, because the agent sends the brief to itself, but it arrives as
+`thread-turn-completed`. The clients decide this from the released
+`origin` field, so it needs no capability and also applies with an older host. The host decides it
+for the phone push.
+
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
 capability a `quiet-turn-completed` event in place of `turn-completed`. The client transport changes
@@ -821,8 +831,30 @@ running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT
 Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
 exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
 reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
-"queue" default. A provider that cannot steer natively (the ACP agents) queues the message in both
-modes.
+"queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
+own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
+(`steerAcpSession` in `src/backend/acp-session-steering.ts`). An OpenCode release before the
+extension does not report `_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
+waits in the queue. `scripts/opencode-steer-e2e.ts` checks both. Antigravity and Devin steer with
+a second `session/prompt` (`AcpFlavor.steerByPromptSince` for Antigravity 1.5.0 and later,
+`steerByPromptCapability` for a Devin CLI that reports `cognition.ai/midTurnPrompts`, because Devin
+reports the version "0.0.0-dev"). While an approval or a question is open, the message waits in the
+queue, because a new prompt would close it. Devin answers each prompt of the run with the same usage,
+so `AcpFlavor.promptRun` reports it once. `scripts/antigravity-steer-e2e.ts` and
+`scripts/devin-steer-e2e.ts` check these paths.
+
+A custom agent (`acp`) uses the same extension (#4977). Its descriptor has `steer: "reported"`: each
+agent process reports at `initialize` whether it steers, so the provider alone does not tell.
+`AcpAgentClient` adds `steersTurns` to its `model/list` answer, `CustomAcpAgentsClient` puts it on
+each model of that agent, and the catalog keeps it as `AgentModelOption.steersTurns`.
+`agentSteersTurns(runtime, models)` reads it for any listed model of the same custom agent, so a
+saved model that the list no longer has, or that model visibility hides, still counts: the host gates
+(`#steerWhenBusy`, `QueueControls.steer`) and the composer, the queue and the agent settings use it.
+A custom agent that does not steer keeps "Send now", and a steer stays in the queue with the reason.
+A remote client reads the steering models from `model-steering-v1`, because the released model list
+does not carry the flag. The route leaves out a model that the server's model picker hides.
+A host before it does not advertise the capability, so the client keeps "Send now" and the host queues the message. `scripts/custom-agent-steer-e2e.ts` checks the catalog,
+a steer, a `promptRequired` answer and an agent without the extension.
 
 A steered message joins work that the model already does, and a model that gets it as plain user
 text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block

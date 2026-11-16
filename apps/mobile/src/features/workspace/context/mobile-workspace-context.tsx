@@ -102,7 +102,12 @@ import {
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
 import { createFocusUsePing } from "@openbot/team-client/focus-use";
 import { createHostedServerWake, WAKE_RECONNECT_DELAY_MS } from "@openbot/team-client/hosted-server-wake";
-import type { RemoteFileUpload, RemoteLargeDownload, RemoteTeamEvent } from "@openbot/team-client/remote-peer";
+import type {
+  RemoteDownloadWatch,
+  RemoteFileUpload,
+  RemoteLargeDownload,
+  RemoteTeamEvent,
+} from "@openbot/team-client/remote-peer";
 import { withWholeApproval } from "@openbot/team-client/runtime-attention";
 import {
   createHostLocalServer,
@@ -193,6 +198,7 @@ import {
   withPhoneSidebarPins,
 } from "@/features/workspace/model/agent-pins";
 import { ConnectionWaits } from "@/features/workspace/model/connection-waits";
+import { NO_CONTEXT_STATES, reduceContextStates } from "@/features/workspace/model/context-states";
 import { conversationMessageId, decodeConversationPage } from "@/features/workspace/model/conversation";
 import { MobileConversationStore } from "@/features/workspace/model/conversation-store";
 import {
@@ -602,6 +608,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       liveState.update("unreadCounts", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("firstUnreadMessageIds", (current) => withoutKeys(current, removedAgentIds));
       liveState.update("activityByServer", (current) => withoutKeys(current, serverIds));
+      liveState.update("contextByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("threadWaitsByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("turnLinesByServer", (current) => withoutKeys(current, serverIds));
       liveState.update("approvalRequests", (current) => withoutKeys(current, serverIds));
@@ -723,11 +730,12 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       upload?: RemoteFileUpload,
       onUploadProgress?: (fraction: number) => void,
       largeDownload?: RemoteLargeDownload,
+      download?: RemoteDownloadWatch,
     ): Promise<T> => {
       if (serverId) await connectionWaits.whenConnected(serverId);
       const client = serverId ? connections.current.get(serverId)?.client : null;
       if (!client) throw new Error(currentText().t("mobile.workspace.error.transportNotReady"));
-      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload);
+      return client.request(method, path, decode, body, upload, onUploadProgress, largeDownload, download);
     },
     [connectionWaits],
   );
@@ -1055,10 +1063,51 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
     channelStore,
   ]);
 
+  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+  const openExchangeReads = useRef(new Map<string, { again: boolean }>());
+  const refreshOpenExchanges = useCallback(
+    (agentId: string, serverId = activeServerIdRef.current) => {
+      for (const messageId of conversationStore.openExchangesBeforeLatest(agentId)) {
+        const key = `${agentId}\0${messageId}`;
+        const running = openExchangeReads.current.get(key);
+        if (running) {
+          running.again = true;
+          continue;
+        }
+        const read = { again: true };
+        openExchangeReads.current.set(key, read);
+        const generation = loadGeneration.current;
+        const isCurrent = () =>
+          generation === loadGeneration.current && Boolean(serverId) && !removedServers.current.has(serverId ?? "");
+        void (async () => {
+          try {
+            while (read.again && isCurrent()) {
+              read.again = false;
+              // The page around the request holds its whole turn at least, with the request as the host has it.
+              const page = await request(
+                "GET",
+                `${TEAM_API_ROUTES.agent.conversationPage(agentId)}?limit=1&around=${encodeURIComponent(messageId)}`,
+                decodeConversationPage,
+                undefined,
+                serverId,
+              );
+              if (isCurrent() && page.agentId === agentId) conversationStore.replaceMessage(page, messageId);
+            }
+          } finally {
+            // In the same step as the last check, so a later page starts a new read and is not lost.
+            openExchangeReads.current.delete(key);
+          }
+        })()
+          // The next latest page reads it again.
+          .catch(() => undefined);
+      }
+    },
+    [request, conversationStore],
+  );
   const loadConversation = useCallback(
     async (agentId: string, serverId = activeServerIdRef.current, refresh = false, attach = false) => {
       const generation = loadGeneration.current;
-      return conversationStore.loadLatest(
+      const page = await conversationStore.loadLatest(
         agentId,
         () =>
           request(
@@ -1072,8 +1121,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         refresh,
         attach,
       );
+      refreshOpenExchanges(agentId, serverId);
+      return page;
     },
-    [request, conversationStore],
+    [request, conversationStore, refreshOpenExchanges],
   );
   // A stable function: an open chat reloads its history when this changes.
   const loadLatestMessages = useCallback(
@@ -1624,6 +1675,11 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           return next === previous ? current : { ...current, [serverId]: next };
         });
       }
+      liveState.update("contextByServer", (current) => {
+        const previous = current[serverId] ?? NO_CONTEXT_STATES;
+        const next = reduceContextStates(previous, event);
+        return next === previous ? current : { ...current, [serverId]: next };
+      });
       // What the chat leaves out: the waits of the side threads, which the home list shows on the agent.
       liveState.update("threadWaitsByServer", (current) => {
         const previous = current[serverId] ?? [];
@@ -1673,7 +1729,10 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
           readRefresh.invalidate(serverId);
           applyConversationReads({ [event.page.agentId]: readState });
         } else void refreshConversationReads(serverId).catch(() => undefined);
-        if (conversationStore.get(event.page.agentId)) conversationStore.applyPage(event.page);
+        if (conversationStore.get(event.page.agentId)) {
+          conversationStore.applyPage(event.page);
+          refreshOpenExchanges(event.page.agentId, serverId);
+        }
       } else if (event.type === "conversation-invalidated") {
         // A read cursor change sends the revision that the phone already has.
         if (
@@ -1708,6 +1767,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
       applyHostHidden,
       applyHostColors,
       loadConversation,
+      refreshOpenExchanges,
       replaceServerAgents,
       conversationStore,
       refreshConversationReads,

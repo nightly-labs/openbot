@@ -101,6 +101,18 @@ export const messages = {
   "browser.secret.submitting": "جارٍ الإرسال…",
   "browser.secret.takeOver": "تولّي التحكم",
   "browser.secret.failed": "تعذّر إكمال الطلب. تحقّق من الاتصال وحاول مرة أخرى.",
+  "browser.secret.vaultSkip.agentScript":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل شغّل نصًا برمجيًا في هذه الصفحة. لاستخدامها، اطلب من الوكيل إعادة تحميل الصفحة والمحاولة مرة أخرى.",
+  "browser.secret.vaultSkip.fieldKind":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأن الوكيل اختار حقلًا خاطئًا في الصفحة.",
+  "browser.secret.vaultSkip.loginChoice":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأن الوكيل لم يختر أيًّا من بيانات تسجيل الدخول المحفوظة لهذا الموقع. أخبر الوكيل بالحساب الذي يجب استخدامه.",
+  "browser.secret.vaultSkip.noPassword":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على كلمة مرور لهذا الموقع.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "لم يستخدم OpenBot بيانات تسجيل الدخول المحفوظة لأنها لا تحتوي على مفتاح تطبيق المصادقة.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "لم يستخدم OpenBot بيانات تسجيل دخول محفوظة لأنه تعذّر عليه قراءة مدير كلمات المرور.",
   "browser.error.openAddress": "تعذّر فتح العنوان في علامة التبويب هذه.",
   "browser.error.channelNoBrowserMember": "لا يمكن لأي عضو فتح علامة تبويب جديدة في هذه القناة.",
   "browser.error.closeTab": "تعذّر إغلاق علامة تبويب المتصفح.",

@@ -213,6 +213,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Yeniden bağlanılamadı.",
   "provider.account.add": "Hesap ekle",
   "provider.account.addLabel": "Başka bir {name} hesabı ekle",
+  "provider.account.addWithCode": "Kodla hesap ekle",
   "provider.account.count": { one: "{count} hesap", other: "{count} hesap" },
   "provider.account.numbered": "Hesap {number}",
   "provider.account.apiKey": "API anahtarı",

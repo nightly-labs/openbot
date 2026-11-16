@@ -11,6 +11,12 @@ export const messages = {
     "لم تعمل الأداة. في tool_call يجب أن تكون arguments كائن JSON وليست نصًا. أرسل الاستدعاء مرة أخرى مع arguments ككائن.",
   "error.agent.toolCallDiscoveryTool":
     "لم تعمل الأداة. لا يمكن لـ tool_call تشغيل openbot.tool_search أو openbot.tool_describe. استدعهما مباشرةً بالوسائط نفسها.",
+  "error.agent.toolCallEnvelopeKeys":
+    "لم تعمل الأداة. لا يقبل tool_call إلا name وarguments. ضع وسائط الأداة في arguments ككائن، ثم أرسل الاستدعاء مرة أخرى.",
+  "error.agent.toolCallUnknownTool":
+    "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. قد يكون الاسم المؤهل {name}. إذا كان كذلك، فأرسل الاستدعاء مرة أخرى بهذا الاسم.",
   "error.agent.routineScheduleArgumentsInvalid":
     "جدول المهمة الدورية غير صالح: {detail} صحّح الجدول وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
@@ -131,6 +137,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "ذاكرة هذا الخادم منخفضة. تنتظر رسالتك في قائمة الانتظار وتبدأ عند توفر الذاكرة.",
   "error.agent.workspaceOnlyToolMissing":
     "يحتاج خيار «مساحة العمل فقط» إلى {tool}، ولم يجده OpenBot. ثبّته، أو اختر الوصول الكامل في إعدادات الوكيل.",
+  "error.agent.codexSandboxUnavailable":
+    "يحتاج خيار «مساحة العمل فقط» إلى بيئة Codex المعزولة، ولا يستطيع Codex تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر «السؤال أولًا» أو «وصول كامل» في إعدادات الوكيل.",
   "error.agent.claudeSandboxUnavailable":
     "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب: {reason}. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
   "error.agent.screenCaptureOff":
@@ -140,6 +148,7 @@ export const messages = {
     "لا يعمل التقاط الشاشة في محادثة Slack أو Discord أو Telegram، لأن أشخاصًا آخرين يتلقون ملفاته.",
   "error.agent.screenCaptureDeclined": "لم يسمح المستخدم بالتقاط الشاشة هذا. لم يُلتقط شيء.",
   "error.agent.mcpServerDeclined": "لم يسمح المستخدم بتغيير خادم MCP هذا. لم يتغير شيء.",
+  "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
     "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في إعدادات الخادم، MCP.",

@@ -10,7 +10,6 @@ export const messages = {
   "app.action.unavailable": "Действие недоступно",
   "app.error.actionFailed": "Не удалось выполнить действие. Повторите попытку.",
   "app.errorStatus.queueLoad": "Не удалось загрузить сообщения в очереди",
-  "app.errorStatus.waitsLoad": "Не удалось загрузить открытые ожидания",
   "app.errorStatus.answer": "Не удалось отправить ответ",
   "app.errorStatus.approval": "Не удалось отправить решение",
   "app.errorStatus.browserTakeover": "Не удалось завершить перехват браузера",

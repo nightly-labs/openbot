@@ -24,8 +24,14 @@ import {
   KIMI_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
-import { ANTIGRAVITY_ACP_FLAVOR, antigravityGeminiHome, GEMINI_DIR_FLAG } from "./acp-flavor-antigravity";
+import {
+  ANTIGRAVITY_ACP_FLAVOR,
+  antigravityGeminiHome,
+  GEMINI_DIR_FLAG,
+  geminiSavedKeyLimitFailure,
+} from "./acp-flavor-antigravity";
 import { OPENCODE_ACP_FLAVOR } from "./acp-flavor-opencode";
+import { acpSessionSteers, steerAcpSession } from "./acp-session-steering";
 import type { AcpArgv, AcpExtensionMethod } from "./acp-sign-in";
 import { readMuseAccount } from "./agent/muse-login";
 import { claudeModelName, modelsAfterOpenCodeDiscoveryFailure, serviceTierFields } from "./agent/provider-models";
@@ -160,6 +166,14 @@ export interface ProviderHomeAccountSupport {
   readonly homeVariable: string;
   /** Signs a new, empty home folder in through the browser: a CLI command, or an ACP `authenticate`. */
   readonly signIn: ProviderCliCommand | AcpAuthenticateSignIn;
+  /**
+   * Signs the home folder in with a code or a link that the user finishes on any device, for a
+   * computer whose browser callback cannot arrive. The CLI prints it (`startCliCodeLogin`). A
+   * `paste` sign-in gives a code that the user copies back, on a computer where
+   * `pasteCodeLoginSupported` only. The descriptor's `accountCodeSignIn` mirrors it; keep the two in
+   * step.
+   */
+  readonly codeSignIn?: { readonly flow: "device" | "paste" | "link"; readonly command: ProviderCliCommand };
   /** Signs the account out before its folder is removed, for a CLI that keeps a credential outside it. */
   readonly signOut?: ProviderCliCommand;
   /** False for a CLI version that ignores `homeVariable`. Absent when every version reads it. */
@@ -213,6 +227,17 @@ const CLAUDE_COMMAND_ENV = (cli: AgentCliInfo): Record<string, string> =>
   cli.source === "managed" ? { DISABLE_AUTOUPDATER: "1" } : {};
 
 /** The browser sign-in of Claude, for the first account and for each account after it. */
+/** With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only. */
+const CLAUDE_CODE_SIGN_IN: ProviderCliCommand = {
+  argv: ["auth", "login", "--claudeai"],
+  env: CLAUDE_COMMAND_ENV,
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+};
+const GROK_CODE_SIGN_IN: ProviderCliCommand = {
+  argv: ["--no-auto-update", "login", "--device-auth"],
+  env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
+  timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+};
 const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
@@ -273,12 +298,14 @@ interface AcpAuthenticateSignIn {
  * `codex-device` is the Codex app-server device code. `muse-device` is the device code a `muse serve`
  * host asks Meta for. `cli` spawns the provider's CLI and reads its link: `device` prints a code the
  * user confirms, `paste` waits for the code the provider's page shows, which the user copies back,
- * and `link` is a page that signs the CLI in by itself.
+ * and `link` is a page that signs the CLI in by itself. `acp-delegated` is an ACP sign-in whose server
+ * gives its page to OpenBot instead of a browser, as a `link`.
  */
 type ProviderCodeSignIn =
   | { kind: "codex-device" }
   | { kind: "muse-device"; timeoutMs: number }
-  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand };
+  | { kind: "cli"; flow: "device" | "paste" | "link"; command: ProviderSignInCommand }
+  | (Omit<AcpAuthenticateSignIn, "kind"> & { readonly kind: "acp-delegated" });
 
 /**
  * The Gemini API key sign-in, the other way in when Google's browser sign-in cannot reach this
@@ -311,6 +338,8 @@ function antigravityKeyOptions(context: ProviderClientContext, agentEnvironment:
         ? providerCall(() => connection.authenticate({ methodId: GEMINI_API_KEY_METHOD })).pipe(Effect.asVoid)
         : Effect.void,
     savedKeyRefusedMessage: () => (key() ? sourceText("error.provider.geminiKeyRefused") : null),
+    savedKeyLimitMessage: (detail: string, error?: unknown) =>
+      key() ? geminiSavedKeyLimitFailure(detail, error) : null,
     authBlockedMessage: () =>
       antigravitySettingsUnreadable(antigravityAppDataDir({ ...process.env, ...account }))
         ? sourceText(
@@ -738,7 +767,9 @@ interface ProviderModelCatalog {
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
   modelName?(id: string): string | null;
   /** Fields that only this provider's CLI reports. */
-  modelFields?(model: ModelListResponse["data"][number]): { fastServiceTier?: string; ultrafastServiceTier?: string };
+  modelFields?(
+    model: ModelListResponse["data"][number],
+  ): Pick<AgentModelOption, "fastServiceTier" | "ultrafastServiceTier" | "steersTurns">;
   /**
    * The models to keep when the list failed, timed out or came back empty. Without this hook a
    * failed list keeps the previous models, and an empty list is a real answer.
@@ -956,6 +987,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     accounts: {
       homeVariable: "CODEX_HOME",
       signIn: { argv: ["login"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      // The app-server's device code signs in the default home folder only, so an account uses the CLI's.
+      codeSignIn: {
+        flow: "device",
+        command: { argv: ["login", "--device-auth"], env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+      },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
     catalog: { paged: true, modelFields: serviceTierFields },
@@ -990,17 +1026,14 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // On Windows the CLI opens its page with `rundll32`. When that opens nothing, it waits for the
     // whole timeout, and its link goes to an output that OpenBot does not read (#8454).
     signIn: { kind: "cli-command", command: CLAUDE_SIGN_IN },
-    // With no browser the CLI prints the link and a "Paste code here" prompt, on a terminal only.
-    codeSignIn: {
-      kind: "cli",
-      flow: "paste",
-      command: { argv: ["auth", "login", "--claudeai"], env: CLAUDE_COMMAND_ENV, timeoutMs: CLI_LOGIN_TIMEOUT_MS },
-    },
+    codeSignIn: { kind: "cli", flow: "paste", command: CLAUDE_CODE_SIGN_IN },
     // On macOS the CLI keeps the credential in a keychain item named after the folder, so the
     // sign-out removes that item before OpenBot removes the folder.
     accounts: {
       homeVariable: "CLAUDE_CONFIG_DIR",
       signIn: CLAUDE_SIGN_IN,
+      // As the provider's own `codeSignIn`, in the folder of the account.
+      codeSignIn: { flow: "paste", command: CLAUDE_CODE_SIGN_IN },
       signOut: { argv: ["auth", "logout"], env: CLAUDE_COMMAND_ENV, timeoutMs: 30_000 },
     },
     // `claudeModelName` says why Claude Code's own model names are not used.
@@ -1035,15 +1068,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
     },
-    codeSignIn: {
-      kind: "cli",
-      flow: "device",
-      command: {
-        argv: ["--no-auto-update", "login", "--device-auth"],
-        env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
-        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
-      },
-    },
+    codeSignIn: { kind: "cli", flow: "device", command: GROK_CODE_SIGN_IN },
     accounts: {
       homeVariable: "GROK_HOME",
       signIn: {
@@ -1051,6 +1076,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
         timeoutMs: CLI_LOGIN_TIMEOUT_MS,
       },
+      codeSignIn: { flow: "device", command: GROK_CODE_SIGN_IN },
     },
     // Only for the own sign-in: an account folder is removed without it.
     signOut: { argv: ["--no-auto-update", "logout"], env: () => ({}), timeoutMs: 30_000 },
@@ -1149,6 +1175,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
               }
             : null;
         },
+        // `openCodeConfigEnv` sends the saved key only to OpenCode Go (#7550).
+        savedKey: (modelId) =>
+          Boolean(context.apiKey("opencode")) && (modelId?.toLowerCase().startsWith("opencode-go/") ?? false),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1158,6 +1187,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           readOpenCodeGoUsage(context.apiKey("opencode")).pipe(
             Effect.mapError((failure) => providerFailure(failure.cause)),
           ),
+        steer: steerAcpSession,
+        steers: acpSessionSteers,
         history: context.history?.("opencode"),
       }),
     createProfileClient: (cli, timeout, context) =>
@@ -1565,6 +1596,15 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       env: MISTRAL_ENV,
       timeoutMs: CLI_LOGIN_TIMEOUT_MS,
     },
+    // A joined server has no browser that the user sees. Vibe 3.1.0's `browser-auth-delegated` gives
+    // the Mistral page to OpenBot, and asks Mistral until the user finishes there, on any device.
+    codeSignIn: {
+      kind: "acp-delegated",
+      methodId: "browser-auth-delegated",
+      argv: MISTRAL_ARGV,
+      env: MISTRAL_ENV,
+      timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+    },
     // The CLI has no sign-out command, and its ACP server has no `logout` method. Its own
     // `_auth/signOut` removes the saved key. A key in the user's environment stays.
     signOut: { argv: MISTRAL_ARGV, env: () => ({ ...MISTRAL_ENV }), timeoutMs: 30_000, acpLogout: "_auth/signOut" },
@@ -1686,7 +1726,13 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
     // again in `model/list`: Claude Agent ACP with a few plugins and MCP servers does.
     // Kiro CLI answers a cold `session/new` before its own catalogue loads and lists no models, so
     // the list is read once more after each start.
-    catalog: { slowList: true, partialListAtStart: true, relistAfterStart: true },
+    catalog: {
+      slowList: true,
+      partialListAtStart: true,
+      relistAfterStart: true,
+      // Whether the custom agent that serves the model takes a message in its running turn (#4977).
+      modelFields: (model) => (model.steersTurns ? { steersTurns: true } : {}),
+    },
     resolveCli: () => Effect.succeed(CUSTOM_AGENTS_CLI),
     createClient: (_cli, timeout, context, confinement) =>
       new CustomAcpAgentsClient(
@@ -1752,6 +1798,10 @@ function customAgentChild(
     ...(confinement ? { confine: (target) => confineSpawnTarget(target, confinement, customAgentStatePaths()) } : {}),
     signInMessage: sourceText("error.provider.customAgentSignIn"),
     servesModel: () => savedCustomAgents(context).some((saved) => saved.id === config.id),
+    // A custom agent that reports `_session/steering` takes a message in its running turn (#4977).
+    // Any other one gets no request, and the message waits in the queue.
+    steer: steerAcpSession,
+    steers: acpSessionSteers,
     ...(profileGeneration
       ? {}
       : {

@@ -8,6 +8,7 @@ import {
   axValue,
   type CdpResult,
   exceptionDescription,
+  frameAutomationContextId,
   frameIds,
   isRecord,
   numberValue,
@@ -34,6 +35,8 @@ const MAX_CANDIDATE_TEXT = 120;
 const MAX_CANDIDATE_ITEM_TEXT = 200;
 const MAX_CANDIDATE_PEERS = 500;
 const MAX_SNAPSHOT_ELEMENT_VALUE = 2_000;
+/** The frames of all captures that get their own walk, after the root frame of each capture. */
+const MAX_FRAME_DOCUMENTS = 12;
 const MAX_SERIALIZED_SNAPSHOT_BYTES = 128 * 1024;
 /**
  * A tree walker filter that skips hidden subtrees, so that the hidden menus and panels of a large page
@@ -98,6 +101,8 @@ export interface TargetRecord {
   visibleText: string;
   /** The fallback pass found it, so an action checks it with the same rules. */
   drawnOnly?: true;
+  /** It is in a frame that the walk of the capture's root frame cannot enter, so checks run in its frame. */
+  ownFrame?: true;
 }
 
 export interface SnapshotTarget {
@@ -144,13 +149,27 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   let hasFrame = captures.length > 1;
   let hasRoot = true;
   let truncated = false;
+  const documents: Array<{ capture: SnapshotTarget; contextId?: number }> = [];
+  let frameBudget = MAX_FRAME_DOCUMENTS;
   for (const capture of captures) {
+    documents.push({ capture });
+    const frames = yield* frameDocumentContexts(send, capture.sessionId, frameBudget).pipe(
+      Effect.catch(() => Effect.succeed([])),
+    );
+    frameBudget -= frames.length;
+    documents.push(...frames.map((contextId) => ({ capture, contextId })));
+  }
+  for (const { capture, contextId } of documents) {
     yield* browserSync(() => assertBeforeDeadline(deadline));
     if (includeText) {
       const remainingText = Math.max(0, MAX_SNAPSHOT_TEXT - textLength);
-      const summary = yield* collectPageSummaryEffect(send, capture.sessionId, remainingText, drawnOnly).pipe(
-        Effect.catch(() => Effect.succeed(null)),
-      );
+      const summary = yield* collectPageSummaryEffect(
+        send,
+        capture.sessionId,
+        remainingText,
+        drawnOnly,
+        contextId,
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
       if (summary) {
         if (summary.text) {
           textParts.push(summary.text);
@@ -159,17 +178,17 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         truncated ||= summary.truncated;
         hasVisualSurface ||= summary.hasVisualSurface;
         hasFrame ||= summary.hasFrame;
-        if (!capture.sessionId) hasRoot = summary.hasRoot;
+        if (!capture.sessionId && contextId === undefined) hasRoot = summary.hasRoot;
       }
     }
     const remainingElements = MAX_SNAPSHOT_ELEMENTS - elements.length;
     if (remainingElements <= 0) continue;
     const candidates =
-      capture.sessionId && deadline === undefined
-        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly).pipe(
+      (capture.sessionId || contextId !== undefined) && deadline === undefined
+        ? yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, undefined, contextId).pipe(
             Effect.catch(() => Effect.succeed([])),
           )
-        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline);
+        : yield* collectActionableNodesEffect(send, capture, remainingElements, drawnOnly, deadline, contextId);
     for (const candidate of candidates) {
       const properties = Array.isArray(candidate.ax.properties) ? candidate.ax.properties.filter(isRecord) : [];
       const states = properties
@@ -200,6 +219,7 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
         element,
         visibleText: candidate.visibleText,
         ...(drawnOnly ? { drawnOnly: true as const } : {}),
+        ...(contextId === undefined ? {} : { ownFrame: true as const }),
       });
       if (elements.length >= MAX_SNAPSHOT_ELEMENTS) break;
     }
@@ -216,13 +236,52 @@ const collectSnapshotPass = Effect.fn("Browser.collectSnapshotPass")(function* (
   };
 });
 
+/**
+ * The automation worlds of the frames of a capture that the walk of their parent cannot enter: a frame
+ * whose origin differs from its parent frame's, also when it is in the same process, as Apple's sign-in
+ * frame on another apple.com host (#10148). A frame of another process is a capture of its own.
+ */
+const frameDocumentContexts = Effect.fn("Browser.frameDocumentContexts")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  limit: number,
+) {
+  if (limit <= 0) return [];
+  const tree = recordValue((yield* send("Page.getFrameTree", {}, sessionId)).frameTree);
+  const frames: string[] = [];
+  const pending = (Array.isArray(tree?.childFrames) ? tree.childFrames : []).map((child) => ({
+    child: recordValue(child),
+    parentOrigin: stringValue(recordValue(tree?.frame)?.securityOrigin),
+  }));
+  while (pending.length > 0 && frames.length < limit) {
+    const next = pending.shift();
+    const frame = recordValue(next?.child?.frame);
+    const id = stringValue(frame?.id);
+    const origin = stringValue(frame?.securityOrigin);
+    if (id && origin !== next?.parentOrigin) frames.push(id);
+    const children = next?.child?.childFrames;
+    if (Array.isArray(children))
+      pending.push(...children.map((child) => ({ child: recordValue(child), parentOrigin: origin })));
+  }
+  const contexts: number[] = [];
+  for (const frameId of frames) {
+    // A frame that detached since the tree was read, or that has no world, has nothing to read.
+    const contextId = yield* frameAutomationContextId(send, frameId, sessionId).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+    );
+    if (contextId !== undefined) contexts.push(contextId);
+  }
+  return contexts;
+});
+
 const collectPageSummaryEffect = Effect.fn("Browser.collectPageSummary")(function* (
   send: SendCommand,
   sessionId: string | undefined,
   maxText: number,
   drawnOnly: boolean,
+  frameContextId?: number,
 ) {
-  const contextId = yield* automationContextId(send, sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, sessionId));
   const result = yield* send(
     "Runtime.evaluate",
     {
@@ -735,13 +794,14 @@ const collectActionableNodesEffect = Effect.fn("Browser.collectActionableNodes")
   limit: number,
   drawnOnly: boolean,
   deadline?: number,
+  frameContextId?: number,
 ) {
   yield* browserSync(() => assertBeforeDeadline(deadline));
   yield* Effect.all([send("DOM.enable", {}, capture.sessionId), send("Accessibility.enable", {}, capture.sessionId)], {
     concurrency: "unbounded",
   });
   yield* browserSync(() => assertBeforeDeadline(deadline));
-  const contextId = yield* automationContextId(send, capture.sessionId);
+  const contextId = frameContextId ?? (yield* automationContextId(send, capture.sessionId));
   const results: Array<{
     backendNodeId: number;
     node: CdpResult;
@@ -971,11 +1031,14 @@ const HIDDEN_SECURITY_CODE = "•••";
  * titles and URLs, and the text of a target or a wait. A page can copy a field anywhere, so every
  * string goes through it. The number stays hidden for the life of the tab. A security code is three
  * or four digits and also hides prices and dates, so it stays hidden only until the filled document
- * goes. Logs do not use it: the main process registers the number with the log redaction.
+ * goes. A password that `submit_secret` typed into a page that stays is hidden the same way, until its
+ * document goes. Logs do not use it: the main process registers the number with the log redaction.
  */
 export class CardValueScrub {
   readonly #numbers = new Map<string, { pattern: RegExp; replacement: string }>();
-  #securityCodes = new Map<string, RegExp>();
+  /** Values of the current document only: security codes and typed passwords. */
+  #documentValues = new Map<string, RegExp>();
+  #documentSecretShown = false;
 
   add(number: string, securityCode: string): void {
     const digits = number.replace(/[^0-9]/gu, "");
@@ -986,23 +1049,51 @@ export class CardValueScrub {
         replacement: `•••• ${digits.slice(-4)}`,
       });
     }
-    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#securityCodes.has(securityCode))
-      this.#securityCodes.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+    if (/^[0-9]{3,4}$/u.test(securityCode) && !this.#documentValues.has(securityCode))
+      this.#documentValues.set(securityCode, new RegExp(`(?<![0-9])${securityCode}(?![0-9])`, "gu"));
+  }
+
+  /**
+   * Hides a password or code that `submit_secret` typed, as the page or its address can show it,
+   * until the document goes. A code is hidden only as a whole number, and a value of one to three
+   * characters only where it stands alone, so neither hides parts of other words and numbers.
+   * `shown` says that the page still holds a copy, so a query of its raw text could tell the agent
+   * the value one part at a time.
+   */
+  addDocumentSecret(secret: string, shown: boolean): void {
+    this.#documentSecretShown ||= shown;
+    const forms = [secret, encodeURIComponent(secret), new URLSearchParams({ v: secret }).toString().slice(2)];
+    for (const value of new Set(forms)) {
+      if (!value || this.#documentValues.has(value)) continue;
+      const escaped = value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+      const pattern = /^[0-9]+$/u.test(value)
+        ? `(?<![0-9])${escaped}(?![0-9])`
+        : value.length < 4
+          ? `(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`
+          : escaped;
+      this.#documentValues.set(value, new RegExp(pattern, "gu"));
+    }
   }
 
   /** The filled document was replaced: its security code is no longer on the page. */
   endDocument(): void {
-    this.#securityCodes = new Map();
+    this.#documentValues = new Map();
+    this.#documentSecretShown = false;
+  }
+
+  /** The current document can still show a typed password or code. */
+  get documentSecretShown(): boolean {
+    return this.#documentSecretShown;
   }
 
   get active(): boolean {
-    return this.#numbers.size > 0 || this.#securityCodes.size > 0;
+    return this.#numbers.size > 0 || this.#documentValues.size > 0;
   }
 
   text(value: string): string {
     let result = value;
     for (const { pattern, replacement } of this.#numbers.values()) result = result.replace(pattern, replacement);
-    for (const pattern of this.#securityCodes.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
+    for (const pattern of this.#documentValues.values()) result = result.replace(pattern, HIDDEN_SECURITY_CODE);
     return result;
   }
 
