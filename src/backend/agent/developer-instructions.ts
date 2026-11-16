@@ -426,19 +426,29 @@ export function steerNote(sender: "user" | "teammate"): string {
 const BACKGROUND_WAKE_START = "<openbot_background_wake>";
 
 /**
- * The prompt that connects an agent's wake-up for a finished background command or subagent to a turn
- * (`AcpFlavor.wakesAfterPromptEnds`, `AcpFlavor.backgroundSubagentTools`). The model reads it; the
- * chat does not show it.
+ * The prompt that connects an agent's wake-up for a finished background command to its open turn
+ * (`AcpFlavor.wakesAfterPromptEnds`). The model reads it; the chat does not show it.
  */
 export const BACKGROUND_WAKE_NOTE = [
   BACKGROUND_WAKE_START,
-  "The session changed while a command or a subagent that you started in the background ran. If it finished, read its result and continue the task. If it still runs, end your turn.",
+  "The session changed while a command that you moved to the background ran. If the command finished, read its result and continue the task. If it still runs, end your turn.",
+  "</openbot_background_wake>",
+].join("\n");
+
+/**
+ * The prompt of the turn that OpenBot starts when an agent wakes up by itself, such as for a subagent
+ * or a timer (`AcpFlavor.selfWakeTools`). The chat does not show what the agent wrote by itself before
+ * it, so the answer to this prompt carries the result.
+ */
+export const SELF_WAKE_NOTE = [
+  BACKGROUND_WAKE_START,
+  "Work that you started in the background, such as a subagent or a timer, may have finished. The user did not see what you wrote after your last turn ended. If it finished, give its result and continue the task. If it still runs, or nothing changed since your last reply, end your turn without text.",
   "</openbot_background_wake>",
 ].join("\n");
 
 /**
  * Whether a user text block is one that `memoryContextUpdate`, `sectionTeammatesUpdate`,
- * `instructionsFileUpdate`, the turn style reminder, `steerNote` or `BACKGROUND_WAKE_NOTE` wrote,
+ * `instructionsFileUpdate`, the turn style reminder, `steerNote` or a background wake note wrote,
  * not text that a person wrote.
  */
 export function isTurnContextBlock(text: string): boolean {
