@@ -2097,7 +2097,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               command: server.command,
               args: server.args,
               env: { ...environment(), ...Object.fromEntries(server.env.map(({ name, value }) => [name, value])) },
-              cwd: server.cwd ?? cwd,
+              // A relative directory is written against the agent's workspace, where Claude and Codex start it.
+              cwd: server.cwd ? resolve(cwd, server.cwd) : cwd,
               onStartAbandoned: () =>
                 this.#reportFailedMcpServer(
                   cwd,
