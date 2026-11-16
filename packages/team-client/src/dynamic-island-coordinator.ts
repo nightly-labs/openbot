@@ -108,6 +108,8 @@ export class DynamicIslandCoordinator {
     }
     this.#servers.set(input.serverId, {
       ...input,
+      // A runtime snapshot has no channels: they come from the channel list, so the last list stays.
+      channels: input.channels ?? previous?.channels,
       turnProgress,
       pendingApprovals,
       pendingPrompts,

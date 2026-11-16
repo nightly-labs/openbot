@@ -20,6 +20,8 @@ export const messages = {
   "island.badge.takeover": "Devral",
   "island.badge.failed": "Başarısız",
   "island.status.replied": "yanıtladı",
+  "island.status.repliedIn": "{channel} kanalında yanıtladı",
+  "island.channel.agentIn": "{channel} kanalında {name}",
   "island.status.failed": "başarısız oldu",
   "island.status.needsYou": "size ihtiyacı var",
   "island.status.needsApproval": "onay bekliyor",

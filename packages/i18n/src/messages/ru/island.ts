@@ -20,6 +20,8 @@ export const messages = {
   "island.badge.takeover": "Перехват",
   "island.badge.failed": "Сбой",
   "island.status.replied": "ответил",
+  "island.status.repliedIn": "ответил в {channel}",
+  "island.channel.agentIn": "{name} в {channel}",
   "island.status.failed": "сбой",
   "island.status.needsYou": "нужны вы",
   "island.status.needsApproval": "нужно подтверждение",

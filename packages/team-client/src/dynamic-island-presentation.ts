@@ -5,6 +5,7 @@ import {
   DYNAMIC_ISLAND_MAX_COUNT,
   type DynamicIslandAgentIdentity,
   type DynamicIslandApprovalItem,
+  type DynamicIslandChannelIdentity,
   type DynamicIslandFailureItem,
   type DynamicIslandPresentation,
   type DynamicIslandPromptItem,
@@ -52,6 +53,20 @@ export interface DynamicIslandPresentationInput {
   pendingPrompts: Record<string, PromptEvent | BrowserTakeoverEvent | undefined>;
   pendingApprovals: Record<string, AgentApproval | undefined>;
   failedTurns: Record<string, string | undefined>;
+  /** The channels with work running or a reply unread. A client without channels leaves it out. */
+  channels?: DynamicIslandChannelSource[];
+}
+
+/** One channel, as the island shows it: who works in it now, and its newest unread reply. */
+export interface DynamicIslandChannelSource {
+  channel: DynamicIslandChannelIdentity;
+  /** The member agents that run a task here now, first the one to show. Empty: nothing runs. */
+  workingAgentIds: string[];
+  /** What the first of them does, such as the task's instruction. Null shows the generic text. */
+  task: string | null;
+  unreadCount: number;
+  /** The newest unread reply of a member agent, or null. */
+  unreadReply: { messageId: string; agentId: string; text: string; createdAt: string } | null;
 }
 
 export interface DynamicIslandAgentSource {
@@ -127,23 +142,43 @@ export function createDynamicIslandPresentation(
   }
   if (attention?.mode === "failed") return { serverId: input.serverId, mode: "failed", item: attention.item };
 
-  const working = visibleAgents
-    .filter((agent) => isAgentWorking(agent.id, input))
-    .slice(0, 3)
-    .map((agent) => ({
-      agent: agentIdentity(agent),
-      task: currentTask(agent.id, input.queues, text),
-      turnId: input.activeTurns[agent.id] ?? null,
-    }));
+  const agentsByIdAll = new Map(input.agents.map((agent) => [agent.id, agent]));
+  const channels = input.channels ?? [];
+  const working = [
+    ...visibleAgents
+      .filter((agent) => isAgentWorking(agent.id, input))
+      .map((agent) => ({
+        agent: agentIdentity(agent),
+        task: currentTask(agent.id, input.queues, text),
+        turnId: input.activeTurns[agent.id] ?? null,
+      })),
+    // A channel shows the member that works in it. Its turn runs on the channel's thread, so the
+    // island has no turn to stop there.
+    ...channels.flatMap((source) => {
+      const agent = source.workingAgentIds.map((id) => agentsByIdAll.get(id)).find((candidate) => candidate);
+      if (!agent) return [];
+      return [
+        {
+          agent: agentIdentity(agent),
+          channel: source.channel,
+          task: truncate(source.task?.trim() || text.taskWorking, 240),
+          turnId: null,
+        },
+      ];
+    }),
+  ].slice(0, 3);
   if (working.length > 0) return { serverId: input.serverId, mode: "working", working };
 
-  const message = latestUnreadMessage(input, visibleAgents);
+  const message = [latestUnreadMessage(input, visibleAgents), latestChannelReply(channels, agentsByIdAll)]
+    .filter((candidate) => candidate !== undefined)
+    .sort((left, right) => messageTimestamp(right.createdAt) - messageTimestamp(left.createdAt))[0];
   if (message) {
     return {
       serverId: input.serverId,
       mode: "message",
       unreadCount: islandCount(
-        visibleAgents.reduce((total, agent) => total + Math.max(0, input.unreadReplies[agent.id] ?? 0), 0),
+        visibleAgents.reduce((total, agent) => total + Math.max(0, input.unreadReplies[agent.id] ?? 0), 0) +
+          channels.reduce((total, source) => total + (source.unreadReply ? Math.max(0, source.unreadCount) : 0), 0),
       ),
       message,
     };
@@ -163,6 +198,29 @@ function latestUnreadMessage(input: DynamicIslandPresentationInput, agents: read
       if (!messageId || !text) return [];
       const createdAt = message?.createdAt || agent.updatedAt || message?.time || new Date(0).toISOString();
       return [{ agent: agentIdentity(agent), messageId, text: truncate(text, 600), createdAt }];
+    })
+    .sort((left, right) => messageTimestamp(right.createdAt) - messageTimestamp(left.createdAt))[0];
+}
+
+function latestChannelReply(
+  channels: readonly DynamicIslandChannelSource[],
+  agentsById: ReadonlyMap<string, DynamicIslandAgentSource>,
+) {
+  return channels
+    .flatMap((source) => {
+      const reply = source.unreadReply;
+      const agent = reply ? agentsById.get(reply.agentId) : undefined;
+      const body = reply?.text.trim();
+      if (!reply || !agent || !body) return [];
+      return [
+        {
+          agent: agentIdentity(agent),
+          channel: source.channel,
+          messageId: reply.messageId,
+          text: truncate(body, 600),
+          createdAt: reply.createdAt,
+        },
+      ];
     })
     .sort((left, right) => messageTimestamp(right.createdAt) - messageTimestamp(left.createdAt))[0];
 }

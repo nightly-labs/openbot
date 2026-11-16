@@ -1,4 +1,5 @@
-import type { DynamicIslandAction } from "@openbot/contracts/ipc";
+import type { ChannelSummary, DynamicIslandAction } from "@openbot/contracts/ipc";
+import type { DynamicIslandChannelSource } from "@openbot/team-client/dynamic-island-presentation";
 import { classifyFailure } from "@openbot/telemetry";
 import { useText } from "@openbot/ui/text";
 import { createEffect, onSettled, untrack } from "solid-js";
@@ -9,6 +10,7 @@ import { usePlatform } from "../../platform";
 import { useTurns } from "../../turns";
 import { attentionByAgent, attentionEventKey, attentionOfAgent } from "../agents/agent-runtime-snapshot";
 import { useAgents } from "../agents/agents-context";
+import { useChannels } from "../channels/channels-context";
 import { useConversation } from "../conversation/conversation-context";
 import { promptRequestKey } from "../conversation/conversation-keys";
 import { useServerScope } from "../servers/server-scope";
@@ -51,6 +53,53 @@ export function DynamicIslandBridge() {
   } = useTurns();
   const { unreadReplies, conversations } = useConversation();
   const { selectAgent, openAgentMessage } = useNavigation();
+  const channels = useChannels();
+  /**
+   * The channels with work running or a reply unread, for the island. Who works: the owners of the
+   * running tasks on the open channel's page; for another channel, the agent that wrote last, then
+   * the lead.
+   */
+  const islandChannels = (): DynamicIslandChannelSource[] => {
+    const page = channels.state.page;
+    return channels.state.channels.flatMap((summary: ChannelSummary): DynamicIslandChannelSource[] => {
+      if (summary.archived) return [];
+      const running =
+        page?.channel.id === summary.id
+          ? page.tasks.filter((task) => task.state === "running" && task.ownerAgentId !== null)
+          : [];
+      const last = summary.lastMessage;
+      const lastAgentId = last?.author?.kind === "agent" ? last.author.id : null;
+      const workingAgentIds =
+        summary.activeTasks > 0
+          ? [
+              ...new Set(
+                [...running.map((task) => task.ownerAgentId), lastAgentId, summary.leadAgentId].filter(
+                  (id): id is string => typeof id === "string",
+                ),
+              ),
+            ]
+          : [];
+      const unreadReply =
+        summary.unreadCount > 0 && last && lastAgentId && last.text.trim()
+          ? { messageId: `channel:${summary.id}:${last.at}`, agentId: lastAgentId, text: last.text, createdAt: last.at }
+          : null;
+      if (workingAgentIds.length === 0 && !unreadReply) return [];
+      return [
+        {
+          channel: {
+            id: summary.id,
+            name: summary.name,
+            icon: summary.icon ?? null,
+            imageUrl: summary.imageUrl ?? null,
+          },
+          workingAgentIds,
+          task: running[0]?.instruction ?? null,
+          unreadCount: summary.unreadCount,
+          unreadReply,
+        },
+      ];
+    });
+  };
   /** The handoff this bridge published, so it never consumes or clears its own. */
   let publishedAction: DynamicIslandAction | null = null;
 
@@ -75,6 +124,7 @@ export function DynamicIslandBridge() {
         pendingPrompts: attentionByAgent(pendingPrompts(), agentList()),
         pendingApprovals: pendingApprovals(),
         failedTurns: failedTurns(),
+        channels: islandChannels(),
       };
     },
     (input) => {
@@ -176,6 +226,10 @@ export function DynamicIslandBridge() {
       // it is the one that consumes its own entry once `loaded()` turns true -
       // which is why `publishedAction` stays untouched.
       setPendingIslandAction(action);
+      return;
+    }
+    if (action.type === "open-channel") {
+      await channels.open(action.channelId);
       return;
     }
     selectAgent(action.agentId);
