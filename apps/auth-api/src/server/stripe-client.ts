@@ -129,7 +129,7 @@ const subscriptionSchema = Schema.Struct({
   latest_invoice: Schema.optional(Schema.NullOr(expandable)),
   /**
    * Stripe Tax on the invoices. Only subscriptions from the days when Checkout used Stripe Tax have it on;
-   * `scripts/stripe-vat-rates-migrate.ts` moves them to `default_tax_rates`.
+   * `scripts/stripe-vat-migrate.ts` moves them to `default_tax_rates`.
    */
   automatic_tax: Schema.optional(Schema.Struct({ enabled: Schema.Boolean })),
   /** The VAT rate of each invoice. Empty for reverse charge and for a buyer outside the EU. */
@@ -621,6 +621,24 @@ export class StripeClient {
     if (input.paymentMethodId) body.set("default_payment_method", input.paymentMethodId);
     for (const [key, value] of Object.entries(input.metadata)) body.set(`metadata[${key}]`, value);
     return yield* this.#requestEffect("POST", "/v1/subscriptions", body, subscriptionSchema, idempotencyKey);
+  }).bind(this);
+
+  /** Sets the VAT rates of the next invoices of a subscription. No rate removes them. */
+
+  readonly setSubscriptionTaxRates = Effect.fn("StripeClient.setSubscriptionTaxRates")(function* (
+    this: StripeClient,
+    subscriptionId: string,
+    rateIds: readonly string[],
+  ): Effect.fn.Return<void, StripeRequestError | StripeTransportError> {
+    const body = new URLSearchParams();
+    if (rateIds.length === 0) body.set("default_tax_rates", "");
+    for (const [index, id] of rateIds.entries()) body.set(`default_tax_rates[${index}]`, id);
+    yield* this.#requestEffect(
+      "POST",
+      `/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
+      body,
+      subscriptionSchema,
+    );
   }).bind(this);
 
   /** Sets metadata on a subscription. An empty value removes the key. */

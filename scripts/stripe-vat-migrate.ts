@@ -1,4 +1,4 @@
-import { VAT_TAX_RATE } from "@openbot/contracts/billing-details";
+import { VAT_SELLER_COUNTRY, VAT_TAX_RATE } from "@openbot/contracts/billing-details";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { z } from "zod";
 import { billingDetailsOf, type VatTreatment, vatTreatment } from "../apps/auth-api/src/server/billing-tax";
@@ -14,7 +14,8 @@ import { STRIPE_API_VERSION, type StripeCustomerTax } from "../apps/auth-api/src
  *
  * Without `--apply` it changes nothing and prints the plan. Without `--live` it refuses a live key. Run
  * `bun run api:stripe:bootstrap` first: it makes the Tax Rate. A subscription whose customer has no
- * country keeps Stripe Tax, and the script names it for a manual check. Run it again at any time: a
+ * country, or has an EU VAT ID of another country than Poland that no check confirmed, keeps Stripe Tax,
+ * and the script names it for a manual check. Run it again at any time: a
  * subscription without `automatic_tax` is not changed.
  */
 
@@ -101,6 +102,8 @@ interface Plan {
   customerId: string;
   country: string | null;
   treatment: VatTreatment | null;
+  /** Why a subscription with no treatment needs a manual check. */
+  reason: string;
 }
 
 async function main(args: readonly string[]): Promise<void> {
@@ -132,11 +135,19 @@ async function main(args: readonly string[]): Promise<void> {
         customers.set(subscription.customer, tax);
       }
       const details = billingDetailsOf(tax);
+      const treatment = details.country ? vatTreatment(details.country, details.vatId !== null) : null;
+      // Stripe Tax gave reverse charge for an EU VAT ID that Stripe could not verify. Such a company
+      // keeps Stripe Tax until a person checks the ID, so that its next invoice does not add 23%.
+      const unverifiedVatId =
+        treatment === "standard" &&
+        details.country !== VAT_SELLER_COUNTRY &&
+        tax.taxIds.some((id) => id.type === "eu_vat");
       plans.push({
         subscriptionId: subscription.id,
         customerId: subscription.customer,
         country: details.country,
-        treatment: details.country ? vatTreatment(details.country, details.vatId !== null) : null,
+        treatment: unverifiedVatId ? null : treatment,
+        reason: unverifiedVatId ? "has an EU VAT ID that no check confirmed" : "has no billing country",
       });
     }
     after = page.has_more ? (page.data.at(-1)?.id ?? null) : null;
@@ -147,7 +158,7 @@ async function main(args: readonly string[]): Promise<void> {
   for (const plan of plans) {
     if (!plan.treatment) {
       counts.manual += 1;
-      logger.warn(`${plan.subscriptionId}: customer ${plan.customerId} has no billing country. It keeps Stripe Tax.`);
+      logger.warn(`${plan.subscriptionId}: customer ${plan.customerId} ${plan.reason}. It keeps Stripe Tax.`);
       continue;
     }
     counts[plan.treatment] += 1;

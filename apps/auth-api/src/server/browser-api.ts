@@ -1,6 +1,6 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
-import { isBillingCountry, parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
+import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import {
@@ -17,6 +17,7 @@ import { type AccountAttribution, requestFirstTouch } from "./account-attributio
 import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
+import { withSuggestedCountry } from "./billing-tax";
 import { companySignInApiOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
@@ -452,14 +453,7 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
     return json(billing ? yield* billing.getState(user.id) : BILLING_UNAVAILABLE_STATE);
   if (path === "v1/me/billing/details" && (request.method === "GET" || request.method === "PUT")) {
     if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
-    if (request.method === "GET") {
-      const details = yield* billing.getBillingDetails(user.id);
-      // Cloudflare sends XX for an unknown country and T1 for Tor; neither is a billing country.
-      const located = request.headers.get("cf-ipcountry");
-      return json(
-        details.country === null && isBillingCountry(located) ? { ...details, suggestedCountry: located } : details,
-      );
-    }
+    if (request.method === "GET") return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
     const input = parseBillingDetailsRequest(yield* readJsonObject(request));
     if (!input) return failure(400, "invalid_billing_details", sourceText("error.billing.detailsInvalid"));
     return json(yield* billing.setBillingDetails(user, input));

@@ -2,6 +2,7 @@ import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { sourceText } from "@openbot/i18n/source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { Effect } from "effect";
+import { withSuggestedCountry } from "../../../../server/billing-tax";
 import { runApiResponse } from "../../../../server/effect-runtime";
 import { readJsonObject } from "../../../../server/json-body";
 import {
@@ -23,7 +24,7 @@ export const Route = createFileRoute("/v1/me/billing/details")({
             if (!user) return apiError(401, "unauthorized", "Sign in is required.");
             const billing = requestBillingService();
             if (!billing) return apiError(503, "billing_unavailable", "Billing is not available.");
-            return json(yield* billing.getBillingDetails(user.id));
+            return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
           }),
           billingErrorResponse,
         ),

@@ -3721,18 +3721,29 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
     const located = async (country: string) =>
       (await account.request("GET", "v1/me/billing/details", undefined, { "CF-IPCountry": country })).body;
     const [france, unknownPlace, tor] = [await located("FR"), await located("XX"), await located("T1")];
+    // The desktop app reads the details through the bearer route, not through the browser API.
+    const desktop = async () => {
+      const response = await fetch(`${account.api}/v1/me/billing/details`, {
+        headers: { Authorization: `Bearer ${account.token}`, "CF-IPCountry": "FR" },
+      });
+      return z.unknown().parse(await response.json().catch(() => null));
+    };
+    const desktopFrance = await desktop();
     const suggestion = (value: unknown) =>
       z.object({ suggestedCountry: z.string().optional() }).safeParse(value).data?.suggestedCountry;
     await save({ country: "DE" });
     const savedFirst = await located("FR");
+    const desktopSaved = await desktop();
     record(
       "vat",
-      "with no saved country the details suggest the CF-IPCountry country (not XX or T1); a saved country gets no suggestion",
+      "with no saved country the details suggest the CF-IPCountry country (not XX or T1), in the browser and on the desktop; a saved country gets no suggestion",
       suggestion(france) === "FR" &&
+        suggestion(desktopFrance) === "FR" &&
         suggestion(unknownPlace) === undefined &&
         suggestion(tor) === undefined &&
-        suggestion(savedFirst) === undefined,
-      { france, unknownPlace, tor, savedFirst },
+        suggestion(savedFirst) === undefined &&
+        suggestion(desktopSaved) === undefined,
+      { france, desktopFrance, unknownPlace, tor, savedFirst, desktopSaved },
     );
 
     // The One Stop Shop count: a paid invoice of a consumer in Germany adds its net amount, in euro cents.
@@ -3763,6 +3774,29 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       );
       return rows[0] ?? null;
     });
+    // Checkout puts the rate on the subscription, so a change of the details must change it there too.
+    const subscriptionRates = async () =>
+      (
+        await stripe(
+          "GET",
+          `/v1/subscriptions/${paid.id}`,
+          z.object({ default_tax_rates: z.array(z.object({ id: z.string() })) }),
+        )
+      ).default_tax_rates.map((rate) => rate.id);
+    const movedOut = await save({ country: "US" });
+    const outsideRates = await subscriptionRates();
+    const movedBack = await save({ country: "DE" });
+    const backRates = await subscriptionRates();
+    record(
+      "vat",
+      "a change of the billing details also changes the VAT of a running subscription: no rate in the United States, the Polish rate again in Germany",
+      movedOut.status === 200 &&
+        outsideRates.length === 0 &&
+        movedBack.status === 200 &&
+        backRates.length === 1 &&
+        backRates[0] === vatRate.id,
+      { movedOut: movedOut.status, outsideRates, movedBack: movedBack.status, backRates },
+    );
     await stripe("DELETE", `/v1/subscriptions/${paid.id}`, idSchema);
     record(
       "vat",

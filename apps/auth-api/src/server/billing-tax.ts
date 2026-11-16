@@ -74,6 +74,15 @@ export function billingDetailsOf(tax: StripeCustomerTax | null): BillingDetails 
   return { country: isBillingCountry(tax.country) ? tax.country : null, vatId: confirmedVatId(tax) };
 }
 
+/**
+ * The billing details with the country of the request as a suggestion, when the account gave no country.
+ * Cloudflare sends XX for an unknown country and T1 for Tor; neither is a billing country.
+ */
+export function withSuggestedCountry(details: BillingDetails, request: Request): BillingDetails {
+  const located = request.headers.get("cf-ipcountry");
+  return details.country === null && isBillingCountry(located) ? { ...details, suggestedCountry: located } : details;
+}
+
 const stripeCall = <A>(call: () => Effect.Effect<A, StripeRequestError | StripeTransportError>) =>
   stripeRequest(call).pipe(Effect.mapError(stripeFailure));
 
@@ -149,7 +158,41 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
       },
     }),
   );
+  yield* syncSubscriptionTax(stripe, customerId, treatment);
   return { country: request.country, vatId };
+});
+
+/** The subscription states that make more invoices. */
+const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "incomplete", "paused"]);
+
+/**
+ * Checkout puts the VAT rate on each subscription, so a change of the billing details must also change
+ * the subscriptions that run. A subscription with Stripe Tax is not changed: `scripts/stripe-vat-migrate.ts`
+ * moves it.
+ */
+const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function* (
+  stripe: StripeClient,
+  customerId: string,
+  treatment: VatTreatment,
+): Effect.fn.Return<void, BillingError | BillingOperationError> {
+  const subscriptions = (yield* stripeCall(() => stripe.listCustomerSubscriptions(customerId))).filter(
+    (subscription) => OPEN_SUBSCRIPTION_STATUSES.has(subscription.status) && !subscription.automatic_tax?.enabled,
+  );
+  if (subscriptions.length === 0) return;
+  const rateId =
+    treatment === "standard"
+      ? yield* stripeCall(() => stripe.findTaxRate(VAT_TAX_RATE.metadataKey, VAT_TAX_RATE.metadataValue))
+      : null;
+  if (treatment === "standard" && !rateId) {
+    console.error("billing: the standard VAT Tax Rate is missing; run scripts/stripe-bootstrap.ts");
+    return yield* new BillingError(503, "vat_unavailable", sourceText("error.billing.vatUnavailable"));
+  }
+  const rateIds = rateId ? [rateId] : [];
+  for (const subscription of subscriptions) {
+    const current = (subscription.default_tax_rates ?? []).map((rate) => rate.id);
+    if (current.length === rateIds.length && current.every((id, index) => id === rateIds[index])) continue;
+    yield* stripeCall(() => stripe.setSubscriptionTaxRates(subscription.id, rateIds));
+  }
 });
 
 /** The fields of a paid Checkout Session that the VAT check reads. */
