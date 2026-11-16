@@ -317,11 +317,14 @@ interface AcpTurn {
    * Then it can be the answer sent again (`AcpFlavor.resendsAnswer`). Null otherwise.
    */
   lastChunkAt: number | null;
+  /** OpenBot started this turn with a wake prompt for the agent's own wake-up (`#watchSelfWake`). */
+  wake: boolean;
   /**
-   * A wake turn (`#watchSelfWake`) shows nothing until the agent echoes its wake prompt. Before that,
-   * the agent still sends what it wrote by itself for the wake-up, and the answer repeats it (#8993).
+   * The updates of a wake turn before the agent echoes its wake prompt; null after the echo. Before
+   * it, the agent still sends what it wrote by itself for the wake-up, and the answer repeats it
+   * (#8993). They show only when the turn ends with no echo.
    */
-  awaitsWakeEcho: boolean;
+  beforeWakeEcho: SessionUpdate[] | null;
 }
 
 /** The parts of a `session/load` request that open this session as it was opened. */
@@ -766,9 +769,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
   /**
    * How many wake turns each session can still start for the work of its turns that wakes the agent
-   * (`AcpFlavor.selfWakeTools`). Each turn end sets a new entry, which ends the watch before it.
+   * (`AcpFlavor.selfWakeTools`), and until when: `ACP_BACKGROUND_WATCH_MS` after the last turn that
+   * started such work. Each turn end sets a new entry, which ends the watch before it.
    */
-  readonly #selfWakes = new WeakMap<AcpThread, { left: number }>();
+  readonly #selfWakes = new WeakMap<AcpThread, { left: number; until: number }>();
 
   constructor(
     cli: AgentCliInfo,
@@ -2603,7 +2607,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /** A turn of the agent's own ends when OpenBot sees it end, so a message waits for it rather than joining it. */
   #turnActiveError(turn: AcpTurn): Error {
-    return turn.unprompted
+    return turn.unprompted || turn.wake
       ? new ProviderTurnActiveError(this.#label)
       : new Error("The ACP thread already has an active turn.");
   }
@@ -2669,7 +2673,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       textMessageStart: 0,
       messageChunks: 0,
       lastChunkAt: null,
-      awaitsWakeEcho: wake,
+      wake,
+      beforeWakeEcho: wake ? [] : null,
     };
     thread.activeTurn = turn;
     this.#threads.holdForTurn(thread);
@@ -3273,9 +3278,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
-    if (turn.awaitsWakeEcho) {
-      if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text")
-        turn.awaitsWakeEcho = !isTurnContextBlock(update.content.text);
+    if (turn.beforeWakeEcho) {
+      if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
+        if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
+      } else if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+        // The agent works, so its prompt is not a silent one (`ACP_FIRST_UPDATE_MS`).
+        turn.answered = true;
+        turn.beforeWakeEcho.push(update);
+      }
       return;
     }
     // The first output after a retry replaces the retry in the chat.
@@ -4065,6 +4075,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: unknown,
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
+    // An agent that did not echo the wake prompt shows what it sent, rather than an empty turn.
+    const beforeEcho = turn.beforeWakeEcho ?? [];
+    turn.beforeWakeEcho = null;
+    for (const update of beforeEcho) this.#applyTurnUpdate(thread, turn, update);
     turn.completing = true;
     // The ACP SDK sends an extension notification through more handlers than `session/update`, so
     // OpenCode's child updates that came before the prompt's result can still be on their way.
@@ -4173,14 +4187,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) !== thread) return;
-    // Work of earlier turns can still run. A stopped or failed turn ends its wake-ups.
-    const left = status === "completed" && !turn.stopped ? (this.#selfWakes.get(thread)?.left ?? 0) + selfWakes : 0;
+    // Work of earlier turns can still run until its watch ends. A stopped or failed turn ends its wake-ups.
+    const earlier = this.#selfWakes.get(thread);
+    const kept = earlier && Date.now() < earlier.until ? earlier : null;
+    const left = status === "completed" && !turn.stopped ? (kept?.left ?? 0) + selfWakes : 0;
     if (left > 0) {
-      const wake = { left };
+      const until = selfWakes > 0 ? Date.now() + ACP_BACKGROUND_WATCH_MS : (kept?.until ?? 0);
+      const wake = { left, until };
       this.#selfWakes.set(thread, wake);
       Effect.runFork(this.#watchSelfWake(thread, wake).pipe(Effect.forkIn(this.#scope)));
     } else this.#selfWakes.delete(thread);
-    if (workRuns || left > 0) this.#holdForWork(thread);
+    if (workRuns || selfWakes > 0) this.#holdForWork(thread);
     yield* this.#threads.markIdle(thread);
   }, Effect.uninterruptible);
 
@@ -4245,19 +4262,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * it, such as a subagent or a timer (`AcpFlavor.selfWakeTools`). With no prompt open, the chat does
    * not show what the agent does, and the agent sends no approval request: a prompt connects the work.
    * Each subagent or timer allows one wake turn, so a session that changes for another cause costs at
-   * most that many. The next turn ends this watch, and its end starts a new one. After
-   * `ACP_BACKGROUND_WATCH_MS` with no change, it ends.
+   * most that many. The next turn ends this watch, and its end starts a new one. The wake-ups end
+   * `ACP_BACKGROUND_WATCH_MS` after the last turn that started such work.
    */
   readonly #watchSelfWake = Effect.fn("AcpAgentClient.watchSelfWake")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
-    wake: { left: number },
+    wake: { left: number; until: number },
   ) {
-    const until = Date.now() + ACP_BACKGROUND_WATCH_MS;
     // The first reading comes one poll after the turn ended, so the agent's own write of that end
     // is not taken as a wake-up.
     let before: string | undefined;
-    while (Date.now() < until) {
+    while (Date.now() < wake.until) {
       yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
       if (this.#selfWakes.get(thread) !== wake) return;
       // A message connects the work by itself. A session that must resume first gets no wake prompt.
