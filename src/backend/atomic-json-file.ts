@@ -66,6 +66,10 @@ export class AtomicFileWriteError extends Schema.TaggedError<AtomicFileWriteErro
  * these when antivirus, the search indexer or a backup tool has the target file open for a moment. A failed
  * rename of the team file at sign-in leaves the host with no id, and Slack, Discord and Telegram then
  * cannot connect. On other systems these codes are permanent permission errors, so they fail at once.
+ *
+ * On some Windows computers a filter driver holds every new file in the data folder, so each rename
+ * fails, while a write to an existing file works (#10580). After the last wait, the content is then
+ * written over `path` in place.
  */
 const HELD_TARGET_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500];
 
@@ -75,13 +79,33 @@ export function isHeldTargetError(cause: unknown): boolean {
   return code === "EPERM" || code === "EACCES" || code === "EBUSY";
 }
 
+/** Writes `content` to `path`, readable only by the user, and flushes it to the disk. */
+function writeAndFlush(path: string, content: string | Uint8Array): Effect.Effect<void, AtomicFileWriteError> {
+  return Effect.tryPromise({
+    try: async () => {
+      const handle = await open(path, "w", 0o600);
+      try {
+        await handle.writeFile(content);
+        await handle.sync();
+      } catch (cause) {
+        // A close failure must not replace the write failure.
+        await handle.close().catch(() => undefined);
+        throw cause;
+      }
+      await handle.close();
+    },
+    catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
+  });
+}
+
 /**
  * Replaces `path` with `content`, readable only by the user.
  *
  * The content goes to a temporary sibling first and is renamed over `path`, so a crash leaves the
  * previous file or the new one, never a truncated one. The content is flushed to the disk before the
  * rename, so a power loss cannot leave `path` filled with zeros. Each call has its own temporary name, so
- * overlapping writes never share a file, and a failed write removes its temporary file.
+ * overlapping writes never share a file, and a failed write removes its temporary file. When Windows
+ * holds the files for longer than the rename waits, the content is written over `path` in place.
  *
  * The write and rename stay together even when the caller interrupts the operation.
  */
@@ -100,21 +124,7 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
     Effect.sync(() => `${path}.${randomUUID()}.tmp`),
     (temporaryPath) =>
       Effect.gen(function* () {
-        yield* Effect.tryPromise({
-          try: async () => {
-            const handle = await open(temporaryPath, "w", 0o600);
-            try {
-              await handle.writeFile(content);
-              await handle.sync();
-            } catch (cause) {
-              // A close failure must not replace the write failure.
-              await handle.close().catch(() => undefined);
-              throw cause;
-            }
-            await handle.close();
-          },
-          catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
-        });
+        yield* writeAndFlush(temporaryPath, content);
         for (let attempt = 0; ; attempt += 1) {
           const renamed = yield* Effect.result(
             Effect.tryPromise({
@@ -123,8 +133,10 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
             }),
           );
           if (Result.isSuccess(renamed)) return;
+          if (!isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
           const wait = HELD_TARGET_WAITS_MS[attempt];
-          if (wait === undefined || !isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
+          // A crash during this write can leave `path` incomplete. Without it, no change is ever saved.
+          if (wait === undefined) return yield* writeAndFlush(path, content);
           yield* Effect.sleep(wait);
         }
       }),
