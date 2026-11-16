@@ -25,6 +25,10 @@ export const messages = {
   "workflow.board.live.connected": "{from} ile {to} bağlandı.",
   "workflow.board.live.connectedLoop": "{from} ile {to} bağlandı. Bu bir döngü oluşturur.",
   "workflow.board.live.connectedMany": { one: "{count} düğüm bağlandı.", other: "{count} düğüm bağlandı." },
+  "workflow.board.live.connectedManyLoop": {
+    one: "{count} düğüm bağlandı. Bu bir döngü oluşturur.",
+    other: "{count} düğüm bağlandı. Bu bir döngü oluşturur.",
+  },
   "workflow.board.live.disconnected": "Bağlantı kaldırıldı.",
   "workflow.board.live.deleted": "{name} silindi.",
   "workflow.board.live.deletedMany": { one: "{count} düğüm silindi.", other: "{count} düğüm silindi." },

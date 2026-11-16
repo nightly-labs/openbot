@@ -30,6 +30,12 @@ export const messages = {
     many: "Połączono {count} węzłów.",
     other: "Połączono {count} węzła.",
   },
+  "workflow.board.live.connectedManyLoop": {
+    one: "Połączono {count} węzeł. Powstała pętla.",
+    few: "Połączono {count} węzły. Powstała pętla.",
+    many: "Połączono {count} węzłów. Powstała pętla.",
+    other: "Połączono {count} węzła. Powstała pętla.",
+  },
   "workflow.board.live.disconnected": "Usunięto połączenie.",
   "workflow.board.live.deleted": "Usunięto: {name}.",
   "workflow.board.live.deletedMany": {

@@ -25,6 +25,10 @@ export const messages = {
   "workflow.board.live.connected": "已将 {from} 连接到 {to}。",
   "workflow.board.live.connectedLoop": "已将 {from} 连接到 {to}。这会形成循环。",
   "workflow.board.live.connectedMany": { one: "已连接 {count} 个节点。", other: "已连接 {count} 个节点。" },
+  "workflow.board.live.connectedManyLoop": {
+    one: "已连接 {count} 个节点。这会形成循环。",
+    other: "已连接 {count} 个节点。这会形成循环。",
+  },
   "workflow.board.live.disconnected": "已移除连接。",
   "workflow.board.live.deleted": "已删除 {name}。",
   "workflow.board.live.deletedMany": { one: "已删除 {count} 个节点。", other: "已删除 {count} 个节点。" },

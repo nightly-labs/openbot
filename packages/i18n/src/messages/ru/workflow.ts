@@ -30,6 +30,12 @@ export const messages = {
     many: "Подключено {count} узлов.",
     other: "Подключено {count} узла.",
   },
+  "workflow.board.live.connectedManyLoop": {
+    one: "Подключён {count} узел. Получился цикл.",
+    few: "Подключено {count} узла. Получился цикл.",
+    many: "Подключено {count} узлов. Получился цикл.",
+    other: "Подключено {count} узла. Получился цикл.",
+  },
   "workflow.board.live.disconnected": "Связь удалена.",
   "workflow.board.live.deleted": "Удалено: {name}.",
   "workflow.board.live.deletedMany": {

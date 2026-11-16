@@ -10,6 +10,7 @@ import { Button, Kbd, LabelTooltip, Repeat, X } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
 import {
   createContext,
+  createMemo,
   createProjection,
   createSignal,
   createStore,
@@ -732,19 +733,33 @@ export function createBoard(options: BoardOptions) {
   const companions = (start: PortRef): PortRef[] => {
     if (state.selection.length < 2 || !state.selection.includes(start.node)) return [];
     return state.selection.flatMap((node) =>
-      node !== start.node &&
-      !state.removed.includes(node) &&
-      ports.has(portKey(node, start.side, start.type, start.branch))
+      node !== start.node && ports.has(portKey(node, start.side, start.type, start.branch))
         ? [{ node, side: start.side, type: start.type, branch: start.branch }]
         : [],
     );
   };
 
-  /** The companions that can end on a port. A named input, as the first frame of a video, takes one source. */
-  const companionsTo = (start: PortRef, end: PortRef): PortRef[] =>
-    end.side === "in" && end.branch !== undefined
-      ? []
-      : companions(start).filter((port) => port.node !== end.node && refusal(port, end) === null);
+  /**
+   * The companions that can end on a port. A named input, as the first frame of a video, takes one
+   * source. A companion that is already connected to the node of the port keeps its connection as it is.
+   */
+  const companionsTo = (start: PortRef, end: PortRef): PortRef[] => {
+    if (end.side === "in" && end.branch !== undefined) return [];
+    return companions(start).filter((port) => {
+      if (port.node === end.node || refusal(port, end) !== null) return false;
+      const [from, to] = orient(port, end);
+      return !hasEdge(from.node, to.node, from.type, from.branch);
+    });
+  };
+
+  /** The companions of the open connection. A port reads it to show that it is armed. */
+  const pendingCompanions = createMemo(() => (state.pending ? companions(state.pending) : []));
+
+  /** Whether a port is the start of the open connection, or the same port on another selected node. */
+  const isArmed = (port: PortRef) => {
+    const pending = state.pending;
+    return pending !== null && (samePort(pending, port) || pendingCompanions().some((other) => samePort(other, port)));
+  };
 
   const link = (start: PortRef, end: PortRef) => {
     const others = companionsTo(start, end);
@@ -753,10 +768,12 @@ export function createBoard(options: BoardOptions) {
       connect(from.node, to.node, from.type, from.branch, to.branch);
       return;
     }
+    const starts = [start, ...others];
+    const loop = makesLoop(starts, end);
     options.beforeChange?.();
     joined = true;
     try {
-      for (const port of [start, ...others]) {
+      for (const port of starts) {
         const [source, target] = orient(port, end);
         connect(source.node, target.node, source.type, source.branch, target.branch);
       }
@@ -764,7 +781,9 @@ export function createBoard(options: BoardOptions) {
       joined = false;
     }
     setState((draft) => {
-      draft.message = t("workflow.board.live.connectedMany", { count: others.length + 1 });
+      draft.message = t(loop ? "workflow.board.live.connectedManyLoop" : "workflow.board.live.connectedMany", {
+        count: starts.length,
+      });
     });
   };
 
@@ -1005,12 +1024,7 @@ export function createBoard(options: BoardOptions) {
         const slots = slotsOf(edge);
         return branch === undefined ? slots.length === 0 : slots.includes(branch);
       }),
-    armed: (node, side, type, branch) => {
-      const pending = state.pending;
-      if (pending === null) return false;
-      const port = { node, side, type, branch };
-      return samePort(pending, port) || companions(pending).some((other) => samePort(other, port));
-    },
+    armed: (node, side, type, branch) => isArmed({ node, side, type, branch }),
     accepts: (node, side, type, branch) => accepts({ node, side, type, branch }),
     refused: (node, side, type, branch) => {
       const target = state.target;
@@ -1037,7 +1051,7 @@ export function createBoard(options: BoardOptions) {
       const pending = state.pending;
       // With no open connection, or one from the same side, the press arms this port or disarms it.
       if (!pending || pending.side === side) {
-        const wasArmed = pending !== null && samePort(pending, port);
+        const wasArmed = isArmed(port);
         setState((draft) => {
           draft.pending = wasArmed ? null : port;
           draft.message = wasArmed ? "" : t(CHOOSE_PORT[side][type]);
@@ -1283,13 +1297,18 @@ export function createBoard(options: BoardOptions) {
       turn: { x: from.x + LOOP_BEND * 0.75, y: (from.y + y) / 2 },
     };
   };
-  /** Whether the open connection would close a loop on the port under the pointer. */
+  /** Whether one of the given connections to a port closes a loop. */
+  const makesLoop = (starts: readonly PortRef[], end: PortRef) =>
+    starts.some((port) => {
+      const [from, to] = orient(port, end);
+      return reaches(to.node, from.node);
+    });
+  /** Whether the open connection, or a line from another selected node, would close a loop on the port under the pointer. */
   const draftLoops = () => {
     const pending = state.pending;
     const port = state.target?.reason === null ? state.target.port : null;
     if (!pending || !port) return false;
-    const [from, to] = orient(pending, port);
-    return reaches(to.node, from.node);
+    return makesLoop([pending, ...companionsTo(pending, port)], port);
   };
 
   /** The connections, under the nodes. Put it first inside the world element. */
@@ -1307,28 +1326,28 @@ export function createBoard(options: BoardOptions) {
       return slots.length > 0 ? slots : [undefined];
     };
     /** The line follows the pointer, and snaps to a port that can take it. */
-    const draftPath = () => {
-      const pending = state.pending;
-      const pointer = state.draft;
-      const anchor = pending ? point(pending.node, pending.side, pending.type, pending.branch) : undefined;
-      if (!pending || !anchor || !pointer) return null;
-      const port = state.target?.reason === null ? state.target.port : null;
-      const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
-      return pending.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+    /** The port that the open connection snaps to, if one can take it. */
+    const draftTarget = () => (state.target?.reason === null ? state.target.port : null);
+    /** Where the open connection ends: the port that it snaps to, else the pointer. */
+    const draftEnd = () => {
+      const port = draftTarget();
+      return (port && point(port.node, port.side, port.type, port.branch)) ?? state.draft;
     };
+    /** The line of the open connection from one port to its end. */
+    const draftLine = (from: PortRef) => {
+      const anchor = point(from.node, from.side, from.type, from.branch);
+      const end = draftEnd();
+      if (!anchor || !end) return null;
+      return from.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor);
+    };
+    const draftPath = () => (state.pending ? draftLine(state.pending) : null);
     /** The lines from the other selected nodes, which connect with the dragged one. */
     const companionPaths = () => {
       const pending = state.pending;
-      const pointer = state.draft;
-      if (!pending || !pointer) return [];
-      const port = state.target?.reason === null ? state.target.port : null;
-      const end = (port && point(port.node, port.side, port.type, port.branch)) ?? pointer;
-      const others = port ? companionsTo(pending, port) : companions(pending);
-      return others.flatMap((other) => {
-        const anchor = point(other.node, other.side, other.type, other.branch);
-        if (!anchor) return [];
-        return [other.side === "out" ? diagramEdgePath(anchor, end) : diagramEdgePath(end, anchor)];
-      });
+      if (!pending || !state.draft) return [];
+      const port = draftTarget();
+      const others = port ? companionsTo(pending, port) : pendingCompanions();
+      return others.flatMap((other) => draftLine(other) ?? []);
     };
     const draftState = () => {
       const target = state.target;

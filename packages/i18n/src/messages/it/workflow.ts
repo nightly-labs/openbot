@@ -25,6 +25,10 @@ export const messages = {
   "workflow.board.live.connected": "{from} collegato a {to}.",
   "workflow.board.live.connectedLoop": "{from} collegato a {to}. Crea un ciclo.",
   "workflow.board.live.connectedMany": { one: "{count} nodo collegato.", other: "{count} nodi collegati." },
+  "workflow.board.live.connectedManyLoop": {
+    one: "{count} nodo collegato. Questo crea un ciclo.",
+    other: "{count} nodi collegati. Questo crea un ciclo.",
+  },
   "workflow.board.live.disconnected": "Connessione rimossa.",
   "workflow.board.live.deleted": "Eliminato: {name}.",
   "workflow.board.live.deletedMany": { one: "{count} nodo eliminato.", other: "{count} nodi eliminati." },
