@@ -136,11 +136,6 @@ const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /**
- * How long before a turn that Claude started by itself a background subagent can have ended and still
- * be the one whose report the turn reads. Claude starts that turn right after the subagent ends.
- */
-const BACKGROUND_REPORT_WINDOW_MS = 60_000;
-/**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
  * A usage limit that the usage-limit gate does not hold comes here too, such as a spent Gemini quota (#4368).
@@ -970,40 +965,51 @@ export class TurnLifecycle {
   }
 
   /**
-   * The finished requests of this thread whose background subagents ended just before the turn
-   * `turnId` started, as one limit continuation that carries the subagents' reports. Null when there
-   * is none, such as for a turn that a scheduled wakeup started.
+   * The finished requests of this thread whose background subagents ended after the start of the last
+   * turn that completed, each with a limit continuation that carries the reports of its own subagents.
+   * A turn that started after a subagent ended and completed has read its report. Null when there is
+   * none, such as for a turn that a scheduled wakeup started.
    */
   #backgroundWork(
     agentId: string,
     turnId: string,
     snapshot: ConversationSnapshot,
-    startedAt: number,
-  ): { deliveries: DeliveryContext[]; continuation: UsageLimitContinuation } | null {
-    const turnIds: string[] = [];
-    const reports: string[] = [];
+  ): { deliveries: DeliveryContext[]; continuations: Map<string, UsageLimitContinuation> } | null {
+    const starts = new Map<string, number>();
+    const completed = new Set<string>();
     for (const message of snapshot.messages) {
-      const ended = (message.subagents ?? []).filter(
-        (subagent) =>
-          subagent.background === true &&
-          subagent.endedAt !== null &&
-          Date.parse(subagent.endedAt) >= startedAt - BACKGROUND_REPORT_WINDOW_MS,
-      );
-      if (ended.length === 0 || message.turnId === undefined || message.turnId === turnId) continue;
-      turnIds.push(message.turnId);
-      for (const subagent of ended) {
-        const report = subagent.steps.findLast((step) => step.id === `${subagent.id}:result`)?.text ?? subagent.error;
-        reports.push(`Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`);
+      if (message.turnId === undefined || message.turnId === turnId || message.author !== "assistant") continue;
+      const at = Date.parse(message.createdAt);
+      starts.set(message.turnId, Math.min(starts.get(message.turnId) ?? at, at));
+      if (message.status === "completed") completed.add(message.turnId);
+    }
+    let readFrom = Number.NEGATIVE_INFINITY;
+    for (const [id, at] of starts) if (completed.has(id)) readFrom = Math.max(readFrom, at);
+    const reports = new Map<string, string[]>();
+    for (const message of snapshot.messages) {
+      if (message.turnId === undefined || message.turnId === turnId) continue;
+      for (const subagent of message.subagents ?? []) {
+        if (!subagent.background || subagent.endedAt === null || Date.parse(subagent.endedAt) <= readFrom) continue;
+        // `pushSubagentReport` adds no result step when the last text step already holds the report.
+        const text = subagent.steps.findLast((step) => step.kind === "text")?.text ?? null;
+        const report = subagent.status === "completed" ? text : (subagent.error ?? text);
+        const line = `Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`;
+        reports.set(message.turnId, [...(reports.get(message.turnId) ?? []), this.#hooks.redactMcp(line)]);
       }
     }
-    const deliveries = turnIds
-      .flatMap((id) => this.#mailbox.completedDeliveriesOfTurn(agentId, id))
-      .filter(({ channelId }) => channelId === undefined);
-    if (deliveries.length === 0) return null;
-    return {
-      deliveries,
-      continuation: { turnId, previousTurnIds: [...turnIds, turnId], workSteps: reports.join("\n\n").slice(-6000) },
-    };
+    const deliveries: DeliveryContext[] = [];
+    const continuations = new Map<string, UsageLimitContinuation>();
+    for (const [earlier, lines] of reports)
+      for (const context of this.#mailbox.completedDeliveriesOfTurn(agentId, earlier)) {
+        if (context.channelId !== undefined) continue;
+        deliveries.push(context);
+        continuations.set(context.delivery.id, {
+          turnId: earlier,
+          previousTurnIds: [earlier, turnId],
+          workSteps: lines.join("\n\n").slice(-6000),
+        });
+      }
+    return deliveries.length > 0 ? { deliveries, continuations } : null;
   }
 
   /** Passes over the model that a held provider error failed. A spent balance names no reset (#5220). */
@@ -1936,7 +1942,7 @@ export class TurnLifecycle {
       // to the queue with the report, so a backup or the reset continues the work (#9493).
       const resumed =
         limited && running?.unprompted === true && deliveries.length === 0 && !channelTurn && !routineSession
-          ? this.#backgroundWork(agentId, turnId, snapshot, running.startedAt)
+          ? this.#backgroundWork(agentId, turnId, snapshot)
           : null;
       // The limit belongs to the model the turn ran on, which the agent may have left since.
       const model = this.#hooks.turnModel(agentId, turnId);
@@ -2023,15 +2029,20 @@ export class TurnLifecycle {
       // Only this loop reads the map, so the finished turn's items go, or it holds every item ever seen.
       for (const [itemId, itemTurnId] of this.#itemTurns) if (itemTurnId === turnId) this.#itemTurns.delete(itemId);
       if (resumed) {
+        // The steps that the refused turn ran go with the reports, so the backup does not repeat them.
+        const steps = running?.acted ? (yield* continuedWork).workSteps : "";
+        if (steps)
+          for (const continuation of resumed.continuations.values())
+            continuation.workSteps = `${continuation.workSteps}\n\n${steps}`.slice(-6000);
         yield* this.#requeueTurn(
           agentId,
           threadId,
           turnId,
           snapshot,
           resumed.deliveries,
-          resumed.continuation,
           undefined,
-          true,
+          undefined,
+          resumed.continuations,
         );
         yield* this.#usageLimits.reached(agentId, resetsAt, model);
         this.#hooks.scheduleDrain(agentId);
@@ -2483,8 +2494,11 @@ export class TurnLifecycle {
     deliveries: readonly DeliveryContext[],
     resumeAfterUsageLimit?: UsageLimitContinuation,
     failureReports?: ReadonlySet<string>,
-    /** The deliveries finished in an earlier turn, as the request of a background subagent did. */
-    finished = false,
+    /**
+     * The continuations of deliveries that finished in an earlier turn, by delivery id, as the request
+     * of a background subagent did. Earlier work steps do not go with them: that work completed.
+     */
+    finished?: ReadonlyMap<string, UsageLimitContinuation>,
   ) {
     // With no continuation, the next attempt runs with this turn ID and writes its text into this
     // attempt's empty rows, which keep this attempt's time. The answer then shows above the messages
@@ -2498,22 +2512,32 @@ export class TurnLifecycle {
       }
     for (const context of deliveries) {
       const { delivery } = context;
-      const continuation = resumeAfterUsageLimit
+      const finishedWork = finished?.get(delivery.id);
+      const continuation = finishedWork
         ? {
-            ...resumeAfterUsageLimit,
+            ...finishedWork,
             previousTurnIds: [
-              ...new Set([
-                ...(context.resumeAfterUsageLimit?.previousTurnIds ?? []),
-                ...resumeAfterUsageLimit.previousTurnIds,
-              ]),
+              ...new Set([...(context.resumeAfterUsageLimit?.previousTurnIds ?? []), ...finishedWork.previousTurnIds]),
             ],
-            workSteps: [context.resumeAfterUsageLimit?.workSteps, resumeAfterUsageLimit.workSteps]
-              .filter(Boolean)
-              .join("\n\n")
-              .slice(-6000),
           }
-        : undefined;
-      yield* this.#mailbox.requeueRefused(delivery.id, continuation, finished).pipe(toTurnOperationFailed);
+        : resumeAfterUsageLimit
+          ? {
+              ...resumeAfterUsageLimit,
+              previousTurnIds: [
+                ...new Set([
+                  ...(context.resumeAfterUsageLimit?.previousTurnIds ?? []),
+                  ...resumeAfterUsageLimit.previousTurnIds,
+                ]),
+              ],
+              workSteps: [context.resumeAfterUsageLimit?.workSteps, resumeAfterUsageLimit.workSteps]
+                .filter(Boolean)
+                .join("\n\n")
+                .slice(-6000),
+            }
+          : undefined;
+      yield* this.#mailbox
+        .requeueRefused(delivery.id, continuation, finishedWork !== undefined)
+        .pipe(toTurnOperationFailed);
       this.#mailboxSync.syncDeliveryMessage(snapshot, delivery.id);
     }
     this.#conversation.emitConversation(snapshot, "turn.completed", { turnId, status: "interrupted" });
