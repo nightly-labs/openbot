@@ -85,16 +85,17 @@ request always shows.
 
 A teammate's request that does not reply to a message of the agent ends quiet in the same way after
 the agent sent its result to that teammate with `send_message` (`quietTeammateTurnDelivery`, #7465).
-Its prompt names `routine_no_update` for after that reply. Before the reply, the tool answers that the
-agent must send the result first. Only the agent's own reply counts (`MailboxStore.hasOwnReplyFrom`):
-the result that OpenBot relays when the turn ends and the note for a failed request come after the
-turn completion, so they do not count, and the history import decides the same. The tool call counts
-also when it came before the reply, at the turn completion and in the history import. The turn does
-not need the tool: when only answered requests started it and its answers are text alone, that text
-repeats the reply, so it becomes quiet answers as after the tool call. Claude often does not load
-the tool, which waits behind its tool search. A file, an image or a question keeps the whole turn in
-the chat. A reply to a message of the agent can hold the result that the user asked for, so it is
-never quiet.
+The turn does not need `routine_no_update`, and the prompt does not name it: Claude often does not
+load the tool, which waits behind its tool search. When only answered requests started the turn and
+its answers are text alone, that text repeats the reply, so it becomes quiet answers as after the tool
+call. A file, an image or a question keeps the whole turn in the chat. The tool still accepts a
+request: before the reply it answers that the agent must send the result first, but only when the
+missing reply is all that keeps the turn from a quiet end. Only the agent's own reply from the turn
+that ran the request counts (`MailboxStore.hasOwnReplyFrom`): the result that OpenBot relays when the
+turn ends, the note for a failed request and a reply from a later turn do not count, so the turn
+completion and the history import decide the same. The import also reads the stored file and question
+messages of the turn, because the provider history does not hold them. A reply to a message of the
+agent can hold the result that the user asked for, so it is never quiet.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the

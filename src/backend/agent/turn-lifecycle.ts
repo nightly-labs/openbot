@@ -1619,12 +1619,9 @@ export class TurnLifecycle {
       this.#armQuietEnd(agentId, turnId);
       return "quiet";
     }
-    return deliveries.some(
-      ({ delivery }) =>
-        teammateRequest(delivery) && !this.#mailbox.hasOwnReplyFrom(delivery.recipientAgentId, delivery.messageId),
-    )
-      ? "unanswered"
-      : "shown";
+    // Only when the reply is all that the turn misses: a turn that cannot end quiet for another
+    // reason, such as a person's message or a task thread, shows its answer anyway.
+    return this.#quietRoutineTurn(agentId, threadId, deliveries, true, true) ? "unanswered" : "shown";
   }
 
   /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
@@ -1727,13 +1724,15 @@ export class TurnLifecycle {
    * Only a turn that runs nothing but quiet routine runs, teammate updates and answered teammate
    * requests, in the agent's own chat or in a routine's side thread: not in a channel, a messaging
    * thread or another task. After a call to the no-update tool (`noUpdateCalled`), a teammate's
-   * answer to a quiet routine run counts too (`#continuesQuietRun`).
+   * answer to a quiet routine run counts too (`#continuesQuietRun`). With `assumeAnswered`, a teammate
+   * request counts before its reply.
    */
   #quietRoutineTurn(
     agentId: string,
     threadId: string | null,
     deliveries: readonly DeliveryContext[],
     noUpdateCalled = false,
+    assumeAnswered = false,
   ): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
@@ -1742,6 +1741,7 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
+          (assumeAnswered && teammateRequest(delivery)) ||
           this.#quietTeammateTurnDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
           (noUpdateCalled && this.#continuesQuietRun(delivery)),
@@ -1758,9 +1758,7 @@ export class TurnLifecycle {
 
   /** A teammate's update, or a request that the agent answered with its own reply (#7465). */
   #quietTeammateTurnDelivery(delivery: QueueDelivery): boolean {
-    return quietTeammateTurnDelivery(delivery, (agentId, messageId) =>
-      this.#mailbox.hasOwnReplyFrom(agentId, messageId),
-    );
+    return quietTeammateTurnDelivery(delivery, (request) => this.#mailbox.hasOwnReplyFrom(request.id));
   }
 
   readonly #completeTurn = Effect.fn("TurnLifecycle.completeTurn")(
@@ -2962,20 +2960,6 @@ export class TurnLifecycle {
 }
 
 /**
- * Remove a turn's answers that hold nothing for a reader.
- *
- * A teammate can start a turn whose work is all internal: the agent answers the teammate and has
- * nothing left to tell the user. A provider ends a turn with text, so a model in that position
- * writes a placeholder instead - "∅" was the one seen. That filler is not only a bubble: the turn
- * takes the last answer as the result it relays to the teammate who asked, and as the agent's
- * sidebar preview. A message with no letter and no digit carries neither, so it is dropped here.
- * The turn-completion write rewrites the whole thread, which deletes the projection row of a
- * message the snapshot no longer holds, so a placeholder already streamed to the database goes too.
- *
- * A message that carries an attachment or a generated image is kept whatever its text: the file is
- * what the user was given, and the text is only its caption.
- */
-/**
  * A quiet turn of teammate requests only, each answered with the agent's own reply (the caller
  * checks that), and only text in the chat: that text repeats the reply, so the turn is quiet as
  * after the no-update tool. Claude often does not load that tool, so the turn does not depend on
@@ -2989,6 +2973,20 @@ function answeredRequestTurn(
   return deliveries.every(({ delivery }) => teammateRequest(delivery)) && textAnswersOnly(snapshot, turnId);
 }
 
+/**
+ * Remove a turn's answers that hold nothing for a reader.
+ *
+ * A teammate can start a turn whose work is all internal: the agent answers the teammate and has
+ * nothing left to tell the user. A provider ends a turn with text, so a model in that position
+ * writes a placeholder instead - "∅" was the one seen. That filler is not only a bubble: the turn
+ * takes the last answer as the result it relays to the teammate who asked, and as the agent's
+ * sidebar preview. A message with no letter and no digit carries neither, so it is dropped here.
+ * The turn-completion write rewrites the whole thread, which deletes the projection row of a
+ * message the snapshot no longer holds, so a placeholder already streamed to the database goes too.
+ *
+ * A message that carries an attachment or a generated image is kept whatever its text: the file is
+ * what the user was given, and the text is only its caption.
+ */
 function dropPlaceholderAnswers(snapshot: ConversationSnapshot, turnId: string): void {
   for (let index = snapshot.messages.length - 1; index >= 0; index -= 1) {
     const message = snapshot.messages[index];

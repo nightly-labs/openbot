@@ -69,6 +69,19 @@ const teammateRequestDelivery: DeliveryContext = {
   },
 };
 
+const QUESTION_DELIVERY_ID = "teammate-question-delivery";
+const QUESTION_ANSWER = "I sent the result and asked you which file to keep.";
+/** An answered teammate request whose turn also asked the user a question: the turn stays shown. */
+const teammateQuestionDelivery: DeliveryContext = {
+  ...teammateRequestDelivery,
+  delivery: {
+    ...teammateRequestDelivery.delivery,
+    id: QUESTION_DELIVERY_ID,
+    messageId: "teammate-question-message",
+    turnId: "claude-question-turn",
+  },
+};
+
 interface Report {
   schemaVersion: 1;
   generatedAt: string;
@@ -115,12 +128,13 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
                 ? failedRoutineDelivery
                 : deliveryId === REQUEST_DELIVERY_ID
                   ? teammateRequestDelivery
-                  : null,
+                  : deliveryId === QUESTION_DELIVERY_ID
+                    ? teammateQuestionDelivery
+                    : null,
           findMessageDelivery: () => null,
           quietRoutineDelivery: (deliveryId) => deliveryId === QUIET_DELIVERY_ID || deliveryId === FAILED_DELIVERY_ID,
           quietTeammateThread: true,
-          hasOwnReplyFrom: (replyAgentId, messageId) =>
-            replyAgentId === agentId && messageId === teammateRequestDelivery.delivery.messageId,
+          hasOwnReplyFrom: (deliveryId) => deliveryId === REQUEST_DELIVERY_ID || deliveryId === QUESTION_DELIVERY_ID,
         }),
       );
     };
@@ -233,6 +247,43 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       .readConversation(agentId, threadId)
       .messages.filter((message) => message.turnId === requestTurnId && message.author === "assistant");
 
+    // The same, but the turn also asked the user a question. OpenBot stored the question in the chat,
+    // and the provider history does not hold it, so the import reads it there and keeps the turn shown.
+    const questionTurnId = "claude-question-turn";
+    database.persistConversationChanges({
+      agentId,
+      threadId,
+      activeTurnId: null,
+      changedMessages: [
+        {
+          id: `question-prompt:${questionTurnId}:1`,
+          turnId: questionTurnId,
+          author: "assistant",
+          text: "Which file should I keep?",
+          createdAt: new Date(12_000).toISOString(),
+          status: "completed",
+          itemType: "question_prompt",
+        },
+      ],
+      eventType: "turn.completed",
+    });
+    const claudeQuestion = await runImport("claude-question-session", "claude", [
+      {
+        turnId: questionTurnId,
+        status: "completed",
+        startedAt: 12,
+        itemOffset: 0,
+        complete: true,
+        items: [
+          { type: "userMessage", id: `${questionTurnId}-prompt`, clientId: QUESTION_DELIVERY_ID, content: [] },
+          { type: "agentMessage", id: `${questionTurnId}-answer`, text: QUESTION_ANSWER, status: "completed" },
+        ],
+      },
+    ]);
+    const questionAnswer = database
+      .readConversation(agentId, threadId)
+      .messages.find((message) => message.turnId === questionTurnId && message.text === QUESTION_ANSWER);
+
     // A turn that an import did not finish keeps `imported = 0` and is imported at the next start.
     database.connection
       .prepare("UPDATE provider_history_turns SET imported = 0 WHERE session_id = ? AND turn_id = ?")
@@ -256,6 +307,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         claudeQuiet,
         claudeFailed,
         claudeRequest,
+        claudeQuestion,
         unfinished,
       },
       acceptance: {
@@ -287,6 +339,10 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
           requestAnswers.length === 1 &&
           requestAnswers[0]?.text === REQUEST_ANSWER &&
           requestAnswers[0]?.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE,
+        claudeAnsweredRequestWithQuestionIsShown:
+          claudeQuestion.turns === 1 &&
+          questionAnswer !== undefined &&
+          questionAnswer.itemType !== ROUTINE_QUIET_ANSWER_ITEM_TYPE,
         unfinishedTurnImportsAgain: unfinished.turns === 1,
         importCompleted: database.providerHistoryImport("codex-session")?.state === "complete",
       },

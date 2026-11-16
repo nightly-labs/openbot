@@ -2054,7 +2054,7 @@ export class OpenBotToolRouter {
           : this.#hooks.requestNoUpdate(senderAgentId, executionThreadId, params.turnId, channelRun?.part === "owner");
       if (outcome === null)
         return openBotToolFailure(
-          "Use this tool only in a routine run, or for a teammate's message that wants no answer.",
+          "Use this tool only in a routine run, or for a teammate's message: an update that wants no answer, or a request after your reply to it.",
         );
       // A teammate's request ends quiet only after its result went back to that teammate (#7465).
       if (outcome === "unanswered")

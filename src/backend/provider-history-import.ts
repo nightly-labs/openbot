@@ -82,10 +82,10 @@ export interface ProviderHistoryImportInput {
    */
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   /**
-   * Whether the agent answered a teammate's request with its own `send_message` reply, so its turn can
-   * have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   * Whether the agent answered this teammate request with its own `send_message` reply in the turn that
+   * ran it, so the turn can have ended quiet, as at the turn completion (#7465). Left out, it cannot.
    */
-  hasOwnReplyFrom?(agentId: string, messageId: string): boolean;
+  hasOwnReplyFrom?(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -357,10 +357,7 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(
-                delivery,
-                (agentId, messageId) => input.hasOwnReplyFrom?.(agentId, messageId) === true,
-              )) ||
+              quietTeammateTurnDelivery(delivery, (request) => input.hasOwnReplyFrom?.(request.id) === true)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
@@ -382,10 +379,26 @@ function routineTurnAnswers(
     if (!routine || (needsNoUpdate && !noUpdateCalled)) return "none";
     if (failureReported) return "answered";
     if (noUpdateCalled) return imageGenerated ? "image" : "quiet";
-    // The import makes text and images only, so an image is the one report that keeps the turn shown.
-    if (requestsOnly) return imageGenerated ? "answered" : "quiet";
+    // A file, an image or a question keeps the turn shown, as at the turn completion.
+    if (requestsOnly) return imageGenerated || storedTurnReport(input, turnId) ? "answered" : "quiet";
     return markers > 0 && !reported && !imageGenerated ? "quiet" : "answered";
   });
+}
+
+/**
+ * Whether the chat holds a file or a question of this turn. OpenBot writes them to the chat itself, so
+ * the provider history does not hold them; the import reads the stored messages instead.
+ */
+function storedTurnReport(input: ProviderHistoryImportInput, turnId: string): boolean {
+  const row = input.database.connection
+    .prepare(
+      `SELECT 1 AS found FROM projection_thread_messages
+       WHERE thread_id = ? AND turn_id = ? AND author = 'assistant'
+         AND (item_type = 'question_prompt' OR json_array_length(message_json, '$.attachments') > 0)
+       LIMIT 1`,
+    )
+    .get(input.publicThreadId, turnId);
+  return row !== undefined;
 }
 
 function keptRoutineMessage(routine: Exclude<RoutineTurnAnswers, "none">) {

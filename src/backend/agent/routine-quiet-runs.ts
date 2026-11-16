@@ -109,12 +109,9 @@ export function teammateRequest(delivery: QueueDelivery): boolean {
  */
 export function quietTeammateTurnDelivery(
   delivery: QueueDelivery,
-  answered: (agentId: string, messageId: string) => boolean,
+  answered: (delivery: QueueDelivery) => boolean,
 ): boolean {
-  return (
-    quietTeammateDelivery(delivery) ||
-    (teammateRequest(delivery) && answered(delivery.recipientAgentId, delivery.messageId))
-  );
+  return quietTeammateDelivery(delivery) || (teammateRequest(delivery) && answered(delivery));
 }
 
 /** Only the marker, with white space around it. The marker inside a longer text is a report. */

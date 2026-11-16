@@ -2196,22 +2196,32 @@ export class MailboxStore {
   }
 
   /**
-   * Whether the agent answered the message with its own `send_message` reply. The result that OpenBot
-   * relays when the turn ends and the note for a failed request do not count, so the turn completion,
-   * which runs before them, and a later history import decide the same.
+   * Whether the recipient answered this teammate request with its own `send_message` reply in the turn
+   * that ran it (or an earlier turn of a run that resumed after a usage limit). The result that OpenBot
+   * relays when the turn ends and the note for a failed request do not count, and neither does a reply
+   * from a later turn, so the turn completion and a later history import decide the same.
    */
-  hasOwnReplyFrom(agentId: string, messageId: string): boolean {
-    const written = new Set(
-      Object.entries(this.#state.idempotency)
-        .filter(([key]) => key.startsWith(AUTO_RESULT_KEY_PREFIX) || key.startsWith(FAILED_REQUEST_KEY_PREFIX))
-        .map(([, id]) => id),
+  hasOwnReplyFrom(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery?.turnId) return false;
+    const replies = new Set(
+      this.#state.messages
+        .filter(
+          (message) =>
+            message.sender.kind === "agent" &&
+            message.sender.agentId === delivery.recipientAgentId &&
+            message.replyToMessageId === delivery.messageId,
+        )
+        .map((message) => message.id),
     );
-    return this.#state.messages.some(
-      (message) =>
-        message.sender.kind === "agent" &&
-        message.sender.agentId === agentId &&
-        message.replyToMessageId === messageId &&
-        !written.has(message.id),
+    if (replies.size === 0) return false;
+    const turnIds = new Set([delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])]);
+    return Object.entries(this.#state.idempotency).some(
+      ([key, messageId]) =>
+        replies.has(messageId) &&
+        !key.startsWith(AUTO_RESULT_KEY_PREFIX) &&
+        !key.startsWith(FAILED_REQUEST_KEY_PREFIX) &&
+        turnIds.has(key.split(":").at(-2) ?? ""),
     );
   }
 
