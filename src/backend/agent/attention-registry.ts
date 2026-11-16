@@ -1365,6 +1365,10 @@ export class AttentionRegistry {
     if (call.tool !== "list_vault_items")
       return yield* new AttentionOperationFailed({ cause: new Error("Invalid Vault list request.") });
     const agentId = params.ownerAgentId;
+    // A Vault file that cannot be read lists no items. Without this, the agent tells the user that
+    // nothing is saved (#7748).
+    if (this.#vaultItems && !this.#vaultItems.ready())
+      return browserTakeoverError("The Vault could not be read. Ask the user, or use request_takeover.");
     const listed = yield* Effect.result(
       attentionStep(() => (agentId ? (this.#vaultItems?.listForAgent(agentId) ?? null) : null)),
     );
