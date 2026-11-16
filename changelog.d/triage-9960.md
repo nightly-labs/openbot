@@ -2,7 +2,7 @@
 
 - Choose how long you can pause in a voice conversation before your words go to the agent, in
   Settings > Voice > Pause before sending. Before, a pause of 1.2 seconds to think always sent a
-  half sentence as its own message. The default stays 1.2 seconds.
+  half sentence as its own message. The default is now 1.5 seconds, the same as in the phone app.
 
 ### Fixed
 

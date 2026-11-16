@@ -531,9 +531,10 @@ export type SpeechSpeed = (typeof SPEECH_SPEEDS)[number];
 
 /**
  * How long the user can be quiet in a voice conversation before their words go to the agent, in
- * milliseconds. The first one is the default. A longer pause suits a slow speaker, or one who stops to think.
+ * milliseconds. The first one is the default, the same as the phone app's. A longer pause suits a slow
+ * speaker, or one who stops to think.
  */
-export const VOICE_TURN_PAUSES = [1_200, 2_000, 3_000, 5_000] as const;
+export const VOICE_TURN_PAUSES = [1_500, 2_000, 3_000, 5_000] as const;
 export type VoiceTurnPause = (typeof VOICE_TURN_PAUSES)[number];
 
 /** The order in which a speed button goes through the speeds: from normal speed up, then the slower ones. */
