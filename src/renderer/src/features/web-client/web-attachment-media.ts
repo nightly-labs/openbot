@@ -45,7 +45,7 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
 const SVG_TYPE = "image/svg+xml";
 
 /** A file that the chat already read from the host. */
-export interface WebMediaFile {
+interface WebMediaFile {
   name: string;
   blob: Blob;
 }
