@@ -120,7 +120,7 @@ export function messagesFromThreadItems(
               ? { prompt: item.prompt }
               : {}),
           // The stored message has the real size (`image-gen-runtime.ts`); the merge keeps it.
-          resolution: isString(item.resolution) ? item.resolution : isString(item.size) ? item.size : "",
+          resolution: isString(item.resolution) ? item.resolution : "",
           aspectRatio: imageGenerationAspectRatio(item) ?? "square",
           ...(failure ? { error: failure } : {}),
         },
@@ -539,11 +539,13 @@ function isProviderAssistantMessage(message: ConversationMessage): boolean {
 }
 
 function providerMessageIdentity(message: ConversationMessage): string {
+  // The live message has the size of the file; provider history does not.
+  const image = message.imageGeneration;
   return JSON.stringify([
     message.turnId,
     message.itemType ?? null,
     message.text,
-    message.imageGeneration ?? null,
+    image ? { ...image, resolution: null, aspectRatio: null } : null,
     ...(message.videoGeneration ? [message.videoGeneration] : []),
   ]);
 }

@@ -1,4 +1,9 @@
-import { type AttachmentSummary, type ImageGenerationAspectRatio, imagePixelSize } from "@openbot/contracts/ipc";
+import {
+  type AttachmentSummary,
+  type ImageGenerationAspectRatio,
+  imageAspectRatioOf,
+  imagePixelSize,
+} from "@openbot/contracts/ipc";
 import { Button, Download, Maximize2 } from "@openbot/ui";
 import { createEffect, createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
@@ -99,8 +104,18 @@ export function ImageGeneration(props: ImageGenerationProps) {
     const known = knownSize();
     return known ? t("chat.media.size", { width: known.width, height: known.height }) : props.resolution;
   };
+  /**
+   * The size of the frame. The host writes the size and the frame of the file together. An older row
+   * has a size that the model was asked for, which can disagree with its frame; that row keeps its frame.
+   */
+  const frameSize = () => {
+    const loaded = imageSize();
+    if (loaded) return loaded;
+    const host = imagePixelSize(props.resolution);
+    return host && imageAspectRatioOf(host) === props.aspectRatio ? host : null;
+  };
   const stageRatio = () => {
-    const known = knownSize();
+    const known = frameSize();
     if (hasFailure() && !isAttachment()) return FAILED_MEDIA_RATIO;
     // A file that is on its way has the frame of its size, so the chat does not move when it shows.
     if (props.status === "completed" && known) return `${known.width} / ${known.height}`;
