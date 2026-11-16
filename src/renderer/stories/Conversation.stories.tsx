@@ -417,6 +417,30 @@ const dataTableMessages: RendererAgentMessage[] = [
     time: "10:03",
     kind: "text",
   },
+  {
+    id: "data-table-wide-user",
+    author: "you",
+    body: "Add the form and the expected goals for each team.",
+    time: "10:04",
+    kind: "text",
+  },
+  {
+    id: "data-table-wide-agent",
+    author: "agent",
+    body: [
+      "A wide table takes more of the chat:",
+      "",
+      "| Fixture | Kickoff | Home form | Away form | Home xG | Away xG | Market odds H/D/A | Implied H/D/A | Scenario | Pick |",
+      "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |",
+      "| Ipswich–Liverpool | Sat 12:30 | L D L W L | W W D W W | 1.02 | 2.14 | 5.25 / 4.60 / 1.57 | 18% / 21% / 61% | 20% / 22% / 58% | Liverpool win |",
+      "| Newcastle–Bournemouth | Sat 15:00 | W W L D W | D L W W L | 1.71 | 1.18 | 2.20 / 3.70 / 3.00 | 43% / 26% / 32% | 45% / 27% / 28% | Newcastle, cautiously |",
+      "| Brighton–Leeds | Sun 14:00 | W D W L W | L L D W D | 1.88 | 0.97 | 1.90 / 3.60 / 4.00 | 50% / 26% / 24% | 48% / 27% / 25% | Brighton win |",
+      "",
+      `![Remote desktop](${new URL("./assets/remote-desktop-mac-mock.png", import.meta.url).href})`,
+    ].join("\n"),
+    time: "10:05",
+    kind: "text",
+  },
 ];
 
 const codeBlockMessages: RendererAgentMessage[] = [
