@@ -157,13 +157,13 @@ const OPENCODE_GO_PROVIDER = "opencode-go";
 /** What a plain OpenCode user needs, now that the free models run without an account at all. */
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
-/** The provider adapter OpenCode bundles for an OpenAI-compatible endpoint. */
+/** The provider adapter OpenCode installs with npm for an OpenAI-compatible endpoint. */
 const OPENCODE_COMPATIBLE_NPM = "@ai-sdk/openai-compatible";
 
-/** The adapter OpenCode bundles for its own Anthropic provider. */
+/** The adapter OpenCode installs with npm for its own Anthropic provider. */
 const OPENCODE_ANTHROPIC_NPM = "@ai-sdk/anthropic";
 
-/** The adapter OpenCode bundles for OpenAI, which calls the Responses API. */
+/** The adapter OpenCode installs with npm for OpenAI, which calls the Responses API. */
 const OPENCODE_OPENAI_NPM = "@ai-sdk/openai";
 
 /**
