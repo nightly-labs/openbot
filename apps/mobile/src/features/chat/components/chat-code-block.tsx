@@ -9,6 +9,7 @@ import { type ColorValue, Text, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import { haptics } from "@/shared/lib/haptics";
+import { isAndroid } from "@/shared/lib/platform";
 import { useText } from "@/shared/lib/text";
 import { CODE_LAYOUT_STYLE, CODE_TEXT_STYLE } from "@/shared/lib/text-direction";
 import type { BubbleTone } from "../model/bubble-tone";
@@ -27,8 +28,16 @@ function streamingHighlightInterval(length: number): number {
   return Math.max(STREAMING_HIGHLIGHT_INTERVAL_MS, Math.round(length / STREAMING_HIGHLIGHT_CHARACTERS_PER_MS));
 }
 
+/**
+ * Android makes a set of spans for each coloured run of a text, and each new span is sorted against
+ * the spans before it. A block with thousands of runs then blocks the main thread when its text is
+ * made, laid out, drawn or read by accessibility services, and Android shows "App isn't responding".
+ * Above this many coloured runs, Android draws the code in the colour of the block. iOS keeps all runs.
+ */
+const ANDROID_MAX_COLORED_RUNS = 300;
+
 /** A run of code in one colour. `color` is unset for code in the colour of the block. */
-interface CodeRun {
+export interface CodeRun {
   offset: number;
   text: string;
   color: ColorValue | undefined;
@@ -39,13 +48,14 @@ interface CodeRun {
  * of the block, so a block has far fewer runs than tokens. The list draws a block again each time
  * its row scrolls into view, and each run that has a colour is a text span to make.
  */
-function codeRuns(
+export function codeRuns(
   tokens: readonly CodeToken[],
   colors: Partial<Record<ShjToken, ColorValue>>,
   foreground: ColorValue,
 ): CodeRun[] {
   const runs: CodeRun[] = [];
   let last: CodeRun | undefined;
+  let colored = 0;
   for (const token of tokens) {
     const tokenColor = token.type ? colors[token.type] : undefined;
     const color = tokenColor === undefined || tokenColor === foreground ? undefined : tokenColor;
@@ -53,8 +63,12 @@ function codeRuns(
       last.text += token.text;
       continue;
     }
+    if (color !== undefined) colored += 1;
     last = { offset: token.offset, text: token.text, color };
     runs.push(last);
+  }
+  if (isAndroid && colored > ANDROID_MAX_COLORED_RUNS) {
+    return [{ offset: 0, text: tokens.map((token) => token.text).join(""), color: undefined }];
   }
   return runs;
 }
