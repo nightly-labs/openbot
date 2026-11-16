@@ -39,5 +39,6 @@ function fileCitationLink(attributes: string): string | null {
       .pop() || path;
   // The workspace file opener decodes a link target once. The shared file opener reads it as written.
   const target = /(?:^|\/)OpenBot\/Shared\//u.test(path.replaceAll("\\", "/")) ? path : path.replaceAll("%", "%25");
-  return `[${(label || name).replace(LABEL_MARKDOWN, "\\$&")}](<${target}>)`;
+  // Markdown removes a backslash before punctuation in a link target, such as `C:\repo\.github`.
+  return `[${(label || name).replace(LABEL_MARKDOWN, "\\$&")}](<${target.replaceAll("\\", "\\\\")}>)`;
 }
