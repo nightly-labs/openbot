@@ -2530,7 +2530,7 @@ export async function createApplicationServices({
           })),
         ),
       mediaProviders: () => service.workflowMediaProviders(),
-      mediaCredits: () => service.workflowMediaCredits(),
+      mediaCredits: (only) => service.workflowMediaCredits(only),
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
       notify: forwardWorkflowNotice,

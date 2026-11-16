@@ -33,17 +33,20 @@ export function WorkflowsCanvas(props: {
     () => desktopAnalytics.scope(),
     untrack(() => props.request),
   );
-  // Sunra makes files on the host's Sunra sign-in, which the person makes in Apps and finishes in the
-  // browser. The canvas reads it again when the window comes back to the front.
-  // A failed read keeps the last answer.
+  // Sunra and Higgsfield make files on the host's sign-in of that service, which the person makes in
+  // Apps and finishes in the browser. The canvas reads them again when the window comes back to the
+  // front. A failed read keeps the last answer.
   const [sunra, setSunra] = createSignal(false);
+  const [higgsfield, setHiggsfield] = createSignal(false);
   let disposed = false;
   const readMediaProviders = () => {
     if (!props.host.mediaSupported()) return;
     void props.host.workflows
       .mediaProviders()
       .then((providers) => {
-        if (!disposed) setSunra(providers.sunra);
+        if (disposed) return;
+        setSunra(providers.sunra);
+        setHiggsfield(providers.higgsfield);
       })
       .catch(() => undefined);
   };
@@ -79,12 +82,13 @@ export function WorkflowsCanvas(props: {
       return workflows.channels();
     },
     // Only the models of a provider that is on and signed in now. The host makes the file with that
-    // subscription, or with the provider's API key when it uses one. Sunra models need the host's
-    // Sunra sign-in, and its credits pay for each file.
+    // subscription, or with the provider's API key when it uses one. Sunra and Higgsfield models need
+    // the host's sign-in of that service, and its credits pay for each file.
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
       return WORKFLOW_MEDIA_MODELS.flatMap((model) => {
         if (model.provider === "sunra") return sunra() ? [model] : [];
+        if (model.provider === "higgsfield") return higgsfield() ? [model] : [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];

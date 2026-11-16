@@ -210,9 +210,10 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       githubHistory: (workflowId) => api().githubHistory(workflowId, serverId),
       githubRunLastEvent: (input) => api().githubRunLastEvent(input, serverId),
       keepPicture: (draftId) => api().keepPicture(draftId, serverId),
-      // Main answers `{ sunra: false }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: false` for a joined server without `workflows-sunra-v1`, and
+      // `higgsfield: false` for one without `workflows-higgsfield-v1`.
       mediaProviders: () => api().mediaProviders(serverId),
-      // Main answers `{ sunra: null }` for a joined server without `workflows-sunra-v1`.
+      // Main answers `sunra: null` or `higgsfield: null` for a joined server without that capability.
       mediaCredits: () => api().mediaCredits(serverId),
     },
     onChanged(changed) {

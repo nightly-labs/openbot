@@ -520,3 +520,7 @@
 [data-provider="sunra"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }
+
+[data-provider="higgsfield"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}

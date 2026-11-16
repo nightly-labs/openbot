@@ -93,4 +93,14 @@ export const messages = {
   "error.workflow.sunraFailed": "O Sunra não conseguiu criar o arquivo: {reason}",
   "error.workflow.sunraTimeout":
     "O Sunra não terminou o arquivo a tempo. Veja o projeto OpenBot em sunra.ai antes de executar a etapa novamente.",
+  "error.workflow.higgsfieldSignIn": "Entre no Higgsfield em Apps para usar os modelos do Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "Sua conta do Higgsfield não tem créditos suficientes. Adicione créditos em higgsfield.ai/pricing e execute a etapa novamente.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Este modelo do Higgsfield precisa de um plano do Higgsfield. Escolha um plano em higgsfield.ai/pricing ou selecione outro modelo.",
+  "error.workflow.higgsfieldBlocked":
+    "O Higgsfield não criou o arquivo porque a verificação de conteúdo o bloqueou. Altere o prompt ou as imagens de entrada e execute a etapa novamente.",
+  "error.workflow.higgsfieldFailed": "O Higgsfield não conseguiu criar o arquivo: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "O Higgsfield não terminou o arquivo a tempo. Veja seu histórico em higgsfield.ai antes de executar a etapa novamente.",
 } as const satisfies PartialTranslation<typeof source>;

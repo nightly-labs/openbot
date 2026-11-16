@@ -82,4 +82,14 @@ export const messages = {
   "error.workflow.sunraFailed": "تعذّر على Sunra إنشاء الملف: {reason}",
   "error.workflow.sunraTimeout":
     "لم يُنهِ Sunra الملف في الوقت المحدد. راجع مشروع OpenBot على sunra.ai قبل تشغيل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldSignIn": "سجّل الدخول إلى Higgsfield في «التطبيقات» لاستخدام نماذج Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "لا يحتوي حسابك في Higgsfield على أرصدة كافية. أضف أرصدة من higgsfield.ai/pricing، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "يحتاج نموذج Higgsfield هذا إلى خطة Higgsfield. اختر خطة من higgsfield.ai/pricing، أو اختر نموذجًا آخر.",
+  "error.workflow.higgsfieldBlocked":
+    "لم ينشئ Higgsfield الملف لأن فحص المحتوى أوقفه. غيّر الموجّه أو صور الإدخال، ثم شغّل الخطوة مرة أخرى.",
+  "error.workflow.higgsfieldFailed": "تعذّر على Higgsfield إنشاء الملف: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "لم ينهِ Higgsfield الملف في الوقت المحدد. راجع سجلّك على higgsfield.ai قبل أن تشغّل الخطوة مرة أخرى.",
 } as const satisfies PartialTranslation<typeof source>;

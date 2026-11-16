@@ -72,4 +72,14 @@ export const messages = {
   "error.workflow.sunraTeamInputs": "Sunra 仅在个人账户下使用输入图片。请在 Sunra 中选择你的个人账户，或移除图片连接。",
   "error.workflow.sunraFailed": "Sunra 无法生成文件：{reason}",
   "error.workflow.sunraTimeout": "Sunra 未能按时完成文件。再次运行此步骤前，请先查看 sunra.ai 上的 OpenBot 项目。",
+  "error.workflow.higgsfieldSignIn": "请在“应用”中登录 Higgsfield，以使用 Higgsfield 模型。",
+  "error.workflow.higgsfieldNoCredits":
+    "你的 Higgsfield 账户积分不足。请在 higgsfield.ai/pricing 添加积分，然后再次运行该步骤。",
+  "error.workflow.higgsfieldNeedsPlan":
+    "此 Higgsfield 模型需要 Higgsfield 套餐。请在 higgsfield.ai/pricing 选择套餐，或选择其他模型。",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield 的内容检查拦截了该文件，因此未生成。请修改提示词或输入图片，然后再次运行该步骤。",
+  "error.workflow.higgsfieldFailed": "Higgsfield 无法生成文件：{reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield 未能按时完成文件。再次运行该步骤前，请先查看 higgsfield.ai 上的历史记录。",
 } as const satisfies PartialTranslation<typeof source>;

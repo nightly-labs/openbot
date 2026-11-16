@@ -87,4 +87,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.sunraFailed": "Sunra could not make the file: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra did not finish the file in time. Look in the OpenBot project on sunra.ai before you run the step again.",
+  "error.workflow.higgsfieldSignIn": "Sign in to Higgsfield in Apps to use Higgsfield models.",
+  "error.workflow.higgsfieldNoCredits":
+    "Your Higgsfield account does not have sufficient credits. Add credits at higgsfield.ai/pricing, then run the step again.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "This Higgsfield model needs a Higgsfield plan. Get a plan at higgsfield.ai/pricing, or select a different model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield did not make the file because its content check stopped it. Change the prompt or the input pictures, then run the step again.",
+  "error.workflow.higgsfieldFailed": "Higgsfield could not make the file: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield did not finish the file in time. Look in your history on higgsfield.ai before you run the step again.",
 });
