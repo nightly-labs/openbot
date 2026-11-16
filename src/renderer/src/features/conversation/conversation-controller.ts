@@ -519,6 +519,8 @@ export function createServerConversationState() {
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
+  // True when the user left the side panel open. Another agent or channel opens with the panel in the same state.
+  const [sidePanelShown, setSidePanelShown] = createSignal(false);
   const [settingsProvider, setSettingsProvider] = createSignal<AgentProviderId>("codex");
   const [settingsModel, setSettingsModel] = createSignal<AgentModelId>("gpt-6-luna");
   const [settingsReasoning, setSettingsReasoning] = createSignal<AgentReasoningEffort>("medium");
@@ -567,6 +569,8 @@ export function createServerConversationState() {
     setRightPanels,
     sidePanels,
     setSidePanels,
+    sidePanelShown,
+    setSidePanelShown,
     settingsProvider,
     setSettingsProvider,
     settingsModel,

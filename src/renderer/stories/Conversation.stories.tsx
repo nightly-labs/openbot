@@ -1856,6 +1856,121 @@ export const UiBlocksInChat: Story = {
   },
 };
 
+const uiBlockEpicTable = [
+  "Recommendation: **Sunday — reliability and finish**, with 7 items.",
+  "",
+  "| Issue | Proposed delivery | Size | Area |",
+  "| --- | --- | --- | --- |",
+  "| #5476 | Isolate the test foundation contention; accept 10 runs in a row without a timeout | M | Backend tests |",
+  "| #5258 | Make the auth connection and cache lock tests deterministic; 20 runs without a failure | M | Tests/CI |",
+  "| #5454 | Make the actions test really exercise the kept snapshot during a failure and API recovery | M | Frontend cache |",
+  "| #4700 | Count every FETCH miss without a double hit or miss | S | Observability |",
+  "| #4703 | Limit the memory of the PDF extraction subprocess; keep the parent alive | M | Backend security |",
+  "| #4720 | Remove duplicate historical alerts and keep new anomalies, repairs and repeats | M | Data quality |",
+  "| #4722 | Document reference_date of the options hub, also for an old trading session | S | API contract |",
+].join("\n");
+
+const uiBlockEpic: UiConfirmBlock = {
+  type: "confirm",
+  title: "Approve the Sunday epic before I open it?",
+  preview: uiBlockEpicTable,
+  actions: [
+    { id: "open", label: "Open the epic", style: "primary" },
+    { id: "change", label: "Change items" },
+  ],
+};
+
+/** More columns than the widest card holds: the table scrolls sideways in the card. */
+const uiBlockEarlierEpic: UiConfirmBlock = {
+  ...uiBlockEpic,
+  title: "Approve the Saturday epic before I open it?",
+  preview: [
+    "| Issue | Proposed delivery | Size | Area | Owner | Risk | Tests | Docs | Release |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    "| #5476 | Isolate the test foundation contention | M | Backend tests | Ana | Low | 10 runs | None | 0.71 |",
+    "| #5258 | Make the auth and cache lock tests deterministic | M | Tests/CI | Rui | Low | 20 runs | None | 0.71 |",
+  ].join("\n"),
+};
+
+const uiBlockEpicScript: UiConfirmBlock = {
+  type: "confirm",
+  title: "Run the script that opens the epics?",
+  preview: [
+    "```sh",
+    'gh issue create --title "Sunday — reliability and finish" --label epic --body-file sunday-epic.md --milestone 0.71',
+    "```",
+  ].join("\n"),
+  actions: [{ id: "run", label: "Run", style: "primary" }],
+};
+
+/**
+ * A table or code in a card preview makes the card as wide as an agent reply with a table, live and
+ * in the history. A table wider than that scrolls sideways in the card.
+ */
+export const UiBlockWithTable: Story = {
+  name: "Agent UI block with a table",
+  args: {
+    messages: [
+      {
+        id: "ui-block-table-user",
+        author: "you",
+        body: "Plan the weekend epics from the open issues.",
+        time: "10:00",
+        kind: "text",
+      },
+      {
+        id: "question-prompt:turn-ui-block-table-earlier:ui-block-saturday",
+        turnId: "turn-ui-block-table-earlier",
+        author: "agent",
+        body: "",
+        time: "10:01",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "ui-block-saturday",
+          questions: uiBlockFallbackQuestions(uiBlockEarlierEpic),
+          resolution: { status: "answered", responses: {} },
+        },
+        uiBlock: {
+          version: 1,
+          blockId: "saturday",
+          spec: uiBlockEarlierEpic,
+          state: { status: "answered", response: { actionId: "open" }, outcome: "Open the epic" },
+        },
+      },
+      {
+        id: "question-prompt:turn-ui-block-table-script:ui-block-script",
+        turnId: "turn-ui-block-table-script",
+        author: "agent",
+        body: "",
+        time: "10:02",
+        kind: "question",
+        itemType: "question_prompt",
+        questionPrompt: {
+          requestId: "ui-block-script",
+          questions: uiBlockFallbackQuestions(uiBlockEpicScript),
+          resolution: { status: "answered", responses: {} },
+        },
+        uiBlock: {
+          version: 1,
+          blockId: "script",
+          spec: uiBlockEpicScript,
+          state: { status: "answered", response: { actionId: "run" }, outcome: "Run" },
+        },
+      },
+    ],
+    prompt: {
+      type: "prompt",
+      requestId: "ui-block-sunday",
+      agentId: "chief",
+      threadId: "thread-chief",
+      turnId: "turn-ui-block-table",
+      questions: uiBlockFallbackQuestions(uiBlockEpic),
+    },
+    promptUiBlock: { version: 1, blockId: "sunday", spec: uiBlockEpic, state: { status: "pending" } },
+  },
+};
+
 export const Queued: Story = {
   args: { queue },
 };

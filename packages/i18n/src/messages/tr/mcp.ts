@@ -27,6 +27,7 @@ export const messages = {
     "{name} hesabınızda oturum açın. OpenBot, bu hesabın erişebildiği araçları alır ve şifre almaz.",
   "mcp.signIn.waiting": "Tarayıcı bekleniyor…",
   "mcp.signIn.continue": "{name} ile devam et",
+  "mcp.signIn.pageDescription": "Bu sayfa {host} üzerindeki tarayıcıda açık. Burada oturum açın.",
   "mcp.test.connected": { one: "Bağlandı · {count} araç", other: "Bağlandı · {count} araç" },
   "mcp.status.testing": "Test ediliyor…",
   "mcp.status.failed": "Başarısız",

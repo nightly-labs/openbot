@@ -93,6 +93,8 @@ export const messages = {
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
   "error.agent.toolLoopStopped":
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
+  "error.agent.answerCutOff":
+    "Agent zatrzymał się przed ukończeniem odpowiedzi, więc odpowiedź jest niepełna. Wyślij wiadomość ponownie.",
   "error.agent.compactionConnectionLost":
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
   "error.agent.compactionLoopStopped":

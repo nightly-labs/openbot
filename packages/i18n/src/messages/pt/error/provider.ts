@@ -289,6 +289,8 @@ export const messages = {
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "O Gemini recusou esta solicitação. Escolha outro modelo e envie sua mensagem novamente. Se falhar de novo, inicie um novo chat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "O Gemini recusou esta solicitação e não informou a causa. Um item do histórico do chat pode causar isso, como uma imagem que o agente abriu. O OpenBot iniciou uma nova sessão do Gemini com o histórico do chat. Tente novamente. Se o erro continuar, escolha outro modelo.",
   "error.provider.antigravityLocationUnsupported":
     "O Google não permite que o Gemini funcione a partir da localização de rede do computador que executa este agente. Use o Gemini em outro computador ou escolha outro provedor para este agente.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -352,6 +354,8 @@ export const messages = {
     "O modelo não aceitou uma imagem deste chat porque a imagem é grande demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.imageCountLimit":
     "O modelo não aceitou este chat porque ele tem imagens demais. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
+  "error.provider.imageUnreadable":
+    "O modelo não conseguiu ler uma imagem deste chat. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente. Se você enviou uma imagem, envie outra.",
   "error.provider.requestTooLarge":
     "Este chat ficou grande demais para ser enviado ao modelo. As imagens do chat costumam causar isso. O OpenBot iniciou uma nova sessão do {provider} com o histórico do chat. Tente novamente.",
   "error.provider.opencodeSessionRejected":

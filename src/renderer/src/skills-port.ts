@@ -26,6 +26,7 @@ export interface SkillsPort {
     | "listMcpServers"
     | "listMcpSignIns"
     | "mcpSignInApp"
+    | "mcpSignInPage"
     | "mcpSignInRelay"
     | "openMcpSignInRelay"
     | "onEvent"

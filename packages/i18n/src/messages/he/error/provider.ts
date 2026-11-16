@@ -264,6 +264,8 @@ export const messages = {
     "השירות Gemini של Google לא השלים את הבקשה. יש לנסות שוב בעוד כמה דקות.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini דחה את הבקשה הזו. יש לבחור מודל אחר ולשלוח את ההודעה שוב. אם זה נכשל שוב, יש להתחיל צ'אט חדש.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini דחה את הבקשה הזו ולא מסר את הסיבה. פריט בהיסטוריית הצ'אט יכול לגרום לכך, למשל תמונה שהסוכן פתח. OpenBot התחיל סשן חדש של Gemini עם היסטוריית הצ'אט. יש לנסות שוב. אם השגיאה נמשכת, יש לבחור מודל אחר.",
   "error.provider.antigravityLocationUnsupported":
     "חברת Google לא מאפשרת ל-Gemini לפעול ממיקום הרשת של המחשב שמריץ את הסוכן הזה. יש להשתמש ב-Gemini במחשב אחר, או לבחור ספק אחר לסוכן הזה.\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini איבד את החיבור לסוכן שלו ונעצר. יש לשלוח הודעה כדי להמשיך.",
@@ -325,6 +327,8 @@ export const messages = {
     "המודל לא קיבל תמונה בצ'אט הזה כי התמונה גדולה מדי. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.imageCountLimit":
     "המודל לא קיבל את הצ'אט הזה כי יש בו יותר מדי תמונות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
+  "error.provider.imageUnreadable":
+    "המודל לא הצליח לקרוא תמונה בצ'אט הזה. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב. אם שלחת תמונה, שלח תמונה אחרת.",
   "error.provider.requestTooLarge":
     "הצ'אט הזה נעשה גדול מדי לשליחה למודל. תמונות בצ'אט גורמות לכך לעיתים קרובות. OpenBot התחיל סשן {provider} חדש עם היסטוריית הצ'אט. נסה שוב.",
   "error.provider.opencodeSessionRejected":

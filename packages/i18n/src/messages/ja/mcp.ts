@@ -27,6 +27,7 @@ export const messages = {
     "{name} アカウントにサインインしてください。OpenBot はそのアカウントで使えるツールを取得し、パスワードは取得しません。",
   "mcp.signIn.waiting": "ブラウザーを待機中…",
   "mcp.signIn.continue": "{name} に進む",
+  "mcp.signIn.pageDescription": "このページは {host} のブラウザーで開いています。ここでサインインしてください。",
   "mcp.test.connected": { other: "接続済み · ツール {count} 個" },
   "mcp.status.testing": "テスト中…",
   "mcp.status.failed": "失敗",

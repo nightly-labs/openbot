@@ -108,5 +108,6 @@ export const messages = {
   "status.agent.planContinues": "プランに未完了のステップがあります。エージェントが続けます（{current}/{limit}）。",
   "status.agent.compactionContinues":
     "エージェントがコンテキストを圧縮している間に接続が切れました。エージェントは続行します。",
+  "status.agent.providerExitContinues": "エージェントは回答を終える前に停止しました。エージェントは続行します。",
   "status.agent.branchTitle": "分岐したチャット",
 } as const satisfies PartialTranslation<typeof source>;

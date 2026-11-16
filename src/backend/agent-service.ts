@@ -1438,8 +1438,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       conversation: this.#conversation,
       mailboxSync: this.#mailboxSync,
       threads: this.#threads,
+      planContinuation: this.#planContinuation,
       hooks: {
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),
+        turnFailed: (agentId, turnId) => this.#turn.markFailedTurn(agentId, turnId),
+        continuesAfterProviderExit: (agentId, turnId, deliveryIds) =>
+          this.#turn.continuesAfterProviderExit(agentId, turnId, deliveryIds),
         // A deleted routine takes its runs with it, so a run without a record counts as quiet:
         // otherwise the import would bring back the answers that its quiet turns settled.
         quietRoutineDelivery: (deliveryId) => {

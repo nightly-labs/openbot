@@ -11,6 +11,10 @@ export const messages = {
   "error.mcp.signInFileTooLarge": "Файл входа MCP слишком большой.",
   "error.mcp.unsupported": "Этот сервер не поддерживает серверы MCP.",
   "error.mcp.signInOnHost": "Войти в сервер MCP можно только в OpenBot на компьютере-хосте.",
+  "error.mcp.signInPageOnServer":
+    "Эта страница входа открывается только на сервере. Попросите владельца или администратора сервера выполнить вход.",
+  "error.mcp.signInPageOnServerSwitch":
+    "Эта страница входа открывается только на сервере. Переключитесь на этот сервер, затем снова выберите «Войти».",
   "error.mcp.signInAppUnsupported": "Этот сервер не поддерживает приложения входа. Обновите OpenBot на хосте.",
   "error.mcp.redirectRelayed": "OpenBot отправил вход на сервер. Это окно можно закрыть.",
   "error.mcp.relayEnded": "Этот вход завершён. Начните его снова.",

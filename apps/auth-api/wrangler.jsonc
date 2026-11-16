@@ -58,6 +58,9 @@
     "EMAIL_FROM": "no_reply@openbot.run",
     "EMAIL_REPLY_TO": "hello@openbot.run",
     "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+    // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+    // license emails from EMAIL_FROM.
+    "EMAIL_LICENSE_FROM": "",
     "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
     "REMOTE_SIGNAL_URL": "wss://signal.openbot.run/v1/signal",
     // Active Signal machines (docs/remote-session-deployment.md): a is sui-alexandria and b is signal2,
@@ -188,6 +191,9 @@
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",
@@ -289,6 +295,9 @@
         "EMAIL_FROM": "no_reply@openbot.run",
         "EMAIL_REPLY_TO": "hello@openbot.run",
         "EMAIL_LICENSE_REPLY_TO": "licenses@openbot.run",
+        // Empty on purpose: deploys use --keep-vars, so a removed var stays live. An empty value sends
+        // license emails from EMAIL_FROM.
+        "EMAIL_LICENSE_FROM": "",
         "SITE_PUBLISH_ENABLED": "false",
         "SITE_COOKIE_ISOLATION_READY": "false",
         "REMOTE_TICKET_KEY_ID": "openbot-remote-1",

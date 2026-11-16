@@ -26,6 +26,7 @@ export const messages = {
     "יש להתחבר לחשבון {name} שלך. OpenBot מקבל את הכלים שהחשבון הזה יכול להגיע אליהם, ולא סיסמה.",
   "mcp.signIn.waiting": "ממתין לדפדפן…",
   "mcp.signIn.continue": "המשך אל {name}",
+  "mcp.signIn.pageDescription": "הדף הזה פתוח בדפדפן ב-{host}. יש להתחבר כאן.",
   "mcp.test.connected": { one: "מחובר · כלי אחד", two: "מחובר · שני כלים", other: "מחובר · {count} כלים" },
   "mcp.status.testing": "בודק…",
   "mcp.status.failed": "נכשל",

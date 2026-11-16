@@ -27,6 +27,7 @@ export const messages = {
     "{name} 계정에 로그인하세요. OpenBot은 해당 계정이 접근할 수 있는 도구를 사용하며, 비밀번호는 받지 않아요.",
   "mcp.signIn.waiting": "브라우저를 기다리는 중…",
   "mcp.signIn.continue": "{name}(으)로 계속",
+  "mcp.signIn.pageDescription": "이 페이지는 {host}의 브라우저에서 열려 있어요. 여기에서 로그인하세요.",
   "mcp.test.connected": { other: "연결됨 · 도구 {count}개" },
   "mcp.status.testing": "테스트 중…",
   "mcp.status.failed": "실패",
