@@ -30,6 +30,10 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  PROVIDER_MODEL_SOURCE_CAPABILITY,
+  PROVIDER_MODEL_SOURCE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-model-source-v1";
 import { V5_AGENT_MODEL } from "@openbot/contracts/team-protocol/v5-adapter";
 import { V6_AGENT_MODEL } from "@openbot/contracts/team-protocol/v6-adapter";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
@@ -184,6 +188,19 @@ export async function routeAgents(
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.agents.status) {
     return json(200, agents.getStatus());
+  }
+  // Where each provider's models come from, when its own settings give them from elsewhere (#9956).
+  // Every member reads it: it says no more than the model list. Frozen by `provider-model-source-v1`.
+  if (method === "POST" && url.pathname === PROVIDER_MODEL_SOURCE_ROUTES.list) {
+    if (!capabilities.has(PROVIDER_MODEL_SOURCE_CAPABILITY))
+      throw new HttpError(400, sourceText("error.team.providerModelSourceUnsupported"));
+    // `readJson` runs the empty body through the wire codec.
+    await readJson(request);
+    // Only a protocol 9 peer has the capability, and it knows every provider (`OPEN_PROVIDER_ID`).
+    const sources = (agents.getStatus().providers ?? []).flatMap((row) =>
+      row.modelSource ? [{ provider: row.id, source: row.modelSource }] : [],
+    );
+    return json(200, { sources });
   }
   if (method === "GET" && url.pathname === TEAM_API_ROUTES.sidebarLayout.state) {
     return json(200, sidebarLayout.getSnapshot());

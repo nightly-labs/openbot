@@ -146,6 +146,7 @@ import {
 import { type WorkflowStore, WorkflowStoreError } from "./workflow-store";
 import { prepareWorkflowSchedules, type ScheduledWorkflowStart, workflowWebhookPayload } from "./workflow-triggers";
 import {
+  agentFileInputs,
   agentStepText,
   conditionAnswer,
   conditionPrompt,
@@ -248,8 +249,15 @@ export interface WorkflowsDependencies {
     run: { id: string; routineId: string; routineName: string; scheduledFor: string };
     agentId: string;
     text: string;
+    /** The files of the image and asset steps before an agent step, which the message carries as copies. */
+    sourcePaths: readonly string[];
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
+  /**
+   * The path of a stored file of this host, or null when Storage no longer has it. Absent where this
+   * host keeps no files: an agent step with files before it then fails.
+   */
+  filePath?: (attachmentId: string) => Effect.Effect<string | null, { readonly cause: unknown }>;
   /** Ends a delivery: cancels it while it waits, or interrupts the turn that answers it. */
   stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   /** One tool-less generation; the failure is a message the user can read. */
@@ -505,6 +513,31 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
             return;
           }
           const run = step.runId ? runs.run(step.runId) : null;
+          // The files of the image and asset steps before it: the run's newest files, or for a step that
+          // runs alone, the newest files of the workflow.
+          const graph = run?.graph ?? store.detail(step.workflowId)?.graph;
+          const attachmentIds = graph
+            ? agentFileInputs(graph, step.nodeId, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
+            : [];
+          if (attachmentIds.length > INPUT_LIMITS.attachments) {
+            settle(step, {
+              status: "failed",
+              error: sourceText("error.backend.attachLimit", { limit: INPUT_LIMITS.attachments }),
+            });
+            return;
+          }
+          const sourcePaths: string[] = [];
+          for (const attachmentId of attachmentIds) {
+            const path = dependencies.filePath
+              ? yield* dependencies.filePath(attachmentId).pipe(Effect.orElseSucceed(() => null))
+              : null;
+            // A file deleted in Storage fails the step: the agent must not do the step without its picture.
+            if (!path) {
+              settle(step, { status: "failed", error: sourceText("error.workflow.mediaInputMissing") });
+              return;
+            }
+            sourcePaths.push(path);
+          }
           const sent = yield* dependencies
             .sendHandoff({
               run: {
@@ -515,6 +548,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
               },
               agentId: step.agentId,
               text: step.input,
+              sourcePaths,
               idempotencyKey: `workflow-step:${step.id}`,
             })
             .pipe(Effect.exit);
@@ -622,9 +656,13 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           const inputs = graph
             ? mediaInputs(graph, node.id, run ? latestSteps(run.id) : runs.latestDone(step.workflowId))
             : [];
+          const images = mediaImages(node.fields, kind, inputs);
+          // A step with no description, no text and no picture would make media from nothing.
+          const empty = !fieldText(node, "prompt").trim() && !step.input.trim() && images.length === 0;
           const make = Effect.gen(function* () {
-            const result =
-              !generateMedia || !model
+            const result = empty
+              ? Result.fail({ message: sourceText("error.workflow.mediaEmptyRequest") })
+              : !generateMedia || !model
                 ? Result.fail({ message: sourceText("error.workflow.nodeUnsupported") })
                 : yield* mediaLock
                     .withPermit(
@@ -635,7 +673,7 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
                         account: mediaAccount(node.fields),
                         specs,
                         prompt: mediaStepPrompt(node.fields, kind, step.input, specs, model.provider),
-                        images: mediaImages(node.fields, kind, inputs),
+                        images,
                         voice: mediaVoice(node.fields, kind, model),
                       }).pipe(Effect.flatMap(sized)),
                     )

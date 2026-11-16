@@ -396,6 +396,8 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
   const [voice, setVoice] = useField(() => props.id, "voice", "", asString);
   /** The image steps that give this step a picture, in connection order. The host reads them the same way. */
   const inputs = () => board.inputs(props.id, "image");
+  /** A step runs with no description when a text or a picture comes in: the host makes the media from them. */
+  const runnable = () => prompt().trim() !== "" || inputs().length > 0 || board.inputs(props.id, "text").length > 0;
   /** The picture of an image step's newest result, or the file of an asset. */
   const inputUrl = (source: string) => {
     const shown = board.shown(source);
@@ -714,7 +716,7 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       size="xs"
                       class="wfn-run-pill"
                       loading={making()}
-                      disabled={!prompt().trim() || locked() || !model()}
+                      disabled={!runnable() || locked() || !model()}
                       onClick={run.start}
                     >
                       <Play aria-hidden="true" />

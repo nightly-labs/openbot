@@ -1,4 +1,4 @@
-import type { AgentModelOption } from "@openbot/contracts/ipc";
+import type { AgentModelOption, ProviderModelSource } from "@openbot/contracts/ipc";
 import { isAgentModel, isReasoningEffort } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result } from "effect";
@@ -39,6 +39,8 @@ export interface ModelCatalogOptions {
 export class ModelCatalog {
   readonly #options: ModelCatalogOptions;
   #models = structuredClone(FALLBACK_MODELS);
+  /** The source of each provider whose CLI settings give its models from elsewhere (`ProviderModelCatalog.source`). */
+  readonly #sources = new Map<AgentProvider, ProviderModelSource>();
 
   constructor(options: ModelCatalogOptions) {
     this.#options = options;
@@ -47,6 +49,35 @@ export class ModelCatalog {
   list(): AgentModelOption[] {
     return structuredClone(this.#models);
   }
+
+  /** Where the provider's models come from, when its CLI settings say that it is not its own list. */
+  source(provider: AgentProvider): ProviderModelSource | undefined {
+    const source = this.#sources.get(provider);
+    return source ? structuredClone(source) : undefined;
+  }
+
+  /**
+   * Reads the source again from the client that lists the models, and answers whether it changed. A
+   * failed read clears the source: a wrong "Uses Ollama" line is worse than none, and with none the
+   * picker shows the version line as before. A client that another one replaced during the read
+   * changes nothing: the new client reads its own source.
+   */
+  readonly #readSource = Effect.fn("ModelCatalog.readSource")(function* (
+    this: ModelCatalog,
+    provider: AgentProvider,
+    client: AgentClient,
+    catalog: ProviderModelCatalog,
+  ) {
+    if (!catalog.source) return false;
+    const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
+    if (this.#options.client(provider) !== client) return false;
+    if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
+    const source = Result.isSuccess(result) ? result.success : null;
+    const before = JSON.stringify(this.#sources.get(provider) ?? null);
+    if (source) this.#sources.set(provider, source);
+    else this.#sources.delete(provider);
+    return JSON.stringify(source) !== before;
+  });
 
   /**
    * Reads the models that one client serves, in the catalogue's order, and how many the CLI listed.
@@ -164,7 +195,11 @@ export class ModelCatalog {
           if (!client) return { provider, models: previous, fresh: false, timedOut: false, failed: false };
           const startedAt = performance.now();
           return yield* Effect.gen({ self: this }, function* () {
-            const { models: sorted, listed } = yield* this.read(client, catalog);
+            // The source comes from the settings, not from the list, so both reads run at once.
+            const [{ models: sorted, listed }, sourceChanged] = yield* Effect.all(
+              [this.read(client, catalog), this.#readSource(provider, client, catalog)],
+              { concurrency: "unbounded" },
+            );
             // For a provider with a fallback, a successful but empty response is no more useful to
             // the picker than a timeout: it must not erase the built-in free tier on first
             // discovery. It is not a fresh catalog, so callers must not treat it as proof that
@@ -175,9 +210,16 @@ export class ModelCatalog {
               durationMs: Math.round(performance.now() - startedAt),
             });
             if (catalog.fallback && listed === 0) {
-              return { provider, models: catalog.fallback(previous), fresh: false, timedOut: false, failed: false };
+              return {
+                provider,
+                models: catalog.fallback(previous),
+                fresh: false,
+                timedOut: false,
+                failed: false,
+                sourceChanged,
+              };
             }
-            return { provider, models: sorted, fresh: true, timedOut: false, failed: false };
+            return { provider, models: sorted, fresh: true, timedOut: false, failed: false, sourceChanged };
           }).pipe(
             Effect.catch((failure) => {
               const timeout = isProviderTimeout(failure.cause);
@@ -210,6 +252,8 @@ export class ModelCatalog {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
       timedOut: timeouts,
       failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
+      /** True when a provider's model source changed, so the provider rows must go out again. */
+      sourceChanged: discovered.some((entry) => "sourceChanged" in entry && entry.sourceChanged),
     };
   });
 
@@ -247,6 +291,8 @@ export class ModelCatalog {
     const { models, listed } = result.success;
     logger.info("A provider listed its models.", { provider, count: models.length, durationMs });
     if ((catalog.fallback || options.quiet) && listed === 0) return false;
+    yield* this.#readSource(provider, client, catalog);
+    if (this.#options.client(provider) !== client) return false;
     const current = this.#models;
     this.#models = BUILT_IN_PROVIDER_DRIVERS.flatMap(({ id }) =>
       id === provider ? models : current.filter((model) => model.provider === id),

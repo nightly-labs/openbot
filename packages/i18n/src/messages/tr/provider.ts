@@ -149,6 +149,8 @@ export const messages = {
   "provider.picker.selectEffort": "Efor seçin",
   "provider.picker.custom": "Özel",
   "provider.picker.cliReady": "{cli} hazır",
+  "provider.picker.modelSourceProvider": "{cli} ayarlarındaki {name} kullanılıyor",
+  "provider.picker.modelSourceCatalog": "{cli} ayarlarındaki model listesi kullanılıyor",
   "provider.status.signInRequired": "Oturum açılmalı",
   "provider.model.free": "Ücretsiz",
   "provider.model.new": "Yeni",

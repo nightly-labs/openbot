@@ -150,6 +150,8 @@ export const messages = {
   "provider.picker.selectEffort": "강도 선택",
   "provider.picker.custom": "사용자 지정",
   "provider.picker.cliReady": "{cli} 준비됨",
+  "provider.picker.modelSourceProvider": "{cli} 설정의 {name} 사용 중",
+  "provider.picker.modelSourceCatalog": "{cli} 설정의 모델 목록 사용 중",
   "provider.status.signInRequired": "로그인 필요",
   "provider.model.free": "무료",
   "provider.model.new": "새 모델",

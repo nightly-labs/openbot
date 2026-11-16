@@ -299,7 +299,8 @@ export function isUsageLimitDiagnostic(message: string): boolean {
  * for 5 hour. Your limit will reset at 2026-11-02 17:37:38" and "Weekly/Monthly Limit Exhausted. Your
  * limit will reset at …" (#4469). Its reset names no zone, so it is not read. Grok's free tier
  * writes "subscription:free-usage-exhausted: You've used all the included free usage for model …
- * Usage resets over a rolling 24-hour window" (#4869). A spent credit
+ * Usage resets over a rolling 24-hour window" (#4869). Cline names its plan between the window and
+ * "limit": "You have reached your weekly Clinepass limit. The limit resets in 8h 30m" (#10674). A spent credit
  * balance or quota does not reset, so it is not one: holding work for it would wait forever and hide
  * the provider's reason. A short request-rate throttle says "rate limit".
  */
@@ -308,6 +309,9 @@ export function isPlanLimitDiagnostic(message: string): boolean {
   if (isBalanceDiagnostic(message) && !/\btry again at\b/iu.test(message)) return false;
   return (
     /\bhit your (?:(?:session|weekly|usage|plan|opus|sonnet|\d+-hour) )*limit\b/iu.test(message) ||
+    /\b(?:hit|reached) your (?:session|weekly|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit\b/iu.test(
+      message,
+    ) ||
     /\b(?:session|weekly) (?:usage )?limit\b.{0,80}\b(?:reached|resets?)\b/iu.test(message) ||
     /\b(?:GoUsageLimitError|Go usage limit exceeded)\b/u.test(message) ||
     /\busage limit reached for \d+ ?hours?\b/iu.test(message) ||
@@ -424,10 +428,12 @@ export function isRequestBodyLimitDiagnostic(message: string): boolean {
  * images by default, and its refusal names no OpenBot setting: "the selected model route accepts text
  * only" (#6033), OpenAI's "image_url is only supported by certain models", and OpenRouter's "No
  * endpoints found that support image input". Kimi refuses a PDF that a read tool added: "the message
- * at position 124 with role 'user' contains an invalid part type: file" (#8654).
+ * at position 124 with role 'user' contains an invalid part type: file" (#8654). Z.ai's text-only
+ * GLM models refuse an image with error 1210: "messages.content.type is invalid, allowed values:
+ * ['text']" (#10012).
  */
 export function isUnreadableContentDiagnostic(message: string): boolean {
-  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b/iu.test(
+  return /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\binvalid part type\b|\b(?:supports?|accepts?) (?:text[- ]only|only text)\b|\bdoes not support media type\b|\bimage_url is only supported by certain models\b|\b(?:does not|doesn['’]t|that) support image input\b|\bcontent\.type is invalid, allowed values: \[\\?['"]?text\\?['"]?\]/iu.test(
     message,
   );
 }

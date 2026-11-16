@@ -148,6 +148,8 @@ export const messages = {
   "provider.picker.selectEffort": "בחירת מאמץ",
   "provider.picker.custom": "מותאם אישית",
   "provider.picker.cliReady": "{cli} מוכן",
+  "provider.picker.modelSourceProvider": "משתמש ב-{name} מהגדרות {cli}",
+  "provider.picker.modelSourceCatalog": "משתמש ברשימת מודלים מהגדרות {cli}",
   "provider.status.signInRequired": "נדרשת התחברות",
   "provider.model.free": "חינם",
   "provider.model.new": "חדש",

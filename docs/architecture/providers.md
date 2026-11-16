@@ -791,6 +791,19 @@ command that runs in the background does the same when it ends (#7713). The flag
 The watch is in memory. A background task that ends while OpenBot is closed, or after OpenBot
 loaded the session again, shows only in OpenCode's own store.
 
+#### Model retries and the stall limit
+
+OpenCode 2.2.7 waits 300 s for a model's response headers (`headerTimeout`; 30 minutes for a custom
+endpoint), the same time as OpenBot's stall limit, and then sends the request again, up to three
+times for a timeout. It reports each retry as a `session_info_update` with
+`_meta["opencode/retry"]`, and a failed retried attempt as the same key with null. OpenBot ended
+the turn as stalled at the moment when the retry started (#9941). `modelRetryUpdate` of
+`OPENCODE_ACP_FLAVOR` makes OpenBot wait 1.2 times the limit, so the retry notice comes first. Only
+the first timeout retry notice after other output or a steer counts as activity: a model that also
+does not answer the retry fails the turn after about 11 minutes, with the stall message, and not
+after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
+failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
+
 #### Text of two steps
 
 OpenCode 2.2.0 gives the message of each step its own ACP `messageId`. With `messagePerId`, text of a
@@ -1509,6 +1522,14 @@ Codex does not read a base URL from its environment while it has a ChatGPT sign-
 Checked with Claude Code 2.1.325, Codex 0.167.2 and Antigravity CLI 1.5.9 against a local server that
 logged each request. Grok is not in the list: with a Grok sign-in, Grok CLI 1.0.52 sends the Grok token
 to `GROK_XAI_API_BASE_URL` and ignores `XAI_API_KEY`.
+
+The user's own Codex settings can also give Codex another model provider (`model_provider`, such as
+Ollama) or a model list file (`model_catalog_json`). Codex then lists those models in `model/list`, and
+OpenBot shows them on the ChatGPT tab (#9956). With each good model list, `readCodexModelSource` reads
+`config/read` and the Codex status row gets `modelSource`. The model picker shows it on the ChatGPT tab
+in place of the pool and version line, so the user sees why the list is not OpenAI's. The
+`openbot_environment` provider above is not a source: the user set it on this page, and Codex keeps
+OpenAI's list with it. A joined server gives the source on `provider-model-source-v1`.
 
 The commands that agents run can read the variables: Claude Code and the Antigravity CLI pass their
 environment on, and Codex leaves out the names with `KEY`, `SECRET` or `TOKEN`. With a proxy, the proxy

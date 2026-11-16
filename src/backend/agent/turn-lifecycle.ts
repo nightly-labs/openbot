@@ -152,6 +152,8 @@ const QUIET_END_MAX_MS = 2 * 60_000;
 const QUIET_REPEAT_POLL_MS = 1_000;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
+/** The time added to a reset that a provider's text names, which rounds down to the minute. */
+const TEXT_RESET_MARGIN_MS = 60_000;
 /**
  * The provider errors that move an agent set to switch without asking to its next backup model. Each
  * one can pass on another provider, account or model; a request the model refuses fails on each.
@@ -1517,7 +1519,15 @@ export class TurnLifecycle {
             isPlanLimitDiagnostic(message) ||
             (error?.codexErrorInfo === "usageLimitExceeded" && !isBalanceDiagnostic(message));
           if (planLimit && notification.method === "error" && errorTurnId && this.#runningTurns.has(errorTurnId)) {
-            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? null);
+            // Cline has no usage reading and names the wait only in its text: "The limit resets in 8h
+            // 30m" (#10674). With no reset, the hold lets one turn try again each 15 minutes. A provider
+            // with a reading gets the exact reset from it. The text rounds down to the minute.
+            const resetDelayMs = agentProviderDescriptor(source.provider).reportsUsage
+              ? null
+              : providerResetDelayMs(message);
+            const namedReset =
+              resetDelayMs === null ? null : Math.ceil((Date.now() + resetDelayMs + TEXT_RESET_MARGIN_MS) / 1_000);
+            this.#limitedTurns.set(errorTurnId, this.#limitedTurns.get(errorTurnId) ?? namedReset);
           }
           const context = {
             turnId: errorTurnId,
@@ -2300,8 +2310,9 @@ export class TurnLifecycle {
           for (const delivery of deliveries)
             yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
         }
-        // A failed turn sends no result, so the agent that asked gets the failure as its answer.
-        if (!continuation && terminal === "failed") {
+        // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
+        // ends a request steered into the turn too, so its sender gets a note and does not wait.
+        if (!continuation && (terminal === "failed" || terminal === "interrupted")) {
           for (const { delivery } of deliveries) yield* this.#answerFailedRequest(agentId, delivery.id);
         }
         // The requester holds the answers of the other teammates until each request has ended, so
@@ -2735,6 +2746,11 @@ export class TurnLifecycle {
     )
       return;
 
+    // A request steered into a turn for other work has no answer of its own: the turn's answer is for
+    // the person or another request, so it does not go to the sender. The request text asks for a
+    // `send_message` reply. No "no reply" note either: Claude can still answer a late steer in a turn
+    // of its own after this end (`moveSteerToTurn`).
+    if (this.#mailbox.steeredIntoOtherWork(delivery.delivery.id)) return;
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;

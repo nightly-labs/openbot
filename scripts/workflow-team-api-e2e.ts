@@ -25,6 +25,8 @@
 // width and height; a failed crop keeps the model's file, and a video or a side out of range is not cropped.
 // An image step with `aspect` "4:5" or "5:4" asks the model for that ratio; a video model without them gets
 // its first ratio.
+// An image step with no description runs from its text input; with no description, no text and no
+// picture it fails with "mediaEmptyRequest" and never reaches the media maker.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -1595,6 +1597,38 @@ try {
       assert.equal(printSize.aspect, "5:4");
       assert.equal(printSize.output, "e2e-media-file-1350x1080");
       return { wide, tall, failed, video, tooLarge, post, postVideo, postSize, print, printVideo, printSize };
+    },
+  );
+
+  await step(
+    "empty media request: a step with no description runs from its input, and fails with no input",
+    async () => {
+      const run = async (title: string, input: string) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(title, {
+          nodes: [
+            { ...promptNode, fields: { text: input } },
+            { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image" } },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        return { done, requests: mediaRequests.slice(before) };
+      };
+      const fromInput = await run("No description, text input", "A red kite over a beach.");
+      assert.equal(fromInput.done.status, "done", JSON.stringify(fromInput.done.error));
+      assert.equal(fromInput.requests.length, 1);
+      assert.match(fromInput.requests[0]?.prompt ?? "", /A red kite over a beach\./);
+      const empty = await run("No description, empty input", "");
+      assert.equal(empty.done.status, "failed");
+      assert.equal(empty.done.error, sourceText("error.workflow.mediaEmptyRequest"), JSON.stringify(empty.done.error));
+      assert.equal(empty.requests.length, 0, "an empty request never reaches the media maker");
+      return { fromInput: fromInput.done.status, empty: empty.done.error };
     },
   );
 

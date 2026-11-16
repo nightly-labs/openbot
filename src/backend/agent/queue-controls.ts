@@ -336,6 +336,7 @@ export class QueueControls {
                   : undefined,
               answeredRoutine: this.#drain.answeredRoutine(context.delivery),
               tags: this.#hooks.tagReferences(agent.id, publicThreadId),
+              steerFramedAsUser: providerForAgent(agent) === "claude",
             }),
           ],
         },

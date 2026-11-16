@@ -126,11 +126,14 @@ export interface WorkflowHost {
   openUrl(url: string): Promise<void>;
 }
 
-/** The pictures of a Library scan that the host can send to an image or video model. */
+/**
+ * The pictures of a Library scan that the host can send to an image or video model, newest first.
+ * The scan lists the largest file first, which would put a new upload out of Recent.
+ */
 export function libraryPictures(usage: StorageUsage | null): readonly StoredFileRow[] {
-  return (usage?.files ?? []).filter(
-    (file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType),
-  );
+  return (usage?.files ?? [])
+    .filter((file) => file.status === "available" && WORKFLOW_PICTURE_TYPES.has(file.mimeType))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 /** Refuses a file that the host does not keep as a picture, before its bytes come into memory. */
