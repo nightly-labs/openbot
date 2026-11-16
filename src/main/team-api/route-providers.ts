@@ -289,9 +289,9 @@ export async function routeProviders(
       case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate: {
         // The endpoint moves to the named harness and keeps the settings of each kept model.
         const { harness, ...input } = parsed(parseUpdateCustomProvider, harnessChoiceBody(body));
-        const result = await runCauseEffect(
-          harness ? customProviders.peerHarnessUpdate(input, harness) : customProviders.peerUpdate(input),
-        );
+        // The frozen codec requires a harness, so a body with none does not get here.
+        if (!harness) throw new Error("Unknown harness.");
+        const result = await runCauseEffect(customProviders.peerHarnessUpdate(input, harness));
         return json(200, wireResult(url.pathname, result));
       }
       case CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customSave: {
