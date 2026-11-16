@@ -25,9 +25,15 @@ export interface OnboardingProviderRows {
  * Whether the user has the provider already: it is connected, or its CLI is on the computer and
  * only the sign-in is missing. A download in progress does not count: the user started it from a
  * row, so that row is in `kept` already.
+ *
+ * On a joined server's host, only a connected provider counts. A new server comes with the CLIs of
+ * OpenBot installed, so each of them needs only a sign-in, and that tells nothing about the user.
+ * The providers that report first, such as the API key providers, would otherwise fill the rows,
+ * and the popular providers would replace them when they report.
  */
-function userHasProvider(option: ProviderPickerOption): boolean {
-  return option.state === "available" || option.state === "sign-in-required" || option.state === "outdated";
+function userHasProvider(option: ProviderPickerOption, hostProviders: boolean): boolean {
+  if (option.state === "available") return true;
+  return !hostProviders && (option.state === "sign-in-required" || option.state === "outdated");
 }
 
 /** Popular providers first, in `POPULAR_PROVIDERS` order; the others keep their order. */
@@ -54,18 +60,22 @@ function popularFirst(options: readonly ProviderPickerOption[]): ProviderPickerO
  *
  * Without `includeFree`, the list has plan rows only, and the free provider is the last provider in
  * "More providers". The user chose to connect a plan, and can still find it there.
+ *
+ * With `hostProviders`, the providers are those of a joined server's host: see `userHasProvider`.
  */
 export function onboardingProviderRows(
   options: readonly ProviderPickerOption[],
   kept: readonly AgentProviderId[] = [],
   includeFree = true,
+  hostProviders = false,
 ): OnboardingProviderRows {
+  const has = (option: ProviderPickerOption) => userHasProvider(option, hostProviders);
   const plans = options.filter((option) => option.id !== FREE_PROVIDER);
   const connected = popularFirst(plans.filter((option) => option.state === "available"));
-  const notReady = popularFirst(plans.filter((option) => userHasProvider(option) && option.state !== "available"));
+  const notReady = popularFirst(plans.filter((option) => has(option) && option.state !== "available"));
   const popular = POPULAR_PROVIDERS.flatMap((id) => {
     const option = plans.find((candidate) => candidate.id === id);
-    return option && !userHasProvider(option) ? [option] : [];
+    return option && !has(option) ? [option] : [];
   });
   const owned = [...connected, ...notReady];
   const ruled = [...owned, ...popular].slice(0, PLAN_ROWS);
@@ -78,8 +88,8 @@ export function onboardingProviderRows(
     listed: includeFree ? [...listedPlans, ...free] : listedPlans,
     hidden: [
       ...owned.filter((option) => !listedIds.has(option.id)),
-      ...hidden.filter((option) => !userHasProvider(option) && !option.freeModels),
-      ...hidden.filter((option) => !userHasProvider(option) && option.freeModels),
+      ...hidden.filter((option) => !has(option) && !option.freeModels),
+      ...hidden.filter((option) => !has(option) && option.freeModels),
       ...(includeFree ? [] : free),
     ],
   };

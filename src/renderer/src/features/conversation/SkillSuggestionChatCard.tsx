@@ -49,10 +49,11 @@ export interface SkillSuggestionChatCardProps {
   messageId: string;
   suggestion: SkillSuggestionEvent;
   outcome: SkillSuggestionOutcome;
-  /** Sends the user's yes to the agent. False when the chat cannot send now. */
-  onSave?: ((text: string) => boolean) | undefined;
-  /** Saves the skill on the host in the background. False when the host saved nothing. */
-  onSaveSkill?: (() => Promise<boolean>) | undefined;
+  /**
+   * Saves the skill on the host in the background, or sends `reply`, the user's yes, to the agent of
+   * this chat when the host saved nothing. False when the chat cannot send now.
+   */
+  onSave?: ((reply: string) => Promise<boolean>) | undefined;
   /** Opens the skill that an update changes. */
   onOpenSkill?: ((skill: { skillId: string }) => void) | undefined;
 }
@@ -74,10 +75,9 @@ export function SkillSuggestionChatCard(props: SkillSuggestionChatCardProps) {
   const save = async () => {
     if (sent()) return;
     setSent(true);
-    if (await props.onSaveSkill?.()) return;
-    const text =
+    const reply =
       props.suggestion.action === "create" ? t("chat.suggestion.saveReply") : t("chat.suggestion.updateReply");
-    if (!props.onSave?.(text)) setSent(false);
+    if (!(await props.onSave?.(reply))) setSent(false);
   };
   const skillAction = (): MarketplaceSuggestionSkillAction =>
     props.suggestion.action === "create" ? "save" : "update";

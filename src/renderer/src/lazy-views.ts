@@ -42,6 +42,9 @@ export const InitialSetup = lazy(() =>
 export const AddServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/AddServerDialog").then((module) => ({ default: module.AddServerDialog })),
 );
+export const HostedPricingPage = lazy(() =>
+  import("@openbot/ui/features/servers/HostedPricingPage").then((module) => ({ default: module.HostedPricingPage })),
+);
 export const CreateLocalServerDialog = lazy(() =>
   import("@openbot/ui/features/servers/CreateLocalServerDialog").then((module) => ({
     default: module.CreateLocalServerDialog,

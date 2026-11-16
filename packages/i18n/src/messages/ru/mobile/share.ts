@@ -10,6 +10,7 @@ export const messages = {
   "mobile.share.content": "Что отправить",
   "mobile.share.footer":
     "Чат откроется с этим содержимым в поле сообщения. Ничего не будет отправлено, пока вы не отправите это.",
+  "mobile.share.sendFooter": "OpenBot отправит это агенту, затем откроет чат.",
   "mobile.share.lastUsed": "Последний использованный",
   "mobile.share.noAgents": "Нет агентов",
   "mobile.share.chooseAgent": "Выберите агента",

@@ -481,6 +481,41 @@ export class ModelVisibility {
     return this.#set(change);
   }
 
+  /** The models that an admin turned off, for each provider, as a server transfer carries them. */
+  hiddenModels(): { provider: string; hidden: string[] }[] {
+    return [...this.#hidden].map(([provider, ids]) => ({ provider, hidden: [...ids] }));
+  }
+
+  /**
+   * Replaces the turned-off models with those of a server transfer. Unlike `set`, it keeps the models
+   * that no provider lists now: on a new server the providers are often not signed in yet.
+   */
+  replaceHidden(
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ): Effect.Effect<void, PreferenceFileFailure> {
+    return this.#replaceHidden(models);
+  }
+
+  readonly #replaceHidden = Effect.fn("ModelVisibility.replaceHidden")(function* (
+    this: ModelVisibility,
+    models: readonly { provider: string; hidden: readonly string[] }[],
+  ) {
+    const next = new Map<string, ReadonlySet<string>>();
+    for (const entry of models) if (entry.hidden.length > 0) next.set(entry.provider, new Set(entry.hidden));
+    yield* this.#writes.withPermit(
+      Effect.uninterruptible(
+        writePreferenceFile(this.#options.path, encodeHidden(next)).pipe(
+          Effect.tap(() =>
+            Effect.sync(() => {
+              this.#hidden = next;
+            }),
+          ),
+        ),
+      ),
+    );
+    this.#options.modelsChanged();
+  });
+
   /**
    * The models of `models` that the picker lists, in the same order: less those that an admin turned
    * off, and with `listing` set to `older` for those that the default hides and to `new` for a recent

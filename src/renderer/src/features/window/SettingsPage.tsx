@@ -4,8 +4,13 @@ import { createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { useAuth } from "../account/account-context";
+import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage-usage";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
-import { activeServerHasProviderSettings, serverSupportsCapability } from "../servers/server-capabilities";
+import {
+  activeServerHasProviderSettings,
+  serverHasAgentDefaults,
+  serverSupportsCapability,
+} from "../servers/server-capabilities";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
@@ -29,8 +34,11 @@ type PersonalRow = {
   macOS?: boolean;
 };
 
-/** A section of the active server's settings. A user looks for providers in the user settings too. */
-type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey: AppTextKey };
+/**
+ * A section, or a row of a section, of the active server's settings. A user looks for providers and
+ * agent settings in the user settings too.
+ */
+type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey?: AppTextKey };
 
 type SearchRow = PersonalRow | ServerRow;
 
@@ -50,6 +58,26 @@ const IMPORT_ROW: ServerRow = {
   section: "import",
   titleKey: "server.settings.importTitle",
   descriptionKey: "server.settings.importDescription",
+};
+
+/** Server Settings > Agent defaults, then its rows. */
+const AGENTS_ROWS: ReadonlyArray<ServerRow> = [
+  {
+    section: "agents",
+    titleKey: "server.settings.agentDefaultsTitle",
+    descriptionKey: "server.settings.agentsDescription",
+  },
+  { section: "agents", titleKey: "agentSettings.automation.title" },
+  { section: "agents", titleKey: "agentSettings.agentNewChat.title" },
+  { section: "agents", titleKey: "agentSettings.quickAcknowledgement.title" },
+  { section: "agents", titleKey: "settings.busyMessage.title", descriptionKey: "settings.busyMessage.description" },
+];
+
+/** Server Settings > Storage lists the background processes of the server. */
+const BACKGROUND_PROCESSES_ROW: ServerRow = {
+  section: "storage",
+  titleKey: "settings.backgroundProcesses.title",
+  descriptionKey: "settings.backgroundProcesses.description",
 };
 
 /** A broad query shows a short list, not every row. */
@@ -106,6 +134,12 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       ...personal,
       ...(activeServerHasProviderSettings(server) ? [PROVIDERS_ROW] : []),
       ...(serverSupportsCapability(server, "agent-import-v1") ? [IMPORT_ROW] : []),
+      ...(serverHasAgentDefaults(server) ? AGENTS_ROWS : []),
+      ...(serverHasBackgroundProcesses(server) &&
+      canManageStorage(server) &&
+      (server.kind === "local" || server.state === "online")
+        ? [BACKGROUND_PROCESSES_ROW]
+        : []),
     ];
   };
   const results = () =>
@@ -141,9 +175,9 @@ export function SettingsPage(props: { kind: SettingsKind }) {
     for (const marked of content.querySelectorAll("[data-search-match]")) marked.removeAttribute("data-search-match");
     if (!row.anchor) return;
     // A row that the current state does not show has no anchor in the page; then only the tab opens.
-    const anchor = content.querySelector(
-      `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`,
-    );
+    // A plain string: as a template type, each tab and row key pair is one member of a union that is too large.
+    const selector: string = `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`;
+    const anchor = content.querySelector(selector);
     // A switch row puts the anchor on its switch, so the search marks the whole row of the card.
     const target = anchor?.closest(".settings-modal-card > *") ?? anchor;
     if (!(target instanceof HTMLElement)) return;

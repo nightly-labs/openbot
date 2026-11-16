@@ -11,7 +11,8 @@ export interface AcpParams {
   sessionId?: string;
   cwd?: string;
   additionalDirectories?: string[];
-  mcpServers?: { name: string }[];
+  /** `type`, `url` and `headers` are on an http server only. */
+  mcpServers?: { name: string; type?: string; url?: string; headers?: { name: string; value: string }[] }[];
   prompt?: { type: string; text?: string }[];
   configId?: string;
   value?: string;

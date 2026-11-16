@@ -281,3 +281,39 @@
 .message-attachment[data-media="audio"] .attachment-media-player {
   height: var(--openbot-control-xl);
 }
+
+/* A video has no card: only the player, as a generated video. Its details show on hover, and a right click gives its actions. */
+.message-attachments-group:has(.message-attachment[data-player="video"]),
+.message-attachments:has(.message-attachment[data-player="video"]) {
+  width: min(100%, 480px);
+}
+
+.message-entry .ui-bubble:has(.message-attachment[data-player="video"]) {
+  width: min(480px, 100%);
+  max-width: min(480px, 100%);
+}
+
+/* The player is all that shows. The row comes back while a download runs or after it fails. */
+.message-attachment[data-player="video"]:not([data-download]) > :not(.attachment-media-player) {
+  display: none;
+}
+
+.message-attachment[data-player="video"],
+.message-attachment[data-player="video"]:hover {
+  row-gap: var(--openbot-space-1-5);
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/* The first frame says that the file is a video. */
+.message-attachment[data-player="video"] .attachment-file-visual {
+  display: none;
+}
+
+/* An upright video keeps its shape and stays as high as a wide one is wide. */
+.message-attachment[data-player="video"] .attachment-media-player {
+  max-width: calc(480px * (var(--media-generation-ratio)));
+  border-radius: var(--openbot-radius-lg);
+}

@@ -862,9 +862,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     if (onScreen()) deps.followSentMessage();
     // A message to a working agent waits behind its turn or its queue. A channel has no such queue.
     // An earlier send that has not failed is about to start a turn, so this one waits behind it.
+    // A host that steers puts the message in the running turn, which the chat shows, so it stays there.
     const queued =
       onScreen() &&
       !deps.props.channel &&
+      !hostSteers() &&
       (Boolean(deps.props.activeTurnId) ||
         deps.orderedQueuedDeliveries().length > 0 ||
         deps.pendingSends.list(target).some((send) => send.state !== "failed"));
@@ -987,6 +989,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return !deps.props.agent || providerSteersTurns(deps.props.agent.provider);
   }
 
+  /** The host steers each message sent while this agent works. Not known for a joined server until it answers. */
+  function hostSteers(): boolean {
+    return agentSteers() && (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
+  }
+
   /**
    * Sends the draft into the running turn: Send, then Steer on its queue row, in one key. An agent
    * that steers each message sent while it works does that itself, so a second steer is not asked.
@@ -994,9 +1001,7 @@ export function createComposerActions(deps: ComposerActionsDeps) {
    */
   function steerComposer(): void {
     if (deps.attachmentBusy() || deps.uploadFailed() || deps.voicePhase() !== "idle" || !deps.agentReady()) return;
-    const hostSteers =
-      agentSteers() && (deps.props.agent?.busyMessageMode ?? deps.props.defaultBusyMessageMode) === "steer";
-    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers);
+    void submitMessage(undefined, undefined, undefined, undefined, !hostSteers());
   }
 
   /** An instruction about selected text is a reply to that message. A failure shows on its row. */
@@ -1009,9 +1014,11 @@ export function createComposerActions(deps: ComposerActionsDeps) {
     return true;
   }
 
-  /** A message that a card in the chat sends for the user, such as Continue after a sign-in. */
-  function sendCardMessage(body: string): boolean {
-    const target = deps.currentTarget();
+  /**
+   * A message that a card in the chat sends for the user, such as Continue after a sign-in. A card
+   * that waits before it sends gives the chat of the click as `target`.
+   */
+  function sendCardMessage(body: string, target = deps.currentTarget()): boolean {
     if (!target || deps.submitting() || !deps.agentReady()) return false;
     queueSend(target, { text: body, attachments: [], replyToMessageId: null }, body);
     return true;

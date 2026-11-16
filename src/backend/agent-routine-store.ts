@@ -8,6 +8,7 @@ import type {
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
+  type ImportedRoutineRun,
   type OwnedRoutine,
   type OwnedRoutineRun,
   type ReceivedWebhookEvent,
@@ -117,6 +118,11 @@ export class AgentRoutineStore extends RoutineStore {
     return routineIds;
   }
 
+  /** Writes the finished runs that a server transfer brought for one of the agent's routines. */
+  importRuns(agentId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.importRunRows(routineId, agentId, runs);
+  }
+
   listRuns(agentId: string, routineId: string, limit = 50, withSkipped = false): RoutineRun[] {
     return this.listRunRows(agentId, routineId, limit, withSkipped).map(toRun);
   }
@@ -145,6 +151,17 @@ export class AgentRoutineStore extends RoutineStore {
     scheduledFor: string,
   ): RoutineRun {
     return toRun(this.createRunRow(runSource(routine), triggerId, start, scheduledFor));
+  }
+
+  /** Records the due occurrences that the scheduler did not start, and why, and moves the trigger. */
+  skipOccurrences(
+    { agentId, ...fields }: Routine,
+    due: Date,
+    scheduledFor: Date,
+    nextRunAt: Date,
+    reason: string,
+  ): void {
+    this.skipOccurrenceRow({ ...fields, ownerId: agentId }, due, scheduledFor, nextRunAt, reason);
   }
 
   receiveWebhook(agentId: string, routineId: string, event: ReceivedWebhookEvent): WebhookReceiveResult<RoutineRun> {

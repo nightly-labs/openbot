@@ -1,6 +1,8 @@
 package run.openbot.quickactions
 
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
@@ -29,6 +31,9 @@ class QuickActionsModule : Module() {
   private var listening = false
   private var pending: String? = null
 
+  /** The last items, so the shortcuts come back when the launcher activity changes. */
+  @Volatile private var items: List<QuickActionItem> = emptyList()
+
   override fun definition() = ModuleDefinition {
     Name("OpenBotQuickActions")
 
@@ -36,6 +41,7 @@ class QuickActionsModule : Module() {
 
     /** Replaces the dynamic shortcuts. Returns false when Android keeps the old ones. */
     AsyncFunction("setItems") { items: List<QuickActionItem> ->
+      this@QuickActionsModule.items = items
       publish(items)
     }
 
@@ -52,6 +58,7 @@ class QuickActionsModule : Module() {
     // JavaScript can listen before the activity is current, so the activity reads its intent again here.
     OnActivityEntersForeground {
       receive(appContext.currentActivity?.intent)
+      restore()
     }
 
     OnNewIntent { intent ->
@@ -78,11 +85,33 @@ class QuickActionsModule : Module() {
     return id
   }
 
+  /**
+   * Android removes the shortcuts of a launcher activity that the app disables, as when the user
+   * selects another app icon (`modules/app-icon`). It can do so after the app is back, so the check
+   * compares the activity of the shortcuts with the current launcher activity, not only the count.
+   * After a restart, JavaScript publishes the items again.
+   */
+  private fun restore() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1 || items.isEmpty()) return
+    val context = appContext.reactContext ?: return
+    val manager = context.getSystemService(ShortcutManager::class.java) ?: return
+    val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return
+    val shortcuts = manager.dynamicShortcuts
+    if (shortcuts.isEmpty() || shortcuts.any { it.activity != launcher }) publish(items)
+  }
+
   private fun publish(items: List<QuickActionItem>): Boolean {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N_MR1) return false
     val context = appContext.reactContext ?: return false
     val manager = context.getSystemService(ShortcutManager::class.java) ?: return false
-    val activity = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return false
+    val launcher = context.packageManager.getLaunchIntentForPackage(context.packageName)?.component ?: return false
+    // The launcher entry is an alias of the main activity. A pinned shortcut opens the main activity
+    // itself, so it still works when the user selects another app icon.
+    val activity = try {
+      context.packageManager.getActivityInfo(launcher, 0).targetActivity?.let { ComponentName(context.packageName, it) }
+    } catch (error: PackageManager.NameNotFoundException) {
+      null
+    } ?: launcher
     val shortcuts = items.take(manager.maxShortcutCountPerActivity).mapIndexed { rank, item ->
       val intent = Intent(SHORTCUT_ACTION)
         .setComponent(activity)
@@ -94,6 +123,8 @@ class QuickActionsModule : Module() {
         .setLongLabel(item.title)
         .setIcon(Icon.createWithResource(context, iconResource(item.icon)))
         .setIntent(intent)
+        // The launcher entry that shows the shortcut: the alias of the selected app icon.
+        .setActivity(launcher)
         .setRank(rank)
         .build()
     }

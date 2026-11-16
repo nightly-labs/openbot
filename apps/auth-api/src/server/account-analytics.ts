@@ -19,6 +19,7 @@ import {
 import { isOneOf } from "@openbot/contracts/runtime-values";
 import { normalizeEmailAddress } from "@openbot/contracts/validation";
 import { Effect, Schema } from "effect";
+import type { HostedPoolGroup } from "./hosted-pool-snapshot";
 
 /** The same OpenPanel project as the desktop app and the website. ANALYTICS.md is the contract. */
 const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
@@ -29,9 +30,10 @@ const OPENPANEL_API_URL = "https://analytics.openbot.run/api";
  * `billing_snapshot`. A billing event without `product` is from a server plan. No generation 10
  * property changes. Generation 12 adds `email_sent`. Generation 13 adds the `license` kind of `email_sent`.
  * Generation 14 adds `email_fallback_sent`. Generation 15 adds the `ready` hosted server action, with
- * `duration_ms` and the `create` reason.
+ * `duration_ms` and the `create` reason. Generation 16 adds `hosted_pool_snapshot`. Generation 17 adds
+ * `machine` on the `provisioned`, `ready` and `setup_failed` hosted server actions.
  */
-export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 15;
+export const ACCOUNT_ANALYTICS_SCHEMA_VERSION = 17;
 const SEND_TIMEOUT_MS = 5_000;
 const ACCOUNT_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -93,6 +95,8 @@ export function isAnalyticsLicenseUsers(value: unknown): value is number {
 }
 /** `create`: only on `ready`, for the first start of a new server. */
 const WAKE_REASONS = ["create", "message", "restart", "schedule", "retention"] as const;
+/** Where a new server starts: on a prepared machine of the operator's pool, or in a boat sandbox. */
+const HOSTED_MACHINES = ["pool", "boat"] as const;
 /**
  * The longest start that `ready` reports. A longer one is a start time that a Worker without the column
  * left behind, not a start.
@@ -149,10 +153,16 @@ export type AccountAnalyticsEvent =
       size?: HostedServerSize;
       reason?: (typeof WAKE_REASONS)[number];
       error?: HostedServerError | null;
-      /** On `ready`: from the request to boat until boat reported the sandbox as usable. */
+      /**
+       * On `ready`: from the request to boat until boat reported the sandbox as usable. For a `pool`
+       * machine: from the assignment until OpenBot on the machine signed in.
+       */
       durationMs?: number;
+      machine?: (typeof HOSTED_MACHINES)[number];
     }
-  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult };
+  | { name: "email_sent" | "email_fallback_sent"; kind: EmailKind; result: EmailResult }
+  /** Each 5 minutes: the machines of the operator in one location and product, by state. */
+  | { name: "hosted_pool_snapshot"; group: HostedPoolGroup };
 
 /** Account events that only the Worker sees: new accounts, payments, hosted servers and email sends. */
 export interface AccountAnalytics {
@@ -303,12 +313,14 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
     if (!isOneOf(EMAIL_KINDS, event.kind) || !isOneOf(EMAIL_RESULTS, event.result)) return null;
     return { ...properties, kind: event.kind, result: event.result };
   }
+  if (event.name === "hosted_pool_snapshot") return hostedPoolProperties(properties, event.group);
   if (event.name !== "hosted_server_action" || !isOneOf(HOSTED_SERVER_ACTIONS, event.action)) return null;
   properties.action = event.action;
   if (isOneOf(BILLING_PLAN_IDS, event.plan)) properties.plan = event.plan;
   if (isOneOf(HOSTED_SERVER_SIZE_NAMES, event.size)) properties.size = event.size;
   if (isOneOf(WAKE_REASONS, event.reason)) properties.reason = event.reason;
   if (isOneOf(HOSTED_SERVER_ERRORS, event.error)) properties.error = event.error;
+  if (isOneOf(HOSTED_MACHINES, event.machine)) properties.machine = event.machine;
   const duration = event.durationMs;
   if (
     event.action === "ready" &&
@@ -319,6 +331,33 @@ function accountEventProperties(event: AccountAnalyticsEvent): AnalyticsProperti
   )
     properties.duration_ms = duration;
   return properties;
+}
+
+const POOL_LOCATION_PATTERN = /^(?:[A-Z]{3}-\d{2}|all|unknown)$/u;
+const POOL_PRODUCT_PATTERN = /^(?:VPS\d{2}|all|unknown)$/u;
+const POOL_COUNTS = [
+  "machines",
+  "free",
+  "ready",
+  "to_reinstall",
+  "plan_ended",
+  "cancel_scheduled",
+  "in_use",
+  "free_in_7d",
+  "free_in_30d",
+] as const satisfies readonly (keyof HostedPoolGroup)[];
+const MAX_POOL_COUNT = 100_000;
+
+/** Drops the event when a location, a product or a count is not of the pool. */
+function hostedPoolProperties(properties: AnalyticsProperties, group: HostedPoolGroup): AnalyticsProperties | null {
+  if (!POOL_LOCATION_PATTERN.test(group.location) || !POOL_PRODUCT_PATTERN.test(group.product)) return null;
+  const result: AnalyticsProperties = { ...properties, location: group.location, product: group.product };
+  for (const key of POOL_COUNTS) {
+    const count = group[key];
+    if (!Number.isInteger(count) || count < 0 || count > MAX_POOL_COUNT) return null;
+    result[key] = count;
+  }
+  return result;
 }
 
 const FIRST_TOUCH_CAMPAIGN_PROPERTIES = {

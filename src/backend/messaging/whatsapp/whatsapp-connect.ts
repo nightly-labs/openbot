@@ -10,8 +10,10 @@ import { MESSAGING_LIMITS } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { newStoreKey } from "@openbot/whatsapp/auth-store";
 import { Effect, Schema } from "effect";
+import type { MessagingHistoryStore } from "../messaging-history-store";
 import type { MessagingCredentials, MessagingOperationFailed } from "../messaging-service";
 import type { MessagingStore } from "../messaging-store";
+import type { WhatsAppHistory } from "./whatsapp-archive";
 import { maskedNumber, whatsAppCredentials, whatsAppIdentity } from "./whatsapp-driver";
 import { userJid } from "./whatsapp-events";
 import type { WhatsAppConnectionHandle, WhatsAppPolicy, WhatsAppRuntime } from "./whatsapp-runtime";
@@ -41,6 +43,7 @@ export interface WhatsAppConnectHooks {
 export interface WhatsAppConnectOptions {
   runtime: WhatsAppRuntime;
   store: MessagingStore;
+  history: MessagingHistoryStore;
   credentials: MessagingCredentials;
   hooks: WhatsAppConnectHooks;
 }
@@ -62,6 +65,7 @@ interface RunningLink {
 export class WhatsAppConnect implements WhatsAppPolicy {
   readonly #runtime: WhatsAppRuntime;
   readonly #store: MessagingStore;
+  readonly #history: MessagingHistoryStore;
   readonly #credentials: MessagingCredentials;
   readonly #hooks: WhatsAppConnectHooks;
   readonly #requests = new WhatsAppPairingRequests();
@@ -71,6 +75,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   constructor(options: WhatsAppConnectOptions) {
     this.#runtime = options.runtime;
     this.#store = options.store;
+    this.#history = options.history;
     this.#credentials = options.credentials;
     this.#hooks = options.hooks;
     this.#runtime.setPolicy(this);
@@ -159,6 +164,11 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
     if (!record?.enabled || this.#ownNumber(record.connectionId)) return null;
     return this.#requests.request(workspaceId, senderId, name);
+  }
+
+  history(workspaceId: string): WhatsAppHistory | null {
+    const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
+    return record ? { connectionId: record.connectionId, store: this.#history } : null;
   }
 
   /** The settings of each linked number, for the overview. */
@@ -366,6 +376,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   #ownNumber(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);
     return values ? whatsAppCredentials(values).ownNumber : true;
+  }
+
+  /**
+   * True when a post to this chat shows as a message of the owner: the owner's personal number, in a
+   * chat that is not the owner's "Message yourself" chat. The workspace id of a number is its phone
+   * number, and the own chat goes by that number.
+   */
+  postsAsOwner(connectionId: string, platformChannelId: string): boolean {
+    const record = this.#store.connection(connectionId);
+    if (record?.platform !== "whatsapp" || !this.#ownNumber(connectionId)) return false;
+    return platformChannelId.split("@")[0] !== record.workspaceId;
   }
 
   /** True unless the owner turned off the "Working on it…" post of this number. */

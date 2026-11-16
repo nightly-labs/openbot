@@ -31,10 +31,15 @@ export const messages = defineMessages("billing", {
   "billing.status.paused": "Paused",
   "billing.otherServers": "Other servers",
   "billing.action.menu": "Plan actions for {server}",
-  "billing.action.change": "Change plan",
+  "billing.action.addStorage": "Add storage",
   "billing.action.cancel": "Cancel plan",
   "billing.action.renew": "Renew plan",
   "billing.action.updatePayment": "Update payment method",
+  // "Add storage" in Billing. {server} is the server name.
+  "billing.storage.title": "More space for {server}",
+  // The button that buys the chosen storage. {size} is the added storage, for example "50 GB".
+  "billing.storage.add": "Add {size}",
+  "billing.storage.failed": "Could not add storage.",
   "billing.lifecycle.cancelRenewal": "Cancel renewal",
   "billing.lifecycle.cancelTitle": "Cancel renewal for {name}?",
   "billing.lifecycle.cancelDescription":
@@ -161,6 +166,8 @@ export const messages = defineMessages("billing", {
   "billing.order.server.summary": "We run OpenBot for your team.",
   "billing.order.server.none": "No server",
   "billing.order.server.noneDetail": "Run OpenBot on your own computer",
+  // The free choice of the order form in the app, which already runs on this computer. The web page says "No server".
+  "billing.order.server.thisComputer": "Your computer",
   "billing.order.server.bestValue": "Best value",
   "billing.order.server.bestFor.starter": "Best for one person",
   "billing.order.server.bestFor.standard": "Best for a small team",
@@ -209,6 +216,8 @@ export const messages = defineMessages("billing", {
   "billing.order.cta.server": "Create a server",
   "billing.order.cta.license": "Buy a license",
   "billing.order.cta.download": "Download",
+  // The button of the order form in the app when the order has no server and no license. It closes the page.
+  "billing.order.cta.keepComputer": "Keep using this computer",
   // Shown before an invite that makes the license too small.
   "billing.license.invite.title": "Add a user to the license?",
   "billing.license.invite.description": "This invite adds 1 user to your license: {price} more a month.",

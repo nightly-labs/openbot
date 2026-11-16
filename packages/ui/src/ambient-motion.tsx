@@ -5,7 +5,8 @@ import { createContext, useContext } from "solid-js";
  * Whether motion that loops by itself may run here, such as the avatar of a working agent. A window
  * that stays above the other apps all day, such as the Dynamic Island or the agent dock, allows it only
  * while the user looks at it. Each frame there makes macOS compose the screen again, so the other apps
- * stuttered while an agent worked. The surface also pauses its CSS loops, such as a spinner.
+ * stuttered while an agent worked. The surface also pauses its CSS loops, but not a spinner: a stopped
+ * spinner looks frozen.
  */
 const AmbientMotionContext = createContext<() => boolean>(() => true);
 

@@ -20,6 +20,11 @@ export const messages = {
   "error.workflow.conditionUnclear": "El modelo no respondió sí o no.",
   "error.workflow.modelFailed": "El modelo no pudo responder. Ejecuta el paso de nuevo.",
   "error.workflow.modelBusy": "Hay otra solicitud al modelo en curso. Ejecuta el paso de nuevo en breve.",
+  "error.workflow.mediaFailed": "El modelo no pudo crear la imagen o el vídeo. Ejecuta el paso de nuevo.",
+  "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
+  "error.workflow.pictureType": "Usa una imagen PNG, JPEG o WebP.",
+  "error.workflow.mediaInputMissing": "Una imagen de un paso anterior no está disponible. Ejecuta ese paso de nuevo.",
+  "error.workflow.mediaInputNotImage": "Este paso solo acepta imágenes, no vídeos. Quita la conexión desde el vídeo.",
   "error.workflow.stepMissing": "Este paso ya no existe.",
   "error.workflow.nodeMissing": "Este paso no está en el flujo de trabajo.",
   "error.workflow.runMissing": "Esta ejecución ya no existe.",
@@ -69,4 +74,14 @@ export const messages = {
     "El cambio se detuvo a medio camino. Puede que ya esté en GitHub. Revísalo antes de ejecutar el paso de nuevo.",
   "error.workflow.githubNoEvent":
     "GitHub no tiene ninguna incidencia ni pull request con la que se inicie este activador.",
+  "error.workflow.sunraSignIn": "Inicia sesión en Sunra en Apps para usar los modelos de Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Tu cuenta de Sunra no tiene créditos suficientes. Añade créditos en sunra.ai/pricing y vuelve a ejecutar el paso.",
+  "error.workflow.sunraNeedsPlan":
+    "Este modelo de Sunra necesita un plan de Sunra. Elige un plan en sunra.ai/pricing o selecciona otro modelo.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra usa imágenes de entrada solo con una cuenta personal. Selecciona tu cuenta personal en Sunra o quita las conexiones de imágenes.",
+  "error.workflow.sunraFailed": "Sunra no pudo crear el archivo: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra no terminó el archivo a tiempo. Revisa el proyecto OpenBot en sunra.ai antes de volver a ejecutar el paso.",
 } as const satisfies PartialTranslation<typeof source>;

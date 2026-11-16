@@ -630,7 +630,6 @@ export function OpenBotDynamicIsland(props: OpenBotDynamicIslandProps): JSX.Elem
       ref={transitionRoot}
       class="openbot-dynamic-island-transition-root"
       data-mode-transitioning={modeTransitioning() ? "true" : undefined}
-      data-ambient-motion={ambientMotion() ? undefined : "paused"}
     >
       <AmbientMotion when={ambientMotion()}>
         <DynamicIsland

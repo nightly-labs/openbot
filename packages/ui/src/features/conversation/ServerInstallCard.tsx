@@ -1,8 +1,9 @@
 import type { ServerSummary } from "@openbot/contracts/ipc";
 import { Button, Check, CircleAlert, LoaderCircle, PlushLoader } from "@openbot/ui";
-import { createSignal, createUniqueId, Show, untrack } from "solid-js";
+import { createSignal, Show, untrack } from "solid-js";
 import { useText } from "../../text";
 import { ServerMark } from "../servers/ServerRail";
+import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 /**
  * - waiting: the agent has the command. No server used it yet.
@@ -29,7 +30,6 @@ const isLive = (step: ServerInstallCardStep) => step === "starting" || step === 
 /** A one-time install command that an agent runs on another computer. The card waits for that server. */
 export function ServerInstallCard(props: ServerInstallCardProps) {
   const { t } = useText();
-  const titleId = createUniqueId();
   const name = () => props.name ?? t("chat.serverInstall.title");
   const status = () => {
     if (props.step === "waiting") return t("server.install.waiting");
@@ -39,34 +39,29 @@ export function ServerInstallCard(props: ServerInstallCardProps) {
     return t("chat.serverInstall.expired");
   };
   return (
-    <article
-      class="conversation-interaction-card marketplace-suggestion server-install-card"
-      data-step={props.step}
-      aria-labelledby={titleId}
-    >
-      <header class="marketplace-suggestion-header">
-        <ServerInstallTile step={props.step} server={props.server ?? null} />
-        <div class="marketplace-suggestion-heading">
-          <h3 id={titleId} class="marketplace-suggestion-title">
-            {name()}
-          </h3>
-          <span class="marketplace-suggestion-description server-install-card-status" role="status">
-            <Show when={status()} keyed>
-              {(text) => <span class="server-install-card-status-text">{text}</span>}
-            </Show>
-          </span>
-        </div>
+    <UiBlockCard
+      class="marketplace-suggestion server-install-card"
+      status="pending"
+      inlineActions
+      title={name()}
+      subtitle={
+        <span class="server-install-card-status" data-step={props.step} role="status">
+          <Show when={status()} keyed>
+            {(text) => <span class="server-install-card-status-text">{text}</span>}
+          </Show>
+        </span>
+      }
+      icon={<ServerInstallTile step={props.step} server={props.server ?? null} />}
+      actions={
         <Show when={props.step === "connected" ? props.onOpenServer : undefined}>
           {(open) => (
-            <div class="marketplace-suggestion-action server-install-card-action">
-              <Button type="button" size="sm" onClick={() => open()()}>
-                {t("server.hosted.open")}
-              </Button>
-            </div>
+            <Button type="button" size="sm" class="server-install-card-action" onClick={() => open()()}>
+              {t("server.hosted.open")}
+            </Button>
           )}
         </Show>
-      </header>
-    </article>
+      }
+    />
   );
 }
 
@@ -83,7 +78,11 @@ function ServerInstallTile(props: {
   /** The loader leaves the tile after it shrinks away, so that its animations stop. */
   const [loaderGone, setLoaderGone] = createSignal(revealed);
   return (
-    <span class="server-install-card-tile" data-step={props.step} data-revealed={revealed ? "" : undefined}>
+    <span
+      class="ui-block-icon server-install-card-tile"
+      data-step={props.step}
+      data-revealed={revealed ? "" : undefined}
+    >
       <Show
         when={props.step !== "expired"}
         fallback={<CircleAlert class="install-server-warning" aria-hidden="true" />}

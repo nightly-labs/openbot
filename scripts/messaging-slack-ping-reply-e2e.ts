@@ -114,6 +114,7 @@ const ingress: MessagingIngress = {
   reconnect: () => {},
   discord: unused,
   onDiscordRoutes: () => () => {},
+  onLinkedRoutes: () => () => {},
 };
 
 /** Each call that OpenBot made to the fake Slack. */

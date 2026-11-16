@@ -4,24 +4,9 @@ import {
   UI_BLOCK_SUBMIT_ACTION_ID,
   type UiBlockValue,
   type UiFormField,
-  type UiFormOptionsField,
   type UiFormBlock as UiFormSpec,
 } from "@openbot/contracts/ui-blocks";
-import {
-  Button,
-  Field,
-  Input,
-  KeyRound,
-  Lock,
-  NativeSelect,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@openbot/ui";
-import type { JSX } from "@solidjs/web";
+import { Button, Field, Input, KeyRound, Lock, NativeSelect, Textarea } from "@openbot/ui";
 import { createSignal, createUniqueId, For, Match, Show, Switch } from "solid-js";
 import { useText } from "../../../text";
 import { cx } from "../../../utils";
@@ -73,7 +58,7 @@ function FormAnswerRows(props: { rows: AnswerRow[] }) {
   );
 }
 
-/** The key before the title of an answered form that asked for a secret. */
+/** The key before the title of a form that asks for a secret, as the Vault request card has its kind. */
 function SecretFormIcon(props: { shown: boolean }) {
   return (
     <Show when={props.shown}>
@@ -84,46 +69,7 @@ function SecretFormIcon(props: { shown: boolean }) {
   );
 }
 
-/**
- * A choice field as a small select at the start of the footer, next to the submit button. A required
- * field cannot go back to no value.
- */
-function FooterSelect(props: {
-  field: UiFormOptionsField;
-  value: string;
-  disabled: boolean;
-  invalid: boolean;
-  onChange: (value: string) => void;
-}) {
-  const { t } = useText();
-  return (
-    <Select<string>
-      class="ui-block-footer-select"
-      options={props.field.options}
-      value={props.value === "" ? null : props.value}
-      disabled={props.disabled}
-      disallowEmptySelection={props.field.required === true}
-      placeholder={props.field.required ? t("uiBlock.form.choose") : t("uiBlock.form.notSet")}
-      validationState={props.invalid ? "invalid" : "valid"}
-      sameWidth={false}
-      placement="bottom-start"
-      onChange={(value) => props.onChange(value ?? "")}
-      itemComponent={(itemProps) => <SelectItem item={itemProps.item}>{itemProps.item.rawValue}</SelectItem>}
-    >
-      <SelectTrigger aria-label={fieldLabel(props.field)} size="sm">
-        <SelectValue<string>>{(selection) => selection.selectedOption()}</SelectValue>
-      </SelectTrigger>
-      <SelectContent />
-    </Select>
-  );
-}
-
-export interface UiFormBlockProps extends UiBlockProps<UiFormSpec> {
-  /** The id of a select or segmented field that the footer shows as a small select, not the form. */
-  footerFieldId?: string | undefined;
-}
-
-export function UiFormBlock(props: UiFormBlockProps) {
+export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   const { t } = useText();
   const formId = createUniqueId();
   const state = () => uiBlockState(props);
@@ -153,18 +99,7 @@ export function UiFormBlock(props: UiFormBlockProps) {
   // The rows already show each answer, so the line under them would repeat it.
   const outcome = () => (summarized() ? undefined : state().outcome);
   const errorOf = (field: UiFormField) => (failed().has(field.id) ? t("uiBlock.form.required") : undefined);
-  const footerField = (): UiFormOptionsField | undefined =>
-    props.spec.fields.find(
-      (field): field is UiFormOptionsField =>
-        field.id === props.footerFieldId && (field.kind === "select" || field.kind === "segmented"),
-    );
-  const bodyFields = () => props.spec.fields.filter((field) => field !== footerField());
-  /** The error of the field in the footer goes to the error line of the card: the select has no room for it. */
-  const cardError = (): string | undefined => {
-    if (rejected()) return t("uiBlock.form.invalid");
-    const field = footerField();
-    return (field && errorOf(field)) ?? props.error;
-  };
+  const cardError = (): string | undefined => (rejected() ? t("uiBlock.form.invalid") : props.error);
 
   function setValue(field: UiFormField, value: string): void {
     setDraft((current) => ({ ...current, [field.id]: value }));
@@ -187,32 +122,17 @@ export function UiFormBlock(props: UiFormBlockProps) {
     setRejected(!sendUiBlockResponse(props.spec, { actionId: UI_BLOCK_SUBMIT_ACTION_ID, values }, props.onRespond));
   }
 
-  function footerSelectOrNone(): JSX.Element | undefined {
-    const field = footerField();
-    if (!field) return undefined;
-    return (
-      <FooterSelect
-        field={field}
-        value={currentValue(field)}
-        disabled={locked()}
-        invalid={errorOf(field) !== undefined}
-        onChange={(value) => setValue(field, value)}
-      />
-    );
-  }
-
   return (
     <UiBlockCard
       class={cx("ui-block-form", props.class)}
       title={props.spec.title}
-      icon={<SecretFormIcon shown={summarized()} />}
+      icon={<SecretFormIcon shown={props.spec.fields.some(isSecretFormField)} />}
       status={state().status}
       outcome={outcome()}
       busy={props.busy}
       waiting={props.disabled !== true}
       error={cardError()}
       onSkip={props.disabled ? undefined : props.onSkip}
-      footerStart={footerSelectOrNone()}
       actions={
         // The button is outside the form, in the footer of the card, so it names the form it sends.
         <Button type="submit" size="sm" form={formId} disabled={locked()}>
@@ -231,7 +151,7 @@ export function UiFormBlock(props: UiFormBlockProps) {
             submit();
           }}
         >
-          <For each={bodyFields()}>
+          <For each={props.spec.fields}>
             {(field) => (
               <Switch>
                 <Match when={field.kind === "segmented" ? field : undefined}>

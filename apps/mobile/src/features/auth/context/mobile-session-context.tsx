@@ -69,6 +69,7 @@ export function MobileSessionProvider({ children }: PropsWithChildren) {
       queryClient.removeQueries({ queryKey: queryKeys.accountSessions() });
       // The hosted server plans keep the last answer for the life of the app; a new session drops it.
       queryClient.removeQueries({ queryKey: queryKeys.hostedServerPlans() });
+      queryClient.removeQueries({ queryKey: queryKeys.billing() });
       // Unsent text belongs to one account. This also drops text that a closing chat wrote after sign-out.
       deleteComposerDrafts();
     }

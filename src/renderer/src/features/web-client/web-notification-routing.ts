@@ -12,6 +12,7 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationRequestKey,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import { channelReplyNotifications } from "@openbot/team-client/channel-notifications";
 import type { TextValue } from "@openbot/ui/text";
@@ -107,6 +108,8 @@ export function createWebNotificationRouting(options: {
       if (requestKey) waitingRequests.delete(requestKey);
       return;
     }
+    // Work between agents stays in the chat and does not call the user, as on desktop.
+    if (teammateTurnCompleted(event)) return;
     const { muted, level } = untrack(() => notifications.state(hostId));
     if (muted) return;
     const agentId = agentEventAgentId(event);

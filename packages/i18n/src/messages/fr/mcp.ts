@@ -152,6 +152,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "Connectez-vous sur {page} dans votre navigateur et terminez-y la connexion. {host} détecte la connexion lui-même.",
   "mcp.signIn.relayOpen": "Ouvrir la page de connexion",
+  "mcp.signIn.relayCopy": "Copier le lien",
   "mcp.signIn.relayPasteHint":
     "Si le navigateur ne revient pas vers OpenBot, copiez l’adresse qu’il affiche et collez-la ici.",
   "mcp.signIn.relayPasteRequired":

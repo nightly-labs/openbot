@@ -74,6 +74,16 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: 모델 "{model}"을(를) 아직 여기서 사용할 수 없어서 에이전트가 기본 모델을 사용해요. 제공자가 준비되면 모델을 다시 선택해 주세요.',
   "error.import.transferSettingSkipped": "{name}을(를) 가져오지 않았어요. {reason}",
+  "error.import.transferRunsSkipped": '{name}: 루틴 "{routine}"의 실행 기록은 가져오지 않아요.',
+  "error.import.transferSharedSkillsSkipped": "공유 스킬을 읽을 수 없어서 파일에 포함되지 않았어요.",
+  "error.import.transferSharedSkillsNotAdded": "파일의 공유 스킬을 이 서버에 추가할 수 없었어요.",
+  "error.import.transferMemberPreferencesSkipped": {
+    other: "멤버 {count}명의 선택을 저장할 수 없었어요.",
+  },
+  "error.import.transferSharedSkillExists": "이름이 같고 파일이 다른 공유 스킬이 이 서버에 이미 있어요.",
+  "error.import.transferServerPreferencesSkipped": {
+    other: "파일의 서버 환경설정 {count}개가 여기서 유효하지 않아 가져오지 않아요.",
+  },
   "error.import.transferRoutineFlowSkipped": "가져오기에서 루틴 플로우 하나를 제외했어요. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: 커스텀 에이전트는 명령을 실행하므로 가져오지 않았어요. 명령 "{command}"을(를) 확인한 후 설정에서 에이전트를 다시 추가해 주세요.',
