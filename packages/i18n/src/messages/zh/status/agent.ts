@@ -40,6 +40,8 @@ export const messages = {
   "status.agent.serverInstallCard": "服务器 {name} 的安装命令",
   "status.agent.browserProfileNamed":
     "将 {agents} 移到浏览器配置文件 {profile}。它们会使用其中的登录信息和 Cookie。它们打开的标签页会关闭。",
+  "status.agent.commitCoAuthorOff": "不再将 OpenBot 作为共同作者添加到所有智能体的提交中。",
+  "status.agent.commitCoAuthorOn": "重新将 OpenBot 作为共同作者添加到所有智能体的提交中。",
   "status.agent.browserProfileNew":
     "新建浏览器配置文件 {profile} 并将 {agents} 移到其中。它没有登录信息。它们打开的标签页会关闭。",
   "status.agent.browserProfileShared":

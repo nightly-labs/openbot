@@ -42,6 +42,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",
   "status.agent.browserProfileNamed":
     "Déplacer {agents} vers le profil de navigateur {profile}. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.commitCoAuthorOff": "Ne plus ajouter OpenBot comme coauteur des commits de tous les agents.",
+  "status.agent.commitCoAuthorOn": "Ajouter de nouveau OpenBot comme coauteur des commits de tous les agents.",
   "status.agent.browserProfileNew":
     "Créer le nouveau profil de navigateur {profile} et y déplacer {agents}. Il n'a aucune connexion. Leurs onglets ouverts se ferment.",
   "status.agent.browserProfileShared":

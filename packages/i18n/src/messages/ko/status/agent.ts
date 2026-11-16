@@ -42,6 +42,8 @@ export const messages = {
   "status.agent.serverInstallCard": "서버 {name}의 설치 명령",
   "status.agent.browserProfileNamed":
     "{agents}을(를) 브라우저 프로필 {profile}(으)로 옮깁니다. 그 프로필의 로그인 정보와 쿠키를 사용하게 됩니다. 열린 탭은 닫힙니다.",
+  "status.agent.commitCoAuthorOff": "모든 에이전트의 커밋에 OpenBot을 공동 작성자로 추가하지 않습니다.",
+  "status.agent.commitCoAuthorOn": "모든 에이전트의 커밋에 OpenBot을 다시 공동 작성자로 추가합니다.",
   "status.agent.browserProfileNew":
     "새 브라우저 프로필 {profile}을(를) 만들고 {agents}을(를) 옮깁니다. 로그인 정보가 없습니다. 열린 탭은 닫힙니다.",
   "status.agent.browserProfileShared":

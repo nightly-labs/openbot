@@ -44,6 +44,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Installationsbefehl für den Server {name}",
   "status.agent.browserProfileNamed":
     "{agents} in das Browser-Profil {profile} verschieben. Sie erhalten seine Anmeldungen und Cookies. Ihre offenen Tabs werden geschlossen.",
+  "status.agent.commitCoAuthorOff": "OpenBot nicht mehr als Mitautor in die Commits aller Agenten eintragen.",
+  "status.agent.commitCoAuthorOn": "OpenBot wieder als Mitautor in die Commits aller Agenten eintragen.",
   "status.agent.browserProfileNew":
     "Das neue Browser-Profil {profile} erstellen und {agents} dorthin verschieben. Es hat keine Anmeldungen. Ihre offenen Tabs werden geschlossen.",
   "status.agent.browserProfileShared":

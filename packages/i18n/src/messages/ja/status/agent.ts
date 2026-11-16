@@ -44,6 +44,8 @@ export const messages = {
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
   "status.agent.browserProfileNamed":
     "{agents} をブラウザープロファイル {profile} に移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.commitCoAuthorOff": "すべてのエージェントのコミットに OpenBot を共同作成者として追加するのをやめます。",
+  "status.agent.commitCoAuthorOn": "すべてのエージェントのコミットに OpenBot を共同作成者として再び追加します。",
   "status.agent.browserProfileNew":
     "新しいブラウザープロファイル {profile} を作成し、{agents} を移動します。ログイン情報はありません。開いているタブは閉じます。",
   "status.agent.browserProfileShared":

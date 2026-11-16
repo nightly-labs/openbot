@@ -42,6 +42,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",
   "status.agent.browserProfileNamed":
     "Mover {agents} para o perfil do navegador {profile}. Eles recebem os logins e cookies dele. As abas abertas deles fecham.",
+  "status.agent.commitCoAuthorOff": "Parar de adicionar o OpenBot como coautor nos commits de todos os agentes.",
+  "status.agent.commitCoAuthorOn": "Voltar a adicionar o OpenBot como coautor nos commits de todos os agentes.",
   "status.agent.browserProfileNew":
     "Criar o novo perfil do navegador {profile} e mover {agents} para ele. Ele não tem logins. As abas abertas deles fecham.",
   "status.agent.browserProfileShared":
