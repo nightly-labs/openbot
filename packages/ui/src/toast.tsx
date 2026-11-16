@@ -100,9 +100,10 @@ export function Toaster(props: ToasterProps): JSX.Element {
   const notifications = useSonner();
   const sonnerProps = omit(props, "onToastShown", "hidden");
   createEffect(
-    () => notifications.toasts(),
-    (toasts) => {
-      if (!props.onToastShown) return;
+    // Tracks `hidden`, so a toast is reported when it shows, not while it is hidden.
+    () => ({ toasts: notifications.toasts(), hidden: props.hidden }),
+    ({ toasts, hidden }) => {
+      if (!props.onToastShown || hidden) return;
       const current = new Set(sonnerToast.getToasts().map((item) => item.id));
       for (const id of shown)
         if (!current.has(id)) {

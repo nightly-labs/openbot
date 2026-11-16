@@ -15,8 +15,9 @@ search and channel creation - are prop-driven views in `WorkspaceOverlayViews.ts
 host connection, so what an overlay decides from its server is decided in one place.
 An open overlay hides the page of a local tab, because that page is a native view above the window.
 A toast does not hide the page. While the full view shows the page of a local tab, the toasts are
-hidden and kept (`native-browser-page.ts`), so the page does not cut them. A host's tab shows in the
-window, under the toasts.
+hidden (`native-browser-page.ts`), so the page does not cut them. A toast that stays until the user
+closes it shows again when the page is hidden; a toast with a timer can end while it is hidden, and
+it is then not reported as shown. A host's tab shows in the window, under the toasts.
 The web client gives `PlatformProvider` a fixed `appInfo` in place of the main-process answer.
 There is no separate web dashboard.
 Small screens switch between the same conversation and workspace components. The shared browser
