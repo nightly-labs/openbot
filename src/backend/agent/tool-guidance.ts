@@ -116,7 +116,7 @@ function openbotGuidance(namespace: string, tool: string): string {
     case "delete_section":
       return [
         RECIPIENT_RULE,
-        `openbot.list_sections shows the sidebar sections (folders), their agents, and the parentId of a nested folder, up to ${SIDEBAR_FOLDER_LEVELS} levels. Only the user nests folders, in the sidebar. To group agents, reuse a matching section or call openbot.create_section, then call openbot.assign_agent_section for each agent id from openbot.list_agents; sectionId null ungroups an agent. openbot.delete_section keeps the agents.`,
+        `openbot.list_sections shows the sidebar sections (folders), their agents and channels, and the parentId of nested folders, up to ${SIDEBAR_FOLDER_LEVELS} levels. Only the user nests folders. To group them, reuse a matching one or call openbot.create_section, then call openbot.assign_agent_section for each id from openbot.list_agents or openbot.list_channels; sectionId null ungroups it. openbot.delete_section keeps them.`,
       ].join("\n");
     case "list_routines":
     case "create_routine":

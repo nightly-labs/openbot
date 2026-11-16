@@ -993,9 +993,10 @@ argument shapes used by both declarations. It reuses the profile, section, and r
 Claude uses the SDK’s `AskUserQuestion` flow instead of the `ask_user` MCP tool.
 There is no separate prompt-generation button or review dialog.
 
-Agents can organize teammates into flat sidebar sections through `list_sections`, `create_section`,
-`rename_section`, `delete_section`, and `assign_agent_section`. Assignment accepts a null section
-to ungroup an agent; deleting a section also ungroups its agents without deleting them. These tools
+Agents can organize teammates and channels into sidebar sections through `list_sections`,
+`create_section`, `rename_section`, `delete_section`, and `assign_agent_section`. Assignment takes an
+agent or channel id as `agentId` (the store files both under one key), and accepts a null section
+to ungroup it; deleting a section also ungroups its agents and channels without deleting them. These tools
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
 
