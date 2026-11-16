@@ -911,6 +911,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Messaggio «Ci sto lavorando…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot lo invia mentre l’agente lavora, poi lo sostituisce con la risposta. Disattiva per inviare solo la risposta.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Reazioni di stato",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reagisce con 👀 quando arriva un messaggio e con ✅ quando la risposta è pronta. Disattiva per non inviare reazioni.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Questo agente riceve i messaggi per OpenBot da tutti i tuoi numeri collegati. Risponde da solo a quelli brevi, passa il resto all'agente giusto e risponde su WhatsApp.",
