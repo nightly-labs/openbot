@@ -32,6 +32,8 @@ export const messages = defineMessages("status.agent", {
     "Fill the saved card {card} on {site}. After you approve, agents can fill this card on this site with no approval. Remove the site in Server settings > Vault.",
   "status.agent.reportProblem":
     "This becomes a public GitHub issue, with the app version and your system. Your name is not shown.",
+  "status.agent.reportPhoneProblem":
+    "This becomes a public GitHub issue, with the app version, your system, and the version, system and support log of your phone. Your name is not shown.",
   "status.agent.sendIdea": "This becomes a public GitHub issue. Your name is not shown.",
   "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
   "status.agent.feedbackSameAs": "Adds to issue #{issue}",

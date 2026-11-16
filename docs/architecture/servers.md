@@ -830,6 +830,7 @@ host advertises a capability only when its `TeamApiAdmin` member exists.
 | `providers-v4` | Code or link sign-in and managed runtimes, Cursor and Cline included | `providerAdmin` |
 | `custom-provider-harness-v1` | List, add and remove custom endpoints as `providers-v1` does; each endpoint in a response names its harness (`opencode` or `pi`). A save names no harness: a new endpoint runs on OpenCode | `providerAdmin` |
 | `custom-provider-edit-v1` | List, add, edit and remove custom endpoints. A list names each endpoint's harness and header names. An edit changes the name, address, models, key and headers; no key keeps the saved key, and `value: null` keeps a saved header value. The host keeps the harness and the limits of each kept model. Protocol 9 only | `providerAdmin` |
+| `custom-provider-harness-choice-v1` | The routes of `custom-provider-edit-v1`, and a save or an edit names the harness (`opencode` or `pi`). A save runs the new endpoint on that harness; an edit moves the endpoint and the agents on each kept model to it. The host keeps the limits of each kept model. Protocol 9 only | `providerAdmin` |
 | `custom-agents-v1` | List, add, replace and remove the host's custom ACP agents. The host starts each command on its computer. An environment value goes only in a save body; a response names the variables only, and `value: null` keeps a saved value. Protocol 9 only | `providerAdmin` |
 | `claude-api-key-v1` | No routes. The host saves an Anthropic API key for Claude through the `providers-v1` key routes | `providerAdmin` |
 | `codex-api-key-v1` | No routes. The host logs Codex in with an OpenAI API key sent through the `apiKeySet` route of `providers-v1`, `-v5` or `-v8` | `providerAdmin` |
@@ -1507,7 +1508,9 @@ the server as a joined server with `thisComputer: true`. `kind` stays `"remote"`
 - **Lifetime.** The child ends when its control pipe closes: stdin, or fd 3 on Windows, where
   Electron replaces `process.stdin` with a stream that only ends (#4868). Teardown step 57 stops
   all children before the joined-server connections close (step 60). The sibling scan before an
-  update leaves out the child PIDs. After an unexpected exit, the desktop starts the child again
+  update leaves out the child PIDs. The desktop installs the update for its children too, so a
+  restart when idle and the automatic install also wait while an agent of a child works (the
+  child's `OPENBOT_LOCAL_SERVER_WORKING` line, reason `agent-turn`). After an unexpected exit, the desktop starts the child again
   after 5 seconds, at most 3 times in 10 minutes. The owner password is registered for redaction
   and is never logged.
 - **Delete.** The desktop stops the child, removes the entry, and moves both folders to the trash

@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Ondersteuningslog wissen?",
   "mobile.settings.support.clearBody": "Hiermee verwijder je alle gebeurtenissen uit het log op deze telefoon.",
   "mobile.settings.support.logFooter":
-    "Het log blijft op deze telefoon en OpenBot verstuurt het niet. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
+    "Het log blijft op deze telefoon. OpenBot verstuurt er alleen regels van met een bugrapport over de telefoon-app dat je zelf verstuurt, en de rapportkaart toont ze eerst. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
   "mobile.settings.support.saveFailed": "Kan het logbestand niet opslaan. Probeer het opnieuw.",
   "mobile.settings.support.sharingUnavailable": "Delen is niet beschikbaar op deze telefoon.",
   "mobile.settings.support.newestFirst": "Nieuwste eerst.",

@@ -206,18 +206,18 @@ function ChatQueueCard({
           </CardAction>
           {queue.activeTurnId ? (
             <CardAction
-              accessibilityLabel={t("mobile.chat.queue.steerNext")}
+              accessibilityLabel={t(queue.steers ? "mobile.chat.queue.steerNext" : "mobile.chat.queue.sendNowNext")}
               disabled={locked || editedElsewhere}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();
-                finish(queue.steer(next));
+                finish(queue.steers ? queue.steer(next) : queue.sendNow(next));
               }}
             >
               <View className="flex-row items-center gap-1 px-1">
                 <CornerDownRight color={foreground} size={18} strokeWidth={2} style={MIRROR_IN_RTL} />
                 <Typography.Paragraph type="body-sm" weight="semibold">
-                  {t("mobile.chat.queue.steer")}
+                  {t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}
                 </Typography.Paragraph>
               </View>
             </CardAction>

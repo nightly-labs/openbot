@@ -17,6 +17,7 @@ export const messages = {
   "sidebar.markAllRead": "すべて既読にする",
   "sidebar.order.title": "チャットの並べ替え",
   "sidebar.order.manual": "手動",
+  "sidebar.order.recent": "最近のアクティビティ",
   "sidebar.order.unreadGroup": "未読をグループにまとめる",
   "sidebar.order.unreadFirst": "フォルダー内で未読を先頭に",
   "sidebar.topbar.openSettings": "{name} の設定を開く",

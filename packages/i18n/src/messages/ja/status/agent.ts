@@ -33,6 +33,8 @@ export const messages = {
     "画面の {x}, {y}, {width} × {height} ポイントの領域をキャプチャし、その画像をエージェントのモデルに送信します。",
   "status.agent.reportProblem":
     "アプリのバージョンとシステム情報付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
+  "status.agent.reportPhoneProblem":
+    "アプリのバージョンとシステム情報に加え、スマートフォンのバージョン、システム情報、サポートログ付きで、公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.sendIdea": "公開の GitHub issue になります。あなたの名前は表示されません。",
   "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
   "status.agent.feedbackSameAs": "issue #{issue} に追加します",

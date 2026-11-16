@@ -31,6 +31,8 @@ export const messages = {
     "Capturar a área da tela em {x}, {y}, {width} × {height} pontos e enviar a imagem ao modelo do agente.",
   "status.agent.reportProblem":
     "Isto será uma issue pública no GitHub, com a versão do app e o seu sistema. O seu nome não aparece.",
+  "status.agent.reportPhoneProblem":
+    "Isto será uma issue pública no GitHub, com a versão do app, o seu sistema e a versão, o sistema e o registro de suporte do seu celular. O seu nome não aparece.",
   "status.agent.sendIdea": "Isto vira uma issue pública no GitHub. Seu nome não aparece.",
   "status.agent.feedbackRecentErrors": "Erros recentes no chat:",
   "status.agent.feedbackSameAs": "Adiciona à issue #{issue}",

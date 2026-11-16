@@ -375,6 +375,8 @@ export interface ProviderHooks {
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   /** Runs after an account after the first listed its models, which `accountModels` now answers. */
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  /** Runs after a change to the accounts of a provider, such as an account that connected. */
+  onAccountsChanged?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -767,7 +769,10 @@ export class ProviderRuntime implements ProviderPort {
             this.#consumeUsageReset(client).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          changed: () => this.#setStatus({}),
+          changed: () => {
+            this.#setStatus({});
+            this.#hooks.onAccountsChanged?.();
+          },
           // Forked: the hook can move agents, and the check that listed the models must not wait for that.
           modelsListed: (provider, accountId) =>
             (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(

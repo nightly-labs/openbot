@@ -84,6 +84,7 @@ import {
   MOBILE_CHAT_ORDERS,
   type MobileChatOrder,
   type MobileSidebarItem,
+  mobileChatOrderSortsSections,
   mobileSidebarItems,
   mobileUnreadItems,
   mobileWaitingItems,
@@ -267,6 +268,7 @@ function applyChatDrop(workspace: MobileWorkspaceActions, serverId: string, chan
 /** The name of each chat order in the chat options menu. */
 const CHAT_ORDER_LABEL = {
   manual: "mobile.agent.home.sort.manual",
+  recent: "mobile.agent.home.sort.recent",
   "unread-group": "mobile.agent.home.sort.unreadGroup",
   "unread-first": "mobile.agent.home.sort.unreadFirst",
 } as const satisfies Record<MobileChatOrder, MobileTextKey>;
@@ -483,13 +485,14 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const sidebar = sidebarByServer[activeServer.id];
   // A waiting agent leaves its section for "Needs you". A pinned agent stays in its tile, which shows the same badge.
   const waitingAgentIds = useWaitingAgentIds();
-  // This phone's own choice. "Unread in a group" takes the unread chats out of their sections, under
-  // "Needs you"; "Unread first in folders" puts them first in each section. Neither changes the layout.
+  // This phone's own choice. "Recent activity" sorts each section by last activity. "Unread in a group"
+  // takes the unread chats out of their sections, under "Needs you"; "Unread first in folders" puts them
+  // first in each section. None of them changes the layout.
   const chatOrder = useChatOrderPreference((state) => state.order);
-  // The manual order does not read the unread state, so a read does not build the list again.
+  // The manual and recent orders do not read the unread state, so a read does not build the list again.
   const unreadChatIds = useMemo(
     () =>
-      chatOrder === "manual"
+      chatOrder === "manual" || chatOrder === "recent"
         ? NO_CHAT_IDS
         : new Set<string>([
             ...unreadAgentIds,
@@ -498,7 +501,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
     [chatOrder, unreadAgentIds, openChannels],
   );
   const [dragging, setDragging] = useState(false);
-  // As on the desktop, an unread order holds still during a drag: a reply then does not move the rows
+  // As on the desktop, an order other than manual holds still during a drag: a reply then does not move the rows
   // under the finger. The list takes the new order when the drag ends.
   const heldItems = useRef<MobileSidebarItem[] | null>(null);
   const items = useMemo(() => {
@@ -521,6 +524,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
           )
         : []),
       ...mobileSidebarItems(layout, listedAgents, listedChannels, undefined, t, {
+        recent: chatOrder === "recent",
         unreadFirst: chatOrder === "unread-first" ? unread : null,
         aside: grouped ? unread : null,
       }),
@@ -727,8 +731,9 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         ...pinnedChannels.map((channel) => ({ kind: "channel" as const, id: channel.id })),
       ],
       collapsedSectionIds,
-      // The unread-first order is not manual, so a drag in the list does not reorder it. Pins still work.
-      sections: sidebarLayout !== null && chatOrder !== "unread-first",
+      // The recent and unread-first orders are not manual, so a drag in the list does not reorder them.
+      // Pins still work.
+      sections: sidebarLayout !== null && !mobileChatOrderSortsSections(chatOrder),
       canPin: canAddChatPin(pinCount),
       scrollInsets: { top: headerHeight, bottom: insets.bottom + HOME_SEARCH_HEIGHT },
       beginScroll: () => {
@@ -748,7 +753,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
       onDrop: (_dragged, _target, change) => applyChatDrop(workspace(), serverId, change),
       readPins: () => workspace().readChatPins(serverId),
       // Without manual sections, a drop in the list only unpins: it does not move the chat in the layout.
-      layout: () => (chatOrder === "unread-first" ? null : sidebarLayout),
+      layout: () => (mobileChatOrderSortsSections(chatOrder) ? null : sidebarLayout),
     }),
     [
       items,

@@ -84,6 +84,7 @@ import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
@@ -126,6 +127,7 @@ import { MODEL_VISIBILITY_CAPABILITY } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CAPABILITY } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
+import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
@@ -333,6 +335,7 @@ export {
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
   FOCUS_USE_CAPABILITY,
@@ -367,6 +370,7 @@ export {
   ONEPASSWORD_CONNECTOR_CAPABILITY,
   PASSWORD_MANAGERS_CAPABILITY,
   PENDING_APPROVAL_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   PROMPT_CACHE_TTL_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_CAPABILITY,
   PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY,
@@ -671,7 +675,9 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_VAULT_SKIP_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -913,7 +919,9 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
     capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+    capability !== PHONE_FEEDBACK_CAPABILITY &&
+    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1030,7 +1038,9 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_VAULT_SKIP_CAPABILITY,
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
+  PHONE_FEEDBACK_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1231,6 +1241,8 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
       capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+      capability !== PHONE_FEEDBACK_CAPABILITY &&
+      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   );
 }

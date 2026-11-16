@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Destek günlüğü temizlensin mi?",
   "mobile.settings.support.clearBody": "Bu işlem, bu telefondaki günlükten tüm olayları kaldırır.",
   "mobile.settings.support.logFooter":
-    "Günlük bu telefonda kalır ve OpenBot onu göndermez. Bağlantı adımlarını, istekleri ve hataları kaydeder. Mesajları ve dosyaları kaydetmez; parolaları ve belirteçleri gizler. Paylaşmadan önce dosyayı okuyun.",
+    "Günlük bu telefonda kalır. OpenBot yalnızca sizin gönderdiğiniz telefon uygulaması hata raporuyla günlükten satırlar gönderir ve rapor kartı bunları önce gösterir. Bağlantı adımlarını, istekleri ve hataları kaydeder. Mesajları ve dosyaları kaydetmez; parolaları ve belirteçleri gizler. Paylaşmadan önce dosyayı okuyun.",
   "mobile.settings.support.saveFailed": "Günlük dosyası kaydedilemedi. Tekrar deneyin.",
   "mobile.settings.support.sharingUnavailable": "Bu telefonda paylaşım kullanılamıyor.",
   "mobile.settings.support.newestFirst": "En yeniler önce gösterilir.",

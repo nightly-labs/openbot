@@ -184,6 +184,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import { FOCUS_USE_INTERVAL_MS } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "@openbot/contracts/team-protocol/github-skills-v1";
@@ -394,6 +395,7 @@ import { routeModelVisibility } from "./team-api/route-model-visibility";
 import { routeOnePasswordConnector } from "./team-api/route-onepassword-connector";
 import { routePasswordManagers } from "./team-api/route-password-managers";
 import { routePendingApproval } from "./team-api/route-pending-approval";
+import { routePhoneFeedback } from "./team-api/route-phone-feedback";
 import { routePromptCacheTtl } from "./team-api/route-prompt-cache-ttl";
 import {
   routeProviderAccountCode,
@@ -1350,6 +1352,7 @@ export class TeamApiServer {
       if ((await routeContextCompact(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentWaits(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routePendingApproval(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routePhoneFeedback(context, this.#options.agents)) === "handled") return;
       if ((await routeMessagePins(context, this.#options.agents, this.#options.agentTasks, hidden)) === "handled")
         return;
       if ((await routeMessageDelete(context, this.#options.agents, this.#options.channels, hidden)) === "handled")
@@ -2701,7 +2704,8 @@ export class TeamApiServer {
             capability === PROVIDERS_V8_CAPABILITY ||
             capability === PROVIDER_USE_CAPABILITY ||
             capability === CUSTOM_PROVIDER_HARNESS_CAPABILITY ||
-            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY
+            capability === CUSTOM_PROVIDER_EDIT_CAPABILITY ||
+            capability === CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY
           )
             return this.#options.admin?.providers !== undefined;
           if (

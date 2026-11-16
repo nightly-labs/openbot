@@ -21,6 +21,12 @@ Claude gets a refused call of these tools (`accepted: false`) as a failed call, 
 for an answer after it. The other providers keep the refusal as a result. Other threads do not get
 these tools, so their requests do not grow.
 
+Every Claude session also names `routine_no_update` in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`. Its `quiet`
+result tells the agent to end the turn with no text. Without it, the CLI asked again, and after a
+teammate's request the agent wrote its result once more in the user's chat (#7465). Each other result
+of the tool (`shown`, or a refusal) reaches Claude as a failed call, so the CLI still asks for the
+answer that someone waits for.
+
 `tool_search` uses local keyword matching. Exact names come first, then word matches, with stable
 catalog order for ties. It returns five results by default and at most ten. It accepts `queries`, or
 one `query` string, because models often send one string. Up to three strong results, an exact name or
@@ -941,7 +947,10 @@ key change clears it (`#forgetUsage`). `OPENBOT_DEV_ANTIGRAVITY_CODE_ASSIST_URL`
 (`scripts/antigravity-usage-e2e.ts`); any other URL is ignored, because the token goes to it.
 Google can give a model a group of its own, such as Gemini 4
 Argon, so a read for a model takes the group whose "Models within this group" list names it (#3055),
-and a model that no group names has no reading. The dock's read, with no model, takes the "Gemini
+and a model that no group names has no reading. Google lists no models for the Argon group (its
+description is a plan note), so a group with no list takes its own name as its model while other groups
+list theirs (#9864). Google's JSON leaves a zero `remainingFraction` out: a bucket with a reset time and
+no fraction, no `remainingAmount` and no `disabled` is spent. The dock's read, with no model, takes the "Gemini
 Models" group. Each reading also carries every group by name and models (`AccountUsageLimit.groups`),
 so the usage popover shows one line per group and the composer notice uses the group of the agent's
 model (`usageGroupForModel`). The ring stays on the reading's own group. The Team API codecs do not

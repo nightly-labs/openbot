@@ -31,6 +31,8 @@ export const messages = {
     "{x}, {y} konumundaki {width} × {height} noktalık ekran alanını yakala ve görüntüyü ajanın modeline gönder.",
   "status.agent.reportProblem":
     "Bu, uygulama sürümü ve sisteminizle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
+  "status.agent.reportPhoneProblem":
+    "Bu; uygulama sürümü, sisteminiz ve telefonunuzun sürümü, sistemi ve destek günlüğüyle birlikte herkese açık bir GitHub issue'su olur. Adınız görünmez.",
   "status.agent.sendIdea": "Bu, herkese açık bir GitHub issue'su olur. Adın gösterilmez.",
   "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
   "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",

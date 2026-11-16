@@ -5,6 +5,11 @@ import {
   type RoutineCalendarRoutine,
   type RoutineCalendarRun,
 } from "@openbot/ui/features/conversation/RoutineCalendar";
+import type {
+  RoutineCalendarCreate,
+  RoutineCreateFields,
+} from "@openbot/ui/features/conversation/RoutineCalendarCreateCard";
+import { type ComponentProps, createSignal } from "solid-js";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import { STORY_AGENTS } from "./fixtures";
@@ -107,6 +112,8 @@ function runTime(schedule: RoutineSchedule, day: string): string | null {
       return weekday === schedule.weekday ? schedule.time : null;
     case "monthly":
       return date.getUTCDate() === schedule.day ? schedule.time : null;
+    case "once":
+      return schedule.date === day ? schedule.time : null;
     default:
       return null;
   }
@@ -247,3 +254,51 @@ export const NarrowMonth: Story = { ...Narrow, args: { initialView: "month" } };
 
 /** The pitch comes first; the sample runs land in rows below it. */
 export const EmptyNarrow: Story = { ...Narrow, args: { routines: [], runs: [] } };
+
+/** Every field of a host on this computer. */
+const ALL_FIELDS: RoutineCreateFields = { onceSchedule: true, limitPolicy: true, missedPolicy: true, runIn: true };
+
+/** A calendar whose card saves: a new routine shows on the calendar at once. */
+function CreatingCalendar(props: ComponentProps<typeof RoutineCalendar> & { fields: RoutineCreateFields }) {
+  const [routines, setRoutines] = createSignal<StoryRoutine[]>(ROUTINES);
+  const create: RoutineCalendarCreate = {
+    fields: props.fields,
+    save: async (routine) => {
+      setRoutines((items) => [
+        ...items,
+        { id: `new-${items.length}`, name: routine.name, agentIds: [routine.agentId], schedule: routine.schedule },
+      ]);
+    },
+  };
+  return (
+    <main style={{ width: "min(1400px, 100vw)", padding: "var(--openbot-space-6)" }}>
+      <RoutineCalendar
+        {...props}
+        routines={routines()}
+        runs={runsFor(routines(), props.now, props.timeZone)}
+        create={create}
+      />
+    </main>
+  );
+}
+
+/**
+ * Issue #9747. A right-click on a future day, a click on its empty part, or its "+" opens a card
+ * with that day. Today starts at the next whole hour, another day at 9:00 AM.
+ */
+export const CreateFromDay: Story = {
+  render: (args) => <CreatingCalendar {...args} fields={ALL_FIELDS} />,
+};
+
+/** In the day view, a right-click on an hour starts the routine at that hour. */
+export const CreateFromHour: Story = { ...CreateFromDay, args: { initialView: "day" } };
+
+/** An older joined host keeps no policies, no place and no one-time schedule: those fields do not show. */
+export const CreateOnOlderHost: Story = {
+  render: (args) => (
+    <CreatingCalendar
+      {...args}
+      fields={{ onceSchedule: false, limitPolicy: false, missedPolicy: false, runIn: false }}
+    />
+  ),
+};

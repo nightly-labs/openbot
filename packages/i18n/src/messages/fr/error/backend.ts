@@ -365,6 +365,8 @@ export const messages = {
   "error.backend.promptInactive": "Cette question n’est plus active.",
   "error.backend.promptAnswerMismatch": "Une réponse ne correspond à aucune question active.",
   "error.backend.approvalInactive": "Cette approbation n’est plus active.",
+  "error.backend.feedbackNeedsPhone":
+    "Seule l'app OpenBot du téléphone peut envoyer ce rapport, car elle ajoute la version et le journal d'assistance du téléphone. Ouvre cette discussion sur le téléphone. Si tu y vois ce message, mets à jour l'app du téléphone.",
   "error.backend.takeoverInactive": "Cette prise de contrôle du navigateur n’est plus active.",
   "error.backend.authSubmitting": "L’envoi de l’authentification est déjà en cours.",
   "error.backend.apiKeySaveFailed": "OpenBot n’a pas pu enregistrer la clé d’API. Réessayez.",

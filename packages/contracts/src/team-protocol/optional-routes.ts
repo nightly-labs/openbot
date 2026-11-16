@@ -61,6 +61,7 @@ import { CONVERSATION_FILE_SEARCH_CODECS } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CODECS } from "./conversation-unread-from-v1";
 import { CUSTOM_AGENTS_CODECS } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CODECS } from "./custom-provider-edit-v1";
+import { CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CODECS } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CODECS } from "./discord-access-v1";
 import { EVENTS_CODECS } from "./events-v1";
@@ -97,6 +98,7 @@ import { MODEL_VISIBILITY_CODECS } from "./model-visibility-v1";
 import { ONEPASSWORD_CONNECTOR_CODECS } from "./onepassword-connector-v1";
 import { PASSWORD_MANAGERS_CODECS } from "./password-managers-v1";
 import { PENDING_APPROVAL_CODECS } from "./pending-approval-v1";
+import { PHONE_FEEDBACK_CODECS } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CODECS } from "./prompt-cache-ttl-v1";
 import { PROVIDER_ACCOUNT_CODE_CODECS } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CODECS } from "./provider-account-keys-v1";
@@ -174,6 +176,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDERS_V8_CODECS,
   ...CUSTOM_PROVIDER_HARNESS_CODECS,
   ...CUSTOM_PROVIDER_EDIT_CODECS,
+  ...CUSTOM_PROVIDER_HARNESS_CHOICE_CODECS,
   ...CUSTOM_AGENTS_CODECS,
   ...AGENT_SESSION_SETTINGS_CODECS,
   ...ACP_REGISTRY_CODECS,
@@ -248,6 +251,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...AGENT_QUEUE_TASK_CODECS,
   ...AGENT_WAITS_CODECS,
   ...PENDING_APPROVAL_CODECS,
+  ...PHONE_FEEDBACK_CODECS,
   ...MESSAGE_PINS_CODECS,
   ...ROUTINE_FLOWS_CODECS,
   ...ROUTINE_FLOW_STOP_CODECS,
