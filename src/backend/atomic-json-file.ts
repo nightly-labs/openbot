@@ -69,7 +69,8 @@ export class AtomicFileWriteError extends Schema.TaggedError<AtomicFileWriteErro
  *
  * On some Windows computers a filter driver holds every new file in the data folder, so each rename
  * fails, while a write to an existing file works (#10580). After the last wait, the content is then
- * written over `path` in place.
+ * written over `path` in place, and later writes of `path` in this process skip the temporary file:
+ * the driver can also hold it against the delete, and each save would leave one behind.
  */
 const HELD_TARGET_WAITS_MS: readonly number[] = [10, 50, 100, 250, 500];
 
@@ -99,7 +100,11 @@ async function writeAndFlush(path: string, content: string | Uint8Array): Promis
  */
 const inPlaceWrites = new Map<string, Promise<void>>();
 
+/** The paths whose rename failed after every wait. Only Windows adds to it. */
+const inPlacePaths = new Set<string>();
+
 function writeInPlace(path: string, content: string | Uint8Array): Promise<void> {
+  inPlacePaths.add(path);
   const write = (inPlaceWrites.get(path) ?? Promise.resolve()).then(() => writeAndFlush(path, content));
   const settled = write.catch(() => undefined);
   inPlaceWrites.set(path, settled);
@@ -116,7 +121,8 @@ function writeInPlace(path: string, content: string | Uint8Array): Promise<void>
  * previous file or the new one, never a truncated one. The content is flushed to the disk before the
  * rename, so a power loss cannot leave `path` filled with zeros. Each call has its own temporary name, so
  * overlapping writes never share a file, and a failed write removes its temporary file. When Windows
- * holds the files for longer than the rename waits, the content is written over `path` in place.
+ * holds the files for longer than the rename waits, the content is written over `path` in place, now
+ * and on each later write of `path` in this process.
  *
  * The write and rename stay together even when the caller interrupts the operation.
  */
@@ -131,6 +137,12 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
       catch: (cause) => new AtomicFileWriteError({ operation: "directory", cause }),
     });
   }
+  // A crash during an in-place write can leave `path` incomplete. Without it, no change is ever saved.
+  if (inPlacePaths.has(path))
+    return yield* Effect.tryPromise({
+      try: () => writeInPlace(path, content),
+      catch: (cause) => new AtomicFileWriteError({ operation: "write", cause }),
+    });
   yield* Effect.acquireUseRelease(
     Effect.sync(() => `${path}.${randomUUID()}.tmp`),
     (temporaryPath) =>
@@ -149,7 +161,6 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
           if (Result.isSuccess(renamed)) return;
           if (!isHeldTargetError(renamed.failure.cause)) return yield* renamed.failure;
           const wait = HELD_TARGET_WAITS_MS[attempt];
-          // A crash during this write can leave `path` incomplete. Without it, no change is ever saved.
           if (wait === undefined)
             return yield* Effect.tryPromise({
               try: () => writeInPlace(path, content),
@@ -158,7 +169,9 @@ export const writeFileAtomically = Effect.fn("AtomicFile.write")(function* (
           yield* Effect.sleep(wait);
         }
       }),
-    // Cleanup failure must not replace the write failure, as in the native adapter.
-    (temporaryPath) => Effect.promise(() => rm(temporaryPath, { force: true }).catch(() => undefined)),
+    // Cleanup failure must not replace the write failure, as in the native adapter. The retries wait
+    // for a Windows hold on the temporary file (`EBUSY`, `EPERM`); a missing file ends at once.
+    (temporaryPath) =>
+      Effect.promise(() => rm(temporaryPath, { force: true, maxRetries: 5, retryDelay: 100 }).catch(() => undefined)),
   );
 }, Effect.uninterruptible);
