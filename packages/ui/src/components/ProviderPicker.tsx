@@ -33,7 +33,7 @@ import { createEffect, createSignal, createStore, createUniqueId, For, Show } fr
 import { useText } from "../text";
 import { MoreProvidersDialog } from "./MoreProvidersDialog";
 import { ProviderAccountList } from "./ProviderAccountList";
-import type { ProviderAccountActions, ProviderPickerAccount } from "./provider-accounts";
+import { hasKeyAccounts, type ProviderAccountActions, type ProviderPickerAccount } from "./provider-accounts";
 import {
   createProviderRow,
   PROVIDER_ACTION_LABEL,
@@ -97,6 +97,8 @@ export interface ProviderPickerOption {
   runtimeStatus?: ProviderRuntimeStatus | undefined;
   /** The CLI that the provider ran last: the one the user installed, or the one OpenBot downloaded. */
   cliSource?: AgentProviderStatus["cliSource"];
+  /** The other CLI the user can run instead: theirs while OpenBot's copy runs, or the newer copy. */
+  otherCliVersion?: string | undefined;
   /**
    * Whether the provider's key is saved: the optional OpenCode key, a Gemini key in use, or a Claude
    * key on a host that reads it. Absent while unknown, so the row shows no badge rather than a
@@ -489,6 +491,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 accountsOffered,
                 accountError,
                 addAccount,
+                accountCodeOffered,
+                addAccountWithCode,
                 installOffered,
                 signInOffered,
                 apiKeyOffered,
@@ -497,6 +501,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () =>
                 alternative() !== null ||
                 mainlandChinaSite() !== null ||
+                (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
                 diagnosticsOffered();
@@ -625,7 +630,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                   <div class="provider-picker-actions">
                     {/* An off provider has no process to act on, so the switch is its only action. */}
                     <Show when={!off()}>
-                      <Show when={accountsOffered()}>
+                      {/* An account that is an API key is added in the provider's settings page. */}
+                      <Show when={accountsOffered() && !hasKeyAccounts(option().id)}>
                         <Button
                           type="button"
                           variant="outline"
@@ -807,6 +813,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                     {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
+                              </Show>
+                              <Show when={accountCodeOffered() && !hasKeyAccounts(option().id)}>
+                                <DropdownMenu.Item onSelect={addAccountWithCode}>
+                                  <Smartphone aria-hidden="true" />
+                                  {t("provider.account.addWithCode")}
+                                </DropdownMenu.Item>
                               </Show>
                               <Show when={diagnosticsOffered()}>
                                 <DropdownMenu.Item

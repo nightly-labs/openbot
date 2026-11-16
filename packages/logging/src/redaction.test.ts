@@ -264,8 +264,6 @@ describe("redactText", () => {
     expect(redactText('{"apiKey":"abcdef123456')).toBe("[redacted-unscanned]");
   });
 
-  // A payload that parses is written back as JSON, so its spacing is the serializer's. The text
-  // around it is untouched: only the run itself is read as data.
   // A line can hold more payloads than the bound allows, and the regex rules match no header name,
   // so what was not read must not be shown.
   it("drops the rest of a line whose payloads pass the scan bound", () => {
@@ -286,7 +284,36 @@ describe("redactText", () => {
   });
 
   it("keeps the text around an embedded payload", () => {
-    expect(redactText("read [1, 2, 3] items")).toBe("read [1,2,3] items");
+    expect(redactText("read [1, 2, 3] items")).toBe("read [1, 2, 3] items");
+  });
+
+  // A skill example reached the agent with other digits, because the payload was parsed and written
+  // again with nothing to redact in it (#7760).
+  it("keeps a payload that no rule changes as it was written", () => {
+    const example = 'Use:\n```json\n{"channelId": 1234567890123456789, "ids": [9876543210987654321]}\n```';
+    expect(redactText(example)).toBe(example);
+    expect(redactText('{"channelId": 1234567890123456789}')).toBe('{"channelId": 1234567890123456789}');
+    const result = JSON.stringify({ instructions: example });
+    expect(JSON.parse(redactText(result)).instructions).toBe(example);
+  });
+
+  it("writes a payload again when it has a secret or a key written twice", () => {
+    expect(redactText('note {"apiKey": "pk_live_9f2b3c4d5e", "n": 1}')).toBe('note {"apiKey":"[redacted]","n":1}');
+    // The parse keeps only the last `headers`, so the first one is never read and must not stay.
+    expect(redactText('ERROR {"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('ERROR {"headers":{}}');
+    expect(redactText('{"headers": {"X-Tenant": "tenant-secret"}, "headers": {}}')).toBe('{"headers":{}}');
+  });
+
+  // Past the conversion depth bound the payload is cut, not kept, and a nesting too deep for the
+  // serializer must not turn the line into an unread one.
+  it("cuts a payload nested past the depth bound", () => {
+    const depth = 100_000;
+    const payload = `${'{"a":'.repeat(depth)}{"headers":{"X":"tenant-secret"}}${"}".repeat(depth)}`;
+    for (const line of [payload, `ERR ${payload}`]) {
+      const redacted = redactText(line);
+      expect(redacted).not.toContain("tenant-secret");
+      expect(redacted).toContain("[too deep]");
+    }
   });
 });
 

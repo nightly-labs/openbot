@@ -17,6 +17,7 @@ import {
   extractArchive,
   extractZipTree,
   rejectNonRegularFiles,
+  tarExecutable,
 } from "./provider-runtime-archive";
 import { ProviderRuntimeFailure, runtimeIO, runtimeSync, toProviderRuntimeFailure } from "./provider-runtime-effects";
 
@@ -90,7 +91,7 @@ export const prepareRegistryAgent = Effect.fn("AcpRegistry.prepare")(function* (
       yield* extractZipTree(archive, payload, "", sourceText("error.provider.nativeArchiveInvalid"));
     else if (pathname.endsWith(".tar.gz") || pathname.endsWith(".tgz")) {
       const listing = yield* runtimeIO((signal) =>
-        execFileAsync("tar", ["-tzf", archive], { signal, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }),
+        execFileAsync(tarExecutable(), ["-tzf", archive], { signal, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }),
       );
       const roots = listing.stdout
         .split(/\r?\n/u)

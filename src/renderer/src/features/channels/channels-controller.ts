@@ -257,6 +257,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
+          if (page.waits === undefined) delete state.page.waits;
+          else state.page.waits = page.waits;
           if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else if (withPage || !selectedExists) state.page = page;
         if (withPage || !selectedExists) state.loading = false;

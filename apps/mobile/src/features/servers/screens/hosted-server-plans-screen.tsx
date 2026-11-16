@@ -1,4 +1,4 @@
-import { type BillingPlanId, siteLimitForPlan } from "@openbot/contracts/billing";
+import { siteLimitForPlan } from "@openbot/contracts/billing";
 import type { HostedServerCatalogPlan, HostedServerList, HostedServerSummary } from "@openbot/contracts/hosted-servers";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { skipToken, useQuery } from "@tanstack/react-query";
@@ -16,8 +16,13 @@ import type { MobileSession } from "@/features/auth/api/mobile-auth";
 import { useMobileSession, useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { hostedServerCalls } from "@/features/servers/api/hosted-servers";
 import { LocalServerOptions } from "@/features/servers/components/local-server-options";
-import { rememberHostedServer, useHostedServerAvailability } from "@/features/servers/model/hosted-server-availability";
-import { hostedServerInSetup } from "@/features/servers/model/hosted-server-plans";
+import {
+  hostedServerListState,
+  ownedHostedServers,
+  rememberHostedServer,
+  useHostedServerAvailability,
+} from "@/features/servers/model/hosted-server-availability";
+import { hostedServerInSetup, HOSTED_PLAN_TEXT as PLAN_TEXT } from "@/features/servers/model/hosted-server-plans";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
@@ -26,12 +31,6 @@ import { devFeatureOverride } from "@/shared/lib/dev-feature-overrides";
 import { refreshMobileFeatures, useMobileFeature } from "@/shared/lib/mobile-features";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
-
-const PLAN_TEXT = {
-  starter: { name: "mobile.server.hosted.plan.starter", summary: "mobile.server.hosted.plan.starterSummary" },
-  standard: { name: "mobile.server.hosted.plan.standard", summary: "mobile.server.hosted.plan.standardSummary" },
-  pro: { name: "mobile.server.hosted.plan.pro", summary: "mobile.server.hosted.plan.proSummary" },
-} as const satisfies Record<BillingPlanId, { name: MobileTextKey; summary: MobileTextKey }>;
 
 const DATE_FORMAT = { dateStyle: "medium" } as const satisfies Intl.DateTimeFormatOptions;
 
@@ -115,16 +114,20 @@ function PlansReady({
   cloudServersOn: boolean;
 }) {
   const { t } = useText();
-  const owned = list.servers.filter((server) => server.state !== "deleted");
+  const owned = ownedHostedServers(list);
   const showPlans = (devFeatureOverride("cloudServers") ?? (list.available && cloudServersOn)) && plans.length > 0;
   // A plan that a server of the account uses, so its row shows "Your plan".
   const ownedPlans = new Set(owned.map((server) => server.plan));
 
+  // With the flag off, an account that has hosted servers still manages them here, with no plans
+  // and no text about how to get one.
   return (
     <>
-      <PlansHeader
-        description={showPlans ? t("mobile.server.hosted.intro.description") : t("mobile.server.hosted.unavailable")}
-      />
+      {showPlans ? (
+        <PlansHeader description={t("mobile.server.hosted.intro.description")} />
+      ) : owned.length === 0 ? (
+        <PlansHeader description={t("mobile.server.hosted.unavailable")} />
+      ) : null}
 
       {owned.length > 0 ? (
         <SettingsSection title={t("mobile.server.hosted.yourServers")}>
@@ -169,8 +172,7 @@ async function readPlans(session: MobileSession): Promise<PlansData> {
   const [catalog, list] = await Promise.all([calls.plans(), calls.list(), refreshMobileFeatures(session.apiUrl, true)]);
   useHostedServerAvailability.setState({
     userId: session.user.id,
-    available: list.available,
-    serverIds: new Set(list.servers.map((server) => server.serverId)),
+    ...hostedServerListState(list),
     checkedAt: Date.now(),
   });
   return { plans: catalog.plans, list };

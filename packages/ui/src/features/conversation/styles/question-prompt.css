@@ -37,6 +37,7 @@
 }
 
 .question-prompt-stage {
+  position: relative;
   display: grid;
   overflow: hidden;
   outline: 0;
@@ -54,8 +55,13 @@
     visibility 0s linear var(--page-slide-dur);
 }
 
+/* Only the open page sizes the stage. A chat that opens with an answered card lays it out at its
+   summary height at once, so the rows under it do not move when the stage height is set. */
 .question-prompt-page[data-pos="prev"],
 .question-prompt-page[data-pos="next"] {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
   opacity: 0;
   filter: blur(var(--page-blur));
   visibility: hidden;

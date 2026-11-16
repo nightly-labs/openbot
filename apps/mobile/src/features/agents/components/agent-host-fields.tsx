@@ -1,22 +1,25 @@
 import {
   AGENT_TASK_LIMIT_DEFAULT,
   AGENT_TASK_LIMIT_MAX,
-  type AgentFastModeSettings,
   type AgentHostSettings,
+  type AgentModelOption,
   type AgentNewChatSettings,
   type AgentPlanCardSettings,
+  type AgentSpeed,
+  type AgentSpeedSettings,
   type AgentTaskLimitSettings,
   agentProviderDescriptor,
   agentProviderName,
   type BusyMessageMode,
   canAdministerServer,
-  type UpdateAgentFastModeInput,
   type UpdateAgentHostSettingsInput,
+  type UpdateAgentSpeedInput,
 } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
+import { Alert } from "react-native";
 import { useUniwind } from "uniwind";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
@@ -347,32 +350,65 @@ export function AgentPlanCardField(props: AgentHostFieldsProps) {
   );
 }
 
+const SPEED_LABEL = {
+  standard: "mobile.agent.fastMode.standard",
+  fast: "mobile.agent.fastMode.fast",
+  ultrafast: "mobile.agent.fastMode.ultrafast",
+} as const satisfies Record<AgentSpeed, MobileTextKey>;
+
 /**
- * Agent info > Model: whether the agent asks its provider for the fast service tier, from
- * `agent-fast-mode-v1`. It shows only for a model with a fast tier, as on desktop. A member with
- * view access reads it; the host saves a change only for a member with manage access. A change
- * applies from the next turn.
+ * Agent info > Model: the speed of the agent (Standard, Fast or Ultrafast), from `agent-speed-v1`, or
+ * from `agent-fast-mode-v1` on an older host. It shows only for a model with a fast tier, as on
+ * desktop, and offers Ultrafast only for a model with that tier. A member with view access reads it;
+ * the host saves a change only for a member with manage access. A change applies from the next turn.
+ * Claude fast mode costs more per token and a Claude subscription pays for it from usage credits, so
+ * a faster speed on a Claude agent asks first, as the desktop picker does.
  */
-export function AgentFastModeField(props: AgentHostFieldsProps) {
+export function AgentSpeedField(props: AgentHostFieldsProps & { model: AgentModelOption }) {
   const { t } = useText();
   const { theme } = useUniwind();
   const workspace = useMobileWorkspaceActions();
   const { current, enabled, error, save } = useAgentHostRecord<
-    AgentFastModeSettings,
-    Omit<UpdateAgentFastModeInput, "agentId">
-  >(props, "fast-mode", workspace.loadAgentFastMode, workspace.updateAgentFastMode, true);
+    AgentSpeedSettings,
+    Omit<UpdateAgentSpeedInput, "agentId">
+  >(props, "fast-mode", workspace.loadAgentSpeed, workspace.updateAgentSpeed, true);
   if (!current) return null;
+  const settings = current;
+  const value = settings.speed ?? "standard";
+  const speeds: AgentSpeed[] =
+    props.model.ultrafastServiceTier || value === "ultrafast"
+      ? ["standard", "fast", "ultrafast"]
+      : ["standard", "fast"];
+  const claude = props.agent.provider === "claude" || props.model.provider === "claude";
+
+  function change(speed: AgentSpeed): void {
+    if (speed === value) return;
+    if (speed === "standard" || !claude) {
+      void save(settings, { speed });
+      return;
+    }
+    Alert.alert(t("mobile.agent.fastMode.confirmTitle"), t("mobile.agent.fastMode.confirmBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("mobile.agent.fastMode.confirm"), onPress: () => void save(settings, { speed }) },
+    ]);
+  }
+
   return (
     <>
       <SettingsSection footer={t("mobile.agent.fastMode.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.fastMode === true}
-            disabled={!enabled}
-            label={t("mobile.agent.fastMode.label")}
-            dark={theme === "dark"}
-            onValueChange={(fastMode) => void save(current, { fastMode })}
-          />
+        <SettingsRow
+          trailing={
+            <SettingsPicker<AgentSpeed>
+              value={value}
+              options={speeds.map((speed) => ({ value: speed, label: t(SPEED_LABEL[speed]) }))}
+              enabled={enabled}
+              dark={theme === "dark"}
+              label={t("mobile.agent.fastMode.speed")}
+              onChange={change}
+            />
+          }
+        >
+          <Typography.Paragraph>{t("mobile.agent.fastMode.speed")}</Typography.Paragraph>
         </SettingsRow>
       </SettingsSection>
       <SaveError error={error} />

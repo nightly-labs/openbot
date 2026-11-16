@@ -23,6 +23,7 @@ import {
   agentEventRequestThread,
   agentNotificationLevel,
   notificationForAgentEvent,
+  teammateTurnCompleted,
 } from "@openbot/team-client/agent-notifications";
 import {
   decodeLiveActivityBytes,
@@ -337,6 +338,8 @@ export class PushNotificationService {
     received: AgentEvent,
     only?: Registration,
   ) {
+    // Work between agents stays in the chat and does not call the user, as on desktop.
+    if (teammateTurnCompleted(received)) return;
     // A side thread's turn notifies as a turn of the chat does. Its answer is in that thread.
     const thread = received.type === "thread-turn-completed" ? received : null;
     const event = thread ? thread.turn : received;

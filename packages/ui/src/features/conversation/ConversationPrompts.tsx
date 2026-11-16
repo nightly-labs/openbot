@@ -5,6 +5,8 @@ import type {
   BrowserTakeoverRequest,
   LocalBrowserSecretResponse,
 } from "@openbot/contracts/ipc";
+import { type FeedbackApproval, feedbackApproval } from "@openbot/team-client/feedback-approval";
+import { approvalIsCut } from "@openbot/team-client/runtime-attention";
 import { classifyFailure } from "@openbot/telemetry";
 import { Button, LogIn, Maximize2, Monitor, toast } from "@openbot/ui";
 import { StandingApprovalConfirmation } from "@openbot/ui/components/StandingApprovalConfirmation";
@@ -12,7 +14,6 @@ import { BrowserSecretCard, type BrowserSecretVault } from "@openbot/ui/features
 import { BrowserTakeoverPreview } from "@openbot/ui/features/conversation/BrowserTakeoverPreview";
 import { type TextValue, useText } from "@openbot/ui/text";
 import { createMemo, createSignal, For, Show } from "solid-js";
-import { type FeedbackApproval, feedbackApproval } from "./feedback-approval";
 import { UiBlockCard } from "./ui-blocks/UiBlockCard";
 
 export function ApprovalCard(props: {
@@ -39,6 +40,9 @@ export function ApprovalCard(props: {
   const [confirmingAlways, setConfirmingAlways] = createSignal(false);
   let alwaysAllowButton: HTMLButtonElement | undefined;
   const report = createMemo(() => feedbackApproval(props.approval));
+  // A runtime snapshot cut the request. Allow must not cover text that the user cannot see, so the card
+  // offers only Deny until the whole copy comes.
+  const cut = () => approvalIsCut(props.approval);
   const submit = async (decision: "accept" | "decline") => {
     if (submitting()) return;
     setSubmitting(true);
@@ -94,7 +98,7 @@ export function ApprovalCard(props: {
                 >
                   {t("prompt.approval.deny")}
                 </Button>
-                <Show when={props.onAlwaysAllow}>
+                <Show when={props.onAlwaysAllow && !cut()}>
                   <Button
                     ref={alwaysAllowButton}
                     variant="secondary"
@@ -106,15 +110,17 @@ export function ApprovalCard(props: {
                     {t("prompt.approval.alwaysAllow")}
                   </Button>
                 </Show>
-                <Button
-                  variant="default"
-                  size="sm"
-                  type="button"
-                  disabled={submitting()}
-                  onClick={() => void submit("accept")}
-                >
-                  {t("prompt.approval.allow")}
-                </Button>
+                <Show when={!cut()}>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    type="button"
+                    disabled={submitting()}
+                    onClick={() => void submit("accept")}
+                  >
+                    {t("prompt.approval.allow")}
+                  </Button>
+                </Show>
               </>
             }
           >
@@ -137,6 +143,9 @@ export function ApprovalCard(props: {
             <Show when={props.approval.kind === "permissions"}>
               <PermissionDetails permissions={props.approval.permissions} />
             </Show>
+            <Show when={cut()}>
+              <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+            </Show>
           </UiBlockCard>
           <StandingApprovalConfirmation
             open={confirmingAlways()}
@@ -151,6 +160,7 @@ export function ApprovalCard(props: {
       {(offer) => (
         <FeedbackOffer
           report={offer()}
+          cut={cut()}
           submitting={submitting()}
           sending={(submitting() && accepting()) || props.sending === true}
           onSend={() => void submit("accept")}
@@ -167,6 +177,8 @@ export function ApprovalCard(props: {
  */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
+  /** The report is only its start, so Send waits for the whole copy. */
+  cut: boolean;
   submitting: boolean;
   sending: boolean;
   onSend: () => void;
@@ -196,6 +208,9 @@ function FeedbackOffer(props: {
         <strong>{props.report.title}</strong>
         <Show when={text()}>{(body) => <p>{body()}</p>}</Show>
       </blockquote>
+      <Show when={props.cut}>
+        <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -208,17 +223,19 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Button
-          variant="default"
-          type="button"
-          class="approval-button"
-          disabled={props.submitting && !props.sending}
-          loading={props.sending}
-          loadingLabel={t("common.sending")}
-          onClick={() => props.onSend()}
-        >
-          {t("prompt.approval.report.send")}
-        </Button>
+        <Show when={!props.cut}>
+          <Button
+            variant="default"
+            type="button"
+            class="approval-button"
+            disabled={props.submitting && !props.sending}
+            loading={props.sending}
+            loadingLabel={t("common.sending")}
+            onClick={() => props.onSend()}
+          >
+            {t("prompt.approval.report.send")}
+          </Button>
+        </Show>
       </div>
     </section>
   );

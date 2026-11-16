@@ -13,18 +13,60 @@ export type AgentDatabaseCheck<T> = { ok: true; value: T } | { ok: false; messag
 interface ScannedStatement {
   /** Bare words outside every string, comment and parenthesis, lowercased. */
   words: string[];
-  /** A `;` with more than whitespace or a comment after it. */
+  /** More than whitespace or a comment after the `;` that ends the first statement. */
   hasTrailingStatement: boolean;
   /** An unterminated string, identifier or block comment. */
   unterminated: boolean;
 }
 
+// Where a statement ends, as SQLite's own `sqlite3_complete` decides it (`src/complete.c`, public
+// domain). Only `CREATE [TEMP] TRIGGER` has a `;` inside its one statement: its body ends at
+// `; END`, and the statement at the next `;`. A `CASE ... END` holds no `;`, so it needs no count.
+// Token numbers are the columns of `TRANSITIONS`. Whitespace and comments are skipped before the
+// table, so its WS column (1) is never read; it stays so the table matches SQLite's.
+const SEMI = 0;
+const OTHER = 2;
+const EXPLAIN = 3;
+const CREATE = 4;
+const TEMP = 5;
+const TRIGGER = 6;
+const END = 7;
+const KEYWORD_TOKENS: Record<string, number> = {
+  explain: EXPLAIN,
+  create: CREATE,
+  temp: TEMP,
+  temporary: TEMP,
+  trigger: TRIGGER,
+  end: END,
+};
+/** The state between two statements. Every `;` that ends a statement leads here. */
+const START = 1;
+// Rows are states, columns are tokens: SEMI, WS, OTHER, EXPLAIN, CREATE, TEMP, TRIGGER, END.
+const TRANSITIONS: readonly (readonly number[])[] = [
+  [1, 0, 2, 3, 4, 2, 2, 2], // nothing yet
+  [1, 1, 2, 3, 4, 2, 2, 2], // START
+  [1, 2, 2, 2, 2, 2, 2, 2], // a statement that the next `;` ends
+  [1, 3, 3, 2, 4, 2, 2, 2], // after EXPLAIN
+  [1, 4, 2, 2, 2, 4, 5, 2], // after CREATE [TEMP]
+  [6, 5, 5, 5, 5, 5, 5, 5], // in a trigger
+  [6, 6, 5, 5, 5, 5, 5, 7], // a `;` in a trigger
+  [1, 7, 5, 5, 5, 5, 5, 5], // `; END` in a trigger
+];
+
 function scanStatement(sql: string): ScannedStatement {
   const words: string[] = [];
   let depth = 0;
   let index = 0;
-  let sawSemicolon = false;
+  let state = 0;
+  let ended = false;
   let hasTrailingStatement = false;
+  // Anything but another `;` after the end of the first statement is a second statement, which
+  // `prepare()` would discard.
+  const see = (token: number) => {
+    if (ended && token !== SEMI) hasTrailingStatement = true;
+    state = TRANSITIONS[state]?.[token] ?? state;
+    if (state === START) ended = true;
+  };
 
   while (index < sql.length) {
     const character = sql[index];
@@ -44,6 +86,7 @@ function scanStatement(sql: string): ScannedStatement {
     if ((character === "x" || character === "X") && sql[index + 1] === "'") {
       const end = sql.indexOf("'", index + 2);
       if (end === -1) return { words, hasTrailingStatement, unterminated: true };
+      see(OTHER);
       index = end + 1;
       continue;
     }
@@ -60,39 +103,45 @@ function scanStatement(sql: string): ScannedStatement {
         index = end + 1;
         break;
       }
+      see(OTHER);
       continue;
     }
     if (character === "[") {
       const end = sql.indexOf("]", index + 1);
       if (end === -1) return { words, hasTrailingStatement, unterminated: true };
+      see(OTHER);
       index = end + 1;
       continue;
     }
     if (character === "(") {
+      see(OTHER);
       depth += 1;
       index += 1;
       continue;
     }
     if (character === ")") {
+      see(OTHER);
       depth = Math.max(0, depth - 1);
       index += 1;
       continue;
     }
     if (character === ";") {
-      sawSemicolon = true;
+      see(SEMI);
       index += 1;
       continue;
     }
-    if (character !== undefined && /[A-Za-z_]/.test(character)) {
+    // As in SQLite, every character above ASCII is an identifier character, so that a part of a
+    // non-ASCII name is never read as END or TRIGGER.
+    if (character !== undefined && /[A-Za-z_\u0080-\uffff]/.test(character)) {
       let end = index;
-      while (end < sql.length && /[A-Za-z0-9_$]/.test(sql.charAt(end))) end += 1;
-      // Anything at all after a `;` means a second statement, which `prepare()` would discard.
-      if (sawSemicolon) hasTrailingStatement = true;
-      if (depth === 0) words.push(sql.slice(index, end).toLowerCase());
+      while (end < sql.length && /[A-Za-z0-9_$\u0080-\uffff]/.test(sql.charAt(end))) end += 1;
+      const word = sql.slice(index, end).toLowerCase();
+      see(KEYWORD_TOKENS[word] ?? OTHER);
+      if (depth === 0) words.push(word);
       index = end;
       continue;
     }
-    if (character !== undefined && !/\s/.test(character) && sawSemicolon) hasTrailingStatement = true;
+    if (character !== undefined && !/\s/.test(character)) see(OTHER);
     index += 1;
   }
 

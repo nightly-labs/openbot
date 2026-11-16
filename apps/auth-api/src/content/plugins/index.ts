@@ -33,9 +33,11 @@ import { REVENUECAT_PLUGIN_GUIDE } from "./revenuecat";
 import { ROBINHOOD_PLUGIN_GUIDE } from "./robinhood";
 import { SENTRY_PLUGIN_GUIDE } from "./sentry";
 import { STRIPE_PLUGIN_GUIDE } from "./stripe";
+import { SUNRA_PLUGIN_GUIDE } from "./sunra";
 import { TICKTICK_PLUGIN_GUIDE } from "./ticktick";
 import { TODOIST_PLUGIN_GUIDE } from "./todoist";
 import { TRELLO_PLUGIN_GUIDE } from "./trello";
+import { TRYPOST_PLUGIN_GUIDE } from "./trypost";
 import { VERCEL_PLUGIN_GUIDE } from "./vercel";
 
 // The written part of each plugin page, by catalog slug. A listing with no entry here
@@ -57,11 +59,13 @@ const PLUGIN_GUIDES: Readonly<Record<string, PluginGuide>> = {
   notion: NOTION_PLUGIN_GUIDE,
   paper: PAPER_PLUGIN_GUIDE,
   higgsfield: HIGGSFIELD_PLUGIN_GUIDE,
+  sunra: SUNRA_PLUGIN_GUIDE,
   elevenlabs: ELEVENLABS_PLUGIN_GUIDE,
   posthog: POSTHOG_PLUGIN_GUIDE,
   resend: RESEND_PLUGIN_GUIDE,
   omnisend: OMNISEND_PLUGIN_GUIDE,
   postiz: POSTIZ_PLUGIN_GUIDE,
+  trypost: TRYPOST_PLUGIN_GUIDE,
   sentry: SENTRY_PLUGIN_GUIDE,
   gitlab: GITLAB_PLUGIN_GUIDE,
   stripe: STRIPE_PLUGIN_GUIDE,

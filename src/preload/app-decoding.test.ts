@@ -9,6 +9,7 @@ import type {
   MobileConnectedDevice,
   NotificationOpenedEvent,
   UpdateStatus,
+  WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import { describe, expect, it } from "vitest";
 import {
@@ -41,6 +42,7 @@ import {
   decodeUpdateStatus,
   decodeVoiceServerProbe,
   decodeVoiceServerSettings,
+  decodeWorkflowNotificationOpenedEvent,
 } from "./app-decoding";
 
 const omarchyPalette = {
@@ -339,6 +341,11 @@ const valid: [string, (value: unknown) => unknown, unknown][] = [
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null, channelId: "channel-1" } satisfies NotificationOpenedEvent,
   ],
+  [
+    "opened workflow notification",
+    decodeWorkflowNotificationOpenedEvent,
+    { serverId: "local", workflowId: "workflow-1" } satisfies WorkflowNotificationOpenedEvent,
+  ],
   ["chat windows", decodeChatWindowTargets, [{ serverId: "local", agentId: "agent-1" }]],
   ["detected model servers", decodeDetectedModelServers, [detectedServer]],
   ["custom agents", decodeCustomAgents, [customAgent, { ...customAgent, id: "qwen", resolvedCommand: null }]],
@@ -536,6 +543,7 @@ const malformed: [string, (value: unknown) => unknown, unknown][] = [
     decodeNotificationOpenedEvent,
     { serverId: "local", agentId: "agent-1", threadId: null, channelId: 7 },
   ],
+  ["opened workflow notification without a workflow", decodeWorkflowNotificationOpenedEvent, { serverId: "local" }],
   ["a chat window without an agent", decodeChatWindowTargets, [{ serverId: "local" }]],
   ["chat windows that are not a list", decodeChatWindowTargets, { serverId: "local", agentId: "agent-1" }],
   // A scan row never carries a credential, so one that does is refused with the whole list.

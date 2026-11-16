@@ -12,6 +12,7 @@ import {
   listAgentSkills,
   listMcpServers,
   listMcpSignIns,
+  readGithubSkills,
   removeMcpServer,
   saveMcpServer,
   setAgentSkillEnabled,
@@ -64,6 +65,9 @@ export function createWebMarketplaceCalls(
         runTeamEffect(uninstallAgentSkill(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
       setEnabled: async (input) =>
         runTeamEffect(setAgentSkillEnabled(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+      // The Marketplace asks only a host with `github-skills-v1`.
+      readGithub: async (link) =>
+        runTeamEffect(readGithubSkills(request(serverId), link).pipe(Effect.mapError((error) => error.cause))),
     }),
     mcp: {
       listMcpServers: async (serverId) =>
