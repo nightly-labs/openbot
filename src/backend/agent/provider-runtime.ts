@@ -2542,7 +2542,14 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
   ): Effect.fn.Return<CustomProviderRestart, ProviderOperationFailed> {
     if (!this.#clients.has("acp")) {
-      if (this.#released.has("acp") || savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      if (savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      // A process stopped for idle keeps its old catalogue, and only an agent's turn starts it again.
+      // A changed agent would then list no model, so no agent could be set to it (#10026). As for a
+      // custom endpoint, the start is not awaited; a failure shows on the status.
+      if (this.#released.has("acp")) {
+        yield* this.ensureProvider("acp").pipe(Effect.ignore, Effect.forkIn(this.#scope));
+        return "not-running";
+      }
       yield* this.refreshProvider("acp").pipe(toProviderOperationFailed);
       return this.#clients.has("acp") ? "restarted" : "not-running";
     }
