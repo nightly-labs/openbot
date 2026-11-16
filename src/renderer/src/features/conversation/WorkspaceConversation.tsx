@@ -50,7 +50,9 @@ import { useServerScope } from "../servers/server-scope";
 import { useServerSettings } from "../servers/server-settings";
 import { useServers } from "../servers/servers-context";
 import { serversPort } from "../servers/servers-port";
+import { appSettingLinkTarget } from "../settings/setting-link-targets";
 import { useSettings } from "../settings/settings-context";
+import { settingsTabShown } from "../settings/settings-tabs";
 import { isReaderAuthor } from "../team/reader-identity";
 import { usePresence } from "../team/team-context";
 import { useUsage } from "../usage/usage-context";
@@ -100,6 +102,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
     agentAutoApproves,
     generalSettings,
     openNotificationLevels,
+    openAppSettingRow,
   } = useSettings();
   const {
     providerRuntimeStatuses,
@@ -544,6 +547,16 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginConnect(request.connect);
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
+        }}
+        // A setting card opens Settings of this computer, also in the chat of a joined server: app settings
+        // belong to this computer. A tab that this window does not show has no Open.
+        appSettingOpener={(settingId) => {
+          const target = appSettingLinkTarget(settingId, platform.appInfo()?.platform);
+          const shown = settingsTabShown(target.tab, {
+            platform: platform.appInfo()?.platform,
+            chatWindow: platform.chatWindow !== null,
+          });
+          return shown ? () => openAppSettingRow(target.tab, target.row) : undefined;
         }}
         // Sign in opens the server's Marketplace page, which signs in as its own button does: on this
         // computer, or through a host that relays its sign-in page.

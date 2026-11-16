@@ -14,6 +14,7 @@ export const messages = defineMessages("status.agent", {
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
+  "status.agent.settingShown": "Showed a setting: {setting}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
   "status.agent.channelMemberRemoved": "{agent} removed {member} from the channel. {person} asked for it.",
   "status.agent.channelInstructionsChanged": "{agent} changed the channel instructions. {person} asked for it.",

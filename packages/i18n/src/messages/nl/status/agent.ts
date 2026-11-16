@@ -15,6 +15,7 @@ export const messages = {
     "{previous} heeft geen tegoed meer. Overgeschakeld naar {model}. Voeg tegoed toe en selecteer het daarna om het weer te gebruiken.",
   "status.agent.modelReturnedAfterError": "Teruggeschakeld naar {model} na de fout bij de aanbieder.",
   "status.agent.marketplaceSuggested": "Een app uit de marktplaats voorgesteld: {app}.",
+  "status.agent.settingShown": "Een instelling getoond: {setting}.",
   "status.agent.channelMemberAdded": "{agent} heeft {member} aan het kanaal toegevoegd. {person} vroeg erom.",
   "status.agent.channelMemberRemoved": "{agent} heeft {member} uit het kanaal verwijderd. {person} vroeg erom.",
   "status.agent.channelInstructionsChanged": "{agent} heeft de kanaalinstructies gewijzigd. {person} vroeg erom.",

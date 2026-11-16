@@ -174,6 +174,8 @@ function openbotGuidance(namespace: string, tool: string): string {
       ].join("\n");
     case "send_feedback":
       return "Use it for a problem in OpenBot itself, not the user's project, or for a wanted change. When the user complains about OpenBot, first help or give a workaround, then call it unasked. Call it once per problem, not again after Not now. Write the text yourself, plainly. Do not ask for versions, logs or settings: OpenBot adds them. Set surface Phone app for a phone app bug, also if told on a computer. Ask one question only when you do not know what went wrong, what they want or which app. Leave out secrets, private paths and other chat text. Never send a security problem: give https://github.com/nightly-labs/openbot/security/advisories/new. For a question or discussion, give https://github.com/nightly-labs/openbot/discussions. Say the issue is public, without their name. Then follow the result's next field. Never open an OpenBot issue with other tools";
+    case "show_setting":
+      return "Before you send an idea with openbot.send_feedback, or say that OpenBot cannot do something, search the settings with words: the feature can exist. Show one setting, the best fit. Follow the next field of its result.";
     case "suggest_marketplace_app":
       return "Follow the next field of its result. When no plugin applies, give the needed sign-in or Computer Use setting.";
     case "messaging_remember":

@@ -14,6 +14,7 @@ export const messages = {
     "{previous} 的额度已用完。已切换到 {model}。要再次使用它，请添加额度，然后选择它。",
   "status.agent.modelReturnedAfterError": "服务商出错后，已切回 {model}。",
   "status.agent.marketplaceSuggested": "推荐了一个市场应用：{app}。",
+  "status.agent.settingShown": "显示了一个设置：{setting}。",
   "status.agent.channelMemberAdded": "{agent} 已把 {member} 加入该频道，这是 {person} 的请求。",
   "status.agent.channelMemberRemoved": "{agent} 已把 {member} 移出该频道，这是 {person} 的请求。",
   "status.agent.channelInstructionsChanged": "{agent} 已修改频道指令，这是 {person} 的请求。",
