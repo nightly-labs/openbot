@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Actualiza también a esta versión cada servidor al que te has unido. En un servidor, el CRM, Añadir cuenta con código, un fondo que establece un agente, las carpetas de la biblioteca que organizan los agentes y los mensajes que entran en un turno de Devin en curso solo funcionan cuando el servidor tiene esta versión."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Muestra un fondo animado detrás de toda la ventana. Elige una escena, como Estanque koi o Luciérnagas, en Ajustes > Fondo de la ventana, o pide a un agente que cree una para ti.",
+          "Gestiona clientes potenciales, clientes y pagos en la nueva página del CRM. Es experimental: un propietario o administrador lo activa en Ajustes del servidor > Experimental. Puede importar desde Stripe, y los agentes proponen cambios que un propietario o administrador aprueba.",
+          "Responde a un agente en el chat del Dock de agentes. Permite o deniega un comando, responde a una pregunta o termina un paso del navegador sin la ventana principal.",
+          "Organiza la Biblioteca con mosaicos de carpetas, Favoritos, Recientes y Deshacer. Arrastra archivos a Nueva carpeta para crear una carpeta, o pide a un agente que organice sus carpetas.",
+          "Añade una cuenta de ChatGPT (Codex), Grok o Claude con un código. Abre el menú junto a Añadir cuenta y selecciona Añadir cuenta con código.",
+          "Un mensaje que envías mientras trabaja un agente de Devin u OpenCode entra en el turno en curso. Esto requiere Devin CLI 3000.12.57 u OpenCode 2.3.0, o una versión posterior."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Los ajustes tienen un nuevo diseño. Las secciones están en grupos con nombre, y los Ajustes del servidor tienen las nuevas secciones Memoria y Predeterminados de agentes. En macOS, OpenBot usa la fuente del sistema.",
+          "Añade y edita servidores MCP personalizados en Marketplace > Apps. Los Ajustes del servidor ya no tienen una sección de MCP.",
+          "En un chat con un agente, tus burbujas ahora toman el color del avatar del agente. Cámbialo en Ajustes > Apariencia > Tus burbujas.",
+          "Una conversación por voz ya no abre el panel lateral. Una barra pequeña en la parte superior del chat muestra los controles de voz."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Un chat que pierde su sesión guardada, o que se vuelve demasiado grande, ya no se queda roto. El agente inicia una sesión nueva con el historial del chat y responde a tu mensaje.",
+          "Más agentes pasan a su modelo de respaldo cuando un límite de uso o un error del proveedor detiene un turno, incluidos los agentes de Grok, Hermes y Claude.",
+          "Los agentes pueden usar un inicio de sesión guardado en más lugares, como un formulario de inicio de sesión en un marco.",
+          "Una rutina sigue activa después de una ejecución fallida, y una ejecución que vence mientras el proveedor no puede iniciarse se ejecuta más tarde.",
+          "OpenBot usa menos CPU y batería: los videos del chat y de las pestañas ocultas del navegador se pausan cuando no los ves."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

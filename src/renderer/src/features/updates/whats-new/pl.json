@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Zaktualizuj do tej wersji także każdy serwer, do którego dołączyłeś. Na serwerze CRM, Dodaj konto kodem, tło ustawione przez agenta, foldery Biblioteki, które agenci porządkują, i wiadomości do bieżącej tury Devin działają tylko wtedy, gdy serwer ma tę wersję."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Odtwarzaj animowane tło za całym oknem. Wybierz scenę, na przykład Staw z karpiami koi lub Świetliki, w Ustawienia → Tło okna, albo poproś agenta, żeby ją dla ciebie utworzył.",
+          "Przechowuj leady, klientów i płatności na nowej stronie CRM. Jest eksperymentalna: właściciel lub administrator włącza ją w Ustawienia serwera → Eksperymentalne. Może importować dane ze Stripe, a agenci proponują zmiany, które właściciel lub administrator zatwierdza.",
+          "Odpowiadaj agentowi w czacie panelu Dok agentów. Zezwól na polecenie lub je odrzuć, odpowiedz na pytanie albo zakończ krok w przeglądarce bez głównego okna.",
+          "Porządkuj Bibliotekę kafelkami folderów, Ulubionymi, Ostatnimi i Cofnij. Przeciągnij pliki na Nowy folder, aby utworzyć folder, albo poproś agenta o uporządkowanie jego folderów.",
+          "Dodaj konto ChatGPT (Codex), Grok lub Claude kodem. Otwórz menu obok Dodaj konto i wybierz Dodaj konto kodem.",
+          "Wiadomość wysłana podczas pracy agenta Devin lub OpenCode trafia do bieżącej tury. Wymaga Devin CLI 3000.12.57 lub OpenCode 2.3.0 albo nowszego."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Ustawienia mają nowy układ. Sekcje są w opisanych grupach, a Ustawienia serwera mają nowe sekcje Pamięć i Ustawienia domyślne agentów. Na macOS OpenBot używa czcionki systemowej.",
+          "Dodawaj i edytuj własne serwery MCP w Marketplace → Aplikacje. Ustawienia serwera nie mają już sekcji MCP.",
+          "W czacie z agentem twoje dymki przyjmują teraz kolor awatara agenta. Zmień to w Ustawienia → Wygląd → Twoje dymki.",
+          "Rozmowa głosowa nie otwiera już panelu bocznego. Mały pasek u góry czatu pokazuje sterowanie głosem."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Czat, który utracił zapisaną sesję albo stał się za duży, nie zostaje zepsuty. Agent rozpoczyna nową sesję z historią czatu i odpowiada na twoją wiadomość.",
+          "Więcej agentów przechodzi na model zapasowy, gdy limit użycia albo błąd dostawcy zatrzyma turę, w tym agenci Grok, Hermes i Claude.",
+          "Agenci mogą używać zapisanego logowania w większej liczbie miejsc, na przykład w formularzu logowania w ramce.",
+          "Rutyna pozostaje włączona po nieudanym uruchomieniu, a uruchomienie zaplanowane wtedy, gdy dostawca nie może wystartować, zostaje wykonane później.",
+          "OpenBot zużywa mniej CPU i baterii: filmy w czacie i w ukrytych kartach przeglądarki wstrzymują się, gdy ich nie widzisz."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [

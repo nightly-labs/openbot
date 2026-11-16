@@ -1,5 +1,44 @@
 [
   {
+    "version": "0.72.0",
+    "date": "2026-11-16",
+    "notices": [
+      "Update ook elke server waarbij je bent aangesloten naar deze versie. Op een server werken de CRM, Account toevoegen met code, een achtergrond die een agent instelt, Bibliotheekmappen die agents ordenen en berichten in een lopende Devin-beurt alleen als de server deze versie heeft."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Speel een geanimeerde achtergrond af achter het hele venster. Kies een scène, zoals Koivijver of Vuurvliegjes, bij Instellingen → Vensterachtergrond, of vraag een agent er een voor je te maken.",
+          "Houd leads, klanten en betalingen bij op de nieuwe CRM-pagina. Die is experimenteel: een eigenaar of beheerder zet hem aan bij Serverinstellingen → Experimenteel. Hij kan importeren uit Stripe, en agents stellen wijzigingen voor die een eigenaar of beheerder goedkeurt.",
+          "Beantwoord een agent in het chatvenster van het Agentdock. Sta een opdracht toe of weiger die, beantwoord een vraag, of rond een browserstap af zonder het hoofdvenster.",
+          "Organiseer de Bibliotheek met maptegels, Favorieten, Recent en Ongedaan maken. Sleep bestanden naar Nieuwe map om een map te maken, of vraag een agent zijn mappen te ordenen.",
+          "Voeg een ChatGPT (Codex)-, Grok- of Claude-account toe met een code. Open het menu naast Account toevoegen en kies Account toevoegen met code.",
+          "Een bericht dat je stuurt terwijl een Devin- of OpenCode-agent werkt, gaat naar de lopende beurt. Dit vereist Devin CLI 3000.12.57 of OpenCode 2.3.0 of later."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Instellingen hebben een nieuwe indeling. Secties staan in gelabelde groepen, en Serverinstellingen heeft nieuwe secties Geheugen en Standaarden voor agents. Op macOS gebruikt OpenBot het systeemlettertype.",
+          "Voeg eigen MCP-servers toe en bewerk ze in Marktplaats → Apps. Serverinstellingen heeft geen MCP-sectie meer.",
+          "In een chat met een agent nemen je ballonnen nu de kleur van de avatar van de agent over. Wijzig dit bij Instellingen → Weergave → Jouw ballonnen.",
+          "Een spraakgesprek opent het zijpaneel niet meer. Een kleine balk boven aan de chat toont de spraakbediening."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Een chat die zijn opgeslagen sessie verliest, of te groot wordt, blijft niet langer kapot. De agent start een nieuwe sessie met de chatgeschiedenis en beantwoordt je bericht.",
+          "Meer agents schakelen naar hun reservemodel wanneer een gebruikslimiet of een providerfout een beurt stopt, ook Grok-, Hermes- en Claude-agents.",
+          "Agents kunnen een opgeslagen login op meer plaatsen gebruiken, zoals een inlogformulier in een frame.",
+          "Een routine blijft aan na een mislukte run, en een run die gepland staat terwijl de provider niet kan starten, loopt later.",
+          "OpenBot gebruikt minder CPU en batterij: video's in de chat en in verborgen browsertabbladen pauzeren wanneer je ze niet kunt zien."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.71.0",
     "date": "2026-11-14",
     "notices": [
