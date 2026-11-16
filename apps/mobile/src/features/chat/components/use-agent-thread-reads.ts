@@ -183,7 +183,8 @@ export function useThreadOpeningUnread(
   const queryScope = useQueryScope();
   const workspace = useMobileWorkspaceReader();
   const enabled = useThreadReadsEnabled(serverId) && taskId !== null;
-  const reads = useQuery(threadReadsQuery(queryScope, workspace, serverId, agentId, enabled));
+  // A fresh read on each visit: the host sends no event when a mark moves.
+  const reads = useQuery({ ...threadReadsQuery(queryScope, workspace, serverId, agentId, enabled), staleTime: 0 });
   const read = reads.data?.find((entry) => entry.taskId === taskId);
   const keptUnread = !reads.data || (read?.unreadCount ?? 0) > 0;
   if (!enabled || reads.isError) return { firstUnread: null, keptUnread: false };
