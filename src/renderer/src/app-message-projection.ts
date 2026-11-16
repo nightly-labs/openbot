@@ -23,6 +23,7 @@ import {
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
+  settingLinkEvent,
   skillConversationEvent,
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
@@ -421,6 +422,8 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const settingLink = settingLinkEvent(message);
+  if (settingLink) return { kind: "setting-link", settingId: settingLink.settingId, timestamp: message.createdAt };
   const skillSuggestion = skillSuggestionEvent(message);
   if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);

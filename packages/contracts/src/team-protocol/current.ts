@@ -164,6 +164,7 @@ import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
@@ -397,6 +398,7 @@ export {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -680,6 +682,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -924,7 +927,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PHONE_FEEDBACK_CAPABILITY &&
     capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
     capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
-    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+    capability !== SETTING_LINK_MARKERS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1045,6 +1049,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1248,6 +1253,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PHONE_FEEDBACK_CAPABILITY &&
       capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
       capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
-      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+      capability !== SETTING_LINK_MARKERS_CAPABILITY,
   );
 }

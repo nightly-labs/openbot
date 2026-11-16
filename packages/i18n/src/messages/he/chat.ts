@@ -166,6 +166,8 @@ export const messages = {
   "chat.usageLimit.send": "שליחה אל {model}",
   "chat.usageLimit.failed": "לא ניתן היה להחליף את המודל. יש לנסות שוב.",
   "chat.marker.marketplaceSuggestion": "הציע אפליקציה מהחנות",
+  "chat.marker.settingLink": "הציג הגדרה",
+  "chat.settingLink.desktopOnly": "יש לפתוח אותה באפליקציית OpenBot במחשב שלך.",
   "chat.marker.skillSuggestion": "הציע מיומנות",
   "chat.marker.mcpSignIn": "ביקש להתחבר לשרת MCP",
   "chat.marker.serverInstall": "יצר פקודה להתקנת שרת",

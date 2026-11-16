@@ -55,8 +55,11 @@ import {
   channelAllowsBrowser,
   channelBrowserAgent,
   isMessageReaction,
+  isSettingLinkId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
+  SETTING_LINK_SCOPES,
+  settingLinkItemType,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
@@ -187,6 +190,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
+import { searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -2355,6 +2359,38 @@ export class OpenBotToolRouter {
       });
     }
 
+    if (params.tool === "show_setting") {
+      const args = params.arguments;
+      if (!isRecord(args) || !isString(args.setting)) throw new Error("setting must be a setting id or words.");
+      const setting = args.setting.trim();
+      if (!isSettingLinkId(setting)) {
+        const matches = searchSettingLinks(setting);
+        return openBotToolResult({
+          status: matches.length > 0 ? "matches" : "not_found",
+          matches,
+          next:
+            matches.length > 0
+              ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id. When none fits, try other words once, then say that OpenBot has no such setting."
+              : "No setting matches. Try other words once, such as the name of the feature. Otherwise say that OpenBot has no setting for it, and offer openbot.send_feedback with an idea.",
+        });
+      }
+      const shown = settingLinkSummary(setting);
+      this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
+        itemType: settingLinkItemType(setting),
+        text: sourceText("status.agent.settingShown", { setting: shown.title }),
+        eventType: "setting.shown",
+        detail: { settingId: setting },
+      });
+      return openBotToolResult({
+        status: "shown",
+        setting: shown,
+        next:
+          SETTING_LINK_SCOPES[setting] === "agent"
+            ? "The card is in the chat. Its Open button shows the row in your agent settings in the side panel. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
+            : "The card is in the chat. On the OpenBot desktop app, its Open button shows the row in OpenBot Settings of the computer that shows the chat; the web client shows only where it is. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card.",
+      });
+    }
+
     if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
 
     if (params.tool === "create_server_install_command")
@@ -2823,7 +2859,7 @@ export class OpenBotToolRouter {
       itemType: string;
       text: string;
       eventType: string;
-      detail: { appId: string } | { mcpServerId: string } | Record<string, never>;
+      detail: { appId: string } | { mcpServerId: string } | { settingId: string } | Record<string, never>;
     },
   ): void {
     const snapshot = structuredClone(this.#conversation.ensureSnapshot(agentId, threadId));

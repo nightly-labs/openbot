@@ -165,6 +165,8 @@ export const messages = defineMessages("chat", {
   "chat.usageLimit.send": "Send to {model}",
   "chat.usageLimit.failed": "The model could not be changed. Try again.",
   "chat.marker.marketplaceSuggestion": "Suggested a Marketplace app",
+  "chat.marker.settingLink": "Showed a setting",
+  "chat.settingLink.desktopOnly": "Open it in the OpenBot app on your computer.",
   "chat.marker.skillSuggestion": "Suggested a skill",
   "chat.marker.mcpSignIn": "Asked you to sign in to an MCP server",
   "chat.marker.serverInstall": "Made a command to install a server",

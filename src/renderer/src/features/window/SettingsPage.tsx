@@ -1,6 +1,6 @@
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Server } from "@openbot/ui";
-import { createSignal, For, flush, onCleanup, Show } from "solid-js";
+import { createEffect, createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { useAuth } from "../account/account-context";
@@ -153,6 +153,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       : i18n.t("app.settingsPage.noResults");
   };
   let content: HTMLElement | undefined;
+  const [contentElement, setContentElement] = createSignal<HTMLElement | undefined>();
   let nav: HTMLElement | undefined;
 
   /**
@@ -173,18 +174,43 @@ export function SettingsPage(props: { kind: SettingsKind }) {
     flush();
     if (!content) return;
     for (const marked of content.querySelectorAll("[data-search-match]")) marked.removeAttribute("data-search-match");
-    if (!row.anchor) return;
-    // A row that the current state does not show has no anchor in the page; then only the tab opens.
+    if (row.anchor) markRow(content, row.tab, row.anchor);
+  };
+
+  /**
+   * Scrolls to a row of the open tab, marks it and puts the focus on its control. Returns false while
+   * the page does not show the row: a row that the current state does not show has no anchor.
+   */
+  const markRow = (root: HTMLElement, tab: SettingsTab, anchor: AppTextKey): boolean => {
     // A plain string: as a template type, each tab and row key pair is one member of a union that is too large.
-    const selector: string = `.settings-modal-tab-panel[data-tab="${row.tab}"] [data-settings-row="${row.anchor}"]`;
-    const anchor = content.querySelector(selector);
+    const selector: string = `.settings-modal-tab-panel[data-tab="${tab}"] [data-settings-row="${anchor}"]`;
+    const found = root.querySelector(selector);
     // A switch row puts the anchor on its switch, so the search marks the whole row of the card.
-    const target = anchor?.closest(".settings-modal-card > *") ?? anchor;
-    if (!(target instanceof HTMLElement)) return;
+    const target = found?.closest(".settings-modal-card > *") ?? found;
+    if (!(target instanceof HTMLElement)) return false;
+    for (const marked of root.querySelectorAll("[data-search-match]")) marked.removeAttribute("data-search-match");
     target.setAttribute("data-search-match", "");
     target.scrollIntoView({ block: "center" });
     target.querySelector<HTMLElement>("button, input, select, [tabindex]")?.focus({ preventScroll: true });
+    return true;
   };
+
+  // A setting card in a chat opens the settings at a row. The tab content comes into the page after the
+  // page shows, so the row is marked when it arrives. A new request or a closed page stops the wait.
+  let handledRowNonce = 0;
+  createEffect(
+    () => ({ request: settings.appSettingRowRequest(), root: contentElement() }),
+    ({ request, root }) => {
+      if (props.kind !== "personal" || !request || !root || request.nonce === handledRowNonce) return;
+      handledRowNonce = request.nonce;
+      if (markRow(root, request.tab, request.anchor)) return;
+      const observer = new MutationObserver(() => {
+        if (markRow(root, request.tab, request.anchor)) observer.disconnect();
+      });
+      observer.observe(root, { childList: true, subtree: true });
+      return () => observer.disconnect();
+    },
+  );
 
   return (
     <SettingsPageFrame
@@ -226,6 +252,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       }
       onMounts={(mounts) => {
         content = mounts?.content;
+        setContentElement(mounts?.content);
         nav = mounts?.nav;
         windowPage.setSettingsMounts(mounts);
       }}

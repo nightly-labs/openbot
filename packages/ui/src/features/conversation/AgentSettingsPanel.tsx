@@ -109,6 +109,7 @@ import {
   createSignal,
   createStore,
   For,
+  flush,
   onCleanup,
   onSettled,
   Show,
@@ -121,6 +122,13 @@ import { AgentChatColorRow } from "../settings/ChatColorSetting";
 import { AgentDeleteHistoryDialog } from "./AgentDeleteHistoryDialog";
 import { type AgentFolderCalls, AgentFoldersPage, AgentFoldersRow, createAgentFolders } from "./AgentFolders";
 import { AgentNewChatDialog } from "./AgentNewChatDialog";
+import {
+  AGENT_SETTING_LINK_ROWS,
+  AGENT_SETTINGS_PAGE_TITLE,
+  type AgentSettingReveal,
+  type AgentSettingsPage,
+  revealSettingRow,
+} from "./agent-setting-links";
 import { BackupModelsPage } from "./BackupModels";
 
 export interface AgentRuntimeSettings {
@@ -196,6 +204,11 @@ export interface AgentSettingsPanelProps {
   onResizeEnd: (width: number) => void;
   /** The width from the last drag. When the chat gets wider again, the panel goes back to it. */
   preferredWidth?: (() => number) | undefined;
+  /**
+   * Shows one row, as a setting card in the chat asks: its page opens and the row is marked. While
+   * `detailOpen`, only the page changes.
+   */
+  reveal?: AgentSettingReveal | null | undefined;
   /** Application-owned navigation and detail surfaces, in the existing panel layout. */
   links?: JSX.Element;
   detailOpen?: boolean;
@@ -258,19 +271,6 @@ function choiceBrowserProfile(choice: BrowserProfileChoice): AgentBrowserProfile
 }
 
 const INSTRUCTIONS_SAVE_DELAY_MS = 400;
-
-/**
- * The pages behind the root list. The root edits the agent's face, name, title and instructions
- * in place, as the mobile app does, and shows one row for each page.
- */
-type AgentSettingsPage = "permissions" | "folders" | "backup-models" | "advanced";
-
-const PAGE_TITLE: Record<AgentSettingsPage, AppTextKey> = {
-  permissions: "agentSettings.permissions.title",
-  folders: "agentSettings.folders.title",
-  "backup-models": "agentSettings.backupModels.title",
-  advanced: "agentSettings.advanced.title",
-};
 
 /** The three free-text fields of the panel, each with a flag for edits made since the last save. */
 interface AgentTextFields {
@@ -378,6 +378,34 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       )?.focus(),
     );
   }
+
+  // The row can show later than its page, such as a row that waits for the host. A new request, another
+  // page or a closed panel stops the wait.
+  createEffect(
+    () => props.reveal,
+    (reveal) => {
+      if (!reveal) return;
+      const row = AGENT_SETTING_LINK_ROWS[reveal.settingId];
+      setPage(row.page);
+      flush();
+      // A detail page covers the panel: the page is where its Back goes, and no row shows to mark.
+      if (untrack(() => props.detailOpen)) return;
+      const root = pageRoot;
+      if (!root) return;
+      if (!row.match) {
+        if (row.page) openPage(row.page);
+        return;
+      }
+      const label = t(row.match);
+      if (revealSettingRow(root, label)) return;
+      const observer = new MutationObserver(() => {
+        // The user went to another page: the row is not wanted there.
+        if (untrack(page) !== row.page || revealSettingRow(root, label)) observer.disconnect();
+      });
+      observer.observe(root, { childList: true, subtree: true });
+      return () => observer.disconnect();
+    },
+  );
 
   function closePage(): void {
     returnFocusPage = page();
@@ -1061,7 +1089,7 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
         >
           {(current) => (
             <SettingsPanelHeader
-              title={t(PAGE_TITLE[current()])}
+              title={t(AGENT_SETTINGS_PAGE_TITLE[current()])}
               onBack={closePage}
               backLabel={t("agentSettings.backToSettings")}
               onClose={props.onClose}

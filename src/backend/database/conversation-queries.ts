@@ -18,6 +18,7 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   SKILL_EVENT_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -42,6 +43,7 @@ export interface ConversationMarkerExclusions {
   excludeRoutineRunEvents?: boolean;
   excludeHostedSiteEvents?: boolean;
   excludeRoutineQuietAnswers?: boolean;
+  excludeSettingLinks?: boolean;
 }
 
 /**
@@ -463,6 +465,7 @@ export class ConversationQueries {
                AND COALESCE(message.item_type, '') NOT LIKE '${ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'
                AND COALESCE(message.item_type, '') NOT LIKE '${MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX}%'
+               AND COALESCE(message.item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'
                AND json_extract(message.message_json, '$.routine') IS NULL
                ${includeSideThreads ? ARCHIVED_SIDE_THREAD_EXCLUSION : SIDE_THREAD_EXCLUSION}
                ${filter}
@@ -807,6 +810,7 @@ function conversationMarkerSqlFilter(exclusions: ConversationMarkerExclusions): 
       ? `AND COALESCE(item_type, '') NOT LIKE '${HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX}%'`
       : "",
     exclusions.excludeRoutineQuietAnswers ? `AND COALESCE(item_type, '') != '${ROUTINE_QUIET_ANSWER_ITEM_TYPE}'` : "",
+    exclusions.excludeSettingLinks ? `AND COALESCE(item_type, '') NOT LIKE '${SETTING_LINK_ITEM_TYPE_PREFIX}%'` : "",
   ]
     .filter(Boolean)
     .join("\n");

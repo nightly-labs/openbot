@@ -8,6 +8,7 @@ import {
   type McpSignInState,
 } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
+import type { AppTextKey } from "@openbot/i18n";
 import { DEFAULT_GENERAL_SETTINGS, type GeneralSettingsValue } from "@openbot/ui/features/settings/app-settings";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createSignal, flush, onSettled } from "solid-js";
@@ -31,6 +32,13 @@ import { desktopMarketplaceCalls } from "./marketplace-calls";
 import { settingsPort } from "./settings-port";
 import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
+
+/** A row of the app settings that a setting card asked for. `anchor` is the row's `data-settings-row`. */
+export interface AppSettingRowRequest {
+  tab: SettingsTab;
+  anchor: AppTextKey;
+  nonce: number;
+}
 
 const ANALYTICS_APP_VERSION_STORAGE_KEY = "openbot:analytics-app-version";
 
@@ -163,9 +171,14 @@ const Settings = createSimpleContext({
       nonce: number;
     } | null>(null);
     let notificationFocusNonce = 0;
+    /** A row that a setting card in a chat asked for. The settings page moves to it once for each nonce. */
+    const [appSettingRowRequest, setAppSettingRowRequest] = createSignal<AppSettingRowRequest | null>(null);
+    let appSettingRowNonce = 0;
     // A request moves the tab once. A later opening of the settings shows the tab from the top.
     createEffect(appSettingsOpen, (open) => {
-      if (!open) setNotificationFocusRequest(null);
+      if (open) return;
+      setNotificationFocusRequest(null);
+      setAppSettingRowRequest(null);
     });
     /** A hosted server that the server menu asked to delete. The nonce repeats a request for the same server. */
     const [hostedServerDeleteRequest, setHostedServerDeleteRequest] = createSignal<{
@@ -510,6 +523,15 @@ const Settings = createSimpleContext({
       openAppSettings(trigger, "notifications");
     }
 
+    /** Opens the settings at one row of a tab, and marks the row, as the settings search does. */
+    function openAppSettingRow(tab: SettingsTab, anchor: AppTextKey, trigger?: HTMLElement | null): void {
+      setAppSettingRowRequest({ tab, anchor, nonce: ++appSettingRowNonce });
+      // The modal applies a tab when the requested tab changes, so a repeated request clears it first.
+      setAppSettingsTab(undefined);
+      flush();
+      openAppSettings(trigger, tab);
+    }
+
     /** Opens the Hosted servers tab with the delete confirmation of one server. */
     function openHostedServerDelete(serverId: string, trigger?: HTMLElement | null): void {
       setHostedServerDeleteRequest({ serverId, nonce: ++hostedServerDeleteNonce });
@@ -767,6 +789,8 @@ const Settings = createSimpleContext({
       openAppSettings,
       notificationFocusRequest,
       openNotificationLevels,
+      appSettingRowRequest,
+      openAppSettingRow,
       hostedServerDeleteRequest,
       openHostedServerDelete,
       skillsMarketplaceOpen,

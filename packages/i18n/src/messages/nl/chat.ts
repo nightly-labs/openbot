@@ -168,6 +168,8 @@ export const messages = {
   "chat.usageLimit.send": "Sturen naar {model}",
   "chat.usageLimit.failed": "Het model kon niet worden gewijzigd. Probeer het opnieuw.",
   "chat.marker.marketplaceSuggestion": "Stelde een app uit de marktplaats voor",
+  "chat.marker.settingLink": "Toonde een instelling",
+  "chat.settingLink.desktopOnly": "Open hem in de OpenBot-app op je computer.",
   "chat.marker.skillSuggestion": "Stelde een vaardigheid voor",
   "chat.marker.mcpSignIn": "Vroeg je in te loggen bij een MCP-server",
   "chat.marker.serverInstall": "Heeft een opdracht gemaakt om een server te installeren",

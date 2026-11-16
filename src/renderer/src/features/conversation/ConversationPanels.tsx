@@ -186,6 +186,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
     settingsOpen,
     skillSettingsRequest,
     instructionsSettingsRequest,
+    agentSettingRowRequest,
     routineSettingsRequest,
     settingsModel,
     settingsProvider,
@@ -878,6 +879,7 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
               instructionsRequest={
                 instructionsSettingsRequest()?.agentId === agent().id ? instructionsSettingsRequest() : null
               }
+              settingReveal={agentSettingRowRequest()?.agentId === agent().id ? agentSettingRowRequest() : null}
               routineSelectionRequest={
                 routineSettingsRequest()?.agentId === agent().id ? routineSettingsRequest() : null
               }

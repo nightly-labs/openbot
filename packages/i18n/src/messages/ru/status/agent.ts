@@ -15,6 +15,7 @@ export const messages = {
     "У {previous} закончились кредиты. Выполнено переключение на {model}. Чтобы снова использовать эту модель, пополните кредиты и выберите её.",
   "status.agent.modelReturnedAfterError": "После ошибки провайдера снова используется {model}.",
   "status.agent.marketplaceSuggested": "Предложено приложение из каталога: {app}.",
+  "status.agent.settingShown": "Показан параметр: {setting}.",
   "status.agent.channelMemberAdded": "Агент {agent} добавил {member} в канал. Запрос: {person}.",
   "status.agent.channelMemberRemoved": "Агент {agent} удалил {member} из канала. Запрос: {person}.",
   "status.agent.channelInstructionsChanged": "Агент {agent} изменил инструкции канала. Запрос: {person}.",

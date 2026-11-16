@@ -21,6 +21,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /**
@@ -120,6 +121,7 @@ export function ConversationSideThread(props: { threadId: string }) {
   /** Continue on a sign-in card goes to this thread, as the person's next message there. */
   const mcpSignInCard = useThreadMcpSignInCard((body) => thread()?.onSend(body, [], null) ?? Promise.resolve(false));
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
   /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
   const visualReplyCard = useThreadVisualReplyCard(draftKey);
   /** Branches this thread through an answer. The branch opens as a chat tab. */
@@ -219,7 +221,10 @@ export function ConversationSideThread(props: { threadId: string }) {
             waitsForAnswer={waitsForAnswer()}
             attention={answerCard()}
             messageCard={(message, quote) =>
-              visualReplyCard(message, quote) ?? mcpSignInCard(message) ?? marketplaceCard(message)
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
             }
             olderMessages={current().thread.olderMessages}
             newerMessages={current().thread.newerMessages}

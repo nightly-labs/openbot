@@ -174,6 +174,8 @@ export const messages = {
   "chat.usageLimit.send": "Invia a {model}",
   "chat.usageLimit.failed": "Non è stato possibile cambiare il modello. Riprova.",
   "chat.marker.marketplaceSuggestion": "Ha suggerito un'app del Marketplace",
+  "chat.marker.settingLink": "Ha mostrato un'impostazione",
+  "chat.settingLink.desktopOnly": "Aprila nell'app OpenBot sul tuo computer.",
   "chat.marker.skillSuggestion": "Ha suggerito una skill",
   "chat.marker.serverInstall": "Ha creato un comando per installare un server",
   "chat.marker.skill.created": "Skill creata",

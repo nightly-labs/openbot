@@ -264,6 +264,8 @@ export const messages = {
   "chat.usageLimit.send": "إرسال إلى {model}",
   "chat.usageLimit.failed": "تعذّر تغيير النموذج. حاول مرة أخرى.",
   "chat.marker.marketplaceSuggestion": "اقترح تطبيقًا من المتجر",
+  "chat.marker.settingLink": "عرض إعدادًا",
+  "chat.settingLink.desktopOnly": "افتحه في تطبيق OpenBot على حاسوبك.",
   "chat.marker.skillSuggestion": "اقترح مهارة",
   "chat.marker.mcpSignIn": "طلب منك تسجيل الدخول إلى خادم MCP",
   "chat.marker.serverInstall": "أنشأ أمرًا لتثبيت خادم",

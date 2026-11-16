@@ -168,6 +168,8 @@ export const messages = {
   "chat.usageLimit.send": "{model} に送信",
   "chat.usageLimit.failed": "モデルを変更できませんでした。もう一度お試しください。",
   "chat.marker.marketplaceSuggestion": "マーケットプレイスのアプリを提案しました",
+  "chat.marker.settingLink": "設定を表示しました",
+  "chat.settingLink.desktopOnly": "コンピューターの OpenBot アプリで開いてください。",
   "chat.marker.skillSuggestion": "スキルを提案しました",
   "chat.marker.serverInstall": "サーバーをインストールするコマンドを作成しました",
   "chat.marker.skill.created": "スキルを作成しました",

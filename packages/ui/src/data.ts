@@ -28,6 +28,7 @@ import type {
   QueueDeliveryStatus,
   RoutineConversationEvent,
   RoutineRunConversationEvent,
+  SettingLinkId,
   SkillConversationEvent,
   SkillSuggestionEvent,
   VideoGenerationInfo,
@@ -172,6 +173,8 @@ export type ChatActionMarkerModel =
     }
   /** The agent suggested a Marketplace app. The chat shows a card to connect it. */
   | { kind: "marketplace-suggestion"; appId: string; timestamp: string }
+  /** The agent showed a setting. The chat shows a card that opens it. */
+  | { kind: "setting-link"; settingId: SettingLinkId; timestamp: string }
   /** A memory review asks to save a skill from the chat. The chat shows a card to save it. */
   | (SkillSuggestionEvent & { kind: "skill-suggestion"; timestamp: string })
   /** The agent saved an MCP server that needs a sign-in. The chat shows a card to sign in. */

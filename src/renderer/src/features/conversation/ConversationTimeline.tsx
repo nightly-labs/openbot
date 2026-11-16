@@ -79,6 +79,7 @@ import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { ServerInstallChatCard } from "./ServerInstallChatCard";
+import { SettingLinkChatCard } from "./SettingLinkChatCard";
 import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggestionChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
@@ -184,6 +185,7 @@ export function ConversationTimeline() {
     openRoutineSettings,
     openSkillSettings,
     openInstructionsSettings,
+    openAgentSettingRow,
     openSharedFile,
     openWorkspaceFile,
     openQuote,
@@ -648,6 +650,7 @@ export function ConversationTimeline() {
     marker.kind === "mcp-sign-in"
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
+  const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
   /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
   const serverInstallCard = (marker: ChatActionMarkerModel) => {
     const watch = props.serverInstall;
@@ -1110,34 +1113,52 @@ export function ConversationTimeline() {
                                                   <Show
                                                     when={serverInstallCard(marker())}
                                                     fallback={
-                                                      <ChatActionMarker
-                                                        onOpenSkill={
-                                                          agentSkillsMode(props.server, props.runtime) === "hidden"
-                                                            ? undefined
-                                                            : openSkillSettings
+                                                      <Show
+                                                        when={settingLinkMarker(marker())}
+                                                        fallback={
+                                                          <ChatActionMarker
+                                                            onOpenSkill={
+                                                              agentSkillsMode(props.server, props.runtime) === "hidden"
+                                                                ? undefined
+                                                                : openSkillSettings
+                                                            }
+                                                            marker={marker()}
+                                                            agents={props.agents}
+                                                            announce={arrives}
+                                                            routineAvailable={routineMarkerAvailable(
+                                                              marker(),
+                                                              availableRoutineIds(),
+                                                            )}
+                                                            onSelectAgent={props.onSelectAgent}
+                                                            onOpenRoutine={openRoutineSettings}
+                                                            openRoutineThread={openRoutineThread}
+                                                            onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                                            onToggleRoutineRun={toggleRoutineRun}
+                                                            onToggleAgentMessage={toggleAgentMessage}
+                                                            agentMessageText={agentMessageText}
+                                                            instructions={instructionsCalls()}
+                                                            onOpenInstructions={
+                                                              channel || !instructionsCalls()
+                                                                ? undefined
+                                                                : openInstructionsSettings
+                                                            }
+                                                          />
                                                         }
-                                                        marker={marker()}
-                                                        agents={props.agents}
-                                                        announce={arrives}
-                                                        routineAvailable={routineMarkerAvailable(
-                                                          marker(),
-                                                          availableRoutineIds(),
+                                                      >
+                                                        {(link) => (
+                                                          <SettingLinkChatCard
+                                                            settingId={link().settingId}
+                                                            agent={
+                                                              channel || !props.agent
+                                                                ? null
+                                                                : { id: props.agent.id, name: props.agent.name }
+                                                            }
+                                                            onOpenAgentSetting={openAgentSettingRow}
+                                                            appSettingOpener={props.appSettingOpener}
+                                                          />
                                                         )}
-                                                        onSelectAgent={props.onSelectAgent}
-                                                        onOpenRoutine={openRoutineSettings}
-                                                        openRoutineThread={openRoutineThread}
-                                                        onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                                        onOpenLink={(url) => void openExternalMessageUrl(url)}
-                                                        onToggleRoutineRun={toggleRoutineRun}
-                                                        onToggleAgentMessage={toggleAgentMessage}
-                                                        agentMessageText={agentMessageText}
-                                                        instructions={instructionsCalls()}
-                                                        onOpenInstructions={
-                                                          channel || !instructionsCalls()
-                                                            ? undefined
-                                                            : openInstructionsSettings
-                                                        }
-                                                      />
+                                                      </Show>
                                                     }
                                                   >
                                                     {(card) => (

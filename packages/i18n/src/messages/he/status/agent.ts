@@ -14,6 +14,7 @@ export const messages = {
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
+  "status.agent.settingShown": "הציג הגדרה: {setting}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
   "status.agent.channelMemberRemoved": "{agent} הסיר את {member} מהערוץ. {person} ביקש זאת.",
   "status.agent.channelInstructionsChanged": "{agent} שינה את הוראות הערוץ. {person} ביקש זאת.",

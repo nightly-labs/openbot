@@ -15,6 +15,7 @@ export const messages = {
     "{previous} non ha più crediti. Passaggio a {model}. Per usarlo di nuovo, aggiungi crediti e poi selezionalo.",
   "status.agent.modelReturnedAfterError": "Tornato a {model} dopo l’errore del provider.",
   "status.agent.marketplaceSuggested": "Ha suggerito un'app del Marketplace: {app}.",
+  "status.agent.settingShown": "Ha mostrato un'impostazione: {setting}.",
   "status.agent.channelMemberAdded": "{agent} ha aggiunto {member} al canale. Lo ha chiesto {person}.",
   "status.agent.channelMemberRemoved": "{agent} ha rimosso {member} dal canale. Lo ha chiesto {person}.",
   "status.agent.channelInstructionsChanged": "{agent} ha modificato le istruzioni del canale. Lo ha chiesto {person}.",
