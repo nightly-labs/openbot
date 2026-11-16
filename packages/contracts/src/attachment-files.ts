@@ -5,8 +5,9 @@ export const MEDIA_ATTACHMENT_EXTENSIONS = ["mp3", "mov"] as const;
 /**
  * Audio that a host with `any-file-attachments` takes as an opaque file, and that the chat still plays
  * by its name. They are not in `MEDIA_ATTACHMENT_EXTENSIONS`: an older remote host refuses them.
+ * Telegram and WhatsApp voice notes are OGG (#9880).
  */
-const NAMED_AUDIO_EXTENSIONS = ["m4a", "wav", "aac"] as const;
+const NAMED_AUDIO_EXTENSIONS = ["m4a", "wav", "aac", "ogg", "oga", "opus", "flac"] as const;
 
 export const ARCHIVE_ATTACHMENT_EXTENSIONS = ["zip"] as const;
 
@@ -238,6 +239,12 @@ export function attachmentMimeTypeForName(name: string) {
       return "audio/wav";
     case "aac":
       return "audio/aac";
+    case "ogg":
+    case "oga":
+    case "opus":
+      return "audio/ogg";
+    case "flac":
+      return "audio/flac";
     case "mov":
       return "video/quicktime";
     case "mp4":
