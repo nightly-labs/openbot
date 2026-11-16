@@ -67,7 +67,8 @@ large title does not work under the custom scroll edge effect on iOS 27, and And
 - Android has no Liquid Glass. The search fields and the bar buttons are plain: the opaque HeroUI
   `default` fill (`--openbot-bg-control`) of the chat composer and its buttons, with no edge, shadow,
   sheen or blur. `GlassCapsule` and `useChromeGlass()` give them that fill. iOS without Liquid Glass
-  keeps the solid glass of the design (`--openbot-bg-chrome-glass`).
+  keeps the solid `default` capsule with a soft shadow for the search fields, and the solid glass of
+  the design (`--openbot-bg-chrome-glass`) for the bar buttons.
 - Android 12 and later blur the content under the bar with `AndroidHeaderBlur`
   (`src/shared/components/android-header-blur.tsx`): the scroll content is in an `AndroidBlurTarget`
   on the surface color. The bar draws the usual Expo progressive blur: a `BlurView` of the target

@@ -395,7 +395,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const [foreground, muted] = useThemeColor(["foreground", "muted"]);
   // The Android header buttons have the glass of the search field.
   const buttonGlass = useChromeGlass({ shadow: isIOS });
-  const searchBlurTarget = useRef<ViewInstance>(null);
+  const barBlurTarget = useRef<ViewInstance>(null);
   const iconColor = String(foreground);
   const mutedColor = String(muted);
   const hasSelectedServer = servers.some((server) => server.id === activeServer.id);
@@ -910,8 +910,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
 
   const listTree = (
     <View className="flex-1 bg-background">
-      {/* The search field and the bar blur the home content. */}
-      <AndroidBlurTarget target={searchBlurTarget} surface="canvas">
+      {/* The bar blurs the home content. */}
+      <AndroidBlurTarget target={barBlurTarget} surface="canvas">
         <HomeSearchList search={search} barHeight={searchBarOffset}>
           {onboarding.active ? null : sceneShows ? (
             // The scene has the insets of the welcome, so the characters stand in the same places on
@@ -1084,7 +1084,7 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
         <LargeTitleBar
           scroll={scroll}
           title={activeServer.name}
-          blurTarget={searchBlurTarget}
+          blurTarget={barBlurTarget}
           // The connection state takes the place of the title in the bar.
           hidden={!searchShows || statusShows || search.open}
         >
