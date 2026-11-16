@@ -372,6 +372,11 @@ export interface MobileWorkspaceContextValue {
   moveSidebarChat: (serverId: string, action: Extract<SidebarLayoutAction, { type: "move-agent" }>) => Promise<void>;
   loadQueue: (agentId: string, serverId: string) => Promise<QueueSnapshot>;
   canEditQueue: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `model-steering-v1`: `loadAgentModels` marks the models of a custom
+   * agent that steers. Without it, the phone cannot tell whether a custom agent steers.
+   */
+  canReadModelSteering: (serverId: string) => boolean;
   /** True when the host advertises `message-client-id-v1`: a repeat of a message is stored once. */
   canRetryMessage: (serverId: string) => boolean;
   /** True when the host advertises `message-delete-v1`. */
@@ -1260,6 +1265,7 @@ interface McpSignInRelay {
 export type MobileWorkspaceCapabilityCheck =
   | "browserViewSupport"
   | "canEditQueue"
+  | "canReadModelSteering"
   | "canRetryMessage"
   | "canDeleteMessages"
   | "canMarkUnreadFrom"

@@ -473,6 +473,8 @@ interface ActiveTurn {
    * its saved session holds and ends no turn, so the message goes again with a new uuid (#9270).
    */
   prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
+  /** The uuids of the messages that OpenBot sent in this turn: the prompt, its new uuids and the steers. */
+  messageIds: Set<string>;
   /** The CLI started the prompt, or sent a frame of the turn. */
   promptStarted: boolean;
 }
@@ -605,6 +607,12 @@ interface ClaudeStreamMessage {
   state?: unknown;
   /** The uuid of the user message that the turn answers, on the turn's first stream event and assistant message. */
   user_message_uuid?: string;
+  /** `result`: the uuids of all user messages that the turn took. */
+  user_message_uuids?: unknown;
+  /** `result`: what started the turn, such as `{ kind: "task-notification" }`. */
+  origin?: unknown;
+  /** `result`: the model requests of the turn. */
+  num_turns?: unknown;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
   resume_reason?: string;
   /** `api_retry`: the retry that starts next, its limit, and the HTTP status, null when no answer came. */
@@ -1722,6 +1730,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       session_id: threadId,
     };
     turn.prompt = { requestedId: requestedTurnId ?? null, message, retries: 0 };
+    turn.messageIds.add(turnId);
     runtime.input.push(message);
     return { turn: { id: turnId, status: "inProgress" } };
   });
@@ -1760,6 +1769,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       sandboxBlockedWarned: false,
       unprompted,
       prompt: null,
+      messageIds: new Set<string>(),
       promptStarted: false,
     };
     runtime.activeTurn = turn;
@@ -1801,6 +1811,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const clientId = getString(params, "clientUserMessageId");
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
+    runtime.activeTurn.messageIds.add(messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },
@@ -1835,6 +1846,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const retryId = promptUuid(runtime, prompt.requestedId ?? turn.id);
     takePrompt(runtime, retryId);
     prompt.message = { ...prompt.message, uuid: retryId };
+    turn.messageIds.add(retryId);
     prompt.retries += 1;
     queryLogger.warn("Claude skipped a message that its session holds, so it goes again with a new id.", {
       threadId: runtime.id,
@@ -2237,9 +2249,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       message.terminal_reason === "aborted_streaming" ||
       message.terminal_reason === "aborted_tools" ||
       errors.some((error) => /interrupt|abort/i.test(error));
+    const turn = runtime.activeTurn;
+    /* The CLI can first end a turn of its own, such as for a background task's notification. The
+       message's turn goes on, and its own result ends it (#9812). A stop ends the turn at once. */
+    if (turn?.prompt && !interrupted && isOtherTurnResult(message, turn.messageIds)) {
+      queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
+      return;
+    }
     // "success" with `is_error` is a turn that ended on an API error, and `result` holds its text.
     const apiError = message.subtype === "success" && message.is_error === true;
-    const turn = runtime.activeTurn;
     if (turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
@@ -3567,6 +3585,25 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
     if (runtime.promptIds.size <= TAKEN_PROMPT_LIMIT) break;
     runtime.promptIds.delete(old);
   }
+}
+
+/**
+ * Whether a result ends a turn that did not take any of the turn's messages. The result names the
+ * messages that its turn took. A background task's notification that made no model request names
+ * none, and ends with no text.
+ */
+function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+  const listed = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter(isString) : [];
+  const taken = listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+  if (taken.length > 0) return !taken.some((uuid) => messageIds.has(uuid));
+  return (
+    isRecord(message.origin) &&
+    message.origin.kind === "task-notification" &&
+    message.num_turns === 0 &&
+    message.subtype === "success" &&
+    message.is_error !== true &&
+    !message.result
+  );
 }
 
 function isUuid(value: string): value is UUID {

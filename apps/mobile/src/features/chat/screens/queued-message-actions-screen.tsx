@@ -45,6 +45,8 @@ export function QueuedMessageActionsScreen() {
   }
 
   const { locked, editedElsewhere } = queuedMessageLocks(delivery, { busy: queue.busy, online: queue.online, held });
+  const head = queue.queued[0];
+  const headEdited = Boolean(head && head.id !== delivery.id && (head.editing || held?.id === head.id));
   const finish = (action: Promise<boolean>) => {
     void action.then((done) => {
       void haptics.notification(done ? "success" : "error");
@@ -85,14 +87,19 @@ export function QueuedMessageActionsScreen() {
             <Typography>{t("common.edit")}</Typography>
           </SettingsRow>
         )}
-        <SettingsRow
-          leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
-          disclosure={false}
-          disabled={locked || editedElsewhere || !queue.activeTurnId}
-          onPress={() => finish(queue.steer(delivery))}
-        >
-          <Typography>{t("mobile.chat.queue.steer")}</Typography>
-        </SettingsRow>
+        {/* As on desktop, an agent that cannot steer offers Send now. An answer has no Send now. */}
+        {queue.steers || !reply ? (
+          <SettingsRow
+            leading={<CornerDownRight color={foreground} size={22} style={MIRROR_IN_RTL} />}
+            disclosure={false}
+            // As on desktop, Send now waits while another message that is first is being edited: an
+            // edited message keeps its place, and the queue starts nothing while it is first.
+            disabled={locked || editedElsewhere || !queue.activeTurnId || (!queue.steers && headEdited)}
+            onPress={() => finish(queue.steers ? queue.steer(delivery) : queue.sendNow(delivery))}
+          >
+            <Typography>{t(queue.steers ? "mobile.chat.queue.steer" : "mobile.chat.queue.sendNow")}</Typography>
+          </SettingsRow>
+        ) : null}
         {reply ? null : (
           <SettingsRow
             leading={<ArrowUpToLine color={foreground} size={22} />}
@@ -124,7 +131,11 @@ export function QueuedMessageActionsScreen() {
       )}
 
       {editedElsewhere ? <SettingsNote>{t("mobile.chat.queue.editedElsewhere")}</SettingsNote> : null}
-      {queue.activeTurnId ? null : <SettingsNote>{t("mobile.chat.queue.steerNeedsTurn")}</SettingsNote>}
+      {queue.activeTurnId ? null : (
+        <SettingsNote>
+          {t(queue.steers ? "mobile.chat.queue.steerNeedsTurn" : "mobile.chat.queue.sendNowNeedsTurn")}
+        </SettingsNote>
+      )}
       {queue.error ? (
         <Typography.Paragraph accessibilityRole="alert" className="px-4 text-danger-text">
           {queue.error}

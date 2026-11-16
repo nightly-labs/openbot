@@ -31,6 +31,8 @@ export const messages = {
     "Сделать снимок области экрана {x}, {y}, {width} × {height} точек и отправить изображение модели агента.",
   "status.agent.reportProblem":
     "Это станет публичным issue на GitHub с версией приложения и вашей системой. Ваше имя не показывается.",
+  "status.agent.reportPhoneProblem":
+    "Это станет публичным issue на GitHub с версией приложения, вашей системой, а также версией, системой и журналом поддержки вашего телефона. Ваше имя не показывается.",
   "status.agent.sendIdea": "Это станет публичным issue на GitHub. Ваше имя не показывается.",
   "status.agent.feedbackRecentErrors": "Последние ошибки в чате:",
   "status.agent.feedbackSameAs": "Добавляется к issue #{issue}",

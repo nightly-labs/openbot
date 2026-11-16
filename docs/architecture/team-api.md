@@ -423,6 +423,22 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `phone-feedback-v1` capability (protocol 9 only) adds
+`POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
+has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
+the name of the VPN or mesh network that is on, never an address) and `log`, the last redacted lines
+of its support log. An agent's bug report with the surface `Phone app` (`openbot.send_feedback`) waits on an
+approval whose notice is `status.agent.reportPhoneProblem`. This route answers that approval with
+"accept" and gives the phone's data to the report. The agent service refuses a plain "accept" of such
+an approval on each path (`POST /v1/respond/approval`, the local IPC), with
+`error.backend.feedbackNeedsPhone` and 403, and the approval keeps waiting; a decline works on each
+client. So no bug report about the phone app goes out without the phone's version, system and log,
+and the account Worker refuses one too (`feedback_needs_phone`), which also stops a host of an older
+version. The desktop and web cards of such a report have no Send and tell the user to send it from
+the phone app. `src/main/team-api/route-phone-feedback.ts` owns the authorization: `chat` on the
+agent of the request (else 403, or 404 for an agent the member cannot see), the owner only (else
+403), and 409 for a request that no longer waits or that is not such a report.
+
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
 new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
