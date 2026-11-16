@@ -441,6 +441,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
   SlackWorkspaceInput,
@@ -1352,6 +1353,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppWorkingMessage: request<SetWhatsAppWorkingMessageInput, void>()(
       "messaging:set-whatsapp-working-message",
     ),
+    setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
+      "messaging:set-whatsapp-status-reactions",
+    ),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1410,6 +1414,10 @@ export const IPC_ENDPOINTS = {
     // A joined server needs `whatsapp-working-message-v1`. Its numbers carry `workingMessage` only then.
     hostSetWhatsAppWorkingMessage: scopedRequest<SetWhatsAppWorkingMessageInput, void, "required">()(
       "messaging:host-set-whatsapp-working-message",
+    ),
+    // A joined server needs `whatsapp-status-reactions-v1`. Its numbers carry `statusReactions` only then.
+    hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
+      "messaging:host-set-whatsapp-status-reactions",
     ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`

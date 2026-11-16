@@ -256,6 +256,8 @@ export const messages = {
     "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
     "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
+  "error.backend.mcpSignInAppRefused":
+    "De inlogserver heeft de inlog-app van deze server niet geaccepteerd. Controleer de client-ID en het clientgeheim van de inlog-app en log daarna opnieuw in.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
   "error.backend.mcpRegistrationRefused":
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",

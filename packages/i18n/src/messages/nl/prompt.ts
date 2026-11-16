@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Inloggen bij {host} geannuleerd",
   "prompt.browser.signInBlocked.body":
     "Log in op deze computer. OpenBot stuurt alleen de inloggegevens van {host} naar {server}, en {name} gaat verder.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} accepteert geen aanmelding vanaf de server. Open deze chat in de OpenBot-desktopapp op je computer en log daar in. Daarna gaat {name} verder.",
   "prompt.browser.signInBlocked.cancelledBody": "Het inloggen is geannuleerd.",
   "prompt.browser.signInBlocked.waiting": "Wachten op inloggen",
   "prompt.browser.signInBlocked.waitingButton": "Wachten op inloggen…",

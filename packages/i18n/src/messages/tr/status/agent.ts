@@ -47,6 +47,8 @@ export const messages = {
   "status.agent.serverInstallCard": "{name} sunucusu için kurulum komutu",
   "status.agent.browserProfileNamed":
     "{agents} ajanlarını {profile} tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.commitCoAuthorOff": "Tüm ajanların commit'lerine OpenBot'u ortak yazar olarak eklemeyi durdur.",
+  "status.agent.commitCoAuthorOn": "Tüm ajanların commit'lerine OpenBot'u yeniden ortak yazar olarak ekle.",
   "status.agent.browserProfileNew":
     "Yeni {profile} tarayıcı profilini oluştur ve {agents} ajanlarını oraya taşı. Hiç oturum açma bilgisi yoktur. Açık sekmeleri kapanır.",
   "status.agent.browserProfileShared":

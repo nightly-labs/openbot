@@ -137,6 +137,7 @@ import {
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
+import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
@@ -152,7 +153,14 @@ import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID }
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from "./image-reader";
-import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
+import {
+  type AgentLibraryFolders,
+  libraryFileAgents,
+  listLibraryFolders,
+  listLibraryFoldersToolSchema,
+  organizeLibrary,
+  organizeLibraryToolSchema,
+} from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
@@ -499,6 +507,8 @@ export interface OpenBotToolRouterOptions {
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
   visualPreview?: ChatVisualPreviewHost | null | undefined;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
@@ -565,6 +575,7 @@ export class OpenBotToolRouter {
   readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
+  readonly #setCommitCoAuthor: SetCommitCoAuthor | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
   readonly #fitImage: ImageFitter | null;
@@ -629,6 +640,7 @@ export class OpenBotToolRouter {
     this.#workflowTools = options.workflowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
+    this.#setCommitCoAuthor = options.setCommitCoAuthor ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
     this.#fitImage = options.fitImage ?? null;
@@ -1023,6 +1035,7 @@ export class OpenBotToolRouter {
               tool === "attach_files_to_response" ||
               tool === "read_image" ||
               tool === "list_library_folders" ||
+              tool === "organize_library" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
@@ -1696,8 +1709,8 @@ export class OpenBotToolRouter {
 
   /**
    * A card with only a reason that only the owner answers, also for an agent with Full access. For
-   * `set_browser_profile`, whose profile holds sign-ins of other agents, and `delete_agent`, which
-   * cannot be undone.
+   * `set_browser_profile`, whose profile holds sign-ins of other agents, `set_commit_co_author`, which
+   * changes every agent, and `delete_agent`, which cannot be undone.
    */
   #ownerApproval(
     client: AgentClient,
@@ -2144,10 +2157,21 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_library_folders") {
       const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      const store = this.#libraryFolders;
-      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const storedFiles = this.#mailbox.listStoredFiles();
+      const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+      );
+    }
+
+    if (params.tool === "organize_library") {
+      const args = organizeLibraryToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
       );
     }
 
@@ -2491,6 +2515,17 @@ export class OpenBotToolRouter {
         approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });
+
+    if (params.tool === "set_commit_co_author") {
+      const setCommitCoAuthor = this.#setCommitCoAuthor;
+      if (!setCommitCoAuthor) return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
+      return yield* handleSetCommitCoAuthorTool(params, {
+        current: () => this.#store.agentDefaults().commitCoAuthor,
+        set: setCommitCoAuthor,
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+      });
+    }
 
     if (params.tool === "delete_agent")
       return yield* handleDeleteAgentTool(params, senderAgentId, {

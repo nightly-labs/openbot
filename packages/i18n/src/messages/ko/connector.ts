@@ -333,6 +333,9 @@ export const messages = {
   "connector.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "connector.whatsapp.workingMessageDescription":
     "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
+  "connector.whatsapp.statusReactions": "상태 반응",
+  "connector.whatsapp.statusReactionsDescription":
+    "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp 오케스트레이터",
   "connector.whatsapp.orchestratorDescription":
     "이 에이전트가 연결된 모든 번호에서 OpenBot에게 오는 메시지를 받아요. 짧은 요청은 직접 답하고, 나머지는 알맞은 에이전트에게 맡긴 뒤 WhatsApp에서 답해요.",

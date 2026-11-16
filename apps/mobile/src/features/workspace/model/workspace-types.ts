@@ -138,6 +138,7 @@ import type {
   SetMessagingEnabledInput,
   SetRoutineResultDestinationInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SharedTable,
   SidebarLayoutAction,
@@ -741,6 +742,8 @@ export interface MobileWorkspaceContextValue {
   setWhatsAppOwnNumber: (input: SetWhatsAppOwnNumberInput, serverId: string) => Promise<void>;
   /** Needs `whatsapp-working-message-v1`. A number carries `workingMessage` only on such a host. */
   setWhatsAppWorkingMessage: (input: SetWhatsAppWorkingMessageInput, serverId: string) => Promise<void>;
+  /** Needs `whatsapp-status-reactions-v1`. A number carries `statusReactions` only on such a host. */
+  setWhatsAppStatusReactions: (input: SetWhatsAppStatusReactionsInput, serverId: string) => Promise<void>;
   /**
    * How this user reaches the OpenBot update of an online host: an owner or admin through
    * `host-update-v1`, any member through `host-member-update-v1`. Null when neither applies.

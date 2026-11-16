@@ -262,6 +262,8 @@ export const messages = {
     "Le serveur a refusé le compte avec lequel vous vous êtes connecté. Vérifiez que ce compte peut utiliser le service. Pour utiliser un autre compte, déconnectez-vous, puis reconnectez-vous.",
   "error.backend.mcpSignInClientRefused":
     "Le serveur de connexion n’a pas accepté OpenBot à la fin de la connexion. Connectez-vous à nouveau : OpenBot s’enregistre de nouveau auprès du serveur.",
+  "error.backend.mcpSignInAppRefused":
+    "Le serveur de connexion n’a pas accepté l’app de connexion de ce serveur. Vérifiez l’ID client et le secret client de l’app de connexion, puis reconnectez-vous.",
   "error.backend.mcpCommandNotFound": "Commande introuvable : {command}",
   "error.backend.mcpRegistrationRefused":
     "Le serveur de connexion n’accepte pas encore OpenBot comme application. Votre compte n’en est pas la cause. Utilisez un autre moyen de connexion, par exemple un serveur MCP local.",

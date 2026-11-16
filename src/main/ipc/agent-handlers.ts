@@ -1210,7 +1210,7 @@ export function agentIpcHandlers({
         },
       }),
       setMessageReaction: scopedHandler(parseMessageReaction, {
-        local: (parsed) => runCauseEffect(service.setMessageReaction(parsed)),
+        local: (parsed) => runCauseEffect(service.setMessageReaction(parsed, host.conversationSender())),
         remote: (parsed, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, TEAM_API_ROUTES.agent.reactions(parsed.agentId), decodeVoid, {

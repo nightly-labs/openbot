@@ -421,6 +421,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"
   // is the CLI's answer for a tool that an own entry does not turn on (#7785).
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  // A probe of 1.5.9 sent `notifications/cancelled` for each OpenBot tool call after exactly 180 s,
+  // also with progress every 20 s, and also with `timeoutSeconds` in the session server entry. Only
+  // the CLI's own `mcp_config.json` changes it, which is the user's file (#9689).
+  mcpToolCallLimitMs: 180_000,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
@@ -488,6 +492,11 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the
   // wake-up. The idle release then stopped the process 5 minutes later (#8660).
   wakesAfterPromptEnds: true,
+  // 1.5.x starts subagents with `start_subagent` or `invoke_subagent` ("Running start_subagent",
+  // "Run invoke_subagent?"), and the call completes at once. 1.5.9 also runs `schedule`, a timer,
+  // although `sessionMeta` turns it off. The end of that work wakes the model with no prompt open, as
+  // for a command. Its results and approvals did not show (#8993).
+  selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it

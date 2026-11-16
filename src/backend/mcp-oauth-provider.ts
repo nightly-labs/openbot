@@ -933,6 +933,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
   readonly #secrets = new Set<string>();
   /** Set once the grant is in hand: from there the client on file is the one that must spend it. */
   #exchangingCode = false;
+  /** The token endpoint refused the sign-in app while it spent the grant. See `clientInformation`. */
+  #appRefused = false;
   /** A client that this sign-in registered while tokens were on file. See `saveClientInformation`. */
   #registeredClient: OAuthClientInformationFull | undefined;
   /** Issuer selected by the SDK for this auth attempt, captured before credentials are read. */
@@ -1106,6 +1108,9 @@ class McpOAuthClientProvider implements OAuthClientProvider {
       const { issuer } = record.app;
       if (issuer && this.#activeIssuer && !issuersMatch(issuer, this.#activeIssuer))
         throw new Error(sourceText("error.backend.mcpSignInAppIssuerChanged"));
+      // The token endpoint refused the app, and the SDK dropped the verifier before it tried again.
+      // The same app and grant cannot pass, and only the administrator can correct the app.
+      if (this.#appRefused) throw new Error(sourceText("error.backend.mcpSignInAppRefused"));
       this.recordSecret(record.app.clientSecret);
       return {
         client_id: record.app.clientId,
@@ -1575,6 +1580,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // can change it.
         const record = yield* mcpSync(() => this.#record());
         if (scope !== "tokens") this.#registeredClient = undefined;
+        if (scope !== "tokens" && this.#exchangingCode && record.app) this.#appRefused = true;
         if (scope === "all") {
           this.#codeVerifier = null;
           if (record.app) yield* this.#options.storage.write(this.#options.key, { app: record.app });

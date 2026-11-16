@@ -48,6 +48,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.serverInstallCard": "Install command for the server {name}",
   "status.agent.browserProfileNamed":
     "Move {agents} to the browser profile {profile}. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.commitCoAuthorOff": "Stop adding OpenBot as a co-author to the commits of all agents.",
+  "status.agent.commitCoAuthorOn": "Add OpenBot as a co-author to the commits of all agents again.",
   "status.agent.browserProfileNew":
     "Make the new browser profile {profile} and move {agents} to it. It has no sign-ins. Their open tabs close.",
   "status.agent.browserProfileShared":

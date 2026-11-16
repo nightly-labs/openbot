@@ -95,6 +95,7 @@ export function WhatsAppConnectorPage({
     setWhatsAppEnabled,
     setWhatsAppOwnNumber,
     setWhatsAppWorkingMessage,
+    setWhatsAppStatusReactions,
     addWhatsAppOrchestrator,
     removeWhatsAppSender,
     answerWhatsAppRequest,
@@ -258,6 +259,22 @@ export function WhatsAppConnectorPage({
                   onValueChange={(workingMessage) =>
                     run(() =>
                       setWhatsAppWorkingMessage({ workspaceId: connection.workspaceId, workingMessage }, serverId),
+                    )
+                  }
+                />
+              </SettingsRow>
+            ) : null}
+            {/* An older host cannot set it: its numbers carry no `statusReactions`. */}
+            {settings && settings.statusReactions !== undefined ? (
+              <SettingsRow supportingText={t("mobile.server.connectors.whatsapp.statusReactionsDescription")}>
+                <SettingsSwitch
+                  value={settings.statusReactions}
+                  disabled={action.busy}
+                  label={t("mobile.server.connectors.whatsapp.statusReactions")}
+                  dark={theme === "dark"}
+                  onValueChange={(statusReactions) =>
+                    run(() =>
+                      setWhatsAppStatusReactions({ workspaceId: connection.workspaceId, statusReactions }, serverId),
                     )
                   }
                 />

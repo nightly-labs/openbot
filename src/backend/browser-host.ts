@@ -636,8 +636,8 @@ export class BrowserHost {
    * relay: the second would replace the first in `#appliedProxies`, and the first would stay open.
    */
   readonly #proxyLock = Semaphore.makeUnsafe(1);
-  /** The proxies whose last page load could not connect to them. */
-  readonly #proxyFailures = new Map<string, BrowserProxyFailure>();
+  /** The proxies whose last page load could not connect to them, with the member of a computer proxy. */
+  readonly #proxyFailures = new Map<string, { failure: BrowserProxyFailure; memberId: string | null }>();
   /**
    * The tabs whose proxy asked for a sign-in that the tab did not give again, until a page loads.
    * Chromium then reports a failed tunnel, which alone means that the proxy did not answer.
@@ -679,6 +679,8 @@ export class BrowserHost {
   /** True while `#syncAttachedView` shows `#attachedView`. On Linux the views in the background window are all shown. */
   #attachedViewShown = false;
   readonly #takeoverTabIds = new Set<string>();
+  /** The takeover tabs that got a sign-in from a member's own device, so the agent learns whether one came. */
+  readonly #takeoverSignInTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
   /**
@@ -1406,6 +1408,7 @@ export class BrowserHost {
           )
         : 0;
     if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    if (this.#takeoverTabIds.has(tabId)) this.#takeoverSignInTabIds.add(tabId);
     // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
     return { cookies: count, storage: stored };
@@ -1443,6 +1446,7 @@ export class BrowserHost {
       .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#userControlTabIds.delete(tabId);
     this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
@@ -1503,6 +1507,7 @@ export class BrowserHost {
     if (!tab) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     stopCookieBanners(tab.contents);
     this.#syncAttachedView();
     tab.diagnostics.clearDiagnostics();
@@ -2098,6 +2103,11 @@ export class BrowserHost {
     return connected;
   }
 
+  /** A member's device sent a sign-in to the tab while its takeover waited. */
+  takeoverSignInArrived(tabId: string): boolean {
+    return this.#takeoverSignInTabIds.has(tabId);
+  }
+
   /** `completed`: the person selected Done, so a bot check that was on the page is one they could not pass. */
   endTakeover(tabId: string, completed = false): void {
     const tab = this.#tabs.get(tabId);
@@ -2107,6 +2117,7 @@ export class BrowserHost {
       if (completed && tab.checkOrigin) tab.checkAfterTakeover = tab.checkOrigin;
     }
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
     // A failed submission can leave the secret in a page that never loads a new document, such as a
@@ -3550,10 +3561,14 @@ export class BrowserHost {
 
   /** Records whether a page load could reach the proxy of its tab, and why not. */
   #noteProxyLoad(tab: BrowserHostTab, failure: BrowserProxyFailure | null): void {
-    const proxyId = this.#tabProxy(tab)?.proxyId;
-    if (proxyId === undefined || (this.#proxyFailures.get(proxyId) ?? null) === failure) return;
-    if (failure === null) this.#proxyFailures.delete(proxyId);
-    else this.#proxyFailures.set(proxyId, failure);
+    const proxy = this.#tabProxy(tab);
+    if (proxy === null || (this.#proxyFailures.get(proxy.proxyId)?.failure ?? null) === failure) return;
+    if (failure === null) this.#proxyFailures.delete(proxy.proxyId);
+    else
+      this.#proxyFailures.set(proxy.proxyId, {
+        failure,
+        memberId: proxy.kind === "computer" ? proxy.memberId : null,
+      });
     this.#onProxyStatusChanged();
   }
 
@@ -3585,7 +3600,7 @@ export class BrowserHost {
       );
     // The network error of this load came first and recorded why. Chromium commits its error page
     // before the load fails here, and that commit clears the sign-in mark of the tab.
-    const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
+    const reason = this.#proxyFailures.get(proxy.proxyId)?.failure ?? this.#tabProxyFailure(tab, proxyError);
     return browserFailure(
       new Error(
         reason === "signIn"
@@ -3597,12 +3612,21 @@ export class BrowserHost {
 
   /** Why the last page load through a proxy failed, or null when it did not fail. */
   proxyFailure(proxyId: string): BrowserProxyFailure | null {
-    return this.#proxyFailures.get(proxyId) ?? null;
+    return this.#proxyFailures.get(proxyId)?.failure ?? null;
   }
 
   /** Forgets the failure of a proxy that changed or went away. The next page load reports again. */
   forgetProxyFailure(proxyId: string): void {
     this.#proxyFailures.delete(proxyId);
+  }
+
+  /**
+   * Forgets the failures of the computer proxies of a member whose computer connected again. A page
+   * that failed while the computer was away, such as a tab that a restart restored, does not mark it.
+   */
+  forgetComputerFailures(memberId: string): void {
+    for (const [proxyId, failure] of this.#proxyFailures)
+      if (failure.memberId === memberId) this.#proxyFailures.delete(proxyId);
   }
 
   #persistentSessions(): Session[] {

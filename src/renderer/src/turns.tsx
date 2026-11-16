@@ -317,6 +317,23 @@ const Turns = createSimpleContext({
       return submitPromptAnswers(agent.id, mark, prompt, answers, options);
     }
 
+    /**
+     * Answers the prompt `requestId` of the thread `threadId` of any agent, from outside its chat, as the
+     * agent dock does. False when the thread no longer waits for that prompt.
+     */
+    async function answerPromptRequest(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      answers: Record<string, string[]>,
+    ): Promise<boolean> {
+      const prompt = pendingPrompts()[attentionKey(agentId, threadId)];
+      if (prompt?.type !== "prompt" || String(prompt.requestId) !== String(requestId)) return false;
+      // The agent id marks the agent's own chat, as `answerPrompt` does.
+      const own = agentList().some((agent) => agent.id === agentId && agent.threadId === threadId);
+      return submitPromptAnswers(agentId, own ? agentId : attentionKey(agentId, threadId), prompt, answers);
+    }
+
     async function submitPromptAnswers(
       agentId: string,
       mark: string,
@@ -402,9 +419,27 @@ const Turns = createSimpleContext({
       options?: PromptAnswerOptions,
     ): Promise<boolean> {
       const agent = activeAgent();
-      const key = agent ? attentionKey(agent.id, threadId ?? agent.threadId) : undefined;
-      const event = key ? pendingPrompts()[key] : undefined;
-      if (!agent || !key || event?.type !== "browser-takeover-requested") return false;
+      const thread = threadId ?? agent?.threadId ?? null;
+      const event = agent ? pendingPrompts()[attentionKey(agent.id, thread)] : undefined;
+      if (!agent || event?.type !== "browser-takeover-requested") return false;
+      return respondToBrowserTakeoverRequest(agent.id, thread, event.request.requestId, decision, options);
+    }
+
+    /**
+     * Answers the takeover `requestId` of the thread `threadId` of any agent. The agent dock answers from
+     * outside the chat. False when the thread no longer waits for that takeover.
+     */
+    async function respondToBrowserTakeoverRequest(
+      agentId: string,
+      threadId: string | null,
+      requestId: string | number,
+      decision: "complete" | "cancel",
+      options?: PromptAnswerOptions,
+    ): Promise<boolean> {
+      const key = attentionKey(agentId, threadId);
+      const event = pendingPrompts()[key];
+      if (event?.type !== "browser-takeover-requested" || String(event.request.requestId) !== String(requestId))
+        return false;
       const serverId = activeServerId();
       try {
         await turnsPort().agent.respondToBrowserTakeover({ requestId: event.request.requestId, decision });
@@ -412,7 +447,7 @@ const Turns = createSimpleContext({
         return true;
       } catch (error) {
         if (options?.onError) options.onError(error);
-        else appendUiError(agent.id, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
+        else appendUiError(agentId, error, currentText().t("app.errorStatus.browserTakeover"), serverId);
         return false;
       }
     }
@@ -642,9 +677,11 @@ const Turns = createSimpleContext({
       activeRoutines,
       refreshRoutineIds,
       answerPrompt,
+      answerPromptRequest,
       respondToApproval,
       respondToApprovalRequest,
       respondToBrowserTakeover,
+      respondToBrowserTakeoverRequest,
       cancelQueuedMessage,
       cancelWait,
       steerQueuedMessage,

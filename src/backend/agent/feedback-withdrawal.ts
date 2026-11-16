@@ -154,13 +154,12 @@ export class FeedbackWithdrawal {
       eventType: FEEDBACK_WITHDRAWN_EVENT,
       detail: {},
     });
-    if (taskId) {
-      this.#tasks.changed(agentId);
-      return;
+    // `setSnapshot` keeps a task thread in its own cache, so the open task panel gets the change too.
+    if (loaded) {
+      snapshot.revision = revision;
+      this.#conversation.setSnapshot(agentId, snapshot);
+      this.#conversation.publishConversation(snapshot);
     }
-    if (!loaded) return;
-    snapshot.revision = revision;
-    this.#conversation.setSnapshot(agentId, snapshot);
-    this.#conversation.publishConversation(snapshot);
+    if (taskId) this.#tasks.changed(agentId);
   }
 }

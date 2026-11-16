@@ -1185,6 +1185,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Status reactions",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",

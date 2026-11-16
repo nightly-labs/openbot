@@ -376,6 +376,9 @@ export const messages = {
   "connector.whatsapp.workingMessage": "“正在处理…”消息",
   "connector.whatsapp.workingMessageDescription":
     "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+  "connector.whatsapp.statusReactions": "状态表情回应",
+  "connector.whatsapp.statusReactionsDescription":
+    "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
   "connector.whatsapp.orchestratorTitle": "WhatsApp 调度助手",
   "connector.whatsapp.orchestratorDescription":
     "该助手接收你所有已关联号码中发给 OpenBot 的消息。简单的问题它自己回答，其余的交给合适的助手处理，并在 WhatsApp 中回答。",
