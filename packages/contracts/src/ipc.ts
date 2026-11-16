@@ -50,6 +50,7 @@ export * from "./ipc-conversation-plan";
 export * from "./ipc-conversation-subagents";
 export * from "./ipc-conversation-trace";
 export * from "./ipc-conversations";
+export * from "./ipc-crm";
 export * from "./ipc-custom-agents";
 export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";

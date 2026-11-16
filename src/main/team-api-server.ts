@@ -71,6 +71,7 @@ import { CLAUDE_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/clau
 import { CLAUDE_COMPACT_WINDOW_CAPABILITY } from "@openbot/contracts/team-protocol/claude-compact-window-v1";
 import { CLAUDE_USER_SETUP_CAPABILITY } from "@openbot/contracts/team-protocol/claude-user-setup-v1";
 import { CODEX_API_KEY_CAPABILITY } from "@openbot/contracts/team-protocol/codex-api-key-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_ADMIN_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -174,6 +175,7 @@ import {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
@@ -363,6 +365,7 @@ import { routeContextCompact } from "./team-api/route-context-compact";
 import { routeContextReset } from "./team-api/route-context-reset";
 import { routeConversationFiles } from "./team-api/route-conversation-files";
 import { routeConversationUnreadFrom } from "./team-api/route-conversation-unread-from";
+import { routeCrm } from "./team-api/route-crm";
 import { routeCustomAgents } from "./team-api/route-custom-agents";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
@@ -438,6 +441,7 @@ import { routeUsageCredits } from "./team-api/route-usage-credits";
 import { routeVault } from "./team-api/route-vault";
 import { routeVaultImport } from "./team-api/route-vault-import";
 import { routeWhatsAppConnector } from "./team-api/route-whatsapp-connector";
+import { routeWhatsAppStatusReactions } from "./team-api/route-whatsapp-status-reactions";
 import { routeWhatsAppWorkingMessage } from "./team-api/route-whatsapp-working-message";
 import { routeWorkflows } from "./team-api/route-workflows";
 import { routeWorkspaceDirectory } from "./team-api/route-workspace-directory";
@@ -1212,6 +1216,7 @@ export class TeamApiServer {
       if ((await routeDiscordAccess(context, this.#options.connectors)) === "handled") return;
       if ((await routeWhatsAppConnector(context, this.#options.connectors)) === "handled") return;
       if ((await routeWhatsAppWorkingMessage(context, this.#options.connectors)) === "handled") return;
+      if ((await routeWhatsAppStatusReactions(context, this.#options.connectors)) === "handled") return;
       if ((await routeOnePasswordConnector(context, this.#options.onePasswordConnector)) === "handled") return;
       if ((await routeBitwardenConnector(context, this.#options.bitwardenConnector)) === "handled") return;
       if ((await routePasswordManagers(context, this.#options.passwordManagers)) === "handled") return;
@@ -1390,6 +1395,7 @@ export class TeamApiServer {
       if ((await routeRoutineFlows(context, this.#options.routineFlows, this.#options.agents, hidden)) === "handled")
         return;
       if ((await routeWorkflows(context, this.#options.workflows, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeCrm(context, this.#options.crm)) === "handled") return;
       if ((await this.#routeEvents(context)) === "handled") return;
       if ((await routeAgentImport(context, this.#options.agentImport, newAgentHidden)) === "handled") return;
       if ((await routeHermesImport(context, this.#options.hermesImport, newAgentHidden)) === "handled") return;
@@ -1745,6 +1751,8 @@ export class TeamApiServer {
         continue;
       }
       const { member, blocked, key: blockedKey } = accessFor(connection);
+      // Only owners and admins may read the CRM (`crm-v1`), so only they hear that it changed.
+      if (event.type === "crm-changed" && !canAdministerServer(member.role)) continue;
       // An event this client's protocol cannot describe is skipped for this client only. Thrown
       // out of the loop, it would stop the event for every client after this one.
       const encodeEvent = (event: AgentEvent, options = {}) => {
@@ -2625,6 +2633,7 @@ export class TeamApiServer {
           if (capability === DISCORD_ACCESS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === WHATSAPP_CONNECTOR_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === WHATSAPP_WORKING_MESSAGE_CAPABILITY) return this.#options.connectors !== undefined;
+          if (capability === WHATSAPP_STATUS_REACTIONS_CAPABILITY) return this.#options.connectors !== undefined;
           if (capability === ONEPASSWORD_CONNECTOR_CAPABILITY) return this.#options.onePasswordConnector !== undefined;
           if (capability === BITWARDEN_CONNECTOR_CAPABILITY) return this.#options.bitwardenConnector !== undefined;
           if (capability === PASSWORD_MANAGERS_CAPABILITY) return this.#options.passwordManagers !== undefined;
@@ -2769,6 +2778,7 @@ export class TeamApiServer {
           if (capability === ROUTINE_FLOWS_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === ROUTINE_FLOW_STOP_CAPABILITY) return this.#options.routineFlows !== undefined;
           if (capability === WORKFLOWS_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === CRM_CAPABILITY) return this.#options.crm !== undefined;
           if (capability === WORKFLOWS_GITHUB_CAPABILITY) return this.#options.workflows?.github !== undefined;
           if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
@@ -2951,6 +2961,7 @@ function eventCapability(event: AgentEvent): TeamCurrentCapability | null {
   if (event.type === "skills-changed") return SKILLS_EVENTS_CAPABILITY;
   if (event.type === "routine-flows-changed") return ROUTINE_FLOWS_CAPABILITY;
   if (event.type === "workflows-changed") return WORKFLOWS_CAPABILITY;
+  if (event.type === "crm-changed") return CRM_CAPABILITY;
   if (event.type === "vault-changed") return VAULT_CAPABILITY;
   if (event.type === "browser-profiles-changed") return BROWSER_PROFILES_EVENTS_CAPABILITY;
   if (event.type === "library-folders-changed") return LIBRARY_FOLDERS_EVENTS_CAPABILITY;

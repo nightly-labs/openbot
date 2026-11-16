@@ -43,6 +43,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Comando de instalación para el servidor {name}",
   "status.agent.browserProfileNamed":
     "Mover {agents} al perfil del navegador {profile}. Reciben sus inicios de sesión y cookies. Sus pestañas abiertas se cierran.",
+  "status.agent.commitCoAuthorOff": "Dejar de añadir a OpenBot como coautor en los commits de todos los agentes.",
+  "status.agent.commitCoAuthorOn": "Volver a añadir a OpenBot como coautor en los commits de todos los agentes.",
   "status.agent.browserProfileNew":
     "Crear el nuevo perfil del navegador {profile} y mover {agents} a él. No tiene inicios de sesión. Sus pestañas abiertas se cierran.",
   "status.agent.browserProfileShared":
@@ -68,6 +70,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Actualizando sus recuerdos…",
   "status.agent.skillUsing": "Usando la habilidad {name}…",
+  "status.agent.backdropSetting": "Cambiando el fondo…",
   "status.agent.skillReading": "Leyendo una habilidad…",
   "status.agent.toolStepFailed":
     "Un paso de herramienta falló; revisando el resultado y decidiendo qué probar después…",

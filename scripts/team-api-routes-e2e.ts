@@ -66,6 +66,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
   type PasswordManagerConnectMethod,
@@ -86,8 +87,10 @@ import {
   type VoiceLiveEvent,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -392,6 +395,11 @@ import {
   WHATSAPP_CONNECTOR_CODECS,
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import {
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CODECS,
+  WHATSAPP_STATUS_REACTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CODECS,
@@ -1454,7 +1462,11 @@ const fakeAgents: TeamApiAgents = {
   },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
-  setMessageReaction: unused("setMessageReaction"),
+  setMessageReaction: (input, sender) =>
+    Effect.sync(() => {
+      record("setMessageReaction", input, sender);
+      return undefined;
+    }),
   // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
   // running turn, as the agent service answers them.
   deleteConversationMessage: (input, access) => {
@@ -1901,6 +1913,7 @@ const whatsappAccount: WhatsAppAccount = {
   workspaceId: WHATSAPP_NUMBER,
   ownNumber: true,
   workingMessage: true,
+  statusReactions: true,
   allowedSenders: [],
   pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
 };
@@ -2004,6 +2017,11 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
     Effect.sync(() => {
       record("whatsapp.setWorkingMessage", workspaceId, workingMessage);
       whatsappAccount.workingMessage = workingMessage;
+    }),
+  setWhatsAppStatusReactions: (workspaceId, statusReactions) =>
+    Effect.sync(() => {
+      record("whatsapp.setStatusReactions", workspaceId, statusReactions);
+      whatsappAccount.statusReactions = statusReactions;
     }),
 };
 const connectors: TeamApiConnectors = {
@@ -9343,6 +9361,97 @@ try {
     );
   }
 
+  // ---- The status reactions of a WhatsApp number (whatsapp-status-reactions-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_STATUS_REACTIONS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setStatusReactions");
+    /** The answer as the client reads it: the frozen codec, then the client's guard. */
+    const asClient = (reply: Reply): WhatsAppStatusReactionsList => {
+      const codec = WHATSAPP_STATUS_REACTIONS_CODECS.get(WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      assert(codec, WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppStatusReactionsList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-status-reactions-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, statusReactions: false };
+    const unsupported = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberList = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberUpdate = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the status reactions",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        whatsappAccount.statusReactions === true,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const bad = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: "no" },
+      ...v9,
+    });
+    const off = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, { token: adaToken, json: update, ...v9 });
+    const after = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    // The frozen `whatsapp-connector-v1` overview carries no setting; the client adds it from the list.
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    const merged = withWhatsAppStatusReactions(plain, asClient(after));
+    check(
+      "an admin reads the status reactions of each number and turns them off; a bad value is refused",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.statusReactions === true &&
+        bad.status === 400 &&
+        off.status === 200 &&
+        settingCalls().length === 1 &&
+        whatsappAccount.statusReactions === false &&
+        asClient(after).numbers[0]?.statusReactions === false &&
+        plain.accounts[0]?.statusReactions === undefined &&
+        merged.accounts[0]?.statusReactions === false &&
+        withWhatsAppStatusReactions(plain, null).accounts[0]?.statusReactions === undefined,
+      [summary(before), summary(bad), summary(off), summary(after)],
+    );
+    // The reverse action.
+    const on = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: true },
+      ...v9,
+    });
+    const restored = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin turns the status reactions on again",
+      on.status === 200 &&
+        whatsappAccount.statusReactions === true &&
+        asClient(restored).numbers[0]?.statusReactions === true,
+      [summary(on), summary(restored)],
+    );
+  }
+
   // ---- Password managers on the host (password-managers-v1) ----
   {
     const v9 = { capabilities: [PASSWORD_MANAGERS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
@@ -10746,6 +10855,30 @@ try {
           ],
         ]),
       { status: update.status, calls: callsOf("updateQueuedMessage") },
+    );
+    // A reaction on an agent reply is also the member's answer, so the host must know who reacted.
+    const react = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "👍" },
+    });
+    const unreact = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: null },
+    });
+    const badEmoji = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "nope" },
+    });
+    check(
+      "a reaction gives 204 and names the caller as sender, a removal too, and an emoji that is not in the list gets 400",
+      react.status === 204 &&
+        unreact.status === 204 &&
+        badEmoji.status === 400 &&
+        isDeepStrictEqual(callsOf("setMessageReaction"), [
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: "👍" }, bobSender],
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: null }, bobSender],
+        ]),
+      [summary(react), summary(unreact), summary(badEmoji), callsOf("setMessageReaction")],
     );
     const updateTooLong = await call("POST", TEAM_API_ROUTES.agent.queueUpdate("agent-ada"), {
       token: bobToken,

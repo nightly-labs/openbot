@@ -44,6 +44,8 @@ export const messages = defineMessages("status.agent", {
   "status.agent.serverInstallCard": "Install command for the server {name}",
   "status.agent.browserProfileNamed":
     "Move {agents} to the browser profile {profile}. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.commitCoAuthorOff": "Stop adding OpenBot as a co-author to the commits of all agents.",
+  "status.agent.commitCoAuthorOn": "Add OpenBot as a co-author to the commits of all agents again.",
   "status.agent.browserProfileNew":
     "Make the new browser profile {profile} and move {agents} to it. It has no sign-ins. Their open tabs close.",
   "status.agent.browserProfileShared":
@@ -70,6 +72,7 @@ export const messages = defineMessages("status.agent", {
   },
   "status.agent.memoriesUpdating": "Updating its memories…",
   "status.agent.skillUsing": "Using the skill {name}…",
+  "status.agent.backdropSetting": "Changing the backdrop…",
   "status.agent.skillReading": "Reading a skill…",
   "status.agent.toolStepFailed": "A tool step failed; reviewing the result and deciding what to try next…",
   "status.agent.toolResultReviewing": "Reviewing the latest tool result…",

@@ -5,6 +5,11 @@ import {
   parseBillingSessionUrl,
   parseBillingState,
 } from "@openbot/contracts/billing";
+import {
+  type BillingDetails,
+  type BillingDetailsRequest,
+  parseBillingDetails,
+} from "@openbot/contracts/billing-details";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, type Layer } from "effect";
 import {
@@ -39,6 +44,16 @@ export class BillingDesktopService {
   buyStorage(request: BillingStorageRequest): Effect.Effect<BillingState, AccountServiceFailure> {
     return buyBillingStorage(request).pipe(Effect.provide(this.#platform));
   }
+
+  /** The billing country and EU VAT ID of the account. */
+  getDetails(): Effect.Effect<BillingDetails, AccountServiceFailure> {
+    return readBillingDetails().pipe(Effect.provide(this.#platform));
+  }
+
+  /** Saves the billing country and EU VAT ID. The account server checks a VAT ID with the EU VIES. */
+  setDetails(request: BillingDetailsRequest): Effect.Effect<BillingDetails, AccountServiceFailure> {
+    return saveBillingDetails(request).pipe(Effect.provide(this.#platform));
+  }
 }
 
 const readBillingState = Effect.fn("BillingDesktop.getState")(function* () {
@@ -64,6 +79,26 @@ const buyBillingStorage = Effect.fn("BillingDesktop.buyStorage")(function* (requ
     decodeBillingState,
   );
 });
+
+const readBillingDetails = Effect.fn("BillingDesktop.getDetails")(function* () {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request("/v1/me/billing/details", { method: "GET" }, decodeBillingDetails);
+});
+
+const saveBillingDetails = Effect.fn("BillingDesktop.setDetails")(function* (request: BillingDetailsRequest) {
+  const platform = yield* AccountServicePlatform;
+  return yield* platform.request(
+    "/v1/me/billing/details",
+    { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(request) },
+    decodeBillingDetails,
+  );
+});
+
+function decodeBillingDetails(value: unknown): BillingDetails {
+  const details = parseBillingDetails(value);
+  if (!details) throw new Error(sourceText("error.billing.invalidResponse"));
+  return details;
+}
 
 function decodeBillingState(value: unknown): BillingState {
   const state = parseBillingState(value);

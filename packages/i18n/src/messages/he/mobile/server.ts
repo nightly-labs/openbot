@@ -1217,6 +1217,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
+  "mobile.server.connectors.whatsapp.statusReactions": "תגובות סטטוס",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים, ועונה ב-WhatsApp.",

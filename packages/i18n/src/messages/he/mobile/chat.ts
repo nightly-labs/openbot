@@ -182,7 +182,7 @@ export const messages = {
     "{name}: המחשב המארח לא מקבל את הקבצים האלה. יש לעדכן שם את OpenBot כדי לצרף אותם.",
   "mobile.chat.attachment.nameTooLong": "יש לבחור קובץ עם שם קצר יותר.",
   "mobile.chat.attachment.damaged": "הקובץ המצורף פגום. יש לבחור אותו שוב.",
-  "mobile.chat.attachment.tooLarge": "{name} גדול מ-10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} גדול מ-{limit}.",
   "mobile.chat.attachment.cameraPermission": "יש לאפשר גישה למצלמה בהגדרות כדי לצלם תמונה.",
   "mobile.chat.composer.send": "שליחת הודעה",
   "mobile.chat.composer.stop": "עצירת {name}",
@@ -367,6 +367,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "קוד חד-פעמי",
   "mobile.chat.browserSecret.takeoverTitle": "השתלטות על הדפדפן",
   "mobile.chat.browserSecret.takeoverBody": "יש להשלים את השלב הזה בדפדפן במחשב שמריץ את OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "יש להתחבר במחשב שלך",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "האתר הזה לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם.",
   "mobile.chat.browserSecret.takeoverReload": "לאחר מכן יש לטעון את הדף מחדש לפני שבוחרים ב״סיימתי״.",
   "mobile.chat.browserSecret.takeoverFailed": "לא ניתן להשלים את הבקשה.",
   "mobile.chat.browserSecret.done": "סיימתי",

@@ -179,7 +179,7 @@ export const messages = {
     "{name}: ホストのコンピューターはこれらのファイルを受け付けません。添付するには、そのコンピューターの OpenBot を更新してください。",
   "mobile.chat.attachment.nameTooLong": "名前が短いファイルを選択してください。",
   "mobile.chat.attachment.damaged": "添付ファイルが破損しています。もう一度選択してください。",
-  "mobile.chat.attachment.tooLarge": "{name} は 10 MB を超えています。",
+  "mobile.chat.attachment.tooLarge": "{name} は {limit} を超えています。",
   "mobile.chat.attachment.cameraPermission": "写真を撮るには、設定でカメラへのアクセスを許可してください。",
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
@@ -366,6 +366,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "ブラウザーの引き継ぎ",
   "mobile.chat.browserSecret.takeoverBody":
     "OpenBot を実行しているコンピューターのブラウザーで、この手順を完了してください。",
+  "mobile.chat.browserSecret.signInBlockedTitle": "お使いのコンピューターでサインインしてください",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "このサイトはサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。",
   "mobile.chat.browserSecret.takeoverReload": "その後、ページを再読み込みしてから「完了しました」を選択してください。",
   "mobile.chat.browserSecret.takeoverFailed": "リクエストを完了できませんでした。",
   "mobile.chat.browserSecret.done": "完了しました",

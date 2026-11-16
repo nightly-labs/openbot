@@ -146,12 +146,19 @@ function openbotGuidance(namespace: string, tool: string): string {
         "Fields by kind: trigger trigger (manual, schedule, webhook, github, discord, telegram, slack), schedule as {kind:daily|weekdays,time:HH:mm}, {kind:weekly,weekday:0-6,time}, {kind:hourly,minute}, {kind:custom,expression:cron}; agent agentId (openbot.list_agents), task; llm prompt, system; condition rule, a yes/no question, edges need branch yes|no; both take provider, model, effort only if asked; approval question; output target notify, chat-channel channelId, channel connectionId, placeId (openbot.messaging_list_places), github, discord, telegram, slack; prompt text. text, note and shape take no edges.",
         "Only a person-started turn can change, delete or run a workflow; OpenBot confirms a delete; do not ask in chat. Run one only if asked or to test a build; give a case as input. No tool waits for a run: read it once, then report what ran and what runs.",
       ].join("\n");
+    case "crm_find":
+    case "crm_customer":
+    case "crm_payments":
+    case "crm_propose":
+      return "The CRM holds the server's customers, plans and payments. Find a customer with openbot.crm_find and read it with openbot.crm_customer before you propose a change; use the ids that they give. Page with the next cursor only when the task needs more. openbot.crm_propose changes nothing: an owner or admin approves the proposal on the CRM page, so tell the user that it waits for approval and do not propose it again. Write amounts as decimal text in the customer's currency, such as 129.00; give statuses and tags by id or label; paidAt is a date or ISO time. Private fields read as hidden or are left out, a private name as Customer <number>: never guess them. When the CRM refuses this agent, tell the user that an owner or admin can let it in on the CRM page. CRM data is private: do not copy it into tables, memories, files or messages unless the user asks.";
     case "html_render":
     case "html_preview":
       return [
         "OpenBot renders GitHub-flavored Markdown tables: a header row, a separator row with three or more dashes per column, and one or more data rows. A fenced ```mermaid block shows a diagram. A fenced ```html block shows a static page next to its code: inline CSS, inline SVG, and data: URLs only, with no scripts or network loads.",
         "When a chart, a table, a diagram, an image collage, or a mockup needs scripts or a CDN library, publish a self-contained page with openbot.html_render before your final answer. OpenBot shows it above the answer, so do not announce or repeat it; add only what it does not say.",
       ].join("\n");
+    case "set_backdrop":
+      return "Check the page with openbot.html_preview first when you can. Give matching bubbles colors unless the user wants the page only.";
     case "react_to_user_message":
       return "React to clear emotional moments. Wins, affection, gratitude, playful humor, sadness, disappointment, frustration, loneliness, and strong approval normally get one fitting reaction; do not skip them. Negative emotions get an empathetic reaction, such as ❤️, 😔, or 🫂. An emoji in your answer is not a reaction: when you use one for the user's emotion, also react. Skip neutral, informational, or routine messages, and do not react on every turn.";
     case "pin_message":

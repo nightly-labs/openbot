@@ -44,6 +44,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",
   "status.agent.browserProfileNamed":
     "Przenieś {agents} do profilu przeglądarki {profile}. Otrzymają jego logowania i pliki cookie. Ich otwarte karty zostaną zamknięte.",
+  "status.agent.commitCoAuthorOff": "Przestań dodawać OpenBot jako współautora commitów wszystkich agentów.",
+  "status.agent.commitCoAuthorOn": "Znowu dodawaj OpenBot jako współautora commitów wszystkich agentów.",
   "status.agent.browserProfileNew":
     "Utwórz nowy profil przeglądarki {profile} i przenieś do niego {agents}. Nie ma w nim logowań. Ich otwarte karty zostaną zamknięte.",
   "status.agent.browserProfileShared":
@@ -71,6 +73,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Aktualizowanie wspomnień…",
   "status.agent.skillUsing": "Używanie umiejętności {name}…",
+  "status.agent.backdropSetting": "Zmienianie tła…",
   "status.agent.skillReading": "Czytanie umiejętności…",
   "status.agent.toolStepFailed": "Krok narzędzia nie powiódł się; sprawdzam wynik i decyduję, co spróbuję dalej…",
   "status.agent.toolResultReviewing": "Sprawdzanie najnowszego wyniku narzędzia…",

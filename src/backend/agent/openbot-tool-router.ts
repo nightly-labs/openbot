@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { chatVisualItemType } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_BACKDROP_ITEM_TYPE,
+  chatVisualItemType,
+  withChatBackdropBubbles,
+  withChatBackdropRequesters,
+} from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import {
   BUG_REPORT_AREAS,
@@ -38,6 +43,7 @@ import type {
   AgentModelChoice,
   AgentModelOption,
   AgentSummary,
+  AvatarColor,
   AvatarImageInput,
   ConversationMessage,
   CreateAgentInput,
@@ -59,6 +65,7 @@ import {
   marketplaceSuggestionItemType,
   mcpSignInItemType,
   SETTING_LINK_SCOPES,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
   settingLinkItemType,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
@@ -80,6 +87,7 @@ import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
+import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
@@ -99,6 +107,7 @@ import {
   saveApiKeyToolSchema,
   sendToChannelToolSchema,
   serverInstallCommandToolSchema,
+  setBackdropToolSchema,
   webSearchToolSchema,
 } from "../openbot-tools";
 import { type AppServerRequest, type DynamicToolCallParams, type DynamicToolResult, isRecord } from "../protocol";
@@ -132,16 +141,30 @@ import {
   listChannelsToolSchema,
 } from "./channel-agent-tools";
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
+import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
-import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
+import {
+  backdropMessageId,
+  responseAttachmentMessageId,
+  visualReplyFileName,
+  visualReplyMessageId,
+} from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
 import { type ImageFitter, READ_IMAGE_MAX_FILE_BYTES, readImageToolSchema } from "./image-reader";
-import { type AgentLibraryFolders, listLibraryFolders, listLibraryFoldersToolSchema } from "./library-folder-tools";
+import {
+  type AgentLibraryFolders,
+  libraryFileAgents,
+  listLibraryFolders,
+  listLibraryFoldersToolSchema,
+  organizeLibrary,
+  organizeLibraryToolSchema,
+} from "./library-folder-tools";
 import type { MailboxSync } from "./mailbox-sync";
 import {
   type AgentMcpServers,
@@ -227,6 +250,11 @@ const API_KEY_TOOLS: ReadonlySet<string> = new Set([
   "remove_api_key",
   "save_api_key",
 ]);
+
+/** A `#rrggbb` color from a tool call, in the lower case that a chat color uses. */
+function lowerCaseColor(color: string): AvatarColor {
+  return `#${color.slice(1).toLowerCase()}`;
+}
 
 /**
  * Interrupts the operation it races when the provider cancels the tool request, as on Stop. The
@@ -470,6 +498,8 @@ export interface OpenBotToolRouterOptions {
   approvalAutomation?: ApprovalAutomationPolicy | undefined;
   /** Draws pages for `html_preview`; null where no window can draw one. */
   visualPreview?: ChatVisualPreviewHost | null | undefined;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /** Captures the desktop for `capture_screen`; null where this process has no desktop. */
   screenCapture?: ScreenCaptureHost | null | undefined;
   /** Downloads and reads online videos for `read_video`; null where this process cannot decode them. */
@@ -490,6 +520,10 @@ export interface OpenBotToolRouterOptions {
   serverClaims?: AgentServerClaims | null | undefined;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`; null where this process has none. */
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The CRM, for the `crm_*` tools; null where this process has none. */
+  crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent. Without it, the CRM tools refuse every agent. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -534,6 +568,7 @@ export class OpenBotToolRouter {
   readonly #workflowTools: (() => WorkflowTools) | undefined;
   readonly #approvalAutomation: ApprovalAutomationPolicy;
   readonly #visualPreview: ChatVisualPreviewHost | null;
+  readonly #setCommitCoAuthor: SetCommitCoAuthor | null;
   readonly #screenCapture: ScreenCaptureHost | null;
   readonly #videoReader: VideoReaderHost | null;
   readonly #fitImage: ImageFitter | null;
@@ -548,6 +583,8 @@ export class OpenBotToolRouter {
   readonly #feedbackSearched = new Set<string>();
   readonly #serverClaims: AgentServerClaims | null;
   readonly #browserProfiles: () => AgentBrowserProfiles | null;
+  readonly #crm: () => CrmHandle | null;
+  readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -597,6 +634,7 @@ export class OpenBotToolRouter {
     this.#workflowTools = options.workflowTools;
     this.#approvalAutomation = options.approvalAutomation ?? NO_APPROVAL_AUTOMATION;
     this.#visualPreview = options.visualPreview ?? null;
+    this.#setCommitCoAuthor = options.setCommitCoAuthor ?? null;
     this.#screenCapture = options.screenCapture ?? null;
     this.#videoReader = options.videoReader ?? null;
     this.#fitImage = options.fitImage ?? null;
@@ -607,6 +645,8 @@ export class OpenBotToolRouter {
     this.#feedback = options.feedback ?? null;
     this.#serverClaims = options.serverClaims ?? null;
     this.#browserProfiles = options.browserProfiles ?? (() => null);
+    this.#crm = options.crm ?? (() => null);
+    this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -990,13 +1030,15 @@ export class OpenBotToolRouter {
               tool === "attach_files_to_response" ||
               tool === "read_image" ||
               tool === "list_library_folders" ||
+              tool === "organize_library" ||
               tool === "send_message" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
               tool === "create_server_install_command";
-            // A workflow tool reports its own correctable failures; only bad arguments reach this point.
+            // A workflow or CRM tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
-              correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
+              correctableTool ||
+              ((WORKFLOW_TOOL_NAMES.has(tool) || CRM_TOOL_NAMES.has(tool)) && cause instanceof z.ZodError);
             const response = this.#handleOpenBotTool(client, toolRequest, toolRequest.params).pipe(
               Effect.catch((failure) =>
                 correctable(failure.cause) ? correctableFailure(failure.cause) : Effect.fail(failure),
@@ -1009,8 +1051,9 @@ export class OpenBotToolRouter {
                 }),
               ),
             );
-            // Both store a file and then add the message that names it.
-            if (tool === "attach_files_to_response" || tool === "html_render") yield* Effect.uninterruptible(response);
+            // Each stores a file and then adds the message that names it.
+            if (tool === "attach_files_to_response" || tool === "html_render" || tool === "set_backdrop")
+              yield* Effect.uninterruptible(response);
             // A side Codex search can take up to two minutes on the user's ChatGPT quota, and a video
             // download and transcript can take longer, so Stop ends them.
             else if (tool === "web_search" || tool === "read_video") {
@@ -1583,8 +1626,8 @@ export class OpenBotToolRouter {
 
   /**
    * A card with only a reason that only the owner answers, also for an agent with Full access. For
-   * `set_browser_profile`, whose profile holds sign-ins of other agents, and `delete_agent`, which
-   * cannot be undone.
+   * `set_browser_profile`, whose profile holds sign-ins of other agents, `set_commit_co_author`, which
+   * changes every agent, and `delete_agent`, which cannot be undone.
    */
   #ownerApproval(
     client: AgentClient,
@@ -1987,6 +2030,10 @@ export class OpenBotToolRouter {
       return yield* this.#renderVisual(params, senderAgentId, executionThreadId);
     }
 
+    if (params.tool === "set_backdrop") {
+      return yield* this.#setBackdrop(params, senderAgentId, executionThreadId);
+    }
+
     if (params.tool === "web_search") {
       const args = webSearchToolSchema.parse(params.arguments ?? {}, { reportInput: true });
       const answer = yield* this.#hooks.searchWeb(senderAgentId, args.query);
@@ -2027,10 +2074,21 @@ export class OpenBotToolRouter {
 
     if (params.tool === "list_library_folders") {
       const args = listLibraryFoldersToolSchema.parse(params.arguments ?? {}, { reportInput: true });
-      const store = this.#libraryFolders;
-      if (!store) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      const storedFiles = this.#mailbox.listStoredFiles();
+      const fileAgents = yield* libraryFileAgents(libraryFolders, storedFiles);
       return openBotToolResult(
-        listLibraryFolders(store.getSnapshot(), this.#mailbox.listStoredFiles(), senderAgentId, args.folder),
+        listLibraryFolders(libraryFolders.getSnapshot(), storedFiles, fileAgents, senderAgentId, args.folder),
+      );
+    }
+
+    if (params.tool === "organize_library") {
+      const args = organizeLibraryToolSchema.parse(params.arguments ?? {}, { reportInput: true });
+      const libraryFolders = this.#libraryFolders;
+      if (!libraryFolders) return openBotToolFailure("Library folders are not available on this OpenBot.");
+      return openBotToolResult(
+        yield* organizeLibrary(libraryFolders, senderAgentId, args, this.#mailbox.listStoredFiles()),
       );
     }
 
@@ -2198,6 +2256,34 @@ export class OpenBotToolRouter {
       new Set(this.#hooks.listAgents().map((agent) => agent.id)),
     );
     if (flowResult) return flowResult;
+
+    if (CRM_TOOL_NAMES.has(params.tool)) {
+      // The Team API gives the CRM to owners and admins only, so a member's message does not reach it here.
+      if (this.#fromRemoteMember(senderAgentId, params.turnId))
+        return openBotToolFailure("A team member's message cannot use the CRM. Ask the member to use the CRM page.");
+      // A member who can see the agent reads its chat and can add a routine to it.
+      if (this.#crmAgentVisibleToMembers(senderAgentId))
+        return openBotToolFailure(
+          "Team members can see this agent, so it cannot use the CRM. Ask an owner or admin to set this agent to No access for Everyone and for each role, in the server's Roles settings.",
+        );
+      // People who are not owners or admins read the replies in an external chat or a channel.
+      if (
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#channels.store.channelForThread(executionThreadId)
+      )
+        return openBotToolFailure(
+          "The CRM does not work in an external chat or a channel. Use it in your own OpenBot chat.",
+        );
+      const crmResult = yield* handleCrmTool(
+        params.tool,
+        params.arguments,
+        this.#crm(),
+        senderAgentId,
+        this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        (text) => this.#hooks.redactMcp(text),
+      );
+      if (crmResult) return crmResult;
+    }
 
     if (
       WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&
@@ -2405,6 +2491,17 @@ export class OpenBotToolRouter {
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });
 
+    if (params.tool === "set_commit_co_author") {
+      const setCommitCoAuthor = this.#setCommitCoAuthor;
+      if (!setCommitCoAuthor) return openBotToolFailure(sourceText("error.agent.toolRequestInvalid"));
+      return yield* handleSetCommitCoAuthorTool(params, {
+        current: () => this.#store.agentDefaults().commitCoAuthor,
+        set: setCommitCoAuthor,
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+      });
+    }
+
     if (params.tool === "delete_agent")
       return yield* handleDeleteAgentTool(params, senderAgentId, {
         listAgents: () => this.#hooks.listAgents(),
@@ -2458,6 +2555,65 @@ export class OpenBotToolRouter {
       detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
     });
     return openBotToolResult({ status: "shown", messageId });
+  });
+
+  /**
+   * `set_backdrop`: stores the page as an HTML attachment and adds a backdrop message. Each client of
+   * the chat puts the newest one behind its window (`agent-backdrops.ts` in the renderer). A channel or
+   * external chat turn cannot use it: someone else's request would change the user's window. A task
+   * thread cannot use it either: the clients do not watch it. On a joined server, members share the
+   * agent's chat, so the page names the people who asked in this turn, and only their clients show it.
+   */
+  readonly #setBackdrop = Effect.fn("OpenBotToolRouter.setBackdrop")(function* (
+    this: OpenBotToolRouter,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    executionThreadId: string,
+  ) {
+    if (
+      this.#channels.store.channelForThread(executionThreadId) ||
+      this.#messaging.store.linkForThread(executionThreadId)
+    ) {
+      return openBotToolFailure("Only a turn in your own OpenBot chat can set the backdrop.");
+    }
+    // The clients watch the agent's own chat only, so a page from a task thread would not show.
+    if (this.#conversation.isTaskThread(executionThreadId)) {
+      return openBotToolFailure("Set the backdrop from your own chat, not from a task thread.");
+    }
+    const parsed = setBackdropToolSchema.safeParse(params.arguments, { reportInput: true });
+    if (!parsed.success) return openBotToolFailure(profileToolErrorMessage(parsed.error));
+    const args = parsed.data;
+    const messageId = backdropMessageId(params.threadId, params.turnId, params.callId);
+    if (
+      this.#conversation.ensureSnapshot(senderAgentId, executionThreadId).messages.some(({ id }) => id === messageId)
+    ) {
+      return openBotToolResult({ status: "set", messageId });
+    }
+    yield* this.#addGeneratedMessage({
+      agentId: senderAgentId,
+      threadId: executionThreadId,
+      turnId: params.turnId,
+      messageId,
+      file: {
+        // The colors go in the page, so each client gets them with the page file.
+        bytes: new TextEncoder().encode(
+          withChatBackdropRequesters(
+            withChatBackdropBubbles(args.html, {
+              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+            }),
+            this.#turnRequesters(senderAgentId, params.turnId),
+          ),
+        ),
+        name: `${visualReplyFileName(args.title)}.html`,
+        mimeType: "text/html",
+      },
+      text: args.title,
+      itemType: CHAT_BACKDROP_ITEM_TYPE,
+      eventType: "response.backdrop-set",
+      detail: (attachmentId) => ({ turnId: params.turnId, messageId, attachmentId }),
+    });
+    return openBotToolResult({ status: "set", messageId });
   });
 
   /**
@@ -2831,6 +2987,20 @@ export class OpenBotToolRouter {
   #remoteMember(messageId: string): boolean {
     const member = this.#mailbox.senderMember(messageId);
     return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+  }
+
+  /**
+   * The people who sent the messages of this turn, as their `senderMember` ids. A message with no
+   * sender is from a person on this computer who is signed out. A turn with no person's message, such
+   * as a routine run, has none.
+   */
+  #turnRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind !== "user") continue;
+      ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
+    }
+    return [...ids];
   }
 
   /** Whether a team member on another computer sent a message of this turn. */

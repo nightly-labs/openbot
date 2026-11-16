@@ -249,4 +249,10 @@ export const messages = {
     other:
       "في ترخيصك {count} مستخدم، وهو الحد الأقصى. تواصل معنا للحصول على ترخيص أكبر. لا يمكن لأشخاص جدد الانضمام إلى خوادمك.",
   },
+  "billing.details.country": "بلد الفوترة",
+  "billing.details.countryPlaceholder": "اختر بلدًا",
+  "billing.details.vatId": "رقم ضريبة القيمة المضافة في الاتحاد الأوروبي (اختياري)",
+  "billing.details.vatIdInvalid": "هذا ليس رقم ضريبة القيمة المضافة للبلد المختار.",
+  "billing.details.countryMissing": "اختر بلد الفوترة.",
+  "billing.details.saveFailed": "تعذّر حفظ بيانات الفوترة",
 } as const satisfies PartialTranslation<typeof source>;

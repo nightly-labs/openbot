@@ -180,7 +180,7 @@ export const messages = {
     "{name}: Der Host-Computer akzeptiert diese Dateien nicht. Aktualisiere OpenBot dort, um sie anzuhängen.",
   "mobile.chat.attachment.nameTooLong": "Wähle eine Datei mit einem kürzeren Namen.",
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
-  "mobile.chat.attachment.tooLarge": "{name} ist größer als 10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
@@ -373,6 +373,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "Browserübernahme",
   "mobile.chat.browserSecret.takeoverBody":
     "Schließe diesen Schritt im Browser auf dem Computer ab, auf dem OpenBot läuft.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Melde dich auf deinem Computer an",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Diese Website akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an.",
   "mobile.chat.browserSecret.takeoverReload": "Lade dann die Seite neu, bevor du „Fertig“ wählst.",
   "mobile.chat.browserSecret.takeoverFailed": "Die Anfrage konnte nicht abgeschlossen werden.",
   "mobile.chat.browserSecret.done": "Fertig",

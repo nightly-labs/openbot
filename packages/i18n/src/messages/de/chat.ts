@@ -396,6 +396,11 @@ export const messages = {
   "chat.menu.markUnread": "Als ungelesen markieren",
   "chat.menu.pin": "Anheften",
   "chat.menu.unpin": "Lösen",
+  "chat.menu.useAsBackdrop": "Als Fensterhintergrund verwenden",
+  "chat.menu.backdropSet": "Der Fensterhintergrund ist festgelegt.",
+  "chat.menu.backdropFailed": "Diese Datei kann kein Fensterhintergrund sein.",
+  "chat.backdrop.agentSet": "Ein Agent hat den Hintergrund geändert: {name}",
+  "chat.backdrop.undo": "Rückgängig",
   "chat.pins.title": "Angeheftete Nachrichten",
   "chat.pins.emptyTitle": "Keine angehefteten Nachrichten",
   "chat.pins.emptyBody":

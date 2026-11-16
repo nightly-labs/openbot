@@ -177,7 +177,7 @@ export const messages = {
     "{name}: 호스트 컴퓨터가 이 파일을 받지 않아요. 첨부하려면 호스트의 OpenBot을 업데이트해 주세요.",
   "mobile.chat.attachment.nameTooLong": "이름이 더 짧은 파일을 선택해 주세요.",
   "mobile.chat.attachment.damaged": "첨부 파일이 손상됐어요. 다시 선택해 주세요.",
-  "mobile.chat.attachment.tooLarge": "{name} 파일이 10MB보다 커요.",
+  "mobile.chat.attachment.tooLarge": "{name} 파일이 {limit}보다 커요.",
   "mobile.chat.attachment.cameraPermission": "사진을 찍으려면 설정에서 카메라 접근을 허용해 주세요.",
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",
@@ -360,6 +360,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "일회용 코드",
   "mobile.chat.browserSecret.takeoverTitle": "브라우저 직접 제어",
   "mobile.chat.browserSecret.takeoverBody": "OpenBot을 실행하는 컴퓨터의 브라우저에서 이 단계를 완료해 주세요.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "내 컴퓨터에서 로그인해 주세요",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "이 사이트는 서버에서의 로그인을 받지 않아요. 내 컴퓨터의 OpenBot 데스크톱 앱에서 이 채팅을 열고 그곳에서 로그인해 주세요.",
   "mobile.chat.browserSecret.takeoverReload": "그런 다음 ‘완료’를 누르기 전에 페이지를 새로 고쳐 주세요.",
   "mobile.chat.browserSecret.takeoverFailed": "요청을 완료할 수 없어요.",
   "mobile.chat.browserSecret.done": "완료",

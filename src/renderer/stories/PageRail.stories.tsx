@@ -121,10 +121,21 @@ function RailPreview(props: {
   customAgentUsage?: readonly CustomAgentUsageRailRow[];
   usageRows?: PageRailProps["usageRows"];
   mediaCredits?: readonly MediaCreditsRailRow[];
+  /** Pins the CRM, whose button has a right-click menu. */
+  crm?: boolean;
 }) {
   const { t } = useText();
   const [current, setCurrent] = createSignal<PageRailPage | null>("agents");
-  const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(["usage"]);
+  const [pinned, setPinned] = createSignal<readonly PageRailPinnablePage[]>(props.crm ? ["usage", "crm"] : ["usage"]);
+  /** Named functions, not ternary props. */
+  function crmAction(): (() => void) | undefined {
+    if (!props.crm) return undefined;
+    return () => setCurrent("crm");
+  }
+  function crmConnectorsAction(): (() => void) | undefined {
+    if (!props.crm) return undefined;
+    return () => setCurrent("crm");
+  }
   return (
     // The extra box keeps the rail out of the rule that hides it in a narrow window.
     <div class="app-window" style={{ height: "100vh" }}>
@@ -144,6 +155,8 @@ function RailPreview(props: {
           onRoutines={() => setCurrent("routines")}
           onSchedule={() => setCurrent("schedule")}
           onUsage={() => setCurrent("usage")}
+          onCrm={crmAction()}
+          onCrmConnectors={crmConnectorsAction()}
           onMarketplace={fn()}
           onSettings={() => setCurrent("settings")}
           settingsNotice={props.updateReady ? t("account.update.ready") : undefined}
@@ -237,4 +250,9 @@ export const MediaCreditsPersonal: Story = {
 /** The Canvas page with Sunra and Higgsfield: a button for each service. */
 export const MediaCreditsTwoServices: Story = {
   args: { mediaCredits: bothCredits },
+};
+
+/** The CRM is pinned. Right-click its button for Connectors and Unpin; the other pinned buttons have Unpin. */
+export const CrmMenu: Story = {
+  args: { crm: true },
 };

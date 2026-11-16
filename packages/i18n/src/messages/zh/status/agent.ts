@@ -41,6 +41,8 @@ export const messages = {
   "status.agent.serverInstallCard": "服务器 {name} 的安装命令",
   "status.agent.browserProfileNamed":
     "将 {agents} 移到浏览器配置文件 {profile}。它们会使用其中的登录信息和 Cookie。它们打开的标签页会关闭。",
+  "status.agent.commitCoAuthorOff": "不再将 OpenBot 作为共同作者添加到所有智能体的提交中。",
+  "status.agent.commitCoAuthorOn": "重新将 OpenBot 作为共同作者添加到所有智能体的提交中。",
   "status.agent.browserProfileNew":
     "新建浏览器配置文件 {profile} 并将 {agents} 移到其中。它没有登录信息。它们打开的标签页会关闭。",
   "status.agent.browserProfileShared":
@@ -62,6 +64,7 @@ export const messages = {
   "status.agent.memoriesSearched": { other: "已搜索记忆：找到 {count} 条" },
   "status.agent.memoriesUpdating": "正在更新记忆…",
   "status.agent.skillUsing": "正在使用技能 {name}…",
+  "status.agent.backdropSetting": "正在更改背景…",
   "status.agent.skillReading": "正在读取技能…",
   "status.agent.toolStepFailed": "工具步骤失败；正在查看结果并决定下一步…",
   "status.agent.toolResultReviewing": "正在查看最新的工具结果…",

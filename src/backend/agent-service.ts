@@ -188,6 +188,7 @@ import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
+import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -301,6 +302,7 @@ import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
+import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
 import { encodedModelId } from "./encoded-model-id";
@@ -394,6 +396,8 @@ export interface AgentServiceOptions {
   hostedSites?: AgentHostedSites | null;
   /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
   visualPreview?: ChatVisualPreviewHost | null;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /**
    * Decodes a picture, makes its flat background clear (`clearFlatBackground`) and gives it back as a
    * PNG; null when the picture has no flat background. Without it a transparent Grok image keeps the
@@ -426,8 +430,12 @@ export interface AgentServiceOptions {
   serverClaims?: AgentServerClaims | null;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`. */
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The CRM, for the `crm_*` tools; null until it starts. */
+  crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent; the `crm_*` tools then refuse it. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   sidebarLayout?: AgentSidebar | null;
-  /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
+  /** The Library folders of this host, for the `folder` of an attach call, `list_library_folders` and `organize_library`. */
   libraryFolders?: AgentLibraryFolders | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -1994,6 +2002,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
+      ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
@@ -2012,6 +2021,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       feedback: options.feedback ?? null,
       serverClaims: options.serverClaims ?? null,
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
+      ...(options.crm === undefined ? {} : { crm: options.crm }),
+      ...(options.crmAgentVisibleToMembers === undefined
+        ? {}
+        : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -2787,6 +2800,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The routine canvas of one agent changed, so every view showing it reads it again. */
   notifyRoutineFlowsChanged(agentId: string): void {
     this.#emit({ type: "routine-flows-changed", agentId });
+  }
+
+  /** The CRM changed, so each open CRM page reads it again. */
+  notifyCrmChanged(): void {
+    this.#emit({ type: "crm-changed" });
   }
 
   /**
@@ -6894,9 +6912,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /**
+   * A new emoji on one of the agent's own replies is also the user's answer to that reply, so it is
+   * queued as a reply that quotes the message: the agent continues without a typed answer. A removed
+   * or unchanged reaction sends nothing. `sender` is the person the host saw react.
+   */
   readonly setMessageReaction = Effect.fn("AgentService.setMessageReaction")(function* (
     this: AgentService,
     input: SetMessageReactionInput,
+    sender?: ConversationMessageSender,
   ) {
     const agent = yield* this.#store
       .existing(input.agentId)
@@ -6910,21 +6934,38 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
       if (message) snapshot.messages.push(message);
     }
-    if (!snapshot.messages.some((message) => message.id === input.messageId)) {
+    const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+    if (!message) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
         cause: new Error(sourceText("error.agent.messageUnavailable")),
       });
     }
-    yield* this.#mailbox
-      .setReaction(agent.id, input.messageId, { kind: "user" }, input.emoji)
-      .pipe(
+    const previous = this.#mailbox.reactionFor(agent.id, input.messageId);
+    // A reply that streams, failed or stopped is not one the user can answer yet.
+    const answer =
+      message.author === "assistant" && message.status === "completed" && input.emoji !== previous ? input.emoji : null;
+    const saveReaction = (emoji: SetMessageReactionInput["emoji"]) =>
+      this.#mailbox.setReaction(agent.id, input.messageId, { kind: "user" }, emoji).pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "set message reaction", cause: failure.cause }),
         ),
+        Effect.tap(() =>
+          Effect.sync(() => {
+            this.#mailboxSync.syncMailboxMessages(snapshot);
+            this.#conversation.emitConversation(snapshot);
+          }),
+        ),
       );
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.emitConversation(snapshot);
+    // The check and the save have no wait between them, so the same reaction twice sends one answer.
+    yield* saveReaction(input.emoji);
+    if (!answer) return;
+    // When the answer cannot go, the old reaction comes back, so the user sees the failure and can try again.
+    yield* this.#sendUserMessage(
+      { agentId: agent.id, text: answer, replyToMessageId: input.messageId },
+      sender,
+      undefined,
+    ).pipe(Effect.tapError(() => saveReaction(previous).pipe(Effect.ignore)));
   }, Effect.uninterruptible).bind(this);
 
   /** The channel, task or messaging thread of a delivery, or null for the agent's own chat. */
@@ -7095,9 +7136,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Effect.Effect<void, AgentLifecycleFailed> {
+  /** `fromMember`: the answer came from a member's device through the Team API. */
+  respondToBrowserTakeover(
+    input: RespondToBrowserTakeoverInput,
+    fromMember = false,
+  ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#attention
-      .respondToBrowserTakeover(input)
+      .respondToBrowserTakeover(input, fromMember)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "respondToBrowserTakeover", cause: failure.cause }),

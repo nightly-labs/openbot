@@ -376,6 +376,72 @@ changed, on this computer and on a joined host.
   failure that tells the agent not to try again. The guidance tells the agent not to ask in chat
   first, so the person answers once. `scripts/agent-workflow-gate-e2e.ts` checks both rules.
 
+## CRM
+
+The CRM page keeps the leads and customers of the host, with their statuses, tags, plans and
+payments. Only an owner or admin uses it, on this computer or on a joined server through the
+optional `crm-v1` capability (see [CRM](servers.md#crm)). The agent event `crm-changed` names no
+customer; a client reads the CRM again.
+
+The CRM is an experimental feature. An owner or admin turns it on in Server Settings > Experimental;
+the switch is off by default and is kept in `openbot-crm-v1.json` in the user data folder
+(`src/main/crm-preference-store.ts`). While it is off, the clients hide the CRM, the CRM tools refuse
+each agent call with `error.crm.off`, and the payment source sync does not run. The data stays. The
+tools stay in the tool list, so the prompt does not change with the switch. The instance transfer
+does not move the switch.
+
+- `src/backend/crm/` owns the tables of migration 63 (`crm-schema.ts`). The same SQL makes the
+  tables of a new database. The three built-in statuses (`lead`, `customer`, `former`) have no label,
+  so the client shows the catalog name; they cannot be renamed or deleted. A customer `number` and a
+  payment `number` (the invoice number) are not given again after a delete, because an agent can
+  have seen `Customer 32`.
+- Amounts are whole minor units of the customer's currency, and totals are per currency. A due date
+  is a calendar date (`YYYY-MM-DD`). A plan makes its first open payment when it is made. A paid
+  payment of a monthly, quarterly or yearly plan makes the next one, when the plan has no other open
+  payment and the next date is not after its end. Marking it unpaid keeps that next payment.
+- `Crm` (`crm.ts`) is an Effect service on its own managed runtime. `apply` takes one `CrmChange`,
+  writes one activity row for each customer that it changes, and calls `changed()` once. A customer
+  update names the `revision` that it read; a stale one gets `{ ok: false, conflict: "revision" }`
+  and writes nothing.
+- Agents use four `openbot` tools (`agent/crm-tool.ts`): `crm_find`, `crm_customer`,
+  `crm_payments` and `crm_propose`. They are not in the visible set. Only agents that an owner or
+  admin let in (`crm_agent_access`) get answers. A turn from a remote member is refused, and so is a
+  turn in an external chat (Slack, Telegram, Discord) or a channel thread, whose readers can be people
+  who are not owners or admins. An agent that an active member (not an owner or admin) can see is
+  refused too (`HostService.agentVisibleToMembers`): the member reads the agent's chat and can add a
+  routine to it. A routine run of an agent that no member can see can read the CRM. An agent
+  never writes: `crm_propose` stores a pending proposal, and an owner or admin approves or rejects it
+  on the page. An approved proposal applies as the person who approved it, and its activity names
+  the agent. Amounts in tool input are decimal text in the customer's currency.
+- `crm-agent-view.ts` hides the private fields: a private name reads as `Customer <number>` and other
+  private values as `hidden`. A search does not match a private value, so an agent cannot test a
+  guess. CRM data does not go to the shared agent data tables.
+- A payment source fills the CRM with no agent and no approval. `crm-source.ts` owns the sync and the
+  matching; `crm-stripe.ts` is the only adapter. The Connectors button on the CRM page opens the
+  dialog. The right-click menu of a pinned CRM rail button also has Connectors (`onCrmConnectors` in
+  `PageRail.tsx`); the page takes that request once. The More menu has no right-click menu, so the
+  page button is the path that always works. The dialog lists
+  each `CRM_SOURCE_KINDS` entry with its state, adds a search field from 8 entries
+  (`CrmSourceDialog.tsx`), and a row opens its connect or status page in the same dialog.
+  "Create key in Stripe" opens the Stripe key page
+  with the name and the Read permissions filled in (`SOURCE_KEY_PAGE`). An owner or admin pastes the
+  restricted key (`rk_live_` or `rk_test_`; a secret `sk_` key is refused). The host checks that the
+  key can read customers, invoices, subscriptions and products, keeps it in `crm-stripe-key.json`
+  (system cipher, `src/main/application-services.ts`), and pulls every 5 minutes and on Sync now.
+  Each sync reads all again: the active subscriptions, the open invoices, the invoices paid in the
+  last year and the customers, then each open CRM row that the lists did not have. There is no event
+  cursor, so a missed change cannot stay missed. No webhook: Cloudflare and Stripe never call the
+  host. One sync runs at a time, and a failure sets an error code; the next tick tries again.
+- Each copied row has `source_id` and `source_ref` (`stripe:cus_…`, `stripe:sub_…`, `stripe:in_…`). A
+  Stripe customer links to the CRM customer with that ref, then that `stripeCustomerId`, then one
+  unlinked customer with the same email, else it is imported. Stripe owns the plans and payments that
+  it made: people and agents cannot change them, and a proposal that targets one is closed as
+  rejected. A linked customer keeps its CRM edits, but its Stripe ID is locked. A deleted linked
+  customer goes to `crm_source_ignored`, so the sync does not import it again. A subscription or
+  invoice in another currency, or with a billing interval that the CRM does not have, is skipped and
+  counted. Disconnect deletes the key and the source; the rows stay and become editable, and a new
+  connection links them again by `source_ref`.
+
 ## Hidden agents
 
 A user hides an agent from its sidebar menu to take it out of the list. The agent keeps its thread,
@@ -994,6 +1060,15 @@ accept it deletes the agents one after the other and reports `ok` or the error f
 the sidebar or Library cleanup fails after an agent is deleted, the tool logs it and reports the
 agent as deleted; the next start removes the places of agents that are gone. `scripts/agent-delete-tool-e2e.ts`
 checks these rules.
+`openbot.set_commit_co_author` turns off, or on again, the `commitCoAuthor` agent default: the
+OpenBot co-author trailer that the developer instructions tell each agent to add to its git commits.
+It writes through the same `AgentDefaultsSettings.update` as Server settings › Agent defaults and the
+`agent-defaults-v1` host route, so every agent gets the change. The setting applies to every agent,
+so the tool asks the owner on one owner-only card, also when the agent has Full access. Only a
+person's message can start it, as for `delete_agent`. A request for the current value shows no card.
+While the trailer is on, the instructions name the tool, so that an agent does not
+tell the user that the trailer cannot be turned off (#7579).
+`scripts/agent-commit-co-author-tool-e2e.ts` checks these rules.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the
 user widens them again, and only the user moves an agent between Ask first and Full access, and changes local script runs. An agent changes MCP servers only with the MCP server tools, after the user's request and approval. A new agent gets
@@ -1012,6 +1087,26 @@ agent or channel id as `agentId` (the store files both under one key), and accep
 to ungroup it; deleting a section also ungroups its agents and channels without deleting them. These tools
 use the same `SidebarLayoutStore` as manual sidebar edits, including persistence, validation,
 and change events delivered to desktop and connected clients.
+
+`set_backdrop` puts an HTML page behind the user's whole window. The router stores the page like an
+`html_render` page, as a message with the item type `window-backdrop` (`CHAT_BACKDROP_ITEM_TYPE`),
+so a joined server and the web client need no new event or capability, and an older client shows the
+title and the file. A channel turn and a linked chat app turn get a tool failure: their requests
+come from other people. Each client keeps the newest backdrop message that is newer than its mark
+(`src/renderer/src/agent-backdrops.ts`, per device and browser) in one replaceable slot per agent in
+`custom-backdrops.ts`, selects it, and shows a notice with Undo. The mark moves to that message, so
+the history of a chat never changes the backdrop again. The desktop reads backdrop messages from the
+chat events of every agent; the web client reads only the open chat. The page plays in the locked
+frame of a custom backdrop and gets no input.
+
+The optional `bubbles` argument (`yours`, `agents`: `#rrggbb`) goes in the page as
+`<meta name="openbot-bubbles" content="yours=#…; agents=#…">` (`withChatBackdropBubbles`), so each
+client gets the colors with the page file and the protocol does not change. `WindowBackdrop` reads
+them with `chatBackdropBubbles` while that page shows and sets them in
+`features/window/backdrop-bubbles.tsx`; the render root gives them to `ChatMessageRow` through the
+`BackdropBubbles` context of `@openbot/ui`. They replace the chat color of the reader's own bubbles
+and of agent bubbles, not the saved agent `chatColor`. A built-in scene or a picture has no bubble
+colors.
 
 `html_render` publishes a visual reply: an HTML page that shows above the agent's reply. On desktop
 and in the web client, a button on the page opens it as a file tab of the side panel too. The router

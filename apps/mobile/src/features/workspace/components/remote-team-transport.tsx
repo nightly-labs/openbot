@@ -12,6 +12,7 @@ import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { sourceText } from "@openbot/i18n/source";
 import type { RemoteTeamDirectoryClient } from "@openbot/team-client";
 import { runTeamEffect } from "@openbot/team-client";
+import { bytesToBase64 } from "@openbot/team-client/base64";
 import {
   createRemoteCommandMailbox,
   type RemoteDownloadProgress,
@@ -29,6 +30,7 @@ import { remoteWorkspaceReadTimeout } from "@openbot/team-client/remote-recovery
 import { referenceFrom } from "@openbot/user-errors";
 import type { DOMProps } from "expo/dom";
 import * as Crypto from "expo-crypto";
+import { File, FileMode } from "expo-file-system";
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useMobileSession } from "@/features/auth/context/mobile-session-context";
 import type {
@@ -49,6 +51,7 @@ import {
   createRequestLimiter,
   isBackgroundRead,
 } from "@/features/workspace/model/request-lanes";
+import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
@@ -212,6 +215,8 @@ export const RemoteTeamTransport = memo(
     const uploadListeners = useRef(new Map<string, (fraction: number) => void>());
     // Download progress arrives the same way, for a request that names the size of its file.
     const downloadListeners = useRef(new Map<string, (received: number, total: number) => void>());
+    // The page reads only the device files of the uploads that wait for a result, by count of commands.
+    const uploadFiles = useRef(new Map<string, number>());
     const enqueue = useCallback(
       (
         next: RemoteTeamCommandInput,
@@ -242,12 +247,18 @@ export const RemoteTeamTransport = memo(
                   ...(next.downloadSize === undefined ? {} : { downloadSize: next.downloadSize }),
                 }
               : { id, type: "disconnect" };
-        if (!onUploadProgress && !onDownloadProgress) return mailbox.send(command);
+        const fileRef = command.type === "request" ? command.upload?.file?.ref : undefined;
+        if (!onUploadProgress && !onDownloadProgress && !fileRef) return mailbox.send(command);
         if (onUploadProgress) uploadListeners.current.set(id, onUploadProgress);
         if (onDownloadProgress) downloadListeners.current.set(id, onDownloadProgress);
+        if (fileRef) uploadFiles.current.set(fileRef, (uploadFiles.current.get(fileRef) ?? 0) + 1);
         return mailbox.send(command).finally(() => {
           uploadListeners.current.delete(id);
           downloadListeners.current.delete(id);
+          if (!fileRef) return;
+          const count = (uploadFiles.current.get(fileRef) ?? 1) - 1;
+          if (count > 0) uploadFiles.current.set(fileRef, count);
+          else uploadFiles.current.delete(fileRef);
         });
       },
       [mailbox],
@@ -422,7 +433,27 @@ export const RemoteTeamTransport = memo(
         sessionId: runTeamEffect(props.directory.startSession(props.hostId)).catch(() => null),
       };
     }, [props.active, props.hostId, props.directory]);
+    const uploadFile = (ref: string) => {
+      if (!uploadFiles.current.has(ref)) throw new Error("The file is not part of an upload.");
+      if (uploadCancelled(ref)) {
+        // The peer stops the transfer and tells the host, so the host does not wait for the rest.
+        const cancelUpload = bridge.current?.cancelUpload;
+        if (typeof cancelUpload === "function") cancelUpload(null);
+        throw new Error("The upload was cancelled.");
+      }
+      return new File(ref);
+    };
     const [actions] = useState(() => ({
+      digestUploadFile: async (ref: string) => uploadFile(ref).digest("SHA-256"),
+      readUploadFile: async ({ ref, offset, length }: { ref: string; offset: number; length: number }) => {
+        const handle = uploadFile(ref).open(FileMode.ReadOnly);
+        try {
+          handle.offset = offset;
+          return bytesToBase64(await handle.readBytes(length));
+        } finally {
+          handle.close();
+        }
+      },
       endSession: (sessionId: string) => runTeamEffect(latest.current.props.directory.endSession(sessionId)),
       getBootstrap: async (hostId: string, clientPublicKey: string, existingSessionId: string | null) => {
         const { directory } = latest.current.props;

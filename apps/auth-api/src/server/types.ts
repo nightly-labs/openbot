@@ -111,10 +111,22 @@ export interface WorkerBindings {
   STRIPE_SECRET_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   /**
+   * The seller's EU VAT ID, such as `PL1234567890`. VIES then gives a consultation number for each VAT ID
+   * check, the proof of the check. Not secret. Absent: the check works with no consultation number.
+   */
+  VIES_REQUESTER_VAT_ID?: string;
+  /**
    * An ISO 8601 time. A license bought more than 2 days before it is free until then. Empty or absent:
    * a new license is paid at once.
    */
   LICENSE_TRIAL_END?: string;
+  /**
+   * `true`: a Checkout page needs the billing country of the account (409 `billing_country_required`).
+   * Otherwise a customer with no country gets a Stripe Tax page, so that a desktop app from before the
+   * billing details step can still buy. Turn it on after that desktop release and the run of
+   * `scripts/stripe-vat-migrate.ts --live`.
+   */
+  BILLING_COUNTRY_REQUIRED?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;

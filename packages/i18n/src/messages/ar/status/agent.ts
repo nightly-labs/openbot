@@ -43,6 +43,8 @@ export const messages = {
   "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",
   "status.agent.browserProfileNamed":
     "انقل {agents} إلى ملف تعريف المتصفح {profile}. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.commitCoAuthorOff": "إيقاف إضافة OpenBot كمؤلف مشارك في إيداعات جميع الوكلاء.",
+  "status.agent.commitCoAuthorOn": "إضافة OpenBot مجددًا كمؤلف مشارك في إيداعات جميع الوكلاء.",
   "status.agent.browserProfileNew":
     "أنشئ ملف تعريف المتصفح الجديد {profile} وانقل {agents} إليه. لا يحتوي على أي تسجيل دخول. تُغلق علاماتهم المفتوحة.",
   "status.agent.browserProfileShared":
@@ -73,6 +75,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "جارٍ تحديث ذكرياته…",
   "status.agent.skillUsing": "جارٍ استخدام المهارة {name}…",
+  "status.agent.backdropSetting": "جارٍ تغيير الخلفية…",
   "status.agent.skillReading": "جارٍ قراءة مهارة…",
   "status.agent.toolStepFailed": "فشلت خطوة أداة؛ جارٍ مراجعة النتيجة وتحديد ما يجب تجربته بعد ذلك…",
   "status.agent.toolResultReviewing": "جارٍ مراجعة آخر نتيجة أداة…",

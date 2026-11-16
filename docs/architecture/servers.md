@@ -495,6 +495,28 @@ The chats, workspaces and channels come from the routine-results options, so the
 as on the desktop cards. Discord triggers and outputs show read-only on the phone, because no route
 sends the Discord roles.
 
+### CRM
+
+`crm-v1` serves the CRM (see [CRM](agents.md#crm)) to a joined desktop and to the web client. Its
+routes are `POST /v1/crm/<name>`: `overview`, `customers`, `payments`, `activity`, `apply`,
+`source-connect`, `source-disconnect`, `source-sync`, `settings` and `set-settings`. The contract header in
+`team-protocol/crm-v1.ts` records the grant:
+
+- Only an owner or admin reads or changes the CRM. A member gets 403 on every route, and the host
+  sends `crm-changed` only to owner and admin clients (the broadcast loop in `team-api-server.ts`).
+- Customers cross in pages of at most 500, ordered by `number`; payments and activity cross in pages
+  of at most 500 with an opaque cursor. A payments or activity page that does not fit in a frame gets
+  413 `tooLargeToSend`; a customers page is cut and its cursor moves to the last customer sent.
+- A Stripe key goes to the host only in `source-connect`. The host keeps and uses it; no response
+  or event carries it back, only its last four characters (`keyHint`). The sync runs on the host,
+  so a joined server pulls from Stripe with no client open.
+- `settings` and `set-settings` read and write the Server Settings > Experimental switch. The CRM is
+  off by default. The routes answer while it is off, but the clients hide the CRM page and the CRM
+  button, so the switch is data and not a capability. A change sends `crm-changed`, so each owner and
+  admin client reads the switch again.
+- A host without the CRM service, or a client without the capability, gets 400 `serverTooOld`. The
+  client hides the CRM page until the host confirms `crm-v1`. Mobile does not show the CRM.
+
 ### History extent
 
 `history-extent-v1` lets the chat's scroll rail draw the history that is not loaded on a joined server.
@@ -1372,6 +1394,42 @@ creates them and the Customer Portal settings.
   checks that it is a `billing.stripe.com` page, and opens it with `shell.openExternal`. The IPC takes
   no URL. The web client does the same check before `location.assign`. Checkout URLs get the same
   check for `checkout.stripe.com` (`isStripeCheckoutUrl`).
+- VAT does not use Stripe Tax. The seller is in Poland and is not in the EU One Stop Shop
+  (`apps/auth-api/src/server/billing-tax.ts`). Before a server or license Checkout, the client saves
+  the billing country and an optional EU VAT ID with `GET`/`PUT /v1/me/billing/details` (desktop IPC
+  `billing:get-details`/`billing:set-details`, shared form `BillingDetailsFields`). The Worker keeps
+  them on the Stripe customer: the address country, an `eu_vat` tax ID and `tax_exempt`. While no
+  country is saved, the `GET` adds `suggestedCountry`, the Cloudflare `CF-IPCountry` of the request
+  (not `XX` or `T1`). The form starts on it; only the country that the buyer sends is saved.
+  - A buyer in Poland, and a buyer in another EU country with no valid VAT ID, pay Polish VAT: the
+    Checkout and the license split subscription get the `default_tax_rates` of the Tax Rate with the
+    metadata `openbot_vat=pl_standard` (`VAT_TAX_RATE`, made by `api:stripe:bootstrap`).
+  - A VAT ID of another EU country gets reverse charge (`tax_exempt=reverse`, no Tax Rate) only after
+    the EU VIES REST service confirms it. An unknown ID returns 400 `vat_id_invalid`; no answer from
+    VIES returns 503 `vat_id_unverified`, and nothing changes. The optional setting
+    `VIES_REQUESTER_VAT_ID` (the seller's VAT ID) makes VIES return a consultation number, which the
+    customer metadata `openbot_vies_request` keeps as proof.
+  - A buyer outside the EU (also the UK, Norway and Switzerland) pays no VAT.
+  - A `PUT` of new details also sets the Tax Rate of each open subscription with the metadata
+    `openbot_vat_treatment`, so that the next invoice of a plan that runs gets the new VAT. Checkout,
+    the license split and `scripts/stripe-vat-migrate.ts` write that metadata. A plan from before VAT
+    has none and keeps its tax. The buyer declares the new country with no proof, so each subscription
+    whose VAT treatment changes writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
+    with the customer, the subscription and the two countries.
+  - A customer with no country (a client from before this step) gets a Checkout with Stripe Tax
+    (`automatic_tax`, tax ID collection) and no VAT metadata, as before. With the Worker setting
+    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Turn the
+    setting on after the desktop release and the live run of `scripts/stripe-vat-migrate.ts`. Checkout requires the billing address; when its country differs from the saved
+    one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
+    with the Checkout session ID and the two countries.
+  - Consumers in other EU countries pay Polish VAT only below the EU limit of EUR 10,000 a year.
+    `BillingOss` (`apps/auth-api/src/server/billing-oss.ts`) keeps the net euro amount of each paid
+    invoice of such a consumer in D1 (`billing_vat_oss_sales`) and sends one pool alert for a year at
+    EUR 9,000 (`billing_vat_oss_alerts`). It converts other currencies with the ECB rates of
+    `BillingUsd`. Refunds do not lower the total.
+  - `scripts/stripe-vat-migrate.ts` (a dry run by default; `--apply`, `--live`) moves the existing
+    subscriptions from Stripe Tax to the Tax Rate. A customer with no country, or in another EU
+    country with an EU VAT ID that no check confirmed, keeps Stripe Tax and is named for a manual check.
 - The change and cancel actions open the Portal flow of one subscription. The Worker first checks
   that the subscription belongs to the account.
 - The server name comes only from a `remote_hosts` row that the same account owns. A plan whose

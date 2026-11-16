@@ -304,12 +304,18 @@ jobs:
       - name: Run the Team API routes E2E test
         run: bun run test:team-api-routes
 
+      - name: Run the CRM Team API E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:crm-team-api
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: team-api-routes-e2e
-          path: .openbot-build/team-api-routes-e2e/
+          path: |
+            .openbot-build/team-api-routes-e2e/
+            .openbot-build/crm-team-api-e2e/
           if-no-files-found: ignore
 
   reverse-actions-e2e:
@@ -547,6 +553,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:agent-delete-tool
 
+      - name: Run the agent commit co-author tool E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:agent-commit-co-author-tool
+
       - name: Run the Claude usage after a resume E2E test
         if: ${{ !cancelled() }}
         run: bun run test:claude-usage-resume
@@ -782,6 +792,7 @@ jobs:
             .openbot-build/browser-profile-agents-e2e/
             .openbot-build/agent-browser-profile-tool-e2e/
             .openbot-build/agent-delete-tool-e2e/
+            .openbot-build/agent-commit-co-author-tool-e2e/
             .openbot-build/claude-usage-resume-e2e/
             .openbot-build/claude-background-hold-e2e/
             .openbot-build/claude-turn-context-e2e/

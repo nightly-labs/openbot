@@ -439,6 +439,9 @@ The service stores:
   and whether it ends at the period end. For a license, it keeps the same fields and the number of
   users in place of the plan. The service also keeps the ID, type and receive time of each
   Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
+- for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
+  Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
+  deletes them after the end of the next year.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -830,7 +833,13 @@ account and server IDs that the subscription names, never the card number. When 
 for a new hosted server, the account service sends Stripe your account email and account ID (to
 make the Stripe customer), and the server ID, the plan, the billing period and the currency (to
 open Stripe Checkout, `checkout.stripe.com`). When you buy or change a license, it sends Stripe
-your account ID, the number of users and the currency, and no names or emails of the users. When you delete a hosted server, the account service
+your account ID, the number of users and the currency, and no names or emails of the users. Before the payment page opens, you give
+your billing country and, for a company in the EU, an optional EU VAT ID. The account service saves
+them on your Stripe customer, because they decide the VAT. When the VAT ID is of an EU country other
+than Poland, the account service first sends only that VAT ID to the EU VAT check service (VIES,
+`ec.europa.eu`) of the European Commission, which says if it is valid. When the billing address that you enter on the
+payment page is in another country than the one you gave, the account service sends the OpenBot team
+the ID of that payment page and the two countries, through a Discord webhook, to check the VAT. When you delete a hosted server, the account service
 tells Stripe to cancel its plan. When you manage billing,
 the account service sends Stripe your Stripe customer ID, and the subscription ID of the plan you
 change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Stripe keeps the
@@ -916,6 +925,13 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   `~/Library/Application Support/OpenBot/groq-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
   deletes the file. The key is redacted from logs, exports and diagnostics.
+- The restricted Stripe key of the CRM is kept in
+  `~/Library/Application Support/OpenBot/crm-stripe-key.json` on the computer that runs OpenBot (on a
+  joined server, on that server), encrypted by the operating system's secret storage. The app window
+  receives only its last four characters. The customers, plans and payments that the sync copies from
+  Stripe go in the CRM tables of `openbot.db`, as rows that a person adds. Disconnect on the CRM page
+  deletes the key file; the copied rows stay until a person deletes them. The key is redacted from
+  logs, exports and diagnostics.
 - The xAI API key for spoken replies is kept in
   `~/Library/Application Support/OpenBot/xai-api-key.json`, encrypted by the operating system's
   secret storage. The app window never receives the key back. Remove key in **Settings → Voice**
@@ -1154,6 +1170,11 @@ Network traffic can also occur when:
   commit, the file list and each `SKILL.md`, and when the user adds a skill, the files of that skill
   folder. The requests carry the repository, the folder and the commit, and no other user data. The
   skill is kept with the agent like a Marketplace skill;
+- an owner or admin connects Stripe on the CRM page. The computer that runs OpenBot, or the joined
+  server, sends the restricted key to `api.stripe.com` and reads the account name, customers,
+  subscriptions, invoices and products of that Stripe account, when the key is connected,
+  every 5 minutes, and on Sync now. OpenBot only reads: it sends no CRM data to Stripe, and the
+  requests carry no other user data. Disconnect stops the requests;
 - the user presses Install on the 1Password page. OpenBot downloads the 1Password CLI release that it
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
@@ -1215,7 +1236,7 @@ Network traffic can also occur when:
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
   else the default Codex sign-in. The microphone audio then goes from this computer to OpenAI, and the
   spoken reply comes back, until the pane closes. OpenAI also gets the short relay instructions of
-  OpenBot, but not the agent's chat. Each request that the voice gives to the agent goes to the
+  OpenBot, with the agent's name, but not the agent's chat. Each request that the voice gives to the agent goes to the
   agent's own provider as a text message, as for a typed message, and shows in the chat. The agent's
   text answer then goes to OpenAI to be spoken. OpenBot never reads the Codex credentials. The voice
   transcript is not added to the chat; no recording is kept. OpenAI handles the audio and the text

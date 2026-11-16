@@ -1211,6 +1211,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+  "mobile.server.connectors.whatsapp.statusReactions": "تفاعلات الحالة",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",

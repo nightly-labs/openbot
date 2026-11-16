@@ -49,7 +49,12 @@ import {
   OPENCODE_CHILD_UPDATE_METHOD,
   type OpenCodeLaunches,
 } from "./agent/acp-subagent-updates";
-import { BACKGROUND_WAKE_NOTE, isTurnContextBlock, withoutTurnContext } from "./agent/developer-instructions";
+import {
+  BACKGROUND_WAKE_NOTE,
+  isTurnContextBlock,
+  SELF_WAKE_NOTE,
+  withoutTurnContext,
+} from "./agent/developer-instructions";
 import type { GeneratedMediaKind } from "./agent/image-generation";
 import { acpPlanSteps, PLAN_UPDATED_METHOD } from "./agent/plan-updates";
 import { elicitationFieldQuestions, elicitationValue } from "./agent/prompts";
@@ -162,6 +167,9 @@ const ACP_TURN_STALL_MS = 5 * 60_000;
  * after that, so this leaves room for a retry of its own.
  */
 const ACP_FIRST_UPDATE_MS = 3 * 60_000;
+
+/** How long before `AcpFlavor.mcpToolCallLimitMs` OpenBot answers a call that waits for the user. */
+const MCP_TOOL_CALL_ANSWER_MARGIN_MS = 15_000;
 
 /** The result of a prompt that got no update within `ACP_FIRST_UPDATE_MS`. */
 const SILENT_PROMPT = Symbol("silent prompt");
@@ -312,6 +320,14 @@ interface AcpTurn {
    * Then it can be the answer sent again (`AcpFlavor.resendsAnswer`). Null otherwise.
    */
   lastChunkAt: number | null;
+  /** OpenBot started this turn with a wake prompt for the agent's own wake-up (`#watchSelfWake`). */
+  wake: boolean;
+  /**
+   * The updates of a wake turn before the agent echoes its wake prompt; null after the echo. Before
+   * it, the agent still sends what it wrote by itself for the wake-up, and the answer repeats it
+   * (#8993). They show only when the turn ends with no echo.
+   */
+  beforeWakeEcho: SessionUpdate[] | null;
 }
 
 /** The parts of a `session/load` request that open this session as it was opened. */
@@ -754,6 +770,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   readonly #subagentThreads = new Map<string, string>();
   /** OpenCode subagent calls whose child session did not start yet. */
   readonly #openCodeLaunches: OpenCodeLaunches = new Map();
+  /**
+   * How many wake turns each session can still start for the work of its turns that wakes the agent
+   * (`AcpFlavor.selfWakeTools`), and until when: `ACP_BACKGROUND_WATCH_MS` after the last turn that
+   * started such work. Each turn end sets a new entry, which ends the watch before it.
+   */
+  readonly #selfWakes = new WeakMap<AcpThread, { left: number; until: number }>();
 
   constructor(
     cli: AgentCliInfo,
@@ -2588,7 +2610,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
 
   /** A turn of the agent's own ends when OpenBot sees it end, so a message waits for it rather than joining it. */
   #turnActiveError(turn: AcpTurn): Error {
-    return turn.unprompted
+    return turn.unprompted || turn.wake
       ? new ProviderTurnActiveError(this.#label)
       : new Error("The ACP thread already has an active turn.");
   }
@@ -2596,7 +2618,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   #beginTurn(
     thread: AcpThread,
     turnId: string,
-    { unprompted, answerOptional }: { unprompted: boolean; answerOptional: boolean },
+    {
+      unprompted,
+      answerOptional,
+      wake = false,
+    }: {
+      unprompted: boolean;
+      answerOptional: boolean;
+      /** OpenBot's own prompt connects the agent's wake-up (`#watchSelfWake`): no delivery started it. */
+      wake?: boolean;
+    },
   ): AcpTurn {
     const currentSecond = Date.now() / 1_000;
     const startedAt = Math.max(currentSecond, this.#lastTurnStartedAt + 0.001);
@@ -2645,6 +2676,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       textMessageStart: 0,
       messageChunks: 0,
       lastChunkAt: null,
+      wake,
+      beforeWakeEcho: wake ? [] : null,
     };
     thread.activeTurn = turn;
     this.#threads.holdForTurn(thread);
@@ -2654,7 +2687,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         threadId: thread.id,
         turn: { id: turn.id, status: "inProgress" },
         // `unprompted` tells the lifecycle that no delivery started this turn.
-        ...(unprompted ? { unprompted } : {}),
+        ...(unprompted || wake ? { unprompted: true } : {}),
       },
     });
     return turn;
@@ -3248,6 +3281,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
+    if (turn.beforeWakeEcho) {
+      if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
+        if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
+      } else if (!SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+        // The agent works, so its prompt is not a silent one (`ACP_FIRST_UPDATE_MS`).
+        turn.answered = true;
+        turn.beforeWakeEcho.push(update);
+      }
+      return;
+    }
     // The first output after a retry replaces the retry in the chat.
     if (turn.retrying && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
       delete turn.retrying;
@@ -4035,6 +4078,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     error: unknown,
   ) {
     if (thread.activeTurn !== turn || turn.completing) return;
+    // An agent that did not echo the wake prompt shows what it sent, rather than an empty turn.
+    const beforeEcho = turn.beforeWakeEcho ?? [];
+    turn.beforeWakeEcho = null;
+    for (const update of beforeEcho) this.#applyTurnUpdate(thread, turn, update);
     turn.completing = true;
     // The ACP SDK sends an extension notification through more handlers than `session/update`, so
     // OpenCode's child updates that came before the prompt's result can still be on their way.
@@ -4072,6 +4119,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         });
     }
     turn.toolItems.clear();
+    // The turn started work that wakes the agent after it (`AcpFlavor.selfWakeTools`).
+    const selfWakes =
+      this.#flavor.wakesAfterPromptEnds === true && this.#steersByPrompt && status === "completed" && !turn.stopped
+        ? this.#selfWakesStarted(turn)
+        : 0;
     this.#emitSubagents(endSubagentTurn(this.#subagents, turn.id, new Date().toISOString()));
     // A turn that started no subagent sends no change, so its thread entry is removed here.
     if (!this.#subagents.turns.has(turn.id)) this.#subagentThreads.delete(turn.id);
@@ -4138,7 +4190,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
     thread.activeTurn = null;
     if (this.#threads.get(thread.id) !== thread) return;
-    if (workRuns) this.#holdForWork(thread);
+    // Work of earlier turns can still run until its watch ends. A stopped or failed turn ends its wake-ups.
+    const earlier = this.#selfWakes.get(thread);
+    const kept = earlier && Date.now() < earlier.until ? earlier : null;
+    const left = status === "completed" && !turn.stopped ? (kept?.left ?? 0) + selfWakes : 0;
+    if (left > 0) {
+      const until = selfWakes > 0 ? Date.now() + ACP_BACKGROUND_WATCH_MS : (kept?.until ?? 0);
+      const wake = { left, until };
+      this.#selfWakes.set(thread, wake);
+      Effect.runFork(this.#watchSelfWake(thread, wake).pipe(Effect.forkIn(this.#scope)));
+    } else this.#selfWakes.delete(thread);
+    if (workRuns || selfWakes > 0) this.#holdForWork(thread);
     yield* this.#threads.markIdle(thread);
   }, Effect.uninterruptible);
 
@@ -4179,6 +4241,68 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!thread.activeTurn) yield* this.#threads.markIdle(thread);
       return;
     }
+  });
+
+  /**
+   * How many wake-ups the work that a completed turn started can cause (`AcpFlavor.selfWakeTools`): the
+   * length of the call's `Subagents` list, else 1. A failed call starts none.
+   */
+  #selfWakesStarted(turn: AcpTurn): number {
+    const tools = this.#flavor.selfWakeTools;
+    if (!tools) return 0;
+    let count = 0;
+    for (const item of turn.messages) {
+      if (item.type !== "toolCall" || item.toolKind !== "other" || item.status === "failed") continue;
+      if (!isString(item.name) || !tools.test(item.name)) continue;
+      const list = isRecord(item.arguments) ? item.arguments.Subagents : undefined;
+      count += Array.isArray(list) && list.length > 0 ? list.length : 1;
+    }
+    return count;
+  }
+
+  /**
+   * Starts a turn when the agent wakes its model for work that a turn started and that ran on after
+   * it, such as a subagent or a timer (`AcpFlavor.selfWakeTools`). With no prompt open, the chat does
+   * not show what the agent does, and the agent sends no approval request: a prompt connects the work.
+   * Each subagent or timer allows one wake turn, so a session that changes for another cause costs at
+   * most that many. The next turn ends this watch, and its end starts a new one. The wake-ups end
+   * `ACP_BACKGROUND_WATCH_MS` after the last turn that started such work.
+   */
+  readonly #watchSelfWake = Effect.fn("AcpAgentClient.watchSelfWake")(function* (
+    this: AcpAgentClient,
+    thread: AcpThread,
+    wake: { left: number; until: number },
+  ) {
+    // The first reading comes one poll after the turn ended, so the agent's own write of that end
+    // is not taken as a wake-up.
+    let before: string | undefined;
+    while (Date.now() < wake.until) {
+      yield* Effect.sleep(ACP_BACKGROUND_POLL_MS);
+      if (this.#selfWakes.get(thread) !== wake) return;
+      // A message connects the work by itself. A session that must resume first gets no wake prompt.
+      if (thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
+      const read = yield* Effect.result(this.#sessionUpdatedAt(thread));
+      if (Result.isFailure(read)) continue;
+      if (read.success === null) break;
+      if (before === undefined || read.success === before) {
+        before = read.success;
+        continue;
+      }
+      // A message can start, and the session can close, while `session/list` runs.
+      if (this.#selfWakes.get(thread) !== wake || thread.activeTurn || this.#openingTurns.has(thread.id)) return;
+      if (this.#threads.get(thread.id) !== thread || thread.needsResume) break;
+      wake.left -= 1;
+      const turn = this.#beginTurn(thread, randomUUID(), { unprompted: false, answerOptional: true, wake: true });
+      turn.task = yield* Effect.forkIn(
+        this.#consumePrompt(thread, turn, [{ type: "text", text: SELF_WAKE_NOTE }], {}),
+        this.#scope,
+        { startImmediately: true },
+      );
+      yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
+      return;
+    }
+    if (this.#selfWakes.get(thread) === wake) this.#selfWakes.delete(thread);
   });
 
   /**
@@ -4386,8 +4510,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = this.#threads.get(params.threadId)?.activeTurn;
     if (turn) turn.answered = true;
+    // Only a call of the running turn: a call with no turn has a new turn id each time, so a card that
+    // waited past its call could not be joined again or closed with its turn (#9689).
+    const limit = turn?.id === params.turnId ? this.#flavor.mcpToolCallLimitMs : undefined;
     const result = yield* this.#serverRequests
-      .call("item/tool/call", params, signal, detachAfterMs)
+      .call(
+        "item/tool/call",
+        params,
+        signal,
+        detachAfterMs,
+        limit === undefined ? undefined : limit - MCP_TOOL_CALL_ANSWER_MARGIN_MS,
+      )
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));

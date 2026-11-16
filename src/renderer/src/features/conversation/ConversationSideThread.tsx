@@ -17,10 +17,12 @@ import { usePlatform } from "../../platform";
 import { deviceQuoteShortcut } from "../../send-shortcut-preference";
 import { useThreadVisualReplyCard } from "./ChatVisualReply";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { SideThread } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction } from "./message-backdrop";
 import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
@@ -50,6 +52,7 @@ export function ConversationSideThread(props: { threadId: string }) {
     branchThread,
     messagePins,
   } = useConversationViewScope();
+  const backdropAction = useMessageBackdropAction(conversationRuntime(view));
   const { t, errorMessage } = useText();
   const failureToast = (fallback: AppTextKey) => ({
     onError: (error: unknown) => {
@@ -212,6 +215,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             onSelectAgent={view.onSelectAgent}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
+            backdropAction={backdropAction}
             approval={current().thread.approval}
             onRespondApproval={(decision) =>
               current().thread.onRespondApproval(decision, failureToast("prompt.approval.answerFailed"))

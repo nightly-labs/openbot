@@ -133,6 +133,7 @@ import { Route as V1MarketplaceAgentsIndexRouteImport } from './routes/v1/market
 import { Route as V1MarketplaceAgentsAgentIdRouteImport } from './routes/v1/marketplace/agents/$agentId'
 import { Route as V1MarketplaceAgentsMineRouteImport } from './routes/v1/marketplace/agents/mine'
 import { Route as V1MeBillingIndexRouteImport } from './routes/v1/me/billing/index'
+import { Route as V1MeBillingDetailsRouteImport } from './routes/v1/me/billing/details'
 import { Route as V1MeBillingPortalRouteImport } from './routes/v1/me/billing/portal'
 import { Route as V1MeBillingStorageRouteImport } from './routes/v1/me/billing/storage'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
@@ -844,6 +845,11 @@ const V1MeBillingIndexRoute = V1MeBillingIndexRouteImport.update({
   path: '/billing/',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MeBillingDetailsRoute = V1MeBillingDetailsRouteImport.update({
+  id: '/billing/details',
+  path: '/billing/details',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeBillingPortalRoute = V1MeBillingPortalRouteImport.update({
   id: '/billing/portal',
   path: '/billing/portal',
@@ -1447,6 +1453,7 @@ export interface FileRoutesByFullPath {
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
+  '/v1/me/billing/details': typeof V1MeBillingDetailsRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
@@ -1654,6 +1661,7 @@ export interface FileRoutesByTo {
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
+  '/v1/me/billing/details': typeof V1MeBillingDetailsRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
@@ -1866,6 +1874,7 @@ export interface FileRoutesById {
   '/v1/auth/email/verify': typeof V1AuthEmailVerifyRoute
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
+  '/v1/me/billing/details': typeof V1MeBillingDetailsRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
   '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
@@ -2075,6 +2084,7 @@ export interface FileRouteTypes {
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
+    | '/v1/me/billing/details'
     | '/v1/me/billing/portal'
     | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
@@ -2282,6 +2292,7 @@ export interface FileRouteTypes {
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
+    | '/v1/me/billing/details'
     | '/v1/me/billing/portal'
     | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
@@ -2493,6 +2504,7 @@ export interface FileRouteTypes {
     | '/v1/auth/email/verify'
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
+    | '/v1/me/billing/details'
     | '/v1/me/billing/portal'
     | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
@@ -3625,6 +3637,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeBillingIndexRouteImport
       parentRoute: typeof V1MeRoute
     }
+    '/v1/me/billing/details': {
+      id: '/v1/me/billing/details'
+      path: '/billing/details'
+      fullPath: '/v1/me/billing/details'
+      preLoaderRoute: typeof V1MeBillingDetailsRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/billing/portal': {
       id: '/v1/me/billing/portal'
       path: '/billing/portal'
@@ -4298,6 +4317,7 @@ interface V1MeRouteChildren {
   V1MeAvatarRoute: typeof V1MeAvatarRoute
   V1MeChatColorRoute: typeof V1MeChatColorRoute
   V1MeProfileRoute: typeof V1MeProfileRoute
+  V1MeBillingDetailsRoute: typeof V1MeBillingDetailsRoute
   V1MeBillingPortalRoute: typeof V1MeBillingPortalRoute
   V1MeBillingStorageRoute: typeof V1MeBillingStorageRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
@@ -4313,6 +4333,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeAvatarRoute: V1MeAvatarRoute,
   V1MeChatColorRoute: V1MeChatColorRoute,
   V1MeProfileRoute: V1MeProfileRoute,
+  V1MeBillingDetailsRoute: V1MeBillingDetailsRoute,
   V1MeBillingPortalRoute: V1MeBillingPortalRoute,
   V1MeBillingStorageRoute: V1MeBillingStorageRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,

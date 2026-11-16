@@ -418,6 +418,9 @@ export const messages = {
   "connector.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "connector.whatsapp.workingMessageDescription":
     "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+  "connector.whatsapp.statusReactions": "Durum tepkileri",
+  "connector.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "connector.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",

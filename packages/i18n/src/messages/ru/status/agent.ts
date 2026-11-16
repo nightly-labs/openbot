@@ -43,6 +43,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Команда установки для сервера {name}",
   "status.agent.browserProfileNamed":
     "Перенести {agents} в профиль браузера {profile}. Они получат его входы в аккаунты и файлы cookie. Их открытые вкладки закроются.",
+  "status.agent.commitCoAuthorOff": "Больше не добавлять OpenBot как соавтора в коммиты всех агентов.",
+  "status.agent.commitCoAuthorOn": "Снова добавлять OpenBot как соавтора в коммиты всех агентов.",
   "status.agent.browserProfileNew":
     "Создать новый профиль браузера {profile} и перенести в него {agents}. В нём нет входов в аккаунты. Их открытые вкладки закроются.",
   "status.agent.browserProfileShared":
@@ -70,6 +72,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Обновление памяти…",
   "status.agent.skillUsing": "Использование навыка {name}…",
+  "status.agent.backdropSetting": "Изменение фона…",
   "status.agent.skillReading": "Чтение навыка…",
   "status.agent.toolStepFailed": "Шаг инструмента завершился ошибкой; просмотр результата и выбор следующего действия…",
   "status.agent.toolResultReviewing": "Просмотр последнего результата инструмента…",

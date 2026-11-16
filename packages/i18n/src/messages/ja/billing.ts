@@ -205,4 +205,10 @@ export const messages = {
     other:
       "ライセンスのユーザー数は上限の {count} 人です。より大きなライセンスについてはお問い合わせください。新しい人はサーバーに参加できません。",
   },
+  "billing.details.country": "請求先の国",
+  "billing.details.countryPlaceholder": "国を選択",
+  "billing.details.vatId": "EU VAT ID（任意）",
+  "billing.details.vatIdInvalid": "選択した国の VAT ID ではありません。",
+  "billing.details.countryMissing": "請求先の国を選択してください。",
+  "billing.details.saveFailed": "請求先情報を保存できませんでした",
 } as const satisfies PartialTranslation<typeof source>;

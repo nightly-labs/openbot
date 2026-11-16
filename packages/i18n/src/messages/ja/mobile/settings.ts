@@ -124,6 +124,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "明度",
   "mobile.settings.appearance.messageColorFooter":
     "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
+  "mobile.settings.appearance.chatBackground": "チャットの背景",
+  "mobile.settings.appearance.chatBackgroundDefault": "デフォルト",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",

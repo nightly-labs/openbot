@@ -135,11 +135,14 @@ export async function routeAgentConversation(
     if (emoji !== null && !isMessageReaction(emoji)) throw new HttpError(400, "Invalid emoji.");
     requireListedAgent(agents, agentId);
     await runCauseEffect(
-      agents.setMessageReaction({
-        agentId,
-        messageId: stringField(body, "messageId"),
-        emoji,
-      }),
+      agents.setMessageReaction(
+        {
+          agentId,
+          messageId: stringField(body, "messageId"),
+          emoji,
+        },
+        memberSender(member),
+      ),
     );
     return empty(204);
   }

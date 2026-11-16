@@ -239,7 +239,7 @@ export const messages = {
     "{name}: komputer hosta nie przyjmuje tych plików. Zaktualizuj tam OpenBot, aby je załączać.",
   "mobile.chat.attachment.nameTooLong": "Wybierz plik o krótszej nazwie.",
   "mobile.chat.attachment.damaged": "Załącznik jest uszkodzony. Wybierz go ponownie.",
-  "mobile.chat.attachment.tooLarge": "{name} ma ponad 10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} ma ponad {limit}.",
   "mobile.chat.attachment.cameraPermission": "Zezwól na dostęp do aparatu w Ustawieniach, aby zrobić zdjęcie.",
   "mobile.chat.composer.send": "Wyślij wiadomość",
   "mobile.chat.composer.stop": "Zatrzymaj: {name}",
@@ -434,6 +434,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Kod jednorazowy",
   "mobile.chat.browserSecret.takeoverTitle": "Przejęcie przeglądarki",
   "mobile.chat.browserSecret.takeoverBody": "Wykonaj ten krok w przeglądarce na komputerze z OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Zaloguj się na swoim komputerze",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Ta witryna nie akceptuje logowania z serwera. Otwórz ten czat w aplikacji OpenBot na komputer i zaloguj się tam.",
   "mobile.chat.browserSecret.takeoverReload": "Potem odśwież stronę, zanim wybierzesz „Gotowe”.",
   "mobile.chat.browserSecret.takeoverFailed": "Nie udało się zrealizować żądania.",
   "mobile.chat.browserSecret.done": "Gotowe",

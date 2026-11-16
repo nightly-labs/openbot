@@ -180,7 +180,7 @@ export const messages = {
     "{name}: el equipo host no acepta estos archivos. Actualiza OpenBot en ese equipo para adjuntarlos.",
   "mobile.chat.attachment.nameTooLong": "Elige un archivo con un nombre más corto.",
   "mobile.chat.attachment.damaged": "El archivo adjunto está dañado. Vuelve a seleccionarlo.",
-  "mobile.chat.attachment.tooLarge": "{name} ocupa más de 10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} ocupa más de {limit}.",
   "mobile.chat.attachment.cameraPermission": "Permite el acceso a la cámara en Ajustes para hacer una foto.",
   "mobile.chat.composer.send": "Enviar mensaje",
   "mobile.chat.composer.stop": "Detener a {name}",
@@ -368,6 +368,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Código de un solo uso",
   "mobile.chat.browserSecret.takeoverTitle": "Control del navegador",
   "mobile.chat.browserSecret.takeoverBody": "Completa este paso en el navegador del equipo que ejecuta OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Inicia sesión en tu ordenador",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Este sitio no acepta un inicio de sesión desde el servidor. Abre este chat en la aplicación de escritorio de OpenBot en tu ordenador e inicia sesión allí.",
   "mobile.chat.browserSecret.takeoverReload": "Después, vuelve a cargar la página antes de elegir «He terminado».",
   "mobile.chat.browserSecret.takeoverFailed": "No se pudo completar la solicitud.",
   "mobile.chat.browserSecret.done": "He terminado",

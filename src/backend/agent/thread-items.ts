@@ -147,6 +147,17 @@ function isForeignReasoningError(message: string): boolean {
 }
 
 /**
+ * Codex sends the Responses API `store: false` and an item ID for each history item. When the
+ * history refers to an item that OpenAI did not keep, OpenAI answers 404 "Item with id ... not found.
+ * Items are not persisted when `store` is set to false". Codex sends that history again on each turn,
+ * so each later turn failed the same way (#9809). Only a new session, given the OpenBot transcript,
+ * recovers. The text can come without the backticks.
+ */
+function isCodexUnstoredItem(provider: AgentProvider, message: string): boolean {
+  return provider === "codex" && /\bItems are not persisted when `?store`? is set to false\b/i.test(message);
+}
+
+/**
  * OpenCode's model gateway answers a request that it does not accept with one generic 400 that
  * names no field. A session that grew too long for its model, often after the agent moved to
  * another model on the same session, fails each turn this way, and OpenCode does not compact it
@@ -222,6 +233,7 @@ function isClaudeContextOverflow(provider: AgentProvider, message: string): bool
 export function refusedSessionFailure(provider: AgentProvider, message: string): string | null {
   if (isForeignReasoningError(message))
     return sourceText("error.provider.foreignReasoning", { provider: providerLabel(provider) });
+  if (isCodexUnstoredItem(provider, message)) return sourceText("error.provider.codexHistoryItemMissing");
   if (isImageTooSmallDiagnostic(message))
     return sourceText("error.provider.imageTooSmall", { provider: providerLabel(provider) });
   if (isImageTooLargeDiagnostic(message))
@@ -604,6 +616,8 @@ export function toolProgressText(item: ThreadItem, completed: boolean): string |
   if (openBot === "remember" || openBot === "forget_memory" || openBot === "set_memory_inclusion") {
     return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.memoriesUpdating");
   }
+  // Its name has `set`, and the page reads as a change of the window, not of a file.
+  if (openBot === "set_backdrop") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.backdropSetting");
   if (openBot === "read_local_skill") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.skillReading");
   // Its name has `send`, a word of the agent words below.
   if (openBot === "send_feedback") return completed ? TOOL_RESULT_PROGRESS : sourceText("status.agent.feedbackSending");

@@ -16,6 +16,7 @@ import {
 } from "./billing";
 import { INPUT_LIMITS } from "./input-limits";
 import type { ConversationMessage } from "./ipc-conversation-messages";
+import type { MachineMetrics } from "./ipc-machine-resources";
 import type { StorageDisk } from "./ipc-storage";
 import { type LicenseOrder, parseLicenseOrder } from "./license";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
@@ -88,6 +89,24 @@ export function hostedPlanDisk(disk: StorageDisk, storageGb: number): StorageDis
   const planBytes = storageGb * GB;
   const userBytes = disk.userBytes ?? Math.max(0, totalBytes - freeBytes - HOSTED_SERVER_BASE_IMAGE_GB * GB);
   return { freeBytes: Math.max(0, Math.min(freeBytes, planBytes - userBytes)), totalBytes: planBytes };
+}
+
+/**
+ * The machine reading of a hosted server with its disk against the plan, as `hostedPlanDisk` counts
+ * it, so the Usage meter shows the same storage as Server settings > Storage and not the whole VPS disk.
+ * `userBytes` is the `storage-disk-v1` value; null counts the files of the users from the free space.
+ */
+export function hostedPlanMachineMetrics(
+  metrics: MachineMetrics,
+  storageGb: number,
+  userBytes: number | null,
+): MachineMetrics {
+  const { freeBytes, totalBytes } = hostedPlanDisk(
+    { freeBytes: metrics.diskFreeBytes, totalBytes: metrics.diskTotalBytes, userBytes },
+    storageGb,
+  );
+  if (freeBytes === null || totalBytes === null) return metrics;
+  return { ...metrics, diskUsedBytes: totalBytes - freeBytes, diskFreeBytes: freeBytes, diskTotalBytes: totalBytes };
 }
 
 export const HOSTED_SERVER_STATES = [

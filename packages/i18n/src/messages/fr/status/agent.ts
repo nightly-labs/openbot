@@ -43,6 +43,8 @@ export const messages = {
   "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",
   "status.agent.browserProfileNamed":
     "Déplacer {agents} vers le profil de navigateur {profile}. Ils reçoivent ses connexions et ses cookies. Leurs onglets ouverts se ferment.",
+  "status.agent.commitCoAuthorOff": "Ne plus ajouter OpenBot comme coauteur des commits de tous les agents.",
+  "status.agent.commitCoAuthorOn": "Ajouter de nouveau OpenBot comme coauteur des commits de tous les agents.",
   "status.agent.browserProfileNew":
     "Créer le nouveau profil de navigateur {profile} et y déplacer {agents}. Il n'a aucune connexion. Leurs onglets ouverts se ferment.",
   "status.agent.browserProfileShared":
@@ -69,6 +71,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Mise à jour de ses souvenirs…",
   "status.agent.skillUsing": "Utilisation de la compétence {name}…",
+  "status.agent.backdropSetting": "Changement de l’arrière-plan…",
   "status.agent.skillReading": "Lecture d’une compétence…",
   "status.agent.toolStepFailed":
     "Une étape d’outil a échoué ; analyse du résultat et recherche de la prochaine tentative…",

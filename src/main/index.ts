@@ -83,6 +83,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -894,6 +895,7 @@ function registerIpcHandlers({
   routineFlows,
   workflows,
   workflowGitHub,
+  crm,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -1060,6 +1062,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),

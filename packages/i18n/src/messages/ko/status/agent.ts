@@ -43,6 +43,8 @@ export const messages = {
   "status.agent.serverInstallCard": "서버 {name}의 설치 명령",
   "status.agent.browserProfileNamed":
     "{agents}을(를) 브라우저 프로필 {profile}(으)로 옮깁니다. 그 프로필의 로그인 정보와 쿠키를 사용하게 됩니다. 열린 탭은 닫힙니다.",
+  "status.agent.commitCoAuthorOff": "모든 에이전트의 커밋에 OpenBot을 공동 작성자로 추가하지 않습니다.",
+  "status.agent.commitCoAuthorOn": "모든 에이전트의 커밋에 OpenBot을 다시 공동 작성자로 추가합니다.",
   "status.agent.browserProfileNew":
     "새 브라우저 프로필 {profile}을(를) 만들고 {agents}을(를) 옮깁니다. 로그인 정보가 없습니다. 열린 탭은 닫힙니다.",
   "status.agent.browserProfileShared":
@@ -66,6 +68,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "메모리를 업데이트하는 중…",
   "status.agent.skillUsing": "스킬 {name}을(를) 사용하는 중…",
+  "status.agent.backdropSetting": "배경을 변경하는 중…",
   "status.agent.skillReading": "스킬을 읽는 중…",
   "status.agent.toolStepFailed": "도구 단계가 실패했습니다. 결과를 확인하고 다음에 시도할 작업을 결정하는 중…",
   "status.agent.toolResultReviewing": "최신 도구 결과를 확인하는 중…",

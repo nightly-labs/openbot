@@ -11,6 +11,9 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { type CrmHandle, createCrm } from "../backend/crm/crm";
+import { CrmError } from "../backend/crm/crm-handle";
+import { stripeSource } from "../backend/crm/crm-stripe";
 import { diskRestoreEnded, diskRestoring } from "../backend/disk-restore";
 import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messaging/discord/discord-connect";
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
@@ -39,6 +42,7 @@ import {
   browserProxyConnection,
   createBrowserProfileService,
 } from "./browser-profile-service";
+import { createCrmPreferenceStore, crmSettingsStore } from "./crm-preference-store";
 import { feedbackFacts, feedbackSender } from "./feedback";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
 import {
@@ -501,6 +505,7 @@ const HOST_TURN_LIMITS_PREFERENCE_FILE = "openbot-host-turn-limits-v1.json";
 const SERVER_PERSONALITY_PREFERENCE_FILE = "openbot-server-personality-v1.json";
 const PROMPT_CACHE_TTL_PREFERENCE_FILE = "openbot-prompt-cache-ttl-v1.json";
 const CLAUDE_USER_SETUP_PREFERENCE_FILE = "openbot-claude-user-setup-v1.json";
+const CRM_PREFERENCE_FILE = "openbot-crm-v1.json";
 const CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE = "openbot-claude-compact-window-v1.json";
 const PROVIDER_ENVIRONMENT_PREFERENCE_FILE = "openbot-provider-environment-v1.json";
 const MODEL_VISIBILITY_PREFERENCE_FILE = "openbot-model-visibility-v1.json";
@@ -607,6 +612,8 @@ const TEARDOWN_ORDER = {
   routineFlows: 103,
   // Before the agent service, so no workflow step is sent to an agent while the service stops.
   workflows: 103.5,
+  // Before the agent service, so no agent tool reads the CRM while it stops.
+  crm: 103.75,
   // Before the agent service, so no calendar read finds it stopping.
   routineFeed: 104,
   mcpOAuthRedirect: 105,
@@ -690,6 +697,8 @@ export interface ApplicationServices {
   workflows: WorkflowsHandle;
   /** The repositories, labels and people that the workflow editor offers from the GitHub connection. */
   workflowGitHub: WorkflowGitHubDirectory;
+  /** The leads, customers, plans and payments of this server; see `crm.ts`. */
+  crm: CrmHandle;
   routineResults: RoutineResultsHandle;
   providerRuntimes: ProviderRuntimeManager;
   providerCredentials: ProviderCredentialStore;
@@ -1471,6 +1480,8 @@ export async function createApplicationServices({
   let browserProxyStatusChanged = () => {};
   // The profile service needs the agent service, so agents read it after it exists.
   let agentBrowserProfiles: BrowserProfileService | null = null;
+  // The CRM is built after the agent service, because its changes go out as agent events.
+  let crmHandle: CrmHandle | null = null;
   const browser = new BrowserHost(mainWindow, store.downloadsRoot, join(app.getPath("userData"), BROWSER_STATE_FILE), {
     memoryLow: () => (hostMemory?.level() ?? "ok") !== "ok",
     browserProfile: (agentId) => {
@@ -1585,6 +1596,7 @@ export async function createApplicationServices({
   const claudeUserSetup = createClaudeUserSetupPreferenceStore(
     join(app.getPath("userData"), CLAUDE_USER_SETUP_PREFERENCE_FILE),
   );
+  const crmPreference = createCrmPreferenceStore(join(app.getPath("userData"), CRM_PREFERENCE_FILE));
   const claudeCompactWindow = createClaudeCompactWindowPreferenceStore(
     join(app.getPath("userData"), CLAUDE_COMPACT_WINDOW_PREFERENCE_FILE),
   );
@@ -1632,6 +1644,7 @@ export async function createApplicationServices({
       serverPersonality.load(),
       promptCacheTtl.load(),
       claudeUserSetup.load(),
+      crmPreference.load(),
       claudeCompactWindow.load(),
       providerEnvironment.load(),
       remoteSessionReuse.load(),
@@ -2205,6 +2218,48 @@ export async function createApplicationServices({
       config.command === "npx" &&
       catalogPluginSlug(config, catalogPluginServers, homedir()) !== null,
   );
+  const userData = app.getPath("userData");
+  const storageSources = {
+    roots: {
+      database: store.database.path,
+      downloads: store.downloadsRoot,
+      caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
+        join(userData, name),
+      ),
+      logs: [
+        join(userData, "logs", "remote"),
+        join(userData, "logs", "update"),
+        join(userData, "logs", "providers"),
+        join(userData, "logs", "agents"),
+        join(userData, "logs", "main"),
+      ],
+      runtimes: providerRuntimesRoot,
+      data: userData,
+    },
+    database: () => store.database.connection,
+    mailbox,
+    agents: () => service.listAgents(),
+    channelFiles: (channelId: string) =>
+      service.channels.store.exists(channelId)
+        ? service.channels.store.messages(channelId).flatMap((entry) =>
+            (entry.message.attachments ?? []).map((attachment) => ({
+              attachmentId: attachment.id,
+              messageId: entry.id,
+            })),
+          )
+        : null,
+    // Only a hosted server counts its plan storage from the user's files. A computer or a server of
+    // the user shows its own disk, and a scan of its home folder would read files that are not OpenBot's.
+    ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
+  };
+  const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
+  teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
+  // The Library shows the files of the host scan, so a folder change reads the agent of a file there.
+  const libraryFoldersService = new LibraryFoldersService({
+    store: libraryFolders,
+    storage: storageUsage,
+    agents: () => service.listAgents(),
+  });
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
   const service: AgentService = new AgentService({
@@ -2212,6 +2267,8 @@ export async function createApplicationServices({
     mailbox,
     browser,
     visualPreview: new ChatVisualPreviewer(),
+    // `agentDefaultsSettings` is built after the service; a tool call reads it.
+    setCommitCoAuthor: (enabled) => agentDefaultsSettings.update({ commitCoAuthor: enabled }),
     clearPictureBackground: (bytes) => {
       // Skia decodes the PNG or JPEG; its bitmap is premultiplied, as `clearFlatBackground` writes it.
       const picture = nativeImage.createFromBuffer(Buffer.from(bytes));
@@ -2319,7 +2376,8 @@ export async function createApplicationServices({
       delete: (siteId) => hostedSites.delete(siteId).pipe(toHostedSiteOperationFailed),
     },
     sidebarLayout,
-    libraryFolders,
+    // The agent tools read the agent of a file from the same scan as the Library.
+    libraryFolders: libraryFoldersService.forAgents(),
     preferredModel: setupState.preferredModel,
     // Only a dev build leads with the OpenCode development model; a packaged app keeps the
     // built-in default.
@@ -2385,6 +2443,9 @@ export async function createApplicationServices({
     agentApiKeys,
     localSkillTools: () => localSkillTools(skills),
     browserProfiles: () => agentBrowserProfiles,
+    crm: () => crmHandle,
+    // `host` is built later, after the agent service; a CRM tool reads it when it runs.
+    crmAgentVisibleToMembers: (agentId) => host.agentVisibleToMembers(agentId),
     // The local read: `listInstalled` asks the marketplace for each skill's latest version.
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
@@ -2626,6 +2687,54 @@ export async function createApplicationServices({
     service.messaging.setSlackMentionHandler(null);
     return Effect.runPromise(workflowRuntime.close());
   });
+  // The leads, customers, plans and payments of this server; see `crm.ts`. The Stripe key is
+  // encrypted with the system cipher, in a file of its own.
+  const stripeCrmKey = new VoiceApiKeyStore({
+    path: join(app.getPath("userData"), "crm-stripe-key.json"),
+    cipher: secretCipher,
+  });
+  await runCauseEffect(stripeCrmKey.load());
+  const crm = await Effect.runPromise(
+    createCrm({
+      database: store.database,
+      changed: () => service.notifyCrmChanged(),
+      settings: crmSettingsStore(crmPreference),
+      sources: {
+        keys: {
+          get: () => stripeCrmKey.get(),
+          set: (_kind, key) =>
+            stripeCrmKey.set(key).pipe(
+              Effect.mapError(
+                (failure) =>
+                  new CrmError({
+                    code: "refused",
+                    message:
+                      failure.cause instanceof Error &&
+                      failure.cause.message === sourceText("error.app.secretStorageUnavailable")
+                        ? failure.cause.message
+                        : sourceText("error.crm.sourceKeySaveFailed"),
+                  }),
+              ),
+            ),
+        },
+        adapters: [
+          stripeSource({
+            // Chromium's network stack uses the computer's proxy settings.
+            fetch: (input, init) => net.fetch(input.href, init),
+            // The E2E test points the sync at a local Stripe stand-in.
+            ...(app.isPackaged || !process.env.OPENBOT_DEV_STRIPE_API_BASE
+              ? {}
+              : { apiBase: process.env.OPENBOT_DEV_STRIPE_API_BASE }),
+          }),
+        ],
+      },
+    }),
+  );
+  crmHandle = crm;
+  teardown.push(TEARDOWN_ORDER.crm, "the CRM", () => {
+    crmHandle = null;
+    return Effect.runPromise(crm.close());
+  });
   // An agent routine's answer sent on to a messaging place; see `routine-results.ts`.
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
@@ -2829,48 +2938,6 @@ export async function createApplicationServices({
   // turn. Provider CLI updates change no MCP resolution, so only tool runtimes refresh.
   providerRuntimes.on("ready", (runtime) => {
     if (isManagedToolRuntime(runtime)) Effect.runFork(service.refreshAllAgentRuntimes());
-  });
-  const userData = app.getPath("userData");
-  const storageSources = {
-    roots: {
-      database: store.database.path,
-      downloads: store.downloadsRoot,
-      caches: ["remote-attachments", "remote-shared-files", "remote-workspace-files"].map((name) =>
-        join(userData, name),
-      ),
-      logs: [
-        join(userData, "logs", "remote"),
-        join(userData, "logs", "update"),
-        join(userData, "logs", "providers"),
-        join(userData, "logs", "agents"),
-        join(userData, "logs", "main"),
-      ],
-      runtimes: providerRuntimesRoot,
-      data: userData,
-    },
-    database: () => store.database.connection,
-    mailbox,
-    agents: () => service.listAgents(),
-    channelFiles: (channelId: string) =>
-      service.channels.store.exists(channelId)
-        ? service.channels.store.messages(channelId).flatMap((entry) =>
-            (entry.message.attachments ?? []).map((attachment) => ({
-              attachmentId: attachment.id,
-              messageId: entry.id,
-            })),
-          )
-        : null,
-    // Only a hosted server counts its plan storage from the user's files. A computer or a server of
-    // the user shows its own disk, and a scan of its home folder would read files that are not OpenBot's.
-    ...(hostedServer ? { userFiles: new UserFilesBytes(userData, homedir()) } : {}),
-  };
-  const storageUsage = new StorageUsageService(new StorageUsageScanner(storageSources), storageSources);
-  teardown.push(TEARDOWN_ORDER.storageUsage, "storage scans", () => Effect.runPromise(storageUsage.dispose()));
-  // The Library shows the files of the host scan, so a folder change reads the agent of a file there.
-  const libraryFoldersService = new LibraryFoldersService({
-    store: libraryFolders,
-    storage: storageUsage,
-    agents: () => service.listAgents(),
   });
   // A deleted or renamed agent changes every scope, so no surface keeps its old answer.
   service.on("event", (event) => {
@@ -3081,6 +3148,7 @@ export async function createApplicationServices({
   browserProxyStatusChanged = () => service.notifyBrowserProfilesChanged();
   agentBrowserProfiles = browserProfiles;
   // A computer that comes online or goes offline changes the proxy list.
+  browserEgress.on("connected", (memberId) => browser.forgetComputerFailures(memberId));
   browserEgress.on("changed", () => service.notifyBrowserProfilesChanged());
   const customProviderChanges = createCustomProviderChanges({ service, customProviders, providerRuntimes });
   const customAgentChanges = createCustomAgentChanges({ service, customAgents });
@@ -3471,6 +3539,8 @@ export async function createApplicationServices({
       rotateWorkflowSecret: (input) => events.rotateWorkflowSecret(input),
       github: workflowGitHub,
     },
+    // Present, so the host advertises `crm-v1`. Only owners and admins.
+    crm,
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
     // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
@@ -4305,6 +4375,7 @@ export async function createApplicationServices({
   let updateAdapter: UpdateAdapter = createDisabledUpdateAdapter();
   let updaterEnabled = updatesEnabled;
   let updaterCacheDirectory: string | undefined;
+  let appImagePath: string | undefined;
   if (updatesEnabled && hostedInstaller) {
     updateAdapter = new HostedUpdateAdapter({
       currentVersion,
@@ -4316,6 +4387,7 @@ export async function createApplicationServices({
     if (realAdapter) {
       updateAdapter = realAdapter;
       updaterCacheDirectory = electronUpdaterCacheDirectory();
+      appImagePath = process.env.APPIMAGE?.trim() || undefined;
     } else {
       updaterEnabled = false;
     }
@@ -4361,6 +4433,7 @@ export async function createApplicationServices({
           appBundlePath: join(app.getPath("exe"), "..", "..", ".."),
         }
       : {}),
+    appImagePath,
     updaterCacheDirectory,
   });
   teardown.push(TEARDOWN_ORDER.updater, "the update service", () => Effect.runPromise(updater.stop()));
@@ -4608,6 +4681,7 @@ export async function createApplicationServices({
     routineFlows: routineFlowRuntime,
     workflows: workflowRuntime,
     workflowGitHub,
+    crm,
     routineResults: routineResultRuntime,
     providerRuntimes,
     providerCredentials,
