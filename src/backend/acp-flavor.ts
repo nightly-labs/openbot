@@ -173,7 +173,7 @@ export interface AcpFlavor {
   probeCloseDelayMs?: number;
   /**
    * Each session gets a process of its own, and an idle session is closed by ending that process.
-   * For an agent with `closeKeepsSession`.
+   * For an agent with `closeKeepsSession`, or one that shares MCP servers between its sessions.
    */
   sessionProcesses?: true;
   /** An agent that sends a failed prompt as answer text and ends the turn as a success. */
@@ -769,6 +769,10 @@ export const MISTRAL_ACP_FLAVOR: AcpFlavor = {
   // Vibe 3.1.0 asks Mistral for the account's model catalogue when a session opens, and waits up to
   // 5 s for it. A close stops that request, and then nothing saves the catalogue for later sessions.
   probeCloseDelayMs: 5_000,
+  // Vibe 3.1.2 keeps one MCP server of each name for its whole process, and its server fingerprint
+  // has the header names but not their values. Each session's `openbot` call then went out with the
+  // token of the session that opened last, and ran in another agent's chat (#9805).
+  sessionProcesses: true,
 };
 
 /**
