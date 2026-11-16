@@ -266,6 +266,7 @@ import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
 import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt";
 import type { ScheduleRoutine } from "../schedule/SchedulePanel";
+import { scheduleRoutinePorts } from "../schedule/schedule-routine-create";
 import { AddServerOverlay, type AddServerResume } from "../servers/AddServerOverlay";
 import { createHostedUpsellOffline, HostedServerUpsell } from "../servers/hosted-server-upsell-controller";
 import { saveRemoteFrameChannels } from "../servers/remote-workspace-frame";
@@ -3158,6 +3159,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                             }}
                             onOpenRoutine={openRoutine}
                             onCreateRoutine={createRoutine}
+                            routinePorts={scheduleRoutinePorts(target(), runtime)}
                           />
                         </Loading>
                       </Match>
