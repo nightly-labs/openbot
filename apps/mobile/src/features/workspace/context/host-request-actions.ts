@@ -1537,9 +1537,11 @@ export function createHostRequestActions({
           sessionId,
         ),
       ),
-    compactContext: async (agentId, serverId) => {
+    compactContext: async (agentId, serverId, taskId) => {
       requireCapability(capabilities, serverId, CONTEXT_COMPACT_CAPABILITY, "mobile.agent.compact.unsupported");
-      await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
+      if (taskId === undefined)
+        await request("POST", CONTEXT_COMPACT_ROUTES.compact, ignoreResponse, { agentId }, serverId);
+      else await request("POST", CONTEXT_COMPACT_ROUTES.compactTask, ignoreResponse, { agentId, taskId }, serverId);
     },
     // Async, so a host without the capability rejects the promise and does not throw at the call.
     listSharedTables: async (serverId) => runTeamRequest(listSharedTables(sharedTablesAdmin(serverId))),

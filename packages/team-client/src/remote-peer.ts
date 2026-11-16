@@ -20,6 +20,7 @@ import {
   decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
   encodeTeamProtocolV8WebRtcHttpRequest,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   type TeamProtocolV2AuthFrame,
@@ -421,6 +422,13 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
+  /**
+   * This peer asked for a runtime snapshot after the host learned its full capabilities. The
+   * compatibility read goes with the bootstrap list, and the host sends its first snapshot for that
+   * list, without the fields of later capabilities such as the context usage. The host does not send
+   * the snapshot again when the next request widens the list.
+   */
+  fullSnapshotRequested: boolean;
   /** When the host last answered a request on this peer, as `performance.now()`. A request deadline counts from it. */
   lastAnswerAt: number;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
@@ -1156,6 +1164,7 @@ export function createRemoteTeamPeer(
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
+        fullSnapshotRequested: false,
         lastAnswerAt: 0,
         lastSignalClose: null,
         signalOpenedAt: 0,
@@ -2010,6 +2019,8 @@ export function createRemoteTeamPeer(
                 }),
               );
         const requestId = createTeamRequestId((size) => crypto.getRandomValues(new Uint8Array(size)));
+        // The list that this request declares to the host. The snapshot request below depends on it.
+        const sentCapabilities = teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol);
         const payload = yield* peerDecode(() =>
           encodeTeamProtocolV2Frame({
             version: 2,
@@ -2021,7 +2032,7 @@ export function createRemoteTeamPeer(
               path,
               body: payloadBody,
               ...(bodyTransferId && upload ? { bodyTransferId, contentType: upload.mimeType } : {}),
-              capabilities: [...teamCapabilitiesForProtocol(checksConnection ? undefined : state.hostProtocol)],
+              capabilities: [...sentCapabilities],
             },
           }),
         );
@@ -2124,6 +2135,16 @@ export function createRemoteTeamPeer(
         );
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
+        // The host applied this request's capabilities before it answered, on the same event socket that
+        // the request below goes to, so the snapshot it sends has the fields of every capability.
+        // A request that went with the bootstrap list does not count, also when the protocol is known now.
+        if (!state.fullSnapshotRequested && sentCapabilities !== TEAM_BOOTSTRAP_CAPABILITIES) {
+          state.fullSnapshotRequested = true;
+          // A send that fails, such as on a channel that is not open yet, lets the next answer ask again.
+          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => {
+            state.fullSnapshotRequested = false;
+          });
+        }
         return response;
       }).pipe(
         Effect.ensuring(
