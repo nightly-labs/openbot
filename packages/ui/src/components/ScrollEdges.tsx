@@ -6,7 +6,15 @@ import { cx } from "../utils";
 
 export type ScrollEdgesAxis = "x" | "y";
 
-type ScrollEdgesState = { start: boolean; end: boolean; rtl: boolean; short: boolean; middle: number | null };
+type ScrollEdgesState = {
+  start: boolean;
+  end: boolean;
+  rtl: boolean;
+  short: boolean;
+  /** The area scrolls on either axis: a code block also scrolls up and down. */
+  scrolls: boolean;
+  middle: number | null;
+};
 
 /** Slack in pixels before an edge counts as reached, for sub-pixel scroll positions. */
 const EDGE_EPSILON = 1;
@@ -47,6 +55,7 @@ export function ScrollEdges(props: {
     end: false,
     rtl: false,
     short: false,
+    scrolls: false,
     middle: null,
   });
 
@@ -54,13 +63,21 @@ export function ScrollEdges(props: {
   const measureEdges = (element: HTMLElement) => {
     const offset = Math.abs(horizontal ? element.scrollLeft : element.scrollTop);
     const range = horizontal ? element.scrollWidth - element.clientWidth : element.scrollHeight - element.clientHeight;
-    const rtl = horizontal && getComputedStyle(element).direction === "rtl";
+    const style = getComputedStyle(element);
+    const rtl = horizontal && style.direction === "rtl";
     const short = (horizontal ? element.clientHeight : element.clientWidth) < SHORT_AREA;
+    // The other axis counts only when it can scroll, not when it clips, as block math does.
+    const crossOverflow = horizontal ? style.overflowY : style.overflowX;
+    const crossRange = horizontal
+      ? element.scrollHeight - element.clientHeight
+      : element.scrollWidth - element.clientWidth;
+    const crossScrolls = (crossOverflow === "auto" || crossOverflow === "scroll") && crossRange > EDGE_EPSILON;
     setState((draft) => {
       draft.start = offset > EDGE_EPSILON;
       draft.end = offset < range - EDGE_EPSILON;
       draft.rtl = rtl;
       draft.short = short;
+      draft.scrolls = range > EDGE_EPSILON || crossScrolls;
     });
   };
 
@@ -202,7 +219,7 @@ export function ScrollEdges(props: {
         class={cx("scroll-edges-view", props.viewClass)}
         aria-label={props.label}
         // Only an area that scrolls is a stop in the Tab order.
-        tabindex={state.start || state.end ? 0 : undefined}
+        tabindex={state.scrolls ? 0 : undefined}
         ref={(element) => (view = element)}
       >
         {props.children}
