@@ -24,6 +24,16 @@ export const messages = {
   "workflow.board.refusal.noOutput": "אין פלט מסוג {type}",
   "workflow.board.live.connected": "{from} חובר אל {to}.",
   "workflow.board.live.connectedLoop": "{from} חובר אל {to}. החיבור יוצר לולאה.",
+  "workflow.board.live.connectedMany": {
+    one: "צומת אחד חובר.",
+    two: "שני צמתים חוברו.",
+    other: "{count} צמתים חוברו.",
+  },
+  "workflow.board.live.connectedManyLoop": {
+    one: "צומת אחד חובר. החיבור יוצר לולאה.",
+    two: "שני צמתים חוברו. החיבור יוצר לולאה.",
+    other: "{count} צמתים חוברו. החיבור יוצר לולאה.",
+  },
   "workflow.board.live.disconnected": "החיבור הוסר.",
   "workflow.board.live.deleted": "{name} נמחק.",
   "workflow.board.live.deletedMany": { one: "צומת אחד נמחק.", two: "שני צמתים נמחקו.", other: "{count} צמתים נמחקו." },
