@@ -119,6 +119,11 @@ const RULE_WORD =
 // The characters of a credential, a URL path or an email address. Not `=`, `:` or quotes, so the
 // label before a value stays readable.
 const TOKEN_CHARACTER = /[A-Za-z0-9._~+/@%-]/u;
+// The host of a web address, after its scheme and its optional user part. A host is public: it is
+// not masked, and a token does not grow into it. Before, a saved short password such as the name of
+// the user's company made every link to the company's site `https:[redacted]` in a chat post. The
+// user part, the path and the query stay masked, because a credential can be there.
+const URL_HOST = /(?<![A-Za-z0-9+.-])([A-Za-z][A-Za-z0-9+.-]*:\/\/(?:[^\s/?#@]*@)?)([\p{L}\p{N}.-]+)/gu;
 const VALUE_MARKER = "__openbot_registered_value__";
 const LABEL_MARKER = "__openbot_registered_secret_authorization";
 const MARKERS = new RegExp(`${VALUE_MARKER}|${LABEL_MARKER}`, "gu");
@@ -193,14 +198,17 @@ function markRegisteredSecrets(value: string): string {
   if (!pattern) return value;
   pattern.lastIndex = 0;
   const ranges: Array<{ start: number; end: number }> = [];
+  let hosts: Uint8Array | null = null;
   for (let match = pattern.exec(value); match !== null; match = pattern.exec(value)) {
     let start = match.index;
     let end = start + match[0].length;
+    hosts ??= urlHosts(value);
+    if (!hosts.subarray(start, end).includes(0)) continue;
     const previous = ranges.at(-1);
     const floor = previous?.end ?? 0;
-    while (start > floor && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
+    while (start > floor && hosts[start - 1] === 0 && TOKEN_CHARACTER.test(value.charAt(start - 1))) start -= 1;
     if (previous && end <= previous.end) continue;
-    while (end < value.length && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
+    while (end < value.length && hosts[end] === 0 && TOKEN_CHARACTER.test(value.charAt(end))) end += 1;
     if (previous && start <= previous.end) previous.end = end;
     else ranges.push({ start, end });
   }
@@ -213,6 +221,16 @@ function markRegisteredSecrets(value: string): string {
     copied = end;
   }
   return result + value.slice(copied);
+}
+
+/** One flag for each character of `value`: 1 in the host of a web address, 0 elsewhere. */
+function urlHosts(value: string): Uint8Array {
+  const flags = new Uint8Array(value.length);
+  for (const match of value.matchAll(URL_HOST)) {
+    const start = match.index + (match[1]?.length ?? 0);
+    flags.fill(1, start, start + (match[2]?.length ?? 0));
+  }
+  return flags;
 }
 
 function applyTextRules(value: string, emails: boolean): string {
