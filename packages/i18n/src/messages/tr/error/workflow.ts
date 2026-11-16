@@ -18,6 +18,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "Ajana giden mesaj, ajan yanıt vermeden kaldırıldı.",
   "error.workflow.conditionUnclear": "Model evet ya da hayır yanıtı vermedi.",
   "error.workflow.modelFailed": "Model yanıt veremedi. Adımı yeniden çalıştırın.",
+  "error.workflow.modelTimedOut":
+    "Model zamanında yanıt vermedi. Bu adım için daha düşük bir efor veya daha hızlı bir model seçin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.modelToolUse":
+    "Model bir araç kullanmaya çalıştı, ancak bu adım yalnızca metinle yanıt verebilir. Adımı yeniden çalıştırın veya başka bir model seçin.",
+  "error.workflow.modelUnavailable": "Bu adımın modeli kullanılamıyor. Bu adım için başka bir model seçin.",
+  "error.workflow.providerBusy": "Sağlayıcı meşgul. Birkaç dakika bekleyin, sonra adımı yeniden çalıştırın.",
+  "error.workflow.providerOffline":
+    "OpenBot sağlayıcıya ulaşamadı. İnternet bağlantısını kontrol edin, sonra adımı yeniden çalıştırın.",
   "error.workflow.modelBusy": "Başka bir model isteği çalışıyor. Adımı birazdan yeniden çalıştırın.",
   "error.workflow.mediaFailed": "Model görseli veya videoyu oluşturamadı. Adımı yeniden çalıştırın.",
   "error.workflow.pictureMissing": "Görsel artık sunucuda değil. Yeniden gönderin.",
