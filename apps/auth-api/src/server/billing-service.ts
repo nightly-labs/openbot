@@ -202,7 +202,8 @@ export interface BillingServiceOptions {
   vies?: ViesClient;
   /**
    * Runs once for each paid Checkout page whose billing address is in another country than the one that
-   * decided its VAT, with the operator text. It must not throw or wait.
+   * decided its VAT, and for each running subscription whose VAT treatment a change of the billing details
+   * changed, with the operator text. It must not throw or wait.
    */
   onVatMismatch?: (text: string) => void;
   /** Counts the paid invoices of consumers in other EU countries, for the One Stop Shop limit. */
@@ -430,7 +431,18 @@ export class BillingService {
     ): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError, BillingDependencies> {
       const dependencies = yield* BillingDependencies;
       const customerId = yield* this.ensureCustomer(user);
-      return yield* setCustomerBillingDetails(dependencies.stripe, this.#vies, customerId, request, dependencies.now());
+      const saved = yield* setCustomerBillingDetails(
+        dependencies.stripe,
+        this.#vies,
+        customerId,
+        request,
+        dependencies.now(),
+      );
+      for (const text of saved.vatChanges) {
+        console.warn(`billing: ${text}`);
+        this.#onVatMismatch?.(text);
+      }
+      return saved.details;
     },
     (operation) => operation.pipe(Effect.provide(this.#layer)),
   ).bind(this);

@@ -1381,7 +1381,9 @@ creates them and the Customer Portal settings.
   - A `PUT` of new details also sets the Tax Rate of each open subscription with the metadata
     `openbot_vat_treatment`, so that the next invoice of a plan that runs gets the new VAT. Checkout,
     the license split and `scripts/stripe-vat-migrate.ts` write that metadata. A plan from before VAT
-    has none and keeps its tax.
+    has none and keeps its tax. The buyer declares the new country with no proof, so each subscription
+    whose VAT treatment changes writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
+    with the customer, the subscription and the two countries.
   - A customer with no country (a client from before this step) gets a Checkout with Stripe Tax
     (`automatic_tax`, tax ID collection) and no VAT metadata, as before. With the Worker setting
     `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Turn the

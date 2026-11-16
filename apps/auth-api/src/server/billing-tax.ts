@@ -123,6 +123,9 @@ export const checkoutTax = Effect.fn("BillingTax.checkoutTax")(function* (
  * Saves the country and the VAT ID of a customer. A VAT ID of another EU country than Poland gives
  * reverse charge, so VIES must confirm it first: an unknown ID is refused, and when VIES does not answer,
  * nothing changes. A request with no VAT ID removes the old one.
+ *
+ * `vatChanges` has one operator text for each running subscription whose VAT treatment changed. The buyer
+ * declares the country with no proof, and no Checkout address follows, so the operator checks it.
  */
 export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillingDetails")(function* (
   stripe: StripeClient,
@@ -130,7 +133,7 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
   customerId: string,
   request: BillingDetailsRequest,
   now: number,
-): Effect.fn.Return<BillingDetails, BillingError | BillingOperationError> {
+): Effect.fn.Return<{ details: BillingDetails; vatChanges: readonly string[] }, BillingError | BillingOperationError> {
   const vatId = request.vatId ?? null;
   const check =
     vatId && vatTreatment(request.country, true) === "reverse"
@@ -164,8 +167,12 @@ export const setCustomerBillingDetails = Effect.fn("BillingTax.setCustomerBillin
       },
     }),
   );
-  yield* syncSubscriptionTax(stripe, customerId, treatment);
-  return { country: request.country, vatId };
+  const changed = yield* syncSubscriptionTax(stripe, customerId, treatment);
+  const vatChanges = changed.map(
+    (subscription) =>
+      `VAT check: customer ${customerId} changed its billing details from ${tax.country ?? "no country"} to ${request.country}, so subscription ${subscription.id} changed from ${subscription.from} to ${treatment} VAT from its next invoice. Check the country.`,
+  );
+  return { details: { country: request.country, vatId }, vatChanges };
 });
 
 /** The subscription states that make more invoices. */
@@ -175,20 +182,20 @@ const OPEN_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", "u
  * Checkout puts the VAT rate on each subscription, so a change of the billing details must also change
  * the subscriptions that run. Only a subscription with a VAT treatment in its metadata changes: Checkout
  * and `scripts/stripe-vat-migrate.ts` write it. A subscription with Stripe Tax, or a plan from before VAT,
- * keeps its tax.
+ * keeps its tax. Returns the subscriptions whose treatment changed, with the old one.
  */
 const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function* (
   stripe: StripeClient,
   customerId: string,
   treatment: VatTreatment,
-): Effect.fn.Return<void, BillingError | BillingOperationError> {
+): Effect.fn.Return<readonly { id: string; from: string }[], BillingError | BillingOperationError> {
   const subscriptions = (yield* stripeCall(() => stripe.listCustomerSubscriptions(customerId))).filter(
     (subscription) =>
       OPEN_SUBSCRIPTION_STATUSES.has(subscription.status) &&
       !subscription.automatic_tax?.enabled &&
       subscription.metadata[VAT_METADATA.treatment] !== undefined,
   );
-  if (subscriptions.length === 0) return;
+  if (subscriptions.length === 0) return [];
   const rateId =
     treatment === "standard"
       ? yield* stripeCall(() => stripe.findTaxRate(VAT_TAX_RATE.metadataKey, VAT_TAX_RATE.metadataValue))
@@ -198,12 +205,16 @@ const syncSubscriptionTax = Effect.fn("BillingTax.syncSubscriptionTax")(function
     return yield* new BillingError(503, "vat_unavailable", sourceText("error.billing.vatUnavailable"));
   }
   const rateIds = rateId ? [rateId] : [];
+  const changed: { id: string; from: string }[] = [];
   for (const subscription of subscriptions) {
     const current = (subscription.default_tax_rates ?? []).map((rate) => rate.id);
     const sameRates = current.length === rateIds.length && current.every((id, index) => id === rateIds[index]);
-    if (sameRates && subscription.metadata[VAT_METADATA.treatment] === treatment) continue;
+    const from = subscription.metadata[VAT_METADATA.treatment] ?? "";
+    if (sameRates && from === treatment) continue;
     yield* stripeCall(() => stripe.setSubscriptionTaxRates(subscription.id, rateIds, treatment));
+    if (from !== treatment) changed.push({ id: subscription.id, from });
   }
+  return changed;
 });
 
 /** The fields of a paid Checkout Session that the VAT check reads. */
