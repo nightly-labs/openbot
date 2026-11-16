@@ -171,6 +171,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyFailure } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
+import type { AgentImportToolPort } from "./agent/agent-import-tool-port";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, AgentRemovalFailed } from "./agent/agent-removal";
 import { AgentSettingsRefused } from "./agent/agent-settings-refused";
@@ -474,6 +475,8 @@ export interface AgentServiceOptions {
   workflowTools?: () => WorkflowTools;
   /** Built after the service, so read when a tool call needs it. */
   webhookRoutines?: () => WebhookRoutineWriter;
+  /** The official agent zip import on this host; wired after `AgentImportService` is created. */
+  agentImportTools?: (() => AgentImportToolPort | null) | undefined;
   /**
    * Whose approvals are answered without asking. The main process owns the preference, because it
    * is a property of this computer and never crosses the Team API. Omitted, every approval asks.
@@ -673,6 +676,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #localSkillTools: (() => LocalSkillTools) | undefined;
   readonly #routineFlowTools: (() => RoutineFlowTools) | undefined;
   readonly #workflowTools: (() => WorkflowTools) | undefined;
+  readonly #agentImportTools: (() => AgentImportToolPort | null) | undefined;
   readonly #developmentDefaults: boolean;
   readonly #busyMessageMode: () => BusyMessageMode;
   /** The task limit of an agent that has no limit of its own on this host. */
@@ -711,6 +715,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       localSkillTools,
       routineFlowTools,
       workflowTools,
+      agentImportTools,
       developmentDefaults = false,
       computerUseMcpServer = () => null,
       githubConnector = null,
@@ -724,6 +729,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.#localSkillTools = localSkillTools;
     this.#routineFlowTools = routineFlowTools;
     this.#workflowTools = workflowTools;
+    this.#agentImportTools = agentImportTools;
     this.#store = store;
     // First of the sub-objects, because `#emitError` reads it to redact and every one of them is
     // given that callback.
@@ -2000,6 +2006,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#localSkillTools === undefined ? {} : { localSkillTools: this.#localSkillTools }),
       ...(this.#routineFlowTools === undefined ? {} : { routineFlowTools: this.#routineFlowTools }),
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
+      ...(this.#agentImportTools === undefined ? {} : { agentImportTools: this.#agentImportTools }),
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
       ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),

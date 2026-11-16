@@ -4,6 +4,7 @@ import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
 import { makeOpenBotSignalRepository } from "@openbot/whatsapp/signal-repository";
 import { Effect, Fiber, Schema } from "effect";
+import type { AgentImportToolPort } from "../backend/agent/agent-import-tool-port";
 import { toAgentRemovalFailed } from "../backend/agent/agent-removal";
 import { toHostedSiteOperationFailed } from "../backend/agent/hosted-site-coordinator";
 import { toToolOperationFailed } from "../backend/agent/tool-operation";
@@ -2262,6 +2263,7 @@ export async function createApplicationServices({
   });
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
+  const agentImportHolder: { current: AgentImportToolPort | null } = { current: null };
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2450,6 +2452,7 @@ export async function createApplicationServices({
     reviewSkills: (agentId) => skills.listInstalledForChatTags(agentId),
     routineFlowTools: () => routineFlowRuntime,
     workflowTools: () => workflowRuntime,
+    agentImportTools: () => agentImportHolder.current,
     // `events` is built later, after the account service and the relay.
     webhookRoutines: () => agentWebhookRoutineWriter(events),
     approvalAutomation,
@@ -3202,6 +3205,17 @@ export async function createApplicationServices({
     () => serverTimezone.effective(),
     join(app.getPath("userData"), "agent-import-uploads"),
   );
+  agentImportHolder.current = {
+    stage: (path) => agentImport.stage(path).pipe(toToolOperationFailed),
+    apply: (input) => agentImport.apply(input).pipe(toToolOperationFailed),
+    discard: (token) =>
+      agentImport.discard(token).pipe(
+        toToolOperationFailed,
+        Effect.map(() => undefined),
+      ),
+    stagedSummary: (token, keys, channelKeys) =>
+      agentImport.stagedSummary(token, keys, channelKeys).pipe(toToolOperationFailed),
+  };
   // Hermes profiles become agents through the same services; MCP servers through the Marketplace.
   const hermesImport = new HermesImportService(
     {
