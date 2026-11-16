@@ -9,8 +9,8 @@
 // RevenueCat (#4884) registers only the clients it approved and answers every other registration
 // with 400 `invalid_client`: the refusal must say so, not quote "The client is not registered.".
 // Omnisend (#7722) registers only the app names it approved and answers OpenBot with 400
-// `invalid_client_metadata` "unknown application: OpenBot": the refusal must say so too. The same
-// error about other metadata keeps the server's own words.
+// `invalid_client_metadata` "unknown application: OpenBot": the refusal must say so too. Tessie
+// (#9372) answers the same error in other words, and the refusal must say the same.
 // Microsoft 365 (#7812) has no protected-resource metadata and names no scope in its challenge, and
 // Microsoft refuses a sign-in page with no scope: OpenBot must ask for the scopes that its
 // authorization server lists. A resource with metadata keeps the scope it names, or none.
@@ -97,7 +97,10 @@ const REGISTRATION_REFUSALS = {
     error_description: "The client is not registered. Contact support if you need to register a new client.",
   },
   omnisend: { error: "invalid_client_metadata", error_description: "unknown application: OpenBot" },
-  badMetadata: { error: "invalid_client_metadata", error_description: "redirect URI must have a host" },
+  tessie: {
+    error: "invalid_client_metadata",
+    error_description: "No dynamic client registration template matched this request.",
+  },
 } as const;
 type RegistrationRefusal = keyof typeof REGISTRATION_REFUSALS;
 
@@ -477,16 +480,15 @@ async function main(): Promise<void> {
     check(omnisend, !omnisend.signedIn, "a token is stored after a refused registration");
     report.cases.push(omnisend);
 
-    // The same error about metadata that does not name OpenBot is not a refusal of OpenBot.
-    const badMetadata = await runCase("registration-bad-metadata", ["none"], 1, { registrationRefused: "badMetadata" });
-    const [metadataAttempt] = badMetadata.attempts;
-    check(
-      badMetadata,
-      metadataAttempt?.error !== registrationRefused && metadataAttempt?.error?.includes("must have a host") === true,
-      `the attempt reported: ${metadataAttempt?.error}`,
-    );
-    check(badMetadata, !badMetadata.signedIn, "a token is stored after a refused registration");
-    report.cases.push(badMetadata);
+    // Tessie refuses with the same error in words that do not name OpenBot. The probe says the same,
+    // not "No dynamic client registration template matched this request.".
+    const tessie = await runCase("registration-refused-no-template", ["none"], 1, { registrationRefused: "tessie" });
+    const [tessieAttempt] = tessie.attempts;
+    check(tessie, tessieAttempt?.error === registrationRefused, `the attempt reported: ${tessieAttempt?.error}`);
+    check(tessie, tessie.pagesOpened === 0, "a sign-in page opened with no registered client");
+    check(tessie, !tessie.storedClient, "a client is stored after a refused registration");
+    check(tessie, !tessie.signedIn, "a token is stored after a refused registration");
+    report.cases.push(tessie);
 
     // Dropbox refuses `/mcp-auth` with 403. OpenBot registers the `/callback` form once more and
     // sends it on the page and in the token request, although the registration names no port.

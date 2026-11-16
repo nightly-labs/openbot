@@ -23,7 +23,6 @@ import { Effect, Result, Schema } from "effect";
 import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
-  MCP_CLIENT_NAME,
   MCP_TOKEN_TIMEOUT_MS,
   type McpOAuthAuthority,
   type McpSignIn,
@@ -769,9 +768,9 @@ function isAccessRefusal(status: number | null): boolean {
  * is not registered.").
  *
  * Omnisend answers each name it did not approve with 400 `invalid_client_metadata` ("unknown
- * application: OpenBot", #7722). That error also names metadata that OpenBot sent wrong, which the
- * user cannot change either, but which this sentence would hide: only an answer that names OpenBot
- * counts.
+ * application: OpenBot", #7722), and Tessie answers the same error with "No dynamic client
+ * registration template matched this request." (#9372). The services' words differ, so the error
+ * class decides, not the text: the user cannot change the metadata that OpenBot sends either.
  */
 function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
   if (signIn.registrationUnsupported()) return true;
@@ -786,7 +785,7 @@ function isRegistrationRefusal(error: unknown, signIn: McpSignIn): boolean {
     error instanceof AccessDeniedError ||
     error instanceof UnauthorizedClientError ||
     error instanceof InvalidClientError ||
-    (error instanceof InvalidClientMetadataError && error.message.includes(MCP_CLIENT_NAME))
+    error instanceof InvalidClientMetadataError
   )
     return true;
   return isAccessRefusal(httpStatus(error));
