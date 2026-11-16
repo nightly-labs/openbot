@@ -1071,6 +1071,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                     onStart={() => voice().onStart()}
                     onCancel={() => voice().onCancel()}
                     onFinish={() => voice().onFinish()}
+                    onSend={() => void send()}
                     send={sendButton()}
                   />
                 )}
