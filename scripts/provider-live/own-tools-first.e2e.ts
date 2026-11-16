@@ -46,7 +46,7 @@ interface TurnRecord {
 }
 
 async function readSteps(browser: Browser, agentId: string) {
-  return browser.evaluate(async (id) => {
+  const read = await browser.evaluate(async (id) => {
     const conversation = await window.openbot.agent.readConversation(id);
     return {
       revision: conversation.revision,
@@ -56,10 +56,15 @@ async function readSteps(browser: Browser, agentId: string) {
         source: message.source ?? null,
         itemType: message.itemType ?? null,
         status: message.status,
-        text: message.text.slice(0, 600),
+        text: message.text,
       })),
     };
   }, agentId);
+  // The report keeps each answer in full, and only the start of tool output.
+  return {
+    ...read,
+    steps: read.steps.map((step) => (isAnswer(step) ? step : { ...step, text: step.text.slice(0, 600) })),
+  };
 }
 
 /** Sends `prompt` as the first message of a new agent and waits until its turn ends or waits for the user. */
@@ -124,9 +129,26 @@ interface BenchResult extends TurnRecord {
   passed: boolean;
 }
 
-function save(task: string, result: BenchResult): void {
+/** Saves the result of one task. It passes when `matches` accepts the answer and no connect card shows. */
+function finish(
+  input: { provider: string; model: string; task: string; expected: string },
+  record: TurnRecord,
+  matches: (answer: string) => boolean,
+): BenchResult {
+  const text = answer(record.steps);
+  const cards = connectCards(record.steps);
+  const result: BenchResult = {
+    provider: input.provider,
+    model: input.model,
+    expected: input.expected,
+    cards,
+    answer: text,
+    passed: matches(text) && cards.length === 0,
+    ...record,
+  };
   mkdirSync(OUT, { recursive: true });
-  writeFileSync(join(OUT, `${result.provider}-${task}.json`), `${JSON.stringify(result, null, 2)}\n`);
+  writeFileSync(join(OUT, `${input.provider}-${input.task}.json`), `${JSON.stringify(result, null, 2)}\n`);
+  return result;
 }
 
 /** Reads `path` of a JSON answer, such as `["data", "amount"]`. */
@@ -292,18 +314,7 @@ test("the agent uses its own tools before it asks for a connection", { tags: [BE
     task: "github",
     prompt: "What is the tag name of the latest release of the GitHub repository oven-sh/bun?",
   });
-  const githubAnswer = answer(github.steps);
-  const githubCards = connectCards(github.steps);
-  const githubResult: BenchResult = {
-    provider,
-    model,
-    expected: tag,
-    cards: githubCards,
-    answer: githubAnswer,
-    passed: githubAnswer.includes(tag) && githubCards.length === 0,
-    ...github,
-  };
-  save("github", githubResult);
+  const results = [finish({ provider, model, task: "github", expected: tag }, github, (text) => text.includes(tag))];
 
   const price = Number(await readJsonString("https://api.coinbase.com/v2/prices/BTC-USD/spot", ["data", "amount"]));
   const priced = await runTask(browser, {
@@ -312,22 +323,14 @@ test("the agent uses its own tools before it asks for a connection", { tags: [BE
     task: "price",
     prompt: "What is the price of one Bitcoin in US dollars now? Use CoinGecko.",
   });
-  const priceAnswer = answer(priced.steps);
-  // The price moves during the turn, and the answer can write it as 98,123.45.
-  const amounts = [...priceAnswer.replaceAll(",", "").matchAll(/\d+(?:\.\d+)?/g)].map((match) => Number(match[0]));
-  const close = amounts.some((amount) => Math.abs(amount - price) / price < 0.03);
-  const priceCards = connectCards(priced.steps);
-  const priceResult: BenchResult = {
-    provider,
-    model,
-    expected: String(price),
-    cards: priceCards,
-    answer: priceAnswer,
-    passed: close && priceCards.length === 0,
-    ...priced,
-  };
-  save("price", priceResult);
-  const results = [githubResult, priceResult];
+  results.push(
+    finish({ provider, model, task: "price", expected: String(price) }, priced, (text) =>
+      // The price moves during the turn, and the answer can write it as 98,123.45.
+      [...text.replaceAll(",", "").matchAll(/\d+(?:\.\d+)?/g)].some(
+        (match) => Math.abs(Number(match[0]) - price) / price < 0.03,
+      ),
+    ),
+  );
 
   if (existsSync(GOOGLE_SESSION)) {
     const subject = await signInToGmail(browser, provider);
@@ -337,19 +340,11 @@ test("the agent uses its own tools before it asks for a connection", { tags: [BE
       task: "mail",
       prompt: "What is the subject of the latest email in my Gmail inbox?",
     });
-    const mailAnswer = answer(mail.steps);
-    const mailCards = connectCards(mail.steps);
-    const mailResult: BenchResult = {
-      provider,
-      model,
-      expected: subject,
-      cards: mailCards,
-      answer: mailAnswer,
-      passed: mailAnswer.toLowerCase().includes(subject.toLowerCase()) && mailCards.length === 0,
-      ...mail,
-    };
-    save("mail", mailResult);
-    results.push(mailResult);
+    results.push(
+      finish({ provider, model, task: "mail", expected: subject }, mail, (text) =>
+        text.toLowerCase().includes(subject.toLowerCase()),
+      ),
+    );
   }
 
   expect(
