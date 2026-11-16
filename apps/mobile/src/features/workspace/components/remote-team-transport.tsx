@@ -51,6 +51,7 @@ import {
   createRequestLimiter,
   isBackgroundRead,
 } from "@/features/workspace/model/request-lanes";
+import { uploadCancelled } from "@/features/workspace/model/upload-cancels";
 import { expoGoDomOptions } from "@/shared/lib/expo-go-dom";
 import { currentText } from "@/shared/lib/text";
 
@@ -434,6 +435,12 @@ export const RemoteTeamTransport = memo(
     }, [props.active, props.hostId, props.directory]);
     const uploadFile = (ref: string) => {
       if (!uploadFiles.current.has(ref)) throw new Error("The file is not part of an upload.");
+      if (uploadCancelled(ref)) {
+        // The peer stops the transfer and tells the host, so the host does not wait for the rest.
+        const cancelUpload = bridge.current?.cancelUpload;
+        if (typeof cancelUpload === "function") cancelUpload(null);
+        throw new Error("The upload was cancelled.");
+      }
       return new File(ref);
     };
     const [actions] = useState(() => ({

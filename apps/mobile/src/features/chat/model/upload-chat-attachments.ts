@@ -34,6 +34,8 @@ export async function uploadChatAttachments<T extends RemoteFileUpload, R = stri
     return await actions.send(ids);
   } catch (error) {
     await Promise.allSettled(ids.map(actions.discard));
+    // Cancel stops a large file in the middle, and the upload then fails with its own error.
+    if (actions.cancelled?.()) throw new ChatUploadCancelledError();
     throw error;
   }
 }

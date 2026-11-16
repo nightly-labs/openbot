@@ -13,6 +13,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
 import { type AwaitingReply, awaitingReplies } from "../model/awaiting-replies";
@@ -323,10 +324,11 @@ export function useChatQueue(
         await uploadChatAttachments(files, {
           upload: async (file) => {
             const stored = edit.addedAttachments.find((item) => item.id === file.id);
-            return workspace().uploadAttachment(
-              agentId,
-              stored ? await queueAttachmentUpload(edit.editId, stored, file) : file,
-              serverId,
+            const upload = stored ? await queueAttachmentUpload(edit.editId, stored, file) : file;
+            return withUploadCancel(
+              upload,
+              () => cancelled.current,
+              () => workspace().uploadAttachment(agentId, upload, serverId),
             );
           },
           // Once Save can reach the host, these IDs must survive an uncertain response.
