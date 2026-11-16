@@ -228,6 +228,7 @@ import {
   deferredCallArgumentsError,
   discoverTools,
   givesBrowserSchemas,
+  mayNameMcpTool,
   namesInSearch,
   OPENCODE_DEFERRED_MCP_NOTE,
   resolveDeferredTool,
@@ -762,7 +763,13 @@ export class OpenBotToolRouter {
               } catch (error) {
                 client.respond(
                   request.id,
-                  openBotToolFailure(error instanceof UnknownToolNamesError ? invalid(error.message) : invalid()),
+                  openBotToolFailure(
+                    !(error instanceof UnknownToolNamesError)
+                      ? invalid()
+                      : mayNameMcpTool(error.names)
+                        ? invalid(error.message)
+                        : error.message,
+                  ),
                 );
                 return;
               }
@@ -771,7 +778,10 @@ export class OpenBotToolRouter {
               if (request.signal?.aborted || !client.running) return;
               // A name that tool_describe did not find can be a tool of the user's MCP servers.
               const deferredMcp =
-                params.tool === "tool_search" || "notFound" in result ? this.#deferredMcpNote(client, threadId) : null;
+                params.tool === "tool_search" ||
+                ("notFound" in result && Array.isArray(result.notFound) && mayNameMcpTool(result.notFound))
+                  ? this.#deferredMcpNote(client, threadId)
+                  : null;
               const found = deferredMcp ? { ...result, mcpTools: deferredMcp } : result;
               client.respond(
                 request.id,
