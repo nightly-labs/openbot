@@ -131,6 +131,7 @@ import {
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { handleDataTool } from "./data-tools";
+import { handleDeleteAgentTool } from "./delete-agent-tool";
 import { responseAttachmentMessageId, visualReplyFileName, visualReplyMessageId } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
@@ -389,6 +390,10 @@ export interface OpenBotToolRouterHooks {
   ): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** `initiatingAgentId` is the calling agent, recorded with a model change. */
   updateAgent(input: UpdateAgentInput, initiatingAgentId: string): Effect.Effect<AgentSummary, ToolOperationFailed>;
+  /** Fails with the reason when the agent cannot be deleted now, such as a turn that runs. */
+  ensureAgentDeletable(agentId: string): Effect.Effect<void, ToolOperationFailed>;
+  /** Deletes the agent as the app's Delete agent does: its data, then its sidebar and Library places. */
+  deleteAgent(agentId: string): Effect.Effect<void, ToolOperationFailed>;
   setAvatar(agentId: string, image: AvatarImageInput | null): Effect.Effect<AgentSummary, ToolOperationFailed>;
   /** The MCP servers of this computer that are turned on, before the Computer Use setting of one agent. */
   /** With an agent, only the servers that the agent gets. */
@@ -1573,6 +1578,37 @@ export class OpenBotToolRouter {
   }
 
   /**
+   * A card with only a reason that only the owner answers, also for an agent with Full access. For
+   * `set_browser_profile`, whose profile holds sign-ins of other agents, and `delete_agent`, which
+   * cannot be undone.
+   */
+  #ownerApproval(
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    reason: string,
+  ) {
+    return this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason,
+        grantRoot: null,
+        permissions: null,
+      },
+      { ownerOnly: true },
+    );
+  }
+
+  /**
    * `create_server_install_command`: a one-time command that installs OpenBot on another computer and
    * signs it in to this account. The claim gives that computer a session of the account, so only the
    * owner approves it, and only for a person's request. The claim goes only to the agent, which runs
@@ -2329,25 +2365,17 @@ export class OpenBotToolRouter {
         listAgents: () => this.#hooks.listAgents(),
         profiles: this.#browserProfiles(),
         requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
-        approve: (reason) =>
-          this.#attention.awaitToolApproval(
-            client,
-            request,
-            {
-              requestId: request.id,
-              agentId: senderAgentId,
-              threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-              turnId: params.turnId,
-              kind: "permissions",
-              command: null,
-              cwd: null,
-              reason,
-              grantRoot: null,
-              permissions: null,
-            },
-            // A profile holds sign-ins of other agents, and Full access does not answer for that.
-            { ownerOnly: true },
-          ),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
+        redactMcp: (text) => this.#hooks.redactMcp(text),
+      });
+
+    if (params.tool === "delete_agent")
+      return yield* handleDeleteAgentTool(params, senderAgentId, {
+        listAgents: () => this.#hooks.listAgents(),
+        ensureDeletable: (agentId) => this.#hooks.ensureAgentDeletable(agentId),
+        deleteAgent: (agentId) => this.#hooks.deleteAgent(agentId),
+        requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });
 
