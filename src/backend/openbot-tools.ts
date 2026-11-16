@@ -330,7 +330,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "organize_library",
     description:
-      'Organize your Library folders and the files in them, by the folder paths and file ids that list_library_folders gives, such as "Reports/2026". action create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder, with the folders in it, into to; omit to for the top level. delete removes folder and the folders in it; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; omit to to take them out of their folders. No action moves, copies or deletes a file on disk. Do not delete or rename a folder that the user did not ask you to change.',
+      'Organize your Library folders and their files, by the folder paths and file ids from list_library_folders, such as "Reports/2026". create makes folder and each missing level, and puts files in it. rename gives folder the new name. move puts folder and its subfolders into to, or at the top level with no to. delete removes folder and its subfolders; their files stay in the Library, in no folder. place puts files into to, and makes a missing folder; with no to, it takes files out of their folders. No action changes a file on disk. Delete or rename only a folder that the user asked you to change.',
     shape: organizeLibraryToolSchema.shape,
   },
   {
