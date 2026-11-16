@@ -1,4 +1,5 @@
 import { agentTemplateShareOrigin } from "@openbot/contracts/agent-template-links";
+import type { McpServerConfig, McpTestResult } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n";
 import { runTeamEffect } from "@openbot/team-client";
 import { createMarketplaceCatalog } from "@openbot/team-client/marketplace-catalog";
@@ -13,6 +14,7 @@ import {
   listMcpServers,
   listMcpSignIns,
   mcpSignInApp,
+  mcpSignInStatus,
   readGithubSkills,
   removeMcpServer,
   removeMcpSignInApp,
@@ -22,6 +24,7 @@ import {
   setHostMcpAccess,
   setMcpServerEnabled,
   signOutMcpServer,
+  startMcpSignIn,
   testMcpServer,
   uninstallAgentSkill,
 } from "@openbot/team-client/team-admin-requests";
@@ -31,6 +34,20 @@ import { Effect } from "effect";
 import type { AgentTemplateInstallCalls } from "../agent-templates/agent-templates-port";
 import type { MarketplaceCalls } from "../settings/marketplace-calls";
 import { webMcpRelay } from "./web-mcp-relay";
+
+/** How often a sign-in in the host's own tab asks the host whether it ended. */
+const HOST_SIGN_IN_POLL_MS = 1_000;
+
+/**
+ * A sign-in whose page only the connected host can reach, such as an MCP server on the host's
+ * loopback address. The host opens it in its own tab, which the live view shows.
+ */
+export interface WebHostSignIn {
+  /** The account is an owner or admin: the host shows its private sign-in tabs only to them. */
+  canAdminister: () => boolean;
+  /** The host opens a sign-in page in its own tab (`mcp-sign-in-v1`, `browser-view`). */
+  hostTab: () => boolean;
+}
 
 /** No server id: the account is a member, or the host runs an OpenBot without agent-install-v1. */
 const noAgentInstall = () => currentText().t("webClient.error.agentInstallNotAllowed");
@@ -46,9 +63,40 @@ const noAgentInstall = () => currentText().t("webClient.error.agentInstallNotAll
 export function createWebMarketplaceCalls(
   accountFetch: typeof fetch,
   request: (serverId?: string) => TeamApiRequest,
+  hostSignIn?: WebHostSignIn,
 ): MarketplaceCalls {
   const catalog = createMarketplaceCatalog(accountFetch);
   const relay = webMcpRelay();
+  /** The host tab of each sign-in in the host's own browser, by the address it signs in to. */
+  const hostTabs = new Map<string, string | null>();
+  const run = <T>(effect: Effect.Effect<T, { cause: unknown }>) =>
+    runTeamEffect(effect.pipe(Effect.mapError((error) => error.cause)));
+
+  /**
+   * The relay already ended on the host. Only the host reaches the page, so its own tab shows it, and
+   * the status is read until the sign-in ends.
+   */
+  async function signInOnHostTab(serverId: string, config: McpServerConfig): Promise<McpTestResult> {
+    if (!hostSignIn?.canAdminister()) return { toolCount: 0, error: sourceText("error.mcp.signInPageOnServer") };
+    if (!hostSignIn.hostTab()) return { toolCount: 0, error: sourceText("error.mcp.signInOnHost") };
+    const url = config.url;
+    await run(startMcpSignIn(request(serverId), { config }));
+    hostTabs.set(url, null);
+    try {
+      while (true) {
+        const status = await run(mcpSignInStatus(request(serverId), { url }));
+        if (status.result) return status.result;
+        hostTabs.set(url, status.tabId);
+        await new Promise((resolve) => setTimeout(resolve, HOST_SIGN_IN_POLL_MS));
+      }
+    } catch (error) {
+      // Nobody watches the page any more, so it must not stay open on the host for the full timeout.
+      void run(cancelMcpSignIn(request(serverId), { url })).catch(() => undefined);
+      throw error;
+    } finally {
+      hostTabs.delete(url);
+    }
+  }
   return {
     skills: {
       list: (query) => runTeamEffect(catalog.skills.list(query)),
@@ -101,9 +149,8 @@ export function createWebMarketplaceCalls(
       // in this browser, and the user pastes the address it ends on.
       signInMcpServer: async ({ config }, serverId) => {
         if (!serverId) throw new Error(sourceText("error.mcp.signInOnHost"));
-        // Marketplace apps sign in on https pages; this keeps the answer for any other page.
         const result = await relay.signIn(request(serverId), config);
-        return result ?? { toolCount: 0, error: sourceText("error.backend.mcpSignInNotWebPage") };
+        return result ?? signInOnHostTab(serverId, config);
       },
       cancelMcpSignIn: async (input, serverId) => {
         await runTeamEffect(cancelMcpSignIn(request(serverId), input).pipe(Effect.mapError((error) => error.cause)));
@@ -123,6 +170,7 @@ export function createWebMarketplaceCalls(
       // No await comes before `window.open`: a browser blocks a page that the user's click did not open.
       open: async (url) => relay.open(url),
       paste: (url, address) => relay.paste(url, address),
+      hostTab: async (url) => hostTabs.get(url) ?? null,
     },
     addAgent: async (input, serverId) => {
       if (!serverId) throw new Error(noAgentInstall());

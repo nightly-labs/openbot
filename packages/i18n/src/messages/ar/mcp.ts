@@ -25,6 +25,7 @@ export const messages = {
     "سجّل الدخول إلى حسابك في {name}. يحصل OpenBot على الأدوات التي يمكن لهذا الحساب الوصول إليها، ولا يحصل على أي كلمة مرور.",
   "mcp.signIn.waiting": "جارٍ انتظار المتصفح…",
   "mcp.signIn.continue": "المتابعة إلى {name}",
+  "mcp.signIn.pageDescription": "هذه الصفحة مفتوحة في المتصفح على {host}. سجّل الدخول هنا.",
   "mcp.test.connected": {
     zero: "متصل · لا أدوات",
     one: "متصل · أداة واحدة",
