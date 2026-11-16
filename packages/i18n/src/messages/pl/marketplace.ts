@@ -418,15 +418,16 @@ export const messages = {
   "marketplace.plugin.resend.prompt.template": "Napisz szkic e-maila resetu hasła dla nowego procesu.",
   "marketplace.plugin.omnisend.tagline": "Marketing e-mail i SMS",
   "marketplace.plugin.omnisend.description":
-    "Omnisend pozwala agentom czytać raporty kampanii i formularzy, wyszukiwać kontakty i segmenty oraz tworzyć i edytować kampanie, automatyzacje, szablony e-maili, formularze i produkty. Każdy użytkownik loguje się do własnego konta Omnisend w przeglądarce i wybiera poziom dostępu na ekranie zgody. Z dostępem do zapisu agenci mogą też wysyłać kampanie i usuwać dane. Wybierz dostęp tylko do odczytu, gdy agentom wystarczą raporty.",
+    "Omnisend pozwala agentom czytać raporty kampanii i formularzy, wyszukiwać kontakty i segmenty oraz tworzyć i edytować kampanie, automatyzacje, szablony e-maili, formularze i produkty. Każdy użytkownik łączy się kluczem API z własnego konta Omnisend. Agenci mogą robić to, na co pozwala klucz, w tym wysyłać kampanie i usuwać dane.",
   "marketplace.plugin.omnisend.app":
-    "Kampanie, automatyzacje, kontakty, segmenty, formularze i raporty przez serwer MCP Omnisend z logowaniem w przeglądarce.",
+    "Kampanie, automatyzacje, kontakty, segmenty, formularze i raporty przez serwer MCP Omnisend z kluczem API.",
   "marketplace.plugin.omnisend.prompt.lastCampaign":
     "Jak wypadły kampanie z zeszłego tygodnia w porównaniu z tygodniem wcześniej?",
   "marketplace.plugin.omnisend.prompt.segment": "Ile kontaktów jest w segmencie VIP i jak zmienił się w tym miesiącu?",
   "marketplace.plugin.omnisend.prompt.draftCampaign":
     "Przygotuj szkic kampanii dla nowej kolekcji, ale jej nie wysyłaj.",
   "marketplace.plugin.postiz.tagline": "Planowanie postów w mediach społecznościowych",
+  "marketplace.plugin.omnisend.hint.apiKey": "W Omnisend otwórz Store settings > API keys i utwórz klucz.",
   "marketplace.plugin.postiz.description":
     "Postiz pozwala agentom wyświetlać twoje kanały w mediach społecznościowych oraz tworzyć szkice, planować i publikować posty w ponad 30 serwisach, takich jak X, LinkedIn, Instagram i TikTok. Agenci mogą też przesyłać multimedia i tworzyć obrazy i filmy AI. Zaloguj się do konta Postiz w przeglądarce albo wklej klucz API z Settings › Developers w Postiz. Wszystkie plany chmurowe Postiz zawierają dostęp do API. Agenci mogą opublikować post od razu, więc sprawdź każdy post, zanim go zatwierdzisz.",
   "marketplace.plugin.postiz.app":
