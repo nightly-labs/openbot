@@ -74,6 +74,9 @@ export function parseServerTimezone(value: unknown): string | null {
   return value;
 }
 
+/** The `TZ` from before `applyServerTimezone` changed it: `=` and the value, or `unset`. */
+const SYSTEM_TZ = "OPENBOT_SYSTEM_TZ";
+
 function decodeServerTimezone(parsed: unknown): string | null {
   return isDynamicRecord(parsed) && parsed.version === 1 && isString(parsed.timezone) && validTimezone(parsed.timezone)
     ? parsed.timezone
@@ -87,6 +90,14 @@ function decodeServerTimezone(parsed: unknown): string | null {
  * A file that `load` reads as automatic leaves `TZ` as it is.
  */
 export function applyServerTimezone(path: string, environment: NodeJS.ProcessEnv): () => string {
+  // A relaunch (`relaunchApp`) gives the new process the environment of this one, with the chosen
+  // `TZ`. Put back the `TZ` of the computer first, so "Automatic" shows its zone and applies again.
+  const before = environment[SYSTEM_TZ];
+  if (before !== undefined) {
+    if (before.startsWith("=")) environment.TZ = before.slice(1);
+    else delete environment.TZ;
+    delete environment[SYSTEM_TZ];
+  }
   const systemTimezone = localTimezone();
   let chosen: string | null = null;
   try {
@@ -95,6 +106,7 @@ export function applyServerTimezone(path: string, environment: NodeJS.ProcessEnv
     // A missing or damaged file is automatic. `load` reports a read failure that is not expected.
   }
   if (chosen === null || chosen === systemTimezone) return localTimezone;
+  environment[SYSTEM_TZ] = environment.TZ === undefined ? "unset" : `=${environment.TZ}`;
   environment.TZ = chosen;
   return () => systemTimezone;
 }
