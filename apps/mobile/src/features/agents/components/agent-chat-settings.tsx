@@ -106,7 +106,7 @@ export function AgentNewChatSection({ agent, available }: { agent: MobileAgent; 
 
 /**
  * Asks the host to compact the context of the agent's chat now, as "Compact now" on desktop. The
- * messages stay. The phone does not show the context usage, so it does not show the progress. The
+ * messages stay. The context ring of the composer shows the progress, on a host that reports it. The
  * host refuses while the agent works or when its provider cannot compact, and its reason shows in
  * the alert.
  */

@@ -1051,10 +1051,10 @@ export interface MobileWorkspaceContextValue {
   /** True when the host advertises `context-compact-v1`. Any member who can send messages can compact. */
   canCompactContext: (serverId: string) => boolean;
   /**
-   * The provider compacts the context of the agent's chat now; the messages stay. The host refuses
-   * while the agent works, or when its provider cannot compact.
+   * The provider compacts the context of the agent's chat now, or of its side task `taskId`; the
+   * messages stay. The host refuses while the chat or task works, or when its provider cannot compact.
    */
-  compactContext: (agentId: string, serverId: string) => Promise<void>;
+  compactContext: (agentId: string, serverId: string, taskId?: string) => Promise<void>;
   /** An owner or admin of an online host that serves `shared-tables-v1`. The host checks the role again. */
   canManageSharedTables: (serverId: string) => boolean;
   /** Every table that the agents of the host share. Owners and admins only. */

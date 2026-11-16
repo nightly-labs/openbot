@@ -20,6 +20,7 @@ import {
   decodeTeamProtocolV9WebRtcHttpResponse,
   encodeTeamProtocolV2Frame,
   encodeTeamProtocolV8WebRtcHttpRequest,
+  TEAM_BOOTSTRAP_CAPABILITIES,
   TEAM_PROTOCOL_V2_CHANNELS,
   TEAM_PROTOCOL_V2_MAX_FILE_BYTES,
   type TeamProtocolV2AuthFrame,
@@ -401,6 +402,13 @@ interface PeerState {
   signalReady: boolean;
   /** The host answered a request on this peer, so its channels worked after authentication. */
   answeredRequest: boolean;
+  /**
+   * This peer asked for a runtime snapshot after the host learned its full capabilities. The
+   * compatibility read goes with the bootstrap list, and the host sends its first snapshot for that
+   * list, without the fields of later capabilities such as the context usage. The host does not send
+   * the snapshot again when the next request widens the list.
+   */
+  fullSnapshotRequested: boolean;
   /** When the host last answered a request on this peer, as `performance.now()`. A request deadline counts from it. */
   lastAnswerAt: number;
   /** The close code of the last Signal socket, so a connection timeout can name it. */
@@ -1122,6 +1130,7 @@ export function createRemoteTeamPeer(
         ticketRequest: false,
         signalReady: false,
         answeredRequest: false,
+        fullSnapshotRequested: false,
         lastAnswerAt: 0,
         lastSignalClose: null,
         signalOpenedAt: 0,
@@ -2088,6 +2097,17 @@ export function createRemoteTeamPeer(
         );
         // A response confirms that the host has every uploaded byte.
         delivery?.complete();
+        // The host applied this request's capabilities before it answered, on the same event socket that
+        // the request below goes to, so the snapshot it sends has the fields of every capability.
+        if (
+          !checksConnection &&
+          !state.fullSnapshotRequested &&
+          state.hostProtocol !== undefined &&
+          teamCapabilitiesForProtocol(state.hostProtocol) !== TEAM_BOOTSTRAP_CAPABILITIES
+        ) {
+          state.fullSnapshotRequested = true;
+          void runPeerEffect(sendEventControl(state, { type: "runtime-snapshot-request" })).catch(() => undefined);
+        }
         return response;
       }).pipe(
         Effect.ensuring(
