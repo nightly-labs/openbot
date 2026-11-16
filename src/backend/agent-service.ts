@@ -2030,12 +2030,25 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           this.updateAgent(input, initiatingAgentId).pipe(toToolOperationFailed),
         setAvatar: (agentId, image) => this.setAvatar(agentId, image).pipe(toToolOperationFailed),
         ensureAgentDeletable: (agentId) => this.ensureAgentDeletable(agentId).pipe(toToolOperationFailed),
-        // The same steps as the app's Delete agent and the Team API: the agent, then its sidebar and Library places.
+        // The same steps as the app's Delete agent and the Team API: the agent, then its sidebar and Library
+        // places. After the agent is gone, a failed place cleanup is only logged, so the tool does not say that
+        // the agent stays. The next start removes the places of agents that the host no longer has.
         deleteAgent: (agentId) =>
           this.deleteAgent(agentId).pipe(
-            Effect.andThen(() => this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void),
-            Effect.andThen(() => this.#libraryFolders?.removeAgent(agentId) ?? Effect.void),
             toToolOperationFailed,
+            Effect.andThen(() =>
+              Effect.all([
+                this.#sidebarLayout?.removeAgent(agentId) ?? Effect.void,
+                this.#libraryFolders?.removeAgent(agentId) ?? Effect.void,
+              ]).pipe(
+                Effect.catch((failure) =>
+                  Effect.sync(() =>
+                    logger.warn("Could not remove the places of a deleted agent.", { agentId, error: failure.cause }),
+                  ),
+                ),
+              ),
+            ),
+            Effect.asVoid,
           ),
         enabledMcpServers: (agentId) => this.enabledMcpServers(agentId),
         emitError: (code, error, agentId) => this.#emitError(code, error, agentId),

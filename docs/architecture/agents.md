@@ -974,8 +974,11 @@ that names the agents, also when the agent has Full access, and a member cannot 
 person's message can start it: a routine, a channel task, an external chat, another agent or a
 team member's message gets an error and no card. The Team API lets an admin delete an agent from
 the app; the tool is stricter and asks only the owner. The tool refuses the caller's own id and an
-unknown id, and checks before the card that each agent is idle. After an accept it deletes the
-agents one after the other and reports `ok` or the error for each id. `scripts/agent-delete-tool-e2e.ts`
+unknown id. Before the card it checks that each agent is idle; when one is not, it names each such
+agent and shows no card. The card adds the id to a name that another agent also has. After an
+accept it deletes the agents one after the other and reports `ok` or the error for each id. When
+the sidebar or Library cleanup fails after an agent is deleted, the tool logs it and reports the
+agent as deleted; the next start removes the places of agents that are gone. `scripts/agent-delete-tool-e2e.ts`
 checks these rules.
 An agent can only restrict access and Computer Use, for itself or a teammate. The router writes
 only a restriction, so a user change between its check and the write is never undone. Only the

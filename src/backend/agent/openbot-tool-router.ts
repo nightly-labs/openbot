@@ -1531,6 +1531,37 @@ export class OpenBotToolRouter {
    * owner approves it, and only for a person's request. The claim goes only to the agent, which runs
    * it over SSH; logs redact it, and the chat card holds only the name and the expiry.
    */
+  /**
+   * A card with only a reason that only the owner answers, also for an agent with Full access. For
+   * `set_browser_profile`, whose profile holds sign-ins of other agents, and `delete_agent`, which
+   * cannot be undone.
+   */
+  #ownerApproval(
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+    reason: string,
+  ) {
+    return this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        turnId: params.turnId,
+        kind: "permissions",
+        command: null,
+        cwd: null,
+        reason,
+        grantRoot: null,
+        permissions: null,
+      },
+      { ownerOnly: true },
+    );
+  }
+
   readonly #serverInstallCommand = Effect.fn("OpenBotToolRouter.serverInstallCommand")(function* (
     this: OpenBotToolRouter,
     client: AgentClient,
@@ -2274,25 +2305,7 @@ export class OpenBotToolRouter {
         listAgents: () => this.#hooks.listAgents(),
         profiles: this.#browserProfiles(),
         requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
-        approve: (reason) =>
-          this.#attention.awaitToolApproval(
-            client,
-            request,
-            {
-              requestId: request.id,
-              agentId: senderAgentId,
-              threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-              turnId: params.turnId,
-              kind: "permissions",
-              command: null,
-              cwd: null,
-              reason,
-              grantRoot: null,
-              permissions: null,
-            },
-            // A profile holds sign-ins of other agents, and Full access does not answer for that.
-            { ownerOnly: true },
-          ),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });
 
@@ -2302,25 +2315,7 @@ export class OpenBotToolRouter {
         ensureDeletable: (agentId) => this.#hooks.ensureAgentDeletable(agentId),
         deleteAgent: (agentId) => this.#hooks.deleteAgent(agentId),
         requestedByPerson: this.#requestedByPerson(senderAgentId, params.turnId, params.threadId),
-        approve: (reason) =>
-          this.#attention.awaitToolApproval(
-            client,
-            request,
-            {
-              requestId: request.id,
-              agentId: senderAgentId,
-              threadId: this.#conversation.publicThreadId(senderAgentId, params.threadId),
-              turnId: params.turnId,
-              kind: "permissions",
-              command: null,
-              cwd: null,
-              reason,
-              grantRoot: null,
-              permissions: null,
-            },
-            // A deletion cannot be undone, and Full access does not answer for that.
-            { ownerOnly: true },
-          ),
+        approve: (reason) => this.#ownerApproval(client, request, params, senderAgentId, reason),
         redactMcp: (text) => this.#hooks.redactMcp(text),
       });
 

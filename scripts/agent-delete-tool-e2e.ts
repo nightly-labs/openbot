@@ -2,8 +2,9 @@
 // message, and only after the owner approves the card, also when the agent has Full access. A routine
 // run, a team member's message, the agent's own id and an unknown id are refused with no card. A
 // member cannot answer the card, a decline keeps the agents, and an accept deletes them and removes
-// them from the sidebar, while the other agents stay.
-// Runs the real agent service, tool router and sidebar store on a temporary profile with a fake Codex
+// them from the sidebar and the Library, while the other agents stay. The card adds the id to a name
+// that another agent also has.
+// Runs the real agent service, tool router, sidebar and Library stores on a temporary profile with a fake Codex
 // app-server. The fake calls the tool through `tool_call`, as a model does, and logs the result.
 // `bun scripts/agent-delete-tool-e2e.ts`. Writes .openbot-build/agent-delete-tool-e2e/report.json.
 import assert from "node:assert/strict";
@@ -35,6 +36,7 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 const { SidebarLayoutStore } = await import("../src/backend/sidebar-layout-store");
+const { LibraryFoldersStore } = await import("../src/backend/library-folders-store");
 
 const CALL_MARK = "DELETE-CALL";
 const PERSON = { id: "local", name: "Alex" };
@@ -210,11 +212,13 @@ const database = new OpenBotDatabase(userData);
 const store = new AgentStore(userData, home, database);
 const mailbox = new MailboxStore(userData, store.sharedRoot, store.database);
 const sidebar = new SidebarLayoutStore(join(userData, "sidebar-layout.json"));
+const library = new LibraryFoldersStore(join(userData, "library-folders.json"));
 const agents = new AgentService({
   store,
   mailbox,
   browser,
   sidebarLayout: sidebar,
+  libraryFolders: library,
   preferredProvider: "codex",
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "codex"),
   timezone: () => "UTC",
@@ -282,6 +286,7 @@ const exists = (agentId: string) => agents.listAgents().some((agent) => agent.id
 
 try {
   await runCauseEffect(sidebar.initialize());
+  await runCauseEffect(library.initialize());
   await runCauseEffect(agents.initialize());
   const chief = await runCauseEffect(
     agents.createAgent({
@@ -305,7 +310,16 @@ try {
   const editorA = await profile("Editor A");
   const editorB = await profile("Editor B");
   const keeper = await profile("Keeper");
+  // Another agent with the name of a target: it stays, and the card names the target with its id.
+  const twinB = await profile("Editor B");
   const ids = new Set(agents.listAgents().map((agent) => agent.id));
+  const folderContext = { agentIds: ids, fileAgent: () => undefined };
+  await runCauseEffect(
+    library.mutate({ type: "create", id: "folder-a", agentId: editorA.id, name: "Drafts" }, folderContext),
+  );
+  await runCauseEffect(
+    library.mutate({ type: "create", id: "folder-k", agentId: keeper.id, name: "Notes" }, folderContext),
+  );
   await runCauseEffect(sidebar.mutate({ type: "create", name: "Editors", agentId: editorA.id }, ids));
   const sectionId = sidebar.getSnapshot().agentAssignments[editorA.id];
   assert.ok(sectionId, "Editor A is in the Editors section.");
@@ -336,7 +350,7 @@ try {
   pass("No refused call showed an approval card", approvals.length === 0, JSON.stringify(approvals));
   pass(
     "The refused calls deleted nothing",
-    [chief.id, editorA.id, editorB.id, keeper.id].every(exists),
+    [chief.id, editorA.id, editorB.id, keeper.id, twinB.id].every(exists),
     JSON.stringify(agents.listAgents().map((agent) => agent.name)),
   );
 
@@ -347,7 +361,7 @@ try {
   const declined = await declinedCall;
   pass(
     "A deletion waits for the owner's card, which names the agents, also with Full access",
-    declinedCard.reason === sourceText("status.agent.deleteAgents", { agents: "Editor A, Editor B" }),
+    declinedCard.reason === sourceText("status.agent.deleteAgents", { agents: `Editor A, Editor B (${editorB.id})` }),
     String(declinedCard.reason),
   );
   pass(
@@ -372,7 +386,7 @@ try {
     accepted.text,
   );
   pass("The deleted agents are not listed", !exists(editorA.id) && !exists(editorB.id));
-  pass("The other agents stay", exists(chief.id) && exists(keeper.id));
+  pass("The other agents stay", exists(chief.id) && exists(keeper.id) && exists(twinB.id));
   const layout = sidebar.getSnapshot();
   pass(
     "The sidebar no longer places the deleted agents, and keeps the others",
@@ -381,6 +395,13 @@ try {
       !layout.agentOrder.includes(editorB.id) &&
       layout.agentAssignments[keeper.id] === sectionId,
     JSON.stringify(layout),
+  );
+  const folders = library.getSnapshot().folders;
+  pass(
+    "The Library no longer has folders of the deleted agents, and keeps the others",
+    !folders.some((folder) => folder.agentId === editorA.id) &&
+      folders.some((folder) => folder.id === "folder-k" && folder.agentId === keeper.id),
+    JSON.stringify(folders),
   );
 
   report.passed = true;

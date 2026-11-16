@@ -5,6 +5,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import { Effect, Result } from "effect";
 import { z } from "zod";
 import type { DynamicToolCallParams } from "../protocol";
+import type { ToolApprovalDecision } from "./attention-registry";
 import { profileToolErrorMessage } from "./profile-tools";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed } from "./tool-operation";
@@ -32,13 +33,22 @@ export interface DeleteAgentToolOptions {
   /** Whether a person's message in the agent's own chat, or a thread they opened, started the turn. */
   requestedByPerson: boolean;
   /** Waits for the owner's answer to a card with this text. */
-  approve(reason: string): Effect.Effect<"accept" | "decline" | "cancel" | string, ToolOperationFailed>;
+  approve(reason: string): Effect.Effect<ToolApprovalDecision, ToolOperationFailed>;
   redactMcp(text: string): string;
 }
 
 type AgentResult =
   | { agentId: string; name: string; ok: true }
   | { agentId: string; name: string; ok: false; error: string };
+
+/**
+ * The name of an agent on the card. Names do not have to be unique, so a name that another agent also
+ * has gets the agent id, and the owner sees which agent goes.
+ */
+function cardLabel(agent: AgentSummary, agents: readonly AgentSummary[]): string {
+  const shared = agents.some((other) => other.id !== agent.id && other.name === agent.name);
+  return shared ? `${agent.name} (${agent.id})` : agent.name;
+}
 
 /**
  * `delete_agent`: deletes other local agents with their chats and files, when the user asks. A deletion
@@ -67,11 +77,25 @@ export const handleDeleteAgentTool = Effect.fn("DeleteAgentTool.handle")(
       if (!agent) throw new Error(sourceText("error.agent.unknown", { id: agentId }));
       return agent;
     });
-    // Before the card, so that the owner does not approve a deletion that cannot happen now.
-    for (const agent of targets) yield* options.ensureDeletable(agent.id);
+    // Before the card, so that the owner does not approve a deletion that cannot happen now. Each
+    // agent that cannot be deleted is named, so the agent can retry without it.
+    const busy: { agentId: string; name: string; error: string }[] = [];
+    for (const agent of targets) {
+      const deletable = yield* Effect.result(options.ensureDeletable(agent.id));
+      if (Result.isFailure(deletable))
+        busy.push({
+          agentId: agent.id,
+          name: agent.name,
+          error: options.redactMcp(profileToolErrorMessage(deletable.failure.cause)),
+        });
+    }
+    if (busy.length > 0)
+      return openBotToolFailure(
+        `No agent was deleted, and no card was shown. These agents cannot be deleted now: ${JSON.stringify(busy)}. Tell the user, or retry without them.`,
+      );
 
     const decision = yield* options.approve(
-      sourceText("status.agent.deleteAgents", { agents: targets.map((agent) => agent.name).join(", ") }),
+      sourceText("status.agent.deleteAgents", { agents: targets.map((agent) => cardLabel(agent, agents)).join(", ") }),
     );
     if (decision === "cancel")
       return openBotToolResult({ status: "cancelled", next: "Nobody answered the card, so no agent was deleted." });

@@ -214,7 +214,7 @@ interface PendingApproval {
   ownerOnly?: boolean;
 }
 
-type ToolApprovalDecision = "accept" | "decline" | "cancel";
+export type ToolApprovalDecision = "accept" | "decline" | "cancel";
 
 const TOOL_APPROVAL_METHOD = "openbot/tool-approval";
 /** The agent reads this, not the user: it says how to ask in an external chat turn (Slack, Discord, Telegram, WhatsApp). */
