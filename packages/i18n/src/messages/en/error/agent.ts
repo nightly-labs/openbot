@@ -91,6 +91,8 @@ export const messages = defineMessages("error.agent", {
     "{provider} stopped responding, so OpenBot ended this turn. Send the message again, or choose another model.",
   "error.agent.toolLoopStopped":
     "{provider} repeated a failed step many times, so OpenBot stopped this turn. Send the message again, or choose another model.",
+  "error.agent.answerCutOff":
+    "The agent stopped before it finished its answer, so the answer is not complete. Send the message again.",
   "error.agent.compactionConnectionLost":
     "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection, then send a message to continue.",
   "error.agent.compactionLoopStopped":

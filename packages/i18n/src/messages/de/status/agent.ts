@@ -108,5 +108,7 @@ export const messages = {
   "status.agent.planContinues": "Der Plan hat offene Schritte. Der Agent macht weiter ({current} von {limit}).",
   "status.agent.compactionContinues":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Der Agent macht weiter.",
+  "status.agent.providerExitContinues":
+    "Der Agent hat aufgehört, bevor seine Antwort fertig war. Der Agent macht weiter.",
   "status.agent.branchTitle": "Abgezweigter Chat",
 } as const satisfies PartialTranslation<typeof source>;

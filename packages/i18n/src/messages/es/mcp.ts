@@ -27,6 +27,7 @@ export const messages = {
     "Inicia sesión en tu cuenta de {name}. OpenBot obtiene las herramientas a las que puede acceder esa cuenta, pero no la contraseña.",
   "mcp.signIn.waiting": "Esperando al navegador…",
   "mcp.signIn.continue": "Continuar en {name}",
+  "mcp.signIn.pageDescription": "Esta página está abierta en el navegador de {host}. Inicia sesión aquí.",
   "mcp.test.connected": {
     one: "Conectado · {count} herramienta",
     other: "Conectado · {count} herramientas",

@@ -106,5 +106,6 @@ export const messages = {
   "status.agent.planContinues": "Le plan a des étapes en cours. L’agent continue ({current} sur {limit}).",
   "status.agent.compactionContinues":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte. L’agent continue.",
+  "status.agent.providerExitContinues": "L’agent s’est arrêté avant de finir sa réponse. L’agent continue.",
   "status.agent.branchTitle": "Chat dérivé",
 } as const satisfies PartialTranslation<typeof source>;

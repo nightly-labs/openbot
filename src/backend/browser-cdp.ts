@@ -2009,6 +2009,7 @@ export class BrowserCdpEngine {
           return assignment;
         }
         onDispatch?.();
+        yield* this.#clearFileInputEffect(send, resolved.backendNodeId, resolved.sessionId);
         yield* send(
           "DOM.setFileInputFiles",
           { backendNodeId: resolved.backendNodeId, files: paths },
@@ -2078,7 +2079,7 @@ export class BrowserCdpEngine {
             debuggerClient.on("message", listener);
             return stopWaitingForChooser;
           });
-          yield* Effect.gen(function* () {
+          yield* Effect.gen({ self: this }, function* () {
             yield* send("Page.enable", {}, chooserSessionId);
             yield* send("Page.setInterceptFileChooserDialog", { enabled: true }, chooserSessionId);
             yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -2094,6 +2095,7 @@ export class BrowserCdpEngine {
             if (!backendNodeId) return yield* browserFailure(new Error("The file chooser has no file input."));
             if (opened.mode === "selectSingle" && paths.length > 1)
               return yield* browserFailure(new Error("The file chooser accepts only one file."));
+            yield* this.#clearFileInputEffect(send, backendNodeId, chooserSessionId);
             yield* send("DOM.setFileInputFiles", { backendNodeId, files: paths }, chooserSessionId);
           }).pipe(
             Effect.ensuring(
@@ -2112,6 +2114,28 @@ export class BrowserCdpEngine {
       (ownSessionId) =>
         ownSessionId ? send("Target.detachFromTarget", { sessionId: ownSessionId }).pipe(Effect.ignore) : Effect.void,
     );
+  });
+
+  /**
+   * Empties a file input, with no event, before `DOM.setFileInputFiles` sets its files. The browser sends
+   * `input` and `change` only when the file list changes, and an upload of unchanged files reuses the
+   * kept copy at the same path (`BrowserUploads`), so without this a retry reaches no page code. It runs
+   * in the automation world, where a page cannot replace `DataTransfer`. A failure leaves the upload as
+   * it was without this step.
+   */
+  readonly #clearFileInputEffect = Effect.fn("BrowserCdp.clearFileInput")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId?: string,
+  ): Effect.fn.Return<void> {
+    yield* this.#callOnNode(
+      send,
+      backendNodeId,
+      "function() { this.files = new DataTransfer().files; }",
+      [],
+      sessionId,
+    ).pipe(Effect.ignore);
   });
 
   readonly #identifyUploadTargetEffect = Effect.fn("BrowserCdp.identifyUploadTarget")(function* (

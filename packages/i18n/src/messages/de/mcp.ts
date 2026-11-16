@@ -27,6 +27,7 @@ export const messages = {
     "Melde dich bei deinem {name}-Konto an. OpenBot erhält die Werkzeuge, auf die dieses Konto zugreifen kann, aber kein Passwort.",
   "mcp.signIn.waiting": "Warten auf den Browser…",
   "mcp.signIn.continue": "Weiter zu {name}",
+  "mcp.signIn.pageDescription": "Diese Seite ist im Browser auf {host} geöffnet. Melde dich hier an.",
   "mcp.test.connected": {
     one: "Verbunden · {count} Werkzeug",
     other: "Verbunden · {count} Werkzeuge",
