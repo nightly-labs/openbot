@@ -182,22 +182,36 @@ export const messages = {
   "provider.geminiKey.title": "Ключ API Gemini",
   "provider.geminiKey.description":
     "Сохраните ключ API Gemini на этом компьютере. Сохранённый ключ используется вместо аккаунта Google. Чтобы войти через Google, удалите ключ и нажмите «Подключить» в строке Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Сохраните ключ API Gemini на хосте. Сохранённый ключ используется вместо аккаунта Google. Чтобы войти через Google, удалите ключ и нажмите «Подключить» в строке Gemini.",
   "provider.geminiKey.label": "Ключ API Gemini",
   "provider.claudeKey.title": "Ключ API Anthropic",
   "provider.claudeKey.description":
     "Сохраните API-ключ Anthropic на хосте. Anthropic списывает каждый запрос с кредитов API ключа, а не с тарифа Claude. Чтобы использовать его для агента, выберите аккаунт «API-ключ» в меню моделей агента. Если в Claude не выполнен вход, все агенты используют ключ.",
   "provider.claudeKey.label": "Ключ API Anthropic",
+  "provider.cursorKey.title": "Ключ API Cursor",
+  "provider.cursorKey.description":
+    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе Integrations и вставьте его сюда. Ключ сохраняется на этом компьютере.",
+  "provider.cursorKey.descriptionHost":
+    "Каждый аккаунт Cursor после первого использует ключ API. Создайте ключ в панели Cursor в разделе Integrations и вставьте его сюда. Ключ сохраняется на хосте.",
+  "provider.cursorKey.label": "Ключ API Cursor",
   "provider.inceptionKey.title": "Ключ API Inception",
   "provider.inceptionKey.description":
     "Сохраните ключ API Inception на этом компьютере, чтобы использовать модели Mercury. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.inceptionKey.descriptionHost":
+    "Сохраните ключ API Inception на хосте, чтобы использовать модели Mercury. OpenBot запускает их в загруженном Pi CLI.",
   "provider.inceptionKey.label": "Ключ API Inception",
   "provider.deepseekKey.title": "Ключ API DeepSeek",
   "provider.deepseekKey.description":
     "Сохраните ключ API DeepSeek на этом компьютере, чтобы использовать модели DeepSeek. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.deepseekKey.descriptionHost":
+    "Сохраните ключ API DeepSeek на хосте, чтобы использовать модели DeepSeek. OpenBot запускает их в загруженном Pi CLI.",
   "provider.deepseekKey.label": "Ключ API DeepSeek",
   "provider.openrouterKey.title": "Ключ API OpenRouter",
   "provider.openrouterKey.description":
     "Сохраните ключ API OpenRouter на этом компьютере, чтобы использовать модели OpenRouter. OpenBot запускает их в загруженном Pi CLI.",
+  "provider.openrouterKey.descriptionHost":
+    "Сохраните ключ API OpenRouter на хосте, чтобы использовать модели OpenRouter. OpenBot запускает их в загруженном Pi CLI.",
   "provider.openrouterKey.label": "Ключ API OpenRouter",
 
   "provider.openCodeKey.title": "Вход в OpenCode Go",
@@ -214,6 +228,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Не удалось переподключиться.",
   "provider.account.add": "Добавить аккаунт",
   "provider.account.addLabel": "Добавить ещё один аккаунт {name}",
+  "provider.account.addWithCode": "Добавить аккаунт по коду",
   "provider.account.count": {
     one: "{count} аккаунт",
     few: "{count} аккаунта",
@@ -248,13 +263,30 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "У {name} не осталось кредитов сброса использования.",
   "provider.account.resetUsageAlreadyRedeemed": "Этот кредит сброса {name} уже использован.",
   "provider.account.resetUsageFailed": "Не удалось сбросить использование {name}.",
+  "provider.account.pool": "Объединить аккаунты",
+  "provider.account.poolDescription":
+    "Агенты используют один аккаунт, пока он не приблизится к лимиту, а затем аккаунт, чей лимит сбросится раньше всех.",
+  "provider.account.inUse": "Используется",
+  "provider.account.notInPool": "Вне пула",
+  "provider.account.leaveOutOfPool": "Исключить из пула",
+  "provider.account.putBackInPool": "Вернуть в пул",
+  "provider.account.poolChip": "Пул",
+  "provider.account.poolCount": "Пул: {accounts}",
+  "provider.account.poolInUse": "{pool} · используется {name}",
+  "provider.settings.accountsPooledDescription": "{count} из {max}. Агенты используют эти аккаунты вместе.",
   "provider.settings.disconnectTitle": "Отключить {name}?",
   "provider.settings.disconnectOthers": "Другие аккаунты {provider} ждут, пока вы снова не подключите {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot выйдет из {provider} на этом компьютере. CLI {provider} в терминале тоже выйдет из аккаунта.",
   "provider.settings.disconnectHost": "OpenBot выйдет из {provider} на сервере.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Вместо входа через Google используется сохранённый ключ Gemini API. Чтобы использовать тариф Google и его модели, удалите ключ.",
   "provider.settings.versionInstalledByUser": "{version} · установлена вами",
   "provider.settings.versionDownloaded": "{version} · загружена OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Не используется: {version} · установлена вами",
+  "provider.settings.otherVersionDownloaded": "Не используется: {version} · загружена OpenBot",
+  "provider.settings.useInstalledVersion": "Использовать свою",
+  "provider.settings.useDownloadedVersion": "Использовать от OpenBot",
   "provider.settings.cache": "Кэш",
   "provider.settings.promptCache": "Кэш промптов",
   "provider.settings.promptCacheDescription": "Как долго Claude хранит контекст агента в кэше между ходами.",
@@ -295,4 +327,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Удаляет CLI, который OpenBot загрузил для {name} ({size}). Аккаунты, входы и агенты останутся.",
   "provider.settings.removeDownloadFailed": "Не удалось удалить загрузку.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot выходит из {provider} на этом компьютере. {provider} CLI в терминале остаётся в своём аккаунте.",
 } as const satisfies PartialTranslation<typeof source>;

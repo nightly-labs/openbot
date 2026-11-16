@@ -83,13 +83,18 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Cette connexion ne peut pas fournir la commande d’exécution d’une routine.",
   "error.team.threadQueueUnsupported": "Cette connexion ne peut pas afficher la file d’attente d’un fil annexe.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Cette connexion ne peut pas afficher ni modifier les limites de fils du serveur.",
   "error.team.usageLimitUnsupported":
     "Cette connexion ne peut pas afficher ni modifier les limites d’utilisation des agents.",
   "error.team.hermesImportUnsupported": "Cette connexion ne peut pas importer de profils Hermes depuis le serveur.",
   "error.team.providerDetectionUnsupported":
     "Cette connexion ne peut pas trouver les serveurs de modèles et les agents du serveur.",
+  "error.team.routineFlowStopUnsupported": "Cette connexion ne peut pas arrêter une exécution de routine.",
   "error.team.sidebarFoldersUnsupported":
     "Les dossiers dans des dossiers ne sont pas pris en charge par cette connexion.",
+  "error.team.libraryFoldersUnsupported":
+    "Les dossiers de la Bibliothèque ne sont pas pris en charge par cette connexion.",
   "error.team.agentNotificationLevelsUnsupported":
     "Ce serveur ne peut pas garder votre propre niveau de notifications pour chaque agent. Mettez à jour OpenBot sur l’ordinateur qui l’exécute.",
   "error.team.sidebarPinsUnsupported":
@@ -127,6 +132,7 @@ export const messages = {
     "Les modifications de l’identité du serveur ne sont pas prises en charge par cette connexion.",
   "error.team.hostUpdateUnsupported": "Les mises à jour de l’hôte ne sont pas prises en charge par cette connexion.",
   "error.team.hostTimezoneUnsupported": "Cette connexion ne prend pas en charge le fuseau horaire du serveur.",
+  "error.team.hostRestartUnsupported": "Cette connexion ne prend pas en charge le redémarrage du serveur.",
   "error.team.hostKeyRotationUnsupported": "Cette connexion ne prend pas en charge le changement de clé du serveur.",
   "error.team.localServersUnsupported": "Cette connexion ne prend pas en charge les serveurs sur cet ordinateur.",
   "error.team.routineResultsUnsupported": "Cette connexion ne prend pas en charge les destinations des routines.",
@@ -180,6 +186,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "L’authentification sécurisée n’est pas prise en charge par ce client.",
   "error.team.agentSettingsUnsupported": "Les réglages des agents ne sont pas pris en charge par cette connexion.",
   "error.team.adminRequired": "Un accès administrateur est requis.",
+  "error.team.mcpAccessStale": "Quelqu’un a modifié l’accès à ce serveur MCP. Refaites votre modification.",
   "error.team.mcpServerNotYours":
     "Seule la personne qui a ajouté ce serveur MCP, ou un administrateur, peut le modifier.",
   "error.team.ownerRequired": "Seul le propriétaire de ce serveur peut faire cela.",
@@ -197,6 +204,8 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Aucun agent de ce serveur n’a affiché ce lien de connexion.",
   "error.team.hostPersonalityUnsupported": "Cette connexion ne prend pas en charge la personnalité du serveur.",
   "error.team.agentWaitsUnsupported": "Cette connexion ne prend pas en charge les attentes ouvertes.",
+  "error.team.pendingApprovalUnsupported": "Cette connexion ne permet pas de lire une approbation complète.",
+  "error.team.messagePinsUnsupported": "Cette connexion ne prend pas en charge les messages épinglés.",
   "error.team.queuedMessageThreadUnsupported":
     "Cette connexion ne prend pas en charge l’exécution d’un message en file d’attente dans un nouveau fil.",
   "error.team.backgroundProcessesUnsupported": "Cette connexion ne prend pas en charge les processus en arrière-plan.",

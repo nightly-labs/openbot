@@ -18,7 +18,9 @@ import {
   NO_ACCOUNT_ANALYTICS,
 } from "./account-analytics";
 import { AccountAttribution } from "./account-attribution";
+import { alertAmount, alertCode } from "./billing-purchase";
 import { BillingUsd, BillingUsdError } from "./billing-usd";
+import type { HostedPoolAlert } from "./hosted-pool-alert";
 import { SalesAnalyticsDelivery, SalesAnalyticsDeliveryError } from "./sales-analytics-delivery";
 import type { StripeEvent } from "./stripe-client";
 
@@ -41,6 +43,12 @@ export interface BillingSalesOptions {
   clientId: string | undefined;
   clientSecret: string | undefined;
   now?: () => number;
+  /**
+   * Sends the operator one message, with the account email, for each paid or failed invoice line, refund
+   * and dispute of a server plan or a license (docs/hosted-servers.md#pool-alerts). Only
+   * `processPending` sends it.
+   */
+  saleAlert?: HostedPoolAlert | null;
 }
 
 export interface BillingSalesCheckout {
@@ -155,6 +163,43 @@ interface FactAttributes {
   suppressBillingAction?: boolean;
 }
 
+const SALE_KIND_TEXT = { first_purchase: "First purchase", renewal: "Renewal", adjustment: "Adjustment" } as const;
+
+/** The start of the operator message of each fact that moves money or fails to. A checkout step has none. */
+const SALE_EVENT_TEXT: Partial<Record<FactType, string>> = {
+  payment_succeeded: "Paid",
+  payment_failed: "Failed payment of the",
+  payment_refunded: "Refunded",
+  refund_failed: "Failed refund of the",
+  payment_disputed: "Disputed payment of the",
+  dispute_lost: "Lost dispute of the",
+};
+
+/**
+ * The operator message of one payment fact, in the form of `purchaseAlertText`: the account email, the
+ * product, the amount of the payment and the period. `email` is null when the account is gone.
+ */
+function saleAlertText(event: string, type: FactType, attributes: FactAttributes, email: string | null): string {
+  const license = (attributes.product ?? "server") === "license";
+  const head = `${event} ${license ? "license" : "server plan"} for ${email === null ? "an unknown account" : alertCode(email)}`;
+  const parts = [
+    ...(license
+      ? attributes.users === undefined
+        ? []
+        : [`${attributes.users} user${attributes.users === 1 ? "" : "s"}`]
+      : [attributes.plan ?? "plan not known"]),
+    ...(attributes.currency ? [alertAmount(attributes.amount ?? null, attributes.currency)] : []),
+    ...(attributes.interval ? [`1 ${attributes.interval} period`] : []),
+  ];
+  const note =
+    type === "payment_succeeded"
+      ? ` ${SALE_KIND_TEXT[attributes.paymentKind ?? "adjustment"]}.`
+      : type === "payment_failed" && attributes.failureReason
+        ? ` Reason: ${attributes.failureReason}.`
+        : "";
+  return `${head}: ${parts.join(", ")}.${note}`;
+}
+
 interface CheckoutRow {
   session_id: string;
   user_id: string;
@@ -179,8 +224,10 @@ export class BillingSales {
   readonly #now: () => number;
   readonly #fetch: (input: string, init: RequestInit) => Promise<Response>;
   readonly #delivery: SalesAnalyticsDelivery;
+  readonly #saleAlert: HostedPoolAlert | null;
 
   constructor(options: BillingSalesOptions) {
+    this.#saleAlert = options.saleAlert ?? null;
     this.#database = options.database;
     this.#now = options.now ?? Date.now;
     this.#fetch = options.fetch;
@@ -883,7 +930,7 @@ export class BillingSales {
                 };
       yield* this.#enqueue(`billing:${row.source_key}`, profileId, eventName, eventProperties, eventTimestamp);
     }
-    yield* d1(this.#database, () =>
+    const marked = yield* d1(this.#database, () =>
       this.#database
         .prepare(
           `UPDATE billing_sales_facts SET delivery_enqueued_at = ?
@@ -892,6 +939,19 @@ export class BillingSales {
         .bind(this.#now(), row.source_key)
         .run(),
     );
+    // Only the run that marked the fact sends the message, so a fact that stayed pending after a failed
+    // FX lookup, or that two cron runs read, sends one message. An imported payment sends none, and a
+    // $0 invoice (a trial start or a $0 proration) moves no money, so it sends none too.
+    const event = SALE_EVENT_TEXT[row.fact_type];
+    if (!this.#saleAlert || !event || marked.meta.changes !== 1 || attributes.suppressBillingAction) return;
+    if (row.fact_type === "payment_succeeded" && attributes.amount === 0) return;
+    // The fact is ended, so a failed read of the email must not fail the run.
+    const account = row.user_id
+      ? yield* d1(this.#database, () =>
+          this.#database.prepare("SELECT email FROM users WHERE id = ?").bind(row.user_id).first<{ email: string }>(),
+        ).pipe(Effect.catch(() => Effect.succeed(null)))
+      : null;
+    yield* this.#saleAlert(saleAlertText(event, row.fact_type, attributes, account?.email ?? null));
   }).bind(this);
 
   readonly #usd = Effect.fn("BillingSales.usd")(function* (

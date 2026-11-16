@@ -5,7 +5,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { DraftAttachment } from "@openbot/contracts/ipc";
 import { AppWindow, Badge, Blocks, Listbox, Puzzle, Split, UsersRound } from "@openbot/ui";
 import { usesTouchLayout } from "@openbot/ui/utils";
-import { Dynamic, Portal } from "@solidjs/web";
+import { Dynamic, type JSX, Portal } from "@solidjs/web";
 import {
   createEffect,
   createMemo,
@@ -147,8 +147,6 @@ interface ComposerEditorProps {
   ) => void;
   /** Offers `@everyone` in the mention picker, which a channel reads as a message to each member. */
   everyoneMention?: boolean | undefined;
-  /** Told when the mention picker opens or closes, so the queue panel can give up the same space. */
-  onPickerOpenChange?: (open: boolean) => void;
   /**
    * The words heard so far while the user dictates. `final` is set while the recording turns into
    * the final text. See `dictationWords` for how they show.
@@ -176,6 +174,48 @@ const EMPTY_TABS: ComposerBrowserTab[] = [];
 const EMPTY_THREADS: ComposerThread[] = [];
 /** The name of the file that a long text paste becomes, as on mobile. */
 const PASTED_TEXT_FILE_NAME = "pasted-text.txt";
+
+/** Longer than the exit of the list in `composer.css`, for a window that does not send its end. */
+const PICKER_EXIT_FALLBACK_MS = 300;
+
+/**
+ * Puts an inert copy of the closed `@` list in its place, so the list leaves with a movement. The
+ * list is out of the page when it closes, so the list itself cannot stay for its exit.
+ */
+function leavePicker(picker: HTMLElement, parent: HTMLElement): void {
+  if (!parent.isConnected || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const copy = picker.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) return;
+  const scrollTop = picker.querySelector(".mention-picker-list")?.scrollTop ?? 0;
+  copy.dataset.leaving = "";
+  copy.inert = true;
+  copy.setAttribute("aria-hidden", "true");
+  // An SVG keeps its ids: an avatar draws its mask through `url(#id)`.
+  for (const element of copy.querySelectorAll("[id]"))
+    if (!(element instanceof SVGElement)) element.removeAttribute("id");
+  parent.append(copy);
+  const list = copy.querySelector(".mention-picker-list");
+  if (list) list.scrollTop = scrollTop;
+  const remove = () => copy.remove();
+  copy.addEventListener("animationend", (event) => {
+    if (event.target === copy) remove();
+  });
+  window.setTimeout(remove, PICKER_EXIT_FALLBACK_MS);
+}
+
+/** Closes with the content of the list, which is the moment to start the exit of the list. */
+function PickerExit(props: { picker: () => HTMLElement | undefined }): JSX.Element {
+  // Solid takes the list out of the page before this cleanup, so its place is read while it is open.
+  let parent: HTMLElement | null = null;
+  queueMicrotask(() => {
+    parent = props.picker()?.parentElement ?? null;
+  });
+  onCleanup(() => {
+    const picker = props.picker();
+    if (picker && parent) leavePicker(picker, parent);
+  });
+  return undefined;
+}
 
 export function expandComposerMentions(value: string): string {
   return value.replace(MENTION_PATTERN, (match, name: string, target: string) => {
@@ -325,12 +365,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
     return t("composer.picker.noSkillMatch", { query: context.query.trim() });
   });
   const pickerOpen = createMemo(() => mention() !== null && (matchingOptions().length > 0 || pickerStatus() !== null));
-  createEffect(
-    () => pickerOpen(),
-    (open) => {
-      props.onPickerOpenChange?.(open);
-    },
-  );
   /** The `@` or `$` query, which the rows mark in their names. */
   const pickerQuery = () => mention()?.query.trim() ?? "";
   const pickerOptionElements = new Map<string, HTMLElement>();
@@ -341,13 +375,23 @@ export function ComposerEditor(props: ComposerEditorProps) {
     keyMove = false;
     return moved;
   };
+  /** The list calls its ref with no owner, so the editor stops the trackers of the last list. */
+  let releasePickerList: (() => void) | undefined;
   const bindPickerList = (list: HTMLElement) => {
-    // The list has no scrollbar, so the fade is the only sign that more options wait below it.
-    onCleanup(trackPickerScrollFades(list));
-    onCleanup(trackEnteringPickerRows(list));
-    onCleanup(trackPickerHighlight(list, takeKeyMove));
+    releasePickerList?.();
+    const stops = [
+      // The list has no scrollbar, so the fade is the only sign that more options wait below it.
+      trackPickerScrollFades(list),
+      trackEnteringPickerRows(list),
+      trackPickerHighlight(list, takeKeyMove),
+    ];
+    releasePickerList = () => {
+      for (const stop of stops) stop();
+    };
   };
+  onCleanup(() => releasePickerList?.());
   let editor: HTMLDivElement | undefined;
+  let pickerElement: HTMLDivElement | undefined;
   let lastAgentId: string | undefined;
   let lastAttachmentKey = "";
   let lastSkillKey = "";
@@ -1116,6 +1160,9 @@ export function ComposerEditor(props: ComposerEditorProps) {
       <Show when={pickerOpen()}>
         <Portal mount={pickerFrame().mount ?? document.body}>
           <div
+            ref={(element) => {
+              pickerElement = element;
+            }}
             class="mention-picker"
             style={{
               "--mention-picker-bottom": `${pickerFrame().bottom}px`,
@@ -1123,6 +1170,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
               "--mention-picker-sections": pickerStatus() === null ? titledSections() : 0,
             }}
           >
+            <PickerExit picker={() => pickerElement} />
             <Show when={pickerStatus()}>
               {(status) => (
                 <p class="mention-picker-status" role="status">

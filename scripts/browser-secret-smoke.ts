@@ -1,4 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
 import { webContents } from "electron";
+import { z } from "zod";
 import type { BrowserHost } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
@@ -11,11 +13,52 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
   const seedContents = webContents.getAllWebContents().find((contents) => contents.getURL() === seed.url);
   if (!seedContents) throw new Error("Missing authentication fixture session.");
   const protocol = seedContents.session.protocol;
+  let mirroredPageLoads = 0;
+  let modalPageLoads = 0;
+  let stuckPageLoads = 0;
   await protocol.handle("https", (request) => {
     const url = new URL(request.url);
     if (url.hostname !== "authentication.openbot.test") return new Response("Not found", { status: 404 });
+    if (url.pathname === "/stuck") stuckPageLoads += 1;
+    if (url.pathname === "/modal") {
+      modalPageLoads += 1;
+      // A password step in a dialog that holds more fields (#9643). The page copies the password into
+      // an attribute, its text and its title, so the value stays in the page after OpenBot empties the field.
+      return new Response(
+        `<!doctype html><body>
+        <dialog id="verify"><form method="dialog">
+        <label>Password<input id="password" type="password" oninput="const copy = document.querySelector('#strength'); copy.dataset.value = this.value; copy.textContent = this.value; document.title = this.value"></label>
+        <label>Code<input id="code" inputmode="numeric"></label>
+        <span id="strength"></span>
+        <button id="validate" type="button">Validate</button></form></dialog></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    }
     if (url.pathname === "/bitwarden-password") return bitwardenLoginFixture("password");
     if (url.pathname === "/bitwarden-authenticator") return bitwardenLoginFixture("authenticator");
+    if (url.pathname === "/signup")
+      // A sign-up form: it sends only when the password and its confirmation match (#6333).
+      return new Response(
+        `<!doctype html><body>
+        <label>Name<input id="name" type="text"></label>
+        <label>Password<input id="password" type="password"></label>
+        <label>Confirm password<input id="confirm" type="password"></label>
+        <button id="submit" onclick="const password = document.querySelector('#password').value; if (password && password === document.querySelector('#confirm').value) location.href = '/complete'">Register</button>
+        </body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    if (url.pathname === "/mirrored") {
+      mirroredPageLoads += 1;
+      // A single-page sign-in as React renders it: the field's value is copied to its value attribute,
+      // and the answer shows in the same document.
+      return new Response(
+        `<!doctype html><body>
+        <label>Password<input id="password" type="password" oninput="this.setAttribute('value', this.value)"></label>
+        <button id="submit" onclick="document.querySelector('#answer').textContent = 'Wrong password'">Sign in</button>
+        <p id="answer"></p></body>`,
+        { headers: { "Content-Type": "text/html" } },
+      );
+    }
     const html =
       url.pathname === "/complete"
         ? "<h1>Signed in</h1>"
@@ -32,6 +75,13 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       <label>Recovery code<input id="recovery-otp" name="recoveryOtp" type="text"></label>
       <label>SMS code<input id="sms-otp" name="smsOtp" type="text"></label>
       <label>Phone<input id="two-factor-phone" name="twoFactorPhone" type="tel"></label>
+      <form><h2>Verify with Google Authenticator</h2><p>Enter the temporary code generated in your Google Authenticator app.</p><label for="okta-code">Enter code</label><input id="okta-code" name="credentials.passcode" type="text" autocomplete="off"><a href="#">Verify with something else</a></form>
+      <form><h2>Verify with your email</h2><p>We sent an email to you.</p><label for="okta-second-code">Enter code</label><input id="okta-second-code" name="credentials.passcode" type="text" autocomplete="off"></form>
+      <form><p>We emailed you a code.</p><label>Enter code<input id="fallback-code" type="text"></label><a href="#">Use an authenticator app instead</a></form>
+      <form><label>Authentication code<input id="squarespace-code" name="code" type="text"></label></form>
+      <form><input id="userid" type="number" placeholder="••••••"><label for="userid">External TOTP</label></form>
+      <form><p>Open your Google Authenticator app.</p><label>Enter code<input id="answer" name="answer" type="text"></label><label>Promo code<input id="promo-code" type="text"></label></form>
+      <form><script>const totpEnabled = true;</script><p hidden>Authenticator</p><label>Enter code<input id="plain-form-code" type="text"></label></form>
       <form method="post" action="/session"><label>Post password<input id="post-password" type="password"></label></form>
       <form method="post" action="/session"><label>Masked password<input id="masked-password" type="text" style="-webkit-text-security: disc"></label></form>
       <form action="/search" onsubmit="event.preventDefault(); location.href = '/complete'"><label>Script password<input id="script-password" name="password" type="password"></label></form>
@@ -166,10 +216,21 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       }
     }
     // A vault code goes only to a code field. An older Keycloak page names it otp with no
-    // autocomplete="one-time-code"; a recovery, SMS, or phone field or a plain numeric field does not take it.
+    // autocomplete="one-time-code"; Okta names it passcode, and Squarespace and Kite name it only in its
+    // label (#8320). A field named only "code" or "passcode" takes it in a form whose visible text names
+    // an authenticator app and no email. A recovery, SMS, phone, or promo field, an email code field, or
+    // a plain code field in another form does not take it, also when hidden text names an app.
     for (const [selector, fillable] of [
       ["#otp", true],
       ["#totpmfa", true],
+      ["#okta-code", true],
+      ["#okta-second-code", false],
+      ["#fallback-code", false],
+      ["#squarespace-code", true],
+      ["#userid", true],
+      ["#answer", true],
+      ["#promo-code", false],
+      ["#plain-form-code", false],
       ["#recovery-otp", false],
       ["#sms-otp", false],
       ["#two-factor-phone", false],
@@ -286,6 +347,307 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
       } finally {
         await runCauseEffect(browser.close(wrongTab.id));
       }
+    }
+    // One saved password fills a sign-up form's password and its confirmation, and the form sends. A
+    // text field cannot take the second copy (#6333).
+    let vaultFillable = false;
+    const signup: Array<{ confirm: string; result: string; path: string }> = [];
+    for (const [confirm, expected] of [
+      ["#confirm", "submitted"],
+      ["#name", "must both be password fields"],
+    ] as const) {
+      const signupTab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/signup", "secret-thread", "secret-agent"),
+      );
+      try {
+        const signupContents = webContents.getAllWebContents().find((item) => item.getURL() === signupTab.url);
+        if (!signupContents) throw new Error("Missing sign-up fixture.");
+        await waitForPresentedFrame(signupContents);
+        const result = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `signup-${confirm}`,
+            arguments: {
+              tabId: signupTab.id,
+              method: "password",
+              targets: [
+                { kind: "css", selector: "#password" },
+                { kind: "css", selector: confirm },
+              ],
+              submission: "click",
+              submitTarget: { kind: "css", selector: "#submit" },
+            },
+          }),
+        ).then(
+          async (handoff) => {
+            vaultFillable ||= handoff.vaultFillable;
+            return runCauseEffect(handoff.submit(vaultPassword, true));
+          },
+          (error: unknown) => (error instanceof Error ? error.message : String(error)),
+        );
+        const snapshot = await runCauseEffect(browser.snapshot(signupTab.id));
+        signup.push({ confirm, result, path: new URL(snapshot.url).pathname });
+        if (!result.includes(expected) || (expected === "submitted") !== snapshot.url.endsWith("/complete"))
+          throw new Error(`A sign-up fill with ${confirm} gave ${result} at ${snapshot.url}.`);
+        if (JSON.stringify(snapshot).includes(vaultPassword)) throw new Error("A sign-up password reached a snapshot.");
+      } finally {
+        await runCauseEffect(browser.close(signupTab.id));
+      }
+    }
+    if (!vaultFillable) throw new Error("A sign-up password and confirmation were not vault-fillable.");
+    await mkdir(".openbot-build", { recursive: true });
+    await writeFile(
+      ".openbot-build/browser-secret-confirm-password.json",
+      JSON.stringify({ status: "passed", vaultFillable, signup }, null, 2),
+    );
+    // A sign-in that answers in the same document keeps its answer: OpenBot empties the field and its
+    // value attribute, and does not load the page again (#7564).
+    const mirroredTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/mirrored", "secret-thread", "secret-agent"),
+    );
+    try {
+      const mirroredContents = webContents.getAllWebContents().find((item) => item.getURL() === mirroredTab.url);
+      if (!mirroredContents) throw new Error("Missing mirrored value fixture.");
+      await waitForPresentedFrame(mirroredContents);
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "mirrored-value",
+          arguments: {
+            tabId: mirroredTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "click",
+            submitTarget: { kind: "css", selector: "#submit" },
+          },
+        }),
+      );
+      const secret = "fixture-password-385617";
+      const submission = await runCauseEffect(handoff.submit(secret, false));
+      const page = z
+        .object({ answer: z.string(), value: z.string(), attribute: z.string().nullable() })
+        .parse(
+          await mirroredContents.executeJavaScript(
+            "({ answer: document.querySelector('#answer').textContent, value: document.querySelector('#password').value, attribute: document.querySelector('#password').getAttribute('value') })",
+            true,
+          ),
+        );
+      const snapshot = JSON.stringify(await runCauseEffect(browser.snapshot(mirroredTab.id)));
+      const report = {
+        status:
+          submission === "submitted" &&
+          mirroredPageLoads === 1 &&
+          page.answer === "Wrong password" &&
+          page.value === "" &&
+          !page.attribute &&
+          !snapshot.includes(secret)
+            ? "passed"
+            : "issues_found",
+        submission,
+        pageLoads: mirroredPageLoads,
+        answerKept: page.answer === "Wrong password",
+        fieldEmpty: page.value === "" && !page.attribute,
+        snapshotHasValue: snapshot.includes(secret),
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-mirrored-value.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`A same-document sign-in lost its answer: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(mirroredTab.id));
+    }
+    // A page that keeps a copy of the password stays open with its dialog and its other fields
+    // (#9643). Snapshots and the tab list hide the value, and no image of the tab is taken.
+    const modalTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/modal", "secret-thread", "secret-agent"),
+    );
+    try {
+      const modalContents = webContents.getAllWebContents().find((item) => item.getURL() === modalTab.url);
+      if (!modalContents) throw new Error("Missing dialog fixture.");
+      await waitForPresentedFrame(modalContents);
+      await modalContents.executeJavaScript(
+        "document.querySelector('#verify').showModal(); document.querySelector('#code').value = '482913';",
+        true,
+      );
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "dialog-value",
+          arguments: {
+            tabId: modalTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      const secret = "fixture-password-964301";
+      const submission = await runCauseEffect(handoff.submit(secret, false));
+      const page = z
+        .object({ open: z.boolean(), code: z.string(), copy: z.string().optional() })
+        .parse(
+          await modalContents.executeJavaScript(
+            "({ open: document.querySelector('#verify').open, code: document.querySelector('#code').value, copy: document.querySelector('#strength').dataset.value })",
+            true,
+          ),
+        );
+      const read = await runCauseEffect(browser.snapshot(modalTab.id));
+      const snapshot = JSON.stringify(read);
+      const listed = JSON.stringify(browser.listTabs().find((tab) => tab.id === modalTab.id));
+      // The page keeps a copy, so a query of its raw text could find the value one part at a time.
+      // A ref from a snapshot still works.
+      const tool = (name: string, args: DynamicToolCallParams["arguments"]) =>
+        runCauseEffect(
+          browser.handleDynamicTool({
+            namespace: "openbot_browser",
+            tool: name,
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: `dialog-${name}`,
+            arguments: args,
+          }),
+        ).then(
+          (result) => result.success,
+          () => false,
+        );
+      const partialWaitRefused = !(await tool("wait_for", {
+        tabId: modalTab.id,
+        text: secret.slice(0, 4),
+        timeoutMs: 1_000,
+      }));
+      const cssTargetRefused = !(await tool("click", {
+        tabId: modalTab.id,
+        target: { kind: "css", selector: `[data-value^="${secret.slice(0, 4)}"]` },
+      }));
+      const validate = read.elements.find((element) => element.name === "Validate");
+      const refClickWorks =
+        validate !== undefined &&
+        (await tool("click", {
+          tabId: modalTab.id,
+          target: { kind: "ref", ref: validate.ref, revision: read.revision },
+        }));
+      const screenshotRefused = await runCauseEffect(browser.screenshot(modalTab.id)).then(
+        () => false,
+        () => true,
+      );
+      const report = {
+        status:
+          submission === "submitted" &&
+          modalPageLoads === 1 &&
+          page.open &&
+          page.code === "482913" &&
+          page.copy === secret &&
+          !snapshot.includes(secret) &&
+          !listed.includes(secret) &&
+          screenshotRefused &&
+          partialWaitRefused &&
+          cssTargetRefused &&
+          refClickWorks
+            ? "passed"
+            : "issues_found",
+        submission,
+        pageLoads: modalPageLoads,
+        dialogOpen: page.open,
+        codeKept: page.code === "482913",
+        pageKeepsCopy: page.copy === secret,
+        snapshotHasValue: snapshot.includes(secret),
+        tabListHasValue: listed.includes(secret),
+        screenshotRefused,
+        partialWaitRefused,
+        cssTargetRefused,
+        refClickWorks,
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-dialog.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`A password fill in a dialog lost the dialog or showed the value: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(modalTab.id));
+    }
+    // A submission that leaves the value in the page keeps the page, and no live view shows it. The
+    // live view of a takeover loads the page again, so a person on another computer can sign in by
+    // hand and never sees the value.
+    const stuckTab = await runCauseEffect(
+      browser.open("https://authentication.openbot.test/stuck", "secret-thread", "secret-agent"),
+    );
+    try {
+      const stuckContents = webContents.getAllWebContents().find((item) => item.getURL() === stuckTab.url);
+      if (!stuckContents) throw new Error("Missing takeover view fixture.");
+      const handoff = await runCauseEffect(
+        browser.prepareSecret({
+          namespace: "openbot_browser",
+          tool: "submit_secret",
+          threadId: "secret-thread",
+          ownerAgentId: "secret-agent",
+          turnId: "secret-turn",
+          callId: "takeover-view",
+          arguments: {
+            tabId: stuckTab.id,
+            method: "password",
+            targets: [{ kind: "css", selector: "#password" }],
+            submission: "on_input",
+          },
+        }),
+      );
+      const secret = "fixture-password-640271";
+      const loadsBefore = stuckPageLoads;
+      const submission = await runCauseEffect(handoff.submit(secret, false)).catch(() => "failed" as const);
+      const keptAfterSubmit = stuckPageLoads === loadsBefore;
+      const refused = await runCauseEffect(browser.startView(stuckTab.id, () => {})).then(
+        async (stop) => {
+          await runCauseEffect(stop());
+          return false;
+        },
+        () => true,
+      );
+      await runCauseEffect(browser.beginTakeover(stuckTab.id));
+      let frames = 0;
+      const stopView = await runCauseEffect(
+        browser.startView(stuckTab.id, () => {
+          frames += 1;
+        }),
+      );
+      try {
+        const deadline = Date.now() + 10_000;
+        while (frames === 0 && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+      } finally {
+        await runCauseEffect(stopView());
+      }
+      const page = await stuckContents.executeJavaScript(
+        "JSON.stringify([document.title, document.querySelector('#password')?.value ?? null, document.body.innerText])",
+        true,
+      );
+      browser.endTakeover(stuckTab.id);
+      const report = {
+        status:
+          submission === "submitted" && keptAfterSubmit && refused && frames > 0 && !page.includes(secret)
+            ? "passed"
+            : "issues_found",
+        submission,
+        keptAfterSubmit,
+        viewRefusedBeforeTakeover: refused,
+        takeoverViewFrames: frames > 0,
+        secretInPage: page.includes(secret),
+      };
+      await mkdir(".openbot-build", { recursive: true });
+      await writeFile(".openbot-build/browser-secret-takeover-view.json", JSON.stringify(report, null, 2));
+      if (report.status !== "passed")
+        throw new Error(`The takeover view of a protected tab is wrong: ${JSON.stringify(report)}`);
+    } finally {
+      await runCauseEffect(browser.close(stuckTab.id));
     }
     process.stdout.write("BrowserHost: secure password, OTP and authenticator handoff passed.\n");
   } finally {

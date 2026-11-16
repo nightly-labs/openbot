@@ -146,6 +146,15 @@
   cursor: grabbing;
 }
 
+/* A press on a text field moves the node, and a click puts the caret in it, so the field shows the text cursor only while it has the focus. */
+.wfn-slot :is(textarea, input.wfn-input):not(:focus, [readonly]) {
+  cursor: grab;
+}
+
+.wfn-viewport[data-dragging] .wfn-slot :is(textarea, input.wfn-input) {
+  cursor: grabbing;
+}
+
 /*
  * The HUD: every bar over the canvas is one glass bar, 40px high, with a 4px inset. Controls inside
  * are 32px with an 8px radius, so the bar radius is 8 + 4 = 12. The bars come in one after another.
@@ -1282,12 +1291,16 @@
   display: none;
 }
 
-/* The server menu keeps the start of the top row, so the bar starts after it. */
+/* The controls of the window keep the start of the top row, so the bar starts after them. A window
+ * with the page rail sets `--top-row-tabs-start`; another window has the server menu there. */
 .wfn-canvas[data-frame="window"] .wfn-hud-top {
   top: 0;
   inset-inline-end: var(--openbot-space-3);
-  inset-inline-start: calc(var(--left-panel-width) + var(--openbot-space-3));
+  inset-inline-start: var(--top-row-tabs-start, calc(var(--left-panel-width) + var(--openbot-space-3)));
+  box-sizing: border-box;
   height: var(--left-header-height);
+  /* The centre line of the buttons of the frame, as each page header has (`window.css`). */
+  padding-block: var(--top-row-padding-block, 2px 0);
   align-items: center;
 }
 

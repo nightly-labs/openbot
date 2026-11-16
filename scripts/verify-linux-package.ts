@@ -88,6 +88,11 @@ await Promise.all([
     access(resolve(resourcesPath, "hosting", file)),
   ),
   ...HOSTED_SCRIPTS.map((file) => access(resolve(resourcesPath, "hosting", file), constants.X_OK)),
+  // The desktop of the agent display. A server runs it from the release, not from its own copy.
+  access(resolve(resourcesPath, "hosting/openbot-desktop"), constants.X_OK),
+  ...["openbox/openbot-rc.xml", "openbox/openbot-menu.xml", "themes/OpenBot/openbox-3/themerc", "openbot-logo.png"].map(
+    (file) => access(resolve(resourcesPath, "hosting/desktop", file)),
+  ),
   // The Computer Use driver of this architecture.
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/cua-driver`)),
   access(resolve(resourcesPath, `cua-driver/linux/${architecture}/wayland-helper/winrects@cua/extension.js`)),

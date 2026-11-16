@@ -20,6 +20,7 @@ export const messages = defineMessages("settings", {
   "settings.interfaceFont.title": "Interface font",
   "settings.interfaceFont.description": "The font of menus, chats and settings.",
   "settings.interfaceFont.default": "Default (Inter)",
+  "settings.interfaceFont.defaultSystem": "System font",
   "settings.codeFont.title": "Code font",
   "settings.codeFont.description": "The font of code, terminals and file paths.",
   "settings.codeFont.default": "Default",
@@ -61,6 +62,11 @@ export const messages = defineMessages("settings", {
   "settings.chatColor.red": "Red",
   "settings.chatColor.green": "Green",
   "settings.chatColor.blue": "Blue",
+  "settings.bubbleStyle.title": "Your bubbles",
+  "settings.bubbleStyle.description": "In a chat with an agent, your bubbles take the agent's color. Only you see it.",
+  "settings.bubbleStyle.solid": "Solid",
+  "settings.bubbleStyle.tint": "Tint",
+  "settings.bubbleStyle.classic": "Classic",
   // The Settings window, General tab.
   "settings.appBehavior.title": "App behavior",
   "settings.conversations.title": "Conversations",
@@ -99,6 +105,8 @@ export const messages = defineMessages("settings", {
   // The message send shortcut. The saved mode stays in English; only the labels are translated.
   "settings.sendShortcut.title": "Send shortcut",
   "settings.sendShortcut.description": "Choose the keys that send a message on this device and browser.",
+  "settings.chatOrder.description":
+    "Choose where the sidebar shows unread chats on this device. Manual turns off the Unread group.",
   "settings.sendShortcut.enter": "Enter to send",
   "settings.sendShortcut.modEnterMac": "⌘Enter to send",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter to send",
@@ -150,6 +158,7 @@ export const messages = defineMessages("settings", {
   "settings.planStart.set": "Set",
   "settings.automationLimit.sectionTitle": "Limit",
   "settings.automationLimit.sectionDescription": "It applies to all agents on this computer.",
+  "settings.automationLimit.sectionDescriptionServer": "It applies to all agents on this server.",
   "settings.automationLimit.title": "Requests an hour",
   "settings.automationLimit.option": "{limit} an hour",
   "settings.automationLimit.note":
@@ -261,6 +270,9 @@ export const messages = defineMessages("settings", {
   "settings.agentDock.edge.description": "Drag the dock up or down to move it along the edge.",
   "settings.agentDock.edge.right": "Right",
   "settings.agentDock.edge.left": "Left",
+  "settings.agentDock.size.title": "Dock size",
+  "settings.agentDock.size.description":
+    "Drag to change the size of the dock above the other apps. In the main window, the dock follows the interface size.",
   "settings.agentDock.autoHide.title": "Hide when not in use",
   "settings.agentDock.autoHide.description": "The dock slides into the edge. Move the pointer to the edge to show it.",
   "settings.agentDock.edgeStrip.title": "Show a strip at the edge",
@@ -268,6 +280,9 @@ export const messages = defineMessages("settings", {
     "A thin strip stays where the dock hides. Move the pointer near it to show the dock. A color wash goes up the strip when an agent asks you something.",
   "settings.agentDock.results.title": "Show finished work",
   "settings.agentDock.results.description": "Results that agents finish show beside the dock for a short time.",
+  "settings.agentDock.activeSeats.title": "Show agents with new messages",
+  "settings.agentDock.activeSeats.description":
+    "An agent or channel that is not on the dock shows on it while it has a new message or waits for you.",
   "settings.agentDock.agents.title": "Agents on the dock",
   "settings.agentDock.agents.description": "The agents of {server}. Each server has its own dock.",
   "settings.agentDock.agents.empty": "This server has no agents yet.",
@@ -278,7 +293,7 @@ export const messages = defineMessages("settings", {
     "On: usage and reliability metadata goes to OpenBot’s self-hosted analytics with your account ID and email. Off: the same metadata goes with a random install ID only. Chats, files and prompts are never sent. This setting applies to this browser.",
   // The Settings window shell: its tab list, headers and save bar.
   "settings.tab.general.title": "General",
-  "settings.tab.general.description": "Control how OpenBot behaves on this computer.",
+  "settings.tab.general.description": "Choose how chats work and what OpenBot shares.",
   "settings.tab.agents.title": "Agents",
   "settings.tab.agents.description":
     "Choose what the agents on this computer can do when you do not set it for an agent.",
@@ -304,6 +319,15 @@ export const messages = defineMessages("settings", {
   "settings.tab.billing.description": "License, server plans, payment method and invoices.",
   "settings.tab.hostedServers.title": "Hosted servers",
   "settings.tab.hostedServers.description": "Create OpenBot servers that run when this computer is off.",
+  "settings.tab.appearance.description": "Choose the theme, colors, language and fonts.",
+  "settings.tab.appBehavior.description": "Choose how OpenBot starts and runs on this computer.",
+  "settings.appearance.colorsTitle": "Colors",
+  "settings.appearance.textTitle": "Language and text",
+  "settings.appBehavior.startTitle": "Start and quit",
+  "settings.appBehavior.backgroundTitle": "Background",
+  // The labels of the groups in the section list of the user settings.
+  "settings.sections.group.account": "Account",
+  "settings.sections.group.thisComputer": "This computer",
   "settings.sections.label": "Settings sections",
   "settings.panel.resize": "Resize right panel",
   // A failed read or save of the app preferences on the General, Notifications, Dynamic Island and Updates tabs.
@@ -525,6 +549,7 @@ export const messages = defineMessages("settings", {
   "settings.updates.status.ready": "{target} is ready. Restart to apply.",
   "settings.updates.status.installing": "Restarting to apply {target}…",
   "settings.updates.status.upToDate": "OpenBot is up to date on the Stable track.",
+  "settings.updates.status.staged": "{target} is rolling out to some computers. Check for updates to get it now.",
   "settings.updates.status.checkFailed": "OpenBot could not check for updates. Try again.",
   "settings.updates.status.unsupported": "Updates are unavailable in this build.",
   "settings.updates.actionFailed": "Could not update OpenBot.",
@@ -764,13 +789,26 @@ export const messages = defineMessages("settings", {
   "settings.transfer.count.noSettings": "No server settings",
   "settings.transfer.includeAgent": "Include {name}",
   "settings.transfer.export.title": "Export this server",
-  "settings.transfer.export.files": "Include workspace files",
-  "settings.transfer.export.filesDescription":
-    "Files your agents made, and the Shared folder. Turn off for a small file.",
-  "settings.transfer.export.settings": "Include server settings",
+  "settings.transfer.preset.label": "What goes into the file",
+  "settings.transfer.preset.templates": "Templates",
+  "settings.transfer.preset.everything": "Everything",
+  "settings.transfer.meter.files": "of {total} in workspace files",
+  "settings.transfer.part.agents": "Agents and their setup",
+  "settings.transfer.part.agentsDescription": "{contents}. Always in the file.",
+  "settings.transfer.part.settings": "Server settings",
+  "settings.transfer.part.chats": "Chat history",
+  "settings.transfer.part.chatsDescription":
+    "The chats and side threads with their files, and the run history of the routines. The agents continue these chats with their context.",
+  "settings.transfer.part.channels": "Channel messages",
+  "settings.transfer.part.channelsDescription":
+    "The messages of the channels that the exported agents are in, with their files and the run history of the channel routines.",
+  "settings.transfer.part.files": "Workspace files",
+  "settings.transfer.part.filesDescription": "Files your agents made, and the Shared folder.",
+  "settings.transfer.part.preferences": "Server preferences",
+  "settings.transfer.part.preferencesDescription":
+    "Name, logo, time zone, personality, agent defaults, model choices, memory and skill settings, and the notification levels and pins of each person.",
   "settings.transfer.export.settingsDescription":
-    "MCP servers, custom model providers, sidebar sections, and routine flows.",
-  "settings.transfer.export.history": "Include chat history",
+    "MCP servers, custom model providers, sidebar sections, routine flows, and shared skills.",
   "settings.transfer.export.historyDescription":
     "The chats, side threads, and channel messages, with the files of the chat messages. The file can be large.",
   "settings.transfer.export.chooseAgents": "Choose agents ({selected} of {total})",
@@ -799,8 +837,11 @@ export const messages = defineMessages("settings", {
   "settings.transfer.import.agentsLabel": "Agents in the file",
   "settings.transfer.import.nameExists": "Name already used",
   "settings.transfer.import.settings": "Import server settings",
-  "settings.transfer.import.settingsDescription":
-    "Adds the MCP servers, custom model providers, and sidebar sections that this server does not have.",
+  "settings.transfer.import.settingsAndPreferences":
+    "Adds the MCP servers, custom model providers, sidebar sections, and shared skills that this server does not have.",
+  "settings.transfer.import.preferences": "Import server preferences",
+  "settings.transfer.import.preferencesDescription":
+    "Replaces the name, logo, and preferences of this server, and the notification levels and pins of each person, with the ones in the file.",
   "settings.transfer.import.submit": { one: "Import {count} agent", other: "Import {count} agents" },
   "settings.transfer.import.submitSettings": "Import server settings",
   "settings.transfer.import.importing": "Importing…",
@@ -813,4 +854,26 @@ export const messages = defineMessages("settings", {
   "settings.transfer.result.signInButton": "Sign in to {provider}",
   "settings.transfer.result.notImported": "Not imported",
   "settings.transfer.result.warnings": "Check these",
+  "settings.transfer.copy.tileTitle": "Copy to another server",
+  "settings.transfer.copy.tileText": "Send agents to another of your servers.",
+  "settings.transfer.copy.title": "Copy agents to another server",
+  "settings.transfer.copy.from": "From",
+  "settings.transfer.copy.to": "To",
+  "settings.transfer.copy.chooseServer": "Choose a server",
+  "settings.transfer.copy.search": "Search agents",
+  "settings.transfer.copy.agentsOn": "Agents on {server}",
+  "settings.transfer.copy.all": { one: "All {count} agent", other: "All {count} agents" },
+  "settings.transfer.copy.noAgents": "This server has no agents.",
+  "settings.transfer.copy.new": "New",
+  "settings.transfer.copy.notCopied":
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "settings.transfer.copy.submit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "settings.transfer.copy.copying": "Copying…",
+  "settings.transfer.copy.done": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "settings.transfer.copy.open": "Open {server}",
+  "settings.transfer.copy.loadFailed": "The agents could not be read",
+  "settings.transfer.copy.failed": "The copy did not finish",
 });

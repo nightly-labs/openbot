@@ -21,6 +21,7 @@ export function SettingsPageStory(props: {
         heading={<h1 class="settings-page-title">{props.title}</h1>}
         onMounts={setPage}
         onEscape={() => props.onEscape?.()}
+        onClose={() => props.onEscape?.()}
       >
         {props.controls}
       </SettingsPageFrame>

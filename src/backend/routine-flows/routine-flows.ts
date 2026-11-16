@@ -30,6 +30,7 @@ import type {
   RoutineFlowStep,
   RoutineRun,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -79,6 +80,14 @@ export interface RoutineFlowsDependencies {
     text: string;
     idempotencyKey: string;
   }): Effect.Effect<string, { readonly cause: unknown }>;
+  /** The user's Stop for a routine run that has not ended: its turn, also in a side thread, and its queue place. */
+  stopRoutineRun(input: {
+    agentId: string;
+    routineId: string;
+    runId: string;
+  }): Effect.Effect<void, { readonly cause: unknown }>;
+  /** Stops one handoff: the turn that answers it, or its place in the queue. */
+  stopDelivery(agentId: string, deliveryId: string): Effect.Effect<void, { readonly cause: unknown }>;
   /** The agents whose canvases changed. */
   changed(agentIds: string[]): void;
   now?: () => Date;
@@ -93,10 +102,19 @@ export interface RoutineFlowsShape {
   updateLink(input: UpdateRoutineFlowLinkInput): Effect.Effect<RoutineFlowLink, RoutineFlowFailed>;
   /**
    * Every agent a routine touches, or the routine of a link touches: its own agent and both agents of
-   * each of its links. Null when the routine or link does not exist. A joined member may change a
-   * flow only when all of them are visible to the member.
+   * each of its links. For a run, also each agent that has a step in it, as a link removed after the
+   * run handed work on no longer names that agent. Null when the routine, link or run does not exist.
+   * A joined member may change a flow, or stop a run, only when all of them are visible to the member.
    */
-  agentsOf(ref: { routineId: string } | { linkId: string }): Effect.Effect<string[] | null, RoutineFlowFailed>;
+  agentsOf(
+    ref: { routineId: string } | { linkId: string } | { runId: string },
+  ): Effect.Effect<string[] | null, RoutineFlowFailed>;
+  /**
+   * The user's Stop for one run: the routine's own turn and every handoff that works now stop, and
+   * each agent of the flow that has not started is skipped. The run and the stopped steps end as
+   * cancelled. A run that has ended stays as it is.
+   */
+  stopRun(input: StopRoutineFlowRunInput): Effect.Effect<void, RoutineFlowFailed>;
   /** Moves every flow that can move now. */
   sweep(): Effect.Effect<void>;
   /** Asks for a sweep when an agent event may have ended a step. Returns at once. */
@@ -207,9 +225,16 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         });
 
         const agentsOf = Effect.fn("RoutineFlows.agentsOf")(function* (
-          ref: { routineId: string } | { linkId: string },
+          ref: { routineId: string } | { linkId: string } | { runId: string },
         ) {
           return yield* attempt(() => {
+            if ("runId" in ref) {
+              const run = store.run(ref.runId);
+              if (!run || !store.routineOwner(run.routineId)) return null;
+              return [
+                ...new Set([...agentsOfRoutine(run.routineId), ...store.steps(run.id).map((step) => step.agentId)]),
+              ];
+            }
             const routineId = "routineId" in ref ? ref.routineId : store.link(ref.linkId)?.routineId;
             return routineId && store.routineOwner(routineId) ? agentsOfRoutine(routineId) : null;
           });
@@ -387,6 +412,50 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           yield* Effect.forkIn(sweep(), scope);
         });
 
+        const stopRun = Effect.fn("RoutineFlows.stopRun")(function* (input: StopRoutineFlowRunInput) {
+          const run = yield* attempt(() => {
+            const found = store.run(input.runId);
+            if (!found || found.routineId !== input.routineId)
+              throw new RoutineFlowError(sourceText("error.backend.routineRunGone"));
+            return found;
+          });
+          yield* dependencies
+            .stopRoutineRun({ agentId: run.agentId, routineId: run.routineId, runId: run.id })
+            .pipe(Effect.mapError((failure) => new RoutineFlowFailed({ cause: failure.cause })));
+          // The flow ends under the sweep's lock, so no sweep hands the run on between these reads and
+          // writes. The provider calls wait outside it: a slow provider does not hold up other flows.
+          const stopped = yield* lock.withPermit(
+            attempt(() => {
+              const steps = store.steps(run.id);
+              const open = steps.filter((step) => step.status === "running");
+              for (const step of open) store.settleStep(step.id, "cancelled", null, null);
+              const links = store.linksForRoutines([run.routineId]).filter((link) => link.createdAt <= run.createdAt);
+              const started = new Set(steps.map((step) => step.agentId));
+              for (const agentId of routineFlowDepths(run.agentId, links).keys())
+                if (agentId !== run.agentId && !started.has(agentId))
+                  store.addStep({ runId: run.id, agentId, input: "", status: "skipped" });
+              return open;
+            }),
+          );
+          dependencies.changed(agentsOfRoutine(run.routineId));
+          // A step that ended as cancelled keeps that: an answer that still comes is not handed on.
+          for (const step of stopped) {
+            if (!step.deliveryId) continue;
+            yield* dependencies.stopDelivery(step.agentId, step.deliveryId).pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() =>
+                  logger.warn("A stopped routine flow step did not stop.", {
+                    stepId: step.id,
+                    cause: String(failure.cause),
+                  }),
+                ),
+              ),
+            );
+          }
+          // The routine's own step, which the sweep records once the run has ended.
+          yield* Effect.forkIn(sweep(), scope);
+        });
+
         return RoutineFlows.of({
           canvas,
           savePosition,
@@ -395,6 +464,7 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           disconnect,
           updateLink,
           agentsOf,
+          stopRun,
           sweep,
           notice,
         });

@@ -6,8 +6,12 @@ export const messages = {
     "L’offre du serveur n’a pas pu être modifiée. Actualisez « Facturation » et réessayez.",
   "error.billing.confirmMismatch": "Saisissez le nom du serveur pour le supprimer.",
   "error.billing.restartBusy": "Le serveur ne peut pas redémarrer maintenant. Réessayez dans une minute.",
+  "error.billing.restartUnavailable": "Ce serveur ne peut pas redémarrer d’ici. Contactez l’assistance.",
   "error.billing.planRequired": "L’offre de ce serveur a pris fin. Renouvelez-la pour démarrer le serveur.",
   "error.billing.planSoldOut": "Cette offre est épuisée. Choisissez une autre offre.",
+  "error.billing.storageUnavailable": "Ce stockage n'est pas disponible pour ce serveur.",
+  "error.billing.storagePaymentFailed":
+    "Le paiement du stockage a échoué. Mettez à jour le moyen de paiement et réessayez.",
   // Billing errors.
   "error.billing.licenseExists": "Ce compte a déjà une licence. Modifiez plutôt son nombre d'utilisateurs.",
   "error.billing.licenseCurrency": "La licence doit utiliser la devise de vos autres forfaits.",

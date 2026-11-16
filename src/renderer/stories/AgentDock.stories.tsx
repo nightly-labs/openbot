@@ -256,6 +256,15 @@ function AgentDockStory(props: { seats: AgentDockSeatRef[]; results?: AgentDockS
           })
         }
         onOpenSettings={() => undefined}
+        onHide={() => undefined}
+        onMove={(seat, before) =>
+          setState((draft) => {
+            const key = agentDockSeatKey(seat);
+            draft.seats.splice(draft.seats.indexOf(key), 1);
+            const index = before ? draft.seats.indexOf(agentDockSeatKey(before)) : -1;
+            draft.seats.splice(index < 0 ? draft.seats.length : index, 0, key);
+          })
+        }
         onSend={async (seat, text) => {
           const agentId = seat.id;
           const id = `story-${++nextId}`;

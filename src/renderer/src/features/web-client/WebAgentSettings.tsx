@@ -41,7 +41,7 @@ export function WebAgentSettings(props: {
   initialDraft?: FirstAgentDraft;
   onDraftChange?: (draft: FirstAgentDraft) => void;
   onClose: () => void;
-  onSaved: () => Promise<void>;
+  onSaved: (agentId: string) => Promise<void>;
 }) {
   const { t } = useText();
   const [state, setState] = createStore<{
@@ -147,7 +147,7 @@ export function WebAgentSettings(props: {
     let created = false;
     try {
       const selectedModel = state.models.find((model) => model.provider === value.provider && model.id === value.model);
-      await props.runtime.createAgent({
+      const agent = await props.runtime.createAgent({
         name: value.name,
         description: value.purpose,
         initialMessage: createAgentInitialMessage(value, props.capabilities.includes(AGENT_WELCOME_CAPABILITY)),
@@ -166,7 +166,7 @@ export function WebAgentSettings(props: {
       });
       created = true;
       if (!disposed) {
-        await props.onSaved();
+        await props.onSaved(agent.id);
         props.onClose();
       }
     } catch {

@@ -12,11 +12,16 @@
 }
 
 /*
- * A page in the chat starts at the edge of the agent's reply below it (an agent chat shows no avatar
- * column) and is as wide as a wide agent bubble.
+ * A page in the chat starts at the edge of the agent's reply below it and is as wide as a wide agent
+ * bubble, which grows with the chat.
  */
 .chat-visual-reply {
-  max-width: 720px;
+  max-width: var(--message-wide-bubble-width);
+}
+
+/* In a chat with agent faces, the page starts after the face column, as the agent's bubbles do. */
+.chat-visual-with-author {
+  padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
 }
 
 /* A page that fills a panel. The page has no margin, so the frame gives it one. */

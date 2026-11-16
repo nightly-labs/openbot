@@ -15,6 +15,8 @@ const RETRY_MS = 5000;
 export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, serverId: string): ProviderRuntimeSource {
   const listeners = new Set<(snapshot: ProviderRuntimeSnapshot) => void>();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  /** The download calls that the host has not answered. */
+  let starting = 0;
 
   function poll(delay: number): void {
     if (timer !== undefined || listeners.size === 0) return;
@@ -25,7 +27,7 @@ export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, ser
         .then(
           (snapshot) => {
             for (const listener of listeners) listener(snapshot);
-            if (running(snapshot)) poll(POLL_MS);
+            if (running(snapshot) || starting > 0) poll(POLL_MS);
           },
           () => poll(RETRY_MS),
         );
@@ -40,7 +42,18 @@ export function remoteProviderRuntimes(admin: () => ProviderAdminDesktopApi, ser
 
   return {
     getStatus: () => admin().getRuntimes(serverId).then(observe),
-    download: (provider) => admin().downloadRuntime(provider, serverId).then(observe),
+    // A host can answer late: it first waits for its release check. The reads start with the call,
+    // so the progress shows as soon as the host has some.
+    download: (provider) => {
+      starting += 1;
+      poll(POLL_MS);
+      return admin()
+        .downloadRuntime(provider, serverId)
+        .finally(() => {
+          starting -= 1;
+        })
+        .then(observe);
+    },
     cancel: (provider) => admin().cancelRuntime(provider, serverId).then(observe),
     checkForUpdates: () => admin().checkRuntimeUpdates(serverId).then(observe),
     onEvent: (listener) => {

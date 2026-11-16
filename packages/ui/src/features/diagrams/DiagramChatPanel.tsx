@@ -13,6 +13,7 @@ import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ComposerEditor } from "../conversation/ComposerEditor";
+import { createComposerRowsResize } from "../conversation/createComposerRowsResize";
 import { MarkdownMessageText } from "../conversation/MarkdownMessageText";
 import type { DiagramChatMessage } from "./diagram-model";
 
@@ -37,6 +38,7 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
   const mood = (): AvatarMood => (props.working ? "working" : "idle");
   const [focusRequest, setFocusRequest] = createSignal(0);
   const [offset, setOffset] = createSignal({ x: 0, y: 0 });
+  const draftRows = createComposerRowsResize();
   let launcher: HTMLElement | undefined;
   let log: HTMLDivElement | undefined;
   /** A new message, or the agent starting on one, scrolls the log to its end. */
@@ -186,14 +188,16 @@ export function DiagramChatPanel(props: DiagramChatPanelProps) {
         </div>
 
         <form
+          ref={draftRows.form}
           class="composer diagram-chat-composer"
           data-compact=""
+          data-small=""
           onSubmit={(event: SubmitEvent) => {
             event.preventDefault();
             send();
           }}
         >
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={undefined}
               agents={[]}

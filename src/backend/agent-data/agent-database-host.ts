@@ -8,8 +8,8 @@
 // Runtime imports are limited to node:* and Effect. Repository shapes remain type-only, so this
 // process cannot load Electron or the openbot.db facade. Effect does not replace process deadlines.
 
-import { existsSync } from "node:fs";
-import { basename } from "node:path";
+import { accessSync, chmodSync, existsSync, constants as fileAccess, statSync } from "node:fs";
+import { basename, dirname } from "node:path";
 import { createInterface } from "node:readline";
 import { constants, DatabaseSync, type StatementSync } from "node:sqlite";
 import { Context, Effect, Layer, ManagedRuntime, Result, Schema } from "effect";
@@ -49,6 +49,12 @@ const SQLITE_BUSY = 5;
 const SQLITE_FULL = 13;
 /** `SQLITE_READONLY_ROLLBACK`: the file has a hot journal that a read-only connection cannot roll back. */
 const SQLITE_READONLY_ROLLBACK = 776;
+/**
+ * `SQLITE_READONLY`, the primary code in the low byte of the extended codes this host meets on a
+ * write: the file is read-only (8), its folder is read-only so no journal can be made (1544), or the
+ * file was replaced while a connection held the old one (1032).
+ */
+const SQLITE_READONLY = 8;
 
 /** Functions SQLite can compile in that read, write, or load code from the filesystem. */
 const DENIED_FUNCTIONS = new Set(["load_extension", "readfile", "writefile", "edit", "fts3_tokenizer"]);
@@ -75,7 +81,13 @@ let protectedTables = new Set<string>();
  * text. Denying `SQLITE_ATTACH` alone closes both `ATTACH DATABASE` and `VACUUM INTO '<path>'` --
  * the only two ways statement text can name a file.
  */
-function authorize(action: number, first: string | null, second: string | null): number {
+function authorize(
+  action: number,
+  first: string | null,
+  second: string | null,
+  _database: string | null,
+  triggerOrView: string | null,
+): number {
   switch (action) {
     case constants.SQLITE_ATTACH:
     case constants.SQLITE_DETACH:
@@ -97,8 +109,12 @@ function authorize(action: number, first: string | null, second: string | null):
     case constants.SQLITE_DELETE:
       // The owner record. An agent may read it -- that is how `list_tables` reports the owner
       // without a PRAGMA -- but nothing an agent writes may reassign or erase it. `provisioning` is
-      // set only while `AgentTables` writes the record itself, from SQL no agent supplied.
-      return first === METADATA_TABLE && !provisioning ? constants.SQLITE_DENY : constants.SQLITE_OK;
+      // set only while `AgentTables` writes the record itself, from SQL no agent supplied. A trigger
+      // that such a statement fires, for example through a foreign-key cascade of `DROP TABLE`, is
+      // SQL an agent wrote, so it gets no such trust.
+      return first === METADATA_TABLE && !(provisioning && triggerOrView === null)
+        ? constants.SQLITE_DENY
+        : constants.SQLITE_OK;
     // Every agent may change the rows in every table, but only the agent that made a table may
     // remove or reshape it. SQLite reports the target table itself, so the rule is decided on the
     // compiled statement rather than on a guess about what the SQL text means. The two actions name
@@ -109,6 +125,16 @@ function authorize(action: number, first: string | null, second: string | null):
       return tableOwnedByAnother(first);
     case constants.SQLITE_ALTER_TABLE:
       return tableOwnedByAnother(second);
+    // A trigger runs inside every write to its table, so adding or removing one reshapes the table
+    // as ALTER does. The actions name the table in the second argument.
+    case constants.SQLITE_CREATE_TRIGGER:
+    case constants.SQLITE_DROP_TRIGGER:
+    case constants.SQLITE_DROP_TEMP_TRIGGER:
+      return tableOwnedByAnother(second);
+    // A TEMP trigger would live only on the one cached connection that every agent shares, and stop
+    // with no notice when that connection closes.
+    case constants.SQLITE_CREATE_TEMP_TRIGGER:
+      return constants.SQLITE_DENY;
     default:
       return constants.SQLITE_OK;
   }
@@ -265,10 +291,11 @@ function runStatement(statement: StatementSync, parameters: readonly AgentDataba
 /**
  * SQLite's own sentence is usually the best one a model can get -- "no such table: users" and
  * "UNIQUE constraint failed: users.email" are exactly what it needs to fix its next call. Only the
- * three that would mislead are rewritten, and the absolute path is removed from every one of them
+ * four that would mislead are rewritten, and the absolute path is removed from every one of them
  * because these sentences are logged and shown.
  */
-function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
+function toFailure(error: unknown, request: AgentDatabaseStatement): AgentDatabaseFailure {
+  const { databasePath } = request;
   if (error instanceof HostFailure) return redactFailure(error.failure, databasePath);
   const code = typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
   const message = error instanceof Error ? error.message : String(error);
@@ -277,6 +304,15 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
     return {
       kind: "size-limit",
       message: "The shared database reached its 256 MB limit. Delete rows or tables that are no longer needed.",
+      sqliteCode: code,
+    };
+  }
+  // Only a write: on the read-only connection the same code means the statement tried to write.
+  if (request.mode === "write" && code !== undefined && (code & 0xff) === SQLITE_READONLY) {
+    return {
+      kind: "sqlite",
+      message:
+        "Nothing was saved, because OpenBot does not have permission to change the shared tables file or its Data folder. The user account that runs OpenBot needs permission to change that folder and the files in it.",
       sqliteCode: code,
     };
   }
@@ -291,7 +327,7 @@ function toFailure(error: unknown, databasePath: string): AgentDatabaseFailure {
     return {
       kind: "not-authorized",
       message:
-        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, and extensions are not available, and a table another agent created cannot be dropped or altered.",
+        "SQLite refused part of this statement. ATTACH, DETACH, PRAGMA, VACUUM, extensions, and TEMP triggers are not available, and a table another agent created cannot be dropped, altered, or given a trigger.",
       ...(code === undefined ? {} : { sqliteCode: code }),
     };
   }
@@ -306,7 +342,7 @@ function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): E
   return Effect.try({
     try: operation,
     catch: (error) => {
-      const failure = toFailure(error, request.databasePath);
+      const failure = toFailure(error, request);
       return new HostFailure(failure.kind, failure.message, failure.sqliteCode);
     },
   });
@@ -322,6 +358,39 @@ function rollBackHotJournal(request: AgentDatabaseStatement): Effect.Effect<void
     openDatabase({ ...request, mode: "write" })
       .prepare("SELECT 1 FROM sqlite_master LIMIT 1")
       .get();
+  });
+}
+
+/**
+ * A write connection that SQLite opened read-only stays read-only, and one that holds a replaced
+ * file never sees the new one, so every later write fails until the app restarts (#9225). Both
+ * connections of the file are closed, the owner gets back read and write access to the folder, the
+ * file, and its journal or WAL files, and the caller runs the write once more on a new connection.
+ * SQLite refused the write before it changed anything, so the second run cannot save it twice. Bits
+ * are only added, and `chmod` cannot change a file another account owns; that case keeps failing
+ * with its sentence.
+ */
+function reopenWritable(request: AgentDatabaseStatement): Effect.Effect<void> {
+  return Effect.sync(() => {
+    closePath(request.databasePath);
+    const folder = dirname(request.databasePath);
+    for (const [path, ownerBits] of [
+      [folder, 0o700],
+      [request.databasePath, 0o600],
+      [`${request.databasePath}-journal`, 0o600],
+      [`${request.databasePath}-wal`, 0o600],
+      [`${request.databasePath}-shm`, 0o600],
+    ] as const) {
+      try {
+        accessSync(path, fileAccess.R_OK | fileAccess.W_OK);
+      } catch {
+        try {
+          chmodSync(path, statSync(path).mode | ownerBits);
+        } catch {
+          // Missing, or owned by another account: the second run reports it.
+        }
+      }
+    }
   });
 }
 
@@ -358,6 +427,13 @@ class AgentDatabaseHost extends Context.Service<
               Effect.catchIf(
                 (failure) => request.mode === "read" && failure.sqliteCode === SQLITE_READONLY_ROLLBACK,
                 () => rollBackHotJournal(request).pipe(Effect.andThen(run)),
+              ),
+              Effect.catchIf(
+                (failure) =>
+                  request.mode === "write" &&
+                  failure.sqliteCode !== undefined &&
+                  (failure.sqliteCode & 0xff) === SQLITE_READONLY,
+                () => reopenWritable(request).pipe(Effect.andThen(run)),
               ),
             );
           },

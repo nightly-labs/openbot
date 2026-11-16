@@ -2,9 +2,8 @@ import { createHash } from "node:crypto";
 import { createReadStream, existsSync } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
-import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
-import { parse } from "yaml";
+import { readUpdateManifest } from "./update-rollout";
 
 const logger = createOpenBotLogger("verify-update-artifacts");
 
@@ -90,29 +89,25 @@ async function verifyMaximumSize(path: string, maximumBytes: number): Promise<vo
 
 /**
  * Checks the manifest describes the artifact on disk, and reports the size of the block map the
- * manifest records inside it, or `null` when it records none.
+ * manifest records inside it, or `null` when it records none. A `stagingPercentage` is optional: the
+ * publish job writes it later (scripts/update-rollout.ts). When it is there, it must be a whole number
+ * from 0 to 100, because electron-updater offers the release to every install for a value it cannot read.
  */
 async function verifyManifest(path: string, artifact: string): Promise<number | null> {
-  const manifest = parse(await readFile(path, "utf8"));
-  if (!isDynamicRecord(manifest) || !Array.isArray(manifest.files)) {
-    throw new Error("The update manifest has no file list.");
-  }
+  const manifest = readUpdateManifest(await readFile(path, "utf8"));
   const artifactName = basename(artifact);
-  const entry = manifest.files?.find((candidate) => {
-    if (!isDynamicRecord(candidate) || !isString(candidate.url)) return false;
-    return basename(decodeURIComponent(candidate.url)) === artifactName;
-  });
-  if (!isDynamicRecord(entry)) throw new Error(`The update manifest does not contain ${artifactName}.`);
+  const entry = manifest.files.find((candidate) => basename(decodeURIComponent(candidate.url)) === artifactName);
+  if (entry === undefined) throw new Error(`The update manifest does not contain ${artifactName}.`);
   const size = (await stat(artifact)).size;
-  if (!isNumber(entry.size) || entry.size !== size) {
+  if (entry.size !== size) {
     throw new Error(`The manifest size does not match ${artifactName}.`);
   }
   const hash = createHash("sha512");
   for await (const chunk of createReadStream(artifact)) hash.update(chunk);
-  if (!isString(entry.sha512) || entry.sha512 !== hash.digest("base64")) {
+  if (entry.sha512 !== hash.digest("base64")) {
     throw new Error(`The manifest SHA-512 does not match ${artifactName}.`);
   }
-  return isNumber(entry.blockMapSize) && entry.blockMapSize > 0 ? entry.blockMapSize : null;
+  return entry.blockMapSize !== undefined && entry.blockMapSize > 0 ? entry.blockMapSize : null;
 }
 
 async function walk(root: string): Promise<string[]> {

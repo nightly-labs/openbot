@@ -74,11 +74,17 @@ const RELAY_INSTRUCTIONS =
   "End with one sentence that says that the full answer is in the chat. " +
   "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
   "do not shorten it, and do not change its form.";
-/** The first message in the voice conversation. The voice model reads it as the user's. */
+/**
+ * The first message in the voice conversation. The voice model reads it as the user's. It is in English,
+ * so without the language rule the voice says its own words, such as an acknowledgment, in English (#6871).
+ */
 const RELAY_VOICE_RULE =
   "From now on, give every request of mine to the background agent, even simple questions and small talk. " +
   "Never answer from your own knowledge. Wait for the agent's result before you give an answer. " +
   "Say only what the result says, and add no facts of your own. " +
+  "Always speak the language that I speak, also for your own short words such as greetings and acknowledgments. " +
+  "Keep that language when a short or unclear phrase sounds like a different one. " +
+  "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
 
 const logger = createOpenBotLogger("live-voice");

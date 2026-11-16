@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "Réponse requise",
   "prompt.question.label": "Questions de l’agent",
   "prompt.question.cancelled": "Questions annulées",
   "prompt.question.expired": "Questions expirées",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "Suivant",
   "prompt.question.cancel": "Annuler les questions",
   "prompt.question.privatePlaceholder": "Saisissez une réponse privée",
-  "prompt.customPlaceholder": "Saisissez votre propre réponse",
   "prompt.question.customAnswerFor": "Réponse personnalisée pour : {question}",
   "prompt.question.skip": "Ignorer",
   "prompt.question.chooseAll": "Choisissez toutes les réponses qui s’appliquent.",
   "prompt.question.somethingElse": "Autre chose",
   "prompt.question.emptyTitle": "Aucune question en attente.",
   "prompt.question.emptyBody": "L’agent continuera quand il aura besoin d’une autre décision.",
-  "prompt.choice.hint": "Choisissez ce qui convient, ou saisissez votre propre réponse.",
-  "prompt.choice.customLabel": "Réponse personnalisée",
   "prompt.approval.answerFailed": "Impossible de répondre à cette demande d’approbation. Réessayez.",
   "prompt.approval.grantFailed": "Impossible d’enregistrer l’autorisation permanente. Réessayez.",
   "prompt.approval.label": "Approbation de l’agent",
@@ -29,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "Autoriser",
   "prompt.approval.alwaysAllow": "Toujours autoriser",
   "prompt.approval.deny": "Refuser",
+  "prompt.approval.cut":
+    "Cette carte n’affiche que le début de la demande : elle propose donc seulement Refuser. Si Autoriser n’apparaît pas bientôt, mettez à jour OpenBot sur le serveur.",
   "prompt.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",

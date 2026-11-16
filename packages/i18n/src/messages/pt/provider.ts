@@ -160,22 +160,36 @@ export const messages = {
   "provider.geminiKey.title": "Chave de API do Gemini",
   "provider.geminiKey.description":
     "Salve uma chave de API do Gemini neste computador. Uma chave salva é usada no lugar da sua conta Google. Para entrar com o Google, remova a chave e selecione Conectar na linha do Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Salve uma chave de API do Gemini no host. Uma chave salva é usada no lugar da sua conta Google. Para entrar com o Google, remova a chave e selecione Conectar na linha do Gemini.",
   "provider.geminiKey.label": "Chave de API do Gemini",
   "provider.claudeKey.title": "Chave de API da Anthropic",
   "provider.claudeKey.description":
     'Salve uma chave de API da Anthropic no host. A Anthropic cobra cada solicitação no crédito de API da chave, não no seu plano do Claude. Para usá-la em um agente, selecione a conta "Chave de API" no menu de modelos do agente. Quando o Claude não está conectado, todos os agentes usam a chave.',
   "provider.claudeKey.label": "Chave de API da Anthropic",
+  "provider.cursorKey.title": "Chave de API do Cursor",
+  "provider.cursorKey.description":
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva neste computador.",
+  "provider.cursorKey.descriptionHost":
+    "Cada conta do Cursor depois da primeira usa uma chave de API. Crie uma chave no painel do Cursor, em Integrations, e cole aqui. A chave é salva no computador anfitrião.",
+  "provider.cursorKey.label": "Chave de API do Cursor",
   "provider.inceptionKey.title": "Chave de API da Inception",
   "provider.inceptionKey.description":
     "Salve uma chave de API da Inception neste computador para usar os modelos Mercury. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.inceptionKey.descriptionHost":
+    "Salve uma chave de API da Inception no host para usar os modelos Mercury. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.inceptionKey.label": "Chave de API da Inception",
   "provider.deepseekKey.title": "Chave de API da DeepSeek",
   "provider.deepseekKey.description":
     "Salve uma chave de API da DeepSeek neste computador para usar os modelos da DeepSeek. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.deepseekKey.descriptionHost":
+    "Salve uma chave de API da DeepSeek no host para usar os modelos da DeepSeek. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.deepseekKey.label": "Chave de API da DeepSeek",
   "provider.openrouterKey.title": "Chave de API do OpenRouter",
   "provider.openrouterKey.description":
     "Salve uma chave de API do OpenRouter neste computador para usar os modelos do OpenRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
+  "provider.openrouterKey.descriptionHost":
+    "Salve uma chave de API do OpenRouter no host para usar os modelos do OpenRouter. O OpenBot os executa na CLI do Pi que ele baixa.",
   "provider.openrouterKey.label": "Chave de API do OpenRouter",
   "provider.openCodeKey.title": "Entrar no OpenCode Go",
   "provider.openCodeKey.description":
@@ -192,6 +206,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Não foi possível reconectar.",
   "provider.account.add": "Adicionar conta",
   "provider.account.addLabel": "Adicionar outra conta de {name}",
+  "provider.account.addWithCode": "Adicionar conta com código",
   "provider.account.count": { one: "{count} conta", other: "{count} contas" },
   "provider.account.numbered": "Conta {number}",
   "provider.account.apiKey": "Chave de API",
@@ -219,14 +234,31 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} não tem mais créditos de redefinição de uso.",
   "provider.account.resetUsageAlreadyRedeemed": "Este crédito de redefinição de {name} já foi usado.",
   "provider.account.resetUsageFailed": "Não foi possível redefinir o uso de {name}.",
+  "provider.account.pool": "Agrupar contas",
+  "provider.account.poolDescription":
+    "Os agentes usam uma conta até ela chegar perto de um limite de uso e depois a conta cujo limite reinicia primeiro.",
+  "provider.account.inUse": "Em uso",
+  "provider.account.notInPool": "Fora do grupo",
+  "provider.account.leaveOutOfPool": "Tirar do grupo",
+  "provider.account.putBackInPool": "Voltar ao grupo",
+  "provider.account.poolChip": "Grupo",
+  "provider.account.poolCount": "Grupo de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} em uso",
+  "provider.settings.accountsPooledDescription": "{count} de {max}. Os agentes compartilham estas contas.",
   "provider.settings.disconnectTitle": "Desconectar {name}?",
   "provider.settings.disconnectOthers":
     "As outras contas do {provider} esperam até você conectar o {provider} de novo.",
   "provider.settings.disconnectLocal":
     "O OpenBot sai do {provider} neste computador. A CLI do {provider} no seu terminal também sai.",
   "provider.settings.disconnectHost": "O OpenBot sai do {provider} no servidor.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Uma chave de API do Gemini salva é usada no lugar de um login do Google. Para usar um plano do Google e os modelos dele, remova a chave.",
   "provider.settings.versionInstalledByUser": "{version} · instalada por você",
   "provider.settings.versionDownloaded": "{version} · baixada pelo OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Sem uso: {version} · instalada por você",
+  "provider.settings.otherVersionDownloaded": "Sem uso: {version} · baixada pelo OpenBot",
+  "provider.settings.useInstalledVersion": "Usar a instalada",
+  "provider.settings.useDownloadedVersion": "Usar a do OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompts",
   "provider.settings.promptCacheDescription":
@@ -266,4 +298,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Exclui a CLI que o OpenBot baixou para {name} ({size}). Contas, logins e agentes continuam.",
   "provider.settings.removeDownloadFailed": "Não foi possível remover o download.",
+  "provider.settings.disconnectLocalOnly":
+    "O OpenBot desconecta o {provider} neste computador. A CLI do {provider} no seu terminal mantém o próprio login.",
 } as const satisfies PartialTranslation<typeof source>;

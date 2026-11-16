@@ -10,6 +10,10 @@ export const messages = {
     "Arguments de découverte d’outils non valides. Utilisez le schéma déclaré et un nom d’outil qualifié d’origine.",
   "error.agent.toolCallArgumentsNotObject":
     "L’outil ne s’est pas exécuté. Dans tool_call, arguments doit être un objet JSON, pas du texte. Renvoyez l’appel avec arguments sous forme d’objet.",
+  "error.agent.toolCallDiscoveryTool":
+    "L’outil ne s’est pas exécuté. tool_call ne peut pas exécuter openbot.tool_search ni openbot.tool_describe. Appelez-les directement avec les mêmes arguments.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La planification de la routine n’est pas valide : {detail} Corrigez la planification et réessayez. openbot.tool_describe donne le schéma.",
   "error.agent.approvalWhileDeleting": "Impossible d’accorder l’approbation pendant la suppression de l’agent.",
   "error.agent.accessLocalOnly": "L’accès à l’agent ne peut être modifié que sur l’ordinateur qui exécute l’agent.",
   "error.agent.duplicateCleanupFailed":
@@ -90,8 +94,12 @@ export const messages = {
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
   "error.agent.turnStalled":
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.toolLoopStopped":
+    "{provider} a répété de nombreuses fois une étape en échec, donc OpenBot a arrêté ce tour. Renvoyez le message ou choisissez un autre modèle.",
   "error.agent.compactionConnectionLost":
     "La connexion s’est interrompue pendant que l’agent compactait son contexte, la tâche s’est donc arrêtée. Vérifiez votre connexion internet, puis envoyez un message pour continuer.",
+  "error.agent.compactionLoopStopped":
+    "{provider} a compacté le contexte encore et encore, et il restait chaque fois trop plein pour continuer : OpenBot a donc arrêté ce tour. Désactivez les serveurs MCP ou l'utilisation de l'ordinateur dont cet agent n'a pas besoin, puis envoyez un message. Si vous ou l'agent avez changé le moment où {provider} compacte, annulez ce changement.",
   "error.agent.selectedGone": "L’agent sélectionné n’existe plus.",
   "error.agent.profileEndpointsChanged":
     "Les points de terminaison personnalisés ont changé pendant la génération. Réessayez.",
@@ -149,6 +157,8 @@ export const messages = {
     "Ce serveur manque de mémoire. Votre message attend dans la file et démarre quand la mémoire est libre.",
   "error.agent.workspaceOnlyToolMissing":
     "« Espace de travail uniquement » nécessite {tool}, qu’OpenBot n’a pas trouvé. Installez-le, ou choisissez « Accès complet » dans les réglages de l’agent.",
+  "error.agent.codexSandboxUnavailable":
+    "« Espace de travail uniquement » nécessite le bac à sable de Codex, que Codex ne peut pas démarrer sur cet ordinateur : les commandes de l’agent échouent. Choisissez « Demander d’abord » ou « Accès complet » dans les réglages de l’agent.",
   "error.agent.claudeSandboxUnavailable":
     "« Espace de travail uniquement » nécessite le bac à sable de Claude, que Claude ne peut pas démarrer sur cet ordinateur : {reason}. Choisissez « Accès complet » ou un autre fournisseur dans les réglages de l’agent.",
   "error.agent.screenCaptureOff":

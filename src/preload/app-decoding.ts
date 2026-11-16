@@ -136,6 +136,7 @@ import {
   type VoiceStream,
   type VoiceStreamTranscript,
   type VoiceTranscriptionResult,
+  type WorkflowNotificationOpenedEvent,
 } from "@openbot/contracts/ipc";
 import {
   decodeList,
@@ -433,12 +434,13 @@ export function decodeAccountSessions(value: unknown): AccountSession[] {
 
 export function decodeUpdateStatus(value: unknown): UpdateStatus {
   const status = decodeRecord(value, "update status");
-  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart } = status;
+  const { phase, errorCode, managedByHost, scheduledRestart, idleRestart, stagedVersion } = status;
   if (!isOneOf(UPDATE_PHASES, phase)) throw new Error("Invalid phase.");
   if (errorCode !== null && !isOneOf(["check_failed", "download_failed", "install_failed"] as const, errorCode)) {
     throw new Error("Invalid errorCode.");
   }
   if (managedByHost !== undefined && !isBoolean(managedByHost)) throw new Error("Invalid managedByHost.");
+  if (stagedVersion !== undefined && !isString(stagedVersion)) throw new Error("Invalid stagedVersion.");
   return {
     phase,
     currentVersion: requiredString(status, "currentVersion"),
@@ -450,6 +452,7 @@ export function decodeUpdateStatus(value: unknown): UpdateStatus {
     ...(managedByHost === undefined ? {} : { managedByHost }),
     ...(scheduledRestart === undefined ? {} : { scheduledRestart: decodeScheduledUpdateRestart(scheduledRestart) }),
     ...(idleRestart === undefined ? {} : { idleRestart: decodeIdleRestart(idleRestart) }),
+    ...(stagedVersion === undefined ? {} : { stagedVersion }),
   };
 }
 
@@ -544,6 +547,11 @@ export function decodeNotificationOpenedEvent(value: unknown): NotificationOpene
     threadId: nullableString(opened, "threadId"),
     ...(opened.channelId === undefined ? {} : { channelId: requiredString(opened, "channelId") }),
   };
+}
+
+export function decodeWorkflowNotificationOpenedEvent(value: unknown): WorkflowNotificationOpenedEvent {
+  const opened = decodeRecord(value, "opened workflow notification");
+  return { serverId: requiredString(opened, "serverId"), workflowId: requiredString(opened, "workflowId") };
 }
 
 const VOICE_MODEL_PHASES: readonly VoiceModelStatus["phase"][] = ["missing", "downloading", "ready", "error"];

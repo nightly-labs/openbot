@@ -4,6 +4,7 @@ import { BROWSER_PROXIES_CAPABILITY } from "@openbot/contracts/team-protocol/bro
 import BrowserFullView from "@openbot/ui/features/browser/BrowserFullView";
 import BrowserLocalSignInDialog from "@openbot/ui/features/browser/BrowserLocalSignInDialog";
 import { BROWSER_NEW_TAB_URL } from "@openbot/ui/features/browser/browser-suggestions";
+import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, onCleanup, Show, untrack } from "solid-js";
 import { desktopBrowserProfileCalls } from "../browser/browser-profiles-port";
 import {
@@ -20,6 +21,7 @@ import {
 import { createBrowserTabProfiles, readTabProfilesWithProxies } from "../browser/stores/browser-tab-profiles";
 import { serverRoleCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { BrowserDockAdapter } from "./BrowserDockAdapter";
+import { browserTeachFile, browserTeachSteps } from "./browser-teach-message";
 import { conversationPort } from "./conversation-port";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -48,7 +50,14 @@ export default function BrowserFullViewAdapter() {
     showBrowserPip,
     showBrowserTabOf,
     localSignIn,
+    browserTeach,
+    closeBrowserTeach,
+    startBrowserTeach,
+    stopBrowserTeach,
+    sendCardFile,
+    addPageText,
   } = useConversationViewScope();
+  const { t } = useText();
   const serverId = () => props.server?.id ?? "";
   const tabs = createMemo(() => orderedBrowserTabs(serverId(), allBrowserTabs()));
   // Any member who sees a tab reads its profile label, from a host that serves `browser-profiles-v1`.
@@ -120,6 +129,31 @@ export default function BrowserFullViewAdapter() {
     }
   }
 
+  /**
+   * Save sends one short message of the user with the steps in a file, so the chat stays easy to read.
+   * When the chat cannot send now, the steps go to the end of the draft as text.
+   */
+  async function saveTeach() {
+    const steps = await stopBrowserTeach(true);
+    if (!steps) return;
+    const message = t("browser.teach.message");
+    if (await sendCardFile(message, browserTeachFile(t, steps))) return;
+    addPageText(`${message}\n\n${browserTeachSteps(t, steps)}`);
+  }
+  const teach = createMemo(() => {
+    const current = browserTeach();
+    const name = props.agent?.name;
+    if (!current || name === undefined) return undefined;
+    return {
+      agentName: name,
+      pending: current.pending,
+      startedAt: current.phase === "recording" ? current.startedAt : null,
+      onStart: () => void startBrowserTeach(),
+      onSave: () => void saveTeach(),
+      onClose: () => (current.phase === "recording" ? void stopBrowserTeach(false) : closeBrowserTeach()),
+    };
+  });
+
   // The session of the sign-in stays in main only while this dialog can finish it.
   onCleanup(localSignIn.cancel);
 
@@ -167,6 +201,7 @@ export default function BrowserFullViewAdapter() {
       onBack={() => setActiveRightPanel("browser")}
       onEnterPip={props.runtime ? () => undefined : showBrowserPip}
       onSignInLocally={localSignIn.canStart(activeBrowserTab()) ? localSignIn.start : undefined}
+      teach={teach()}
       // A local tab is a native view above this window, so its dock goes in the overlay above the page.
       dock={<BrowserDockAdapter tab={activeBrowserTab()} overlay={!props.runtime && props.server?.kind === "local"} />}
       dialogs={

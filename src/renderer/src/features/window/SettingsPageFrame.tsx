@@ -1,5 +1,5 @@
 import type { CentralAuthUser, ServerSummary } from "@openbot/contracts/ipc";
-import { Button, ChevronRight, Input, Search, UserAvatar, UserRound } from "@openbot/ui";
+import { Button, ChevronRight, IconButton, Input, Search, UserAvatar, UserRound, X } from "@openbot/ui";
 import { ServerMark } from "@openbot/ui/features/servers/ServerRail";
 import type { SettingsPagePlacement } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { useText } from "@openbot/ui/text";
@@ -10,7 +10,8 @@ import { flush, onSettled, Show } from "solid-js";
  * The frame of a settings page, on desktop and on the web: the heading and the section list at the
  * width of the sidebar, the path to an open detail page in the top row, and the panel. The settings
  * panel shows its nav, path and content in the mounts that `onMounts` gets. The footer, below the
- * section list, holds the row that opens the other settings page.
+ * section list, holds the row that opens the other settings page. The Close button at the end of the
+ * top row is the visible way out of the page.
  */
 export function SettingsPageFrame(props: {
   heading: JSX.Element;
@@ -21,7 +22,10 @@ export function SettingsPageFrame(props: {
   onMounts: (mounts: SettingsPagePlacement | undefined) => void;
   /** Escape outside a popup or a text field of the window. */
   onEscape: () => void;
+  /** The Close button. It closes the page, also while a search has text. */
+  onClose: () => void;
 }) {
+  const { t } = useText();
   let nav!: HTMLDivElement;
   let content!: HTMLDivElement;
   let path!: HTMLDivElement;
@@ -60,6 +64,16 @@ export function SettingsPageFrame(props: {
         <div class="settings-page-footer">{props.footer}</div>
       </div>
       <div class="settings-page-path-row" ref={path} />
+      <IconButton
+        variant="secondary"
+        size="icon-sm"
+        class="settings-page-close"
+        label={t("common.close")}
+        data-cuelume-tap="close"
+        onClick={() => props.onClose()}
+      >
+        <X aria-hidden="true" />
+      </IconButton>
       <div class="settings-page-content" ref={content} />
     </div>
   );

@@ -44,7 +44,7 @@ const BILLING_ACTIONS = [
 ] as const;
 const BILLING_PLANS = ["starter", "standard", "pro"] as const;
 const BILLING_INTERVALS = ["month", "year"] as const;
-const BILLING_CURRENCIES = ["eur", "usd", "pln"] as const;
+const BILLING_CURRENCIES = ["eur", "usd", "pln", "brl"] as const;
 const BILLING_PAYMENT_KINDS = ["first_purchase", "renewal", "adjustment"] as const;
 const BILLING_RECOVERY_KINDS = ["invoice", "checkout", "invoice_recovery", "checkout_recovery", "none"] as const;
 const BILLING_FLOWS = ["manage", "update", "cancel"] as const;

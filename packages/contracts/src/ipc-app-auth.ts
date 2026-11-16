@@ -93,6 +93,11 @@ export interface UpdateStatus {
   scheduledRestart?: ScheduledUpdateRestart;
   /** A restart that the user of this computer asked for. Absent when none waits. */
   idleRestart?: IdleRestart;
+  /**
+   * A newer release that is in its staged rollout and that this install does not get yet. Only with
+   * phase `up-to-date`. A check that a person asks for gets this release. Absent when none waits.
+   */
+  stagedVersion?: string;
 }
 
 /** `relaunch` starts OpenBot again; `update` installs the downloaded update. */

@@ -1,0 +1,160 @@
+/* The pinned messages of a chat: the list that the pin button of the chat header opens. */
+
+/* The title stays in place and the list scrolls under it. A ring only: the list has no drop shadow. */
+.ui-popover-menu-surface.pinned-messages {
+  display: flex;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - var(--openbot-space-4)));
+  max-height: min(560px, 76vh);
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--openbot-border);
+}
+
+.pinned-messages-title {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: var(--openbot-space-3) var(--openbot-space-3) var(--openbot-space-1);
+  color: var(--openbot-text-secondary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  line-height: var(--openbot-leading-sm);
+}
+
+.pinned-messages-list {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--openbot-space-0-5);
+  margin: 0;
+  overflow: hidden auto;
+  padding: var(--openbot-space-1);
+  list-style: none;
+  overscroll-behavior: contain;
+}
+
+/* A pin is one target: the jump button lies under its content. */
+.pinned-messages-item {
+  position: relative;
+  min-width: 0;
+}
+
+.pinned-messages-item > .pinned-messages-jump {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border-radius: var(--openbot-radius-md);
+}
+
+.pinned-messages-item > .pinned-messages-jump:focus-visible {
+  outline: 0;
+  box-shadow: 0 0 0 1px var(--openbot-text-muted);
+}
+
+.pinned-messages-content {
+  position: relative;
+  min-width: 0;
+  padding: var(--openbot-space-2);
+  pointer-events: none;
+}
+
+.pinned-messages-content > .message-reply-context {
+  max-width: none;
+  margin: 0;
+}
+
+/* The time ends before the Unpin button. A long name gives its room to the time. */
+.pinned-messages-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--openbot-space-2);
+  margin-bottom: var(--openbot-space-1);
+  padding-inline-end: var(--openbot-space-6);
+}
+
+.pinned-messages-author {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-sm);
+  font-weight: var(--openbot-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinned-messages-time {
+  flex: 0 0 auto;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.pinned-messages-item > .pinned-messages-unpin {
+  position: absolute;
+  top: var(--openbot-space-1-5);
+  inset-inline-end: var(--openbot-space-1-5);
+  color: var(--openbot-text-muted);
+  opacity: 0;
+}
+
+.pinned-messages-item:is(:hover, :focus-within) > .pinned-messages-unpin {
+  opacity: 1;
+}
+
+/* No pins yet */
+
+.pinned-messages-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--openbot-space-1);
+  padding: var(--openbot-space-6) var(--openbot-space-6) var(--openbot-space-8);
+  text-align: center;
+}
+
+.pinned-messages-empty-mark {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin-bottom: var(--openbot-space-2);
+  place-items: center;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-bg-control-hover);
+  color: var(--openbot-text-secondary);
+}
+
+.pinned-messages-empty-mark > svg {
+  width: var(--openbot-icon-md);
+  height: var(--openbot-icon-md);
+}
+
+.pinned-messages-empty-title {
+  margin: 0;
+  color: var(--openbot-text-primary);
+  font-size: var(--openbot-text-md);
+  font-weight: var(--openbot-weight-semibold);
+}
+
+.pinned-messages-empty-body {
+  max-width: 260px;
+  margin: 0;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-wrap: balance;
+}
+
+/* The chat of a pin in another chat, and who pinned it. */
+.pinned-messages-meta {
+  min-width: 0;
+  margin: var(--openbot-space-1) 0 0;
+  overflow: hidden;
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

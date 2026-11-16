@@ -1,3 +1,4 @@
+import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import { CONVERSATION_TRACE_STEP_LIMIT, type ConversationTurnTrace } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
@@ -62,6 +63,35 @@ const SEARCH_ALL_THREADS = 8;
 const SEARCH_ALL_CHARACTERS = 8_000;
 /** Messages one search call reads before it returns a cursor, whether or not they match. */
 const SEARCH_SCAN_ROWS = 200;
+const SEARCH_TERMS = /"([^"]+)"|(\S+)/gu;
+
+/**
+ * The lowercase terms of a query: each word, and each quoted text as one phrase. A message matches
+ * when it holds every term, in any order, as Hermes matches the words of a `session_search` query.
+ * Models write several keywords, and a query that matched only as one exact text found nothing (#8127).
+ */
+function searchTerms(query: string): string[] {
+  return [...query.toLowerCase().matchAll(SEARCH_TERMS)].flatMap((match) => {
+    // A quote with no pair is not part of the word.
+    const term = (match[1] ?? match[2]?.replace(/^"+|"+$/gu, "") ?? "").trim();
+    return term ? [term] : [];
+  });
+}
+
+/** The position of the first term in `text`, or -1 when a term is missing. No term matches at 0. */
+function searchMatch(text: string, terms: readonly string[]): number {
+  const lower = text.toLowerCase();
+  let first = terms.length ? lower.length : 0;
+  for (const term of terms) {
+    const index = lower.indexOf(term);
+    if (index < 0) return -1;
+    first = Math.min(first, index);
+  }
+  return first;
+}
+
+/** The next step of a search with no match. Without it, a model sends the same search again. */
+const NO_MATCH_HINT = "No message holds all the words. Search again with fewer or shorter words.";
 /** A side thread of the calling agent, or `main` for its own chat. The router checks the owner. */
 const taskId = id.optional();
 /**
@@ -89,7 +119,14 @@ const readShape = {
   includeWorkSteps: z.boolean().optional(),
   workStepsOffset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).optional(),
 };
-const searchSchema = z.strictObject(searchShape);
+// A search cursor continues one query. Without a query, the cursor fits no call of this tool (#6995).
+const searchSchema = z
+  .strictObject(searchShape)
+  .refine((value) => value.cursor === undefined || value.query !== undefined, {
+    path: ["cursor"],
+    message:
+      "A cursor continues the call that gave it. Send a history_search cursor with the same query, and a history_read cursor to history_read as before.",
+  });
 const readSchema = z
   .strictObject(readShape)
   .refine(
@@ -105,6 +142,40 @@ const cursorSchema = z.strictObject({
   anchorMessageId: id,
   query: z.string().nullable(),
 });
+
+/**
+ * The thread that a cursor from an earlier answer continues, or null for text that is not a cursor.
+ * The cursor is not signed: the caller checks that the thread is one of the agent's own conversations.
+ */
+export function historyCursorThread(text: unknown): string | null {
+  if (typeof text !== "string" || !cursorText.safeParse(text).success) return null;
+  return readCursor(text)?.threadId ?? null;
+}
+
+/** The fields of a cursor from an earlier answer. Throws for text that is not a cursor. */
+function decodeCursor(text: string) {
+  return cursorSchema.parse(JSON.parse(Buffer.from(text, "base64url").toString("utf8")));
+}
+
+/** The fields of a cursor from an earlier answer, or null for text that is not a cursor. */
+function readCursor(text: string) {
+  try {
+    return decodeCursor(text);
+  } catch {
+    return null;
+  }
+}
+
+/** A `before` that is not a cursor is a message of the chat that is read. The error names the argument. */
+const beforeMessageSchema = (inChat: (messageId: string) => boolean) =>
+  z.object({
+    before: z
+      .string()
+      .refine(
+        inChat,
+        "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again.",
+      ),
+  });
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
@@ -123,7 +194,7 @@ export const HISTORY_TOOL_DEFINITIONS = [
   {
     name: "history_read",
     description:
-      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text, or use before from an earlier response for older messages. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
+      "Read this chat, or one by taskId, after its latest reset. Read a messageId with offset for large text; for older messages, before is nextCursor or a messageId. Optional captured work steps contain no raw reasoning; continue them with workStepsOffset from nextWorkStepsOffset. Channels use channel_history.",
     shape: readShape,
   },
 ];
@@ -132,6 +203,8 @@ interface HistoryToolOptions {
   store: AgentStore;
   redact(text: string): string;
   capturedSteps(session: ProviderSession): Effect.Effect<Map<string, string> | null, ToolOperationFailed>;
+  /** The text of a visual reply page, or null when its file is deleted or not readable. */
+  pageText(attachmentId: string): Effect.Effect<string | null>;
   /** The agent's side threads, open and archived, with activity at or after `after`. The latest first. */
   recentThreads(agentId: string, after: string | null, limit: number): readonly AgentThreadRecord[];
 }
@@ -146,6 +219,8 @@ interface ThreadEntry {
   /** Absent for a plain side thread. */
   kind?: "chat" | "routine" | "branch";
   archived?: true;
+  /** The chat of this call. After a new provider session, its earlier messages are not in context. */
+  current?: true;
   outcome?: string;
   lastActivityAt: string | null;
   lastRequest?: string;
@@ -179,6 +254,8 @@ interface HistoryEntry {
   workStepsOffset?: number;
   nextWorkStepsOffset?: number | null;
   attachmentsOmitted?: number;
+  /** Set for a visual reply in a list: its text is only the page title. */
+  page?: string;
 }
 
 /** Owns bounded model-facing history output. Scope is supplied by the authenticated router. */
@@ -213,9 +290,9 @@ export class HistoryTools {
     const listed = yield* toolStep(() => {
       const conversations = this.#conversations(agentId, after, limit + 1);
       const records = conversations.filter((conversation) => conversation.record !== null);
-      // The conversation of this call is left out: its messages are already in context.
-      const candidates = conversations.filter((candidate) => candidate.threadId !== currentThreadId);
-      const entries = candidates.map(({ taskId, threadId, record }): ThreadEntry => {
+      // The conversation of this call is listed too: after a new provider session, such as a rotation,
+      // its earlier messages are not in context, and a list without it looked empty (#8127).
+      const entries = conversations.map(({ taskId, threadId, record }): ThreadEntry => {
         const request = latest(threadId, "user");
         const reply = latest(threadId, "assistant");
         // Messages give the activity: an archive, a reopen or an outcome also moves `updatedAt`.
@@ -232,6 +309,7 @@ export class HistoryTools {
           title,
           ...(kind ? { kind } : {}),
           ...(record?.closedAt ? { archived: true as const } : {}),
+          ...(threadId === currentThreadId ? { current: true as const } : {}),
           ...(record?.outcome ? { outcome: record.outcome } : {}),
           lastActivityAt: activity.sort().at(-1) ?? null,
           // A thread title is often its first request. Do not send the same text twice.
@@ -331,6 +409,8 @@ export class HistoryTools {
         break;
       }
     }
+    // With `more`, a chat is not scanned to its end, and its older messages can still match.
+    if (result.messages.length === 0 && !result.more) result.next = `${NO_MATCH_HINT} ${result.next}`;
     return openBotToolResult(result);
   }).bind(this);
 
@@ -360,15 +440,26 @@ export class HistoryTools {
     const read = search ? null : yield* toolStep(() => readSchema.parse(args));
     const searchQuery = search?.query;
     if (search && searchQuery === undefined) throw new Error(sourceText("error.agent.historyUnavailable"));
+    const terms = searchQuery === undefined ? [] : searchTerms(searchQuery);
     const after = search?.after === undefined ? null : windowBound(search.after, Date.now());
     const store = this.#options.store;
     const redact = (text: string) => this.#options.redact(redactSecrets(text));
     const query = search?.query;
     const limit = search?.limit ?? read?.limit ?? (search ? 5 : 10);
-    const suppliedCursor = search?.cursor ?? read?.before;
-    const cursor = suppliedCursor
-      ? yield* toolStep(() => cursorSchema.parse(JSON.parse(Buffer.from(suppliedCursor, "base64url").toString("utf8"))))
-      : null;
+    const searchCursor = search?.cursor;
+    // A history_read `before` can also be a messageId of an earlier answer: models often send one (#7055).
+    const cursor = searchCursor
+      ? yield* toolStep(() => decodeCursor(searchCursor))
+      : read?.before
+        ? readCursor(read.before)
+        : null;
+    const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
+    if (beforeMessageId !== null)
+      yield* toolStep(() =>
+        beforeMessageSchema(
+          (messageId) => store.database.readConversationMessages(agentId, threadId, [messageId]).length === 1,
+        ).parse({ before: beforeMessageId }),
+      );
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
@@ -376,7 +467,7 @@ export class HistoryTools {
     const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
       limit: read?.messageId ? 1 : scanLimit + 1,
-      ...(cursor ? { before: cursor.anchorMessageId } : {}),
+      ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
     };
     const page = yield* toolStep(() => store.database.readAgentHistory(agentId, threadId, selection));
@@ -413,8 +504,12 @@ export class HistoryTools {
         more = false;
         break;
       }
-      const text = redact(message.text);
-      const match = searchQuery === undefined ? 0 : text.toLowerCase().indexOf(searchQuery.toLowerCase());
+      // The text of a visual reply is its title; the page is its file. A read of that one message
+      // gives the page text too, so that the agent can read what it showed before (#8346).
+      const visual = chatVisualReply(message);
+      const pageText = visual && read?.messageId ? yield* this.#options.pageText(visual.attachment.id) : null;
+      const text = redact(pageText ? `${message.text}\n\n${pageText}` : message.text);
+      const match = searchMatch(text, terms);
       if (match < 0) {
         result.nextCursor = nextCursor(message.id);
         continue;
@@ -439,6 +534,11 @@ export class HistoryTools {
               mimeType: redact(file.mimeType),
               size: file.size,
             })),
+        ...(visual && !read?.messageId
+          ? {
+              page: "history_read with this messageId, and the taskId of this entry if it has one, gives the page text.",
+            }
+          : {}),
       };
       if (read?.includeWorkSteps) {
         const session = sessions.find((candidate) => candidate.id === row.providerSessionId);

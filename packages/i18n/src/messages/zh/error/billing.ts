@@ -5,8 +5,11 @@ export const messages = {
   "error.billing.lifecycleFailed": "无法更改服务器套餐，请刷新账单后重试。",
   "error.billing.confirmMismatch": "请输入服务器名称以确认删除。",
   "error.billing.restartBusy": "服务器当前无法重启，请一分钟后再试。",
+  "error.billing.restartUnavailable": "此服务器无法从这里重启，请联系支持团队。",
   "error.billing.planRequired": "该服务器的套餐已结束，请续费后启动服务器。",
   "error.billing.planSoldOut": "该套餐已售罄，请选择其他套餐。",
+  "error.billing.storageUnavailable": "此存储空间不适用于该服务器。",
+  "error.billing.storagePaymentFailed": "存储空间付款失败。请更新付款方式后重试。",
   // License errors.
   "error.billing.licenseExists": "该账号已有许可证，请改为更改其用户数。",
   "error.billing.licenseCurrency": "许可证必须使用你其他套餐的币种。",

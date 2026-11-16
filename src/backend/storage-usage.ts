@@ -32,6 +32,7 @@ import {
 } from "./database/storage-usage-queries";
 import type { MailboxStore, MailboxStoredFile } from "./mailbox-store";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
+import type { UserFilesBytes } from "./user-files-bytes";
 
 interface StorageRoots {
   /** The SQLite file. Its `-wal` and `-shm` companions are counted with it. */
@@ -59,6 +60,19 @@ export interface StorageUsageSources {
     deleteStoredFile: OmitThisParameter<MailboxStore["deleteStoredFile"]>;
   };
   agents: () => readonly StorageAgent[];
+  /**
+   * The files of one channel's messages, by attachment id, or null when the host has no such channel.
+   * Absent on a host without channels.
+   */
+  channelFiles?: (channelId: string) => readonly StorageChannelFile[] | null;
+  /** The bytes of the files of the server's user. Only a hosted server has it. */
+  userFiles?: Pick<UserFilesBytes, "read" | "forget" | "dispose">;
+}
+
+export interface StorageChannelFile {
+  attachmentId: string;
+  /** The channel message that carries the file. */
+  messageId: string;
 }
 
 /** The request names an agent or a file the host does not have. The Team API answers 404. */
@@ -166,6 +180,8 @@ interface MeasuredFile {
   placement: StoragePlacement | null;
   /** Every chat of the scope that shows the file. */
   threadIds: ReadonlySet<string>;
+  /** On the channel scope: the channel message that carries the file. */
+  channelMessageId: string | null;
   agentId: string | null;
   bytes: number;
   status: "available" | "missing";
@@ -200,12 +216,23 @@ export class StorageUsageScanner {
         cause: new StorageNotFoundError(sourceText("error.storage.agentMissing")),
       });
 
+    // A channel's members answer in channel threads, which hold no chat of their own: the channel
+    // scope is the files of the channel's messages only.
+    const channelFiles =
+      input.scope === "channel" && input.channelId !== undefined
+        ? (this.#sources.channelFiles?.(input.channelId) ?? null)
+        : undefined;
+    if (channelFiles === null)
+      return yield* new StoredStateFailure({
+        cause: new StorageNotFoundError(sourceText("error.backend.channelNotFound")),
+      });
+
     const db = this.#sources.database();
-    let threads = yield* storedSync(() => storageThreads(db, input.agentId));
+    let threads = channelFiles ? [] : yield* storedSync(() => storageThreads(db, input.agentId));
     if (input.scope === "conversation") threads = threads.filter((thread) => thread.threadId === input.conversationId);
     const threadById = new Map(threads.map((thread) => [thread.threadId, thread]));
     const placements = yield* this.#placements(db, threadById);
-    const files = yield* this.#measureFiles(input, placements, threadById);
+    const files = yield* this.#measureFiles(input, placements, threadById, channelFiles);
     const threadSizes = new Map<string, { messageCount: number; bytes: number }>();
     for (const thread of threads) {
       threadSizes.set(thread.threadId, yield* storedSync(() => storageThreadSize(db, thread.threadId)));
@@ -282,6 +309,7 @@ export class StorageUsageScanner {
       scope: input.scope,
       agentId: input.agentId ?? null,
       conversationId: input.conversationId ?? null,
+      ...(input.channelId === undefined ? {} : { channelId: input.channelId }),
       scannedAt,
       freeBytes: yield* freeBytes(this.#sources.roots.data),
       breakdown,
@@ -321,7 +349,9 @@ export class StorageUsageScanner {
     input: GetStorageUsageInput,
     placements: ReadonlyMap<string, StoragePlacement[]>,
     threadById: ReadonlyMap<string, StorageThread>,
+    channelFiles: readonly StorageChannelFile[] | undefined,
   ): Effect.fn.Return<MeasuredFile[], StoredStateFailure> {
+    const channelMessage = new Map(channelFiles?.map((entry) => [entry.attachmentId, entry.messageId]));
     const seen = new Set<string>();
     const selected: Omit<MeasuredFile, "bytes" | "status" | "modifiedAt">[] = [];
     for (const stored of this.#sources.mailbox.listStoredFiles()) {
@@ -330,7 +360,10 @@ export class StorageUsageScanner {
         left.createdAt.localeCompare(right.createdAt),
       );
       const inScope =
-        input.scope === "host" || shown.length > 0 || (input.scope === "agent" && stored.agentId === input.agentId);
+        input.scope === "host" ||
+        shown.length > 0 ||
+        (input.scope === "agent" && stored.agentId === input.agentId) ||
+        channelMessage.has(stored.attachment.id);
       if (!inScope) continue;
       seen.add(stored.attachment.id);
       const placement = shown[0] ?? null;
@@ -339,6 +372,7 @@ export class StorageUsageScanner {
         stored,
         placement,
         threadIds: new Set(shown.map((entry) => entry.threadId)),
+        channelMessageId: channelMessage.get(stored.attachment.id) ?? null,
         agentId: input.scope === "agent" ? (input.agentId ?? null) : (placementAgent ?? stored.agentId),
       });
     }
@@ -367,7 +401,7 @@ export class StorageUsageScanner {
   #fileRow(file: MeasuredFile, threadById: ReadonlyMap<string, StorageThread>, scannedAt: string): StoredFileRow {
     const thread = file.placement ? threadById.get(file.placement.threadId) : undefined;
     const conversationId = wireId(thread?.threadId);
-    const messageId = conversationId ? wireId(file.placement?.messageId) : null;
+    const messageId = conversationId ? wireId(file.placement?.messageId) : wireId(file.channelMessageId);
     return {
       ...file.stored.attachment,
       source: file.stored.source,
@@ -499,7 +533,7 @@ const clearStorageCategory = Effect.fn("StorageUsage.clearCategory")(function* (
 });
 
 function scopeKey(input: GetStorageUsageInput): string {
-  return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null]);
+  return JSON.stringify([input.scope, input.agentId ?? null, input.conversationId ?? null, input.channelId ?? null]);
 }
 
 /**
@@ -509,7 +543,7 @@ function scopeKey(input: GetStorageUsageInput): string {
  */
 export class StorageUsageService {
   readonly #scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> };
-  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox">;
+  readonly #sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">;
   readonly #now: () => number;
   readonly #cache = new Map<string, { at: number; usage: StorageUsage }>();
   readonly #running = new Map<string, { token: symbol; fiber: Fiber.Fiber<StorageUsage, StoredStateFailure> }>();
@@ -519,7 +553,7 @@ export class StorageUsageService {
 
   constructor(
     scanner: { scan: OmitThisParameter<StorageUsageScanner["scan"]> },
-    sources: Pick<StorageUsageSources, "roots" | "mailbox">,
+    sources: Pick<StorageUsageSources, "roots" | "mailbox" | "userFiles">,
     now: () => number = Date.now,
   ) {
     this.#scanner = scanner;
@@ -560,21 +594,36 @@ export class StorageUsageService {
   readonly deleteFile = Effect.fn("StorageUsage.deleteFile")(function* (this: StorageUsageService, fileId: string) {
     if (!this.#sources.mailbox.listStoredFiles().some((file) => file.attachment.id === fileId))
       return yield* new StoredStateFailure({ cause: new StorageNotFoundError(sourceText("error.backend.fileGone")) });
-    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.invalidate())));
+    yield* this.#sources.mailbox.deleteStoredFile(fileId).pipe(Effect.ensuring(Effect.sync(() => this.#afterRemove())));
   }).bind(this);
 
   disk() {
     return diskSpace(this.#sources.roots.data);
   }
 
+  /** The disk with the bytes of the user's files (`storage-user-files-v1`). */
+  readonly diskUse = Effect.fn("StorageUsage.diskUse")(function* (this: StorageUsageService) {
+    const disk = yield* diskSpace(this.#sources.roots.data);
+    const userBytes = this.#sources.userFiles ? yield* this.#sources.userFiles.read() : null;
+    return { ...disk, userBytes };
+  }).bind(this);
+
   clear(category: ClearableStorageCategory) {
     return clearStorageCategory(this.#sources.roots, category).pipe(
-      Effect.ensuring(Effect.sync(() => this.invalidate())),
+      Effect.ensuring(Effect.sync(() => this.#afterRemove())),
     );
   }
 
   dispose() {
-    return Scope.close(this.#scope, Exit.void);
+    return Scope.close(this.#scope, Exit.void).pipe(
+      Effect.andThen(this.#sources.userFiles ? this.#sources.userFiles.dispose() : Effect.void),
+    );
+  }
+
+  /** A delete or a clear also makes the measured user files old, so the free space of the plan shows it. */
+  #afterRemove(): void {
+    this.invalidate();
+    this.#sources.userFiles?.forget();
   }
 
   invalidate(): void {

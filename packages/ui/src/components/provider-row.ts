@@ -12,7 +12,7 @@ import { useText } from "../text";
 import { toast } from "../toast";
 import { createCodeSignInFallback } from "./createCodeSignInFallback";
 import type { ProviderAlternativeSignIn, ProviderConnection, ProviderPickerOption } from "./ProviderPicker";
-import type { ProviderAccountActions } from "./provider-accounts";
+import { accountCodeSignInOffered, type ProviderAccountActions } from "./provider-accounts";
 
 /** The callbacks a provider row runs. The onboarding picker and the Providers settings page pass their own. */
 export interface ProviderRowHost {
@@ -195,6 +195,14 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
       setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
     );
   };
+  /** A new account can also sign in with a code, where a browser sign-in is not possible. */
+  const accountCodeOffered = () => accountsOffered() && accountCodeSignInOffered(option().id, host.accountActions);
+  const addAccountWithCode = () => {
+    setAccountError(null);
+    void Promise.resolve(host.accountActions?.connectWithCode?.(option().id, null)).catch((error: unknown) =>
+      setAccountError(errorMessage(error, t("provider.account.actionFailed", { name: option().name }))),
+    );
+  };
   const installOffered = () =>
     !runtimeStatus() &&
     agentProviderDescriptor(option().id).installGuideLink !== null &&
@@ -270,6 +278,8 @@ export function createProviderRow(option: () => ProviderPickerOption, host: Prov
     accountsOffered,
     accountError,
     addAccount,
+    accountCodeOffered,
+    addAccountWithCode,
     installOffered,
     signInOffered,
     apiKeyOffered,

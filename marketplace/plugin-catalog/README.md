@@ -216,6 +216,60 @@ Troubleshooting:
   instance (`NEXT_PUBLIC_BACKEND_URL`) followed by `/mcp`, and the same
   `Authorization` header, in the MCP servers settings.
 
+## TryPost
+
+The listing connects to TryPost's own MCP server at `https://app.trypost.it/mcp/trypost`
+(<https://docs.trypost.it/ai/introduction>). It answers 401 with a `Bearer` challenge. The
+protected-resource metadata names `https://app.trypost.it`, which has dynamic client registration
+with S256, so the user signs in through the browser and types no key. On the consent screen, the
+user chooses the workspace that the connection can use. One connection works on one workspace.
+
+TryPost Cloud needs an active subscription for MCP. A self-hosted TryPost does not.
+
+Troubleshooting:
+
+- The server replies 402 with "Active subscription required.": the TryPost Cloud account of the
+  workspace has no active subscription. Subscribe in TryPost, then test the server again.
+- The agent does not see the posts or channels that the user expects: the connection uses another
+  workspace. In the MCP servers settings, select Sign out on the TryPost server, then Sign in, and
+  choose the correct workspace.
+- A self-hosted TryPost: add an MCP server with the address of the instance followed by
+  `/mcp/trypost`, in the MCP servers settings, and select Sign in.
+
+## Adobe Analytics
+
+The listing connects to Adobe's own MCP server at `https://aa-mcp.adobe.io/mcp`
+(<https://developer.adobe.com/analytics-mcp/docs/aa/>). It answers 401 with a `Bearer` challenge. The
+authorization server metadata names Adobe IMS (`ims-na1.adobelogin.com`) and has dynamic client
+registration with S256, so the user signs in with an Adobe ID through the browser and types no key.
+A registration with the loopback address gets the `offline_access` scope and the `refresh_token`
+grant (checked 2026-11-13). A user whose Adobe ID is in more than one organization selects one at
+sign-in.
+
+The metadata does not list `offline_access` in `scopes_supported`, so OpenBot does not ask for it
+(`withOfflineAccess` in `src/backend/mcp-oauth-provider.ts`). Adobe's authorize endpoint accepts the
+request with or without that scope. Not confirmed with an Adobe account: whether the token answer
+then has a refresh token. Without one, the user signs in again when the access token expires.
+
+An Adobe administrator must add `MCP Read-only Access` or `MCP Full Access` to a product profile of
+the user, in Admin Console > Products > Adobe Analytics > Permissions > Analytics Tools. A product
+administrator always has full access. Full access adds `upsertSegment`, `upsertCalculatedMetric`,
+`createDateRange` and `upsertProject`. The server has no delete tools.
+
+Adobe's server-to-server path (`client_credentials`) is not in the listing. It needs four headers
+(`Authorization`, `x-api-key`, `x-gw-ims-org-id`, `x-global-company-id`), a key flow has at most two
+fields, and its access token expires, so a saved token stops working.
+
+Customer Journey Analytics has a separate server, `https://cja-mcp.adobe.io/mcp`, with the same
+sign-in. It has no listing; the user adds it in the MCP servers settings and selects Sign in.
+
+Troubleshooting:
+
+- The sign-in succeeds but the tools are refused: the account has no MCP permission item. Ask the
+  Adobe administrator, then sign out and sign in again; Adobe says a change can take some time.
+- The agent sees the wrong report suites: the connection uses another organization or login company.
+  Sign out, sign in, and select the correct organization. `findCompanies` lists the login companies.
+
 ## ElevenLabs
 
 The listing connects to ElevenLabs' hosted MCP server at `https://api.elevenlabs.io/v1/mcp`
@@ -232,3 +286,75 @@ Troubleshooting:
 
 - The sign-in page refuses the redirect address: another program uses port 28417, so OpenBot
   listens on another port that the document does not list. Close that program and restart OpenBot.
+
+## Sunra
+
+The listing connects to Sunra's hosted MCP server at `https://mcp.sunra.ai`
+(<https://mcp.sunra.ai/.well-known/oauth-authorization-server>). The server uses OAuth 2.1 with
+dynamic client registration and client ID metadata documents, PKCE S256, refresh tokens and the
+scope `mcp`, so the user signs in through the browser and types no key. The connection pays from the
+Sunra workspace that the user selected at sign-in: Personal or a Team. `select_workspace` changes
+it; an agent must not change it without a request from the user.
+
+A create tool (`create_image`, `create_video`, `create_audio`, `create_model3d`) without
+`auto_confirm` only stages the work and returns a quote with `estimated_credits` and a `plan_id`.
+`confirm_execution`, or `auto_confirm` on the create call, spends the credits. The agent reads the
+result with `get_job`.
+
+Troubleshooting:
+
+- "Insufficient credits": the selected workspace has too few credits. Sunra gives free daily
+  credits; top-ups are only for subscribers. See <https://sunra.ai/pricing>.
+- A video generation fails: video models need an active Sunra plan.
+
+## AppSignal
+
+The listing connects to AppSignal's own MCP server at `https://appsignal.com/api/mcp`
+(<https://docs.appsignal.com/mcp.html>). It answers 401 with a `Bearer` challenge. The
+authorization server (`https://appsignal.com`) has dynamic client registration with S256, so the
+user signs in through the browser and types no key (checked 2026-11-14). The resource metadata asks
+for `app:read app:write`.
+
+A sign-in gives all read and write tools of the account. AppSignal's MCP token can limit the
+applications and the tools, but the listing does not use it: the token is a second way in, and a
+listing has one flow. A user who wants that limit adds an MCP server with the same address and an
+`Authorization: Bearer <token>` header in the MCP servers settings.
+
+Not confirmed with an AppSignal account: whether the token answer has a refresh token. Without one,
+the user signs in again when the access token expires.
+
+Troubleshooting:
+
+- A tool returns no data: the app does not send that data to AppSignal. For example,
+  `get_log_lines` is empty when the app sends no logs.
+
+## Cloud 66
+
+The listing connects to Cloud 66's own MCP server at `https://app.cloud66.com/mcp`
+(<https://help.cloud66.com/sites/mcp/what-is-the-mcp-server/>). It answers 401 with a `Bearer`
+challenge. The authorization server (`https://app.cloud66.com/mcp/oauth`) has dynamic client
+registration with S256 (checked 2026-11-14). The resource metadata lists each scope, so the
+authorization request asks for all of them, and the user can clear some on the consent page. Tools
+outside the granted scopes are hidden. A scope cannot give more than the user's Cloud 66 role.
+
+The access token is valid for 7 days. A second sign-in of the same client revokes the first token.
+Each user can have 10 MCP sessions at a time.
+
+To delete an application or a deployment profile, or to add a cloud, Cloud 66 sends an elicitation
+over the open session. The agent shows a one-time Cloud 66 link, and the user confirms on that page
+in the browser (with 2FA for a delete). Cloud 66 does not document the elicitation mode. OpenBot
+shows a `form` request as a question card in the chat and declines a `url` request
+(`mcpElicitationQuestions` in `src/backend/agent/prompts.ts`). Cloud 66 supports only MCP
+`2025-06-18`, which has no `url` mode, so the request is probably a `form`. Not confirmed with a
+Cloud 66 account. A chat in Slack, Discord or Telegram cancels the request. When the request fails,
+the tool fails with "this tool requires an MCP client with elicitation support" or a decline; do
+the action in the Cloud 66 dashboard. The other tools do not need it.
+
+Troubleshooting:
+
+- `Missing required argument: account_id`: each tool except `list_accounts` needs an account.
+  Ask the agent to list the accounts first.
+- `Token missing scope: <resource>:<action>`: the user cleared that permission on the consent page.
+  Sign out, sign in, and select it.
+- HTTP 429 when the connection opens: the user has 10 open sessions. Wait for old sessions to end.
+- Deleting needs 2FA on the Cloud 66 account.

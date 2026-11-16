@@ -17,7 +17,8 @@ import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-
  * The frame of a joined server's workspace from its last load: the agents, their sidebar layout and
  * the models. A client shows it while it connects again, read-only, and the next load replaces it.
  * It holds no message text: the last message of each agent (`preview`) is removed before the write,
- * and a channel keeps only its row: no last message, no instructions, no counts.
+ * and a channel keeps only its row: no last message, no instructions, no counts. An agent keeps its
+ * unread count, so the sidebar "Unread" group does not reorder the rows when the host answers.
  * The frame is of one account and one server, and it is deleted on sign-out, when the server leaves
  * the list, and when the host ends access.
  */
@@ -32,6 +33,8 @@ export interface RemoteWorkspaceFrame {
   selectedAgentId: string | null;
   /** The agents opened last on the web, the newest first. A new page reads their latest page early. */
   recentAgentIds: string[];
+  /** The unread count of each agent chat that has unread messages. */
+  unreadCounts: Record<string, number>;
 }
 
 type FrameStorage = Pick<Storage, "getItem" | "setItem" | "removeItem" | "key" | "length">;
@@ -75,7 +78,16 @@ function decodeFrame(frame: unknown): RemoteWorkspaceFrame | null {
     channels: Array.isArray(frame.channels) ? frame.channels.filter(isChannel).map(frameChannel) : [],
     selectedAgentId: isString(frame.selectedAgentId) ? frame.selectedAgentId : null,
     recentAgentIds: Array.isArray(frame.recentAgentIds) ? frame.recentAgentIds.filter(isString) : [],
+    unreadCounts: unreadCounts(frame.unreadCounts),
   };
+}
+
+/** The positive counts of a record. A frame from an older version has none. */
+function unreadCounts(counts: unknown): Record<string, number> {
+  if (!isDynamicRecord(counts)) return {};
+  return Object.fromEntries(
+    Object.entries(counts).flatMap(([agentId, count]) => (isNumber(count) && count > 0 ? [[agentId, count]] : [])),
+  );
 }
 
 /** The saved frame, or null when there is none, when it is too old, or when it does not decode. */
@@ -116,6 +128,7 @@ export function saveRemoteWorkspaceFrame(
     channels: (update.channels ?? current?.channels ?? []).map(frameChannel),
     selectedAgentId: update.selectedAgentId !== undefined ? update.selectedAgentId : (current?.selectedAgentId ?? null),
     recentAgentIds: selected ? [selected, ...recent.filter((id) => id !== selected)].slice(0, RECENT_AGENTS) : recent,
+    unreadCounts: unreadCounts(update.unreadCounts ?? current?.unreadCounts ?? {}),
   };
   try {
     storage.setItem(frameKey(accountId, serverId), JSON.stringify(frame));
@@ -141,6 +154,22 @@ export function saveRemoteFrameChannels(
   saveRemoteWorkspaceFrame(accountId, serverId, { channels: rows });
 }
 
+/** The last unread counts written for each frame. The counts come again on each read of the host. */
+const savedUnreadCounts = new Map<string, string>();
+
+/** Writes the unread counts of the agents to the frame when they changed since the last write. */
+export function saveRemoteFrameUnreadCounts(
+  accountId: string,
+  serverId: string,
+  counts: Readonly<Record<string, number>>,
+): void {
+  const key = frameKey(accountId, serverId);
+  const value = JSON.stringify(counts);
+  if (savedUnreadCounts.get(key) === value) return;
+  savedUnreadCounts.set(key, value);
+  saveRemoteWorkspaceFrame(accountId, serverId, { unreadCounts: { ...counts } });
+}
+
 function frameKeys(storage: FrameStorage, prefix: string): string[] {
   const keys: string[] = [];
   for (let index = 0; index < storage.length; index += 1) {
@@ -160,6 +189,7 @@ export function deleteRemoteWorkspaceFrames(
   storage: FrameStorage = window.localStorage,
 ): void {
   savedChannelRows.clear();
+  savedUnreadCounts.clear();
   try {
     const prefix = accountId === null ? FRAME_KEY_PREFIX : `${FRAME_KEY_PREFIX}${encodeURIComponent(accountId)}:`;
     const kept = new Set(accountId === null ? [] : keepServerIds.map((serverId) => frameKey(accountId, serverId)));
@@ -175,6 +205,7 @@ export function deleteRemoteWorkspaceFrame(
   storage: FrameStorage = window.localStorage,
 ): void {
   savedChannelRows.delete(frameKey(accountId, serverId));
+  savedUnreadCounts.delete(frameKey(accountId, serverId));
   try {
     storage.removeItem(frameKey(accountId, serverId));
   } catch {

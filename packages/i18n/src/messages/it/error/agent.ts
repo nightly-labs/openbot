@@ -10,6 +10,10 @@ export const messages = {
     "Argomenti di ricerca del tool non validi. Usa lo schema dichiarato e un nome di tool qualificato originale.",
   "error.agent.toolCallArgumentsNotObject":
     "Il tool non è stato eseguito. In tool_call, arguments deve essere un oggetto JSON, non testo. Invia di nuovo la chiamata con arguments come oggetto.",
+  "error.agent.toolCallDiscoveryTool":
+    "Il tool non è stato eseguito. tool_call non può eseguire openbot.tool_search o openbot.tool_describe. Chiamali direttamente con gli stessi argomenti.",
+  "error.agent.routineScheduleArgumentsInvalid":
+    "La pianificazione della routine non è valida: {detail} Correggi la pianificazione e riprova. openbot.tool_describe fornisce lo schema.",
   "error.agent.approvalWhileDeleting": "Impossibile concedere l'approvazione mentre l'agente viene eliminato.",
   "error.agent.accessLocalOnly": "L'accesso dell'agente si può cambiare solo sul computer che lo esegue.",
   "error.agent.duplicateCleanupFailed":
@@ -87,8 +91,12 @@ export const messages = {
   "error.agent.endpointRemoved": "L'endpoint usato da questo agente è stato rimosso. Scegli un altro modello.",
   "error.agent.turnStalled":
     "{provider} ha smesso di rispondere, quindi OpenBot ha terminato questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
+  "error.agent.toolLoopStopped":
+    "{provider} ha ripetuto molte volte un passaggio non riuscito, quindi OpenBot ha interrotto questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
   "error.agent.compactionConnectionLost":
     "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet, poi invia un messaggio per continuare.",
+  "error.agent.compactionLoopStopped":
+    "{provider} ha compattato il contesto più e più volte, e ogni volta è rimasto troppo pieno per continuare, quindi OpenBot ha fermato questo turno. Disattiva i server MCP o l'uso del computer che questo agente non usa, poi invia un messaggio. Se tu o l'agente avete cambiato quando {provider} compatta, annulla la modifica.",
   "error.agent.selectedGone": "L'agente selezionato non esiste più.",
   "error.agent.profileEndpointsChanged": "Gli endpoint personalizzati sono cambiati durante la generazione. Riprova.",
   "error.agent.profileInvalid": "Il provider ha restituito un profilo non valido. Prova a rivedere il prompt.",
@@ -143,6 +151,8 @@ export const messages = {
     "Questo server ha poca memoria. Il tuo messaggio resta in coda e parte quando si libera memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo workspace richiede {tool}, che OpenBot non ha trovato. Installalo, oppure scegli Accesso completo nelle impostazioni dell'agente.",
+  "error.agent.codexSandboxUnavailable":
+    "Solo workspace richiede la sandbox di Codex, che Codex non riesce ad avviare su questo computer, quindi i comandi dell'agente non riescono. Scegli Chiedi prima o Accesso completo nelle impostazioni dell'agente.",
   "error.agent.claudeSandboxUnavailable":
     "Solo workspace richiede la sandbox di Claude, che Claude non riesce ad avviare su questo computer: {reason}. Scegli Accesso completo o un altro provider nelle impostazioni dell'agente.",
   "error.agent.screenCaptureOff":

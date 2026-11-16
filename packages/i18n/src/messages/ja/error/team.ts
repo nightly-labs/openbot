@@ -75,10 +75,13 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "この接続では 1 回のみ実行するルーティンを保存できません。",
   "error.team.routineRunCommandUnsupported": "この接続ではルーティンの実行コマンドを取得できません。",
   "error.team.threadQueueUnsupported": "この接続ではサイドスレッドのキューを表示できません。",
+  "error.team.hostTurnLimitsUnsupported": "この接続ではサーバーのスレッド上限を表示または変更できません。",
   "error.team.usageLimitUnsupported": "この接続ではエージェントの使用量の上限を表示または変更できません。",
   "error.team.hermesImportUnsupported": "この接続ではサーバーから Hermes のプロファイルを取り込めません。",
   "error.team.providerDetectionUnsupported": "この接続ではサーバーのモデルサーバーとエージェントを検出できません。",
+  "error.team.routineFlowStopUnsupported": "この接続ではルーティンの実行を停止できません。",
   "error.team.sidebarFoldersUnsupported": "この接続ではフォルダー内のフォルダーを使用できません。",
+  "error.team.libraryFoldersUnsupported": "この接続ではライブラリのフォルダーを使用できません。",
   "error.team.agentNotificationLevelsUnsupported":
     "このサーバーはエージェントごとの通知レベルを保存できません。サーバーを実行しているコンピューターで OpenBot を更新してください。",
   "error.team.sidebarPinsUnsupported":
@@ -111,6 +114,7 @@ export const messages = {
   "error.team.hostIdentityUnsupported": "この接続ではサーバーの ID を変更できません。",
   "error.team.hostUpdateUnsupported": "この接続ではホストをアップデートできません。",
   "error.team.hostTimezoneUnsupported": "この接続はサーバーのタイムゾーンに対応していません。",
+  "error.team.hostRestartUnsupported": "この接続はサーバーの再起動に対応していません。",
   "error.team.hostKeyRotationUnsupported": "この接続はサーバーキーの変更に対応していません。",
   "error.team.localServersUnsupported": "この接続はこのコンピュータ上のサーバーに対応していません。",
   "error.team.routineResultsUnsupported": "この接続はルーティンの送信先に対応していません。",
@@ -159,6 +163,7 @@ export const messages = {
   "error.team.secureAuthUnsupported": "このクライアントは安全な認証に対応していません。",
   "error.team.agentSettingsUnsupported": "この接続ではエージェントの設定を利用できません。",
   "error.team.adminRequired": "管理者のアクセス権が必要です。",
+  "error.team.mcpAccessStale": "他の人がこの MCP サーバーへのアクセスを変更しました。もう一度変更してください。",
   "error.team.mcpServerNotYours": "この MCP サーバーを変更できるのは、追加した人か管理者だけです。",
   "error.team.ownerRequired": "この操作ができるのはこのサーバーのオーナーだけです。",
   "error.team.requestTooLarge": "リクエストの本文が大きすぎます。",
@@ -175,6 +180,8 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "このサーバーのエージェントはこのサインインリンクを表示していません。",
   "error.team.hostPersonalityUnsupported": "この接続はサーバーのパーソナリティに対応していません。",
   "error.team.agentWaitsUnsupported": "この接続では未完了の待機を使用できません。",
+  "error.team.pendingApprovalUnsupported": "この接続では承認リクエスト全体を読み込めません。",
+  "error.team.messagePinsUnsupported": "この接続はピン留めしたメッセージに対応していません。",
   "error.team.queuedMessageThreadUnsupported":
     "この接続では、キュー内のメッセージを新しいスレッドとして実行できません。",
   "error.team.backgroundProcessesUnsupported": "この接続ではバックグラウンドプロセスを使用できません。",

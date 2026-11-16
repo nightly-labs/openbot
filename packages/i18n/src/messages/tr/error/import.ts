@@ -66,6 +66,19 @@ export const messages = {
   "error.import.transferModelMissing":
     '{name}: "{model}" modeli burada henüz kullanılamıyor, bu yüzden ajan varsayılan modeli kullanıyor. Sağlayıcısı hazır olduğunda modeli yeniden seçin.',
   "error.import.transferSettingSkipped": "{name} içe aktarılmadı. {reason}",
+  "error.import.transferRunsSkipped": '{name}: "{routine}" rutininin çalıştırma geçmişi içe aktarılmadı.',
+  "error.import.transferSharedSkillsSkipped": "Paylaşılan beceriler okunamadı, bu yüzden dosyada değiller.",
+  "error.import.transferSharedSkillsNotAdded": "Dosyadaki paylaşılan beceriler bu sunucuya eklenemedi.",
+  "error.import.transferMemberPreferencesSkipped": {
+    one: "{count} üyenin seçimleri kaydedilemedi.",
+    other: "{count} üyenin seçimleri kaydedilemedi.",
+  },
+  "error.import.transferSharedSkillExists":
+    "Bu sunucuda bu ada ve farklı dosyalara sahip paylaşılan bir beceri zaten var.",
+  "error.import.transferServerPreferencesSkipped": {
+    one: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+    other: "Dosyadaki {count} sunucu tercihi burada geçerli değil, bu yüzden içe aktarılmaz.",
+  },
   "error.import.transferRoutineFlowSkipped": "İçe aktarma bir rutin akışını dışarıda bıraktı. {reason}",
   "error.import.transferCustomAgentCommand":
     '{name}: özel ajanlar bir komut çalıştırdıkları için içe aktarılmaz. "{command}" komutunu kontrol edin ve ajanı Ayarlar\'da yeniden ekleyin.',

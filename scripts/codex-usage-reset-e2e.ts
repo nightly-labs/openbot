@@ -6,7 +6,8 @@
 // `nothingToReset`, spends none, and ends a hold that a refused turn left; a credential change, as when a
 // key is saved, ends a hold; a message from the user tries one turn before the reset, which a spent
 // plan refuses again with no second notice, and which runs the held messages after the account changed
-// outside OpenBot; another provider is refused.
+// outside OpenBot; an agent set to switch without asking tries the held model before its backup, and
+// stays on it after the plan was reset outside OpenBot (#7068); another provider is refused.
 // `bun scripts/codex-usage-reset-e2e.ts`. Writes .openbot-build/codex-usage-reset-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -25,6 +26,7 @@ const fakeCodex = join(root, "codex");
 const consumeLog = join(root, "consumed.jsonl");
 const refusedLog = join(root, "refused.jsonl");
 const turnLog = join(root, "turns.jsonl");
+const modelLog = join(root, "models.jsonl");
 /** Its presence makes the next turn find a new account with an unspent plan, as a sign-in in a terminal does. */
 const switchedFlag = join(root, "switched");
 
@@ -43,6 +45,7 @@ const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 /**
  * A Codex app-server with the methods that the service calls. A turn whose text has "limit" spends the
  * plan, and while the plan is spent each turn fails as Codex fails it. A reset credit restores it.
+ * GPT-6 Terra has its own plan, which is never spent.
  */
 const FAKE_CODEX = `#!/usr/bin/env node
 const { appendFileSync, existsSync, readFileSync, rmSync } = require("node:fs");
@@ -80,7 +83,7 @@ const answer = (message) => {
       appendFileSync(${JSON.stringify(consumeLog)}, JSON.stringify({ idempotencyKey: params.idempotencyKey, outcome }) + "\\n");
       return write({ id: message.id, result: { outcome } });
     }
-    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }] } });
+    case "model/list": return write({ id: message.id, result: { data: [{ model: "gpt-6-luna", displayName: "GPT-6 Luna" }, { model: "gpt-6-terra", displayName: "GPT-6 Terra" }] } });
     case "plugin/list": return write({ id: message.id, result: { marketplaces: [] } });
     case "config/read": return write({ id: message.id, result: config });
     case "config/batchWrite": return write({ id: message.id, result: {} });
@@ -99,6 +102,7 @@ const answer = (message) => {
       if (input.includes("Exhaust")) spent = true;
       if (existsSync(${JSON.stringify(switchedFlag)})) { rmSync(${JSON.stringify(switchedFlag)}); spent = false; }
       appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify(params.input) + "\\n");
+      appendFileSync(${JSON.stringify(modelLog)}, JSON.stringify(params.model) + "\\n");
       // A refusal that the plan does not show, as when Codex counted a limit that ended since. Once per
       // message, also across a restart, so the retry of a released message runs.
       const refused = existsSync(${JSON.stringify(refusedLog)}) ? readFileSync(${JSON.stringify(refusedLog)}, "utf8").split("\\n") : [];
@@ -107,7 +111,7 @@ const answer = (message) => {
       write({ id: message.id, result: { turn: { id: turnId, status: "inProgress", items: [] } } });
       write({ method: "turn/started", params: { threadId: params.threadId, turn: { id: turnId } } });
       setTimeout(() => {
-        if (spent || transient) {
+        if ((spent || transient) && params.model !== "gpt-6-terra") {
           const error = { message: "You've hit your usage limit. Try again later.", codexErrorInfo: "usageLimitExceeded" };
           write({ method: "error", params: { threadId: params.threadId, turnId, error, willRetry: false } });
           write({ method: "turn/completed", params: { threadId: params.threadId, turn: { id: turnId, status: "failed", error } } });
@@ -186,6 +190,18 @@ async function waitFor<T>(label: string, read: () => T | null | undefined | fals
 function turnInputs(): string[] {
   try {
     return readFileSync(turnLog, "utf8").split("\n").filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/** The model of each turn, in order. */
+function turnModels(): string[] {
+  try {
+    return readFileSync(modelLog, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
   } catch {
     return [];
   }
@@ -375,6 +391,58 @@ try {
   report.cases.push({
     name: "an agent that a usage limit holds can be deleted",
     details: { heldForDelete },
+    passed: true,
+  });
+
+  // The plan is still spent. An agent set to switch without asking goes to the model that the limit
+  // holds. A message from the user tries that model first, as the plan can have been reset outside
+  // OpenBot, and the agent moves to its backup only after the refusal (#7068).
+  await waitFor("the spent plan to hold GPT-6 Luna", () =>
+    agents.getRuntimeSnapshot().usageLimitedModels?.some((limit) => limit.model === "gpt-6-luna"),
+  );
+  const backup = await runCauseEffect(
+    agents.createAgent({
+      name: "Backup",
+      description: "Checks the try before the backup.",
+      avatarSeed: "backup",
+      avatarHue: null,
+      initialMessage: "Start on Terra.",
+      provider: "codex",
+      model: "gpt-6-terra",
+    }),
+  );
+  const done = () => agents.listQueue(backup.id).deliveries.every((delivery) => delivery.status === "completed");
+  const modelOf = () => agents.listAgents().find((candidate) => candidate.id === backup.id)?.model;
+  await waitFor("the first message to run on GPT-6 Terra", done);
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: backup.id,
+      model: "gpt-6-luna",
+      backupModels: { automatic: true, order: [{ provider: "codex", model: "gpt-6-terra" }] },
+    }),
+  );
+  const triesFrom = turnModels().length;
+  await runCauseEffect(agents.sendMessage({ agentId: backup.id, text: "Still spent on Luna?" }));
+  await waitFor("the message to run on the backup", () => done() && modelOf() === "gpt-6-terra");
+  const tried = turnModels().slice(triesFrom);
+  assert.deepEqual(tried, ["gpt-6-luna", "gpt-6-terra"], "The message tries the held model, then the backup.");
+  // The plan is reset outside OpenBot, and the user puts the agent back on GPT-6 Luna. The next
+  // message runs there, and the agent stays.
+  writeFileSync(switchedFlag, "");
+  await runCauseEffect(agents.updateAgent({ agentId: backup.id, model: "gpt-6-luna" }));
+  const returnFrom = turnModels().length;
+  await runCauseEffect(agents.sendMessage({ agentId: backup.id, text: "Reset outside OpenBot." }));
+  await waitFor("the message to run on the model that the limit held", done);
+  const returned = turnModels().slice(returnFrom);
+  assert.deepEqual(returned, ["gpt-6-luna"], "After a reset outside OpenBot, the message runs on the held model.");
+  assert.equal(modelOf(), "gpt-6-luna", "The agent stays on the model that it tried.");
+  assert.ok(
+    !agents.getRuntimeSnapshot().usageLimitedModels?.some((limit) => limit.model === "gpt-6-luna"),
+    "A completed try ends the limit.",
+  );
+  report.cases.push({
+    name: "an agent set to switch without asking tries the held model before its backup",
+    details: { tried, returned },
     passed: true,
   });
 

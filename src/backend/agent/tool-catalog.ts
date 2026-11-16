@@ -248,6 +248,13 @@ export const DEFERRED_MCP_NOTE =
 export const CODEX_DEFERRED_MCP_NOTE =
   "The tools of your MCP servers are not in this catalog. Find them with the separate tool named exactly tool_search. When you have exec instead, read ALL_TOOLS in an exec cell, where MCP tool names start with mcp__, and call the tool on tools.";
 
+/**
+ * OpenCode 2.2.7 puts the tools of the user's MCP servers only in `execute`, and lists only some
+ * tools of a large server there (#7097).
+ */
+export const OPENCODE_DEFERRED_MCP_NOTE =
+  "The tools of your MCP servers are not in this catalog. They are in execute: when one is not listed there, find it with search(...) inside execute and call the path that it returns.";
+
 function words(text: string): string[] {
   return text
     .toLowerCase()
@@ -264,6 +271,13 @@ const READY_SEARCH_RESULTS = 3;
  * such as "create workflow routine" does not also load the routine schemas and guidance.
  */
 const WORKFLOW_WORDS = new Set(["workflow", "workflows"]);
+/**
+ * The release notes call the board of the Workflows page the Canvas, so users ask an agent for a
+ * canvas. Without these words a search found no workflow tool, and the agent said that it could not
+ * make one (#9367). A canvas can also be the Routines canvas or a canvas on a web page, so these words
+ * add the workflow tools and keep the other results.
+ */
+const CANVAS_WORDS = new Set(["canvas", "canvases"]);
 const WORKFLOW_TOOLS = BUILTIN_TOOL_CATALOG.filter(
   (entry) =>
     entry.namespace === OPENBOT_DYNAMIC_TOOLS.name && words(entry.tool).some((word) => WORKFLOW_WORDS.has(word)),
@@ -391,10 +405,21 @@ function parseCall(params: DynamicToolCallParams) {
 }
 
 /**
- * The error for a `tool_call` that `resolveDeferredTool` refused because its `arguments` is not an
- * object, or null for another reason. A general error made the agent send the same text again.
+ * True when a `tool_call` names OpenBot's discovery tool, such as `openbot.tool_describe`. Only a qualified
+ * name counts: a bare `tool_search` can mean the provider's own search for MCP tools.
+ */
+function callsDiscoveryTool(envelope: unknown): boolean {
+  const named = bridgedName(envelope)?.trim();
+  return named !== undefined && /^(?:openbot\.|openbot__|mcp__openbot__)tool_(?:search|describe)$/.test(named);
+}
+
+/**
+ * The error for a `tool_call` that `resolveDeferredTool` refused because it names a discovery tool or
+ * its `arguments` is not an object, or null for another reason. A general error made the agent send
+ * the same text again: an agent that loaded a schema through tool_call never got it (#6754).
  */
 export function deferredCallArgumentsError(params: DynamicToolCallParams): string | null {
+  if (callsDiscoveryTool(params.arguments)) return sourceText("error.agent.toolCallDiscoveryTool");
   const parsed = parseCall(params);
   const sent = isRecord(params.arguments) && params.arguments.arguments !== undefined;
   return sent && !parsed.success && parsed.error.issues.some(({ path }) => path[0] === "arguments")
@@ -472,10 +497,11 @@ export function discoverTools(params: DynamicToolCallParams, provider: AgentProv
         .map(({ entry }) => entry),
     );
     const workflowSearch = [...terms].some((term) => WORKFLOW_WORDS.has(term));
-    if (workflowSearch) {
+    if (workflowSearch)
       // A tool that a query names exactly keeps its schema; other ready results, such as routines, go.
       for (const entry of ready)
         if (!matches.some((match) => match.entry === entry && match.exact)) ready.delete(entry);
+    if (workflowSearch || [...terms].some((term) => CANVAS_WORDS.has(term))) {
       for (const entry of WORKFLOW_TOOLS) {
         if (!found.some((result) => result.entry === entry)) found.push({ entry, strong: true });
         ready.add(entry);

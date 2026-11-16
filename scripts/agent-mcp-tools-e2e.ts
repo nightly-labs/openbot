@@ -1,14 +1,16 @@
 // Drives the agent MCP tools of issue #2673 on the real modules: the MCP tools, McpGateway, the
 // SQLite MCP store and the probe, against local MCP servers. The approval and the sign-in card are
 // recorded where the router would show them. No provider or account is used. It also checks what
-// suggest_marketplace_app answers for a Marketplace app that is already installed.
+// suggest_marketplace_app answers for a Marketplace app that is already installed, and that a
+// startup moves an app installed from an earlier catalog pin to the current pin, and that the
+// built-in GitHub connection is listed as the agents get it (#7088).
 // bun scripts/agent-mcp-tools-e2e.ts. Writes .openbot-build/agent-mcp-tools-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { McpServerConfig } from "@openbot/contracts/ipc";
+import { GITHUB_CONNECTOR_MCP_SERVER_ID, type McpServerConfig } from "@openbot/contracts/ipc";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
 import { McpGateway } from "../src/backend/agent/mcp-gateway";
@@ -20,9 +22,10 @@ import {
   mcpServersFromGateway,
 } from "../src/backend/agent/mcp-tools";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { McpServerStore } from "../src/backend/mcp-server-store";
+import { CATALOG_PIN_MOVES, McpServerStore } from "../src/backend/mcp-server-store";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import { NO_PROVIDER_CREDENTIALS } from "../src/backend/provider-drivers";
+import { catalogPluginSlug, loadCatalogPluginServers } from "../src/main/analytics-plugin-catalog";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/agent-mcp-tools-e2e");
 const URL_SECRET = "url-secret-7f3a91";
@@ -102,7 +105,7 @@ interface ToolAnswer {
   error?: string;
   toolCount?: number;
   tools?: string[];
-  servers?: Array<{ name: string; headerNames?: string[] }>;
+  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean }>;
   enabled?: boolean;
   removed?: boolean;
   setupSteps?: string[];
@@ -154,11 +157,11 @@ try {
   });
   const tools = mcpServersFromGateway(gateway);
 
-  const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true) => {
+  const call = async (name: string, tool: McpServerToolName, args: unknown, approved = true, using = tools) => {
     const approvals: string[] = [];
     const signInCards: string[] = [];
     const response = await runCauseEffect(
-      handleMcpServerTool(tools, {
+      handleMcpServerTool(using, {
         tool,
         arguments: args,
         approve: (reason) =>
@@ -353,12 +356,107 @@ try {
   assert.equal(removed.success, true);
   assert.equal(row("calendar"), undefined);
 
+  // The GitHub connection is not a row, but the agents get it: the list shows it, and the other
+  // tools say that it is part of OpenBot (#7088).
+  const githubGateway = new McpGateway({
+    servers: store,
+    credentials: NO_PROVIDER_CREDENTIALS,
+    computerUseMcpServer: () => null,
+    githubConnector: {
+      mcpServer: () => ({
+        id: GITHUB_CONNECTOR_MCP_SERVER_ID,
+        name: "github",
+        transport: "http",
+        enabled: true,
+        command: "",
+        args: [],
+        env: [],
+        envPassthrough: [],
+        workingDirectory: "",
+        url: servers.open.url,
+        headers: [],
+      }),
+      mcpAuthorization: () => Effect.succeed(null),
+    },
+    logger: createOpenBotLogger("agent-service", () => undefined),
+    hooks: { emitError: () => undefined, refreshAllAgentRuntimes: () => Effect.void },
+  });
+  const githubTools = mcpServersFromGateway(githubGateway);
+  assert.ok(githubGateway.enabled().some((config) => config.name === "github"));
+  const githubListed = await call("the GitHub connection is listed", "list_mcp_servers", {}, true, githubTools);
+  assert.deepEqual(
+    githubListed.result.servers?.find((entry) => entry.name === "github"),
+    { name: "github", transport: "http", enabled: true, builtIn: true },
+  );
+  const githubTested = await call(
+    "the GitHub connection is not tested",
+    "test_mcp_server",
+    { name: "github" },
+    true,
+    githubTools,
+  );
+  assert.equal(githubTested.success, false);
+  assert.match(githubTested.result.error ?? "", /part of OpenBot/u);
+  const githubRemoved = await call(
+    "the GitHub connection is not removed",
+    "remove_mcp_server",
+    { name: "github" },
+    true,
+    githubTools,
+  );
+  assert.equal(githubRemoved.success, false);
+  assert.equal(githubRemoved.approvals.length, 0);
+
   const reserved = await call("a reserved name is refused", "save_mcp_server", {
     name: "openbot",
     url: servers.open.url,
   });
   assert.equal(reserved.success, false);
   assert.equal(reserved.approvals.length, 0, "an invalid server is corrected before the user is asked");
+
+  // An app installed from an earlier catalog pin runs the current pin after the next start and is
+  // still the Marketplace app (#7004). A renamed row and changed arguments are the user's own.
+  const catalog = await Effect.runPromise(
+    loadCatalogPluginServers(resolve(import.meta.dirname, "../resources/plugin-catalog")),
+  );
+  const npxConfig = (name: string, args: readonly string[]): McpServerConfig => ({
+    id: "",
+    name,
+    transport: "stdio",
+    enabled: false,
+    command: "npx",
+    args: [...args],
+    env: [{ key: "ICLOUD_MODE", value: "local" }],
+    envPassthrough: [],
+    workingDirectory: root,
+    url: "",
+    headers: [],
+  });
+  const npxRow = (name: string, args: readonly string[]) => store.save(npxConfig(name, args));
+  for (const pin of CATALOG_PIN_MOVES) {
+    const listed = catalog.find((server) => server.name === pin.name);
+    assert.ok(listed, `${pin.name} is in the shipped catalog`);
+    const current = catalogPluginSlug(npxConfig(pin.name, pin.current), catalog, homedir());
+    assert.equal(current, listed.slug, `${pin.name} moves to the pin of the shipped catalog`);
+    for (const earlier of pin.earlier) {
+      const installed = npxRow(pin.name, earlier);
+      const renamed = npxRow(`${pin.name}-mine`, earlier);
+      const edited = npxRow(`${pin.name}-edited`, [...earlier, "--verbose"]);
+      gateway.migrateCatalogRows();
+      const moved = store.get(installed.id);
+      assert.deepEqual(
+        moved,
+        { ...installed, args: [...pin.current] },
+        "only the arguments of the installed row change",
+      );
+      assert.equal(moved && catalogPluginSlug(moved, catalog, homedir()), listed.slug);
+      assert.deepEqual(store.get(renamed.id), renamed, "a renamed row stays");
+      assert.deepEqual(store.get(edited.id), edited, "changed arguments stay");
+      gateway.migrateCatalogRows();
+      assert.deepEqual(store.get(installed.id), moved, "a second start changes nothing");
+      for (const row of [installed, renamed, edited]) store.remove(row.id);
+    }
+  }
 
   // Nothing an agent reads names a key: not the query of an address, not a header value.
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));

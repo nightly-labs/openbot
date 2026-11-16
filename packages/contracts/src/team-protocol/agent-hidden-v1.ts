@@ -3,9 +3,12 @@
 // What it grants, recorded here because freezing it makes it permanent: any signed-in member reads
 // the agents that the host owner or an admin hid. Only an owner or an admin hides or restores one; the
 // host refuses a member with 403. A hidden agent stays in
-// `/v1/agents` with all of its data. The host does not run its routines and refuses new messages to
-// it until it is restored. Each change sends `hidden-agents-changed` with the whole list. Bounds and
-// meaning do not follow IPC changes; widening any of it needs a second capability string.
+// `/v1/agents` with all of its data. A host that has only this capability does not run its routines
+// and refuses new messages to it until it is restored. A host that also has `agent-hidden-work`
+// keeps the agent at work: the hide then takes the agent out of the list and changes no other thing.
+// The routes and the shapes here are the same on both. Each change sends `hidden-agents-changed`
+// with the whole list. Bounds and meaning do not follow IPC changes; widening any of it needs a
+// second capability string.
 import { isDynamicRecord } from "../runtime-values";
 import {
   type AdminDecoder,

@@ -10,6 +10,7 @@ import type {
   McpSignInState,
   McpTestResult,
   SaveMcpSignInAppInput,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -286,6 +287,38 @@ const ServerSettings = createSimpleContext({
     }
 
     /**
+     * Saves the plush look of the server in the settings. The list shows it before the host answers,
+     * so each mark of the server changes at the click; a failure puts the previous look back.
+     */
+    async function saveServerAppearance(appearance: ServerAppearance | null): Promise<void> {
+      const server = serverSettingsTarget();
+      if (!serverCanAdminister(server, "host-appearance-v1"))
+        throw new Error(currentText().t("error.team.hostIdentityUnsupported"));
+      const serverId = server.id;
+      const previous = server.appearance;
+      const patch = (value: ServerAppearance | null | undefined) =>
+        setServers((current) =>
+          current.map((item) => {
+            if (item.id !== serverId) return item;
+            const { appearance: _previous, ...rest } = item;
+            return value === undefined ? rest : { ...rest, appearance: value };
+          }),
+        );
+      patch(appearance);
+      try {
+        if (server.kind === "local") setHostStatus(await serversPort().host.updateIdentity({ appearance }));
+        else {
+          const updated = await serversPort().hostAdmin.updateIdentity({ appearance }, serverId);
+          setServers((current) => current.map((item) => (item.id === serverId ? updated : item)));
+        }
+      } catch (error) {
+        patch(previous);
+        throw error;
+      }
+      setServers(await serversPort().servers.list());
+    }
+
+    /**
      * Asks the host whether the screen recording grant it was refused is now in place.
      *
      * The member who was refused cannot answer this: the grant is given on the host, and the status
@@ -474,11 +507,17 @@ const ServerSettings = createSimpleContext({
       if (serverSettingsTarget()?.id === server.id) setServerSettingsOpen(false);
     }
 
-    /** Restarts the hosted server, or the server on this computer, that the confirmation from the server menu asks about. */
+    /**
+     * Restarts the server that the confirmation from the server menu asks about: a server on this computer
+     * through its supervisor, a hosted server through the account service, and a self-hosted server
+     * through its own host (`host-restart-v1`).
+     */
     async function restartConfirmedServer(): Promise<void> {
       const server = restartConfirmServer();
       if (!server) throw new Error(currentText().t("server.settings.unavailable"));
       if (server.thisComputer) await serversPort().localServers.restart(server.id);
+      else if (server.hosted !== true && serverSupportsCapability(server, "host-restart-v1"))
+        await serversPort().hostAdmin.restartHost(server.id);
       else await serversPort().hostedServers.restart(server.id);
     }
 
@@ -611,7 +650,12 @@ const ServerSettings = createSimpleContext({
             .catch(() => null);
           if (!waiting()) return;
           const current = serverSettingsMcpSignInRelays()[url];
-          if (current?.authorizeHost !== page?.authorizeHost || current?.listening !== page?.listening) set(page);
+          if (
+            current?.authorizeHost !== page?.authorizeHost ||
+            current?.url !== page?.url ||
+            current?.listening !== page?.listening
+          )
+            set(page);
           await new Promise((resolve) => setTimeout(resolve, MCP_SIGN_IN_PAGE_POLL_MS));
         }
       } finally {
@@ -748,6 +792,7 @@ const ServerSettings = createSimpleContext({
       openServerSettings,
       refreshServerSettings,
       saveServerIdentity,
+      saveServerAppearance,
       recheckScreenRecording,
       rotateHostKey,
       setServerPublished,

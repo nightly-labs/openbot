@@ -20,6 +20,27 @@ export interface BrowserTab {
   canGoForward?: boolean;
 }
 
+/**
+ * One thing that a person did while they showed a task in an agent's tab: a page that loaded, or a
+ * click on a control. `path` has no query and no hash. No step has typed text.
+ */
+export interface BrowserTeachStep {
+  kind: "page" | "click";
+  host: string;
+  path: string;
+  /** The title of the page. */
+  title?: string;
+  /** The role and the name of the clicked control. */
+  role?: string;
+  name?: string;
+}
+
+/** Ends the recording of a tab. Without `save` the steps are deleted. */
+export interface BrowserTeachStopInput {
+  tabId: string;
+  save: boolean;
+}
+
 export type BrowserImageMode = "auto" | "always" | "never";
 
 export type BrowserTarget =
@@ -258,7 +279,7 @@ export interface BrowserLocalSignInFinish {
 }
 
 /**
- * The count of cookies that the server set in the tab's session. `signedIn` is false when a checked
+ * The count of cookies, and of page storage pairs, that the server set for the tab. `signedIn` is false when a checked
  * send left the server tab on a sign-in step.
  */
 export interface BrowserLocalSignInResult {

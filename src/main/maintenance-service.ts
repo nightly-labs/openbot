@@ -13,7 +13,8 @@ import type { BrowserHost } from "../backend/browser-host";
 import type { MailboxStore } from "../backend/mailbox-store";
 import { type ArchiveOperationError, archiveCall, archiveFailure, archiveSync } from "./archive-effects";
 import type { ResourceMonitor } from "./resource-monitor";
-import type { TraceFile } from "./trace-file";
+import type { StartAttemptsSummary } from "./start-attempts";
+import { TraceFile } from "./trace-file";
 import type { UpdateService } from "./update-service";
 
 const execFileAsync = promisify(execFile);
@@ -161,16 +162,7 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
     // 4, not 3: schema 3 had a one-time `memory` reading, and this report has the `resources` summaries.
     schemaVersion: 4,
     generatedAt: new Date().toISOString(),
-    application: {
-      version: app.getVersion(),
-      packaged: app.isPackaged,
-      platform: process.platform,
-      architecture: arch(),
-      osRelease: osRelease(),
-      electron: process.versions.electron,
-      chromium: process.versions.chrome,
-      node: process.versions.node,
-    },
+    application: applicationDiagnostics(),
     agent: {
       phase: status.phase,
       cliVersion: status.cliVersion,
@@ -219,6 +211,55 @@ export const exportDiagnostics = Effect.fn("Archive.exportDiagnostics")(function
   ).pipe(Effect.uninterruptible);
   return { saved: true };
 });
+
+/**
+ * The diagnostics that the start recovery window exports. The start did not finish, so no agent
+ * service, browser or updater exists: this has the application, the start attempts and the trace
+ * summary only, under the same privacy promise as `exportDiagnostics`.
+ */
+export const exportStartDiagnostics = Effect.fn("Archive.exportStartDiagnostics")(function* (
+  context: Pick<MaintenanceContext, "parentWindow" | "translate"> & { startAttempts: StartAttemptsSummary },
+): Effect.fn.Return<ExportResult, ArchiveOperationError> {
+  const destination = yield* chooseExportDestinationEffect(
+    context.parentWindow,
+    `OpenBot-start-diagnostics-${new Date().toISOString().slice(0, 10)}.json`,
+    [{ name: context.translate("dialog.filter.jsonDocument"), extensions: ["json"] }],
+  );
+  if (!destination) return { saved: false };
+  const trace = new TraceFile({ directory: join(app.getPath("userData"), "logs") });
+  const diagnostics = {
+    schemaVersion: 1,
+    kind: "start-recovery",
+    generatedAt: new Date().toISOString(),
+    application: applicationDiagnostics(),
+    // Versions, a count and fixed words.
+    startAttempts: context.startAttempts,
+    // IPC channels, crash origins and quit reasons with counts and outcomes, from the local trace file.
+    trace: yield* trace.summarize(),
+    privacy:
+      "Contains no conversations, URLs, email addresses, tokens, file contents, file paths, or raw error messages.",
+  };
+  yield* archiveCall(() =>
+    writeFile(destination, `${JSON.stringify(diagnostics, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+    }),
+  ).pipe(Effect.uninterruptible);
+  return { saved: true };
+});
+
+function applicationDiagnostics() {
+  return {
+    version: app.getVersion(),
+    packaged: app.isPackaged,
+    platform: process.platform,
+    architecture: arch(),
+    osRelease: osRelease(),
+    electron: process.versions.electron,
+    chromium: process.versions.chrome,
+    node: process.versions.node,
+  };
+}
 
 const chooseExportDestinationEffect = Effect.fn("Archive.chooseExportDestination")(function* (
   parentWindow: BrowserWindow | null,

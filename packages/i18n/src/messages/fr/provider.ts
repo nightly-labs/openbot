@@ -176,22 +176,36 @@ export const messages = {
   "provider.geminiKey.title": "Clé d’API Gemini",
   "provider.geminiKey.description":
     "Enregistrez une clé d’API Gemini sur cet ordinateur. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
+  "provider.geminiKey.descriptionHost":
+    "Enregistrez une clé d’API Gemini sur l’hôte. Une clé enregistrée est utilisée à la place de votre compte Google. Pour vous connecter avec Google, supprimez la clé et sélectionnez « Connecter » sur la ligne Gemini.",
   "provider.geminiKey.label": "Clé d’API Gemini",
   "provider.claudeKey.title": "Clé d’API Anthropic",
   "provider.claudeKey.description":
     "Enregistrez une clé API Anthropic sur l'hôte. Anthropic facture chaque requête au crédit API de la clé, pas à votre forfait Claude. Pour l'utiliser pour un agent, sélectionnez le compte « Clé API » dans le menu des modèles de l'agent. Si Claude n'est pas connecté, tous les agents utilisent la clé.",
   "provider.claudeKey.label": "Clé d’API Anthropic",
+  "provider.cursorKey.title": "Clé d’API Cursor",
+  "provider.cursorKey.description":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur cet ordinateur.",
+  "provider.cursorKey.descriptionHost":
+    "Chaque compte Cursor après le premier utilise une clé d’API. Créez une clé dans le tableau de bord Cursor, sous Integrations, puis collez-la ici. La clé est enregistrée sur l’hôte.",
+  "provider.cursorKey.label": "Clé d’API Cursor",
   "provider.inceptionKey.title": "Clé d’API Inception",
   "provider.inceptionKey.description":
     "Enregistrez une clé d’API Inception sur cet ordinateur pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.inceptionKey.descriptionHost":
+    "Enregistrez une clé d’API Inception sur l’hôte pour utiliser les modèles Mercury. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.inceptionKey.label": "Clé d’API Inception",
   "provider.deepseekKey.title": "Clé d’API DeepSeek",
   "provider.deepseekKey.description":
     "Enregistrez une clé d’API DeepSeek sur cet ordinateur pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.deepseekKey.descriptionHost":
+    "Enregistrez une clé d’API DeepSeek sur l’hôte pour utiliser les modèles DeepSeek. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.deepseekKey.label": "Clé d’API DeepSeek",
   "provider.openrouterKey.title": "Clé d’API OpenRouter",
   "provider.openrouterKey.description":
     "Enregistrez une clé d’API OpenRouter sur cet ordinateur pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
+  "provider.openrouterKey.descriptionHost":
+    "Enregistrez une clé d’API OpenRouter sur l’hôte pour utiliser les modèles d’OpenRouter. OpenBot les exécute dans la CLI Pi qu’il télécharge.",
   "provider.openrouterKey.label": "Clé d’API OpenRouter",
   "provider.openCodeKey.title": "Se connecter à OpenCode Go",
   "provider.openCodeKey.description":
@@ -208,6 +222,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Impossible de se reconnecter.",
   "provider.account.add": "Ajouter un compte",
   "provider.account.addLabel": "Ajouter un autre compte {name}",
+  "provider.account.addWithCode": "Ajouter un compte par code",
   "provider.account.count": { one: "{count} compte", other: "{count} comptes" },
   "provider.account.numbered": "Compte {number}",
   "provider.account.apiKey": "Clé API",
@@ -235,13 +250,30 @@ export const messages = {
   "provider.account.resetUsageNoCredit": "{name} n’a plus de crédits de réinitialisation d’usage.",
   "provider.account.resetUsageAlreadyRedeemed": "Ce crédit de réinitialisation de {name} a déjà été utilisé.",
   "provider.account.resetUsageFailed": "Impossible de réinitialiser l’usage de {name}.",
+  "provider.account.pool": "Regrouper les comptes",
+  "provider.account.poolDescription":
+    "Les agents utilisent un compte jusqu’à ce qu’il approche d’une limite d’usage, puis le compte dont la limite se réinitialise en premier.",
+  "provider.account.inUse": "Utilisé",
+  "provider.account.notInPool": "Hors du groupe",
+  "provider.account.leaveOutOfPool": "Retirer du groupe",
+  "provider.account.putBackInPool": "Remettre dans le groupe",
+  "provider.account.poolChip": "Groupe",
+  "provider.account.poolCount": "Groupe de {accounts}",
+  "provider.account.poolInUse": "{pool} · {name} utilisé",
+  "provider.settings.accountsPooledDescription": "{count} sur {max}. Les agents partagent ces comptes.",
   "provider.settings.disconnectTitle": "Déconnecter {name} ?",
   "provider.settings.disconnectOthers": "Les autres comptes {provider} attendent que vous reconnectiez {provider}.",
   "provider.settings.disconnectLocal":
     "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal est aussi déconnectée.",
   "provider.settings.disconnectHost": "OpenBot déconnecte {provider} sur le serveur.",
+  "provider.settings.geminiKeyReplacesAccount":
+    "Une clé API Gemini enregistrée est utilisée à la place d'une connexion Google. Pour utiliser un abonnement Google et ses modèles, supprimez la clé.",
   "provider.settings.versionInstalledByUser": "{version} · installée par vous",
   "provider.settings.versionDownloaded": "{version} · téléchargée par OpenBot",
+  "provider.settings.otherVersionInstalledByUser": "Non utilisée : {version} · installée par vous",
+  "provider.settings.otherVersionDownloaded": "Non utilisée : {version} · téléchargée par OpenBot",
+  "provider.settings.useInstalledVersion": "Utiliser l'installée",
+  "provider.settings.useDownloadedVersion": "Utiliser celle d'OpenBot",
   "provider.settings.cache": "Cache",
   "provider.settings.promptCache": "Cache de prompt",
   "provider.settings.promptCacheDescription":
@@ -281,4 +313,6 @@ export const messages = {
   "provider.settings.deleteOff":
     "Supprime la CLI qu'OpenBot a téléchargée pour {name} ({size}). Les comptes, les connexions et les agents restent.",
   "provider.settings.removeDownloadFailed": "Impossible de supprimer le téléchargement.",
+  "provider.settings.disconnectLocalOnly":
+    "OpenBot déconnecte {provider} sur cet ordinateur. La CLI {provider} de votre terminal garde sa propre connexion.",
 } as const satisfies PartialTranslation<typeof source>;

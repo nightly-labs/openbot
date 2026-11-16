@@ -1,10 +1,13 @@
 import type {
   ClientAgentSummary,
+  GithubSkillSource,
   InstalledSkill,
   MarketplaceAgentDetail,
   MarketplaceAgentSummary,
   MarketplaceSkillDetail,
   MarketplaceSkillSummary,
+  McpAccessChange,
+  McpServerAccess,
   McpServerConfig,
   SkillCategory,
 } from "@openbot/contracts/ipc";
@@ -39,6 +42,9 @@ export type AgentListingState = "add" | "added" | "update";
 
 /** How far the read of one agent's installed skills got. An empty list is an answer only when `loaded`. */
 export type SkillRead = "idle" | "loading" | "loaded" | "failed";
+
+/** The answer to a GitHub link: the skills under it, or why the server could not read it. */
+export type GithubSkillRead = { status: "found"; source: GithubSkillSource } | { status: "failed"; message: string };
 
 /** `connecting`: a sign-in started and waits, such as for a GitHub device code. */
 export type MarketplaceAppStatus = "connected" | "attention" | "connecting" | "idle";
@@ -176,6 +182,16 @@ export interface MarketplaceMacAutomation {
  * What the Marketplace view reads and asks for. The renderer builds it from its IPC calls, and a
  * story builds it from fixtures. Each action reports its own failure through `error`.
  */
+/** The agents and the role levels of the MCP rows of the server. */
+export interface MarketplaceMcpAccess {
+  /** The access of one MCP row. A row with no stored entry has the default. */
+  entry: (mcpServerId: string) => McpServerAccess;
+  roles: () => readonly { id: string; name: string }[];
+  busy: () => boolean;
+  /** A full replace for each row. False when the host refused one; the error shows in the window. */
+  set: (changes: readonly McpAccessChange[]) => Promise<boolean>;
+}
+
 export interface MarketplaceModel {
   listAgents: CatalogList<MarketplaceAgentSummary>;
   agentHomeCache?: MarketplaceHomeCache<MarketplaceAgentSummary> | undefined;
@@ -223,6 +239,11 @@ export interface MarketplaceModel {
   setSkillEnabled: (agentId: string, skillId: string, on: boolean) => Promise<void>;
   /** Installs the newest version on each agent that has an older one. A changed copy asks first. */
   updateSkill: (skill: MarketplaceSkillRef, agentIds: readonly string[]) => Promise<void>;
+  /**
+   * Reads the skills under a link to a public GitHub repository or folder, at its newest commit.
+   * Absent while the server cannot read GitHub, or this user cannot add skills.
+   */
+  readGithubSkills?: ((link: string) => Promise<GithubSkillRead>) | undefined;
   /** Absent while no composer can take the request. Starts a chat that makes a new skill. */
   createSkill?: ((agentId: string) => void) | undefined;
   /** Absent while no composer can take the example. */
@@ -263,6 +284,11 @@ export interface MarketplaceModel {
   disconnectApp: (app: Extract<MarketplaceApp, { kind: "plugin" }>) => void;
   /** Removes a custom MCP server. */
   removeServer: (id: string) => Promise<boolean>;
+  /**
+   * Who gets the MCP servers of an app (`mcp-access-v1`). Absent while the host does not have it, the
+   * user is not an owner or admin, or the answer did not arrive.
+   */
+  mcpAccess?: MarketplaceMcpAccess | undefined;
   /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
   addServer?: (() => void) | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;

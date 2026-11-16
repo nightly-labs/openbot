@@ -2,7 +2,6 @@ import type { PartialTranslation } from "../../message";
 import type { messages as source } from "../en/prompt";
 
 export const messages = {
-  "prompt.inputRequired": "مطلوب إدخال",
   "prompt.question.label": "أسئلة الوكيل",
   "prompt.question.cancelled": "أُلغيت الأسئلة",
   "prompt.question.expired": "انتهت صلاحية الأسئلة",
@@ -12,15 +11,12 @@ export const messages = {
   "prompt.question.next": "التالي",
   "prompt.question.cancel": "إلغاء الأسئلة",
   "prompt.question.privatePlaceholder": "أدخل إجابة خاصة",
-  "prompt.customPlaceholder": "اكتب إجابتك الخاصة",
   "prompt.question.customAnswerFor": "إجابة مخصصة لـ: {question}",
   "prompt.question.skip": "تخطٍّ",
   "prompt.question.chooseAll": "اختر كل ما ينطبق.",
   "prompt.question.somethingElse": "شيء آخر",
   "prompt.question.emptyTitle": "لا أسئلة في الانتظار.",
   "prompt.question.emptyBody": "سيتابع الوكيل عندما يحتاج إلى قرار آخر.",
-  "prompt.choice.hint": "اختر ما يناسبك، أو اكتب إجابتك الخاصة.",
-  "prompt.choice.customLabel": "إجابة مخصصة",
   "prompt.approval.answerFailed": "تعذّرت الإجابة عن طلب الموافقة هذا. حاول مرة أخرى.",
   "prompt.approval.grantFailed": "تعذّر حفظ الموافقة الدائمة. حاول مرة أخرى.",
   "prompt.approval.label": "موافقة الوكيل",
@@ -29,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "سماح",
   "prompt.approval.alwaysAllow": "السماح دائمًا",
   "prompt.approval.deny": "رفض",
+  "prompt.approval.cut":
+    "تعرض هذه البطاقة بداية الطلب فقط، لذلك تقدّم الرفض فقط. إذا لم يظهر زر السماح قريبًا، فحدّث OpenBot على الخادم.",
   "prompt.approval.report.bugHeadline": "وجدت خطأً؟ لنُصلحه.",
   "prompt.approval.report.ideaHeadline": "لديك فكرة؟ لنحققها.",
   "prompt.approval.report.dontSend": "ليس الآن",

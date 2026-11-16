@@ -3,8 +3,9 @@
 // over the loopback Team API, as it reaches a joined server, and logs in as its owner at each start.
 //
 // A child ends when its control pipe closes, so it stops also when this process is killed. The
-// supervisor starts a child again after it stops on its own, a few times only, so a child that cannot
-// start does not use the computer's power in a loop.
+// supervisor starts a child again after it stops on its own or after a start that nobody waits for
+// fails, a few times only, so a child that cannot start does not use the computer's power in a loop.
+// After that, Retry on the server's connection screen starts it again.
 //
 // The owner password goes to the child in its environment, and the child removes it from there at
 // once. No password or session token is written to a log.
@@ -18,7 +19,8 @@
 // The child has no account session, so it cannot read its members from the account directory. It
 // asks on stdout, and this process writes the list to its control pipe. After this app changes a
 // member of the server, it writes the new list without a request. In the same way, this process makes
-// the Marketplace reads that adding an agent needs, with its own session, and only those reads.
+// the Marketplace reads that adding an agent needs, and the start of a Slack or Discord connect of that
+// server, with its own session, and only those requests.
 //
 // Each child writes the agents that work on it when the list changes. A quit of the desktop app stops
 // the children, so `Cmd + Q` asks for a hold while one of them works, as it does for the local agents.
@@ -165,7 +167,7 @@ interface LocalServerAccount {
   remove(hostId: string): Effect.Effect<void, RemoteWorkflowError>;
   /** The origin of the account service. */
   apiOrigin: string;
-  /** A JSON request with this app's session. Only the Marketplace reads below get here. */
+  /** A JSON request with this app's session. Only the Marketplace reads and connect starts below get here. */
   requestAuthorized(path: string, init: RequestInit): Effect.Effect<unknown, RemoteWorkflowError>;
   /** A file with this app's session. Only the Marketplace reads below get here. */
   downloadAuthorized(path: string): Effect.Effect<Uint8Array, RemoteWorkflowError>;
@@ -189,13 +191,53 @@ const MARKETPLACE_READS: ReadonlyArray<{ method: "GET" | "POST"; download: boole
   { method: "POST", download: false, path: /^\/v1\/skills\/[^/]+\/install$/u },
 ];
 
+/**
+ * The start of a Slack or Discord connect: the account service gives the install page only to the
+ * owner of the host, and the child has no session. A child starts it only for its own host.
+ */
+const CONNECT_STARTS: ReadonlySet<string> = new Set(["/v2/slack/authorize", "/v2/discord/authorize"]);
+
 const installReceiptSchema = Schema.Struct({ receiptId: Schema.String });
 const decodeInstallReceipt = Schema.decodeUnknownSync(Schema.fromJsonString(installReceiptSchema));
+const connectStartSchema = Schema.Struct({
+  hostId: Schema.String,
+  hostNonce: Schema.String,
+  hostPublicKey: Schema.String,
+});
+const decodeConnectStart = Schema.decodeUnknownSync(Schema.fromJsonString(connectStartSchema));
 
-/** The path and the request to make for a child's read, or null when the read is not allowed. */
+/** The request to make for a child's connect start, or null when it is not for the child's own host. */
+function allowedConnectStart(
+  request: LocalServerMarketplaceRequest,
+  path: string,
+  hostId: string | null,
+): { path: string; init: RequestInit } | null {
+  if (hostId === null || request.method !== "POST" || request.download) return null;
+  try {
+    const body = decodeConnectStart(request.body);
+    if (body.hostId.toLowerCase() !== hostId.toLowerCase()) return null;
+    // Only these fields go on: a child cannot choose where the install page returns.
+    return {
+      path,
+      init: {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hostId: body.hostId, hostNonce: body.hostNonce, hostPublicKey: body.hostPublicKey }),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The path and the request to make for a child's read, or null when the read is not allowed.
+ * `hostId` is the child's own server.
+ */
 function allowedMarketplaceRead(
   request: LocalServerMarketplaceRequest,
   apiOrigin: string,
+  hostId: string | null,
 ): { path: string; init: RequestInit } | null {
   let url: URL;
   try {
@@ -205,6 +247,8 @@ function allowedMarketplaceRead(
   }
   // An id never holds `%`, so an encoded `/` cannot move a read to another route.
   if (url.origin !== apiOrigin || url.pathname.includes("%")) return null;
+  if (CONNECT_STARTS.has(url.pathname))
+    return url.search === "" ? allowedConnectStart(request, url.pathname, hostId) : null;
   const allowed = MARKETPLACE_READS.some(
     (read) => read.method === request.method && read.download === request.download && read.path.test(url.pathname),
   );
@@ -262,8 +306,15 @@ export class LocalServers {
   readonly #spawn: SpawnChild;
   readonly #scope = Scope.makeUnsafe("parallel");
   readonly #running = new Map<string, RunningChild>();
-  /** The times each server stopped on its own, in the last `RESTART_WINDOW_MS`. */
+  /**
+   * The times each server stopped on its own or failed a start that nobody waits for, in the last
+   * `RESTART_WINDOW_MS`. A restart or a Retry from the user clears them.
+   */
   readonly #exits = new Map<string, number[]>();
+  /** The registry ids that wait for a start after a stop. */
+  readonly #restartPending = new Set<string>();
+  /** The starts in progress of `#startIfStopped`, by registry id. Another caller waits for the same start. */
+  readonly #starts = new Map<string, Deferred.Deferred<ServerSummary, LocalServerFailure>>();
   /** The agents that work on each running server, by registry id. */
   readonly #working = new Map<string, AgentSummary[]>();
   /** The last ready line of each running server, by registry id. */
@@ -364,7 +415,23 @@ export class LocalServers {
           .detachLocalServer(entry.serverId, false)
           .pipe(Effect.catch(() => Effect.void));
     }
-    for (const entry of this.#registry.servers) this.#background(this.#start(entry, false));
+    for (const entry of this.#registry.servers) this.#startInBackground(entry);
+  });
+
+  /**
+   * Retry on the connection screen of a server on this computer. A server with no child starts again,
+   * and a Retry during a start waits for that start. Null when its child runs: the caller then retries
+   * the connection. Not a server on this computer: null.
+   */
+  readonly startStopped = Effect.fn("LocalServers.startStopped")(function* (
+    this: LocalServers,
+    serverId: string,
+  ): Effect.fn.Return<ServerSummary | null, LocalServerFailure> {
+    const entry = this.#registry.findByServerId(serverId);
+    if (!entry) return null;
+    // The user asks for this start, so the stops before it do not count against the next restarts.
+    if (!this.#running.has(entry.id)) this.#exits.delete(entry.id);
+    return yield* this.#startIfStopped(entry);
   });
 
   /**
@@ -532,7 +599,11 @@ export class LocalServers {
    * is not allowed, or that fails, gets the reason, so that the child does not wait.
    */
   #readMarketplace(id: string, running: RunningChild, request: LocalServerMarketplaceRequest): void {
-    const read = allowedMarketplaceRead(request, this.#options.account.apiOrigin);
+    const read = allowedMarketplaceRead(
+      request,
+      this.#options.account.apiOrigin,
+      this.#ready.get(id)?.serverId ?? null,
+    );
     // The request holds the read and its ids only, no secret.
     if (!read)
       this.#options.log.warn("A server on this computer asked for an account read that is not allowed.", {
@@ -790,21 +861,58 @@ export class LocalServers {
     const serverId = this.#registry.find(entry.id)?.serverId;
     if (serverId)
       this.#background(this.#options.remoteServers.detachLocalServer(serverId, false).pipe(toLocalServerFailure));
+    this.#scheduleRestart(entry);
+  }
+
+  /** A start that nobody waits for. A failed one counts as a stop, so it is tried again a few times only. */
+  #startInBackground(entry: StoredLocalServer): void {
+    this.#background(
+      this.#startIfStopped(entry).pipe(Effect.tapError(() => Effect.sync(() => this.#scheduleRestart(entry)))),
+    );
+  }
+
+  /**
+   * Starts the server again after `RESTART_DELAY`, at most `RESTART_LIMIT` times in `RESTART_WINDOW_MS`.
+   * A child that stops during its start also fails the start: the restart that waits counts the two once.
+   */
+  #scheduleRestart(entry: StoredLocalServer): void {
+    if (this.#stopped || this.#restartPending.has(entry.id)) return;
     const now = Date.now();
     const exits = (this.#exits.get(entry.id) ?? []).filter((time) => now - time < RESTART_WINDOW_MS);
     exits.push(now);
     this.#exits.set(entry.id, exits);
     if (exits.length > RESTART_LIMIT) return;
+    this.#restartPending.add(entry.id);
     this.#background(
       Effect.sleep(RESTART_DELAY).pipe(
         Effect.andThen(
-          Effect.suspend(() => {
+          Effect.sync(() => {
+            this.#restartPending.delete(entry.id);
             const current = this.#registry.find(entry.id);
-            return current && !this.#running.has(entry.id) ? this.#start(current, false) : Effect.void;
+            if (current) this.#startInBackground(current);
           }),
         ),
       ),
     );
+  }
+
+  /** Starts the server when it has no child. A start in progress is shared; a running child gives null. */
+  #startIfStopped(entry: StoredLocalServer): Effect.Effect<ServerSummary | null, LocalServerFailure> {
+    return Effect.suspend(() => {
+      const pending = this.#starts.get(entry.id);
+      if (pending) return Deferred.await(pending);
+      if (this.#running.has(entry.id)) return Effect.succeed(null);
+      const done = Deferred.makeUnsafe<ServerSummary, LocalServerFailure>();
+      this.#starts.set(entry.id, done);
+      return this.#start(entry, false).pipe(
+        Effect.onExit((exit) =>
+          Effect.sync(() => {
+            if (this.#starts.get(entry.id) === done) this.#starts.delete(entry.id);
+            Deferred.doneUnsafe(done, exit);
+          }),
+        ),
+      );
+    });
   }
 
   /**

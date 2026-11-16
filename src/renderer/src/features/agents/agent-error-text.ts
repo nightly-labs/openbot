@@ -1,8 +1,11 @@
 import { agentProviderName, isAgentProvider } from "@openbot/contracts/ipc";
+import { redactText } from "@openbot/logging";
 import { currentText } from "@openbot/ui/text";
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */
 const ERROR_DESCRIPTION_LIMIT = 300;
+/** The copied details keep as much text as the provider log line of the same error. */
+const ERROR_DETAILS_LIMIT = 2_000;
 // Repeated model-refresh failures arrive as identical error events. Coalesce
 // them so one outage shows one toast instead of one per retry.
 const ERROR_TOAST_DEDUPE_MS = 30_000;
@@ -14,6 +17,19 @@ export function readableAgentError(message: string): string {
   const readable = errorMessage(message, t("agent.error.continueFailed"));
   if (readable.length <= ERROR_DESCRIPTION_LIMIT) return readable;
   return `${readable.slice(0, ERROR_DESCRIPTION_LIMIT - 1).trimEnd()}…`;
+}
+
+/**
+ * The provider's own text, for the "Copy details" button, when the banner shows only the general
+ * sentence (`readable`) because the text is empty, long or technical (#6410). It is redacted again
+ * here, because a host of an older version redacts fewer secret shapes. Null when the banner already
+ * shows the provider's text or a sentence of its own kind.
+ */
+export function agentErrorDetails(message: string, readable: string): string | null {
+  const { t } = currentText();
+  const raw = message.trim();
+  if (!raw || readable !== t("agent.error.continueFailed")) return null;
+  return redactText(raw).slice(0, ERROR_DETAILS_LIMIT);
 }
 
 /**

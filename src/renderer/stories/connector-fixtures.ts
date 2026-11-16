@@ -56,6 +56,7 @@ export const STORY_CONNECTOR_DETAILS: readonly ConnectorDetail[] = [
       onReconnect: fn(),
       onSetEnabled: fn(),
       onSetOwnNumber: fn(),
+      onSetWorkingMessage: fn(),
       onAddOrchestrator: fn(),
       loadGroups: fn(async () => []),
       onAddSender: fn(),
@@ -191,7 +192,15 @@ export const CONNECTED_CONNECTOR_DETAILS: readonly ConnectorDetail[] = STORY_CON
           ...detail.props,
           agents: [ORCHESTRATOR],
           connections: [channel({ platform: "whatsapp", workspaceId: "447700900123", workspaceName: "Ada Lovelace" })],
-          accounts: [{ workspaceId: "447700900123", ownNumber: true, allowedSenders: [], pendingRequests: [] }],
+          accounts: [
+            {
+              workspaceId: "447700900123",
+              ownNumber: true,
+              workingMessage: true,
+              allowedSenders: [],
+              pendingRequests: [],
+            },
+          ],
         },
       };
     case "onepassword":

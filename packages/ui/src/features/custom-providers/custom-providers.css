@@ -17,6 +17,11 @@
   color: var(--openbot-text-primary);
 }
 
+/* The models of this computer are a table of six columns, which needs the width. */
+.custom-provider-dialog.custom-provider-dialog-wide {
+  width: min(1120px, 100%);
+}
+
 .custom-provider-header {
   display: flex;
   flex-shrink: 0;
@@ -78,6 +83,19 @@
   padding: var(--openbot-space-4);
 }
 
+.custom-provider-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--openbot-space-4);
+}
+
+/* The wide dialog has room for two endpoint fields in a line. */
+.custom-provider-dialog-wide .custom-provider-fields {
+  display: grid;
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
 /* The saved endpoints scroll on the same terms the form's fields do, so both dialogs keep their
  * footer outside the fade. */
 .custom-provider-list {
@@ -126,33 +144,48 @@
   grid-template-columns: minmax(0, 1fr) auto;
 }
 
-/* A token count is short, so the context window column is narrower than the ID and the name. */
-.custom-provider-row-inputs.custom-provider-row-triple {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.6fr) auto;
+/* The model table: the ID gets the most room, a token count holds a value such as 1,048,576, and
+ * the last column is the size of the remove button so that the column names stay in line. */
+.custom-provider-row-inputs.custom-provider-row-table {
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.2fr) 120px 120px minmax(0, 1.2fr) 140px 32px;
 }
 
-/* Two token counts next to the ID and the name. Each count keeps room for a value such as 131,072. */
-.custom-provider-row-inputs.custom-provider-row-quad {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(9ch, 0.8fr) minmax(9ch, 0.8fr) auto;
-}
-
-/* The efforts of one model, under its fields. They wrap on a narrow dialog. */
-.custom-provider-efforts {
+.custom-provider-row-head > * {
   min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--openbot-space-1) var(--openbot-space-2);
+  overflow: hidden;
+  padding-inline-start: var(--openbot-space-1);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.custom-provider-effort {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--openbot-space-1);
-  cursor: pointer;
+/* Six fields in a line: the smaller text keeps a long model ID in view. */
+.custom-provider-row-table .ui-input {
+  font-size: var(--openbot-text-md);
+}
+
+.custom-provider-row-table input[inputmode="numeric"] {
+  font-variant-numeric: tabular-nums;
+}
+
+.custom-provider-mono {
+  font-family: var(--openbot-font-mono);
+}
+
+/* A cell that holds a set of choices, such as the efforts of a model. */
+.custom-provider-choice {
+  width: 100%;
+  min-width: 0;
+}
+
+.custom-provider-choice-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-provider-choice-text[data-empty] {
+  color: var(--openbot-text-muted);
 }
 
 .custom-provider-rows-error,
@@ -183,6 +216,11 @@
   stroke-width: var(--openbot-icon-stroke);
 }
 
+/* In the wide dialog a button as wide as the table reads as a row, so it keeps its own width. */
+.custom-provider-dialog-wide .custom-provider-rows > .ui-button {
+  align-self: flex-start;
+}
+
 /* The label sits first and a find control follows it; a section error keeps the far end. */
 .custom-provider-rows-heading > .custom-provider-discover {
   margin-inline-start: auto;
@@ -204,35 +242,60 @@
   gap: var(--openbot-space-2);
 }
 
-.custom-provider-discovered {
+/*
+ * The found models open in a menu, as the add menu of the agent dock: the search stays in place and
+ * only the model rows scroll.
+ */
+.custom-provider-found-menu.ui-action-menu {
   display: flex;
+  width: var(--kb-popper-anchor-width);
+  min-width: 280px;
+  max-width: calc(100vw - var(--openbot-space-4));
+  max-height: min(380px, calc(100dvh - 16px), var(--kb-popper-content-available-height, 380px));
   flex-direction: column;
-  margin: 0;
-  padding: var(--openbot-space-1);
-  list-style: none;
-  border: 1px solid var(--openbot-border);
-  border-radius: var(--openbot-radius-md);
 }
 
-.custom-provider-discovered-row {
-  display: flex;
-  align-items: center;
-  gap: var(--openbot-space-2);
-  padding: var(--openbot-space-1) var(--openbot-space-2);
-  border-radius: var(--openbot-radius-sm);
-  cursor: pointer;
+/* Only the rows give up height. The search, the separator and the footer keep theirs. */
+.custom-provider-found-menu.ui-action-menu > :not(.custom-provider-found-list) {
+  flex: none;
 }
 
-.custom-provider-discovered-row:hover {
-  background: var(--openbot-bg-control-hover);
+.custom-provider-found-menu .custom-provider-found-search {
+  margin: calc(var(--ui-menu-padding) * -1) calc(var(--ui-menu-padding) * -1) var(--ui-menu-padding);
 }
 
-.custom-provider-discovered-id {
+.custom-provider-found-search-input,
+.custom-provider-found-search-input:focus,
+.custom-provider-found-search-input:focus-visible {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.custom-provider-found-list {
+  min-height: 0;
+  flex: 1 1 auto;
+  margin-inline: calc(var(--ui-menu-padding) * -1);
+  padding-inline: var(--ui-menu-padding);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.custom-provider-found-id {
   min-width: 0;
   overflow: hidden;
   font-family: var(--openbot-font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.custom-provider-found-limit {
+  margin: 0;
+  padding: var(--openbot-space-1) var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
 }
 
 /* The preset chooser: two short groups of full-width rows. */
@@ -468,4 +531,29 @@ input.custom-acp-code {
   margin-inline-start: auto;
   color: var(--openbot-text-muted);
   font-size: var(--openbot-text-sm);
+}
+
+/* A narrow window: the endpoint fields stack, and each model takes two lines without column names.
+ * The accessible name of each field still says what it holds. */
+@media (max-width: 760px) {
+  .custom-provider-dialog-wide .custom-provider-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .custom-provider-row-inputs.custom-provider-row-table {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px;
+  }
+
+  /* Two cells in each line: the names, the token counts, then the two menus. */
+  .custom-provider-row-table > :nth-child(odd):not(.ui-icon-button) {
+    grid-column: 1;
+  }
+
+  .custom-provider-row-inputs.custom-provider-row-head {
+    display: none;
+  }
+
+  .custom-provider-row-table > .ui-icon-button {
+    grid-area: 1 / 3;
+  }
 }

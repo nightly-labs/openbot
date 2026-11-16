@@ -1,7 +1,10 @@
+import { closeSync, openSync, readdirSync, readFileSync, readSync, statSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { isRecord } from "./protocol";
+import { getRecord, isRecord } from "./protocol";
 
 /**
  * Antigravity 1.3.0's `quota_exhausted_message`: a fixed header, then the reset time. The 1.5 CLI
@@ -23,10 +26,17 @@ const GEMINI_CONNECTION_LOST_ANSWER = /^\s*Agent connection was lost and could n
  * Google refuses a request until the user verifies the account (`VALIDATION_REQUIRED`, #2419).
  * Antigravity 1.4.5 `format_execution_error` then sends Google's message, an empty line, and
  * `<link text>: <validation_url>` as the answer, with no `Agent execution error:` prefix. The link
- * is a Google sign-in page that continues to the Gemini Code Assist success page.
+ * is a Google sign-in page that continues to the Gemini Code Assist success page. The Antigravity
+ * CLI 1.5.4 puts the link on its own line after "Please verify your account in your browser to
+ * continue:" (#6985).
  */
 const GEMINI_VERIFICATION_ANSWER =
-  /(?:^|\n)[^\n]*: (https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+  /(?:^|\n)[^\n]*:\s+(https:\/\/accounts\.google\.com\/signin\/[^\s]*auth_success_gemini[^\s]*)\s*$/u;
+/**
+ * The verification link anywhere in a failure text. The text is cut for the banner, so a link that
+ * is not found there lost its end and could not open (#6985).
+ */
+const GEMINI_ACCOUNT_LINK = /https:\/\/accounts\.google\.com\/signin\/[^\s<>"'`)\]]*auth_success_gemini[^\s<>"'`)\]]*/u;
 /**
  * The Antigravity CLI 1.5 sends a failed request as an answer that starts with a line break, a
  * warning sign and a space, such as "\n⚠ Agent Platform API has not been used in project ...", and
@@ -39,15 +49,17 @@ const GEMINI_FAILURE_ANSWER = new RegExp(
   "u",
 );
 
+/** Only for a text that is already a failure: a model's answer can name a Google page. */
 function geminiAccountLink(text: string): string | null {
-  return GEMINI_VERIFICATION_ANSWER.exec(text)?.[1] ?? null;
+  return GEMINI_ACCOUNT_LINK.exec(text)?.[0].replace(/[.,;:]+$/u, "") ?? null;
 }
 /**
  * Antigravity's SDK error when a model step returns neither text nor a tool call, as when an agent
- * ends its turn silently after a tool call or on a message that asks for no reply (#4505).
+ * ends its turn silently after a tool call or on a message that asks for no reply (#4505). The
+ * Antigravity CLI 1.5 sends it as the answer "⚠ Model produced invalid output." (#7266).
  */
 const GEMINI_EMPTY_OUTPUT_FAILURE =
-  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b/iu;
+  /\bmodel output must contain either output text or tool calls, these cannot both be empty\b|\bModel produced invalid output\b/iu;
 
 /**
  * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
@@ -82,8 +94,26 @@ function geminiMcpLoadFailure(text: string): { name: string; reason: string } | 
  * or `HTTP`: a bare 404 or "unavailable" can be an MCP server or a tool. Antigravity does not
  * document its failure texts. A proxy's answer in the stream comes as a raw status line with the
  * HTTP version, such as `HTTP/1.0 502 Bad Gateway` (#5752).
+ *
+ * A model at capacity comes as RESOURCE_EXHAUSTED or UNAVAILABLE with the reason
+ * MODEL_CAPACITY_EXHAUSTED and "No capacity available for model …". It is not the plan's quota,
+ * so it is matched before the rate limit (#8554). Not the word "capacity" alone: Google's quota
+ * text "You have exhausted your capacity on this model" is a spent quota.
+ *
+ * Google refuses all requests from some network addresses, also server addresses in a supported
+ * country, with FAILED_PRECONDITION "User location is not supported for the API use." Waiting or
+ * another model does not help (#9681). Not the status name: Google also uses it for other failures.
  */
 const GEMINI_REQUEST_FAILURES = [
+  ["error.provider.antigravityLocationUnsupported", /\bUser location is not supported\b/iu],
+  [
+    "error.provider.antigravityModelAtCapacity",
+    /\bMODEL_CAPACITY_EX(?:HAUSTED|CEEDED)\b|\b[Nn]o capacity available for model\b/u,
+  ],
+  // Google's text for a spent plan quota: "Individual quota reached. Please upgrade your subscription
+  // to increase your limits. Resets in 152h1m7s." It resets in days, so "wait a few minutes" is
+  // wrong for it, and before this it showed with no advice (#9675).
+  ["error.provider.antigravityQuotaReached", /\bquota\b.{0,40}\breached\b/iu],
   ["error.provider.antigravityRateLimited", /\bRESOURCE_EXHAUSTED\b/u],
   [
     "error.provider.antigravityRateLimited",
@@ -98,6 +128,10 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityServiceFailure",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
+  // Google's generic text for a 400 INVALID_ARGUMENT that names no field. The chat stopped with only
+  // this text, and another model let the user continue (#7116). Not the status name: a refused API
+  // key is also INVALID_ARGUMENT.
+  ["error.provider.antigravityRequestRejected", /\bRequest contains an invalid argument\b/iu],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */
@@ -113,25 +147,173 @@ function geminiTurnFailure(answer: string): string {
   return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
 }
 
+/** The prefix that the ACP SDK puts before the server's text of a failed request. */
+const GEMINI_INTERNAL_ERROR_PREFIX = /^(?:RequestError:\s*)?Internal error:\s*/u;
+/**
+ * Google's quota of 0 for the model, such as a free-tier key on a paid model: "Quota exceeded for
+ * metric: ..._free_tier_requests, limit: 0". Waiting does not help. Not "limit: 0.5" or "limit: 05".
+ */
+const GEMINI_ZERO_LIMIT = /\blimit:\s*0(?!\d|\.\d)/u;
+
+/**
+ * The message of a rate limit or quota refusal while a saved Gemini API key serves the turns, or
+ * `null` for another failure. The key's quota is not the Google plan's, so the plan's text misled
+ * the user, and for a quota of 0 its advice to wait never helped (#9517). The same failure texts as
+ * the flavor's, from the answer (`error` is absent) or from a failed request.
+ */
+export function geminiSavedKeyLimitFailure(text: string, error?: unknown): string | null {
+  if (error !== undefined && !(error instanceof RequestError)) return null;
+  const reason = text.replace(GEMINI_WARNING_ANSWER, "").replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
+  if (geminiAccountLink(reason) !== null || GEMINI_CONNECTION_LOST_ANSWER.test(reason)) return null;
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  if (key !== "error.provider.antigravityRateLimited") return null;
+  return sourceText(
+    GEMINI_ZERO_LIMIT.test(reason) ? "error.provider.geminiKeyQuotaZero" : "error.provider.geminiKeyRateLimited",
+    { detail: shownFailureDetail(reason) },
+  );
+}
+
 /** Only a failure the server answered with: a local failure is not Google's to explain. */
 function geminiRequestFailure(error: unknown, detail: string): string {
   if (!(error instanceof RequestError)) return detail;
-  const reason = detail.replace(/^(?:RequestError:\s*)?Internal error:\s*/u, "");
+  const reason = detail.replace(GEMINI_INTERNAL_ERROR_PREFIX, "");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   return key ? sourceText(key, { detail: shownFailureDetail(reason) }) : detail;
 }
 
+/** The Gemini home of an Antigravity process: the account's `GEMINI_HOME`, else `~/.gemini`. */
+export function antigravityGeminiHome(env: Readonly<Record<string, string | undefined>>): string {
+  return env.GEMINI_HOME?.trim() || join(homedir(), ".gemini");
+}
+
+/**
+ * The server names in the two `mcp_config.json` files that the Antigravity CLI 1.5.6 reads: the
+ * user's, in the Gemini home, and the workspace's. A file that is missing or is not JSON gives no
+ * names: the CLI starts no server from it.
+ */
+/** The flag that gives the CLI its Gemini home. */
+export const GEMINI_DIR_FLAG = "--gemini-dir=";
+/** The flag that gives the CLI its app data folder, relative to the Gemini home. */
+const APP_DATA_DIR_FLAG = "--app-data-dir=";
+
+function flagValue(argv: readonly string[], flag: string): string | undefined {
+  return argv.find((arg) => arg.startsWith(flag))?.slice(flag.length);
+}
+
+function antigravityOwnMcpServerNames(cwd: string, argv: readonly string[]): string[] {
+  // The account's folder travels in the flag, not in the environment of the process.
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const files = [...(home ? [join(home, "config", "mcp_config.json")] : []), join(cwd, ".agents", "mcp_config.json")];
+  return files.flatMap((file) => {
+    try {
+      const servers = getRecord(JSON.parse(readFileSync(file, "utf8")), "mcpServers");
+      return servers ? Object.keys(servers) : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+/** The CLI 1.5.6 answer for a failure of its own, such as a refused tool schema. It names no cause. */
+const GEMINI_TERMINATED_ANSWER = /^\s*(?:\u26A0 )?Agent execution terminated due to error\.?\s*$/u;
+/** The Antigravity CLI 1.5.6 log line of each prompt, before it builds the toolbox for the prompt. */
+const GEMINI_PROMPT_LOG = "Sending user message to conversation ";
+/**
+ * Antigravity 1.5.6 checks the parameter schema of each MCP tool with Go's RE2 when it builds the
+ * toolbox of a prompt. One `pattern` with a lookahead, such as the email of Resend's `get-contact`,
+ * ends every turn with only "Agent execution terminated due to error." as the answer (#7228). Only
+ * the CLI's own log names the tool, in `<Gemini home>/<app data>/log/acp-server-<time>-<pid>.log`.
+ * The 1.5.9 CLI answers with this line itself, and no longer with the short answer (#9568).
+ */
+const GEMINI_REFUSED_TOOL = /\bbuilding toolbox: tool "(mcp_[^"]+)" advertises an invalid parameter schema\b/gu;
+/** A log that the CLI wrote in this time can hold the failure of the prompt that just ended. */
+const GEMINI_LOG_RECENT_MS = 10 * 60_000;
+/** The end of a log that is read. The failure comes a few lines after the line of its prompt. */
+const GEMINI_LOG_TAIL_BYTES = 256 * 1024;
+
+function logTail(file: string, size: number): string {
+  const length = Math.min(size, GEMINI_LOG_TAIL_BYTES);
+  const buffer = Buffer.alloc(length);
+  const fd = openSync(file, "r");
+  try {
+    return buffer.subarray(0, readSync(fd, buffer, 0, length, size - length)).toString("utf8");
+  } finally {
+    closeSync(fd);
+  }
+}
+
+/**
+ * The tools that the CLI refused after the last prompt of the session. The 1.5.9 answer names the
+ * tool. An older CLI names it only in its log. Each session has a process, and so a log, of its own.
+ * A session that opened again on a new process has an older log too, so only the newest log with a
+ * prompt of the session counts. A log that cannot be read gives no tools: the turn then fails as
+ * before.
+ */
+function antigravityRefusedMcpTools(text: string, argv: readonly string[], sessionId: string): string[] {
+  const answered = Array.from(text.matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  if (answered.length > 0) return answered;
+  if (!GEMINI_TERMINATED_ANSWER.test(text)) return [];
+  const home = flagValue(argv, GEMINI_DIR_FLAG);
+  const appData = flagValue(argv, APP_DATA_DIR_FLAG);
+  if (!home || !appData) return [];
+  const folder = join(home, appData, "log");
+  const since = Date.now() - GEMINI_LOG_RECENT_MS;
+  const prompt = `${GEMINI_PROMPT_LOG}${sessionId}`;
+  let logs: { file: string; size: number; mtimeMs: number }[];
+  try {
+    logs = readdirSync(folder)
+      .filter((name) => name.endsWith(".log"))
+      .flatMap((name) => {
+        const file = join(folder, name);
+        try {
+          const stat = statSync(file);
+          return stat.isFile() && stat.mtimeMs >= since ? [{ file, size: stat.size, mtimeMs: stat.mtimeMs }] : [];
+        } catch {
+          return [];
+        }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs);
+  } catch {
+    return [];
+  }
+  for (const { file, size } of logs) {
+    let log: string;
+    try {
+      log = logTail(file, size);
+    } catch {
+      continue;
+    }
+    const at = log.lastIndexOf(prompt);
+    if (at >= 0) return Array.from(log.slice(at).matchAll(GEMINI_REFUSED_TOOL), (match) => match[1] ?? "");
+  }
+  return [];
+}
+
 export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
+  // Antigravity 1.5.6 starts the entry of its own `mcp_config.json` in place of a session server with
+  // the same name, and does not start the session server. The user's entry and its tool limits then
+  // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"
+  // is the CLI's answer for a tool that an own entry does not turn on (#7785).
+  ownMcpServerNames: antigravityOwnMcpServerNames,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
   // routines, and a workflow runs agents that OpenBot does not show. Antigravity keeps the filter with
   // the session; a load or resume sends it again, so a session from an earlier release gets it too.
   sessionMeta: { antigravity: { disabledTools: ["schedule", "run_workflow"] } },
+  // After an approval, Antigravity runs the edit as a new call (`<sessionId>:<n>`, "Running
+  // edit_file") and then fails the approved call with this text. The chat showed a failure beside
+  // each approved edit that worked (#6878).
+  approvedEditSweep: /^\s*Tool call was approved but never executed\.?\s*$/u,
   // Antigravity 1.3.0 has three exact forms: a load or resume puts the ID in data.sessionId, a
   // configuration change uses the SDK's resource URI `session <id>`, and a prompt raises a plain
-  // error that the SDK wraps as an internal error.
+  // error that the SDK wraps as an internal error. The 1.5 CLI sends no data: a resume answers
+  // "Failed to read session <id>; retry, or load it with session/load", and a prompt "Session not
+  // found: <id>". Its `session/load` of a missing session opens an empty one, so the hint is not
+  // followed: OpenBot opens a new session and gives it the chat (#8468).
   sessionNotFound: (error, sessionId) => {
+    if (error.code === -32603 && error.message.startsWith(`Failed to read session ${sessionId};`)) return true;
+    if (error.code === -32602 && error.message === `Session not found: ${sessionId}`) return true;
     if (!isRecord(error.data)) return false;
     if (error.code === -32603) return error.data.details === `Session not found: ${sessionId}`;
     return error.code === -32002 && (error.data.sessionId === sessionId || error.data.uri === `session ${sessionId}`);
@@ -159,11 +341,15 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
         : null;
     },
     mcpLoadFailure: geminiMcpLoadFailure,
+    refusedMcpTools: antigravityRefusedMcpTools,
     sessionLost: GEMINI_CONNECTION_LOST_ANSWER,
   },
   // Its SDK waits for FULLY_IDLE even after halt_request. Stop waiting locally, then rebuild the
   // harness through session/resume before accepting another prompt.
   cancelLocallyThenResume: true,
+  // `agy acp` 1.5.0 steers a running turn with another prompt. A probe of 1.5.8: the first prompt
+  // answered `end_turn` at once, its shell command ran on, and the model read the new message.
+  steerByPromptSince: "1.5.0",
   // A stopped stream cannot provide another tool result. Preserve its last output without
   // reporting successful execution.
   interruptToolsOnStop: true,
@@ -172,6 +358,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   streamAnswerBeforePromptReturns: true,
   // A silent prompt can be a background task that still runs, so the turn is not ended as stalled.
   promptOpenForBackgroundTasks: true,
+  // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the
+  // wake-up. The idle release then stopped the process 5 minutes later (#8660).
+  wakesAfterPromptEnds: true,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it

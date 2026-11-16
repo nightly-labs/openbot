@@ -2,7 +2,7 @@ import { LOCAL_SERVER_ID } from "@openbot/contracts/ipc";
 import { onSettled } from "solid-js";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
 import type { MockOpenBotOptions } from "../src/preview/mock-openbot";
-import { AGENT_ID, TABS_KEY, THREAD_OPTIONS, UNREAD_OPTIONS } from "./agent-threads-fixtures";
+import { AGENT_ID, TABS_KEY, THREAD_OPTIONS, THREAD_QUEUE_OPTIONS, UNREAD_OPTIONS } from "./agent-threads-fixtures";
 import { createAppDom, openChat, PrototypeApp } from "./prototype-support";
 import "./agent-threads-story.css";
 
@@ -56,6 +56,14 @@ export const UnreadThreads: Story = {
 /** A side thread in the place of the chat, with its context meter. */
 export const SideThread: Story = {
   render: () => <AgentThreadsApp open={["pricing", "competitors"]} active="pricing" />,
+};
+
+/**
+ * A thread that works, with two messages in its queue above the input. Reply to a message: the reply
+ * card comes out from behind the input, under the queue.
+ */
+export const ThreadWithQueue: Story = {
+  render: () => <AgentThreadsApp open={["competitors"]} active="competitors" options={THREAD_QUEUE_OPTIONS} />,
 };
 
 /** A thread that the agent started, held by the limit of parallel threads. */

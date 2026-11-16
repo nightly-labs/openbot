@@ -1,4 +1,4 @@
-import type { AgentAccessLevels, AgentAccessSnapshot, ServerSummary } from "@openbot/contracts/ipc";
+import type { AgentAccessLevel, AgentAccessLevels, AgentAccessSnapshot, ServerSummary } from "@openbot/contracts/ipc";
 import { AGENT_ACCESS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-access-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import type { AgentMessage } from "@openbot/ui/data";
@@ -24,10 +24,8 @@ export function readerCanDeleteMessage(
   return sender !== undefined && access.isOwnSender(sender.id);
 }
 
-/** Where the levels that decide Delete in an agent's chat come from. */
-export interface AgentMessageDeleteAccessSource {
-  /** This computer, or an owner or admin of the server: they delete any message. */
-  deletesAny: () => boolean;
+/** Where the access levels of a member come from. */
+export interface AgentLevelsSource {
   /** The joined server whose levels decide, or null when they do not: no member, or no level route. */
   levelsServerId: () => string | null;
   readLevels: (serverId: string) => Promise<AgentAccessSnapshot>;
@@ -35,12 +33,17 @@ export interface AgentMessageDeleteAccessSource {
   onLevelsChanged: (serverId: string, listener: () => void) => () => void;
 }
 
+/** Where the levels that decide Delete in an agent's chat come from. */
+export interface AgentMessageDeleteAccessSource extends AgentLevelsSource {
+  /** This computer, or an owner or admin of the server: they delete any message. */
+  deletesAny: () => boolean;
+}
+
 /**
- * Whether the reader can delete any message of an agent's chat: this computer, an owner or admin,
- * or a member with manage access to the agent. A member's levels are read again after each change.
- * Until they load, and on a host without them, a member can delete only their own messages.
+ * The level of the member for each agent of `levelsServerId`, read again after each change. Undefined
+ * until the levels load, after a failed read, and when no server decides.
  */
-export function createAgentMessageDeleteAccess(source: AgentMessageDeleteAccessSource) {
+export function createAgentLevels(source: AgentLevelsSource) {
   const [levels, setLevels] = createSignal<{ serverId: string; mine: AgentAccessLevels } | null>(null);
   createEffect(
     () => source.levelsServerId(),
@@ -53,7 +56,7 @@ export function createAgentMessageDeleteAccess(source: AgentMessageDeleteAccessS
           (access) => {
             if (active) setLevels({ serverId, mine: access.mine });
           },
-          // The reader keeps the Delete item of their own messages.
+          // The caller keeps the actions that need no level.
           () => undefined,
         );
       };
@@ -65,12 +68,31 @@ export function createAgentMessageDeleteAccess(source: AgentMessageDeleteAccessS
       };
     },
   );
-  return (agentId: string | undefined): boolean => {
-    if (source.deletesAny()) return true;
+  return (agentId: string): AgentAccessLevel | undefined => {
     const known = levels();
-    return agentId !== undefined && known?.serverId === source.levelsServerId() && known.mine[agentId] === "manage";
+    return known !== null && known.serverId === source.levelsServerId() ? known.mine[agentId] : undefined;
   };
 }
+
+/**
+ * Whether the reader can delete any message of an agent's chat: this computer, an owner or admin,
+ * or a member with manage access to the agent. A member's levels are read again after each change.
+ * Until they load, and on a host without them, a member can delete only their own messages.
+ */
+export function createAgentMessageDeleteAccess(source: AgentMessageDeleteAccessSource) {
+  const level = createAgentLevels(source);
+  return (agentId: string | undefined): boolean =>
+    source.deletesAny() || (agentId !== undefined && level(agentId) === "manage");
+}
+
+/** Reads the levels of a joined server through preload, and reads them again on `agent-access-changed`. */
+export const desktopAgentLevels: Pick<AgentLevelsSource, "readLevels" | "onLevelsChanged"> = {
+  readLevels: (serverId) => conversationPort().hostAdmin.getAgentAccess(serverId),
+  onLevelsChanged: (serverId, listener) =>
+    conversationPort().agent.onScopedEvent((scoped) => {
+      if (scoped.serverId === serverId && scoped.event.type === "agent-access-changed") listener();
+    }),
+};
 
 /** The levels of the desktop's active server, read through preload. */
 export function desktopAgentMessageDeleteAccess(
@@ -90,10 +112,6 @@ export function desktopAgentMessageDeleteAccess(
         ? current.id
         : null;
     },
-    readLevels: (serverId) => conversationPort().hostAdmin.getAgentAccess(serverId),
-    onLevelsChanged: (serverId, listener) =>
-      conversationPort().agent.onScopedEvent((scoped) => {
-        if (scoped.serverId === serverId && scoped.event.type === "agent-access-changed") listener();
-      }),
+    ...desktopAgentLevels,
   };
 }

@@ -3,6 +3,7 @@ import type {
   HostedSitesDesktopApi,
   HostStatus,
   InviteSummary,
+  ServerAppearance,
   ServerSummary,
   TeamInviteSummary,
   TeamPresenceMember,
@@ -20,6 +21,8 @@ import {
   AppWindow,
   ArrowLeftRight,
   Blocks,
+  Bot,
+  Brain,
   Button,
   CalendarClock,
   Download,
@@ -44,6 +47,7 @@ import type { ProviderSettingsDetail } from "@openbot/ui/features/settings/Provi
 import {
   SaveBarDock,
   SettingsDialogShell,
+  SettingsNavGroupLabel,
   type SettingsPagePlacement,
 } from "@openbot/ui/features/settings/SettingsDialogShell";
 import { SettingsHostedSitesTab } from "@openbot/ui/features/settings/SettingsHostedSitesTab";
@@ -68,6 +72,7 @@ import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
 import { type ServerVaultOptions, ServerVaultPanel } from "../vault/ServerVaultPanel";
 import type { McpServerConfig, McpTestResult } from "./mcp-servers";
+import { createServerAgentsSection, type ServerAgentDefaultsOptions } from "./ServerAgentsSection";
 import { createServerAuditSection, type ServerAuditOptions } from "./ServerAuditSection";
 import type { ServerBrowsingMemoryOptions } from "./ServerBrowsingMemorySetting";
 import { type CompanySignInCalls, createServerCompanySignInSection } from "./ServerCompanySignInSection";
@@ -83,12 +88,14 @@ import { type McpPanelDetail, type McpPanelSignIn, ServerMcpPanel } from "./Serv
 import { createServerMembersSection } from "./ServerMembersSection";
 import type { ServerMemoryLimitOptions } from "./ServerMemoryLimitSetting";
 import type { ServerMemoryReviewOptions } from "./ServerMemoryReviewSetting";
+import { createServerMemorySection } from "./ServerMemorySection";
 import { type ServerPersonalityOptions, ServerPersonalitySetting } from "./ServerPersonalitySetting";
 import { createServerRolesSection, type ServerAgentAccessOptions } from "./ServerRolesSection";
 import { type ServerRoutineFeedOptions, ServerRoutineFeedPanel } from "./ServerRoutineFeedPanel";
 import type { ServerSkillLearningOptions } from "./ServerSkillLearningSetting";
 import type { ServerTimezoneOptions } from "./ServerTimezoneSetting";
 import { type ServerTransferOptions, ServerTransferPanel } from "./ServerTransferPanel";
+import type { ServerTurnLimitsOptions } from "./ServerTurnLimitsSetting";
 import { type ServerUpdateOptions, ServerUpdatePanel } from "./ServerUpdatePanel";
 import { serverCanAdminister, serverCanManageMcp, serverRoleCanAdminister } from "./server-capabilities";
 import type { ServerSettingsSectionHost } from "./server-settings-section";
@@ -107,6 +114,11 @@ export interface ServerSettingsModalProps {
   restoreFocusTarget?: HTMLElement | null;
   onRetry: () => Promise<void>;
   onSaveIdentity: (input: { serverName: string; logo?: AvatarImageInput | null }) => Promise<void>;
+  /**
+   * Saves the plush look that the server shows with no logo; null gives the automatic look. The
+   * picker shows only where a caller supplies this.
+   */
+  onSaveAppearance?: ((appearance: ServerAppearance | null) => Promise<void>) | undefined;
   onSetPublished: (published: boolean) => Promise<void>;
   /**
    * Changes the key of the server on this computer, and paired devices follow it. The Server key
@@ -212,10 +224,15 @@ export interface ServerSettingsModalProps {
    */
   hostUpdate?: ServerUpdateOptions | undefined;
   /**
-   * General shows the server timezone only when a caller supplies this, and only for the local
+   * Agent defaults shows the server timezone only when a caller supplies this, and only for the local
    * server or a remote host with `host-timezone-v1` that this member administers.
    */
   hostTimezone?: ServerTimezoneOptions | undefined;
+  /**
+   * Agent defaults shows the thread limits only when a caller supplies this, and only for the local
+   * server or a remote host with `host-turn-limits-v1` that this member administers.
+   */
+  hostTurnLimits?: ServerTurnLimitsOptions | undefined;
   /**
    * The Personality section shows only when a caller supplies this, and only for the local server or
    * a remote host with `host-personality-v1` that this member administers.
@@ -283,6 +300,11 @@ export interface ServerSettingsModalProps {
    */
   serverAudit?: ServerAuditOptions | undefined;
   /**
+   * The Agents section appears only when a caller supplies this: for this computer, and for an online
+   * remote host with `agent-defaults-v1` that this member administers.
+   */
+  agentDefaults?: ServerAgentDefaultsOptions | undefined;
+  /**
    * The Routines section appears only when a caller supplies this: the feed listens on this
    * computer, so a remote server passes nothing.
    */
@@ -319,6 +341,8 @@ export interface ServerHostedSitesOptions {
 export type ServerSettingsSection =
   | "general"
   | "personality"
+  | "agents"
+  | "memory"
   | "vault"
   | "members"
   | "roles"
@@ -338,6 +362,8 @@ type Section = ServerSettingsSection;
 const sections = {
   general: { title: "server.settings.generalTitle", description: "server.settings.generalDescription" },
   personality: { title: "server.settings.personalityTitle", description: "server.settings.personalityDescription" },
+  agents: { title: "server.settings.agentDefaultsTitle", description: "server.settings.agentsDescription" },
+  memory: { title: "server.settings.memoryTitle", description: "server.settings.memoryDescription" },
   vault: { title: "server.settings.vaultTitle", description: "server.settings.vaultDescription" },
   members: { title: "server.settings.membersTitle", description: "server.settings.membersDescription" },
   roles: { title: "server.settings.rolesTitle", description: "server.settings.rolesDescription" },
@@ -354,24 +380,63 @@ const sections = {
   "browser-profiles": { title: "browser.profiles.title", description: "browser.profiles.subtitle" },
 } as const satisfies Record<Section, { title: AppTextKey; description: AppTextKey }>;
 
-/** The section list, in its order. A section shows only when the server and the caller support it. */
-const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings }> = [
+/** The row names of a section, so that the section search also finds a section by one of its rows. */
+const SECTION_ROWS: Partial<Record<Section, readonly AppTextKey[]>> = {
+  general: [
+    "server.settings.name",
+    "server.settings.logo",
+    "server.settings.hostKeyTitle",
+    "server.settings.leaveTitle",
+    "server.settings.removeTitle",
+  ],
+  agents: [
+    "server.settings.timezone",
+    "server.settings.turnLimit",
+    "server.settings.agentTaskLimit",
+    "agentSettings.automation.title",
+    "agentSettings.agentNewChat.title",
+    "agentSettings.quickAcknowledgement.title",
+    "settings.busyMessage.title",
+    "settings.commitCoAuthor.sectionTitle",
+  ],
+  memory: [
+    "server.settings.memoryLimit",
+    "server.settings.memoryReview",
+    "server.settings.skillLearning",
+    "server.settings.browsingMemory",
+  ],
+  members: [
+    "server.settings.publish",
+    "server.companySignIn.title",
+    "server.companySignIn.sso",
+    "server.companySignIn.scim",
+  ],
+  storage: ["settings.backgroundProcesses.title"],
+};
+
+/**
+ * The section list, in its order. The sections that most users need come first, and each group after
+ * them starts with its label. A section shows only when the server and the caller support it.
+ */
+const NAV_SECTIONS: ReadonlyArray<{ value: Section; icon: typeof Settings; group?: AppTextKey }> = [
   { value: "general", icon: Settings },
-  { value: "personality", icon: Smile },
-  { value: "vault", icon: KeyRound },
-  { value: "members", icon: UsersRound },
-  { value: "roles", icon: ShieldCheck },
-  { value: "audit", icon: History },
-  { value: "desktop", icon: Monitor },
-  { value: "mcp", icon: Blocks },
-  { value: "storage", icon: HardDrive },
-  { value: "sites", icon: Globe2 },
   { value: "providers", icon: Sparkles },
-  { value: "updates", icon: RefreshCw },
-  { value: "import", icon: Download },
-  { value: "transfer", icon: ArrowLeftRight },
-  { value: "routines", icon: CalendarClock },
-  { value: "browser-profiles", icon: AppWindow },
+  { value: "personality", icon: Smile },
+  { value: "agents", icon: Bot, group: "server.settings.group.agents" },
+  { value: "memory", icon: Brain, group: "server.settings.group.agents" },
+  { value: "mcp", icon: Blocks, group: "server.settings.group.agents" },
+  { value: "vault", icon: KeyRound, group: "server.settings.group.agents" },
+  { value: "browser-profiles", icon: AppWindow, group: "server.settings.group.agents" },
+  { value: "routines", icon: CalendarClock, group: "server.settings.group.agents" },
+  { value: "sites", icon: Globe2, group: "server.settings.group.agents" },
+  { value: "members", icon: UsersRound, group: "server.settings.group.people" },
+  { value: "roles", icon: ShieldCheck, group: "server.settings.group.people" },
+  { value: "audit", icon: History, group: "server.settings.group.people" },
+  { value: "storage", icon: HardDrive, group: "server.settings.group.server" },
+  { value: "updates", icon: RefreshCw, group: "server.settings.group.server" },
+  { value: "desktop", icon: Monitor, group: "server.settings.group.server" },
+  { value: "import", icon: Download, group: "server.settings.group.server" },
+  { value: "transfer", icon: ArrowLeftRight, group: "server.settings.group.server" },
 ];
 
 export function ServerSettingsModal(props: ServerSettingsModalProps) {
@@ -387,6 +452,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     if (section() === "mcp") return mcpDetail();
     if (section() === "import") return importDetail();
     if (section() === "roles") return roles.crumb();
+    if (section() === "agents") return agents.crumb();
     return section() === "providers" ? providerDetail() : null;
   };
   /** The key of the one action in flight, gating every panel at once rather than belonging to any. */
@@ -401,6 +467,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   let syncedServerId = "";
 
   const local = () => props.server.kind === "local";
+  // A named function, not a ternary in the prop: a ternary makes a memo on each read, and a read
+  // from an effect callback (a select that reports a change) then halts the renderer.
+  const hostName = () => (local() ? undefined : props.server.name);
   // The client's remote desktop setup is for macOS. A local server shows the section on every platform,
   // because its owner chooses there who can control the computer.
   const remoteDesktopSection = () => props.remoteDesktopSupported !== false && (props.platform === "darwin" || local());
@@ -492,6 +561,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   const general = createServerGeneralSection(host);
   const roles = createServerRolesSection(host, () => section() === "roles" || section() === "members");
   const audit = createServerAuditSection(host, () => section() === "audit");
+  const agents = createServerAgentsSection(host, () => section() === "agents");
+  const memory = createServerMemorySection(host);
 
   /** Whether this server and the caller support the section. */
   const sectionSupported = (value: Section): boolean => {
@@ -501,6 +572,10 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         return true;
       case "personality":
         return Boolean(personalityOptions());
+      case "agents":
+        return agents.available();
+      case "memory":
+        return memory.available();
       case "vault":
         return Boolean(props.vault);
       case "roles":
@@ -534,7 +609,9 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     const needle = props.sectionQuery?.trim().toLocaleLowerCase();
     if (!needle) return true;
     const { title, description } = sections[value];
-    return t(title).toLocaleLowerCase().includes(needle) || t(description).toLocaleLowerCase().includes(needle);
+    return [title, description, ...(SECTION_ROWS[value] ?? [])].some((key) =>
+      t(key).toLocaleLowerCase().includes(needle),
+    );
   };
   /** The sections that the search finds. Without a search, each section that this server supports. */
   const matchingSections = createMemo(() =>
@@ -640,6 +717,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         companySignIn.resetForServer();
         roles.resetForServer();
         audit.resetForServer();
+        agents.resetForServer();
       }
       if (!editing) general.syncFromServer(name, logoUrl);
     },
@@ -658,6 +736,22 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
     () => section() === "audit" && !audit.available(),
     (gone) => {
       if (gone) setSection("members");
+    },
+  );
+
+  /** The agent defaults leave with the access that gives them, as Roles does. */
+  createEffect(
+    () => section() === "agents" && !agents.available(),
+    (gone) => {
+      if (gone) setSection("general");
+    },
+  );
+
+  /** The memory settings leave with the access that gives them, as the agent defaults do. */
+  createEffect(
+    () => section() === "memory" && !memory.available(),
+    (gone) => {
+      if (gone) setSection("general");
     },
   );
 
@@ -706,6 +800,8 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
       if (
         value === "general" ||
         value === "personality" ||
+        value === "agents" ||
+        value === "memory" ||
         value === "vault" ||
         value === "members" ||
         value === "roles" ||
@@ -856,13 +952,18 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
           <>
             <Tabs.List class="settings-modal-nav" aria-label={t("server.settings.sections")}>
               <For each={navSections()}>
-                {(item) => {
+                {(item, index) => {
                   const Icon = item.icon;
                   return (
-                    <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
-                      <Icon aria-hidden="true" />
-                      <span>{t(sections[item.value].title)}</span>
-                    </Tabs.Trigger>
+                    <>
+                      <Show when={item.group !== navSections()[index() - 1]?.group && item.group}>
+                        {(group) => <SettingsNavGroupLabel label={t(group())} />}
+                      </Show>
+                      <Tabs.Trigger class="settings-modal-nav-item" value={item.value}>
+                        <Icon aria-hidden="true" />
+                        <span>{t(sections[item.value].title)}</span>
+                      </Tabs.Trigger>
+                    </>
                   );
                 }}
               </For>
@@ -879,6 +980,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
         <Tabs.Content value="general" class="settings-modal-tab-panel server-settings-panel" data-tab="general">
           <general.Panel />
         </Tabs.Content>
+        <Show when={memory.available()}>
+          <Tabs.Content value="memory" class="settings-modal-tab-panel server-settings-panel" data-tab="memory">
+            <memory.Panel />
+          </Tabs.Content>
+        </Show>
         <Show when={personalityOptions()}>
           {(options) => (
             <Tabs.Content
@@ -899,6 +1005,11 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               </SettingsSection>
             </Tabs.Content>
           )}
+        </Show>
+        <Show when={agents.available()}>
+          <Tabs.Content value="agents" class="settings-modal-tab-panel server-settings-panel" data-tab="agents">
+            <agents.Panel />
+          </Tabs.Content>
         </Show>
         <Show when={props.vault}>
           {(vault) => (
@@ -1009,7 +1120,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
               {(providers) => (
                 <HostProviderSettingsPanel
                   {...providers()}
-                  hostName={local() ? undefined : props.server.name}
+                  hostName={hostName()}
                   selectMount={modalElement()}
                   onDetailChange={setProviderDetail}
                   promptCache={promptCacheSource()}

@@ -20,6 +20,11 @@ export const messages = {
   "composer.update.manual": "Werk {provider} bij op de computer waarop het draait om door te gaan.",
   "composer.update.pending": "Bijwerken…",
   "composer.update.action": "Bijwerken",
+  "composer.usageLimit.credits":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken nu je tegoed.",
+  "composer.usageLimit.creditsResets":
+    "Je hebt de volledige planlimiet van {provider} gebruikt. Je agents gebruiken je tegoed tot de limiet {reset} wordt gereset.",
+  "composer.usageLimit.creditsTitle": "Tegoed in gebruik",
   "composer.usageLimit.resets":
     "Je hebt je limiet voor {provider} volledig gebruikt. De limiet wordt op {reset} gereset.",
   "composer.usageLimit.selectModel":
@@ -78,6 +83,7 @@ export const messages = {
   "composer.placeholder.messageAgent": "Bericht aan agent",
   "composer.add.label": "Toevoegen aan prompt",
   "composer.add.files": "Bestanden bijvoegen",
+  "composer.add.teach": "Een taak aanleren",
   "composer.add.skill": "Vaardigheid gebruiken",
   "composer.upload.cancel": "Uploaden annuleren",
   "composer.upload.uploading": "{name} wordt geüpload",

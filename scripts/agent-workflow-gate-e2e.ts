@@ -235,7 +235,10 @@ const agents = new AgentService({
   timezone: () => "UTC",
   channelRemotePerson: (personId) => personId === MEMBER.id,
   // Full access: a workflow delete must still ask the person.
-  approvalAutomation: { autoApproves: () => true },
+  approvalAutomation: {
+    autoApproves: () => true,
+    set: () => Effect.succeed({ defaultAutoApprove: true, autoApproveOverrides: {} }),
+  },
   workflowTools: () => {
     assert.ok(workflows, "The workflow service is not ready.");
     return workflows;
