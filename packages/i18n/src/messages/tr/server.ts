@@ -310,6 +310,12 @@ export const messages = {
   "server.settings.group.agents": "Ajanlar",
   "server.settings.group.people": "Kişiler",
   "server.settings.group.server": "Sunucu",
+  "server.settings.experimentalTitle": "Deneysel",
+  "server.settings.experimentalDescription": "Henüz tamamlanmamış özellikleri açın.",
+  "server.settings.experimentalFeatures": "Özellikler",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "CRM sayfasını sahiplere ve yöneticilere gösterin, ajanların CRM'i okumasına izin verin ve Stripe'ı eşitleyin. Kapattığınızda veriler kalır.",
   "server.settings.agentDefaultsTitle": "Ajan varsayılanları",
   "server.settings.threadsCard": "Mesaj dizileri ve saat dilimi",
   "server.settings.memoryTitle": "Bellek",

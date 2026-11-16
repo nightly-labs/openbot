@@ -41,7 +41,8 @@
     "./plan-limits": "./src/plan-limits.ts",
     "./agent-tasks": "./src/agent-tasks.ts",
     "./stored-files": "./src/stored-files.ts",
-    "./workflow-decoding": "./src/workflow-decoding.ts"
+    "./workflow-decoding": "./src/workflow-decoding.ts",
+    "./crm-decoding": "./src/crm-decoding.ts"
   },
   "scripts": {
     "typecheck": "bun ../../scripts/type-checker.ts --noEmit -p tsconfig.json"

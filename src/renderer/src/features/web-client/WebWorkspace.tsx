@@ -64,6 +64,7 @@ import { CONTEXT_COMPACT_CAPABILITY } from "@openbot/contracts/team-protocol/con
 import { CONTEXT_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/context-reset-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
+import { CRM_CAPABILITY } from "@openbot/contracts/team-protocol/crm-v1";
 import {
   AGENT_HIDDEN_CAPABILITY,
   AGENT_HIDDEN_WORK_CAPABILITY,
@@ -213,6 +214,7 @@ import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
 import {
   AgentUsagePanel,
+  CrmScreen,
   RoutineFlowsCanvas,
   ScheduleView,
   ServerLibrary,
@@ -266,6 +268,7 @@ import {
 } from "../conversation/message-delete-access";
 import { webEventRoutinesApi } from "../conversation/routine-webhooks-api";
 import { trackUsageLimitShown, usageLimitAskFrom } from "../conversation/usage-limit-ask";
+import { createCrmEnabled } from "../crm/crm-enabled";
 import type { FilesPort } from "../files/files-port";
 import { hostSetupProviderProps } from "../onboarding/host-setup-provider-props";
 import { createRoutineTimezonePrompt } from "../schedule/routine-timezone-prompt";
@@ -341,6 +344,7 @@ import { createWebChatHistory, type WebChatHistoryEntry } from "./web-chat-histo
 import { createWebWorkspace, type WebRuntimeFactory } from "./web-client-context";
 import { createWebConversationRuntime } from "./web-conversation-runtime";
 import { createWebConversationView } from "./web-conversation-view";
+import { webCrmHost } from "./web-crm";
 import { createWebFileSaver } from "./web-file-download";
 import { webGitHubConnectorPort } from "./web-github-connector";
 import { createWebHostedServers } from "./web-hosted-server-state";
@@ -409,7 +413,7 @@ async function reportedFailure(send: () => Promise<unknown>, options: PromptAnsw
 }
 
 /** The pages of the connected host that cover the conversation. */
-type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library";
+type HostPageView = "usage" | "schedule" | "tasks" | "workflows" | "library" | "crm";
 
 type WebWorkspaceProps = {
   accountId: string;
@@ -750,6 +754,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [marketplaceOpen, setMarketplaceOpen] = createSignal(false);
   /** The Usage, Schedule or Tasks page of the connected host. As on desktop, it follows a host switch. */
   const [hostPage, setHostPage] = createSignal<{ view: HostPageView; trigger: HTMLElement | null } | null>(null);
+  /** The server whose CRM page opens its connectors. The page takes it once. */
+  const [crmConnectorsRequest, setCrmConnectorsRequest] = createSignal<string>();
   /** A server at its site limit offers the server plans, which have more sites, to its owner. */
   function canOfferServerPlans(): boolean {
     return (
@@ -778,6 +784,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   function closeHostPage() {
     const trigger = hostPage()?.trigger;
     setHostPage(null);
+    setCrmConnectorsRequest(undefined);
     queueMicrotask(() => {
       if (trigger?.isConnected) trigger.focus({ preventScroll: true });
     });
@@ -1369,6 +1376,43 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     return (button) => {
       const id = server()?.id;
       if (id) void openServerSettings(id, button, "providers");
+    };
+  }
+  /** Only an owner or admin reads the CRM, on a host with `crm-v1`. */
+  const crmAllowed = () =>
+    canAdministerServer(workspace.state.host?.role) && workspace.state.capabilities.includes(CRM_CAPABILITY);
+  const crmHost = webCrmHost({ request: () => hostRequest(), onHostEvent: workspace.onHostEvent });
+  const crmServerId = createMemo(() => (crmAllowed() ? server()?.id : undefined));
+  /** The Server Settings > Experimental switch. A new host object for each server, so a switch reads it again. */
+  const crmSwitch = createCrmEnabled(createMemo(() => (crmServerId() === undefined ? undefined : { ...crmHost })));
+  const crmEnabled = crmSwitch.enabled;
+  /** The CRM shows only while an owner or admin has it on in Server Settings > Experimental. */
+  const crmSupported = () => crmAllowed() && crmEnabled() === true;
+  // As the Library: a member, or an older host, has no CRM button. The page also closes when the CRM is off.
+  createEffect(
+    () => page() === "crm" && workspace.state.status === "online" && (!crmAllowed() || crmEnabled() === false),
+    (unsupported) => {
+      if (unsupported) setHostPage(null);
+    },
+  );
+  /** The CRM button of the page rail. A named function, not a ternary prop. */
+  function crmRailAction(): ((button: HTMLElement) => void) | undefined {
+    if (!crmSupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (!id) return;
+      setCrmConnectorsRequest(undefined);
+      void openHostPage(id, "crm", button);
+    };
+  }
+  /** The Connectors item of the CRM button's right-click menu. A named function, not a ternary prop. */
+  function crmConnectorsAction(): ((button: HTMLElement) => void) | undefined {
+    if (!crmSupported()) return undefined;
+    return (button) => {
+      const id = server()?.id;
+      if (!id) return;
+      setCrmConnectorsRequest(id);
+      void openHostPage(id, "crm", button);
     };
   }
   /** The Workflows button of the page rail, only on a host with `workflows-v1`. A named function, not a ternary prop. */
@@ -2979,6 +3023,8 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               onWorkflows={workflowsRailAction()}
               onLibrary={libraryRailAction()}
               onProviders={providersRailAction()}
+              onCrm={crmRailAction()}
+              onCrmConnectors={crmConnectorsAction()}
               onUsage={(button) => {
                 const id = server()?.id;
                 if (id) void openHostPage(id, "usage", button);
@@ -3054,7 +3100,11 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
               page={
                 <Show
                   when={
-                    page() === "usage" || page() === "schedule" || page() === "workflows" || page() === "library"
+                    page() === "usage" ||
+                    page() === "schedule" ||
+                    page() === "workflows" ||
+                    page() === "library" ||
+                    page() === "crm"
                       ? server()
                       : undefined
                   }
@@ -3198,6 +3248,24 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                                 onOpenUrl={(url) => void openWebLink(url)}
                                 mediaSource={runtime.attachmentMedia}
                                 opensFiles={false}
+                              />
+                            </Loading>
+                          )}
+                        </Show>
+                      </Match>
+                      <Match when={page() === "crm"}>
+                        {/* Keyed: the page reads the CRM of one server, as on desktop. */}
+                        <Show when={target().id} keyed>
+                          {(serverId) => (
+                            <Loading>
+                              <CrmScreen
+                                serverId={serverId}
+                                host={crmHost}
+                                agents={workspace.profiles()}
+                                connectors={{
+                                  requested: () => crmConnectorsRequest() === serverId,
+                                  taken: () => setCrmConnectorsRequest(undefined),
+                                }}
                               />
                             </Loading>
                           )}
@@ -3558,6 +3626,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         }}
                         browserProfiles={browserProfileSettings()}
                         vault={vaultSettings()}
+                        crm={crmHost}
                         // The providers of the host are its own, so there is no sign-in here.
                         instanceTransfer={instanceTransferSettings()}
                         // Any member imports into a host with `agent-import-v1`.

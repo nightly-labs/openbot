@@ -84,6 +84,7 @@ import { attachmentCall, attachmentFailure } from "../attachment-effects";
 import { repairBrowserToolInput } from "../browser-tool-input";
 import { OPENBOT_BROWSER_NAMESPACE } from "../browser-tools";
 import type { ChannelService } from "../channel-service";
+import type { CrmHandle } from "../crm/crm";
 import type { ProviderSession } from "../database/provider-sessions";
 import type { MailboxStore } from "../mailbox-store";
 import { agentMcpServers, codexDeferredMcpServers, openCodeMcpServers } from "../mcp-provider-shapes";
@@ -139,6 +140,7 @@ import {
 import type { ChatVisualPreviewHost } from "./chat-visual-preview";
 import { handleSetCommitCoAuthorTool, type SetCommitCoAuthor } from "./commit-co-author-tool";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { CRM_TOOL_NAMES, handleCrmTool } from "./crm-tool";
 import { handleDataTool } from "./data-tools";
 import { handleDeleteAgentTool } from "./delete-agent-tool";
 import {
@@ -514,6 +516,10 @@ export interface OpenBotToolRouterOptions {
   serverClaims?: AgentServerClaims | null | undefined;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`; null where this process has none. */
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The CRM, for the `crm_*` tools; null where this process has none. */
+  crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent. Without it, the CRM tools refuse every agent. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   /** The API keys that users saved for agents; null where nothing can save them. */
   apiKeys?: AgentApiKeys | null | undefined;
   /** The Vault, where `save_api_key` keeps a key for every agent; null where this server has none. */
@@ -573,6 +579,8 @@ export class OpenBotToolRouter {
   readonly #feedbackSearched = new Set<string>();
   readonly #serverClaims: AgentServerClaims | null;
   readonly #browserProfiles: () => AgentBrowserProfiles | null;
+  readonly #crm: () => CrmHandle | null;
+  readonly #crmAgentVisibleToMembers: (agentId: string) => boolean;
   readonly #apiKeys: AgentApiKeys | null;
   readonly #vaultItems: VaultItems | null;
   readonly #hooks: OpenBotToolRouterHooks;
@@ -633,6 +641,8 @@ export class OpenBotToolRouter {
     this.#feedback = options.feedback ?? null;
     this.#serverClaims = options.serverClaims ?? null;
     this.#browserProfiles = options.browserProfiles ?? (() => null);
+    this.#crm = options.crm ?? (() => null);
+    this.#crmAgentVisibleToMembers = options.crmAgentVisibleToMembers ?? (() => true);
     this.#apiKeys = options.apiKeys ?? null;
     this.#vaultItems = options.vaultItems ?? null;
     this.#hooks = options.hooks;
@@ -1021,9 +1031,10 @@ export class OpenBotToolRouter {
               tool === "messaging_post" ||
               tool === "web_search" ||
               tool === "create_server_install_command";
-            // A workflow tool reports its own correctable failures; only bad arguments reach this point.
+            // A workflow or CRM tool reports its own correctable failures; only bad arguments reach this point.
             const correctable = (cause: unknown) =>
-              correctableTool || (WORKFLOW_TOOL_NAMES.has(tool) && cause instanceof z.ZodError);
+              correctableTool ||
+              ((WORKFLOW_TOOL_NAMES.has(tool) || CRM_TOOL_NAMES.has(tool)) && cause instanceof z.ZodError);
             const response = this.#handleOpenBotTool(client, toolRequest, toolRequest.params).pipe(
               Effect.catch((failure) =>
                 correctable(failure.cause) ? correctableFailure(failure.cause) : Effect.fail(failure),
@@ -2241,6 +2252,34 @@ export class OpenBotToolRouter {
       new Set(this.#hooks.listAgents().map((agent) => agent.id)),
     );
     if (flowResult) return flowResult;
+
+    if (CRM_TOOL_NAMES.has(params.tool)) {
+      // The Team API gives the CRM to owners and admins only, so a member's message does not reach it here.
+      if (this.#fromRemoteMember(senderAgentId, params.turnId))
+        return openBotToolFailure("A team member's message cannot use the CRM. Ask the member to use the CRM page.");
+      // A member who can see the agent reads its chat and can add a routine to it.
+      if (this.#crmAgentVisibleToMembers(senderAgentId))
+        return openBotToolFailure(
+          "Team members can see this agent, so it cannot use the CRM. Ask an owner or admin to set this agent to No access for Everyone and for each role, in the server's Roles settings.",
+        );
+      // People who are not owners or admins read the replies in an external chat or a channel.
+      if (
+        this.#messaging.store.linkForThread(executionThreadId) ||
+        this.#channels.store.channelForThread(executionThreadId)
+      )
+        return openBotToolFailure(
+          "The CRM does not work in an external chat or a channel. Use it in your own OpenBot chat.",
+        );
+      const crmResult = yield* handleCrmTool(
+        params.tool,
+        params.arguments,
+        this.#crm(),
+        senderAgentId,
+        this.#conversation.publicThreadId(senderAgentId, params.threadId),
+        (text) => this.#hooks.redactMcp(text),
+      );
+      if (crmResult) return crmResult;
+    }
 
     if (
       WORKFLOW_CHANGE_TOOL_NAMES.has(params.tool) &&

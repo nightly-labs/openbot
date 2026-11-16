@@ -299,6 +299,12 @@ export const messages = {
   "server.settings.group.agents": "エージェント",
   "server.settings.group.people": "ユーザー",
   "server.settings.group.server": "サーバー",
+  "server.settings.experimentalTitle": "試験運用",
+  "server.settings.experimentalDescription": "まだ完成していない機能をオンにします。",
+  "server.settings.experimentalFeatures": "機能",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "オーナーと管理者に CRM ページを表示し、エージェントが CRM を読めるようにして、Stripe と同期します。オフにしてもデータは残ります。",
   "server.settings.agentDefaultsTitle": "エージェントのデフォルト",
   "server.settings.threadsCard": "スレッドとタイムゾーン",
   "server.settings.memoryTitle": "メモリー",

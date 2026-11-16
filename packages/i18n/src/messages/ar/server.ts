@@ -332,6 +332,12 @@ export const messages = {
   "server.settings.group.agents": "الوكلاء",
   "server.settings.group.people": "الأشخاص",
   "server.settings.group.server": "الخادم",
+  "server.settings.experimentalTitle": "تجريبي",
+  "server.settings.experimentalDescription": "شغّل ميزات لم تكتمل بعد.",
+  "server.settings.experimentalFeatures": "الميزات",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "اعرض صفحة CRM للمالكين والمسؤولين، واسمح للوكلاء بقراءة CRM، وزامن Stripe. عند إيقافه تبقى البيانات.",
   "server.settings.agentDefaultsTitle": "الإعدادات الافتراضية للوكلاء",
   "server.settings.threadsCard": "السلاسل والمنطقة الزمنية",
   "server.settings.memoryTitle": "الذاكرة",
