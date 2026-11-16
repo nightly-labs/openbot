@@ -15,8 +15,11 @@ import { homedir, platform, userInfo } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect, Option, Result, Schema } from "effect";
 import type * as Koffi from "koffi";
+
+const logger = createOpenBotLogger("claude-stored-sign-in");
 
 const KEYCHAIN_TIMEOUT_MS = 3_000;
 /** `security` exits with this code when the Keychain has no such item. */
@@ -71,7 +74,7 @@ const StoredCredential = Schema.Struct({
   }),
 });
 
-const StoredSettings = Schema.Struct({
+const StoredAccount = Schema.Struct({
   oauthAccount: Schema.optional(
     Schema.NullOr(
       Schema.Struct({
@@ -81,8 +84,6 @@ const StoredSettings = Schema.Struct({
       }),
     ),
   ),
-  // The CLI's cached feature flags. Its shape is not ours, so a change in it must not hide the account.
-  cachedGrowthBookFeatures: Schema.optional(Schema.Unknown),
 });
 
 /** The parts of a long sign-in in Credential Manager: `n` parts that hold `l` base64 characters together. */
@@ -183,7 +184,14 @@ const readCredentialText = Effect.fn("ClaudeStoredSignIn.readCredentialText")(fu
     const stored = yield* Effect.try({
       try: () => readCredentialManager(`Claude Code-credentials${suffix}`, loadWindowsCredentialRead()),
       catch: (cause) => new ClaudeStoredSignInFailed({ cause }),
-    }).pipe(Effect.option);
+    }).pipe(
+      Effect.tapError((failure) =>
+        Effect.sync(() =>
+          logger.warn("Unable to read the Claude sign-in in Windows Credential Manager:", toLogValue(failure.cause)),
+        ),
+      ),
+      Effect.option,
+    );
     // As the CLI does, the file is read when Credential Manager has no sign-in.
     if (Option.isSome(stored) && stored.value !== null) return Option.some(stored.value);
   }
@@ -212,7 +220,10 @@ const readCredentialText = Effect.fn("ClaudeStoredSignIn.readCredentialText")(fu
   return yield* readText(join(configDirectory, ".credentials.json"));
 });
 
-/** The CLI's settings file, which holds the email, the organization and the cached feature flags. */
+/**
+ * The CLI's settings file, which holds the email, the organization and the cached feature flags. The
+ * account and the flag are read apart, so that a field of one that this build cannot read keeps the other.
+ */
 const readSettings = Effect.fn("ClaudeStoredSignIn.readSettings")(function* (
   environment: NodeJS.ProcessEnv,
   configDirectory: string,
@@ -222,9 +233,14 @@ const readSettings = Effect.fn("ClaudeStoredSignIn.readSettings")(function* (
     Option.isSome(legacy) && legacy.value.length > 0
       ? legacy
       : yield* readText(join(environment.CLAUDE_CONFIG_DIR || homedir(), ".claude.json"));
-  if (Option.isNone(text)) return null;
-  const settings = Schema.decodeUnknownOption(Schema.fromJsonString(StoredSettings))(text.value);
-  return Option.isSome(settings) ? settings.value : null;
+  const settings = Option.flatMap(text, Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown)));
+  if (Option.isNone(settings)) return { account: null, credentialManager: false };
+  const account = Schema.decodeUnknownOption(StoredAccount)(settings.value);
+  const flags = isDynamicRecord(settings.value) ? settings.value.cachedGrowthBookFeatures : undefined;
+  return {
+    account: Option.isSome(account) ? (account.value.oauthAccount ?? null) : null,
+    credentialManager: isDynamicRecord(flags) && flags.tengu_windows_credman === true,
+  };
 });
 
 /**
@@ -238,9 +254,12 @@ export const readClaudeStoredSignIn = Effect.fn("ClaudeStoredSignIn.read")(funct
   const customConfigDirectory = Boolean(environment.CLAUDE_CONFIG_DIR);
   const configDirectory = (environment.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")).normalize("NFC");
   const settings = yield* readSettings(environment, configDirectory);
-  const flags = settings?.cachedGrowthBookFeatures;
-  const credentialManager = isDynamicRecord(flags) && flags.tengu_windows_credman === true;
-  const text = yield* readCredentialText(environment, configDirectory, customConfigDirectory, credentialManager);
+  const text = yield* readCredentialText(
+    environment,
+    configDirectory,
+    customConfigDirectory,
+    settings.credentialManager,
+  );
   if (Option.isNone(text)) return Option.none<DynamicRecord>();
   const credential = Schema.decodeUnknownOption(Schema.fromJsonString(StoredCredential))(text.value);
   if (Option.isNone(credential)) return Option.none<DynamicRecord>();
@@ -248,7 +267,7 @@ export const readClaudeStoredSignIn = Effect.fn("ClaudeStoredSignIn.read")(funct
   const refreshExpiresAt = oauth.refreshTokenExpiresAt ?? null;
   if (!oauth.refreshToken || (refreshExpiresAt !== null && refreshExpiresAt <= Date.now()))
     return Option.none<DynamicRecord>();
-  const account = settings?.oauthAccount ?? null;
+  const { account } = settings;
   return Option.some<DynamicRecord>({
     loggedIn: true,
     authMethod: "claude.ai",
