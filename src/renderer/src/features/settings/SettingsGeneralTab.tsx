@@ -43,6 +43,7 @@ import { useI18n } from "../../i18n-context";
 import { useInterfaceSizeChoice } from "../../interface-size";
 import { useLayout } from "../../layout";
 import { useLogoColorChoice } from "../../logo-color";
+import { ChatBackdropSetting } from "./ChatBackdropSetting";
 import { ExternalLinkSelect } from "./ExternalLinkSelect";
 
 const interfaceSizeOptions = [...APP_INTERFACE_SIZES];
@@ -344,6 +345,15 @@ function AppearanceRows(props: SettingsGeneralTabProps) {
                     : appearance.changeChatBackgroundDark(value)
                 }
               />
+            </ItemActions>
+          </Item>
+          <Item data-settings-row="settings.chatBackdrop.title" class="settings-modal-row">
+            <ItemContent>
+              <ItemTitle>{i18n.t("settings.chatBackdrop.title")}</ItemTitle>
+              <ItemDescription>{i18n.t("settings.chatBackdrop.description")}</ItemDescription>
+            </ItemContent>
+            <ItemActions>
+              <ChatBackdropSetting mount={props.selectMount} />
             </ItemActions>
           </Item>
         </ItemGroup>

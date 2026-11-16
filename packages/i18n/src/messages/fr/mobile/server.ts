@@ -459,7 +459,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Aucun fuseau horaire ne correspond à cette recherche.",
   "mobile.server.settings.timezoneMore": "Saisissez plus de lettres pour voir d’autres fuseaux horaires.",
   "mobile.server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "mobile.server.settings.timezoneLoading": "Chargement du fuseau horaire…",
   "mobile.server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "mobile.server.settings.timezoneSaveFailed": "Impossible d’enregistrer le fuseau horaire. Réessayez.",
@@ -922,6 +922,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Message « En cours… »",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot l’envoie pendant que l’agent travaille, puis le remplace par la réponse. Désactivez pour n’envoyer que la réponse.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Réactions d’état",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot réagit avec 👀 quand un message arrive et avec ✅ quand la réponse est prête. Désactivez pour n’envoyer aucune réaction.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Cet agent reçoit les messages destinés à OpenBot depuis tous vos numéros associés. Il répond lui-même aux messages courts, confie les autres tâches au bon agent et répond dans WhatsApp.",

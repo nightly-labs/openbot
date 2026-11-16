@@ -240,6 +240,8 @@ export const messages = {
     "서버가 로그인한 계정을 거부했어요. 이 계정이 서비스를 사용할 수 있는지 확인하세요. 다른 계정을 사용하려면 로그아웃한 다음 다시 로그인하세요.",
   "error.backend.mcpSignInClientRefused":
     "로그인을 완료할 때 로그인 서버가 OpenBot을 받아들이지 않았어요. 다시 로그인하세요. OpenBot이 서버에 다시 등록해요.",
+  "error.backend.mcpSignInAppRefused":
+    "로그인 서버가 이 서버의 로그인 앱을 받아들이지 않았어요. 로그인 앱의 클라이언트 ID와 클라이언트 시크릿을 확인한 후 다시 로그인하세요.",
   "error.backend.mcpCommandNotFound": "명령을 찾을 수 없어요: {command}",
   "error.backend.mcpRegistrationRefused":
     "로그인 서버가 아직 OpenBot을 앱으로 허용하지 않아요. 계정 문제가 아니에요. 로컬 MCP 서버처럼 다른 방법으로 연결하세요.",
@@ -413,6 +415,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "이 채팅을 분기하기 전에 현재 턴을 중지하세요.",
   "error.backend.branchMessageNotFound": "에이전트의 완료된 답변에서만 분기할 수 있어요.",
   "error.backend.branchRemoteUnsupported": "분기는 이 컴퓨터의 에이전트에서만 사용할 수 있어요.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "이 보고서를 삭제하려면 에이전트에게 요청하세요.",
   "error.backend.threadMoveRefused": "이 에이전트에게만 보낸 메시지만 새 스레드에서 실행할 수 있어요.",
   "error.backend.taskTitleRequired": "작업에 짧은 제목을 지정하세요.",
   "error.backend.taskToolInvalid": "작업에 120자 이하의 제목과 할 일을 설명하는 지시문을 지정하세요.",

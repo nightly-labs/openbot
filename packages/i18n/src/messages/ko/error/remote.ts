@@ -148,6 +148,7 @@ export const messages = {
   "error.remote.attachmentRejected": "호스트가 첨부 파일을 거부했어요.",
   "error.remote.attachmentTooLarge": "첨부 파일은 10MB 이하여야 해요.",
   "error.remote.attachmentBusy": "현재 첨부 파일이 끝날 때까지 기다려 주세요.",
+  "error.remote.attachmentChanged": "파일이 변경되었거나 사용할 수 없어요. 다시 선택해 주세요.",
   "error.remote.uploadTimeout": "첨부 파일 업로드 시간이 초과되었어요.",
   "error.remote.hostSessionActive": "호스트에 이미 활성 원격 세션이 있어요.",
   "error.remote.tooManyConnections": "활성 원격 연결이 너무 많아요.",

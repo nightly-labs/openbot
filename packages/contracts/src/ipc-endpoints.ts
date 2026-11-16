@@ -33,6 +33,7 @@ import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } f
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
 import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
+import type { BillingDetails, BillingDetailsRequest } from "./billing-details";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -310,7 +311,23 @@ import type {
   SearchConversationMessagesInput,
   SendMessageInput,
   SetMessageReactionInput,
+  WithdrawFeedbackInput,
+  WithdrawFeedbackResult,
 } from "./ipc-conversations";
+import type {
+  CrmActivityPage,
+  CrmActivityPageInput,
+  CrmApplyResult,
+  CrmChange,
+  CrmCustomerPage,
+  CrmCustomerPageInput,
+  CrmOverview,
+  CrmPaymentPage,
+  CrmPaymentPageInput,
+  CrmSettings,
+  CrmSourceConnectInput,
+  CrmSourceInput,
+} from "./ipc-crm";
 import type {
   CheckCustomAgentInput,
   CustomAgentCheckResult,
@@ -439,6 +456,7 @@ import type {
   SetSlackEnabledInput,
   SetTelegramEnabledInput,
   SetWhatsAppOwnNumberInput,
+  SetWhatsAppStatusReactionsInput,
   SetWhatsAppWorkingMessageInput,
   SlackOverview,
   SlackWorkspaceInput,
@@ -1350,6 +1368,9 @@ export const IPC_ENDPOINTS = {
     setWhatsAppWorkingMessage: request<SetWhatsAppWorkingMessageInput, void>()(
       "messaging:set-whatsapp-working-message",
     ),
+    setWhatsAppStatusReactions: request<SetWhatsAppStatusReactionsInput, void>()(
+      "messaging:set-whatsapp-status-reactions",
+    ),
     // The same for a joined server with `connectors-v1`, which an owner or admin manages from here.
     // The host opens no page: main opens it in this computer's browser. A Slack or Discord install
     // returns to this computer's `openbot://` link, and main sends the sealed grant on to the host.
@@ -1408,6 +1429,10 @@ export const IPC_ENDPOINTS = {
     // A joined server needs `whatsapp-working-message-v1`. Its numbers carry `workingMessage` only then.
     hostSetWhatsAppWorkingMessage: scopedRequest<SetWhatsAppWorkingMessageInput, void, "required">()(
       "messaging:host-set-whatsapp-working-message",
+    ),
+    // A joined server needs `whatsapp-status-reactions-v1`. Its numbers carry `statusReactions` only then.
+    hostSetWhatsAppStatusReactions: scopedRequest<SetWhatsAppStatusReactionsInput, void, "required">()(
+      "messaging:host-set-whatsapp-status-reactions",
     ),
   },
   // The server name, logo, timezone, agent memory limit and app update of one server's host. `host.updateIdentity` and `update`
@@ -1635,6 +1660,9 @@ export const IPC_ENDPOINTS = {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
     buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
+    // The billing country and EU VAT ID that decide the VAT of the next plan or license.
+    getDetails: request<undefined, BillingDetails>()("billing:get-details"),
+    setDetails: request<BillingDetailsRequest, BillingDetails>()("billing:set-details"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
@@ -1840,6 +1868,8 @@ export const IPC_ENDPOINTS = {
     deleteConversationMessage: scopedRequest<DeleteConversationMessageInput, void>()(
       "agent:delete-conversation-message",
     ),
+    // A joined server takes it through `feedback-withdraw-v1`, for its owner only.
+    withdrawFeedback: scopedRequest<WithdrawFeedbackInput, WithdrawFeedbackResult>()("agent:withdraw-feedback"),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
@@ -2004,6 +2034,24 @@ export const IPC_ENDPOINTS = {
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
   },
   /**
+   * CRM: leads and customers, their plans and payments, and the changes that agents propose. Only an
+   * owner or admin reads it. The agent event `crm-changed` says that it changed. A joined server
+   * answers through `crm-v1` when it supports it.
+   */
+  crm: {
+    overview: scopedQuery<CrmOverview>()("crm:overview"),
+    customers: scopedRequest<CrmCustomerPageInput, CrmCustomerPage>()("crm:customers"),
+    payments: scopedRequest<CrmPaymentPageInput, CrmPaymentPage>()("crm:payments"),
+    activity: scopedRequest<CrmActivityPageInput, CrmActivityPage>()("crm:activity"),
+    apply: scopedRequest<CrmChange, CrmApplyResult>()("crm:apply"),
+    sourceConnect: scopedRequest<CrmSourceConnectInput, CrmApplyResult>()("crm:source-connect"),
+    sourceDisconnect: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-disconnect"),
+    sourceSync: scopedRequest<CrmSourceInput, CrmApplyResult>()("crm:source-sync"),
+    /** The CRM switch of Server Settings > Experimental. The answer of `settings` comes before the CRM is on. */
+    settings: scopedQuery<CrmSettings>()("crm:settings"),
+    setSettings: scopedRequest<CrmSettings, CrmSettings>()("crm:set-settings"),
+  },
+  /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
    * keeps a destination, so the group has no remote route. The agent event `routines-changed` says
    * when a destination or a delivery changed.
@@ -2038,6 +2086,12 @@ export const IPC_ENDPOINTS = {
     previewWorkspaceFile: scopedRequest<PreviewWorkspaceFileInput, FilePreview>()("agent:preview-workspace-file"),
     /** Releases only this client's temporary HTML bytes, never a file on a host. */
     releaseFilePreview: request<string, void>()("agent:release-file-preview"),
+    /**
+     * Keeps HTML that the renderer already holds, such as a backdrop page saved on this device, as a
+     * temporary page on this client. The answer is its `openbot-visual://preview/...` address, or null
+     * when the page store is full. `releaseFilePreview` releases it.
+     */
+    addPreviewPage: request<string, string | null>()("agent:add-preview-page"),
     listWorkspaceDirectory: scopedRequest<OpenWorkspaceFileInput, WorkspaceDirectory>()(
       "agent:list-workspace-directory",
     ),
@@ -2452,6 +2506,7 @@ export const IPC_GROUP_PATHS = {
   routineFeed: "routineFeed",
   routineFlows: "routineFlows",
   workflows: "workflows",
+  crm: "crm",
   routineResults: "routineResults",
   billing: "billing",
   license: "license",

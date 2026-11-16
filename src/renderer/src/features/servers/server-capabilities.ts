@@ -52,6 +52,7 @@ export function serverSupportsCapability(
       capability === "password-managers-v1" ||
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
+      capability === "crm-v1" ||
       capability === "vault-v2" ||
       capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
@@ -107,6 +108,7 @@ export function serverSupportsCapability(
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
       capability === "whatsapp-working-message-v1" ||
+      capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
@@ -138,6 +140,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "feedback-withdraw-v1" ||
       capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||

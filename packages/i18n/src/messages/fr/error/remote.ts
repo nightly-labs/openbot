@@ -155,6 +155,7 @@ export const messages = {
   "error.remote.attachmentRejected": "L’hôte a refusé la pièce jointe.",
   "error.remote.attachmentTooLarge": "Les pièces jointes doivent faire 10 Mo au maximum.",
   "error.remote.attachmentBusy": "Attendez la fin de l’envoi de la pièce jointe en cours.",
+  "error.remote.attachmentChanged": "Le fichier a changé ou n’est pas disponible. Sélectionnez-le à nouveau.",
   "error.remote.uploadTimeout": "L’envoi de la pièce jointe a expiré.",
   "error.remote.hostSessionActive": "L’hôte a déjà une session distante active.",
   "error.remote.tooManyConnections": "Trop de connexions distantes actives.",

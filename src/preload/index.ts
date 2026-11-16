@@ -165,6 +165,7 @@ import {
   decodeAppLogoColorPreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingDetails,
   decodeBillingState,
   decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
@@ -268,6 +269,7 @@ import {
   decodeConversationPageFromMain,
   decodeConversationSearchPageFromMain,
   decodeFilePreview,
+  decodeOptionalFilePreviewPageUrl,
   decodePendingApproval,
   decodePinnedMessages,
   decodeQueue,
@@ -278,7 +280,16 @@ import {
   decodeTaskPage,
   decodeTaskWindow,
   decodeWaits,
+  decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
+import {
+  decodeCrmActivityPage,
+  decodeCrmApplyResult,
+  decodeCrmCustomerPage,
+  decodeCrmOverview,
+  decodeCrmPaymentPage,
+  decodeCrmSettings,
+} from "./crm-decoding";
 import {
   decodeDynamicIslandAction,
   decodeDynamicIslandGeometry,
@@ -663,6 +674,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   sendMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   deleteConversationMessage: decodeVoid,
+  withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
@@ -931,6 +943,18 @@ const openbotApi: OpenBotDesktopApi = {
     mediaProviders: decodeWorkflowMediaProviders,
     mediaCredits: decodeWorkflowMediaCredits,
   }),
+  crm: bridgeGroup(IPC_ENDPOINTS.crm, {
+    overview: decodeCrmOverview,
+    customers: decodeCrmCustomerPage,
+    payments: decodeCrmPaymentPage,
+    activity: decodeCrmActivityPage,
+    apply: decodeCrmApplyResult,
+    sourceConnect: decodeCrmApplyResult,
+    sourceDisconnect: decodeCrmApplyResult,
+    sourceSync: decodeCrmApplyResult,
+    settings: decodeCrmSettings,
+    setSettings: decodeCrmSettings,
+  }),
   routineResults: bridgeGroup(IPC_ENDPOINTS.routineResults, {
     options: decodeRoutineResultOptions,
     destination: decodeRoutineResultDestination,
@@ -1116,6 +1140,8 @@ const openbotApi: OpenBotDesktopApi = {
     getState: decodeBillingState,
     openPortal: decodeVoid,
     buyStorage: decodeBillingState,
+    getDetails: decodeBillingDetails,
+    setDetails: decodeBillingDetails,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,
@@ -1249,6 +1275,7 @@ const openbotApi: OpenBotDesktopApi = {
     answerWhatsAppRequest: decodeVoid,
     setWhatsAppOwnNumber: decodeVoid,
     setWhatsAppWorkingMessage: decodeVoid,
+    setWhatsAppStatusReactions: decodeVoid,
     // A joined server can list up to the Telegram limit; main has already read its states.
     hostOverview: decodeTelegramOverviewReply,
     hostConnect: decodeVoid,
@@ -1273,6 +1300,7 @@ const openbotApi: OpenBotDesktopApi = {
     hostAnswerWhatsAppRequest: decodeVoid,
     hostSetWhatsAppOwnNumber: decodeVoid,
     hostSetWhatsAppWorkingMessage: decodeVoid,
+    hostSetWhatsAppStatusReactions: decodeVoid,
   }),
   hostAdmin: bridgeGroup(IPC_ENDPOINTS.hostAdmin, {
     updateIdentity: decodeServer,
@@ -1467,6 +1495,7 @@ const openbotApi: OpenBotDesktopApi = {
       previewSharedFile: decodeFilePreview,
       previewWorkspaceFile: decodeFilePreview,
       releaseFilePreview: decodeVoid,
+      addPreviewPage: decodeOptionalFilePreviewPageUrl,
       listWorkspaceDirectory: decodeWorkspaceDirectory,
     }),
     ...agentFoldersGroup,

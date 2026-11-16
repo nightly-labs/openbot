@@ -308,6 +308,12 @@ export const messages = {
   "server.settings.group.agents": "Agents",
   "server.settings.group.people": "Personnes",
   "server.settings.group.server": "Serveur",
+  "server.settings.experimentalTitle": "Expérimental",
+  "server.settings.experimentalDescription": "Activez des fonctions qui ne sont pas encore terminées.",
+  "server.settings.experimentalFeatures": "Fonctions",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Affiche la page CRM aux propriétaires et administrateurs, permet aux agents de lire le CRM et synchronise Stripe. Si vous le désactivez, les données restent.",
   "server.settings.agentDefaultsTitle": "Valeurs par défaut des agents",
   "server.settings.threadsCard": "Fils et fuseau horaire",
   "server.settings.memoryTitle": "Mémoire",
@@ -346,7 +352,7 @@ export const messages = {
     "Choisissez ce que les agents de ce serveur peuvent faire quand vous ne le définissez pas pour un agent.",
   "server.settings.timezone": "Fuseau horaire",
   "server.settings.timezoneDescription":
-    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur.",
+    "Les nouvelles routines utilisent ce fuseau horaire quand le message n’indique pas celui de l’expéditeur. Sur un serveur, le navigateur l’utilise aussi après le prochain redémarrage.",
   "server.settings.timezoneAutomatic": "Automatique ({zone})",
   "server.settings.timezoneLoadFailed": "Impossible de charger le fuseau horaire du serveur.",
   "server.settings.turnLimit": "Fils en même temps",

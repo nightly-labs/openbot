@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Anmeldung bei {host} abgebrochen",
   "prompt.browser.signInBlocked.body":
     "Melde dich auf diesem Computer an. OpenBot sendet nur die Anmeldung für {host} an {server}, und {name} fährt fort.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an. Dann fährt {name} fort.",
   "prompt.browser.signInBlocked.cancelledBody": "Die Anmeldung wurde abgebrochen.",
   "prompt.browser.signInBlocked.waiting": "Warten auf die Anmeldung",
   "prompt.browser.signInBlocked.waitingButton": "Warten auf die Anmeldung…",

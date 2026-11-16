@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
 // Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a table or
@@ -37,6 +38,7 @@ const EMPTY_WORKFLOW_TABLES = {
   agent_usage_skill_loads: [],
   projection_messaging_pings: [],
   projection_messaging_history: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
   projection_pinned_thread_messages: [],
 };
 
@@ -109,7 +111,7 @@ function workflowTables(db: DatabaseSync) {
 }
 
 function expectHealthy(db: DatabaseSync): void {
-  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 62 });
+  expect(db.prepare("SELECT MAX(version) AS version FROM schema_migrations").get()).toEqual({ version: 63 });
   expect(db.prepare("PRAGMA foreign_keys").get()).toEqual({ foreign_keys: 1 });
   expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
   expect(db.prepare("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
@@ -191,9 +193,9 @@ describe("workflow migration", () => {
     const db = databaseAt(45);
     seed(db, 45);
     const before = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=20");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=20");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 20");
     expect(contents(db)).toEqual(before);
     expect(workflowTables(db)).toEqual([]);
@@ -280,6 +282,7 @@ const EMPTY_V54_TABLES = {
   agent_usage_skill_loads: [],
   projection_messaging_pings: [],
   projection_messaging_history: [],
+  ...CRM_TABLES_AFTER_MIGRATION,
   projection_pinned_thread_messages: [],
 };
 const EMPTY_LATER_TABLES = { projection_messaging_allowed_senders: [], ...EMPTY_V54_TABLES };
@@ -369,9 +372,9 @@ describe("workflow GitHub migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=46");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=46");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 46");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
@@ -510,9 +513,9 @@ describe("workflow Discord migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=47");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=47");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 47");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
@@ -599,9 +602,9 @@ describe("workflow Telegram migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=48");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=48");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 48");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);
@@ -700,9 +703,9 @@ describe("workflow Slack migration", () => {
     seedWorkflow(db);
     const before = contents(db);
     const check = runSourceCheck(db);
-    db.exec("INSERT INTO schema_migrations VALUES(63,'now')");
+    db.exec("INSERT INTO schema_migrations VALUES(64,'now')");
     expect(() => migrateOpenBotDatabase(db)).toThrow("newer than this application supports");
-    db.exec("DELETE FROM schema_migrations WHERE version=63; DELETE FROM schema_migrations WHERE version=48");
+    db.exec("DELETE FROM schema_migrations WHERE version=64; DELETE FROM schema_migrations WHERE version=48");
     expect(() => migrateOpenBotDatabase(db)).toThrow("missing version 48");
     expect(contents(db)).toEqual(before);
     expect(runSourceCheck(db)).toBe(check);

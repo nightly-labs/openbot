@@ -28,6 +28,12 @@ export function visualReplyMessageId(threadId: string, turnId: string, callId: s
   return `visual-reply:${digest}`;
 }
 
+/** The id of the message that one `set_backdrop` call adds, so a retried call adds no second page. */
+export function backdropMessageId(threadId: string, turnId: string, callId: string): string {
+  const digest = createHash("sha256").update(`${threadId}\0${turnId}\0${callId}`).digest("hex").slice(0, 32);
+  return `window-backdrop:${digest}`;
+}
+
 /** A file name from a page title, without the characters that file systems refuse. */
 export function visualReplyFileName(title: string): string {
   return (
@@ -384,6 +390,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         ? [
             "Do not create, delete, or test routines, and do not change other routines, during this run.",
             `When the task says to stop after a condition and the condition is met, pause this routine: call openbot.update_routine with routineId "${delivery.sender.routineId}" and active false, then give your report. Make no other change to this routine.`,
+            `A failure or a blocker, such as a file or a service that you cannot reach, is not a stop condition: keep this routine on, and call the ${ROUTINE_REPORT_FAILURE_TOOL} tool.`,
           ]
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",

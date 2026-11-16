@@ -231,6 +231,8 @@ export const messages = {
     "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
     "لم يقبل خادم تسجيل الدخول OpenBot عند إكمال تسجيل الدخول. سجّل الدخول مرة أخرى: سيسجّل OpenBot لدى الخادم مرة أخرى.",
+  "error.backend.mcpSignInAppRefused":
+    "لم يقبل خادم تسجيل الدخول تطبيق تسجيل الدخول لهذا الخادم. تحقّق من Client ID وClient secret لتطبيق تسجيل الدخول، ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpCommandNotFound": "لم يتم العثور على الأمر: {command}",
   "error.backend.mcpRegistrationRefused":
     "لا يقبل خادم تسجيل الدخول OpenBot كتطبيق بعد. حسابك ليس السبب. استخدم طريقة أخرى للاتصال، مثل خادم MCP محلي.",
@@ -412,6 +414,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "أوقف الدور الحالي قبل تفريع هذه الدردشة.",
   "error.backend.branchMessageNotFound": "يمكنك التفريع فقط من إجابة مكتملة للوكيل.",
   "error.backend.branchRemoteUnsupported": "التفريعات متاحة فقط للوكلاء على هذا الحاسوب.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "لإزالة هذا البلاغ، اطلب من الوكيل إزالته.",
   "error.backend.threadMoveRefused": "يمكن تشغيل الرسالة التي أرسلتها إلى هذا الوكيل وحده فقط في سلسلة جديدة.",
   "error.backend.taskTitleRequired": "امنح المهمة عنوانًا قصيرًا.",
   "error.backend.taskToolInvalid": "امنح المهمة عنوانًا من 120 حرفًا كحد أقصى ووصفًا موجزًا يوضح ما يجب فعله.",

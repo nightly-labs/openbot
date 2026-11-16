@@ -14,6 +14,7 @@ export const messages = defineMessages("status.agent", {
     "{previous} has no credits left. Switched to {model}. To use it again, add credits and then select it.",
   "status.agent.modelReturnedAfterError": "Switched back to {model} after the provider error.",
   "status.agent.marketplaceSuggested": "Suggested a Marketplace app: {app}.",
+  "status.agent.settingShown": "Showed a setting: {setting}.",
   "status.agent.channelMemberAdded": "{agent} added {member} to the channel. {person} asked for it.",
   "status.agent.channelMemberRemoved": "{agent} removed {member} from the channel. {person} asked for it.",
   "status.agent.channelInstructionsChanged": "{agent} changed the channel instructions. {person} asked for it.",
@@ -38,11 +39,18 @@ export const messages = defineMessages("status.agent", {
   "status.agent.feedbackRecentErrors": "Recent errors in the chat:",
   "status.agent.feedbackSameAs": "Adds to issue #{issue}",
   "status.agent.feedbackSent": "Sent to the OpenBot team: {title}",
+  "status.agent.feedbackWithdrawn": "Removed from GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remove report #{issue} from GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Everyone loses access to this report on GitHub. You cannot undo this. To fix it, the agent can send a corrected report.",
+  "status.agent.feedbackWithdrawing": "Removing your report from GitHub…",
   "status.agent.serverInstallCommand":
     "Make a one-time command that installs OpenBot on another computer as the server {name} and signs it in to your account. The agent runs it there.",
   "status.agent.serverInstallCard": "Install command for the server {name}",
   "status.agent.browserProfileNamed":
     "Move {agents} to the browser profile {profile}. They get its sign-ins and cookies. Their open tabs close.",
+  "status.agent.commitCoAuthorOff": "Stop adding OpenBot as a co-author to the commits of all agents.",
+  "status.agent.commitCoAuthorOn": "Add OpenBot as a co-author to the commits of all agents again.",
   "status.agent.browserProfileNew":
     "Make the new browser profile {profile} and move {agents} to it. It has no sign-ins. Their open tabs close.",
   "status.agent.browserProfileShared":
@@ -69,6 +77,7 @@ export const messages = defineMessages("status.agent", {
   },
   "status.agent.memoriesUpdating": "Updating its memories…",
   "status.agent.skillUsing": "Using the skill {name}…",
+  "status.agent.backdropSetting": "Changing the backdrop…",
   "status.agent.skillReading": "Reading a skill…",
   "status.agent.toolStepFailed": "A tool step failed; reviewing the result and deciding what to try next…",
   "status.agent.toolResultReviewing": "Reviewing the latest tool result…",

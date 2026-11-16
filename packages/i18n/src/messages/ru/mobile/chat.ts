@@ -237,7 +237,7 @@ export const messages = {
     "{name}: компьютер-хост не принимает такие файлы. Обновите там OpenBot, чтобы прикреплять их.",
   "mobile.chat.attachment.nameTooLong": "Выберите файл с более коротким именем.",
   "mobile.chat.attachment.damaged": "Вложение повреждено. Выберите его заново.",
-  "mobile.chat.attachment.tooLarge": "{name} больше 10 МБ.",
+  "mobile.chat.attachment.tooLarge": "{name} больше {limit}.",
   "mobile.chat.attachment.cameraPermission": "Чтобы сделать фото, разрешите доступ к камере в настройках.",
   "mobile.chat.composer.send": "Отправить сообщение",
   "mobile.chat.composer.stop": "Остановить: {name}",
@@ -433,6 +433,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Одноразовый код",
   "mobile.chat.browserSecret.takeoverTitle": "Управление браузером",
   "mobile.chat.browserSecret.takeoverBody": "Выполните этот шаг в браузере на компьютере, где работает OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Войдите на своём компьютере",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Этот сайт не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там.",
   "mobile.chat.browserSecret.takeoverReload": "Затем обновите страницу и только потом нажмите «Готово».",
   "mobile.chat.browserSecret.takeoverFailed": "Не удалось выполнить запрос.",
   "mobile.chat.browserSecret.done": "Готово",

@@ -18,6 +18,10 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Wywołaj {names} bezpośrednio. tool_describe nie opisuje narzędzi wyszukiwania.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Harmonogram rutyny jest nieprawidłowy: {detail} Popraw harmonogram i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",

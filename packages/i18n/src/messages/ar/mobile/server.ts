@@ -535,7 +535,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "لا توجد منطقة زمنية تطابق هذا البحث.",
   "mobile.server.settings.timezoneMore": "اكتب المزيد من الاسم لرؤية مناطق زمنية أخرى.",
   "mobile.server.settings.timezoneDescription":
-    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل.",
+    "تستخدم المهام الدورية الجديدة هذه المنطقة الزمنية عندما لا تذكر الرسالة المنطقة الزمنية للمرسل. على الخادم، يستخدمها المتصفح أيضًا بعد إعادة التشغيل التالية.",
   "mobile.server.settings.timezoneLoading": "جارٍ تحميل المنطقة الزمنية…",
   "mobile.server.settings.timezoneLoadFailed": "تعذّر تحميل المنطقة الزمنية للخادم.",
   "mobile.server.settings.timezoneSaveFailed": "تعذّر حفظ المنطقة الزمنية. أعد المحاولة.",
@@ -1211,6 +1211,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+  "mobile.server.connectors.whatsapp.statusReactions": "تفاعلات الحالة",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "يستقبل هذا الوكيل الرسائل الموجّهة إلى OpenBot من كل أرقامك المرتبطة. يجيب بنفسه عن الرسائل القصيرة، ويسند الأعمال الأخرى إلى الوكيل المناسب، ويجيب في WhatsApp.",

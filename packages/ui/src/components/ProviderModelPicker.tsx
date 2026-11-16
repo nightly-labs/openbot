@@ -120,6 +120,11 @@ interface ProviderModelPickerProps {
    */
   accountUsage?: AccountUsage | null | undefined;
   /**
+   * The agent has Workspace only access. A model that the host cannot run with it
+   * (`workspaceOnlyUnavailable`) shows but cannot be chosen, and its tab says why.
+   */
+  workspaceOnly?: boolean | undefined;
+  /**
    * The agent's provider when this build does not know it. The host still runs the agent, so the
    * picker shows its model, and it cannot open until OpenBot is updated.
    */
@@ -417,6 +422,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   );
   const modelAvailable = (model: PickerModel): boolean =>
     providerAvailability(props.agentStatus, props.modelOptions, model.provider, t).state === "available";
+  /** The providers that the host refuses for a Workspace only agent. An account's own models too. */
+  const workspaceOnlyBlockedProviders = createMemo(
+    () =>
+      new Set<string>(
+        props.workspaceOnly
+          ? props.modelOptions.filter((option) => option.workspaceOnlyUnavailable).map((option) => option.provider)
+          : [],
+      ),
+  );
+  const workspaceOnlyBlocked = (model: PickerModel): boolean => workspaceOnlyBlockedProviders().has(model.provider);
   /** The pool's line on the pool's entry, in the place of the account's email, while the provider is available. */
   const poolSummary = (key: RailKey, status: AgentProviderStatus): string | undefined =>
     status.state === "available" && key === railOf(key) ? railPool(railOf(key))?.summary : undefined;
@@ -554,7 +569,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   }
 
   function selectModel(option: PickerModel, accountId: string | null, key: RailKey): void {
-    if (props.disabled || !modelAvailable(option)) return;
+    if (props.disabled || !modelAvailable(option) || workspaceOnlyBlocked(option)) return;
     if (!showsReasoningEffort() && !option.variants.length) setOpen(false);
     const queued = queuedEffort();
     setQueuedEffort(undefined);
@@ -1007,7 +1022,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 const available = () => status().state === "available";
                 // An account that is not signed in holds back the models its provider serves.
                 const modelEnabled = (model: PickerModel) =>
-                  modelAvailable(model) && (accountId() === null || available());
+                  modelAvailable(model) && (accountId() === null || available()) && !workspaceOnlyBlocked(model);
                 const effortLocked = () => !available();
                 /** A spent window that limits every model of the tab: a chip beside the provider name. */
                 const headingSpent = createMemo(() => (available() ? entrySpentWindow(key) : undefined));
@@ -1188,6 +1203,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                             </Button>
                           )}
                         </Show>
+                      </div>
+                    </Show>
+                    <Show when={available() && models().some(workspaceOnlyBlocked)}>
+                      <div class="provider-model-empty" role="status">
+                        {t("provider.picker.workspaceOnlyUnavailable")}
                       </div>
                     </Show>
                     <Input

@@ -4,6 +4,7 @@ import {
   type BillingSubscriptionStatus,
   isOpenBillingStatus,
 } from "@openbot/contracts/billing";
+import type { BillingDetails } from "@openbot/contracts/billing-details";
 import {
   LICENSE_INCLUDED_USERS,
   LICENSE_MAX_USERS,
@@ -62,6 +63,14 @@ import type { JSX } from "@solidjs/web";
 import { createEffect, createSignal, For, Match, onSettled, Show, Switch, untrack } from "solid-js";
 import { useText } from "../../text";
 import { guessHostedCurrency, HOSTED_BILLING_CURRENCY, HostedBillingSwitch } from "../servers/HostedServerPricing";
+import {
+  type BillingDetailsCalls,
+  type BillingDetailsDraft,
+  BillingDetailsFields,
+  billingDetailsDraft,
+  billingDetailsRequest,
+  saveBillingDetails,
+} from "./BillingDetailsFields";
 import type { LicenseStore } from "./license-store";
 import { formatMinorMoney } from "./money";
 
@@ -75,6 +84,11 @@ export interface LicenseSectionProps {
   startBuying?: boolean | undefined;
   /** The order from the pricing page. The license dialog fills it in and goes on to Checkout. */
   startOrder?: PricingOrder | undefined;
+  /**
+   * The billing country and EU VAT ID, which decide the VAT. The license dialog asks for them and saves them
+   * before Checkout.
+   */
+  billingDetails?: BillingDetailsCalls | undefined;
 }
 
 export { formatMinorMoney } from "./money";
@@ -162,6 +176,7 @@ export function LicenseSection(props: LicenseSectionProps): JSX.Element {
                     store={props.store}
                     startBuying={props.startBuying ?? false}
                     startOrder={props.startOrder}
+                    billingDetails={props.billingDetails}
                     onContactUs={props.onContactUs}
                   />
                 }
@@ -448,6 +463,7 @@ function LicenseOffer(props: {
   store: LicenseStore;
   startBuying: boolean;
   startOrder: PricingOrder | undefined;
+  billingDetails: BillingDetailsCalls | undefined;
   onContactUs: (() => void) | undefined;
 }): JSX.Element {
   const { t, format } = useText();
@@ -535,6 +551,7 @@ function LicenseOffer(props: {
           state={props.state}
           store={props.store}
           order={props.startOrder}
+          billingDetails={props.billingDetails}
           onContactUs={props.onContactUs}
           onClose={() => setBuying(false)}
         />
@@ -552,6 +569,7 @@ function BuyLicenseDialog(props: {
   store: LicenseStore;
   /** The pricing page order. The dialog shows it and opens Checkout at once when it fits the account. */
   order: PricingOrder | undefined;
+  billingDetails: BillingDetailsCalls | undefined;
   onContactUs: (() => void) | undefined;
   onClose: () => void;
 }): JSX.Element {
@@ -571,11 +589,13 @@ function BuyLicenseDialog(props: {
   const monthly = () => licenseOrderMonthly(plan(), order().users, currency);
   const money = (amount: number) => formatMinorMoney(format, amount, currency);
   const trialEnd = () => props.state.trialEnd;
+  const details = createBillingDetailsForm(() => props.billingDetails);
   async function confirm(): Promise<void> {
     if (contact()) {
       props.onContactUs?.();
       return;
     }
+    if (!(await details.save())) return;
     const request: LicenseCheckoutRequest = {
       users: order().users,
       currency,
@@ -584,11 +604,15 @@ function BuyLicenseDialog(props: {
     };
     if (await props.store.openCheckout(request)) props.onClose();
   }
-  // The order goes on to Checkout when it fits: the same currency, enough users, and no license of an owner.
+  // The order goes on to Checkout when it fits: the same currency, enough users, no license of an owner, and a
+  // saved billing country.
   onSettled(() => {
     const license = start?.license;
     if (!license || start.currency !== currency || license.users < minimum) return;
-    if (untrack(() => props.state.coveredBy.length) === 0) void confirm();
+    if (untrack(() => props.state.coveredBy.length) !== 0) return;
+    void details.loaded.then((country) => {
+      if (country) void confirm();
+    });
   });
   const confirmLabel = () => {
     if (contact()) return t("billing.license.contact.action");
@@ -603,8 +627,8 @@ function BuyLicenseDialog(props: {
       description={t("billing.license.buy.description")}
       confirmLabel={confirmLabel()}
       pendingLabel={t("billing.opening")}
-      pending={props.store.state.pending === "checkout"}
-      error={props.store.state.actionError ?? undefined}
+      pending={props.store.state.pending === "checkout" || details.saving()}
+      error={details.error() ?? props.store.state.actionError ?? undefined}
       onCancel={() => {
         props.store.clearActionError();
         props.onClose();
@@ -612,6 +636,13 @@ function BuyLicenseDialog(props: {
       onConfirm={confirm}
     >
       <div class="billing-license-change">
+        <Show when={props.billingDetails && !contact()}>
+          <BillingDetailsFields
+            value={details.draft()}
+            disabled={props.store.state.pending !== null || details.saving()}
+            onChange={details.edit}
+          />
+        </Show>
         <HostedBillingSwitch
           billing={interval() === "year" ? "yearly" : "monthly"}
           discountPercent={LICENSE_YEAR_DISCOUNT_PERCENT}
@@ -674,6 +705,62 @@ function BuyLicenseDialog(props: {
       </div>
     </ConfirmDialog>
   );
+}
+
+/**
+ * The billing details form of a dialog: it loads the saved details, and saves the form before Checkout. Without
+ * `calls`, it has no form and each save passes.
+ */
+function createBillingDetailsForm(calls: () => BillingDetailsCalls | undefined) {
+  const { t, errorMessage } = useText();
+  const [saved, setSaved] = createSignal<BillingDetails | null>(null);
+  const [draft, setDraft] = createSignal<BillingDetailsDraft>(billingDetailsDraft(null));
+  const [edited, setEdited] = createSignal(false);
+  const [saving, setSaving] = createSignal(false);
+  const [error, setError] = createSignal<string | null>(null);
+  const api = untrack(calls);
+  /** Resolves with the saved country, or null when there is none or the read failed. */
+  const loaded: Promise<string | null> = api
+    ? api.getDetails().then(
+        (details) => {
+          setSaved(details);
+          if (!untrack(edited)) setDraft(billingDetailsDraft(details));
+          return details.country;
+        },
+        () => null,
+      )
+    : Promise.resolve(null);
+  async function save(): Promise<boolean> {
+    const current = calls();
+    if (!current) return true;
+    if (!billingDetailsRequest(draft())) {
+      setError(t("billing.details.countryMissing"));
+      return false;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      setSaved(await saveBillingDetails(current, saved(), draft()));
+      return true;
+    } catch (failure) {
+      setError(errorMessage(failure, t("billing.details.saveFailed")));
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+  return {
+    draft,
+    saving,
+    error,
+    loaded,
+    save,
+    edit: (next: BillingDetailsDraft) => {
+      setEdited(true);
+      setError(null);
+      setDraft(next);
+    },
+  };
 }
 
 /** The price lines of a plan for a number of users, and the total of one period. */

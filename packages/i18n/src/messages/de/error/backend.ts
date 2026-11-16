@@ -268,6 +268,8 @@ export const messages = {
     "Der Server hat das Konto abgelehnt, mit dem du dich angemeldet hast. Prüfe, ob dieses Konto den Dienst nutzen darf. Für ein anderes Konto melde dich ab und dann wieder an.",
   "error.backend.mcpSignInClientRefused":
     "Der Anmeldeserver hat OpenBot beim Abschluss der Anmeldung nicht akzeptiert. Melde dich erneut an: OpenBot registriert sich erneut beim Server.",
+  "error.backend.mcpSignInAppRefused":
+    "Der Anmeldeserver hat die Anmelde-App dieses Servers nicht akzeptiert. Prüfe die Client-ID und das Client-Secret der Anmelde-App und melde dich dann erneut an.",
   "error.backend.mcpCommandNotFound": "Befehl nicht gefunden: {command}",
   "error.backend.mcpRegistrationRefused":
     "Der Anmeldeserver akzeptiert OpenBot noch nicht als Anwendung. Dein Konto ist nicht die Ursache. Verwende eine andere Verbindungsmethode, etwa einen lokalen MCP-Server.",
@@ -457,6 +459,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Stoppe die laufende Runde, bevor du diesen Chat abzweigst.",
   "error.backend.branchMessageNotFound": "Du kannst nur von einer fertigen Antwort des Agenten abzweigen.",
   "error.backend.branchRemoteUnsupported": "Abzweigungen sind nur für Agenten auf diesem Computer verfügbar.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Bitte den Agenten, diesen Bericht zu entfernen.",
   "error.backend.threadMoveRefused":
     "Nur eine Nachricht, die du allein an diesen Agenten gesendet hast, kann in einem neuen Thread laufen.",
   "error.backend.taskTitleRequired": "Gib der Aufgabe einen kurzen Titel.",

@@ -457,7 +457,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Ninguna zona horaria coincide con esta búsqueda.",
   "mobile.server.settings.timezoneMore": "Escribe más del nombre para ver otras zonas horarias.",
   "mobile.server.settings.timezoneDescription":
-    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente.",
+    "Las rutinas nuevas usan esta zona horaria cuando el mensaje no indica la zona horaria del remitente. En un servidor, el navegador también la usa después del próximo reinicio.",
   "mobile.server.settings.timezoneLoading": "Cargando zona horaria…",
   "mobile.server.settings.timezoneLoadFailed": "No se pudo cargar la zona horaria del servidor.",
   "mobile.server.settings.timezoneSaveFailed": "No se pudo guardar la zona horaria. Inténtalo de nuevo.",
@@ -927,6 +927,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Mensaje «Trabajando en ello…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot lo envía mientras el agente trabaja y luego lo sustituye por la respuesta. Desactívalo para enviar solo la respuesta.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Reacciones de estado",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reacciona con 👀 cuando llega un mensaje y con ✅ cuando la respuesta está lista. Desactívalas para no enviar reacciones.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Orquestador de WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Este agente recibe los mensajes para OpenBot de todos tus números vinculados. Responde él mismo a los cortos, asigna el resto del trabajo al agente adecuado y responde en WhatsApp.",

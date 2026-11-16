@@ -17,6 +17,7 @@ import type {
   ClientAgentModelOption,
   ConversationSnapshot,
   CustomAgentSummary,
+  CustomProviderRestart,
   CustomProviderSummary,
   DraftAttachment,
   FilePreview,
@@ -28,6 +29,7 @@ import type {
   TeamPresenceSnapshot,
   UpdateAgentAdminSettingsInput,
   UpdateAgentInput,
+  UpdateCustomProviderInput,
   WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
@@ -44,6 +46,7 @@ import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/convers
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
+import type { AppSettingLinkId } from "../settings/setting-link-targets";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
@@ -156,6 +159,11 @@ export interface ConversationProps {
    * pressed Connect or Install on the card: the page then starts the connect step.
    */
   onOpenMarketplaceApp?: ((request: { appId: string; connect: boolean }) => void) | undefined;
+  /**
+   * The action that opens Settings of this computer at the row of an app setting card, or undefined where
+   * this window does not show the row's tab. Absent in the web client: the card then says where it is.
+   */
+  appSettingOpener?: ((settingId: AppSettingLinkId) => (() => void) | undefined) | undefined;
   /** The connectors of the server on screen, which a suggestion card for a connector reads. */
   connectors?: ConnectorRegistry | undefined;
   /**
@@ -194,6 +202,12 @@ export interface ConversationProps {
    * path `providerRuntimeStatuses` above already takes.
    */
   customProviders?: readonly CustomProviderSummary[] | undefined;
+  /**
+   * Saves an edit of one of `customProviders`. Only for this computer: a Team API list and edit keep
+   * the released model fields, id and name, so a joined server's host does not show or take what a
+   * model accepts.
+   */
+  onUpdateCustomProvider?: ((input: UpdateCustomProviderInput) => Promise<CustomProviderRestart>) | undefined;
   /** The user's own ACP agents on this computer, for the model picker's Custom tab. */
   customAgents?: readonly CustomAgentSummary[] | undefined;
   onDownloadProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;

@@ -249,6 +249,8 @@ export const messages = {
     "Serwer odrzucił konto, na które się zalogowano. Sprawdź, czy to konto może korzystać z usługi. Aby użyć innego konta, wyloguj się, a potem zaloguj ponownie.",
   "error.backend.mcpSignInClientRefused":
     "Serwer logowania nie zaakceptował OpenBot przy kończeniu logowania. Zaloguj się ponownie: OpenBot zarejestruje się ponownie na serwerze.",
+  "error.backend.mcpSignInAppRefused":
+    "Serwer logowania nie zaakceptował aplikacji logowania tego serwera. Sprawdź identyfikator klienta i sekret klienta aplikacji logowania, a potem zaloguj się ponownie.",
   "error.backend.mcpCommandNotFound": "Nie znaleziono polecenia: {command}",
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
@@ -428,6 +430,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Zatrzymaj bieżącą turę, zanim utworzysz odgałęzienie tego czatu.",
   "error.backend.branchMessageNotFound": "Odgałęzienie możesz utworzyć tylko od ukończonej odpowiedzi agenta.",
   "error.backend.branchRemoteUnsupported": "Odgałęzienia są dostępne tylko dla agentów na tym komputerze.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Aby usunąć to zgłoszenie, poproś o to agenta.",
   "error.backend.threadMoveRefused": "W nowym wątku można uruchomić tylko wiadomość wysłaną wyłącznie do tego agenta.",
   "error.backend.taskTitleRequired": "Nadaj zadaniu krótki tytuł.",
   "error.backend.taskToolInvalid":

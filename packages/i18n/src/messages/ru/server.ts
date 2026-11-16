@@ -309,6 +309,12 @@ export const messages = {
   "server.settings.group.agents": "Агенты",
   "server.settings.group.people": "Люди",
   "server.settings.group.server": "Сервер",
+  "server.settings.experimentalTitle": "Экспериментальные",
+  "server.settings.experimentalDescription": "Включите функции, которые ещё не готовы.",
+  "server.settings.experimentalFeatures": "Функции",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "Показывать страницу CRM владельцам и администраторам, разрешить агентам читать CRM и синхронизировать Stripe. При выключении данные сохраняются.",
   "server.settings.agentDefaultsTitle": "Настройки агентов по умолчанию",
   "server.settings.threadsCard": "Ветки и часовой пояс",
   "server.settings.memoryTitle": "Память",
@@ -347,7 +353,7 @@ export const messages = {
     "Выберите, что могут делать агенты на этом сервере, если вы не задали это для агента.",
   "server.settings.timezone": "Часовой пояс",
   "server.settings.timezoneDescription":
-    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
+    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя. На сервере браузер тоже использует его после следующего перезапуска.",
   "server.settings.timezoneAutomatic": "Автоматически ({zone})",
   "server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
   "server.settings.turnLimit": "Ветки одновременно",

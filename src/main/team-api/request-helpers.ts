@@ -34,6 +34,7 @@ import {
   ROUTINE_EVENT_ITEM_TYPE_PREFIX,
   ROUTINE_QUIET_ANSWER_ITEM_TYPE,
   ROUTINE_RUN_EVENT_ITEM_TYPE_PREFIX,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
   type TeamMemberSummary,
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
@@ -47,6 +48,7 @@ import {
   TEAM_AGENT_CREATE_MODEL_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { teamHttpCodec } from "@openbot/contracts/team-protocol/http-codecs";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import {
   TEAM_CAPABILITIES_HEADER,
@@ -192,12 +194,14 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
   excludeRoutineRunEvents: boolean;
   excludeHostedSiteEvents: boolean;
   excludeRoutineQuietAnswers: boolean;
+  excludeSettingLinks?: boolean;
 } {
   return {
     excludeRoutineEvents: !capabilities.has("routine-event-markers"),
     excludeRoutineRunEvents: !capabilities.has("routine-run-event-markers"),
     excludeHostedSiteEvents: !capabilities.has("hosted-site-event-markers"),
     excludeRoutineQuietAnswers: true,
+    excludeSettingLinks: !capabilities.has(SETTING_LINK_MARKERS_CAPABILITY),
   };
 }
 
@@ -217,6 +221,7 @@ function markerSupported(itemType: string | undefined, capabilities: ReadonlySet
   if (itemType?.startsWith(HOSTED_SITE_EVENT_ITEM_TYPE_PREFIX)) {
     return capabilities.has("hosted-site-event-markers");
   }
+  if (itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX)) return capabilities.has(SETTING_LINK_MARKERS_CAPABILITY);
   return true;
 }
 

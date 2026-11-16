@@ -249,6 +249,8 @@ export const messages = {
     "Сервер отклонил аккаунт, с которым вы вошли. Проверьте, что у этого аккаунта есть доступ к сервису. Чтобы использовать другой аккаунт, выйдите и войдите снова.",
   "error.backend.mcpSignInClientRefused":
     "Сервер входа не принял OpenBot при завершении входа. Войдите снова: OpenBot заново зарегистрируется на сервере.",
+  "error.backend.mcpSignInAppRefused":
+    "Сервер входа не принял приложение входа этого сервера. Проверьте ID клиента и секрет клиента приложения входа, затем войдите снова.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
   "error.backend.mcpRegistrationRefused":
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
@@ -429,6 +431,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
   "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
   "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Чтобы удалить этот отчёт, попросите агента удалить его.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",

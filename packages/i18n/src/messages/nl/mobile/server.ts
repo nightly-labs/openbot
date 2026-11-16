@@ -455,7 +455,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Geen tijdzone komt overeen met deze zoekopdracht.",
   "mobile.server.settings.timezoneMore": "Typ meer van de naam om andere tijdzones te zien.",
   "mobile.server.settings.timezoneDescription":
-    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt.",
+    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "mobile.server.settings.timezoneLoading": "Tijdzone laden…",
   "mobile.server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
   "mobile.server.settings.timezoneSaveFailed": "Kan de tijdzone niet opslaan. Probeer het opnieuw.",
@@ -887,6 +887,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",

@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} 로그인이 취소되었어요",
   "prompt.browser.signInBlocked.body":
     "이 컴퓨터에서 로그인해 주세요. OpenBot은 {host} 로그인 정보만 {server}에 보내고, {name}이(가) 이어서 진행해요.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host}은(는) 서버에서의 로그인을 받지 않아요. 내 컴퓨터의 OpenBot 데스크톱 앱에서 이 채팅을 열고 그곳에서 로그인해 주세요. 그러면 {name}이(가) 이어서 진행해요.",
   "prompt.browser.signInBlocked.cancelledBody": "로그인이 취소되었어요.",
   "prompt.browser.signInBlocked.waiting": "로그인을 기다리는 중",
   "prompt.browser.signInBlocked.waitingButton": "로그인을 기다리는 중…",

@@ -299,6 +299,12 @@ export const messages = {
   "server.settings.group.agents": "エージェント",
   "server.settings.group.people": "ユーザー",
   "server.settings.group.server": "サーバー",
+  "server.settings.experimentalTitle": "試験運用",
+  "server.settings.experimentalDescription": "まだ完成していない機能をオンにします。",
+  "server.settings.experimentalFeatures": "機能",
+  "server.settings.experimentalCrm": "CRM",
+  "server.settings.experimentalCrmDescription":
+    "オーナーと管理者に CRM ページを表示し、エージェントが CRM を読めるようにして、Stripe と同期します。オフにしてもデータは残ります。",
   "server.settings.agentDefaultsTitle": "エージェントのデフォルト",
   "server.settings.threadsCard": "スレッドとタイムゾーン",
   "server.settings.memoryTitle": "メモリー",
@@ -337,7 +343,7 @@ export const messages = {
     "エージェントごとに設定しない場合に、このサーバーのエージェントができることを選択します。",
   "server.settings.timezone": "タイムゾーン",
   "server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "server.settings.timezoneAutomatic": "自動 ({zone})",
   "server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "server.settings.turnLimit": "同時に実行するスレッド",

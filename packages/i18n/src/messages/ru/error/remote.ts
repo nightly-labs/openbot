@@ -150,6 +150,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Хост отклонил вложение.",
   "error.remote.attachmentTooLarge": "Вложения должны быть не больше 10 МБ.",
   "error.remote.attachmentBusy": "Дождитесь завершения текущего вложения.",
+  "error.remote.attachmentChanged": "Файл изменился или недоступен. Выберите его снова.",
   "error.remote.uploadTimeout": "Время отправки вложения истекло.",
   "error.remote.hostSessionActive": "У хоста уже есть активная удалённая сессия.",
   "error.remote.tooManyConnections": "Слишком много активных удалённых подключений.",

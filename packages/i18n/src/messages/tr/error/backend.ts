@@ -243,6 +243,8 @@ export const messages = {
     "Sunucu, oturum açtığınız hesabı reddetti. Bu hesabın hizmeti kullanabildiğini kontrol edin. Başka bir hesap kullanmak için oturumu kapatıp yeniden açın.",
   "error.backend.mcpSignInClientRefused":
     "Oturum açma sunucusu, oturum açma tamamlanırken OpenBot'u kabul etmedi. Yeniden oturum açın: OpenBot sunucuya yeniden kaydolur.",
+  "error.backend.mcpSignInAppRefused":
+    "Oturum açma sunucusu bu sunucunun oturum açma uygulamasını kabul etmedi. Oturum açma uygulamasının istemci kimliğini ve istemci gizli anahtarını kontrol edip yeniden oturum açın.",
   "error.backend.mcpCommandNotFound": "Komut bulunamadı: {command}",
   "error.backend.mcpRegistrationRefused":
     "Oturum açma sunucusu OpenBot'u henüz bir uygulama olarak kabul etmiyor. Hesabınız bunun nedeni değildir. Yerel bir MCP sunucusu gibi bağlanmanın başka bir yolunu kullanın.",
@@ -421,6 +423,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Bu sohbeti dallandırmadan önce geçerli turu durdurun.",
   "error.backend.branchMessageNotFound": "Yalnızca ajanın tamamlanmış bir yanıtından dallandırabilirsiniz.",
   "error.backend.branchRemoteUnsupported": "Dallar yalnızca bu bilgisayardaki ajanlar için kullanılabilir.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Bu raporu kaldırmak için ajandan kaldırmasını isteyin.",
   "error.backend.threadMoveRefused":
     "Yeni bir mesaj dizisinde yalnızca, doğrudan ve tek başına bu ajana gönderdiğiniz bir mesaj çalışabilir.",
   "error.backend.taskTitleRequired": "Göreve kısa bir başlık verin.",

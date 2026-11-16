@@ -1,5 +1,6 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
+import { FEEDBACK_WITHDRAW_CAPABILITY } from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
@@ -44,11 +45,11 @@ import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
-import { planItems, planTitle } from "../../app-message-projection";
+import { planItems, planTitle, replacedPlanIds } from "../../app-message-projection";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
+import { remoteRoutineRecovery, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -68,17 +69,21 @@ import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
 import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
+import { useConversationController } from "./conversation-controller-context";
+import { conversationPort } from "./conversation-port";
 import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { McpSignInChatCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
 import { createMessageImageFiles } from "./message-image-files";
 import { RoutineChatCard } from "./RoutineChatCard";
 import { createChatWebhookRoutines, RoutineWebhookChatCard } from "./RoutineWebhookChatCard";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import { ServerInstallChatCard } from "./ServerInstallChatCard";
+import { SettingLinkChatCard } from "./SettingLinkChatCard";
 import { SkillSuggestionChatCard, skillSuggestionOutcome } from "./SkillSuggestionChatCard";
 import { PENDING_SEND_ID_PREFIX, pendingSendRetrySafe } from "./stores/pending-send-store";
 import { createSubagentDock } from "./subagent-dock";
@@ -184,6 +189,7 @@ export function ConversationTimeline() {
     openRoutineSettings,
     openSkillSettings,
     openInstructionsSettings,
+    openAgentSettingRow,
     openSharedFile,
     openWorkspaceFile,
     openQuote,
@@ -232,6 +238,7 @@ export function ConversationTimeline() {
     messagePins,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
+  const controller = useConversationController();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
   // the avatar reads it in a tracked effect, where a new memo halts the reactive system.
   const waitingProviderName = () => {
@@ -293,6 +300,8 @@ export function ConversationTimeline() {
     if (channel || !props.threads?.onBranch || !branchPoints().has(message.id)) return;
     return () => void branchThread(null, message.id);
   };
+  /** The stopped plans whose work a later turn continued: they do not show as stopped. */
+  const replacedPlans = createMemo(() => replacedPlanIds(timelineMessages()));
   /** The last agent text of each turn the user spoke: it shows a play control at all times. */
   const spokenReplyIds = createMemo(() => {
     const ids = new Set<string>();
@@ -361,6 +370,13 @@ export function ConversationTimeline() {
   );
 
   const runtime = conversationRuntime(props);
+  const backdropAction = useMessageBackdropAction(runtime);
+  watchAgentBackdrops(
+    runtime,
+    () => props.agent?.id,
+    () => props.messages,
+    () => props.isOwnSender,
+  );
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
   const localInstructions = agentInstructionsCalls();
@@ -381,6 +397,41 @@ export function ConversationTimeline() {
     if (!props.runtime && props.server?.kind === "local") return localInstructions;
     const serverId = instructionsServerId();
     return serverId === undefined ? undefined : agentInstructionsCalls(serverId, webInstructionsApi());
+  });
+  /**
+   * Remove on a thank-you card. The host whose account sent the report removes it: this computer, or
+   * a joined server with `feedback-withdraw-v1` for its owner. Only the owner approves a report. For
+   * another member, or on an older server, the card asks the agent in the composer, and the agent
+   * removes the report with `withdraw_feedback` when the owner approves.
+   */
+  const withdrawFeedback = createMemo(() => {
+    const agentId = props.agent?.id;
+    const server = props.server;
+    if (channel || !agentId || !server || (server.kind !== "local" && server.role !== "owner")) return undefined;
+    const remove = props.runtime?.withdrawFeedback;
+    if (remove) return (messageId: string) => remove({ agentId, messageId }).then(({ status }) => status);
+    if (props.runtime || !serverSupportsCapability(server, FEEDBACK_WITHDRAW_CAPABILITY)) return undefined;
+    return (messageId: string) =>
+      conversationPort()
+        .agent.withdrawFeedback({ agentId, messageId }, server.id)
+        .then(({ status }) => status);
+  });
+  /**
+   * Fix or remove on a thank-you card puts the request in the composer: the agent removes the report
+   * and sends the corrected text with `withdraw_feedback` and `send_feedback`. It is also how a joined
+   * server's report is removed. A fix shows a composer notice with Cancel.
+   */
+  const requestFeedbackChange = createMemo(() => {
+    const agentId = props.agent?.id;
+    const server = props.server;
+    if (channel || !agentId || !server) return undefined;
+    return (request: { number: number; change: "fix" | "remove" }) => {
+      const target = { serverId: server.id, agentId };
+      const number = String(request.number);
+      if (request.change === "fix")
+        controller.startFeedbackFix(target, request.number, t("chat.feedbackSent.fixPrompt", { number }));
+      else controller.appendPluginPrompt(target, t("chat.feedbackSent.removePrompt", { number }));
+    };
   });
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const interactionAgentName = () => (channel ? channel.interactionAgentName() : props.agent?.name);
@@ -648,6 +699,7 @@ export function ConversationTimeline() {
     marker.kind === "mcp-sign-in"
       ? mcpServers().find((config) => config.id === marker.mcpServerId && config.transport === "http")
       : undefined;
+  const settingLinkMarker = (marker: ChatActionMarkerModel) => (marker.kind === "setting-link" ? marker : undefined);
   /** An install command card, where this client can watch its server list. Elsewhere it keeps the marker. */
   const serverInstallCard = (marker: ChatActionMarkerModel) => {
     const watch = props.serverInstall;
@@ -1110,34 +1162,54 @@ export function ConversationTimeline() {
                                                   <Show
                                                     when={serverInstallCard(marker())}
                                                     fallback={
-                                                      <ChatActionMarker
-                                                        onOpenSkill={
-                                                          agentSkillsMode(props.server, props.runtime) === "hidden"
-                                                            ? undefined
-                                                            : openSkillSettings
+                                                      <Show
+                                                        when={settingLinkMarker(marker())}
+                                                        fallback={
+                                                          <ChatActionMarker
+                                                            onOpenSkill={
+                                                              agentSkillsMode(props.server, props.runtime) === "hidden"
+                                                                ? undefined
+                                                                : openSkillSettings
+                                                            }
+                                                            marker={marker()}
+                                                            agents={props.agents}
+                                                            announce={arrives}
+                                                            routineAvailable={routineMarkerAvailable(
+                                                              marker(),
+                                                              availableRoutineIds(),
+                                                            )}
+                                                            onSelectAgent={props.onSelectAgent}
+                                                            onOpenRoutine={openRoutineSettings}
+                                                            openRoutineThread={openRoutineThread}
+                                                            onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
+                                                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                                                            onWithdrawFeedback={withdrawFeedback()}
+                                                            onRequestFeedbackChange={requestFeedbackChange()}
+                                                            onToggleRoutineRun={toggleRoutineRun}
+                                                            onToggleAgentMessage={toggleAgentMessage}
+                                                            agentMessageText={agentMessageText}
+                                                            instructions={instructionsCalls()}
+                                                            onOpenInstructions={
+                                                              channel || !instructionsCalls()
+                                                                ? undefined
+                                                                : openInstructionsSettings
+                                                            }
+                                                          />
                                                         }
-                                                        marker={marker()}
-                                                        agents={props.agents}
-                                                        announce={arrives}
-                                                        routineAvailable={routineMarkerAvailable(
-                                                          marker(),
-                                                          availableRoutineIds(),
+                                                      >
+                                                        {(link) => (
+                                                          <SettingLinkChatCard
+                                                            settingId={link().settingId}
+                                                            agent={
+                                                              channel || !props.agent
+                                                                ? null
+                                                                : { id: props.agent.id, name: props.agent.name }
+                                                            }
+                                                            onOpenAgentSetting={openAgentSettingRow}
+                                                            appSettingOpener={props.appSettingOpener}
+                                                          />
                                                         )}
-                                                        onSelectAgent={props.onSelectAgent}
-                                                        onOpenRoutine={openRoutineSettings}
-                                                        openRoutineThread={openRoutineThread}
-                                                        onOpenHostedSite={(url) => void openExternalMessageUrl(url)}
-                                                        onOpenLink={(url) => void openExternalMessageUrl(url)}
-                                                        onToggleRoutineRun={toggleRoutineRun}
-                                                        onToggleAgentMessage={toggleAgentMessage}
-                                                        agentMessageText={agentMessageText}
-                                                        instructions={instructionsCalls()}
-                                                        onOpenInstructions={
-                                                          channel || !instructionsCalls()
-                                                            ? undefined
-                                                            : openInstructionsSettings
-                                                        }
-                                                      />
+                                                      </Show>
                                                     }
                                                   >
                                                     {(card) => (
@@ -1287,7 +1359,7 @@ export function ConversationTimeline() {
                             {(current) => (
                               <TaskList
                                 items={planItems(current(), message()?.streaming === true)}
-                                title={planTitle(current())}
+                                title={planTitle(current(), replacedPlans().has(initialMessage.id))}
                                 defaultOpen={untrack(() => initialMessage.streaming === true)}
                               />
                             )}
@@ -1499,6 +1571,7 @@ export function ConversationTimeline() {
                   onBranch: branchAction(message() ?? initialMessage),
                   branchDisabled: Boolean(props.activeTurnId),
                   pin: pinAction(message() ?? initialMessage),
+                  onUseAsBackdrop: backdropAction(message() ?? initialMessage),
                   onDelete: deleteAction(message() ?? initialMessage),
                 });
                 /*

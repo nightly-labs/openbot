@@ -578,11 +578,19 @@ export function vaultPromptResult(
   return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
-/** `vault` says what happened to a password that the user asked to keep in the Vault. */
+/** Done on a phone or in a web browser: the card there cannot send a sign-in from the user's own device. */
+const TAKEOVER_SIGN_IN_MISSING_NEXT =
+  "No sign-in came from the user's own device. Take a fresh snapshot. If the page still asks for a sign-in, tell the user in one short sentence that this site accepts only a sign-in from the OpenBot desktop app on their computer, then call request_takeover with reason sign-in-blocked once more so that they can answer the card there. If this result comes again, do not ask again: tell the user and end your turn.";
+
+/**
+ * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
+ * the person selected Done on a sign-in-blocked takeover, but no sign-in came from their device.
+ */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
   vault?: string,
   vaultSkipped?: string,
+  signInMissing = false,
 ): DynamicToolResult {
   return {
     success: true,
@@ -593,11 +601,27 @@ export function browserTakeoverResult(
           status: decision === "complete" ? "completed" : "cancelled",
           ...(vault ? { vault } : {}),
           ...(vaultSkipped ? { vaultSkipped } : {}),
-          ...(decision === "complete" ? { next: "Take a fresh snapshot and continue the task." } : {}),
+          ...(signInMissing ? { signIn: "not-received" } : {}),
+          ...(decision === "complete"
+            ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
+            : {}),
         }),
       },
     ],
   };
+}
+
+/**
+ * The answer for a takeover call that the provider cannot wait for: it stops each tool call after a
+ * fixed time (#9689). The card stays open, and the next call for the same tab waits on it again. Only
+ * the model reads it.
+ */
+export function browserTakeoverWaitingResult(tool: string, tabId: string): DynamicToolResult {
+  const value = {
+    status: "waiting",
+    next: `The user has not finished yet. The card stays open. Call ${tool} again now with tabId "${tabId}" to keep waiting for it; that call does not show a new card. Do not end your turn: the card closes when the turn ends.`,
+  };
+  return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify(value) }] };
 }
 
 /** The answer for a browser tool call that waited while the user controlled its tab. Only the model reads it. */

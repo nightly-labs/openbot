@@ -82,12 +82,14 @@ import { CONTEXT_RESET_CAPABILITY } from "./context-reset-v1";
 import { TEAM_CONTEXT_USAGE_CAPABILITY } from "./context-usage-v1";
 import { CONVERSATION_FILE_SEARCH_CAPABILITY } from "./conversation-file-search-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "./conversation-unread-from-v1";
+import { CRM_CAPABILITY } from "./crm-v1";
 import { CUSTOM_AGENTS_CAPABILITY } from "./custom-agents-v1";
 import { CUSTOM_PROVIDER_EDIT_CAPABILITY } from "./custom-provider-edit-v1";
 import { CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY } from "./custom-provider-harness-choice-v1";
 import { CUSTOM_PROVIDER_HARNESS_CAPABILITY } from "./custom-provider-harness-v1";
 import { DISCORD_ACCESS_CAPABILITY } from "./discord-access-v1";
 import { EVENTS_CAPABILITY } from "./events-v1";
+import { FEEDBACK_WITHDRAW_CAPABILITY } from "./feedback-withdraw-v1";
 import { FOCUS_USE_CAPABILITY } from "./focus-use-v1";
 import { GITHUB_SKILLS_CAPABILITY } from "./github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY } from "./hermes-import-v1";
@@ -164,6 +166,7 @@ import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
 import { ROUTINE_RUN_PLACE_CAPABILITY } from "./routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "./routines-once-v1";
 import { SERVER_AUDIT_CAPABILITY } from "./server-audit-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "./setting-link-markers-v1";
 import { SHARED_TABLES_CAPABILITY } from "./shared-tables-v1";
 import { SIDE_QUESTION_CAPABILITY } from "./side-question-v1";
 import { SIDEBAR_FOLDERS_CAPABILITY } from "./sidebar-folders-v1";
@@ -194,6 +197,7 @@ import { TEAM_VIDEO_GENERATION_CAPABILITY } from "./video-generation-v1";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "./webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "./webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "./whatsapp-connector-v1";
+import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "./whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "./workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
@@ -205,6 +209,7 @@ import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CAPABILITY } from "./workflows-sunra-v1";
 import { WORKFLOWS_CAPABILITY } from "./workflows-v1";
 import { WORKSPACE_DIRECTORY_CAPABILITY } from "./workspace-directory-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "./workspace-only-process-limit-v1";
 
 export const TEAM_SEMANTIC_TAGS_CAPABILITY = "installed-skills";
 export const TEAM_AGENT_ACTIVITY_CAPABILITY = "agent-activity";
@@ -333,12 +338,14 @@ export {
   CONTEXT_RESET_CAPABILITY,
   CONVERSATION_FILE_SEARCH_CAPABILITY,
   CONVERSATION_UNREAD_FROM_CAPABILITY,
+  CRM_CAPABILITY,
   CUSTOM_AGENTS_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
   DISCORD_ACCESS_CAPABILITY,
   EVENTS_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
   FOCUS_USE_CAPABILITY,
   HOST_ADMIN_CAPABILITY,
   HOST_APPEARANCE_CAPABILITY,
@@ -397,6 +404,7 @@ export {
   ROUTINE_RUN_PLACE_CAPABILITY,
   ROUTINES_ONCE_CAPABILITY,
   SERVER_AUDIT_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
   SHARED_TABLES_CAPABILITY,
   SIDE_QUESTION_CAPABILITY,
   SIDEBAR_FOLDERS_CAPABILITY,
@@ -440,6 +448,7 @@ export {
   WEBHOOK_SENDER_SECRET_CAPABILITY,
   WEBHOOK_TESTS_CAPABILITY,
   WHATSAPP_CONNECTOR_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WORKFLOWS_CAPABILITY,
   WORKFLOWS_CHANNELS_CAPABILITY,
@@ -451,6 +460,7 @@ export {
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
   WORKSPACE_DIRECTORY_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 };
 
 export const TEAM_CURRENT_CAPABILITIES = [
@@ -680,6 +690,11 @@ export const TEAM_CURRENT_CAPABILITIES = [
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -924,7 +939,12 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== PHONE_FEEDBACK_CAPABILITY &&
     capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
     capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
-    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+    capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+    capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
+    capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+    capability !== CRM_CAPABILITY &&
+    capability !== SETTING_LINK_MARKERS_CAPABILITY &&
+    capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1045,6 +1065,11 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   PROVIDER_ENVIRONMENT_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  CRM_CAPABILITY,
+  SETTING_LINK_MARKERS_CAPABILITY,
+  WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1248,6 +1273,11 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== PHONE_FEEDBACK_CAPABILITY &&
       capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
       capability !== PROVIDER_ENVIRONMENT_CAPABILITY &&
-      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+      capability !== CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY &&
+      capability !== FEEDBACK_WITHDRAW_CAPABILITY &&
+      capability !== WHATSAPP_STATUS_REACTIONS_CAPABILITY &&
+      capability !== CRM_CAPABILITY &&
+      capability !== SETTING_LINK_MARKERS_CAPABILITY &&
+      capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY,
   );
 }

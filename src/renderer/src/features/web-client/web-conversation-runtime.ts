@@ -13,6 +13,11 @@ import {
 import { AGENT_FOLDERS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-folders-v1";
 import { AGENT_INSTRUCTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-instructions-v1";
 import { AGENT_MEMORY_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/agent-memory-limit-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-results-v1";
 import {
@@ -432,6 +437,15 @@ export function createWebConversationRuntime(
           agentId: input.agentId,
           question: input.question,
           earlier: input.earlier.map(({ question, answer }) => ({ question, answer })),
+        });
+    },
+    // Only the owner can press Remove (the timeline checks the role); the host checks it again.
+    get withdrawFeedback() {
+      if (!adminRequest || hasCapability?.(FEEDBACK_WITHDRAW_CAPABILITY) !== true) return undefined;
+      return async (input: { agentId: string; messageId: string }) =>
+        adminRequest()("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, decodeFeedbackWithdrawResult, {
+          agentId: input.agentId,
+          messageId: input.messageId,
         });
     },
     // A member who can chat with the agent can press Save; the host checks the level.

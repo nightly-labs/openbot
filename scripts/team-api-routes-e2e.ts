@@ -66,6 +66,7 @@ import {
   type HermesImportPreview,
   type HiddenAgentsSnapshot,
   INSTANCE_TRANSFER_LIMITS,
+  isWhatsAppStatusReactionsList,
   isWhatsAppWorkingMessageList,
   type LibraryFolderAction,
   type PasswordManagerConnectMethod,
@@ -86,8 +87,10 @@ import {
   type VoiceLiveEvent,
   type WhatsAppAccount,
   type WhatsAppLinkState,
+  type WhatsAppStatusReactionsList,
   type WhatsAppWorkingMessageList,
   withHostProviderAccountModels,
+  withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -239,6 +242,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
@@ -359,6 +367,7 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -392,10 +401,16 @@ import {
   WHATSAPP_CONNECTOR_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
 import {
+  WHATSAPP_STATUS_REACTIONS_CAPABILITY,
+  WHATSAPP_STATUS_REACTIONS_CODECS,
+  WHATSAPP_STATUS_REACTIONS_ROUTES,
+} from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
+import {
   WHATSAPP_WORKING_MESSAGE_CAPABILITY,
   WHATSAPP_WORKING_MESSAGE_CODECS,
   WHATSAPP_WORKING_MESSAGE_ROUTES,
 } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -417,6 +432,7 @@ import { MailboxStore } from "../src/backend/mailbox-store";
 import { MessageDeleteRefused } from "../src/backend/message-delete";
 import { MessagePinRefused } from "../src/backend/message-pins";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
+import { canConfineProcesses } from "../src/backend/process-confinement";
 import { RoutineResultError } from "../src/backend/routine-results/routine-results";
 import type { OwnedRoutineRecord } from "../src/backend/routine-store";
 import { TeamChatStore } from "../src/backend/team-chat-store";
@@ -1251,6 +1267,10 @@ const fakeAgents: TeamApiAgents = {
     record("saveSkillSuggestion", input);
     return Effect.succeed({ saved: input.messageId === "suggestion-1" });
   },
+  withdrawFeedback: (input) => {
+    record("withdrawFeedback", input);
+    return Effect.succeed({ status: input.messageId === "feedback-card-1" ? "withdrawn" : "notYours" });
+  },
   saveProfile: unused("saveProfile"),
   createAgent: unused("createAgent"),
   committedAgentDuplication: unused("committedAgentDuplication"),
@@ -1453,7 +1473,11 @@ const fakeAgents: TeamApiAgents = {
   },
   listWorkspaceDirectory: unused("listWorkspaceDirectory"),
   sendMessage: unused("sendMessage"),
-  setMessageReaction: unused("setMessageReaction"),
+  setMessageReaction: (input, sender) =>
+    Effect.sync(() => {
+      record("setMessageReaction", input, sender);
+      return undefined;
+    }),
   // A member owns `message-of-<member id>`. `message-gone` is not shown and `message-busy` is in a
   // running turn, as the agent service answers them.
   deleteConversationMessage: (input, access) => {
@@ -1900,6 +1924,7 @@ const whatsappAccount: WhatsAppAccount = {
   workspaceId: WHATSAPP_NUMBER,
   ownNumber: true,
   workingMessage: true,
+  statusReactions: true,
   allowedSenders: [],
   pendingRequests: [{ code: "K7Q2ZP", senderId: "48600100400", name: "Ola", expiresAt: "2026-11-03T21:00:00.000Z" }],
 };
@@ -2003,6 +2028,11 @@ const whatsappMessaging: TeamApiConnectors["messaging"] = {
     Effect.sync(() => {
       record("whatsapp.setWorkingMessage", workspaceId, workingMessage);
       whatsappAccount.workingMessage = workingMessage;
+    }),
+  setWhatsAppStatusReactions: (workspaceId, statusReactions) =>
+    Effect.sync(() => {
+      record("whatsapp.setStatusReactions", workspaceId, statusReactions);
+      whatsappAccount.statusReactions = statusReactions;
     }),
 };
 const connectors: TeamApiConnectors = {
@@ -3420,6 +3450,13 @@ try {
       list(field(hiddenWorkV9.body, "capabilities")).includes(AGENT_HIDDEN_WORK_CAPABILITY) &&
         !list(field(hiddenWorkV8.body, "capabilities")).includes(AGENT_HIDDEN_WORK_CAPABILITY),
       [summary(hiddenWorkV9), list(field(hiddenWorkV8.body, "capabilities")).length],
+    );
+    check(
+      "the host advertises workspace-only-process-limit to a protocol 9 peer only when it cannot confine the process",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY) ===
+        !canConfineProcesses() &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      { platform: process.platform, v9: summary(hiddenWorkV9) },
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(
@@ -5736,6 +5773,7 @@ try {
               excludeRoutineRunEvents: true,
               excludeHostedSiteEvents: true,
               excludeRoutineQuietAnswers: true,
+              excludeSettingLinks: true,
             },
           ],
         ]),
@@ -5842,6 +5880,42 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Setting cards (setting-link-markers-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises setting-link-markers-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The database leaves the setting cards out of a page for a client that cannot show them.
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=setting-card`;
+    const pageExclusions = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeSettingLinks" in options
+        ? options.excludeSettingLinks
+        : undefined;
+    };
+    const withCards = await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SETTING_LINK_MARKERS_CAPABILITY],
+    });
+    const withCardsExcluded = pageExclusions();
+    const withoutCards = await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const withoutCardsExcluded = pageExclusions();
+    check(
+      "a conversation page keeps the setting cards only for a client with setting-link-markers-v1",
+      withCards.status === 200 &&
+        withCardsExcluded === false &&
+        withoutCards.status === 200 &&
+        withoutCardsExcluded === true,
+      [summary(withCards), withCardsExcluded, summary(withoutCards), withoutCardsExcluded],
     );
   }
 
@@ -9305,6 +9379,97 @@ try {
     );
   }
 
+  // ---- The status reactions of a WhatsApp number (whatsapp-status-reactions-v1) ----
+  {
+    const v9 = { capabilities: [WHATSAPP_STATUS_REACTIONS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const settingCalls = () => calls.filter((entry) => entry.method === "whatsapp.setStatusReactions");
+    /** The answer as the client reads it: the frozen codec, then the client's guard. */
+    const asClient = (reply: Reply): WhatsAppStatusReactionsList => {
+      const codec = WHATSAPP_STATUS_REACTIONS_CODECS.get(WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      assert(codec, WHATSAPP_STATUS_REACTIONS_ROUTES.list);
+      const value = codec.response(reply.status, reply.body);
+      assert(isWhatsAppStatusReactionsList(value), "the list does not pass the client's guard");
+      return value;
+    };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises whatsapp-status-reactions-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(WHATSAPP_STATUS_REACTIONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const update = { workspaceId: WHATSAPP_NUMBER, statusReactions: false };
+    const unsupported = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: update,
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const memberList = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: bobToken, json: {}, ...v9 });
+    const memberUpdate = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: bobToken,
+      json: update,
+      ...v9,
+    });
+    check(
+      "a client without the capability gets 400, and a member cannot read or set the status reactions",
+      errorIs(unsupported, 400, sourceText("error.team.connectorsUnsupported")) &&
+        errorIs(memberList, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberUpdate, 403, sourceText("error.team.adminRequired")) &&
+        settingCalls().length === 0 &&
+        whatsappAccount.statusReactions === true,
+      [summary(unsupported), summary(memberList), summary(memberUpdate)],
+    );
+    const before = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    const bad = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: "no" },
+      ...v9,
+    });
+    const off = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, { token: adaToken, json: update, ...v9 });
+    const after = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    // The frozen `whatsapp-connector-v1` overview carries no setting; the client adds it from the list.
+    const overview = await call("POST", WHATSAPP_CONNECTOR_ROUTES.overview, {
+      token: adaToken,
+      json: {},
+      capabilities: [WHATSAPP_CONNECTOR_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    const connectorCodec = WHATSAPP_CONNECTOR_CODECS.get(WHATSAPP_CONNECTOR_ROUTES.overview);
+    assert(connectorCodec, WHATSAPP_CONNECTOR_ROUTES.overview);
+    const plain = decodeHostWhatsAppOverview(connectorCodec.response(overview.status, overview.body));
+    const merged = withWhatsAppStatusReactions(plain, asClient(after));
+    check(
+      "an admin reads the status reactions of each number and turns them off; a bad value is refused",
+      before.status === 200 &&
+        asClient(before).numbers[0]?.workspaceId === WHATSAPP_NUMBER &&
+        asClient(before).numbers[0]?.statusReactions === true &&
+        bad.status === 400 &&
+        off.status === 200 &&
+        settingCalls().length === 1 &&
+        whatsappAccount.statusReactions === false &&
+        asClient(after).numbers[0]?.statusReactions === false &&
+        plain.accounts[0]?.statusReactions === undefined &&
+        merged.accounts[0]?.statusReactions === false &&
+        withWhatsAppStatusReactions(plain, null).accounts[0]?.statusReactions === undefined,
+      [summary(before), summary(bad), summary(off), summary(after)],
+    );
+    // The reverse action.
+    const on = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.update, {
+      token: adaToken,
+      json: { workspaceId: WHATSAPP_NUMBER, statusReactions: true },
+      ...v9,
+    });
+    const restored = await call("POST", WHATSAPP_STATUS_REACTIONS_ROUTES.list, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin turns the status reactions on again",
+      on.status === 200 &&
+        whatsappAccount.statusReactions === true &&
+        asClient(restored).numbers[0]?.statusReactions === true,
+      [summary(on), summary(restored)],
+    );
+  }
+
   // ---- Password managers on the host (password-managers-v1) ----
   {
     const v9 = { capabilities: [PASSWORD_MANAGERS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
@@ -10708,6 +10873,30 @@ try {
           ],
         ]),
       { status: update.status, calls: callsOf("updateQueuedMessage") },
+    );
+    // A reaction on an agent reply is also the member's answer, so the host must know who reacted.
+    const react = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "👍" },
+    });
+    const unreact = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: null },
+    });
+    const badEmoji = await call("POST", TEAM_API_ROUTES.agent.reactions("agent-ada"), {
+      token: bobToken,
+      json: { messageId: "message-1", emoji: "nope" },
+    });
+    check(
+      "a reaction gives 204 and names the caller as sender, a removal too, and an emoji that is not in the list gets 400",
+      react.status === 204 &&
+        unreact.status === 204 &&
+        badEmoji.status === 400 &&
+        isDeepStrictEqual(callsOf("setMessageReaction"), [
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: "👍" }, bobSender],
+          [{ agentId: "agent-ada", messageId: "message-1", emoji: null }, bobSender],
+        ]),
+      [summary(react), summary(unreact), summary(badEmoji), callsOf("setMessageReaction")],
     );
     const updateTooLong = await call("POST", TEAM_API_ROUTES.agent.queueUpdate("agent-ada"), {
       token: bobToken,
@@ -13459,6 +13648,85 @@ try {
         without: withoutEvents.events.map((event) => event.type),
         folders: stored().folders.length,
       },
+    );
+  }
+
+  // ---- Remove on a feedback thank-you card (feedback-withdraw-v1) ----
+  {
+    const capabilities = [FEEDBACK_WITHDRAW_CAPABILITY];
+    const ownerToken = owner.sessionToken;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises feedback-withdraw-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+    });
+    const malformed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "" },
+      capabilities,
+    });
+    // Protocol 6 does not know Pi, so the host hides `agent-pi`.
+    const hidden = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      protocol: 6,
+      json: { agentId: "agent-pi", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const missing = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-gone", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    // Only the owner approves a report, so a member and an admin ask the agent instead.
+    const member = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const admin = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: adaToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    check(
+      "a feedback removal without the capability, with a bad body, to a hidden or missing agent, or from a member or an admin reaches no agent",
+      errorIs(unsupported, 400, sourceText("error.backend.feedbackWithdrawRemoteUnsupported")) &&
+        malformed.status === 400 &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(member, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(admin, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("withdrawFeedback").length === 0,
+      [summary(unsupported), summary(malformed), summary(hidden), summary(missing), summary(member), summary(admin)],
+    );
+    const removed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const refused = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-2" },
+      capabilities,
+    });
+    check(
+      "the owner removes a report; the host gets the agent and card, and the client decodes each result",
+      removed.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(removed.body), { status: "withdrawn" }) &&
+        refused.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(refused.body), { status: "notYours" }) &&
+        isDeepStrictEqual(callsOf("withdrawFeedback"), [
+          [{ agentId: "agent-ada", messageId: "feedback-card-1" }],
+          [{ agentId: "agent-ada", messageId: "feedback-card-2" }],
+        ]),
+      [summary(removed), summary(refused)],
     );
   }
 

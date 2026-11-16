@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
   "composer.queueEdit.cancel": "Bearbeitung abbrechen",
+  "composer.feedbackFix.body":
+    "Bericht #{number} wird korrigiert. Sende die Anfrage, oder brich ab, damit der Bericht bleibt, wie er ist.",
+  "composer.feedbackFix.cancel": "Abbrechen",
   "composer.providerWait.offlineTitle": "Keine Internetverbindung",
   "composer.providerWait.offline": "{provider} kann erst antworten, wenn dieser Computer wieder online ist.",
   "composer.providerWait.silent": "{provider} hat seit {duration} nichts gesendet.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Aktualisiere {provider} auf dem Computer, auf dem es läuft, um fortzufahren.",
   "composer.update.pending": "Wird aktualisiert…",
   "composer.update.action": "Aktualisieren",
+  "composer.imageInput.body":
+    "{model} erhält nur Text und sieht die angehängten Bilder nicht. Wenn dieses Modell Bilder lesen kann, schalte Bilder dafür ein.",
+  "composer.imageInput.label": "Bilder für {model} einschalten",
+  "composer.imageInput.pending": "Wird eingeschaltet…",
+  "composer.imageInput.action": "Bilder einschalten",
   "composer.usageLimit.credits":
     "Du hast das Planlimit von {provider} erreicht. Deine Agenten nutzen jetzt dein Guthaben.",
   "composer.usageLimit.creditsResets":

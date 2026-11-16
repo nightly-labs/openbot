@@ -507,7 +507,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Нет часовых поясов, подходящих под запрос.",
   "mobile.server.settings.timezoneMore": "Введите больше букв названия, чтобы увидеть другие часовые пояса.",
   "mobile.server.settings.timezoneDescription":
-    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
+    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя. На сервере браузер тоже использует его после следующего перезапуска.",
   "mobile.server.settings.timezoneLoading": "Загрузка часового пояса…",
   "mobile.server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
   "mobile.server.settings.timezoneSaveFailed": "Не удалось сохранить часовой пояс. Повторите попытку.",
@@ -1012,6 +1012,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",

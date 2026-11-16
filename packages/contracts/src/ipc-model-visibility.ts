@@ -4,7 +4,12 @@
  * codec has already checked the fields; this gives them their IPC type and fails closed on anything else.
  */
 
-import { type AgentProviderRef, isAgentProviderRef } from "./agent-providers";
+import {
+  type AgentProviderRef,
+  agentProviderDescriptor,
+  isAgentProviderRef,
+  isKnownAgentProvider,
+} from "./agent-providers";
 import { INPUT_LIMITS } from "./input-limits";
 import { AGENT_MODEL_LISTINGS, type AgentModelId, type AgentModelListing, isAgentModel } from "./ipc-agent-identity";
 import { isBoundedString } from "./ipc-bounded-values";
@@ -144,4 +149,22 @@ export function withSteeringModels<Model extends { provider: string; id: string;
   return models.map((model) =>
     keys.has(`${model.provider}\u0000${model.id}`) ? { ...model, steersTurns: true } : model,
   );
+}
+
+/**
+ * Marks each model whose provider runs in a process of its own (`confined-process`) when the host
+ * cannot run that process with Workspace only: this computer off macOS, or a joined server with
+ * `workspace-only-process-limit-v1`. It replaces any mark from a host, so only the client sets it.
+ */
+export function withWorkspaceOnlyLimit<
+  Model extends { provider: AgentProviderRef; workspaceOnlyUnavailable?: boolean },
+>(models: readonly Model[], limited: boolean): Model[] {
+  return models.map((model) => {
+    const unavailable =
+      limited &&
+      isKnownAgentProvider(model.provider) &&
+      agentProviderDescriptor(model.provider).workspaceEnforcement === "confined-process";
+    if (unavailable) return { ...model, workspaceOnlyUnavailable: true };
+    return model.workspaceOnlyUnavailable === undefined ? model : { ...model, workspaceOnlyUnavailable: false };
+  });
 }

@@ -1,4 +1,5 @@
 import { AGENT_MEMORY_CONTEXT_BUDGET_BYTES, essentialMemoryBytes } from "@openbot/contracts/agent-memory-context";
+import { feedbackSentIssue, feedbackWithdrawnItemType } from "@openbot/contracts/feedback";
 import type {
   AcpRegistryEntry,
   AgentProviderRef,
@@ -232,6 +233,7 @@ import { createMockBilling, previewBillingServers } from "./mock-billing";
 import { createMockBitwardenConnector } from "./mock-bitwarden-connector";
 import { createMockBrowser, type MockBrowserOptions } from "./mock-browser";
 import { createMockChannels, type MockChannelSeed } from "./mock-channels";
+import { type MockCrmSeed, mockCrm } from "./mock-crm";
 import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
@@ -300,6 +302,8 @@ export interface MockOpenBotOptions
   routineFlowLinks?: RoutineFlowLink[];
   routineFlowSteps?: RoutineFlowStep[];
   workflows?: MockWorkflowSeed[];
+  /** The CRM when the preview starts. Without it, the CRM is empty. */
+  crm?: MockCrmSeed;
   customProviders?: CustomProviderSummary[];
   /** The read state of each agent's chat, keyed by agent id. An agent with none shows no unread count. */
   conversationReads?: Record<string, ConversationReadState>;
@@ -1723,6 +1727,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     workflows: mockWorkflows(options.workflows ?? [], (workflowId) =>
       emitAgentEvent({ type: "workflows-changed", workflowId }),
     ),
+    crm: mockCrm(options.crm ?? {}, () => emitAgentEvent({ type: "crm-changed" })),
     routineResults: mockRoutineResults(routines, options, (agentId) =>
       emitAgentEvent({ type: "routines-changed", agentId }),
     ),
@@ -3135,6 +3140,20 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         });
         emitAgentEvent({ type: "message-pins-changed", agentId: input.agentId });
       },
+      // The preview has no account service: the card changes to a removed card at once.
+      withdrawFeedback: async (input) => {
+        const card = getSnapshot(input.agentId).messages.find((message) => message.id === input.messageId);
+        const issue = card ? feedbackSentIssue(card) : null;
+        if (!issue) return { status: "notFound" };
+        updateSnapshot(input.agentId, (snapshot) => {
+          snapshot.messages = snapshot.messages.map((message) =>
+            message.id === input.messageId
+              ? { ...message, itemType: feedbackWithdrawnItemType(issue.number) }
+              : message,
+          );
+        });
+        return { status: "withdrawn" };
+      },
       chooseAttachments: async (_input) => [],
       importAttachmentData: async (data) =>
         data.map((file) => ({
@@ -3165,6 +3184,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       openWorkspaceFile: async (_input: OpenWorkspaceFileInput) => undefined,
       previewSharedFile: async (input: OpenSharedFileInput) => mockFilePreview(input.path, "shared-file"),
       releaseFilePreview: async () => undefined,
+      addPreviewPage: async () => null,
       previewWorkspaceFile: async (input: OpenWorkspaceFileInput) => {
         // A path with no extension is a folder here, so a folder chip reaches the listing as on desktop.
         if (!/\.[^/]+$/u.test(input.path)) throw new Error("Workspace path is not a file.");

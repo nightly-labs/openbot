@@ -15,6 +15,7 @@ export const messages = {
     "{previous} のクレジットがなくなりました。{model} に切り替えました。再び使うには、クレジットを追加してから選択してください。",
   "status.agent.modelReturnedAfterError": "プロバイダーのエラーの後、{model} に戻しました。",
   "status.agent.marketplaceSuggested": "マーケットプレイスのアプリを提案しました: {app}。",
+  "status.agent.settingShown": "設定を表示しました: {setting}。",
   "status.agent.channelMemberAdded": "{agent} が {member} をチャンネルに追加しました。{person} の依頼です。",
   "status.agent.channelMemberRemoved": "{agent} が {member} をチャンネルから外しました。{person} の依頼です。",
   "status.agent.channelInstructionsChanged": "{agent} がチャンネルの指示を変更しました。{person} の依頼です。",
@@ -39,11 +40,18 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "チャットの最近のエラー:",
   "status.agent.feedbackSameAs": "issue #{issue} に追加します",
   "status.agent.feedbackSent": "OpenBot チームに送信しました: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub から削除しました: {title}",
+  "status.agent.feedbackWithdrawCommand": "レポート #{issue} を GitHub から削除",
+  "status.agent.feedbackWithdrawReason":
+    "このレポートは GitHub で誰も見られなくなります。元に戻せません。修正するには、エージェントが修正したレポートを送信できます。",
+  "status.agent.feedbackWithdrawing": "レポートを GitHub から削除しています…",
   "status.agent.serverInstallCommand":
     "別のコンピューターに OpenBot をサーバー {name} としてインストールし、あなたのアカウントにサインインさせる 1 回限りのコマンドを作成します。エージェントがそこで実行します。",
   "status.agent.serverInstallCard": "サーバー {name} のインストールコマンド",
   "status.agent.browserProfileNamed":
     "{agents} をブラウザープロファイル {profile} に移動します。そのログイン情報と Cookie を使えるようになります。開いているタブは閉じます。",
+  "status.agent.commitCoAuthorOff": "すべてのエージェントのコミットに OpenBot を共同作成者として追加するのをやめます。",
+  "status.agent.commitCoAuthorOn": "すべてのエージェントのコミットに OpenBot を共同作成者として再び追加します。",
   "status.agent.browserProfileNew":
     "新しいブラウザープロファイル {profile} を作成し、{agents} を移動します。ログイン情報はありません。開いているタブは閉じます。",
   "status.agent.browserProfileShared":
@@ -66,6 +74,7 @@ export const messages = {
   "status.agent.memoriesSearched": { other: "メモリーを検索しました: {count} 件見つかりました" },
   "status.agent.memoriesUpdating": "メモリーを更新しています…",
   "status.agent.skillUsing": "スキル {name} を使用しています…",
+  "status.agent.backdropSetting": "背景を変更しています…",
   "status.agent.skillReading": "スキルを読み込んでいます…",
   "status.agent.toolStepFailed": "ツールのステップが失敗しました。結果を確認し、次に試すことを判断しています…",
   "status.agent.toolResultReviewing": "最新のツール結果を確認しています…",

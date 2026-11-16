@@ -319,6 +319,10 @@ export const messages = {
     "حظرت خدمة Claude هذا الطلب. عادةً تكون هذه مشكلة قصيرة من جهة Claude، وليست مشكلة في حسابك. أرسل الرسالة مرة أخرى بعد بضع دقائق.",
   "error.provider.foreignReasoning":
     "لم يقبل {provider} الاستدلال السابق في هذه الدردشة، لأن حسابًا أو مفتاح API مختلفًا استلمه. بدأ OpenBot جلسة {provider} جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.codexHistoryItemMissing":
+    "لم يتمكن Codex من متابعة هذه الدردشة، لأن عنصرًا في سجله المحفوظ مفقود. بدأ OpenBot جلسة Codex جديدة بسجل الدردشة. أعد المحاولة.",
+  "error.provider.codexRequestRefused":
+    "رفض {provider} طلب هذه الدردشة ولم يذكر السبب. قد يحدث هذا في دردشة طويلة تحتوي على صور كثيرة. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooSmall":
     "لم يقبل النموذج صورة في هذه الدردشة لأن الصورة صغيرة جدًا. بدأ OpenBot جلسة {provider} جديدة مع سجل الدردشة. حاول مرة أخرى.",
   "error.provider.imageTooLarge":
@@ -437,6 +441,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
+  "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
   "error.provider.piStopped": "Pi لا يعمل. اربط Pi وأعد المحاولة.",
   "error.provider.piSessionMissing": "ملف جلسة Pi غير متاح على هذا الحاسوب.",
   "error.provider.piResumeCancelled": "ألغى Pi استئناف الجلسة. أعد المحاولة.",

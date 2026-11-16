@@ -154,6 +154,7 @@ export const messages = {
   "error.remote.attachmentRejected": "ホストが添付ファイルを拒否しました。",
   "error.remote.attachmentTooLarge": "添付ファイルは 10 MB 以下にしてください。",
   "error.remote.attachmentBusy": "現在の添付ファイルが完了するまでお待ちください。",
+  "error.remote.attachmentChanged": "ファイルが変更されたか、利用できません。もう一度選択してください。",
   "error.remote.uploadTimeout": "添付ファイルのアップロードがタイムアウトしました。",
   "error.remote.hostSessionActive": "ホストにはすでに有効なリモートセッションがあります。",
   "error.remote.tooManyConnections": "有効なリモート接続が多すぎます。",

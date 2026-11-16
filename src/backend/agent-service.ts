@@ -130,6 +130,8 @@ import type {
   VoiceLiveEvent,
   VoiceLiveSession,
   VoiceLiveStart,
+  WithdrawFeedbackInput,
+  WithdrawFeedbackResult,
 } from "@openbot/contracts/ipc";
 import {
   AGENT_TASK_LIMIT_DEFAULT,
@@ -188,6 +190,7 @@ import type { AgentBrowserProfiles } from "./agent/browser-profile-tool";
 import { BrowserUploads } from "./agent/browser-uploads";
 import type { ChatVisualPreviewHost } from "./agent/chat-visual-preview";
 import { CodexIdleSessions } from "./agent/codex-idle-sessions";
+import type { SetCommitCoAuthor } from "./agent/commit-co-author-tool";
 import { ContextCompaction, compactsOnRequest } from "./agent/context-compaction";
 import { ConversationReader } from "./agent/conversation-reader";
 import { ConversationRuntime } from "./agent/conversation-runtime";
@@ -198,6 +201,7 @@ import type { SectionTeammates } from "./agent/developer-instructions";
 import { DrainScheduler } from "./agent/drain-scheduler";
 import { DuplicationGate, toAgentDuplicationFailed } from "./agent/duplication-gate";
 import type { FailureContext, FailureSignal } from "./agent/failure-signal";
+import { FeedbackWithdrawal } from "./agent/feedback-withdrawal";
 import { type AgentHostedSites, HostedSiteCoordinator } from "./agent/hosted-site-coordinator";
 import { ImageGenRuntime } from "./agent/image-gen-runtime";
 import {
@@ -301,13 +305,14 @@ import { ChannelRoutineScheduler } from "./channel-routine-scheduler";
 import { ChannelService } from "./channel-service";
 import type { BundledProviderExecutables } from "./cli";
 import type { ConversationMarkerExclusions } from "./conversation-read-store";
+import type { CrmHandle } from "./crm/crm";
 import type { ProviderSession } from "./database/provider-sessions";
 import { reportOriginalFailure } from "./effect-boundary";
 import { encodedModelId } from "./encoded-model-id";
 import type { HostMemory } from "./host-memory";
 import type { SignInRegion } from "./kimi-region";
 import type { LinkWallet } from "./link-wallet";
-import type { MailboxStore } from "./mailbox-store";
+import { type MailboxStore, MESSAGING_LANE } from "./mailbox-store";
 import { toMcpOperationError } from "./mcp-effects";
 import type { McpSignInOpener } from "./mcp-oauth-provider";
 import { McpServerStore } from "./mcp-server-store";
@@ -394,6 +399,8 @@ export interface AgentServiceOptions {
   hostedSites?: AgentHostedSites | null;
   /** Draws pages for `html_preview`. Without it the tool tells the agent to show the page unchecked. */
   visualPreview?: ChatVisualPreviewHost | null;
+  /** Saves the `commitCoAuthor` agent default for `set_commit_co_author`. Without it the tool fails. */
+  setCommitCoAuthor?: SetCommitCoAuthor | undefined;
   /**
    * Decodes a picture, makes its flat background clear (`clearFlatBackground`) and gives it back as a
    * PNG; null when the picture has no flat background. Without it a transparent Grok image keeps the
@@ -426,8 +433,12 @@ export interface AgentServiceOptions {
   serverClaims?: AgentServerClaims | null;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`. */
   browserProfiles?: (() => AgentBrowserProfiles | null) | undefined;
+  /** The CRM, for the `crm_*` tools; null until it starts. */
+  crm?: (() => CrmHandle | null) | undefined;
+  /** Whether a member who is not an owner or admin can see the agent; the `crm_*` tools then refuse it. */
+  crmAgentVisibleToMembers?: ((agentId: string) => boolean) | undefined;
   sidebarLayout?: AgentSidebar | null;
-  /** The Library folders of this host, for the `folder` of an attach call and `list_library_folders`. */
+  /** The Library folders of this host, for the `folder` of an attach call, `list_library_folders` and `organize_library`. */
   libraryFolders?: AgentLibraryFolders | null;
   /**
    * What a spawned CLI is given beyond its own binary: the stored keys, and the user's own model
@@ -624,6 +635,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #tasks: AgentTasks;
   readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
+  readonly #feedbackWithdrawal: FeedbackWithdrawal;
   readonly #messagePins: MessagePins;
   readonly #tables: AgentTables | null;
   readonly #routines: RoutineScheduler;
@@ -809,6 +821,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       mailbox,
       conversation: this.#conversation,
       tasks: this.#tasks,
+    });
+    this.#feedbackWithdrawal = new FeedbackWithdrawal({
+      store,
+      conversation: this.#conversation,
+      tasks: this.#tasks,
+      feedback: options.feedback ?? null,
     });
     this.#messagePins = new MessagePins({
       store,
@@ -1643,8 +1661,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     this.messaging = new MessagingThreads(store.database, mailbox, {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
-      busy: (agentId) =>
-        Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
+      // A conversation in the messaging lane waits for that lane only. The others wait in the own chat's lane.
+      busy: (agentId, linkId) =>
+        this.#mailbox.inMessagingLane(agentId, linkId)
+          ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0
+          : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
       ownChat: (threadId) => this.#store.ownsThread(threadId),
@@ -1915,6 +1937,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
               ),
             ),
         taskForThread: (threadId) => this.#tasks.taskForThread(threadId),
+        inMessagingLane: (agentId, threadId) => this.messaging.inMessagingLane(agentId, threadId),
         isRoutineThread: (threadId) => this.#tasks.isRoutineThreadId(threadId),
         taskOpen: (taskId) => this.#tasks.threadId(taskId) !== null,
         taskFailed: (taskId, message) => this.#tasks.failed(taskId, this.#mcp.redact(message)),
@@ -1994,6 +2017,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(this.#workflowTools === undefined ? {} : { workflowTools: this.#workflowTools }),
       ...(options.approvalAutomation === undefined ? {} : { approvalAutomation: options.approvalAutomation }),
       ...(options.visualPreview === undefined ? {} : { visualPreview: options.visualPreview }),
+      ...(options.setCommitCoAuthor === undefined ? {} : { setCommitCoAuthor: options.setCommitCoAuthor }),
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
@@ -2010,8 +2034,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,
       feedback: options.feedback ?? null,
+      feedbackWithdrawal: this.#feedbackWithdrawal,
       serverClaims: options.serverClaims ?? null,
       ...(options.browserProfiles === undefined ? {} : { browserProfiles: options.browserProfiles }),
+      ...(options.crm === undefined ? {} : { crm: options.crm }),
+      ...(options.crmAgentVisibleToMembers === undefined
+        ? {}
+        : { crmAgentVisibleToMembers: options.crmAgentVisibleToMembers }),
       apiKeys: options.agentApiKeys ?? null,
       vaultItems: options.vaultItems ?? null,
       codexSubagentParent: (childThreadId) => this.#turn.codexSubagentParent(childThreadId),
@@ -2787,6 +2816,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** The routine canvas of one agent changed, so every view showing it reads it again. */
   notifyRoutineFlowsChanged(agentId: string): void {
     this.#emit({ type: "routine-flows-changed", agentId });
+  }
+
+  /** The CRM changed, so each open CRM page reads it again. */
+  notifyCrmChanged(): void {
+    this.#emit({ type: "crm-changed" });
   }
 
   /**
@@ -4119,11 +4153,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return next ? { input: { ...move(next), leaveUsageLimit: true }, move: failed ? "provider-error" : null } : null;
   }
 
-  /** Whether work waits for the agent: in its chat, a task, a channel lane, or a channel. */
+  /** Whether work waits for the agent: in its chat, a task, a channel lane, its conversations, or a channel. */
   #hasWaitingWork(agentId: string): boolean {
     return (
       Boolean(this.#mailbox.nextQueued(agentId)) ||
-      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some((laneId) =>
+      [...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.sideLanes(agentId, true)].some((laneId) =>
         this.#mailbox.nextQueued(agentId, laneId),
       ) ||
       this.channels.ownsWaitingWork(agentId)
@@ -4290,7 +4324,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * a limit stopped.
    */
   #queuedContinuation(agentId: string): boolean {
-    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.channelLanes(agentId, true)].some(
+    return [null, ...this.#mailbox.queuedTaskIds(agentId), ...this.#mailbox.sideLanes(agentId, true)].some(
       (taskId) => this.#mailbox.nextQueued(agentId, taskId)?.resumeAfterUsageLimit !== undefined,
     );
   }
@@ -5074,6 +5108,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ),
       );
     yield* lifecycleStep("restore channel links", () => {
+      // Before any drain. A conversation whose thread is also the agent's own chat (#2120) runs its turns
+      // there, and a provider that runs one turn at a time keeps one queue: both keep the own chat's lane.
+      const ownChatLinks = new Set(
+        this.#store.list().flatMap((agent) => {
+          const link = agent.threadId ? this.messaging.store.linkForThread(agent.threadId) : null;
+          return link ? [link.linkId] : [];
+        }),
+      );
+      this.#mailbox.useMessagingLane((agentId, linkId) => {
+        const provider = this.#store.providerOf(agentId);
+        return !ownChatLinks.has(linkId) && provider !== undefined && agentProviderDescriptor(provider).concurrentTurns;
+      });
       this.#mcp.migrateCatalogRows();
       this.channels.restoreDeliveryLinks();
       this.channels.removeDeletedMembers(new Set(this.#store.list().map((agent) => agent.id)));
@@ -6478,6 +6524,22 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     );
   }
 
+  /**
+   * The Remove action of a thank-you card: takes the report off GitHub with the account of this
+   * computer, and marks the card as removed.
+   */
+  withdrawFeedback(input: WithdrawFeedbackInput): Effect.Effect<WithdrawFeedbackResult, AgentLifecycleFailed> {
+    return this.#feedbackWithdrawal.withdrawCard(input).pipe(
+      Effect.map(({ status }) => ({ status })),
+      Effect.catchTags({
+        StoredStateFailure: ({ cause }) =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "withdrawFeedback", cause })),
+        ToolOperationFailed: ({ cause }) =>
+          Effect.fail(new AgentLifecycleFailed({ operation: "withdrawFeedback", cause })),
+      }),
+    );
+  }
+
   /** The pinned messages of all chats of the agent: its own chat and its side threads. The newest pin is first. */
   listPinnedMessages(agentId: string): PinnedMessagesSnapshot {
     return this.#messagePins.list(agentId);
@@ -6894,9 +6956,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
+  /**
+   * A new emoji on one of the agent's own replies is also the user's answer to that reply, so it is
+   * queued as a reply that quotes the message: the agent continues without a typed answer. A removed
+   * or unchanged reaction sends nothing. `sender` is the person the host saw react.
+   */
   readonly setMessageReaction = Effect.fn("AgentService.setMessageReaction")(function* (
     this: AgentService,
     input: SetMessageReactionInput,
+    sender?: ConversationMessageSender,
   ) {
     const agent = yield* this.#store
       .existing(input.agentId)
@@ -6910,21 +6978,38 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
       if (message) snapshot.messages.push(message);
     }
-    if (!snapshot.messages.some((message) => message.id === input.messageId)) {
+    const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+    if (!message) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
         cause: new Error(sourceText("error.agent.messageUnavailable")),
       });
     }
-    yield* this.#mailbox
-      .setReaction(agent.id, input.messageId, { kind: "user" }, input.emoji)
-      .pipe(
+    const previous = this.#mailbox.reactionFor(agent.id, input.messageId);
+    // A reply that streams, failed or stopped is not one the user can answer yet.
+    const answer =
+      message.author === "assistant" && message.status === "completed" && input.emoji !== previous ? input.emoji : null;
+    const saveReaction = (emoji: SetMessageReactionInput["emoji"]) =>
+      this.#mailbox.setReaction(agent.id, input.messageId, { kind: "user" }, emoji).pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "set message reaction", cause: failure.cause }),
         ),
+        Effect.tap(() =>
+          Effect.sync(() => {
+            this.#mailboxSync.syncMailboxMessages(snapshot);
+            this.#conversation.emitConversation(snapshot);
+          }),
+        ),
       );
-    this.#mailboxSync.syncMailboxMessages(snapshot);
-    this.#conversation.emitConversation(snapshot);
+    // The check and the save have no wait between them, so the same reaction twice sends one answer.
+    yield* saveReaction(input.emoji);
+    if (!answer) return;
+    // When the answer cannot go, the old reaction comes back, so the user sees the failure and can try again.
+    yield* this.#sendUserMessage(
+      { agentId: agent.id, text: answer, replyToMessageId: input.messageId },
+      sender,
+      undefined,
+    ).pipe(Effect.tapError(() => saveReaction(previous).pipe(Effect.ignore)));
   }, Effect.uninterruptible).bind(this);
 
   /** The channel, task or messaging thread of a delivery, or null for the agent's own chat. */
@@ -7095,9 +7180,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Effect.Effect<void, AgentLifecycleFailed> {
+  /** `fromMember`: the answer came from a member's device through the Team API. */
+  respondToBrowserTakeover(
+    input: RespondToBrowserTakeoverInput,
+    fromMember = false,
+  ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#attention
-      .respondToBrowserTakeover(input)
+      .respondToBrowserTakeover(input, fromMember)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "respondToBrowserTakeover", cause: failure.cause }),

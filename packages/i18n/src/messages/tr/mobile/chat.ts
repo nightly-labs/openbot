@@ -178,7 +178,7 @@ export const messages = {
     "{name}: ana makine bu dosyaları kabul etmiyor. Bunları eklemek için oradaki OpenBot'u güncelleyin.",
   "mobile.chat.attachment.nameTooLong": "Daha kısa ada sahip bir dosya seçin.",
   "mobile.chat.attachment.damaged": "Ek bozuk. Tekrar seçin.",
-  "mobile.chat.attachment.tooLarge": "{name} 10 MB'tan daha büyük.",
+  "mobile.chat.attachment.tooLarge": "{name} {limit}'tan daha büyük.",
   "mobile.chat.attachment.cameraPermission": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin.",
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",
@@ -365,6 +365,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Tek kullanımlık kod",
   "mobile.chat.browserSecret.takeoverTitle": "Tarayıcı devralma",
   "mobile.chat.browserSecret.takeoverBody": "Bu adımı OpenBot çalıştıran bilgisayardaki tarayıcıda tamamlayın.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Bilgisayarınızda oturum açın",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Bu site sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın.",
   "mobile.chat.browserSecret.takeoverReload": "Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
   "mobile.chat.browserSecret.takeoverFailed": "İstek tamamlanamadı.",
   "mobile.chat.browserSecret.done": "Bitirdim",

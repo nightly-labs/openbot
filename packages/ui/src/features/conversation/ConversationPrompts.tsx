@@ -263,6 +263,8 @@ interface BrowserTakeoverCardProps {
    * sign-in on this computer; `signingIn` is true while that sign-in is open.
    */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
+  /** The page refused the sign-in from the server, and only the desktop app can send one from the user's device. */
+  signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
     /** Offer "Save to Vault" for a password. */
@@ -319,12 +321,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     const blocked = props.signInBlocked;
     if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
     if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
-    return blocked
-      ? t("prompt.browser.signInBlocked.body", {
-          host: pageDetails().host,
-          server: blocked.server,
-          name: props.agentName,
-        })
+    if (blocked)
+      return t("prompt.browser.signInBlocked.body", {
+        host: pageDetails().host,
+        server: blocked.server,
+        name: props.agentName,
+      });
+    return props.signInOnDesktop
+      ? t("prompt.browser.signInBlocked.desktopBody", { host: pageDetails().host, name: props.agentName })
       : t("prompt.browser.pendingBody", { name: props.agentName });
   };
   const pageHost = () => {

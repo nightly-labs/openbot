@@ -334,6 +334,10 @@ export const messages = defineMessages("error.provider", {
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.codexHistoryItemMissing":
+    "Codex could not continue this chat, because an item in its saved history is missing. OpenBot started a new Codex session with the chat history. Try again.",
+  "error.provider.codexRequestRefused":
+    "{provider} refused the request for this chat and did not give the cause. This can occur in a long chat with many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
@@ -456,6 +460,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeNotStarted": "The {provider} CLI could not start.",
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
+  "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
   "error.provider.piStopped": "Pi is not running. Connect Pi and try again.",
   "error.provider.piSessionMissing": "The Pi session file is not available on this computer.",
   "error.provider.piResumeCancelled": "Pi cancelled the session resume. Try again.",

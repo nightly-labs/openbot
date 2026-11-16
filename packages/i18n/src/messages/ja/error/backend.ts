@@ -258,6 +258,8 @@ export const messages = {
     "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
+  "error.backend.mcpSignInAppRefused":
+    "サインインサーバーがこのサーバーのサインインアプリを受け付けませんでした。サインインアプリのクライアント ID とクライアントシークレットを確認してから、もう一度サインインしてください。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
@@ -440,6 +442,8 @@ export const messages = {
   "error.backend.branchSourceBusy": "このチャットを分岐する前に、現在のターンを停止してください。",
   "error.backend.branchMessageNotFound": "分岐できるのは、エージェントの完了した回答からのみです。",
   "error.backend.branchRemoteUnsupported": "分岐は、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.feedbackWithdrawRemoteUnsupported":
+    "このレポートを削除するには、エージェントに削除を依頼してください。",
   "error.backend.threadMoveRefused":
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",

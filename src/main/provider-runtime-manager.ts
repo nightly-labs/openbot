@@ -1819,9 +1819,13 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
-        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
-      )).stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }

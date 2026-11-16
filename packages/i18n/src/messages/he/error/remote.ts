@@ -147,6 +147,7 @@ export const messages = {
   "error.remote.attachmentRejected": "המארח דחה את הקובץ המצורף.",
   "error.remote.attachmentTooLarge": "קבצים מצורפים צריכים להיות בגודל 10 MB לכל היותר.",
   "error.remote.attachmentBusy": "יש להמתין לסיום הקובץ המצורף הנוכחי.",
+  "error.remote.attachmentChanged": "הקובץ השתנה או שאינו זמין. יש לבחור אותו שוב.",
   "error.remote.uploadTimeout": "העלאת הקובץ המצורף חרגה ממגבלת הזמן.",
   "error.remote.hostSessionActive": "במארח כבר יש סשן מרוחק פעיל.",
   "error.remote.tooManyConnections": "יותר מדי חיבורים מרוחקים פעילים.",

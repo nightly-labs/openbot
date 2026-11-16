@@ -437,7 +437,8 @@ export const messages = {
   "mobile.server.settings.timezoneSearch": "搜索时区",
   "mobile.server.settings.timezoneNoMatch": "没有匹配该搜索的时区。",
   "mobile.server.settings.timezoneMore": "输入更多名称以查看其他时区。",
-  "mobile.server.settings.timezoneDescription": "消息没有给出发送者的时区时，新的自动化任务使用该时区。",
+  "mobile.server.settings.timezoneDescription":
+    "消息没有给出发送者的时区时，新的自动化任务使用该时区。在服务器上，浏览器也会在下次重启后使用该时区。",
   "mobile.server.settings.timezoneLoading": "正在加载时区…",
   "mobile.server.settings.timezoneLoadFailed": "无法加载服务器时区。",
   "mobile.server.settings.timezoneSaveFailed": "无法保存时区，请重试。",
@@ -843,6 +844,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "“正在处理…”消息",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+  "mobile.server.connectors.whatsapp.statusReactions": "状态表情回应",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp 调度助手",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "该助手接收你所有已关联号码中发给 OpenBot 的消息。简单的问题它自己回答，其余的交给合适的助手处理，并在 WhatsApp 中回答。",

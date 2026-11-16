@@ -574,7 +574,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "אין אזור זמן שמתאים לחיפוש הזה.",
   "mobile.server.settings.timezoneMore": "יש להקליד עוד מהשם כדי לראות אזורי זמן אחרים.",
   "mobile.server.settings.timezoneDescription":
-    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח.",
+    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה לא מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "mobile.server.settings.timezoneLoading": "טוען אזור זמן…",
   "mobile.server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
   "mobile.server.settings.timezoneSaveFailed": "לא ניתן לשמור את אזור הזמן. אפשר לנסות שוב.",
@@ -1217,6 +1217,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "הודעת ״עובד על זה…״",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot שולח אותה בזמן שהסוכן עובד, ואז מחליף אותה בתשובה. יש לכבות כדי לשלוח רק את התשובה.",
+  "mobile.server.connectors.whatsapp.statusReactions": "תגובות סטטוס",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot מגיב עם 👀 כשהודעה מגיעה ועם ✅ כשהתשובה מוכנה. יש לכבות כדי לא לשלוח תגובות.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "הסוכן הזה מקבל את ההודעות ל-OpenBot מכל המספרים המקושרים שלך. הוא עונה בעצמו על הודעות קצרות, מעביר עבודה אחרת לסוכן המתאים, ועונה ב-WhatsApp.",

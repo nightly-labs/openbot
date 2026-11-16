@@ -32,6 +32,7 @@ import {
   shell,
   systemPreferences,
 } from "electron";
+import { localTimezone } from "../backend/agent/routine-tools";
 import { setDiskRestoreProbe } from "../backend/disk-restore";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { NewerDatabaseError } from "../backend/openbot-database-schema";
@@ -83,6 +84,7 @@ import { browserIpcHandlers } from "./ipc/browser-handlers";
 import { channelMemoryIpcHandlers } from "./ipc/channel-memory-handlers";
 import { channelRoutineIpcHandlers } from "./ipc/channel-routine-handlers";
 import { computerUseIpcHandlers } from "./ipc/computer-use-handlers";
+import { crmIpcHandlers } from "./ipc/crm-handlers";
 import { customAgentIpcHandlers } from "./ipc/custom-agent-handlers";
 import { customProviderIpcHandlers } from "./ipc/custom-provider-handlers";
 import { registerIpcGroups } from "./ipc/define-ipc-group";
@@ -157,6 +159,7 @@ import { RoutineWake } from "./routine-wake";
 import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
+import { applyServerTimezone, SERVER_TIMEZONE_PREFERENCE_FILE } from "./server-timezone-preference-store";
 import { configureContentSecurityPolicy, configureRendererPermissions } from "./session-configuration";
 import { OWNER_PIN_KEY } from "./sidebar-pin-store";
 import { StartAttempts, takeForcedStartFailure } from "./start-attempts";
@@ -314,6 +317,11 @@ if (commandLineUserDataDirectory) {
   );
 }
 app.setName("OpenBot");
+// After `userData` has its final path and before the app is ready: renderers read `TZ` when they start.
+const systemTimezone =
+  serverMode || hostedServer || localServerChild
+    ? applyServerTimezone(join(app.getPath("userData"), SERVER_TIMEZONE_PREFERENCE_FILE), process.env)
+    : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
@@ -894,6 +902,7 @@ function registerIpcHandlers({
   routineFlows,
   workflows,
   workflowGitHub,
+  crm,
   routineResults,
 }: ApplicationServices): void {
   // Every renderer-to-main endpoint is bound by one of these, one file per domain under ./ipc.
@@ -1060,6 +1069,7 @@ function registerIpcHandlers({
     ...routineIpcHandlers({ service, remoteServers }),
     ...routineFlowIpcHandlers({ routineFlows, remoteServers }),
     ...workflowIpcHandlers({ workflows, events, github: workflowGitHub, remoteServers }),
+    ...crmIpcHandlers({ crm, remoteServers }),
     ...routineResultIpcHandlers({ routineResults, remoteServers }),
     ...channelMemoryIpcHandlers({ service, remoteServers }),
     ...channelRoutineIpcHandlers({ service, remoteServers }),
@@ -1560,6 +1570,7 @@ if (!hasSingleInstanceLock) {
         hostingDeveloperKey,
         localServerChild,
         localServerControl,
+        systemTimezone,
         previousUncleanExit,
         macHapticFeedback,
         teardown,

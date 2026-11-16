@@ -4,6 +4,8 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "أنت تعدّل رسالة في قائمة الانتظار. احفظ التعديل أو ألغه لتشغيلها.",
   "composer.queueEdit.cancel": "إلغاء التعديل",
+  "composer.feedbackFix.body": "تصحيح البلاغ #{number}. أرسل الطلب، أو ألغِه لإبقاء البلاغ كما هو.",
+  "composer.feedbackFix.cancel": "إلغاء",
   "composer.providerWait.offlineTitle": "لا يوجد اتصال بالإنترنت",
   "composer.providerWait.offline": "لا يمكن لـ {provider} الرد حتى يعود هذا الحاسوب إلى الاتصال.",
   "composer.providerWait.silent": "لم يرسل {provider} أي تحديث منذ {duration}.",
@@ -19,6 +21,11 @@ export const messages = {
   "composer.update.manual": "حدّث {provider} على الحاسوب الذي يشغّله للمتابعة.",
   "composer.update.pending": "جارٍ التحديث…",
   "composer.update.action": "تحديث",
+  "composer.imageInput.body":
+    "يتلقى {model} النص فقط، لذلك لا يرى الصور التي ترفقها. إذا كان هذا النموذج يقرأ الصور، فشغّل الصور له.",
+  "composer.imageInput.label": "تشغيل الصور لـ {model}",
+  "composer.imageInput.pending": "جارٍ التشغيل…",
+  "composer.imageInput.action": "تشغيل الصور",
   "composer.usageLimit.credits": "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك الآن.",
   "composer.usageLimit.creditsResets":
     "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك حتى إعادة تعيينه {reset}.",

@@ -231,6 +231,8 @@ export const messages = {
     "השרת דחה את החשבון שאיתו התחברת. יש לוודא שלחשבון הזה יש גישה לשירות. כדי להשתמש בחשבון אחר, יש להתנתק ואז להתחבר שוב.",
   "error.backend.mcpSignInClientRefused":
     "שרת ההתחברות לא קיבל את OpenBot כשהתחברות הושלמה. יש להתחבר שוב: OpenBot ירשום את עצמו שוב בשרת.",
+  "error.backend.mcpSignInAppRefused":
+    "שרת ההתחברות לא קיבל את אפליקציית ההתחברות של השרת הזה. יש לבדוק את ה-Client ID ואת ה-Client secret של אפליקציית ההתחברות, ואז להתחבר שוב.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
@@ -406,6 +408,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "יש לעצור את התור הנוכחי לפני שמפצלים את הצ'אט הזה.",
   "error.backend.branchMessageNotFound": "אפשר לפצל רק מתשובה שהסוכן סיים.",
   "error.backend.branchRemoteUnsupported": "פיצולים זמינים רק לסוכנים שנמצאים במחשב הזה.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "כדי להסיר את הדיווח הזה, בקשו מהסוכן להסיר אותו.",
   "error.backend.threadMoveRefused": "רק הודעה ששלחת לסוכן הזה לבדו יכולה לרוץ בשרשור חדש.",
   "error.backend.taskTitleRequired": "יש לתת למשימה כותרת קצרה.",
   "error.backend.taskToolInvalid": "יש לתת למשימה כותרת של עד 120 תווים ותקציר שאומר מה לעשות.",

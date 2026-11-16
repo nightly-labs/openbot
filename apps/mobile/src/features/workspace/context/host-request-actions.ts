@@ -40,7 +40,9 @@ import {
   type TeamRole,
   withFastServiceTiers,
   withSteeringModels,
+  withWhatsAppStatusReactions,
   withWhatsAppWorkingMessages,
+  withWorkspaceOnlyLimit,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -186,10 +188,12 @@ import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
 import { VAULT_V3_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v3";
 import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
+import { WHATSAPP_STATUS_REACTIONS_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-status-reactions-v1";
 import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-github-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
+import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
@@ -313,8 +317,10 @@ import {
   whatsappConnectorRemoveSender,
   whatsappConnectorSetEnabled,
   whatsappConnectorSetOwnNumber,
+  whatsappConnectorSetStatusReactions,
   whatsappConnectorSetWorkingMessage,
   whatsappConnectorStartLink,
+  whatsappConnectorStatusReactions,
   whatsappConnectorWorkingMessages,
 } from "@openbot/team-client/team-admin-requests";
 import {
@@ -556,6 +562,7 @@ type HostRequestActions = Pick<
   | "answerWhatsAppRequest"
   | "setWhatsAppOwnNumber"
   | "setWhatsAppWorkingMessage"
+  | "setWhatsAppStatusReactions"
   | "loadServerUpdate"
   | "checkServerUpdate"
   | "startServerUpdate"
@@ -1000,13 +1007,23 @@ export function createHostRequestActions({
     // `whatsapp-connector-v1` is frozen without the "Working on it…" setting: a second request reads
     // it. The numbers of an older host carry no setting, and the page then shows no switch.
     loadWhatsAppConnector: async (serverId) => {
-      const overview = whatsappConnectorOverview(whatsappAdmin(serverId));
-      if (!has(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)) return runTeamRequest(overview);
+      const api = whatsappAdmin(serverId);
       return runTeamRequest(
-        Effect.zipWith(
-          overview,
-          whatsappConnectorWorkingMessages(whatsappAdmin(serverId)),
-          withWhatsAppWorkingMessages,
+        Effect.all(
+          [
+            whatsappConnectorOverview(api),
+            has(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY)
+              ? whatsappConnectorWorkingMessages(api)
+              : Effect.succeed(null),
+            has(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY)
+              ? whatsappConnectorStatusReactions(api)
+              : Effect.succeed(null),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(
+          Effect.map(([overview, workingMessages, statusReactions]) =>
+            withWhatsAppStatusReactions(withWhatsAppWorkingMessages(overview, workingMessages), statusReactions),
+          ),
         ),
       );
     },
@@ -1036,6 +1053,13 @@ export function createHostRequestActions({
       runTeamRequest(
         whatsappConnectorSetWorkingMessage(
           capabilityApi(serverId, WHATSAPP_WORKING_MESSAGE_CAPABILITY, "mobile.server.connectors.unsupported"),
+          input,
+        ),
+      ),
+    setWhatsAppStatusReactions: async (input, serverId) =>
+      runTeamRequest(
+        whatsappConnectorSetStatusReactions(
+          capabilityApi(serverId, WHATSAPP_STATUS_REACTIONS_CAPABILITY, "mobile.server.connectors.unsupported"),
           input,
         ),
       ),
@@ -1203,7 +1227,10 @@ export function createHostRequestActions({
           ? request("POST", MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {}, serverId).catch(() => [])
           : [],
       ]);
-      return withSteeringModels(withFastServiceTiers(options, fast), steering);
+      return withWorkspaceOnlyLimit(
+        withSteeringModels(withFastServiceTiers(options, fast), steering),
+        has(serverId, WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY),
+      );
     },
     loadAgentMemorySelection: (agentId, serverId) =>
       runTeamRequest(

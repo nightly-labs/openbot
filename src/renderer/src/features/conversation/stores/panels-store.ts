@@ -6,6 +6,7 @@ import {
   type FilePreview,
   type WorkspaceDirectory,
 } from "@openbot/contracts/ipc";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import type { MessageImageFile } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { isSidePanelPane } from "@openbot/ui/features/conversation/SidePanel";
 import { currentText } from "@openbot/ui/text";
@@ -29,6 +30,11 @@ import { conversationOwnerId } from "./composer-store";
 
 // Each member reads the interface language when it is called.
 const { t, errorMessage } = currentText();
+
+/** A setting card asks the agent settings to show one row. */
+export interface AgentSettingRowRequest extends AgentSettingReveal {
+  agentId: string;
+}
 
 export interface RoutineSettingsRequest {
   agentId: string;
@@ -131,6 +137,19 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     setInstructionsSettingsRequest({ agentId });
     setActiveRightPanel("settings", agentId);
   }
+  const [agentSettingRowRequest, setAgentSettingRowRequest] = createSignal<AgentSettingRowRequest | null>(null);
+  let agentSettingRowNonce = 0;
+  /** Opens the settings of the chat's agent at one row, as a setting card asks. Each call shows the row again. */
+  function openAgentSettingRow(agentId: string, settingId: AgentSettingLinkId): void {
+    if (deps.props.agent?.id !== agentId) return;
+    agentSettingRowNonce += 1;
+    setAgentSettingRowRequest({ agentId, settingId, nonce: agentSettingRowNonce });
+    setActiveRightPanel("settings", agentId);
+  }
+  /** The panel showed the row, so the request does not show it again when the panel mounts again. */
+  function handleAgentSettingRowRequest(nonce: number): void {
+    setAgentSettingRowRequest((current) => (current?.nonce === nonce ? null : current));
+  }
   const [routineSettingsRequest, setRoutineSettingsRequest] = createSignal<RoutineSettingsRequest | null>(null);
   let routineSettingsRequestNonce = 0;
 
@@ -224,6 +243,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     if (mode !== "settings") {
       setSkillSettingsRequest(null);
       setInstructionsSettingsRequest(null);
+      setAgentSettingRowRequest(null);
       setRoutineSettingsRequest((current) => (current?.agentId === agentId ? null : current));
     }
     deps.setRightPanels((current) => (current[agentId] === mode ? current : { ...current, [agentId]: mode }));
@@ -716,6 +736,9 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     openSkillSettings,
     instructionsSettingsRequest,
     openInstructionsSettings,
+    agentSettingRowRequest,
+    openAgentSettingRow,
+    handleAgentSettingRowRequest,
     routineSettingsRequest,
     activeRightPanel,
     settingsOpen,

@@ -147,6 +147,7 @@ export const messages = {
   "error.remote.attachmentRejected": "رفض المضيف المرفق.",
   "error.remote.attachmentTooLarge": "يجب ألا يتجاوز حجم المرفقات 10 MB.",
   "error.remote.attachmentBusy": "انتظر حتى يكتمل المرفق الحالي.",
+  "error.remote.attachmentChanged": "تغيّر الملف أو أنه غير متاح. حدده مرة أخرى.",
   "error.remote.uploadTimeout": "انتهت مهلة رفع المرفق.",
   "error.remote.hostSessionActive": "لدى المضيف بالفعل جلسة بعيدة نشطة.",
   "error.remote.tooManyConnections": "عدد كبير جدًا من الاتصالات البعيدة النشطة.",

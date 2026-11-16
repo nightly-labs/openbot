@@ -256,6 +256,8 @@ export const messages = {
     "Il server ha rifiutato l'account con cui hai effettuato l'accesso. Verifica che questo account possa usare il servizio. Per usare un altro account, esci e poi accedi di nuovo.",
   "error.backend.mcpSignInClientRefused":
     "Il server di accesso non ha accettato OpenBot al completamento dell'accesso. Accedi di nuovo: OpenBot si registra di nuovo sul server.",
+  "error.backend.mcpSignInAppRefused":
+    "Il server di accesso non ha accettato l'app di accesso di questo server. Controlla l'ID client e il secret del client dell'app di accesso, poi accedi di nuovo.",
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
   "error.backend.mcpRegistrationRefused":
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",
@@ -439,6 +441,8 @@ export const messages = {
   "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
   "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
   "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.feedbackWithdrawRemoteUnsupported":
+    "Per rimuovere questa segnalazione, chiedi all’agente di rimuoverla.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",

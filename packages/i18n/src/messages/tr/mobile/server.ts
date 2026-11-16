@@ -458,7 +458,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Bu aramayla eşleşen saat dilimi yok.",
   "mobile.server.settings.timezoneMore": "Diğer saat dilimlerini görmek için adın devamını yazın.",
   "mobile.server.settings.timezoneDescription":
-    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır.",
+    "Mesaj gönderenin saat dilimini belirtmediğinde yeni rutinler bu saat dilimini kullanır. Bir sunucuda tarayıcı da bir sonraki yeniden başlatmadan sonra bunu kullanır.",
   "mobile.server.settings.timezoneLoading": "Saat dilimi yükleniyor…",
   "mobile.server.settings.timezoneLoadFailed": "Sunucunun saat dilimi yüklenemedi.",
   "mobile.server.settings.timezoneSaveFailed": "Saat dilimi kaydedilemedi. Tekrar deneyin.",
@@ -915,6 +915,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Durum tepkileri",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot bir mesaj geldiğinde 👀, yanıt hazır olduğunda ✅ tepkisi verir. Hiç tepki göndermemek için kapatın.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Düzenleyicisi",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Bu ajan bağlı tüm numaralarınızdan OpenBot'a gelen mesajları alır. Kısa olanları kendisi yanıtlar, diğer işleri doğru ajana iletir ve WhatsApp'ta yanıt verir.",

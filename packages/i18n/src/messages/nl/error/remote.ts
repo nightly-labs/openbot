@@ -154,6 +154,7 @@ export const messages = {
   "error.remote.attachmentRejected": "De host heeft de bijlage geweigerd.",
   "error.remote.attachmentTooLarge": "Bijlagen mogen maximaal 10 MB zijn.",
   "error.remote.attachmentBusy": "Wacht tot de huidige bijlage klaar is.",
+  "error.remote.attachmentChanged": "Het bestand is gewijzigd of niet beschikbaar. Selecteer het opnieuw.",
   "error.remote.uploadTimeout": "Het uploaden van de bijlage duurde te lang.",
   "error.remote.hostSessionActive": "De host heeft al een actieve externe sessie.",
   "error.remote.tooManyConnections": "Te veel actieve externe verbindingen.",

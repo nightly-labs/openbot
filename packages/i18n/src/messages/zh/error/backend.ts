@@ -223,6 +223,8 @@ export const messages = {
     "服务器拒绝了你登录所用的账号。请确认该账号可以使用此服务。要使用其他账号，请先退出登录，再重新登录。",
   "error.backend.mcpSignInClientRefused":
     "完成登录时，登录服务器未接受 OpenBot。请重新登录，OpenBot 会重新向服务器注册。",
+  "error.backend.mcpSignInAppRefused":
+    "登录服务器未接受该服务器的登录应用。请检查登录应用的客户端 ID 和客户端密钥，然后重新登录。",
   "error.backend.mcpCommandNotFound": "未找到命令：{command}",
   "error.backend.mcpRegistrationRefused":
     "登录服务器尚未接受 OpenBot 作为应用，这与你的账号无关。请改用其他连接方式，例如本地 MCP 服务器。",
@@ -385,6 +387,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "请先停止当前回合，再为此聊天创建分支。",
   "error.backend.branchMessageNotFound": "只能从助手已完成的回答创建分支。",
   "error.backend.branchRemoteUnsupported": "分支仅适用于本电脑上的助手。",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "要删除此报告，请让助手删除它。",
   "error.backend.threadMoveRefused": "只有你单独发给该助手的消息才能在新话题中运行。",
   "error.backend.taskTitleRequired": "请给任务起一个简短的标题。",
   "error.backend.taskToolInvalid": "标题不超过 120 个字符，并写明要做什么。",

@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Connexion à {host} annulée",
   "prompt.browser.signInBlocked.body":
     "Connectez-vous sur cet ordinateur. OpenBot envoie uniquement la connexion à {host} vers {server}, et {name} continue.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là. Ensuite, {name} continue.",
   "prompt.browser.signInBlocked.cancelledBody": "La connexion a été annulée.",
   "prompt.browser.signInBlocked.waiting": "En attente de la connexion",
   "prompt.browser.signInBlocked.waitingButton": "En attente de la connexion…",
