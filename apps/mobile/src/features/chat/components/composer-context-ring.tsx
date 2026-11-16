@@ -1,5 +1,4 @@
 import { memo, useEffect } from "react";
-import { Pressable } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -17,8 +16,8 @@ import { useReducedMotion } from "@/shared/lib/motion";
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-// Drawn at the size of the composer's other glyphs, in the 40 pt box they press in.
-const SIZE = 20;
+// Drawn at the size of the attachment menu's other icons.
+const SIZE = 21;
 const STROKE = 2.5;
 const RADIUS = (SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -29,7 +28,7 @@ const SPIN_MS = 900;
 const FILL_MS = 300;
 const FILL_EASING = Easing.bezier(0.23, 1, 0.32, 1);
 
-/** What the composer's context ring shows, and what a press on it does. */
+/** What the context ring shows, and what a press on its row in the attachment menu does. */
 export interface ComposerContextMeter {
   /** The used share of the window, 0 to 1. */
   share: number;
@@ -41,17 +40,11 @@ export interface ComposerContextMeter {
 }
 
 /**
- * How full the chat's context is, as the ring of the desktop composer. The fill and the turn of a
- * compaction run on the UI thread: a new reading sets their target, and React draws nothing per frame.
+ * How full the chat's context is, as the ring of the desktop composer. It is the icon of the Context
+ * row in the attachment menu, and the row owns the press. The fill and the turn of a compaction run
+ * on the UI thread: a new reading sets their target, and React draws nothing per frame.
  */
-export const ComposerContextRing = memo(function ComposerContextRing({
-  meter,
-  enabled,
-}: {
-  meter: ComposerContextMeter;
-  /** False while the composer rests: the ring is not drawn there and takes no touch. */
-  enabled: boolean;
-}) {
+export const ComposerContextRing = memo(function ComposerContextRing({ meter }: { meter: ComposerContextMeter }) {
   const [dim, secondary, warning, danger, accent] = useCSSVariable([
     "--openbot-text-dim",
     "--openbot-text-secondary",
@@ -94,43 +87,32 @@ export const ComposerContextRing = memo(function ComposerContextRing({
   const arcProps = useAnimatedProps(() => ({ strokeDashoffset: CIRCUMFERENCE * (1 - fill.get()) }));
   const turnStyle = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.get() * 360}deg` }] }));
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={meter.label}
-      accessibilityState={{ busy: meter.compacting }}
-      accessibilityElementsHidden={!enabled}
-      importantForAccessibility={enabled ? "auto" : "no-hide-descendants"}
-      disabled={!enabled}
-      className="size-10 items-center justify-center rounded-full"
-      onPress={meter.onPress}
-    >
-      <Animated.View style={[{ width: SIZE, height: SIZE }, turnStyle]}>
-        <Svg width={SIZE} height={SIZE}>
-          <G rotation={-90} origin={`${SIZE / 2}, ${SIZE / 2}`}>
-            <Circle
-              cx={SIZE / 2}
-              cy={SIZE / 2}
-              r={RADIUS}
-              // The track of the desktop meter: the dim text colour, faint.
-              stroke={String(dim)}
-              strokeOpacity={0.35}
-              strokeWidth={STROKE}
-              fill="none"
-            />
-            <AnimatedCircle
-              cx={SIZE / 2}
-              cy={SIZE / 2}
-              r={RADIUS}
-              stroke={String(color)}
-              strokeWidth={STROKE}
-              strokeLinecap="round"
-              strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
-              fill="none"
-              animatedProps={arcProps}
-            />
-          </G>
-        </Svg>
-      </Animated.View>
-    </Pressable>
+    <Animated.View style={[{ width: SIZE, height: SIZE }, turnStyle]}>
+      <Svg width={SIZE} height={SIZE}>
+        <G rotation={-90} origin={`${SIZE / 2}, ${SIZE / 2}`}>
+          <Circle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            // The track of the desktop meter: the dim text colour, faint.
+            stroke={String(dim)}
+            strokeOpacity={0.35}
+            strokeWidth={STROKE}
+            fill="none"
+          />
+          <AnimatedCircle
+            cx={SIZE / 2}
+            cy={SIZE / 2}
+            r={RADIUS}
+            stroke={String(color)}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            fill="none"
+            animatedProps={arcProps}
+          />
+        </G>
+      </Svg>
+    </Animated.View>
   );
 });

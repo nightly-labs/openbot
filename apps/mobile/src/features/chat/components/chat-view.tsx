@@ -1546,6 +1546,7 @@ export function ChatView({
             anchor={attachments.menuAnchor}
             appActive={appActive}
             attachments={attachments}
+            context={contextMeter}
             fallbackBackground={fieldBackground}
             foreground={foreground}
             keyboardHeight={motion.keyboardHeight}
