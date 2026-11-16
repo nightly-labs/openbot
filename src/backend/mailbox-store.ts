@@ -1554,8 +1554,12 @@ export class MailboxStore {
         const delivery = this.#publicDelivery(storedDelivery, positions, message);
         messages.push({
           id: delivery.id,
-          // A plan continuation keeps the request in its first turn, like `syncDeliveryMessage`.
-          turnId: storedDelivery.planContinuation?.turnIds[0] ?? storedDelivery.turnId ?? undefined,
+          // A plan continuation and continued work keep the request in its first turn, like `syncDeliveryMessage`.
+          turnId:
+            storedDelivery.planContinuation?.turnIds[0] ??
+            storedDelivery.resumeAfterUsageLimit?.previousTurnIds[0] ??
+            storedDelivery.turnId ??
+            undefined,
           author: message.sender.kind === "agent" ? "agent" : "user",
           source: message.sender.kind === "agent" ? "agent" : message.sender.kind === "routine" ? "routine" : "user",
           text: message.text,
