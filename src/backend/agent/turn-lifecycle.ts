@@ -1754,8 +1754,6 @@ export class TurnLifecycle {
           : null;
       const refused = running !== undefined && refusedFailure !== null;
       const limited = status === "failed" && this.#limitedTurns.has(turnId);
-      const failingSession =
-        running !== undefined && !refused && this.#countSessionFailure(running, threadId, status, limited);
       const resetsAt = this.#limitedTurns.get(turnId) ?? null;
       this.#limitedTurns.delete(turnId);
       const failover = this.#failoverTurns.get(turnId);
@@ -1779,6 +1777,19 @@ export class TurnLifecycle {
       const mayRunAgain = failedOnProvider && !running.acted;
       const mayContinue =
         failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
+      // A spent quota, a failed compaction and a routine run's own session have their own handling.
+      const failingSession =
+        running !== undefined &&
+        !refused &&
+        this.#countSessionFailure(
+          running,
+          threadId,
+          status,
+          !limited &&
+            failover?.context.causeCode !== "usage_limit" &&
+            compactionFailure === undefined &&
+            !routineSession,
+        );
       const shouldCompact =
         !refused &&
         !failingSession &&
@@ -2313,19 +2324,25 @@ export class TurnLifecycle {
   /**
    * Counts a failed turn of an Antigravity session, and true when the session failed
    * `SESSION_FAILURE_LIMIT` turns in a row. A completed turn resets the count. A stop by the user
-   * (`interrupted`) and a spent quota do not change it.
+   * (`interrupted`) and a failure that does not `count` do not change it.
    */
-  #countSessionFailure(running: { client: AgentClient }, threadId: string, status: string, limited: boolean): boolean {
+  #countSessionFailure(running: { client: AgentClient }, threadId: string, status: string, count: boolean): boolean {
     if (running.client.provider !== "antigravity") return false;
     if (status === "completed") this.#sessionFailures.delete(threadId);
-    if (status !== "failed" || limited) return false;
+    if (status !== "failed" || !count) return false;
     const failures = (this.#sessionFailures.get(threadId) ?? 0) + 1;
-    if (failures < SESSION_FAILURE_LIMIT) {
-      this.#sessionFailures.set(threadId, failures);
-      return false;
+    if (failures >= SESSION_FAILURE_LIMIT) {
+      this.#sessionFailures.delete(threadId);
+      return true;
     }
-    this.#sessionFailures.delete(threadId);
-    return true;
+    this.#sessionFailures.set(threadId, failures);
+    // Another path can close a session after one failure, such as a refused session or a deleted
+    // thread. Its entry goes when the map is full.
+    if (this.#sessionFailures.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#sessionFailures.keys();
+      if (oldest !== undefined) this.#sessionFailures.delete(oldest);
+    }
+    return false;
   }
 
   /** Closes a session that `#countSessionFailure` found failing. The public thread stays. */
