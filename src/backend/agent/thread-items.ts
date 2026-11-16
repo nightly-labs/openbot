@@ -28,7 +28,13 @@ import {
   reasoningText,
   type ThreadItem,
 } from "../protocol";
-import { isImageCountDiagnostic, isImageTooLargeDiagnostic, isImageTooSmallDiagnostic } from "./provider-diagnostics";
+import {
+  isImageCountDiagnostic,
+  isImageTooLargeDiagnostic,
+  isImageTooSmallDiagnostic,
+  isRequestBodyLimitDiagnostic,
+  isUnreadableContentDiagnostic,
+} from "./provider-diagnostics";
 import { stepLabel } from "./step-labels";
 import { BUILTIN_TOOL_CATALOG } from "./tool-catalog";
 
@@ -45,7 +51,22 @@ export function isNonActionableCodexWarning(message: string): boolean {
     // Codex sends this on each session start when its config asks for a tier, such as `priority`,
     // that the model does not list (`codex-rs/core/src/session/mod.rs`). Codex leaves the tier out
     // and the turn continues at the standard speed, so the banner showed a false error (#6827).
-    message.startsWith("Configured service tier ")
+    message.startsWith("Configured service tier ") ||
+    // Codex sends this once at start when it cannot update a marketplace from `config.toml`, such as
+    // a Git source on a computer without Git (`codex-rs/core-plugins/src/manager.rs`). It has no
+    // thread, the chat works, and the plugins stay at their version, so it showed a false
+    // "Provider error" toast (#6976). The text covers `marketplace `name`:` and `marketplaces:`.
+    message.startsWith("Codex could not update marketplace") ||
+    // Codex sends this on `thread/resume` when the last turn of the thread used another model
+    // (`codex-rs/core/src/session/mod.rs`). OpenBot changes the model on purpose: the user picked a
+    // new one, or a backup model ran. The turn continues, but the red banner looked like a failure and
+    // told the user to switch back (#8135).
+    message.startsWith("This session was recorded with model ") ||
+    // Codex sends this on each session start when the user's own or a project's `config.toml` sets
+    // `features.multi_agent` (`codex-rs/config/src/loader/mod.rs`). A session setting from OpenBot
+    // does not stop it, because Codex reads only those two layers. The chat works, but a red banner
+    // asked the user to edit the Codex file (#8763).
+    message.startsWith("`[features].multi_agent` is deprecated.")
   );
 }
 
@@ -139,6 +160,21 @@ function isRejectedOpenCodeRequest(provider: AgentProvider, message: string): bo
 }
 
 /**
+ * OpenCode 2.2.5 to 2.3.0 compacts a chat near its model's window with a summary from the model. A
+ * weak local model can answer with a tool call or with no summary headings, and OpenCode then fails
+ * the turn. The session stays too long, so each later turn compacts and fails again (#6006). Only a
+ * new session, given the OpenBot transcript, recovers.
+ */
+function isFailedOpenCodeCompaction(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "opencode" &&
+    /\bCompaction summary did not match the required template\b|\bCompaction produced no summary\b|\bCompaction summary reached the output token limit\b/i.test(
+      message,
+    )
+  );
+}
+
+/**
  * Muse stores a failed MCP startup audit in the session, and `session/resume` cannot clear it. Each
  * later turn of that session fails in milliseconds, even after the failed server is removed
  * (#2369). Only a new session, given the OpenBot transcript, recovers.
@@ -177,7 +213,12 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.imageTooLarge", { provider: providerLabel(provider) });
   if (isImageCountDiagnostic(message))
     return sourceText("error.provider.imageCountLimit", { provider: providerLabel(provider) });
+  if (isRequestBodyLimitDiagnostic(message))
+    return sourceText("error.provider.requestTooLarge", { provider: providerLabel(provider) });
+  if (provider === "opencode" && isUnreadableContentDiagnostic(message))
+    return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
+  if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
   if (isClaudeContextOverflow(provider, message)) return sourceText("error.provider.claudeContextFull");
@@ -254,6 +295,7 @@ type ToolUsageKind =
   | "web_fetch"
   | "mcp"
   | "image_generation"
+  | "video_generation"
   | "subagent"
   | "other";
 
@@ -281,6 +323,7 @@ const CODEX_ITEM_KINDS = new Map<string, ToolUsageKind>([
   ["webSearch", "web_search"],
   ["imageGeneration", "image_generation"],
   ["image_generation_call", "image_generation"],
+  ["videoGeneration", "video_generation"],
   ["collabAgentToolCall", "subagent"],
 ]);
 
@@ -596,6 +639,7 @@ const TOOL_USAGE_ACTIVITIES: Readonly<Record<ToolUsageKind, AgentStepActivity>> 
   web_fetch: "browsing",
   mcp: "working",
   image_generation: "editing",
+  video_generation: "editing",
   subagent: "delegating",
   other: "working",
 };

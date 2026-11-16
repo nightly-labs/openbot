@@ -309,9 +309,15 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
           : 0;
     const checking = CHALLENGE_WAIT_MS - sharedWaitMs > CHALLENGE_POLL_MS;
     const detected = result.challenge;
+    const origin = URL.canParse(result.snapshot.url) ? new URL(result.snapshot.url).origin : "";
+    if (detected) tab.checkOrigin = origin;
+    else delete tab.checkOrigin;
+    if (!detected || tab.checkAfterTakeover !== origin) delete tab.checkAfterTakeover;
+    const afterTakeover = tab.checkAfterTakeover !== undefined;
     // The first read of a document that needs a person offers its checkbox for one click.
     const clickOnce =
       detected?.checkbox &&
+      !afterTakeover &&
       detected.kind !== "block" &&
       !(detected.kind === "non-interactive" && checking) &&
       tab.challengeClick?.document !== tab.documents
@@ -324,6 +330,7 @@ export const readTabSnapshot = Effect.fn("BrowserTab.readTabSnapshot")(function*
       waitedVendor === null ? 0 : Date.now() - waitStarted,
       checking,
       clickOnce,
+      afterTakeover,
     );
     if (challenge) result.snapshot.challenge = challenge;
   }

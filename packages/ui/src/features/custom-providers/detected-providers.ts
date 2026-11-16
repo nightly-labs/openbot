@@ -7,12 +7,14 @@ import {
   type CustomProviderRestart,
   type SaveCustomProviderInput,
 } from "@openbot/contracts/ipc";
+import type { AppFormat } from "@openbot/i18n";
 import type { AcpAgentCheck, CustomAcpAgentDraft } from "./custom-acp-agent-form";
 import {
   type CustomProviderDraft,
   type CustomProviderEndpoint,
   type DiscoveredModel,
   savedHeaderDrafts,
+  tokenCountText,
 } from "./custom-provider-form";
 
 interface DetectedBase {
@@ -93,13 +95,16 @@ export function detectedLocation(provider: DetectedProvider): string {
  * The endpoint form for a server. A new server opens with the models it lists, up to the number an
  * endpoint can hold; a saved one opens with the models the user chose.
  */
-export function detectedModelsDraft(provider: Extract<DetectedProvider, { kind: "models" }>): CustomProviderDraft {
+export function detectedModelsDraft(
+  provider: Extract<DetectedProvider, { kind: "models" }>,
+  format: Pick<AppFormat, "number">,
+): CustomProviderDraft {
   const source = provider.added && provider.savedModels ? provider.savedModels : provider.models;
   const models = source.slice(0, CUSTOM_PROVIDER_LIMITS.models).map((model) => ({
     id: model.id,
     name: model.name ?? "",
-    contextWindow: model.contextWindow?.toString() ?? "",
-    maxOutput: model.maxOutput?.toString() ?? "",
+    contextWindow: model.contextWindow === undefined ? "" : tokenCountText(model.contextWindow, format),
+    maxOutput: model.maxOutput === undefined ? "" : tokenCountText(model.maxOutput, format),
     ...(model.reasoningEfforts ? { reasoningEfforts: [...model.reasoningEfforts] } : {}),
     ...(model.inputs ? { inputs: [...model.inputs] } : {}),
   }));

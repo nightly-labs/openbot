@@ -1,11 +1,14 @@
 import {
   type AgentSessionSettings,
   decodeAgentAnalytics,
+  decodeGithubSkillSource,
   decodeHostAnalytics,
   decodeHostProviderAccounts,
   decodeInstalledSkills,
   decodeProviderUsageResetOutcome,
   decodeProviderUsageResets,
+  decodeUsageCredits,
+  type GithubSkillSource,
   type HostDefaultProvider,
   type HostProviderAccounts,
   isAgentHostSettings,
@@ -15,6 +18,7 @@ import {
   isAgentTaskPage,
   isAgentTaskReadState,
   isAgentTasksSnapshot,
+  isAgentTaskWindow,
   isConversationSnapshot,
   isHiddenAgentsSnapshot,
   isSidebarPinsSnapshot,
@@ -43,6 +47,7 @@ import type {
   QueuedMessageReceipt,
   QueueSnapshot,
   SidebarLayoutSnapshot,
+  UsageCredits,
 } from "@openbot/contracts/ipc";
 import {
   isAccountUsage,
@@ -91,6 +96,7 @@ export const decodeRemoteAgentThreadQueues = guardedDecoder(isAgentThreadQueues,
 export const decodeRemoteAgentUsageLimits = guardedDecoder(isAgentUsageLimits, "remote usage limits");
 export const decodeRemoteTaskConversation = guardedDecoder(isConversationSnapshot, "remote task conversation");
 export const decodeRemoteTaskPage = guardedDecoder(isAgentTaskPage, "remote thread page");
+export const decodeRemoteTaskWindow = guardedDecoder(isAgentTaskWindow, "remote thread part");
 export const decodeRemoteTaskReadState = guardedDecoder(isAgentTaskReadState, "remote thread read state");
 const decodeTaskReadStates = guardedListDecoder(isAgentTaskReadState, "remote thread read states");
 export function decodeRemoteTaskReadStates(value: unknown): AgentTaskReadState[] {
@@ -113,13 +119,9 @@ export function decodeDraftAttachment(value: unknown): DraftAttachment {
 export function decodeAgentSummary(value: unknown): ClientAgentSummary {
   // Backup models stay on their host, and this decoder drops them. A later host can save a provider
   // or more models than this version accepts, so they are not checked. An owner or admin reads them
-  // on `agent-backup-models-v1`.
-  const {
-    backupModels: _backupModels,
-    usageLimitReturn: _usageLimitReturn,
-    pendingRuntime: _pendingRuntime,
-    ...record
-  } = decodeRecord(value, "agent");
+  // on `agent-backup-models-v1`. `pendingRuntime` comes only under `agent-pending-runtime-v1`, whose
+  // codec has already left out one that this version does not know.
+  const { backupModels: _backupModels, usageLimitReturn: _usageLimitReturn, ...record } = decodeRecord(value, "agent");
   // Servers older than 63b55606 omit `avatarUrl` entirely. The shared guard requires the field, so
   // normalize the absent case to null before validating rather than loosening the guard for everyone.
   const candidate = record.avatarUrl === undefined ? { ...record, avatarUrl: null } : record;
@@ -142,6 +144,7 @@ export function decodeAgentSummary(value: unknown): ClientAgentSummary {
     avatarHue: candidate.avatarHue,
     avatarUrl: candidate.avatarUrl,
     ...(marketplaceSource === undefined ? {} : { marketplaceSource }),
+    ...(candidate.pendingRuntime === undefined ? {} : { pendingRuntime: candidate.pendingRuntime }),
   };
 }
 
@@ -247,6 +250,12 @@ export function decodeAccountUsageFromHost(value: unknown): AccountUsage {
   return value;
 }
 
+/** The `usage-credits-v1` list: an unknown provider is left out. */
+export function decodeUsageCreditsList(value: unknown): UsageCredits[] {
+  if (!isDynamicRecord(value)) throw new Error("Invalid usage credits.");
+  return decodeUsageCredits(value.accounts);
+}
+
 // Fails closed on a member, not just on the array: `packages/contracts/AGENTS.md` makes a malformed
 // known payload a `protocol_error`, and a list this build silently shortens is the shape that rule
 // exists to forbid -- the host and the client would disagree about what was offered with nothing
@@ -271,6 +280,10 @@ export function decodeAgentSummaries(value: unknown): ClientAgentSummary[] {
 
 export function decodeInstalledSkillsFromHost(value: unknown): InstalledSkill[] {
   return decodeInstalledSkills(value);
+}
+
+export function decodeGithubSkillSourceFromHost(value: unknown): GithubSkillSource {
+  return decodeGithubSkillSource(value);
 }
 
 export function decodeAgentMemory(value: unknown): AgentMemory {

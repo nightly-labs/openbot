@@ -21,8 +21,7 @@ type WorkspaceFrameProps = ParentProps<
     left: JSX.Element;
     /** The page of the rail. A page of another kind than the agents covers the middle panes, and makes them inert. */
     windowPage: WindowPage;
-    /** Hides the sidebar below the top row. The middle panes then span it; the server menu stays. */
-    sidebarHidden?: boolean;
+    /** A page that covers the sidebar and the middle panes below the top row. */
     page?: JSX.Element;
     connection?: JSX.Element;
     initialLoading?: boolean;
@@ -50,7 +49,6 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "onRetryServer",
     "left",
     "windowPage",
-    "sidebarHidden",
     "page",
     "after",
     "children",
@@ -58,6 +56,9 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
     "initialLoading",
     "class",
   );
+
+  /** A page that covers the sidebar keeps its column width when the user closed the sidebar. */
+  const compactWidth = () => props.compact && (!pageOpen() || layout.leftPanelNarrow());
 
   return (
     <div
@@ -70,15 +71,15 @@ export function WorkspaceFrame(props: WorkspaceFrameProps) {
         props.class,
         {
           "app-frame-sidebar-compact": props.compact,
+          "app-frame-sidebar-closed": layout.sidebarClosed(),
           "app-frame-edge": platform.appInfo() !== null,
           "app-frame-with-server-rail": layout.serverRailVisible(),
           "app-frame-page-open": pageOpen(),
-          "app-frame-sidebar-hidden": props.sidebarHidden === true,
           "app-frame-platform-darwin": platform.appInfo()?.platform === "darwin",
         },
       ]}
       aria-hidden={props.hidden ? "true" : undefined}
-      style={`--left-panel-width: ${props.compact ? LEFT_PANEL_COMPACT : layout.leftPanelWidth()}px`}
+      style={`--left-panel-width: ${compactWidth() ? LEFT_PANEL_COMPACT : layout.leftPanelWidth()}px`}
     >
       {props.left}
       <WorkspaceLeftPanelResizer />

@@ -509,6 +509,20 @@ function SkillMarkers() {
           onOpenSkill={setSelected}
         />
       ))}
+      <ChatActionMarker
+        marker={{
+          kind: "skill-lifecycle",
+          action: "installed",
+          skillId: "skill-release-notes",
+          revision: 3,
+          skillName: "Release notes",
+          timestamp: "2026-09-13T12:01:00Z",
+          installMessageIds: Array.from({ length: 38 }, (_, index) => `install-${index}`),
+        }}
+        agents={agents}
+        onSelectAgent={onSelectAgent}
+        onOpenSkill={setSelected}
+      />
       <AgentSkillsModal
         open={Boolean(selected())}
         selectionRequest={selected()}

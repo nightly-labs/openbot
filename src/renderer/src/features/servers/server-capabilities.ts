@@ -29,6 +29,7 @@ export function serverSupportsCapability(
       capability === "channel-delete-v1" ||
       capability === "channel-attention-v1" ||
       capability === "channel-isolation-v1" ||
+      capability === "channel-browser-v1" ||
       capability === "agent-duplication" ||
       capability === "model-scoped-usage" ||
       capability === "browser-navigation" ||
@@ -41,6 +42,7 @@ export function serverSupportsCapability(
       capability === "mcp-sign-in-app-v1" ||
       capability === "mcp-accounts-v1" ||
       capability === "mcp-member-access-v1" ||
+      capability === "mcp-access-v1" ||
       capability === "live-voice-v1" ||
       capability === "sign-in-relay-v1" ||
       capability === "connectors-v1" ||
@@ -62,6 +64,7 @@ export function serverSupportsCapability(
       capability === "agent-backup-models-v1" ||
       capability === "agent-task-limit-v1" ||
       capability === "agent-plan-card-v1" ||
+      capability === "agent-defaults-v1" ||
       capability === "browser-profiles-v1" ||
       capability === "provider-usage-reset-v1" ||
       capability === "skills-admin-v1" ||
@@ -82,10 +85,14 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-turn-limits-v1" ||
+      capability === "host-restart-v1" ||
+      capability === "host-appearance-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
       capability === "browsing-memory-v1" ||
+      capability === "browser-teach-v1" ||
       capability === "prompt-cache-ttl-v1" ||
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
@@ -93,11 +100,14 @@ export function serverSupportsCapability(
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
+      capability === "library-folders-v1" ||
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
+      capability === "whatsapp-working-message-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
+      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
@@ -105,7 +115,9 @@ export function serverSupportsCapability(
       capability === "agent-import-v1" ||
       capability === "instance-transfer-v1" ||
       capability === "instance-transfer-chunks-v1" ||
+      capability === "instance-transfer-full-copy-v1" ||
       capability === "agent-hidden-v1" ||
+      capability === "agent-hidden-work" ||
       capability === "agent-tasks-v1" ||
       capability === "agent-threads-v1" ||
       capability === "agent-thread-reads-v1" ||
@@ -123,6 +135,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||
       capability === "conversation-file-search-v1" ||
@@ -131,6 +144,7 @@ export function serverSupportsCapability(
       capability === "routine-results-v1" ||
       capability === "workflows-chats-v1" ||
       capability === "workflows-channels-v1" ||
+      capability === "workflows-media-v1" ||
       capability === "vault-import-v1" ||
       capability === "agent-waits-v1" ||
       capability === "agent-queue-task-v1" ||
@@ -302,6 +316,14 @@ export function remoteAdminServer(
  */
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
+}
+
+/**
+ * Server Settings > Agents shows: this computer, or an online joined server that this account
+ * administers and whose host serves `agent-defaults-v1`.
+ */
+export function serverHasAgentDefaults(server: ServerSummary): boolean {
+  return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }
 
 /**

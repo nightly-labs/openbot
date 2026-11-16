@@ -3,6 +3,7 @@ import solidPlugin from "@solidjs/vite-plugin";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 import { lazyLanguageCatalogs } from "./packages/i18n/src/vite-plugin";
+import { devWorktree } from "./scripts/dev-worktree-vite-plugin";
 
 const rendererPort = readRendererPort(process.env.OPENBOT_DEV_RENDERER_PORT);
 
@@ -30,6 +31,8 @@ export default defineConfig({
         // when it runs and goes on without them (no thumbnails, link previews or audio waveforms).
         external: ["jimp", "sharp", "audio-decode", "link-preview-js"],
         input: {
+          // The entry (`main` in package.json). It loads `index` and reports a damaged installation.
+          start: resolve("src/main/start.ts"),
           index: resolve("src/main/index.ts"),
           // The database host is its own process. Only node:* and the installed Effect package
           // are runtime imports; the unpacked host must not load the main process bundle.
@@ -61,7 +64,13 @@ export default defineConfig({
   renderer: {
     // The Solid Performance panel tracks record each effect run under `vite dev`, and make a send
     // in a chat drop frames that the built app does not drop. Set this to true for a trace.
-    plugins: [solidPlugin({ performanceTracks: false }), tailwindcss({ optimize: false }), lazyLanguageCatalogs()],
+    plugins: [
+      solidPlugin({ performanceTracks: false }),
+      tailwindcss({ optimize: false }),
+      lazyLanguageCatalogs(),
+      // The branch and color of this worktree in a dev renderer (`src/renderer/src/dev-worktree.ts`).
+      devWorktree(resolve(".")),
+    ],
     optimizeDeps: {
       // bloub finds its plush images with `new URL(..., import.meta.url)`. A pre-bundle moves the
       // code away from the images, so Vite serves the package as it is.
@@ -79,6 +88,8 @@ export default defineConfig({
           browserPip: resolve("src/renderer/browser-pip.html"),
           browserPipControls: resolve("src/renderer/browser-pip-controls.html"),
           teamWebrtc: resolve("src/renderer/team-webrtc.html"),
+          // The setup page of a server in a container. src/main/server-setup-page.ts serves it.
+          serverSetup: resolve("src/renderer/server-setup.html"),
         },
       },
     },

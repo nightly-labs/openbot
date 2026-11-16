@@ -1,4 +1,4 @@
-import { isKnownAgentProvider } from "@openbot/contracts/agent-providers";
+import { isKeyOnlyProvider, isKnownAgentProvider } from "@openbot/contracts/agent-providers";
 import { bugReportFormUrl } from "@openbot/contracts/feedback";
 import type {
   AgentProviderId,
@@ -22,7 +22,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import {
   type ProviderAccountRelay,
   providerAccountRelay,
@@ -54,12 +57,14 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { runTeamEffect } from "@openbot/team-client";
 import {
   type CustomProviderRoutes,
+  cancelProviderAccountCodeLogin,
   cancelProviderAccountSignIn,
   cancelProviderCodeLogin,
   cancelProviderHostSignIn,
   cancelProviderRuntime,
   checkProviderRuntimeUpdates,
   clearProviderApiKey,
+  connectProviderAccountKey,
   deleteCustomAgent,
   deleteCustomProvider,
   downloadProviderRuntime,
@@ -73,6 +78,7 @@ import {
   listProviderAccountsWithModels,
   type ProviderCodeLoginRoutes,
   type ProviderRuntimeRoutes,
+  providerAccountCodeLoginStatus,
   providerAccountSignInStatus,
   providerAccountUsage,
   providerHostSignInStatus,
@@ -83,12 +89,15 @@ import {
   saveCustomAgent,
   saveCustomProvider,
   setHostProviderDefault,
+  setProviderAccountPool,
   setProviderApiKey,
   setProviderUse,
   signOutProvider,
+  startProviderAccountCodeLogin,
   startProviderAccountSignIn,
   startProviderCodeLogin,
   startProviderHostSignIn,
+  submitProviderAccountCodeLogin,
   submitProviderCodeLogin,
   updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
@@ -165,6 +174,8 @@ function webProviderAdmin(
   accountRelay: () => ProviderAccountRelay | null,
   /** Whether the host has `provider-account-models-v1`. */
   accountModels: () => boolean,
+  /** Whether the host has `provider-account-pool-v1`. */
+  accountPools: () => boolean,
 ): ProviderAdminDesktopApi {
   return {
     startCodeLogin: async (provider, serverId) =>
@@ -253,7 +264,7 @@ function webProviderAdmin(
       ),
     accounts: async (serverId) =>
       runTeamEffect(
-        listProviderAccountsWithModels(request(serverId), accountModels()).pipe(
+        listProviderAccountsWithModels(request(serverId), accountModels(), accountPools()).pipe(
           Effect.mapError((error) => error.cause),
         ),
       ),
@@ -269,10 +280,30 @@ function webProviderAdmin(
       runTeamEffect(
         cancelProviderAccountSignIn(request(serverId), provider).pipe(Effect.mapError((error) => error.cause)),
       ),
+    connectAccountKey: async (input, serverId) =>
+      runTeamEffect(connectProviderAccountKey(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    startAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        startProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    submitAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        submitProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    accountCodeLoginStatus: async (input, serverId) =>
+      runTeamEffect(
+        providerAccountCodeLoginStatus(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
+    cancelAccountCodeLogin: async (input, serverId) =>
+      runTeamEffect(
+        cancelProviderAccountCodeLogin(request(serverId), input).pipe(Effect.mapError((error) => error.cause)),
+      ),
     renameAccount: async (input, serverId) =>
       runTeamEffect(renameProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     removeAccount: async (input, serverId) =>
       runTeamEffect(removeProviderAccount(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
+    setAccountPool: async (input, serverId) =>
+      runTeamEffect(setProviderAccountPool(request(serverId), input).pipe(Effect.mapError((error) => error.cause))),
     hostDefaultProvider: async (serverId) =>
       knownHostDefault(
         await runTeamEffect(getHostProviderDefault(request(serverId)).pipe(Effect.mapError((error) => error.cause))),
@@ -392,6 +423,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           : PROVIDERS_ADMIN_ROUTES,
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
+    () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
   );
   const serverId = createMemo(() => remoteAdminServer(options.server(), "providers-v1")?.id);
   const runtimes = createProviderRuntimeStore(
@@ -429,13 +461,19 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
   const readsCodexKey = createMemo(() => serverSupportsCapability(options.server(), CODEX_API_KEY_CAPABILITY));
   const providerKeys = createMemo(() => {
     const id = serverId();
-    return id
-      ? {
-          ...hostProviderKeyApi(() => admin, id, openWebDestination),
-          readsClaudeKey: readsClaudeKey(),
-          readsCodexKey: readsCodexKey(),
-        }
-      : undefined;
+    if (!id) return undefined;
+    const api = hostProviderKeyApi(() => admin, id, openWebDestination);
+    return {
+      ...api,
+      readsClaudeKey: readsClaudeKey(),
+      readsCodexKey: readsCodexKey(),
+      setProviderApiKey: async (input: { provider: AgentProviderId; key: string }) => {
+        const result = await api.setProviderApiKey(input);
+        // The host downloads Pi for the key when it has none, and sends no event for it.
+        if (isKeyOnlyProvider(input.provider)) runtimes.refreshProviderRuntimes();
+        return result;
+      },
+    };
   });
   // The released status and agent routes carry no account, so `provider-accounts-v1` adds them.
   const accountsServerId = createMemo(() => remoteAdminServer(options.server(), PROVIDER_ACCOUNTS_CAPABILITY)?.id);
@@ -493,6 +531,7 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         },
         ...(accountsServerId() ? { accountSignIn: accountSignIn(accountsServerId() ?? "") } : {}),
         ...(relayed ? { accountRelay: accountRelay(accountsServerId() ?? "", relayed) } : {}),
+        ...(accountCodeServerId() ? { accountCode: accountCode(accountCodeServerId() ?? "") } : {}),
         relay: {
           hostName: options.server()?.name ?? "",
           start: (provider: AgentProviderId) => admin.startRelaySignIn(provider, id ?? ""),
@@ -529,6 +568,34 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
       },
     };
   }
+  /** The joined server whose host signs a provider account in with a code (`provider-account-code-v1`). */
+  const accountCodeServerId = () => {
+    const id = accountsServerId();
+    return id && remoteAdminServer(options.server(), PROVIDER_ACCOUNT_CODE_CAPABILITY)?.id === id ? id : undefined;
+  };
+  /** As on desktop: the accounts are read again when an account's code sign-in starts and when it ends. */
+  function accountCode(id: string) {
+    const refresh = () => hostAccounts.refresh().catch(() => undefined);
+    return {
+      start: async (provider: AgentProviderId, accountId: string | null) => {
+        const started = await admin.startAccountCodeLogin({ provider, accountId }, id);
+        // The code is shown at once: the code lives for a short time only.
+        void refresh();
+        return started;
+      },
+      submit: (provider: AgentProviderId, accountId: string, code: string) =>
+        admin.submitAccountCodeLogin({ provider, accountId, code }, id),
+      status: async (provider: AgentProviderId, accountId: string) => {
+        const result = await admin.accountCodeLoginStatus({ provider, accountId }, id);
+        if (result.result) await refresh();
+        return result;
+      },
+      cancel: async (provider: AgentProviderId, accountId: string) => {
+        await admin.cancelAccountCodeLogin({ provider, accountId }, id);
+        await refresh();
+      },
+    };
+  }
   /** As on desktop: the other relay requests run an account's relayed sign-in by its provider. */
   function accountRelay(id: string, relayed: ProviderAccountRelay) {
     return {
@@ -560,8 +627,10 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     return {
       connect: async (provider, accountId) => connection.connectAccount(provider, accountId),
       // The host runs one account sign-in for each provider, so the released cancel names only the provider.
-      cancel: async (provider) => {
+      // It does not stop a code sign-in, which the code route stops by its account.
+      cancel: async (provider, accountId) => {
         await accountSignIn(id).cancel(provider);
+        if (accountCodeServerId() === id) await accountCode(id).cancel(provider, accountId);
       },
       rename: (provider, accountId, label) => changed(admin.renameAccount({ provider, accountId, label }, id)),
       remove: (provider, accountId) => changed(admin.removeAccount({ provider, accountId }, id)),
@@ -578,6 +647,26 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         : {}),
       ...(remoteAdminServer(options.server(), PROVIDER_SIGN_OUT_CAPABILITY)?.id === id
         ? { signOut: (provider: AgentProviderId) => changed(admin.signOut(provider, id)) }
+        : {}),
+      ...(remoteAdminServer(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY)?.id === id
+        ? {
+            setPool: (provider: AgentProviderId, enabled: boolean, leftOut: readonly string[]) =>
+              changed(admin.setAccountPool({ provider, enabled, leftOut: [...leftOut] }, id)),
+          }
+        : {}),
+      ...(accountCodeServerId() === id
+        ? {
+            connectWithCode: async (provider: AgentProviderId, accountId: string | null) =>
+              connection.connectAccountWithCode(provider, accountId),
+            // Only a host that can run a pasted code advertises `providers-v3`.
+            pasteCodeSignIn: serverSupportsCapability(options.server(), "providers-v3"),
+          }
+        : {}),
+      ...(remoteAdminServer(options.server(), PROVIDER_ACCOUNT_KEYS_CAPABILITY)?.id === id
+        ? {
+            connectKey: (provider: AgentProviderId, accountId: string | null, key: string) =>
+              changed(admin.connectAccountKey({ provider, accountId, key }, id)),
+          }
         : {}),
     };
   });

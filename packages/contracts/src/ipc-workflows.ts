@@ -100,9 +100,207 @@ export type WorkflowFieldValue = string | number | boolean;
  *   emoji of `react`). For `chat-channel`: `channelId`. The result shows in the channel as a note; no
  *   task starts.
  * - prompt: `text`.
+ * - image: `media` (a `WorkflowMediaKind`, "image" when absent), `prompt`, `aspect` (one of
+ *   `WORKFLOW_MEDIA_ASPECTS`), `model` (an id of `WORKFLOW_MEDIA_MODELS`), `account` (the id of the
+ *   account of the model's provider that pays for the file; empty or absent is the provider's own
+ *   sign-in, and Sunra ignores it), `resolution` (one of the
+ *   model's resolutions, such as "720p" or "2K"), and for a video `duration` (seconds), `firstFrame`
+ *   and `lastFrame` (the id of an image node that an
+ *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
+ *   `WORKFLOW_VIDEO_VOICES`), and for an image `background` ("transparent" for a picture with clear
+ *   pixels around its subject, from a model with `transparent`; absent is the model's own background).
+ *   The pictures of the other image nodes with an `image` edge into it are
+ *   references. The output of its step is the id of the generated attachment.
  * Every other field is view state, such as a colour or a font, and the host keeps it as it is.
  */
 export type WorkflowFields = Record<string, WorkflowFieldValue>;
+
+export const WORKFLOW_MEDIA_KINDS = ["image", "video"] as const;
+export type WorkflowMediaKind = (typeof WORKFLOW_MEDIA_KINDS)[number];
+
+export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16"] as const;
+export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
+
+/**
+ * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra,
+ * whose MCP server the user connects in Apps and whose credits pay for the file.
+ */
+export type WorkflowMediaProvider = "codex" | "grok" | "sunra";
+
+/** A model that makes the image or the video of an `image` node, with the subscription of its provider. */
+export interface WorkflowMediaModel {
+  id: string;
+  provider: WorkflowMediaProvider;
+  name: string;
+  maker: string;
+  /** The name of the subscription, or of the credits with `credits`, that pays for the file. */
+  subscription: string;
+  /** True when each file spends credits of the provider account, not a subscription. */
+  credits?: boolean;
+  /** The id of the model at the provider, when it is not `id`. */
+  providerModel?: string;
+  kinds: readonly WorkflowMediaKind[];
+  /** Whether a video can speak in a preset voice of `WORKFLOW_VIDEO_VOICES`. */
+  voices: boolean;
+  /** The aspect ratios that it makes. All of `WORKFLOW_MEDIA_ASPECTS` when absent. */
+  aspects?: readonly WorkflowMediaAspect[];
+  /** The lengths of a video in seconds. `WORKFLOW_VIDEO_DURATIONS` when absent. */
+  durations?: readonly number[];
+  /**
+   * The resolutions that it makes, the default first. A video has `WORKFLOW_VIDEO_RESOLUTIONS` when
+   * absent; an image without them has no resolution choice.
+   */
+  resolutions?: readonly string[];
+  /** Whether an image can have a transparent background (`background` "transparent"). */
+  transparent?: boolean;
+}
+
+/** The Sunra image models, from Sunra's `list_models` (2026-11-12). */
+const SUNRA_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+const SUNRA_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
+
+function sunraModel(
+  id: string,
+  name: string,
+  maker: string,
+  kind: WorkflowMediaKind,
+  specs: Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions">,
+): WorkflowMediaModel {
+  return {
+    id: `sunra-${id}`,
+    provider: "sunra",
+    providerModel: id,
+    name,
+    maker,
+    subscription: "Sunra",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    ...specs,
+  };
+}
+
+export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
+  {
+    id: "gpt-image",
+    provider: "codex",
+    name: "GPT Image",
+    maker: "OpenAI",
+    subscription: "ChatGPT",
+    kinds: ["image"],
+    voices: false,
+    transparent: true,
+  },
+  {
+    id: "grok-imagine",
+    provider: "grok",
+    name: "Grok Imagine",
+    maker: "xAI",
+    subscription: "Grok",
+    kinds: ["image", "video"],
+    voices: true,
+    transparent: true,
+  },
+  sunraModel("nano-banana-pro", "Nano Banana Pro", "Google", "image", { resolutions: SUNRA_IMAGE_RESOLUTIONS }),
+  sunraModel("gpt-image-2", "GPT Image 2", "OpenAI", "image", { resolutions: SUNRA_IMAGE_RESOLUTIONS }),
+  sunraModel("seedream-5-pro", "Seedream 5.0 Pro", "ByteDance", "image", { resolutions: ["2K", "1K"] }),
+  sunraModel("flux-3-image", "FLUX 3", "Black Forest Labs", "image", { resolutions: SUNRA_IMAGE_RESOLUTIONS }),
+  sunraModel("seedance-2.0", "Seedance 2.0", "ByteDance", "video", {
+    durations: [5, 10, 15],
+    resolutions: SUNRA_VIDEO_RESOLUTIONS,
+  }),
+  sunraModel("kling-v4", "Kling 4.0", "Kuaishou", "video", {
+    aspects: ["1:1", "16:9", "9:16"],
+    durations: [5, 10, 15],
+    resolutions: SUNRA_VIDEO_RESOLUTIONS,
+  }),
+  sunraModel("veo-3.1", "Veo 3.1", "Google", "video", {
+    aspects: ["16:9", "9:16"],
+    durations: [4, 6, 8],
+    resolutions: SUNRA_VIDEO_RESOLUTIONS,
+  }),
+];
+
+/** The picture types that an asset step keeps and that image and video steps take as input. */
+export const WORKFLOW_PICTURE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+export const WORKFLOW_VIDEO_DURATIONS = [6, 10] as const;
+export const WORKFLOW_VIDEO_RESOLUTIONS = ["480p", "720p"] as const;
+
+/** The preset voices that a person in a Grok Imagine video can speak in (Grok CLI 1.0.77). */
+export const WORKFLOW_VIDEO_VOICES = [
+  { id: "ara", name: "Ara" },
+  { id: "eve", name: "Eve" },
+  { id: "leo", name: "Leo" },
+  { id: "rex", name: "Rex" },
+] as const;
+export type WorkflowVideoVoice = (typeof WORKFLOW_VIDEO_VOICES)[number]["id"];
+
+/** The media kind of an `image` node. */
+export function workflowMediaKind(fields: WorkflowFields): WorkflowMediaKind {
+  return fields.media === "video" ? "video" : "image";
+}
+
+/** The choices of a model, or of every model when it is not known. */
+type WorkflowMediaRange = Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">;
+
+export function workflowMediaAspects(model: WorkflowMediaRange | null | undefined): readonly WorkflowMediaAspect[] {
+  return model?.aspects ?? WORKFLOW_MEDIA_ASPECTS;
+}
+
+export function workflowVideoDurations(model: WorkflowMediaRange | null | undefined): readonly number[] {
+  return model?.durations ?? WORKFLOW_VIDEO_DURATIONS;
+}
+
+/** The resolutions of a model for a kind. An image of a model without them has none. */
+export function workflowMediaResolutions(
+  model: WorkflowMediaRange | null | undefined,
+  kind: WorkflowMediaKind,
+): readonly string[] {
+  return model?.resolutions ?? (kind === "video" ? WORKFLOW_VIDEO_RESOLUTIONS : []);
+}
+
+/** The frame, the length and the resolution that an `image` node asks its model for. */
+export interface WorkflowMediaSpecs {
+  aspect: WorkflowMediaAspect;
+  /** Seconds. Only a video uses it. */
+  duration: number;
+  resolution: string | null;
+  /** An image with a transparent background. Only an image of a model with `transparent` has one. */
+  transparent: boolean;
+}
+
+/**
+ * The specs of an `image` node for its model. A value that the model does not make, such as a length
+ * kept from another model, becomes the nearest length or the first choice of the model. The host and
+ * the canvas read it the same way, so the canvas shows what the model gets.
+ */
+export function workflowMediaSpecs(
+  fields: WorkflowFields,
+  kind: WorkflowMediaKind,
+  model: WorkflowMediaRange | null | undefined,
+): WorkflowMediaSpecs {
+  const aspects = workflowMediaAspects(model);
+  const aspect = aspects.find((value) => value === fields.aspect) ?? aspects[0] ?? "1:1";
+  const durations = workflowVideoDurations(model);
+  const asked = typeof fields.duration === "number" ? fields.duration : WORKFLOW_VIDEO_DURATIONS[0];
+  const duration = durations.reduce(
+    (best, value) => (Math.abs(value - asked) < Math.abs(best - asked) ? value : best),
+    durations[0] ?? WORKFLOW_VIDEO_DURATIONS[0],
+  );
+  const resolutions = workflowMediaResolutions(model, kind);
+  const preferred = typeof fields.resolution === "string" ? fields.resolution : "720p";
+  const resolution = resolutions.includes(preferred) ? preferred : (resolutions[0] ?? null);
+  const transparent = kind === "image" && model?.transparent === true && fields.background === "transparent";
+  return { aspect, duration, resolution, transparent };
+}
+
+/** The model of an `image` node, or null when the node names a model the host does not know. */
+export function workflowMediaModel(fields: WorkflowFields): WorkflowMediaModel | null {
+  const kind = workflowMediaKind(fields);
+  const id = typeof fields.model === "string" && fields.model !== "" ? fields.model : null;
+  return WORKFLOW_MEDIA_MODELS.find((model) => (id === null || model.id === id) && model.kinds.includes(kind)) ?? null;
+}
 
 export interface WorkflowPoint {
   x: number;
@@ -734,4 +932,44 @@ export function isWorkflowTriggerInput(value: unknown): value is WorkflowTrigger
 
 export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhookSecret {
   return isDynamicRecord(value) && isBoundedString(value.secret, INPUT_LIMITS.identifier) && value.secret.length > 0;
+}
+
+/**
+ * The media services that the host can use now, beyond the agent providers. `sunra`: an enabled Sunra
+ * row in the host's Apps is signed in, so the Sunra models of `WORKFLOW_MEDIA_MODELS` can run.
+ */
+export interface WorkflowMediaProviders {
+  sunra: boolean;
+}
+
+export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
+  return isDynamicRecord(value) && isBoolean(value.sunra);
+}
+
+/**
+ * The credits of a media service that the host can spend now. `available`: the credits that the
+ * signed-in account can spend. `quota`: the limit of a team member, or null for an account with no
+ * limit of its own.
+ */
+export interface WorkflowMediaCreditBalance {
+  available: number;
+  quota: number | null;
+}
+
+/** The credits of each media service beyond the agent providers. `sunra`: null when the host cannot read them. */
+export interface WorkflowMediaCredits {
+  sunra: WorkflowMediaCreditBalance | null;
+}
+
+const isCreditCount = (value: unknown): value is number =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
+function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
+  return (
+    isDynamicRecord(value) && isCreditCount(value.available) && (value.quota === null || isCreditCount(value.quota))
+  );
+}
+
+export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCredits {
+  return isDynamicRecord(value) && (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra));
 }

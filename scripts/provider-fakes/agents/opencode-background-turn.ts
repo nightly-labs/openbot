@@ -5,7 +5,8 @@
 //
 // A prompt with `steps` writes text, calls a tool, and then writes the answer in two steps, each a
 // message of its own with no tool call between them, as OpenCode 2.2.0 can. A prompt with
-// `background` also starts a subagent that stays running. Its turn comes in parts, each at a
+// `background` also starts a subagent that stays running, or with `shell` a shell command in the
+// background, whose result has a `shellID` and no `sessionID`, as in OpenCode 2.2.7 (#7713). Its turn comes in parts, each at a
 // `session/list`: first a tool call that runs, then, after the test creates the file named after the
 // session in the folder `FAKE_RELEASE`, the tool's end and an answer with no text yet. The answer's
 // text then comes in two more parts, as a replay can find a message that grows. Any other prompt
@@ -174,9 +175,12 @@ serveFakeAcpAgent({
         text(`${turn}_c`, "Nothing to change."),
       ]);
     } else if (prompt.includes("background")) {
+      const metadata = prompt.includes("shell")
+        ? { status: "running", truncated: false, shellID: `shl_${turn}` }
+        : { sessionID: `ses_child_${turn}`, status: "running" };
       send(peer, session, [
         text(`${turn}_a`, "Starting a background task."),
-        ...tool(`${turn}_subagent`, "completed", { metadata: { sessionID: `ses_child_${turn}`, status: "running" } }),
+        ...tool(`${turn}_task`, "completed", { metadata }),
         text(`${turn}_b`, "I started it."),
       ]);
       session.pending = 1;

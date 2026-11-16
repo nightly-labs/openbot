@@ -47,6 +47,10 @@ export const messages = {
     "Bu uzak ana makine mevcut bir sekmede adres çubuğuyla gezinmeyi desteklemiyor.",
   "error.backend.browserUserControlBusy":
     "Bu tarayıcı sekmesi bir gizli bilgi bekliyor. Önce gizli bilgi isteğini yanıtlayın.",
+  "error.backend.browserTeachBusy":
+    "Bu tarayıcı sekmesini başka bir kişi kontrol ediyor. O bitirdiğinde tekrar deneyin.",
+  "error.backend.browserTeachUnavailable": "Bu tarayıcı sekmesinde görev öğrenebilecek bir ajan yok.",
+  "error.backend.browserTeachUnsupported": "Bu uzak ana makine görev kaydını desteklemiyor.",
   "error.backend.browserUserControlUnsupported":
     "Bu uzak ana makine bir tarayıcı sekmesinin denetimini almayı desteklemiyor.",
   "error.backend.browserSignInUnsupported": "Bu uzak ana makine bu bilgisayardan oturum açma alamaz.",
@@ -62,6 +66,8 @@ export const messages = {
     "Sıkıştırma bu sohbeti küçültmüyor: iki sıkıştırmadan sonra hâlâ modelin bağlam penceresinin %{percent} kadarını kullanıyor, bu yüzden OpenBot sıkıştırmayı durduruyor. Pencerenin çoğunu araçlar ve talimatlar kullanıyor. Bu ajanın ihtiyaç duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın ya da daha büyük pencereli bir model seçin. Ardından yeni bir sohbet başlatın.",
   "error.backend.contextCompactionStopped":
     'Bu sohbetin art arda iki sıkıştırması başarısız oldu, bu yüzden OpenBot onu otomatik olarak sıkıştırmayı bırakıyor. Her deneme tüm sohbeti modele gönderir ve plan sınırınızı kullanır. Yeniden denemek için "Şimdi sıkıştır"ı seçin veya yeni bir sohbet başlatın.',
+  "error.backend.providerModelAtCapacity":
+    "Model kapasitesinin sınırında. Sağlayıcı birkaç dakika içinde yeniden deneyecek. Hemen devam etmek için turu durdurun ve başka bir model seçin.",
   "error.backend.providerRetrying":
     "Sağlayıcı bu isteği {attempts} kez tamamlayamadı ve yeniden deniyor. Ajan devam etmezse turu durdurun.",
   "error.backend.providerRetryingLargeContext":
@@ -79,6 +85,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "Bu kanaldaki iş bitene kadar bekleyin, sonra geçmişini silin.",
   "error.backend.channelCompactUnavailable":
     "Bu kanalın hiçbir üyesi şu anda bağlamını sıkıştıramıyor. Önce bir üyenin kanalda yanıt vermesi ve sağlayıcısının sıkıştırmayı desteklemesi gerekir.",
+  "error.backend.channelCompactNoSession":
+    "Bu kanalın üyelerinin henüz sıkıştırılacak bir konuşması yok. Bir üye kanalda yanıt verdikten sonra sıkıştırın.",
+  "error.backend.channelCompactNotSupported":
+    "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
@@ -111,6 +121,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Bellek işlemi başarısız oldu. Tekrar deneyin.",
   "error.backend.memoryGone": "Bu bellek artık mevcut değil.",
   "error.backend.routineGone": "Bu rutin artık mevcut değil.",
+  "error.backend.routineRunGone": "Bu rutin çalıştırması artık mevcut değil.",
   "error.backend.turnNotStarted": "Sağlayıcı bu turu başlatmadı.",
   "error.backend.routineResultConnectionOff": "Bu mesajlaşma bağlantısı kapalı veya kaldırılmış. Başka bir yer seçin.",
   "error.backend.routineResultNoDelivery": "Bu çalıştırmanın yeniden gönderilecek bir yanıtı yok.",
@@ -158,6 +169,10 @@ export const messages = {
   "error.backend.attachBetween": "1 ila {limit} dosya ekleyin.",
   "error.backend.attachmentNotFile": "Ek bir dosya değil: {path}",
   "error.backend.generatedImageTooLarge": "Oluşturulan görsel 100 MB sınırını aşıyor.",
+  "error.backend.generatedVideoTooLarge": "Oluşturulan video 100 MB sınırını aşıyor.",
+  "error.backend.videoGenerationFailed": "Video oluşturulamadı.",
+  "error.backend.videoGenerationNoVideo": "Video oluşturma bir video döndürmedi.",
+  "error.backend.videoGenerationInterrupted": "Video oluşturma kesintiye uğradı.",
   "error.backend.attachmentNotRegularFile": "Yalnızca normal dosyalar eklenebilir: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot {name} öğesini kopyalayamadı.",
   "error.backend.routineNameRequired": "Bir rutin adı gereklidir.",
@@ -185,6 +200,8 @@ export const messages = {
   "error.backend.interruptSelf": "Bir ajan kendi kendini kesintiye uğratamaz.",
   "error.backend.interruptOtherWork":
     "Bu ajan mesajınızın başlatmadığı bir görev üzerinde çalışıyor. Yalnızca kullanıcı veya o görevin göndereni görevi durdurabilir.",
+  "error.backend.interruptSharedWork":
+    "Bu ajanın turu mesajınız ve ayrıca kullanıcıdan ya da başka bir ajandan gelen bir mesaj üzerinde çalışıyor. Onu yalnızca kullanıcı, o ajanın sohbetindeki Ajanı durdur ile durdurabilir.",
   "error.backend.interruptStarting": "Bu ajan hâlâ bir tur başlatıyor. Tur başladıktan sonra tekrar deneyin.",
   "error.backend.interruptNoSession": "OpenBot sağlayıcı oturumu kullanılamadığı için bu ajanı kesintiye uğratamıyor.",
   "error.backend.memoryTextRequired": "Bellek metni gereklidir.",
@@ -213,6 +230,9 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Bu mesaj sohbette yok.",
   "error.backend.messageDeleteBusy": "Bu mesaj devam eden bir turun parçası. Tur bitince silin.",
   "error.backend.messageDeleteForbidden": "Yalnızca gönderdiğiniz mesajları silebilirsiniz.",
+  "error.backend.messagePinNotFound": "Bu mesaj sohbette değil.",
+  "error.backend.messagePinLimit":
+    "Bu sohbette 50 sabitlenmiş mesaj var. Başka bir mesaj sabitlemeden önce birini kaldırın.",
   "error.backend.routineFlowHandoffFailed": "Rutin işi bu ajana aktaramadı.",
   "error.backend.mcpServerLimit": "OpenBot en fazla {limit} MCP sunucusu tutar.",
   "error.backend.mcpServerNameTaken": "{name} adında bir MCP sunucusu zaten mevcut.",
@@ -244,6 +264,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Sunucunun {tool} aracının giriş biçimini bu sağlayıcı okuyamıyor. Diğer sağlayıcılardaki ajanlar sunucuyu almaya devam ediyor.",
   "error.backend.mcpServerSignInForProvider":
     "{provider}, {name} MCP sunucusunu kullanamadı, çünkü sunucu oturum açmanızı istiyor. MCP ayarlarını açın ve Oturum aç'ı seçin.",
   "error.backend.mcpServerFailedForProvider":
@@ -275,6 +297,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Bölüm adı çok uzun.",
   "error.backend.sidebarFolderTooDeep": "Klasörler en fazla üç seviye derinliğinde olabilir.",
   "error.backend.sidebarFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
+  "error.backend.libraryFolderName": "Klasör adı 1 ile {limit} karakter arasında olmalıdır.",
+  "error.backend.libraryFolderLimit": "Bir sunucuda en fazla {limit} Kitaplık klasörü olabilir.",
+  "error.backend.libraryFolderFileLimit": "Kitaplık klasörlerinde çok fazla dosya var.",
+  "error.backend.libraryFolderTooDeep": "Kitaplık klasörleri en fazla {limit} düzey derinliğinde olabilir.",
+  "error.backend.libraryFolderGone": "Klasör yok veya zaten silinmiş.",
+  "error.backend.libraryFolderOtherAgent": "Bir dosya yalnızca kendi ajanının klasörüne konabilir.",
+  "error.backend.libraryFolderMoveInvalid": "Bu klasör oraya taşınamaz.",
   "error.backend.sectionNameDuplicate": "Bölüm adları benzersiz olmalıdır.",
   "error.backend.directMessageRequired": "Önce bir mesaj yazın.",
   "error.backend.directMessageTooLong": "Doğrudan mesaj en fazla {limit} karakter içerebilir.",
@@ -325,8 +354,12 @@ export const messages = {
   "error.backend.browserProxyChanged": "Bu proxy siz açtıktan sonra değişti. Yeniden kontrol edip tekrar deneyin.",
   "error.backend.browserProxyUnreachable": "{name} proxy'si yanıt vermiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserProxySignInRefused": "{name} proxy'si oturum açmayı reddetti, bu yüzden sayfa açılmadı.",
+  "error.backend.browserSystemProxyFailed":
+    "OpenBot'u çalıştıran bilgisayarın ayarlarındaki proxy yanıt vermiyor veya bağlantıyı reddetti, bu yüzden sayfa açılmadı. O bilgisayarın proxy ayarlarını kontrol edin.",
   "error.backend.browserProxyComputerUnreachable":
     "Bu profilin kullandığı bilgisayar yanıt vermiyor, bu yüzden sayfa açılmadı.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Bu profilin kullandığı bilgisayar yalnızca herkese açık siteleri açar. Yerel ağdaki adresleri açmaz, bu yüzden sayfa açılmadı.",
   "error.backend.browserCertificateUntrusted":
     "Bu sitenin güvenlik sertifikasına güvenilmiyor, bu yüzden sayfa açılmadı.",
   "error.backend.browserLowMemory":

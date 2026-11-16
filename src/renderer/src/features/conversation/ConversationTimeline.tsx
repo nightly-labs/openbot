@@ -1,7 +1,7 @@
-import { fileQuoteId } from "@openbot/contracts/chat-tag-references";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
 import type { AgentApproval, ConversationMessageSender, MessageReaction } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
+import { feedbackApproval } from "@openbot/team-client/feedback-approval";
 import { Button } from "@openbot/ui";
 import type { AgentMessage, ChatActionMarkerModel, MessageKind } from "@openbot/ui/data";
 import { ChannelActivityIndicator, type ChannelWorker } from "@openbot/ui/features/channels/ChannelActivityIndicator";
@@ -21,10 +21,8 @@ import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/con
 import { ChatRowBoundary } from "@openbot/ui/features/conversation/ChatRowBoundary";
 import { ChatScrollRail, createChatScrollRail } from "@openbot/ui/features/conversation/ChatScrollRail";
 import { ChatSearch } from "@openbot/ui/features/conversation/ChatSearch";
-import { ChatVisual } from "@openbot/ui/features/conversation/ChatVisual";
 import { ContextCompactionMarker, type ContextCompactionView } from "@openbot/ui/features/conversation/ContextUsage";
 import { dayMarkerLabel } from "@openbot/ui/features/conversation/chat-day-markers";
-import { feedbackApproval } from "@openbot/ui/features/conversation/feedback-approval";
 import { markdownPlainText } from "@openbot/ui/features/conversation/MarkdownMessageText";
 import { ReplyReturnButton, ScrollToLatestButton } from "@openbot/ui/features/conversation/MessageNavigation";
 import {
@@ -35,6 +33,7 @@ import {
   type MessageMenuItemsProps,
 } from "@openbot/ui/features/conversation/MessageRendering";
 import { countableTimelineMessage } from "@openbot/ui/features/conversation/new-message-tally";
+import { ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { PendingSendStatus } from "@openbot/ui/features/conversation/PendingSendStatus";
 import { SubagentDock, SubagentGroup } from "@openbot/ui/features/conversation/Subagents";
 import { TaskList } from "@openbot/ui/features/conversation/TaskList";
@@ -43,11 +42,12 @@ import { UnreadMessagesBanner, UnreadMessagesDivider } from "@openbot/ui/feature
 import { VoicePlayer } from "@openbot/ui/features/conversation/VoicePlayer";
 import { teamMemberName } from "@openbot/ui/features/team/TeamPersonAvatar";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createMemo, createSignal, For, Loading, lazy, onCleanup, Show, untrack } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Loading, onSettled, Show, untrack } from "solid-js";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { planItems, planTitle } from "../../app-message-projection";
+import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
-import { currentDevicePlatform, deviceQuoteShortcut } from "../../send-shortcut-preference";
+import { currentDevicePlatform } from "../../send-shortcut-preference";
 import { remoteRoutineRecovery, serverCanAdminister } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
@@ -62,12 +62,12 @@ import {
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
 import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
+import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { continuesSenderRun } from "./chat-grouping";
 import { chatSearchCanOpen, chatSearchOpensMessage } from "./chat-search";
-import { isChatVisualAppShortcut } from "./chat-visual-shortcuts";
-import { chatVisualPageUrl } from "./chat-visual-url";
+import { ApprovalCard, preloadConversationCards, QuestionPromptBubble, UiBlockPrompt } from "./conversation-cards";
 import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
@@ -229,6 +229,7 @@ export function ConversationTimeline() {
     shownSubagentId,
     toggleSubagentPanel,
     sideThreadOpen,
+    messagePins,
   } = useConversationViewScope();
   const { t, format, sourceText } = useText();
   // A named function, not a ternary in the prop: the compiler wraps a ternary prop in a memo, and
@@ -263,6 +264,13 @@ export function ConversationTimeline() {
     return () => setDeleteTargetId(message.id);
   };
   const deleteMessage = (messageId: string) => props.onDeleteMessage?.(messageId) ?? Promise.resolve();
+  /** A finished message that the host stores can be pinned to the agent's chat. A channel has no pins yet. */
+  const pinAction = (message: AgentMessage) => {
+    if (!messagePins.available() || message.streaming || message.id.startsWith(PENDING_SEND_ID_PREFIX)) return;
+    if (message.actionMarker) return;
+    const pinned = messagePins.isPinned(undefined, message.id);
+    return { pinned, onToggle: () => messagePins.set(undefined, message.id, !pinned) };
+  };
   /** A finished message of an agent chat can start work in a channel. A channel message stays where it is. */
   const sendToChannelAction = (message: AgentMessage) => {
     const target = props.sendToChannel;
@@ -688,6 +696,7 @@ export function ConversationTimeline() {
   });
   const showAgentSteps = useShowAgentSteps();
   const compactActions = useCompactMessageActions();
+  const bubbleStyle = useChatBubbleStyle();
   const traceKeyboard = currentDevicePlatform() === "darwin" ? "mac" : "pc";
   /** The trace that the steps row of an answer opens. A channel names the agent that answered. */
   const traceAbove = (messageId: string | undefined, agentName?: string): AgentStepsTrace => ({
@@ -772,6 +781,9 @@ export function ConversationTimeline() {
       ? props.agent
       : undefined,
   );
+  // The cards of an agent's requests draw from lazy chunks. Loaded after the first chat opens, the card
+  // of the next chat is in its first frame, and the chat does not jump.
+  onSettled(preloadConversationCards);
   const sampleRoutinePrompt = () =>
     props.routines?.find((routine) => routine.active && routine.instruction.trim())?.instruction ??
     props.routines?.find((routine) => routine.instruction.trim())?.instruction;
@@ -939,8 +951,14 @@ export function ConversationTimeline() {
                   const current = message();
                   const sender = otherSender(current);
                   if (sender) return memberAuthor(sender);
+                  // In an agent chat, Settings › Appearance › Your bubbles can give them the agent's color.
                   if (current?.author === "you")
-                    return { kind: "you", name: t("chat.message.you"), chatColor: ownChatColor() };
+                    return ownMessageAuthor({
+                      name: t("chat.message.you"),
+                      style: channel ? "classic" : bubbleStyle(),
+                      agent: props.agent,
+                      chatColor: ownChatColor(),
+                    });
                   if (channel && current) return channel.author(current);
                   // The profile gives the row the agent's color, for the name and the bubble tint.
                   return {
@@ -1186,8 +1204,9 @@ export function ConversationTimeline() {
                                           suggestion(),
                                           Boolean(props.activeTurnId),
                                         )}
-                                        onSave={sendCardMessage}
-                                        onSaveSkill={() => saveSkillSuggestion(message()?.id ?? initialMessage.id)}
+                                        onSave={(reply) =>
+                                          saveSkillSuggestion(message()?.id ?? initialMessage.id, reply)
+                                        }
                                         onOpenSkill={skillOpener()}
                                       />
                                     )}
@@ -1363,36 +1382,8 @@ export function ConversationTimeline() {
                     </div>
                   );
                 }
-                const initialVisual = untrack(() => chatVisualReply(initialMessage));
-                // The desktop loads the page from its own scheme. The web client has no page URL: it
-                // reads the HTML and shows it as `srcdoc`. Another client shows the title and file.
-                const loadPage = runtime.visualPage;
-                if (initialVisual && (chatVisualPageUrl(initialVisual.attachment.previewUrl) || loadPage)) {
-                  // A visual reply is the agent's page. It shows above the final reply, with no bubble.
-                  const visual = () => chatVisualReply(message() ?? initialMessage) ?? initialVisual;
-                  const pageUrl = () => chatVisualPageUrl(visual().attachment.previewUrl);
-                  // The page quotes as its file, as in the side panel, so the quote chip opens the page.
-                  const pageQuoteId = () =>
-                    fileQuoteId({
-                      source: "attachment",
-                      attachmentId: visual().attachment.id,
-                      name: visual().attachment.name,
-                    });
-                  const [page, setPage] = createSignal<{ html?: string; failed?: boolean }>({});
-                  if (loadPage && !pageUrl()) {
-                    let mounted = true;
-                    onCleanup(() => {
-                      mounted = false;
-                    });
-                    void loadPage(initialVisual.attachment).then(
-                      (html) => {
-                        if (mounted) setPage({ html });
-                      },
-                      () => {
-                        if (mounted) setPage({ failed: true });
-                      },
-                    );
-                  }
+                const initialVisual = untrack(() => shownVisualReply(initialMessage, runtime.visualPage));
+                if (initialVisual) {
                   return (
                     <div
                       data-index={virtualRow.index}
@@ -1427,22 +1418,18 @@ export function ConversationTimeline() {
                         <article
                           data-chat-search-message={message()?.id}
                           aria-label={(message() ?? initialMessage).body}
-                          class={{ "message-entry-animated": animateEntrance }}
+                          class={{
+                            "message-entry-animated": animateEntrance,
+                            // A channel shows agent faces, so the page starts after their column.
+                            "chat-visual-with-author": Boolean(channel) && author().kind === "agent",
+                          }}
                         >
-                          <ChatVisual
-                            src={pageUrl()}
-                            html={page().html}
-                            failed={pageUrl() === undefined && (!loadPage || page().failed === true)}
-                            title={(message() ?? initialMessage).body}
-                            height={visual().height}
-                            onOpenLink={(url) => void openExternalMessageUrl(url)}
+                          <ChatVisualReply
+                            message={message() ?? initialMessage}
+                            initial={initialVisual}
                             onMessage={addPageText}
                             onContext={(text) => setPageContext(message() ?? initialMessage, text)}
-                            onQuote={(text) => quoteSelection(pageQuoteId(), text)}
-                            quoteShortcut={deviceQuoteShortcut(props.platform)}
-                            onOpenInSidePanel={() => void previewAttachment(visual().attachment)}
-                            isAppShortcut={isChatVisualAppShortcut}
-                            macWindowControls={props.platform === "darwin"}
+                            onQuote={quoteSelection}
                           />
                         </article>
                       </ChatRowBoundary>
@@ -1511,6 +1498,7 @@ export function ConversationTimeline() {
                   sendToChannel: sendToChannelAction(message() ?? initialMessage),
                   onBranch: branchAction(message() ?? initialMessage),
                   branchDisabled: Boolean(props.activeTurnId),
+                  pin: pinAction(message() ?? initialMessage),
                   onDelete: deleteAction(message() ?? initialMessage),
                 });
                 /*
@@ -1846,11 +1834,3 @@ export function ConversationTimeline() {
     </>
   );
 }
-
-const ApprovalCard = lazy(() =>
-  import("@openbot/ui/features/conversation/ConversationPrompts").then((module) => ({ default: module.ApprovalCard })),
-);
-const QuestionPromptBubble = lazy(() =>
-  import("@openbot/ui/components/QuestionPromptBubble").then((module) => ({ default: module.QuestionPromptBubble })),
-);
-const UiBlockPrompt = lazy(() => import("./UiBlockPrompt").then((module) => ({ default: module.UiBlockPrompt })));

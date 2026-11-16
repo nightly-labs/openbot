@@ -397,6 +397,8 @@ export function createWebConversationRuntime(
       stop: (tabId) => remote.stopBrowserTab(tabId),
       takeControl: (tabId) => remote.takeBrowserControl(tabId),
       releaseControl: (tabId) => remote.releaseBrowserControl(tabId),
+      startTeach: (tabId) => remote.startBrowserTeach(tabId),
+      stopTeach: (input) => remote.stopBrowserTeach(input),
       setVisible: async () => {},
     },
     voice: {

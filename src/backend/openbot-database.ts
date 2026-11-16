@@ -10,6 +10,7 @@ import type {
   ConversationSearchPage,
   ConversationSnapshot,
   HostedSiteConversationEventStatus,
+  MessagePinner,
   SentMessageStats,
 } from "@openbot/contracts/ipc";
 import { AgentHistoryQueries, type AgentHistorySelection } from "./database/agent-history-queries";
@@ -29,6 +30,15 @@ import {
   type MailboxProjectionChanges,
   type MailboxProjectionState,
 } from "./database/mailbox-projection";
+import {
+  type PinnedThreadMessage,
+  pinnedThreadMessageCount,
+  pinnedThreadMessages,
+  pinThreadMessage,
+  threadMessagePinner,
+  threadMessagesContaining,
+  unpinThreadMessage,
+} from "./database/pinned-thread-messages";
 import {
   type ProviderHistoryImportState,
   type ProviderHistorySessionInput,
@@ -241,6 +251,10 @@ export class OpenBotDatabase {
     return this.#conversations.conversationCountBefore(threadId, messageId, options);
   }
 
+  conversationHasAfter(threadId: string, messageId: string, options: ConversationMarkerExclusions = {}): boolean {
+    return this.#conversations.conversationHasAfter(threadId, messageId, options);
+  }
+
   readConversationPage(
     agentId: string,
     threadId: string | null,
@@ -341,6 +355,34 @@ export class OpenBotDatabase {
   /** The ids of the messages that a person deleted from this thread. */
   deletedConversationMessageIds(threadId: string): Set<string> {
     return deletedThreadMessageIds(this.connection, threadId);
+  }
+
+  /** The pinned messages of these threads that are still shown, the newest pin first, at most `limit`. */
+  pinnedThreadMessages(threadIds: readonly string[], limit: number): PinnedThreadMessage[] {
+    return pinnedThreadMessages(this.connection, threadIds, limit);
+  }
+
+  pinnedThreadMessageCount(threadId: string): number {
+    return pinnedThreadMessageCount(this.connection, threadId);
+  }
+
+  /** Who pinned this message of the thread, or null when it is not pinned. */
+  threadMessagePinner(threadId: string, messageId: string): MessagePinner | null {
+    return threadMessagePinner(this.connection, threadId, messageId);
+  }
+
+  /** Pins a shown message of a thread. The caller has checked that the thread holds the message. */
+  pinThreadMessage(threadId: string, messageId: string, pinnedAt: string, pinnedBy: MessagePinner): void {
+    pinThreadMessage(this.connection, threadId, messageId, pinnedAt, pinnedBy);
+  }
+
+  unpinThreadMessage(threadId: string, messageId: string): void {
+    unpinThreadMessage(this.connection, threadId, messageId);
+  }
+
+  /** The newest shown messages of a thread whose text contains `quote`, the newest first. */
+  threadMessagesContaining(threadId: string, quote: string, limit: number): ConversationMessage[] {
+    return threadMessagesContaining(this.connection, threadId, quote, limit);
   }
 
   upsertProviderHistoryMessage(input: {

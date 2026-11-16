@@ -1,3 +1,4 @@
+import { isStorageGb } from "@openbot/contracts/billing";
 import {
   type AvatarColor,
   type ChannelPage,
@@ -9,6 +10,7 @@ import {
   type SidebarLayoutSnapshot,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { optionalServerAppearanceField } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { RemoteTeamHost } from "@openbot/team-client";
 import * as Crypto from "expo-crypto";
 import * as FileSystem from "expo-file-system/legacy";
@@ -166,6 +168,7 @@ function decodeCachedServer(value: unknown): CachedServer {
 function decodeCachedHost(value: unknown): RemoteTeamHost {
   if (!isDynamicRecord(value)) throw new Error("The cached server list is invalid.");
   const { hostId, name, logoKey, devicePublicKey, membershipId, role, memberLimit, hosted, keyChangedAt } = value;
+  const { restartAvailable, storageGb, appearance } = value;
   if (
     !isString(hostId) ||
     !isString(name) ||
@@ -188,6 +191,11 @@ function decodeCachedHost(value: unknown): RemoteTeamHost {
     role,
     ...(memberLimit === undefined ? {} : { memberLimit }),
     ...(hosted === undefined ? {} : { hosted }),
+    // A bad value drops only the flag: the next server list writes it again.
+    ...(isBoolean(restartAvailable) ? { restartAvailable } : {}),
+    ...(isStorageGb(storageGb) ? { storageGb } : {}),
+    // A file of an older build has no appearance, and a bad one is dropped: the next server list writes it again.
+    ...optionalServerAppearanceField(appearance),
     ...(keyChangedAt === undefined ? {} : { keyChangedAt }),
   };
 }

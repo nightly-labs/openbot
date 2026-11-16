@@ -50,6 +50,7 @@ import {
   SIGNED_OUT_CHANNEL_MEMBER_ID,
 } from "@openbot/contracts/ipc";
 import type { LiveActivityRelayPush } from "@openbot/contracts/live-activity-relay";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { HostRestartState } from "@openbot/contracts/team-protocol/host-update-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -60,7 +61,11 @@ import type { TeamChatStore } from "../backend/team-chat-store";
 import type { AgentAccessStore } from "./agent-access-store";
 import { type AgentNotificationLevelStore, OWNER_NOTIFICATION_KEY } from "./agent-notification-level-store";
 import { BrowserViewGateway } from "./browser-view-gateway";
-import type { RemoteHostTicketHome, VerifiedRemoteSessionTicket } from "./central-auth-manager";
+import {
+  isFinalClientError,
+  type RemoteHostTicketHome,
+  type VerifiedRemoteSessionTicket,
+} from "./central-auth-manager";
 import { LiveActivityPushService, LiveActivitySendFailure } from "./live-activity-push";
 import type { PushNotificationStore } from "./push-notification-store";
 import {
@@ -85,6 +90,7 @@ import { TeamApiServer } from "./team-api-server";
 import type { RemoteDirectoryMember, TeamIdentity, TeamStore } from "./team-store";
 import type { TeamWebRtcBridge } from "./team-webrtc-bridge";
 import { TeamWebRtcHostGateway } from "./team-webrtc-host-gateway";
+import { windowsSessionDisconnected } from "./windows-session-state";
 
 export const DEVELOPMENT_REMOTE_CLIENT_USERNAME = "openbot-dev-client";
 
@@ -121,6 +127,7 @@ interface HostServiceOptions {
   channels?: ChannelService;
   mcpServers?: ForwardedApiOptions["mcpServers"];
   mcpServerOwners?: ForwardedApiOptions["mcpServerOwners"];
+  mcpAccess?: ForwardedApiOptions["mcpAccess"];
   mcpSignIns?: ForwardedApiOptions["mcpSignIns"];
   signInRelay?: ForwardedApiOptions["signInRelay"];
   connectors?: ForwardedApiOptions["connectors"];
@@ -134,6 +141,7 @@ interface HostServiceOptions {
   providerSignOut?: ForwardedApiOptions["providerSignOut"];
   mcpToolRuntimePreparation?: ForwardedApiOptions["mcpToolRuntimePreparation"];
   storage?: ForwardedApiOptions["storage"];
+  libraryFolders?: ForwardedApiOptions["libraryFolders"];
   machine?: ForwardedApiOptions["machine"];
   backgroundProcesses?: ForwardedApiOptions["backgroundProcesses"];
   liveVoice?: ForwardedApiOptions["liveVoice"];
@@ -292,6 +300,11 @@ interface HostServiceOptions {
     image: AvatarImageInput | null,
     version?: string | null,
   ) => Effect.Effect<string | null, RemoteWorkflowError>;
+  /** Copies the shape and colour of the server to the account service, as `updateRemoteHostLogo` does the logo. */
+  updateRemoteHostAppearance?: (
+    hostId: string,
+    appearance: ServerAppearance | null,
+  ) => Effect.Effect<void, RemoteWorkflowError>;
 }
 
 class HostApiRuntime extends Context.Service<
@@ -357,6 +370,7 @@ export class HostService extends EventEmitter<HostEvents> {
         (() => Effect.succeed({ username: "openbot", password: "development-runtime-not-for-release" })),
       ...(options.getRemoteDesktopDisplays ? { getDisplays: options.getRemoteDesktopDisplays } : {}),
       getDisplayScreenOrigin: options.getRemoteDesktopDisplayScreenOrigin,
+      sessionDisconnected: windowsSessionDisconnected,
       getIceServers:
         options.getRemoteDesktopIceServers ??
         (() => Effect.fail(new RemoteWorkflowError({ cause: new Error(sourceText("error.host.iceServersMissing")) }))),
@@ -483,6 +497,7 @@ export class HostService extends EventEmitter<HostEvents> {
       ...(options.channels === undefined ? {} : { channels: options.channels }),
       ...(options.mcpServers === undefined ? {} : { mcpServers: options.mcpServers }),
       ...(options.mcpServerOwners === undefined ? {} : { mcpServerOwners: options.mcpServerOwners }),
+      ...(options.mcpAccess === undefined ? {} : { mcpAccess: options.mcpAccess }),
       ...(options.mcpSignIns === undefined ? {} : { mcpSignIns: options.mcpSignIns }),
       ...(options.signInRelay === undefined ? {} : { signInRelay: options.signInRelay }),
       ...(options.connectors === undefined ? {} : { connectors: options.connectors }),
@@ -498,6 +513,7 @@ export class HostService extends EventEmitter<HostEvents> {
         ? {}
         : { mcpToolRuntimePreparation: options.mcpToolRuntimePreparation }),
       ...(options.storage === undefined ? {} : { storage: options.storage }),
+      ...(options.libraryFolders === undefined ? {} : { libraryFolders: options.libraryFolders }),
       ...(options.machine === undefined ? {} : { machine: options.machine }),
       ...(options.backgroundProcesses === undefined ? {} : { backgroundProcesses: options.backgroundProcesses }),
       ...(options.liveVoice === undefined ? {} : { liveVoice: options.liveVoice }),
@@ -573,6 +589,7 @@ export class HostService extends EventEmitter<HostEvents> {
                 });
               return yield* issueTicket(hostId, failedSignalUrl === undefined ? {} : { failedSignalUrl });
             }),
+          renewalRefused: isFinalClientError,
           onSignalRecoveryFailure: (error, reason) => {
             logger.warn(`Host phase ${this.#status.phase} -> error: Signal ${reason}.`);
             this.#setStatus({
@@ -866,6 +883,7 @@ export class HostService extends EventEmitter<HostEvents> {
         configured: true,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: identity.enabledOnLaunch,
       });
     } else {
@@ -875,6 +893,7 @@ export class HostService extends EventEmitter<HostEvents> {
     if (identity) {
       this.#api.refreshPresence();
       this.#api.refreshIdentity();
+      this.#api.refreshAppearance();
     }
   }
 
@@ -920,6 +939,7 @@ export class HostService extends EventEmitter<HostEvents> {
         serverId: identity.serverId,
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         enabledOnLaunch: false,
         message: null,
       });
@@ -961,6 +981,7 @@ export class HostService extends EventEmitter<HostEvents> {
     function* (this: HostService, input: UpdateHostIdentityInput): Effect.fn.Return<HostStatus, RemoteWorkflowError> {
       const optionalRegisterRemoteHost = this.#options.registerRemoteHost;
       const optionalUpdateRemoteHostLogo = this.#options.updateRemoteHostLogo;
+      const optionalUpdateRemoteHostAppearance = this.#options.updateRemoteHostAppearance;
       // A server on this computer has no account session (#5092). Only the desktop app knows its
       // owner password, and the Team API route already required an admin.
       const passwordOwner = this.#options.passwordOwner === true;
@@ -973,9 +994,11 @@ export class HostService extends EventEmitter<HostEvents> {
       this.#setStatus({
         serverName: identity.serverName,
         logoUrl: identity.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+        appearance: identity.appearance,
         message: sourceText("status.host.identityUpdated"),
       });
       this.#api.refreshIdentity();
+      if (input.appearance !== undefined) this.#api.refreshAppearance();
       // The desktop app registers it for the account at each start, with the name of that start.
       if (passwordOwner) return this.getStatus();
       const ownerMembershipId = yield* remoteDecode(() => this.#requiredOwnerMemberId());
@@ -983,6 +1006,9 @@ export class HostService extends EventEmitter<HostEvents> {
       if (input.logo !== undefined && this.#isActiveHost(identity.serverId)) {
         yield* optionalUpdateRemoteHostLogo?.(identity.serverId, input.logo ?? null, identity.logoVersion) ??
           Effect.succeed(undefined);
+      }
+      if (input.appearance !== undefined && this.#isActiveHost(identity.serverId)) {
+        yield* optionalUpdateRemoteHostAppearance?.(identity.serverId, identity.appearance) ?? Effect.void;
       }
       return this.getStatus();
     },
@@ -1090,6 +1116,21 @@ export class HostService extends EventEmitter<HostEvents> {
     yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
     // `automatic`: the account service refuses a host that its owner removed (#5273).
     yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()), true);
+  }).bind(this);
+
+  /**
+   * Registers the running host again when the user asks for it, as a start does. A start of a running
+   * host does not register, so this sends a key change whose answer was lost and the current key (#9369).
+   */
+  readonly refreshRegistration = Effect.fn("HostService.refreshRegistration")(function* (this: HostService) {
+    const register = this.#options.registerRemoteHost;
+    if (!register) return;
+    yield* remoteDecode(() => this.#options.store.assertOwnerAccount(this.#options.getSignedInUser()));
+    const publicKey = this.#options.store.getIdentity()?.publicKey;
+    yield* this.#registerRemoteHost(register, yield* remoteDecode(() => this.#requiredOwnerMemberId()));
+    const identity = this.#options.store.getIdentity();
+    if (identity && identity.publicKey !== publicKey && this.#isActiveHost(identity.serverId))
+      this.#api.refreshIdentity();
   }).bind(this);
 
   /**
@@ -2197,6 +2238,9 @@ export class HostService extends EventEmitter<HostEvents> {
    */
   channelPersonIsRemote(personId: string): boolean {
     if (personId === SIGNED_OUT_CHANNEL_MEMBER_ID || personId === this.#findCurrentMemberId()) return false;
+    // A server on this computer has no account session. Its owner is the password member that only
+    // the desktop app on this computer logs in as.
+    if (this.#options.passwordOwner === true && personId === this.#options.store.getOwnerMemberId()) return false;
     try {
       return personId !== `local-user:${this.#options.getSignedInUser().id}`;
     } catch {
@@ -2276,6 +2320,7 @@ function initialHostStatus(identity: TeamIdentity | null, unattended: boolean): 
     serverId: identity?.serverId ?? null,
     serverName: identity?.serverName ?? null,
     logoUrl: identity?.logoVersion ? serverLogoUrl(identity.logoVersion) : null,
+    appearance: identity?.appearance ?? null,
     apiUrl: null,
     apiOnline: false,
     remoteDesktopReady: false,

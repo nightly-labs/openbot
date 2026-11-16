@@ -1,12 +1,13 @@
 /** An asset step: a workspace file as an input. The output type follows the file. */
 
-import type { StoredFileRow } from "@openbot/contracts/ipc";
+import { type StoredFileRow, WORKFLOW_PICTURE_TYPES } from "@openbot/contracts/ipc";
 import type { AppTextKey } from "@openbot/i18n";
 import { Button, Download, File, FileInput, Input, Maximize2, Popover, Search, SlidingTabs, Upload } from "@openbot/ui";
 import { createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
 import { useText } from "../../text";
 import { ImageLightbox, type ImageLightboxOpening } from "../conversation/ImageLightbox";
+import { usePictureShape } from "./picture-shape";
 import { useBoard, type WfnBoard } from "./workflow-board";
 import { asString, download, NodeShell, NodeToolbar, ToolAction, useField, useLocked } from "./workflow-node-parts";
 
@@ -23,9 +24,36 @@ const ASSET_FILTERS: readonly { value: AssetFilter; label: AppTextKey }[] = [
 /** The files of the library: the files from the computer of this board, newest first, then the workspace files. */
 const libraryFiles = (board: WfnBoard) => [...board.uploads(), ...board.catalogs().files];
 
+const PICTURE_ACCEPT = [...WORKFLOW_PICTURE_TYPES].join(",");
+
 /** The files of a drag from the computer, or none when the drag holds no files. */
 const draggedFiles = (event: DragEvent) =>
   event.dataTransfer?.types.includes("Files") ? [...event.dataTransfer.files] : [];
+
+/**
+ * A picture of the host that the library does not list, such as one that a member sent: a member gets
+ * only the files of the agents that they see. The host gives it by its id.
+ */
+function hostPicture(board: WfnBoard, id: string, name: string): StoredFileRow | undefined {
+  const url = board.catalogs().media?.(id, "image");
+  if (!url) return undefined;
+  return {
+    id,
+    name,
+    size: 0,
+    kind: "image",
+    mimeType: "image/png",
+    previewKind: "image",
+    previewUrl: url,
+    source: "generated",
+    agentId: null,
+    conversation: null,
+    messageId: null,
+    createdAt: "",
+    status: "available",
+    deletable: false,
+  };
+}
 
 function assetsFor(board: WfnBoard, filter: AssetFilter): readonly StoredFileRow[] {
   const available = libraryFiles(board).filter((file) => file.status === "available");
@@ -49,7 +77,7 @@ function AssetThumb(props: { file: StoredFileRow }) {
         </span>
       }
     >
-      {(url) => <img class="wfn-media" src={url()} alt="" />}
+      {(url) => <img class="wfn-media" src={url()} alt="" draggable="false" />}
     </Show>
   );
 }
@@ -179,13 +207,13 @@ function LibraryGrid(props: {
 }
 
 /** Opens the file dialog of the computer. The file goes into the workspace library. */
-function UploadButton(props: { onAdd: (file: StoredFileRow) => void }) {
+function UploadButton(props: { busy: boolean; onChoose: (file: File) => void }) {
   const board = useBoard();
   const { t } = useText();
   let input: HTMLInputElement | undefined;
   return (
     <>
-      <Button variant="ghost" size="xs" onClick={() => input?.click()}>
+      <Button variant="ghost" size="xs" disabled={props.busy} onClick={() => input?.click()}>
         <Upload aria-hidden="true" />
         {t("workflow.asset.upload")}
       </Button>
@@ -195,12 +223,14 @@ function UploadButton(props: { onAdd: (file: StoredFileRow) => void }) {
         }}
         class="sr-only"
         type="file"
+        // A host keeps only the pictures that its models take.
+        accept={board.catalogs().upload ? PICTURE_ACCEPT : undefined}
         tabindex={-1}
         aria-label={t("workflow.asset.upload")}
         onChange={(event) => {
           const chosen = event.currentTarget.files?.[0];
           event.currentTarget.value = "";
-          if (chosen) props.onAdd(board.upload(chosen));
+          if (chosen) props.onChoose(chosen);
         }}
       />
     </>
@@ -279,7 +309,8 @@ export function AssetNode(props: { id: string; file?: string }) {
     const id = fileId();
     return (
       (id ? files.find((candidate) => candidate.id === id) : undefined) ??
-      files.find((candidate) => candidate.name === fileName())
+      files.find((candidate) => candidate.name === fileName()) ??
+      (id ? hostPicture(board, id, fileName()) : undefined)
     );
   };
   const setFile = (next: StoredFileRow) => board.setFields(props.id, { file: next.name, fileId: next.id });
@@ -290,14 +321,26 @@ export function AssetNode(props: { id: string; file?: string }) {
   const [viewer, setViewer] = createSignal<ImageLightboxOpening>();
   const [dropping, setDropping] = createSignal(false);
   const isImage = () => file()?.previewKind === "image";
+  const shape = usePictureShape(() => (isImage() ? (file()?.previewUrl ?? undefined) : undefined));
+  /** A picture with clear pixels shows on the canvas at its own shape, with no card behind it. */
+  const clear = () => (isImage() ? shape()?.clear === true : false);
+  const [sending, setSending] = createSignal(false);
+  /** Sends a file from the computer to the library, and makes it the asset. The host shows a failure. */
+  const send = (chosen: File) => {
+    setSending(true);
+    setOpen(false);
+    board
+      .upload(chosen)
+      .then(setFile, () => undefined)
+      .finally(() => setSending(false));
+  };
   /** A file from the computer, dropped on the card, goes into the library and becomes the asset. */
   const onDrop = (event: DragEvent) => {
     setDropping(false);
     const [dropped] = draggedFiles(event);
-    if (!dropped || locked() || !uploads()) return;
+    if (!dropped || locked() || !uploads() || sending()) return;
     event.preventDefault();
-    setFile(board.upload(dropped));
-    setOpen(false);
+    send(dropped);
   };
   return (
     <>
@@ -306,7 +349,8 @@ export function AssetNode(props: { id: string; file?: string }) {
         label={t("workflow.asset.title")}
         kind="asset"
         media={isImage()}
-        style={{ "--wfn-aspect": "4 / 3" }}
+        clear={clear()}
+        style={{ "--wfn-aspect": clear() ? String(shape()?.ratio ?? 4 / 3) : "4 / 3" }}
         output={file() ? (isImage() ? "image" : "file") : undefined}
         toolbar={
           <NodeToolbar id={props.id} name={t("workflow.asset.name")} locked={locked()} onLock={setLocked}>
@@ -350,6 +394,7 @@ export function AssetNode(props: { id: string; file?: string }) {
           <Popover.Trigger
             class="wfn-asset-trigger"
             disabled={locked()}
+            aria-busy={sending() ? "true" : undefined}
             data-dropping={dropping() ? "" : undefined}
             onDragOver={(event: DragEvent) => {
               if (locked() || !uploads() || !event.dataTransfer?.types.includes("Files")) return;
@@ -396,12 +441,7 @@ export function AssetNode(props: { id: string; file?: string }) {
               <div class="wfn-popover-head">
                 <Popover.Title class="wfn-popover-title">{t("workflow.asset.library")}</Popover.Title>
                 <Show when={uploads()}>
-                  <UploadButton
-                    onAdd={(next) => {
-                      setFile(next);
-                      setOpen(false);
-                    }}
-                  />
+                  <UploadButton busy={sending()} onChoose={send} />
                 </Show>
               </div>
               <AssetLibrary

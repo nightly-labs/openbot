@@ -47,6 +47,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserNavigateUnsupported":
     "This remote host does not support address-bar navigation in an existing tab.",
   "error.backend.browserUserControlBusy": "This browser tab waits for a secret. Answer the secret request first.",
+  "error.backend.browserTeachBusy": "Another person controls this browser tab. Try again when they finish.",
+  "error.backend.browserTeachUnavailable": "This browser tab has no agent that can learn a task.",
+  "error.backend.browserTeachUnsupported": "This remote host does not support the recording of a task.",
   "error.backend.browserUserControlUnsupported": "This remote host does not support taking control of a browser tab.",
   "error.backend.browserSignInUnsupported": "This remote host cannot take a sign-in from this computer.",
   "error.backend.browserSignInOpenFailed": "OpenBot could not open the sign-in window.",
@@ -61,6 +64,8 @@ export const messages = defineMessages("error.backend", {
     "Compaction does not make this chat smaller: after two compactions it still uses {percent}% of the model's context window, so OpenBot stops compacting it. Tools and instructions use most of the window. Turn off the MCP servers or computer use that this agent does not need, or select a model with a larger window. Then start a new chat.",
   "error.backend.contextCompactionStopped":
     "Two compactions of this chat failed in a row, so OpenBot stops compacting it automatically. Each try sends the whole chat to the model and uses your plan limit. Select Compact now to try again, or start a new chat.",
+  "error.backend.providerModelAtCapacity":
+    "The model is at capacity. The provider tries again in a few minutes. To continue now, stop the turn and choose a different model.",
   "error.backend.providerRetrying":
     "The provider failed this request {attempts} times and tries again. If the agent does not continue, stop the turn.",
   "error.backend.providerRetryingLargeContext":
@@ -79,6 +84,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelWaitBeforeDeleteHistory": "Wait until the work in this channel stops, then delete its history.",
   "error.backend.channelCompactUnavailable":
     "No member of this channel can compact its context now. A member must answer in the channel first, and its provider must support compaction.",
+  "error.backend.channelCompactNoSession":
+    "The members of this channel have no conversation to compact yet. Compact it after a member answers in the channel.",
+  "error.backend.channelCompactNotSupported":
+    "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
@@ -110,6 +119,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.memoryOperationFailed": "The memory operation failed. Try again.",
   "error.backend.memoryGone": "This memory no longer exists.",
   "error.backend.routineGone": "This routine no longer exists.",
+  "error.backend.routineRunGone": "This routine run no longer exists.",
   "error.backend.turnNotStarted": "The provider did not start this turn.",
   "error.backend.routineResultConnectionOff": "This messaging connection is off or removed. Choose another place.",
   "error.backend.routineResultNoDelivery": "This run has no answer to send again.",
@@ -159,6 +169,10 @@ export const messages = defineMessages("error.backend", {
   "error.backend.attachBetween": "Attach between 1 and {limit} files.",
   "error.backend.attachmentNotFile": "Attachment is not a file: {path}",
   "error.backend.generatedImageTooLarge": "Generated image exceeds the 100 MB limit.",
+  "error.backend.generatedVideoTooLarge": "Generated video exceeds the 100 MB limit.",
+  "error.backend.videoGenerationFailed": "Video generation failed.",
+  "error.backend.videoGenerationNoVideo": "Video generation did not return a video.",
+  "error.backend.videoGenerationInterrupted": "Video generation was interrupted.",
   "error.backend.attachmentNotRegularFile": "Only regular files can be attached: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot could not copy {name}.",
   "error.backend.routineNameRequired": "A routine name is required.",
@@ -186,6 +200,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.interruptSelf": "An agent cannot interrupt itself.",
   "error.backend.interruptOtherWork":
     "This agent works on a task that your message did not start. Only the user or the sender of that task can stop it.",
+  "error.backend.interruptSharedWork":
+    "This agent's turn works on your message and also on a message from the user or another agent. Only the user can stop it, with Stop agent in that agent's chat.",
   "error.backend.interruptStarting": "This agent is still starting a turn. Try again after the turn starts.",
   "error.backend.interruptNoSession":
     "OpenBot cannot interrupt this agent because its provider session is unavailable.",
@@ -215,6 +231,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.messageDeleteNotFound": "This message is not in the chat.",
   "error.backend.messageDeleteBusy": "This message is part of a running turn. Delete it when the turn ends.",
   "error.backend.messageDeleteForbidden": "You can delete only the messages that you sent.",
+  "error.backend.messagePinNotFound": "The message to pin is not in this chat.",
+  "error.backend.messagePinLimit": "This chat has 50 pinned messages. Unpin one before you pin another.",
   "error.backend.routineFlowHandoffFailed": "The routine could not pass the work on to this agent.",
   "error.backend.mcpServerLimit": "OpenBot keeps up to {limit} MCP servers.",
   "error.backend.mcpServerNameTaken": "An MCP server named {name} already exists.",
@@ -245,14 +263,26 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+  "error.backend.mcpAppReconnect":
+    "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
+  "error.backend.mcpServerSignInPage":
+    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open the MCP settings and sign in to {name}, then ask the agent again.",
+  "error.backend.mcpServerRequestDeclined":
+    "The MCP server {name} asked for something that OpenBot cannot show, so OpenBot declined it.",
+  "error.backend.mcpRequestDeclined":
+    "An MCP server asked for something that OpenBot cannot show, so OpenBot declined it.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
     "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
+  "error.backend.mcpOAuthRequestRefused":
+    "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
   "error.backend.mcpLocalServerOff":
     "No server answers at {address} on this computer. Start the server, or turn it on in the app that runs it, then try again.",
@@ -276,6 +306,13 @@ export const messages = defineMessages("error.backend", {
   "error.backend.sectionNameTooLong": "Section name is too long.",
   "error.backend.sidebarFolderTooDeep": "Folders can go only three levels deep.",
   "error.backend.sidebarFolderMoveInvalid": "This folder cannot move there.",
+  "error.backend.libraryFolderName": "A folder name must have 1 to {limit} characters.",
+  "error.backend.libraryFolderLimit": "A server can have up to {limit} Library folders.",
+  "error.backend.libraryFolderFileLimit": "Too many files are in Library folders.",
+  "error.backend.libraryFolderTooDeep": "Library folders can go only {limit} levels deep.",
+  "error.backend.libraryFolderGone": "The folder does not exist or is already deleted.",
+  "error.backend.libraryFolderOtherAgent": "A file can go only into a folder of its agent.",
+  "error.backend.libraryFolderMoveInvalid": "This folder cannot go there.",
   "error.backend.sectionNameDuplicate": "Section names must be unique.",
   "error.backend.directMessageRequired": "Write a message first.",
   "error.backend.directMessageTooLong": "A direct message can have up to {limit} characters.",
@@ -333,8 +370,12 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserProxyChanged": "This proxy changed after you opened it. Look at it again, then try again.",
   "error.backend.browserProxyUnreachable": "The proxy {name} does not answer, so the page did not open.",
   "error.backend.browserProxySignInRefused": "The proxy {name} refused the sign-in, so the page did not open.",
+  "error.backend.browserSystemProxyFailed":
+    "The proxy in the settings of the computer that runs OpenBot does not answer or refused the connection, so the page did not open. Check the proxy settings of that computer.",
   "error.backend.browserProxyComputerUnreachable":
     "The computer that this profile uses does not answer, so the page did not open.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "The computer that this profile uses opens only public sites. It does not open addresses on a local network, so the page did not open.",
   "error.backend.browserCertificateUntrusted":
     "The security certificate of this site is not trusted, so the page did not open.",
   "error.backend.browserLowMemory":
@@ -357,6 +398,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.browserViewProtected": "Browser view is protected during authentication.",
   "error.backend.browserPreviewPageChanged": "The browser page changed during the preview. Try again.",
   "error.backend.browserInputProtected": "Browser input is protected during authentication.",
+  "error.backend.browserClickMoved":
+    "Nothing was clicked. The page moved the target when the pointer came near, and the press went to {element}. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMoved":
     "The page moved focus away from the target before typing. Nothing was typed. Take a fresh snapshot.",
   "error.backend.browserTypingFocusMovedWhileTyping":

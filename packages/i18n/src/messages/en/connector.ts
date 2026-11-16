@@ -304,6 +304,7 @@ export const messages = defineMessages("connector", {
   "connector.telegram.helpRelayUnavailableHost":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "connector.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
+  "connector.telegram.helpNotLinked": "This chat is not linked to this server. Select Reconnect to link it.",
   "connector.telegram.retryAt": "Telegram asked OpenBot to wait. It tries again at {time}.",
   "connector.telegram.pause": "Pause",
   "connector.telegram.resume": "Resume",
@@ -390,6 +391,7 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.helpLoggedOutHost":
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "connector.whatsapp.helpError": "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "connector.whatsapp.helpKeysUnreadable": "OpenBot cannot read the saved keys of this number. Link the number again.",
   "connector.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "connector.whatsapp.pause": "Pause",
   "connector.whatsapp.resume": "Resume",
@@ -406,6 +408,9 @@ export const messages = defineMessages("connector", {
   "connector.whatsapp.ownNumber": "Personal number",
   "connector.whatsapp.ownNumberDescription":
     "Only your “Message yourself” chat and the people you allow can write. Turn off for a number only for OpenBot.",
+  "connector.whatsapp.workingMessage": "“Working on it…” message",
+  "connector.whatsapp.workingMessageDescription":
+    "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
   "connector.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "connector.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",

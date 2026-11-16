@@ -48,6 +48,9 @@ export const messages = {
     "Ten zdalny host nie obsługuje nawigacji z paska adresu w istniejącej karcie.",
   "error.backend.browserUserControlBusy":
     "Ta karta przeglądarki czeka na sekret. Najpierw odpowiedz na prośbę o sekret.",
+  "error.backend.browserTeachBusy": "Inna osoba steruje tą kartą przeglądarki. Spróbuj ponownie, gdy skończy.",
+  "error.backend.browserTeachUnavailable": "Ta karta przeglądarki nie ma agenta, który może nauczyć się zadania.",
+  "error.backend.browserTeachUnsupported": "Ten zdalny host nie obsługuje nagrywania zadania.",
   "error.backend.browserUserControlUnsupported":
     "Ten zdalny host nie obsługuje przejmowania kontroli nad kartą przeglądarki.",
   "error.backend.browserSignInUnsupported": "Ten zdalny host nie może przyjąć logowania z tego komputera.",
@@ -63,6 +66,8 @@ export const messages = {
     "Kompaktowanie nie zmniejsza tego czatu: po dwóch kompaktowaniach nadal zajmuje {percent}% okna kontekstu modelu, więc OpenBot przestaje go kompaktować. Narzędzia i instrukcje zajmują większość okna. Wyłącz serwery MCP lub sterowanie komputerem, których ten agent nie potrzebuje, albo wybierz model z większym oknem. Potem zacznij nowy czat.",
   "error.backend.contextCompactionStopped":
     "Dwa kompaktowania tego czatu z rzędu się nie udały, więc OpenBot przestaje go kompaktować automatycznie. Każda próba wysyła cały czat do modelu i zużywa limit planu. Wybierz „Kompaktuj”, aby spróbować ponownie, albo zacznij nowy czat.",
+  "error.backend.providerModelAtCapacity":
+    "Model jest przeciążony. Dostawca spróbuje ponownie za kilka minut. Aby kontynuować od razu, zatrzymaj turę i wybierz inny model.",
   "error.backend.providerRetrying":
     "Dostawca nie wykonał tego żądania {attempts} razy i próbuje ponownie. Jeśli agent nie będzie kontynuować, zatrzymaj turę.",
   "error.backend.providerRetryingLargeContext":
@@ -82,6 +87,10 @@ export const messages = {
     "Poczekaj, aż praca w tym kanale się zakończy, a potem usuń jego historię.",
   "error.backend.channelCompactUnavailable":
     "Żaden członek tego kanału nie może teraz skompaktować kontekstu. Członek musi najpierw odpowiedzieć w kanale, a jego dostawca musi obsługiwać kompaktowanie.",
+  "error.backend.channelCompactNoSession":
+    "Członkowie tego kanału nie mają jeszcze rozmowy do skompaktowania. Skompaktuj go, gdy członek odpowie w kanale.",
+  "error.backend.channelCompactNotSupported":
+    "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
@@ -115,6 +124,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "Operacja na wspomnieniach nie powiodła się. Spróbuj ponownie.",
   "error.backend.memoryGone": "To wspomnienie już nie istnieje.",
   "error.backend.routineGone": "Ta rutyna już nie istnieje.",
+  "error.backend.routineRunGone": "To uruchomienie rutyny już nie istnieje.",
   "error.backend.turnNotStarted": "Dostawca nie rozpoczął tej tury.",
   "error.backend.routineResultConnectionOff":
     "To połączenie z komunikatorem jest wyłączone lub usunięte. Wybierz inne miejsce.",
@@ -163,6 +173,10 @@ export const messages = {
   "error.backend.attachBetween": "Załącz od 1 do {limit} plików.",
   "error.backend.attachmentNotFile": "Załącznik nie jest plikiem: {path}",
   "error.backend.generatedImageTooLarge": "Wygenerowany obraz przekracza limit 100 MB.",
+  "error.backend.generatedVideoTooLarge": "Wygenerowany film przekracza limit 100 MB.",
+  "error.backend.videoGenerationFailed": "Generowanie filmu nie powiodło się.",
+  "error.backend.videoGenerationNoVideo": "Generowanie filmu nie zwróciło filmu.",
+  "error.backend.videoGenerationInterrupted": "Generowanie filmu zostało przerwane.",
   "error.backend.attachmentNotRegularFile": "Załączać można tylko zwykłe pliki: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot nie mógł skopiować pliku {name}.",
   "error.backend.routineNameRequired": "Nazwa rutyny jest wymagana.",
@@ -191,6 +205,8 @@ export const messages = {
   "error.backend.interruptSelf": "Agent nie może przerwać samego siebie.",
   "error.backend.interruptOtherWork":
     "Ten agent pracuje nad zadaniem, którego nie rozpoczęła twoja wiadomość. Zatrzymać je może tylko użytkownik lub nadawca tego zadania.",
+  "error.backend.interruptSharedWork":
+    "Tura tego agenta obsługuje Twoją wiadomość, a także wiadomość od użytkownika lub innego agenta. Tylko użytkownik może ją zatrzymać, przyciskiem Zatrzymaj agenta w czacie tego agenta.",
   "error.backend.interruptStarting": "Ten agent wciąż rozpoczyna turę. Spróbuj ponownie, gdy tura się zacznie.",
   "error.backend.interruptNoSession":
     "OpenBot nie może przerwać tego agenta, ponieważ jego sesja dostawcy jest niedostępna.",
@@ -221,6 +237,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "Tej wiadomości nie ma w czacie.",
   "error.backend.messageDeleteBusy": "Ta wiadomość należy do trwającej tury. Usuń ją po zakończeniu tury.",
   "error.backend.messageDeleteForbidden": "Możesz usuwać tylko wiadomości, które wysłałeś.",
+  "error.backend.messagePinNotFound": "Tej wiadomości nie ma na czacie.",
+  "error.backend.messagePinLimit": "Ten czat ma 50 przypiętych wiadomości. Odepnij jedną, zanim przypniesz kolejną.",
   "error.backend.routineFlowHandoffFailed": "Rutyna nie mogła przekazać pracy temu agentowi.",
   "error.backend.mcpServerLimit": "OpenBot przechowuje maksymalnie {limit} serwerów MCP.",
   "error.backend.mcpServerNameTaken": "Serwer MCP o nazwie {name} już istnieje.",
@@ -252,6 +270,8 @@ export const messages = {
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "Jego narzędzie {tool} ma format danych wejściowych, którego ten dostawca nie umie odczytać. Agenci u innych dostawców nadal dostają serwer.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} nie może użyć serwera MCP {name}, ponieważ serwer wymaga zalogowania. Otwórz ustawienia MCP i wybierz Zaloguj się.",
   "error.backend.mcpServerFailedForProvider":
@@ -284,6 +304,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "Nazwa sekcji jest za długa.",
   "error.backend.sidebarFolderTooDeep": "Foldery mogą mieć tylko trzy poziomy.",
   "error.backend.sidebarFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
+  "error.backend.libraryFolderName": "Nazwa folderu musi mieć od 1 do {limit} znaków.",
+  "error.backend.libraryFolderLimit": "Serwer może mieć maksymalnie {limit} folderów Biblioteki.",
+  "error.backend.libraryFolderFileLimit": "W folderach Biblioteki jest za dużo plików.",
+  "error.backend.libraryFolderTooDeep": "Foldery Biblioteki mogą mieć maksymalnie {limit} poziomów.",
+  "error.backend.libraryFolderGone": "Folder nie istnieje lub został już usunięty.",
+  "error.backend.libraryFolderOtherAgent": "Plik można przenieść tylko do folderu jego agenta.",
+  "error.backend.libraryFolderMoveInvalid": "Tego folderu nie można tam przenieść.",
   "error.backend.sectionNameDuplicate": "Nazwy sekcji muszą być unikalne.",
   "error.backend.directMessageRequired": "Najpierw napisz wiadomość.",
   "error.backend.directMessageTooLong": "Wiadomość prywatna może mieć maksymalnie {limit} znaków.",
@@ -337,8 +364,12 @@ export const messages = {
     "Ten serwer proxy zmienił się po jego otwarciu. Sprawdź go ponownie i spróbuj jeszcze raz.",
   "error.backend.browserProxyUnreachable": "Proxy {name} nie odpowiada, więc strona się nie otworzyła.",
   "error.backend.browserProxySignInRefused": "Proxy {name} odrzuciło logowanie, więc strona się nie otworzyła.",
+  "error.backend.browserSystemProxyFailed":
+    "Proxy w ustawieniach komputera, na którym działa OpenBot, nie odpowiada lub odrzuciło połączenie, więc strona się nie otworzyła. Sprawdź ustawienia proxy tego komputera.",
   "error.backend.browserProxyComputerUnreachable":
     "Komputer, którego używa ten profil, nie odpowiada, więc strona się nie otworzyła.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "Komputer używany przez ten profil otwiera tylko publiczne witryny. Nie otwiera adresów w sieci lokalnej, więc strona się nie otworzyła.",
   "error.backend.browserCertificateUntrusted":
     "Certyfikat bezpieczeństwa tej witryny nie jest zaufany, więc strona się nie otworzyła.",
   "error.backend.browserLowMemory":

@@ -1,4 +1,5 @@
 import type { ChatWindowTarget } from "@openbot/contracts/ipc";
+import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import { CONVERSATION_UNREAD_FROM_CAPABILITY } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
 import { AGENT_HIDDEN_CAPABILITY } from "@openbot/contracts/team-protocol/current";
 import { Sidebar } from "@openbot/ui/features/sidebar/Sidebar";
@@ -33,6 +34,7 @@ import { useSettings } from "../settings/settings-context";
 import { usePresence } from "../team/team-context";
 import { SidebarUpdateIsland } from "../updates/SidebarUpdateIsland";
 import { createCommunityCardVisibility } from "./community-card";
+import { DevWorktreeLabel } from "./DevWorktreeLabel";
 import { createSidebarAlertCards, SidebarAlertCards } from "./SidebarAlertCards";
 import { ServerUpgradeOffer } from "./server-upgrade-offer";
 import { useSidebar } from "./sidebar-context";
@@ -83,11 +85,22 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
     duplicatingAgentIds,
     openAgentSetup,
     userHiddenAgents,
-    userHiddenAgentIds,
+    userPausedAgentIds,
+    userHiddenAgentsWork,
+    mutedAgentIds,
   } = useAgents();
-  const { editAgent, duplicateAgent, duplicateSection, duplicatingSectionIds, deleteAgent, setAgentHiddenByUser } =
-    useAgentActions();
-  // The host refuses a member: a hidden agent stops for every member, as a deleted one does.
+  const {
+    editAgent,
+    duplicateAgent,
+    duplicateSection,
+    duplicatingSectionIds,
+    deleteAgent,
+    setAgentHiddenByUser,
+    setAgentMuted,
+  } = useAgentActions();
+  // A server that keeps no levels has no mute item: the item must not fail.
+  const muteSupported = () => activeServerSupportsCapability(AGENT_NOTIFICATION_LEVELS_CAPABILITY);
+  // The host refuses a member: an agent is hidden for every member.
   const hideAllowed = () =>
     activeServerSupportsCapability(AGENT_HIDDEN_CAPABILITY) && serverRoleCanAdminister(activeServer());
   const { pendingPrompts, approvals } = useTurns();
@@ -206,7 +219,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         }}
         hasUnread={
           agentList().some(
-            (agent) => !userHiddenAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
+            (agent) => !userPausedAgentIds().has(agent.id) && (agentUnreadReplies()[agent.id] ?? 0) > 0,
           ) || channels.hasUnread()
         }
         view={layout.sidebarView()}
@@ -227,6 +240,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
           const badge = server ? serverUpdateBadge(server.id) : null;
           return server && badge ? { ...badge, onOpen: () => void showServerUpdate(server.id) } : undefined;
         })()}
+        topbarDetail={<DevWorktreeLabel />}
         serverMenu={
           platform.appInfo()
             ? {
@@ -285,6 +299,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         onDuplicateAgent={duplicateAgent}
         onDeleteAgent={deleteAgent}
         userHiddenAgents={userHiddenAgents()}
+        userHiddenAgentsWork={userHiddenAgentsWork()}
         unreadAgentIds={unreadAgentIds()}
         onMarkAgentRead={(agentId) => void markAgentChatRead(agentId)}
         onMarkAgentUnread={
@@ -292,6 +307,8 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
             ? (agentId) => void markAgentChatUnread(agentId)
             : undefined
         }
+        mutedAgentIds={muteSupported() ? mutedAgentIds() : undefined}
+        onSetAgentMuted={muteSupported() ? (agentId, muted) => void setAgentMuted(agentId, muted) : undefined}
         onHideAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, true) : undefined}
         onRestoreAgent={hideAllowed() ? (agentId) => void setAgentHiddenByUser(agentId, false) : undefined}
         onNewAgentThread={newAgentThread()}
@@ -303,6 +320,7 @@ export function WorkspaceSidebar(props: { peopleEnabled: boolean }) {
         windowAgentIds={windowAgentIds()}
         compact={layout.leftPanelCompact()}
         onExpand={layout.expandSidebar}
+        onCollapse={() => layout.setSidebarClosed(true)}
         onOpenSearch={() => setGlobalSearchVisibility(true)}
         footer={
           <>

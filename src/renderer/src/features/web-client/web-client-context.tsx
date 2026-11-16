@@ -30,13 +30,14 @@ import type {
   TeamPresenceSnapshot,
   TeamRealtimeEvent,
 } from "@openbot/contracts/ipc";
-import { canAdministerServer } from "@openbot/contracts/ipc";
+import { canAdministerServer, openExchangesOutside } from "@openbot/contracts/ipc";
 import {
   AGENT_COLORS_CAPABILITY,
   AGENT_HIDDEN_CAPABILITY,
   CHAT_COLORS_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_CAPABILITY } from "@openbot/contracts/team-protocol/focus-use-v1";
+import { HOST_APPEARANCE_CAPABILITY, type ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import { MESSAGE_DELETE_CAPABILITY } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
@@ -48,14 +49,23 @@ import {
   isSafeConnectionError,
   type RemoteRecoveryStatus,
 } from "@openbot/team-client/remote-recovery";
-import { reconcilePendingRequests } from "@openbot/team-client/runtime-attention";
+import {
+  approvalIsCut,
+  keepWholeApprovals,
+  reconcilePendingRequests,
+  withWholeApproval,
+} from "@openbot/team-client/runtime-attention";
 import { markRemoteSync } from "@openbot/team-client/sync-profile";
 import { duplicateSection as duplicateSectionWith } from "@openbot/ui/features/sidebar/duplicate-section";
 import { currentText } from "@openbot/ui/text";
 import { errorReference, type UserErrorDetails } from "@openbot/user-errors";
 import { createEffect, createMemo, createSignal, createStore, onSettled } from "solid-js";
 import { toAgentProfile } from "../../app-message-projection";
-import { mergeConversationPage, missingReplyOriginals } from "../conversation/conversation-merge";
+import {
+  mergeConversationPage,
+  missingReplyOriginals,
+  windowedSnapshotMessages,
+} from "../conversation/conversation-merge";
 import { latestIncomingConversationMessage } from "../conversation/conversation-read-state";
 import type { PromptAnswerOptions } from "../conversation/conversation-types";
 import { appendTurnStepLine, type TurnStepLines } from "../conversation/turn-step-lines";
@@ -63,12 +73,21 @@ import {
   deleteRemoteWorkspaceFrame,
   deleteRemoteWorkspaceFrames,
   readRemoteWorkspaceFrame,
+  saveRemoteFrameUnreadCounts,
   saveRemoteWorkspaceFrame,
 } from "../servers/remote-workspace-frame";
 import { followsServerUpdate } from "../servers/server-update-flow";
 import { createSidebarPreferences } from "../sidebar/sidebar-preferences";
 import { defaultSidebarLayout } from "../sidebar/sidebar-sections";
 import { createHostRestartToasts, type HostRestartView } from "../updates/host-restart-toast";
+import {
+  agentPictureMark,
+  deleteSavedAgentPictures,
+  deleteSavedServerPictures,
+  keepSavedAgentPictures,
+  readSavedAgentPicture,
+  saveAgentPicture,
+} from "./web-agent-pictures";
 import type { WebHostNotice } from "./web-host-connections";
 import { createWebHostLifecycle } from "./web-host-lifecycle";
 import { WebHostOtherTabError, type WebHostState } from "./web-host-lock";
@@ -94,6 +113,11 @@ interface WebConversation {
   trimmed?: boolean;
   /** The last older page did not load. The chat shows it above its messages, and a scroll up tries again. */
   olderError?: string | null;
+  /**
+   * The page shows a part around an older message, not the newest messages. A latest read changes only
+   * the messages that it shows, and new messages wait until the user goes to the latest ones.
+   */
+  around?: boolean;
 }
 
 /** The messages that a conversation keeps when it is not open, as on the desktop. */
@@ -110,6 +134,7 @@ function trimToLatestPage(conversation: WebConversation): void {
   const page = conversation.page;
   if (!page) return;
   conversation.trimmed = true;
+  conversation.around = false;
   if (page.messages.length <= LATEST_PAGE_SIZE) return;
   const kept = page.messages.slice(-LATEST_PAGE_SIZE);
   const removedById = new Map(page.messages.slice(0, -LATEST_PAGE_SIZE).map((message) => [message.id, message]));
@@ -320,6 +345,8 @@ export function createWebWorkspace(
   const readWrites = new Map<string, Promise<void>>();
   /** The conversation reads in flight by agent, and the deltas that wait for them to finish. */
   const conversationReads = new Map<string, number>();
+  /** The newest read around a message for each agent. A newer jump or a return to the latest messages wins. */
+  const aroundReads = new Map<string, number>();
   const heldDeltas = new Map<string, Array<Extract<AgentEvent, { type: "conversation-delta" }>>>();
   const hostEventListeners = new Set<(event: AgentEvent | TeamRealtimeEvent) => void>();
   let connectionPromise: { hostId: string; opened: boolean; promise: Promise<void> } | null = null;
@@ -396,6 +423,34 @@ export function createWebWorkspace(
     },
   });
   const hostNoticeListeners = new Set<(hostId: string, event: WebHostNotice, agents: ClientAgentSummary[]) => void>();
+  // A runtime snapshot cuts the long texts of an approval. The whole copy is read once for each cut
+  // request. Until it comes, and from a host without `pending-approval-v1`, the card offers only Deny.
+  const wholeApprovalReads = new Set<string>();
+  function readWholeApprovals(): void {
+    const read = runtime.readPendingApproval;
+    if (!read) return;
+    const current = generation;
+    for (const approval of state.approvals.filter(approvalIsCut)) {
+      const key = JSON.stringify([hostId, approval.agentId, approval.turnId, approval.requestId]);
+      if (wholeApprovalReads.has(key)) continue;
+      wholeApprovalReads.add(key);
+      void read({ agentId: approval.agentId, requestId: approval.requestId }).then(
+        (whole) => {
+          if (disposed) return;
+          // A read that a reconnect made stale, or that an older host refused, tries again at the next snapshot.
+          if (!whole || current !== generation) {
+            wholeApprovalReads.delete(key);
+            return;
+          }
+          setState((draft) => {
+            draft.approvals = [...withWholeApproval(draft.approvals, whole)];
+          });
+        },
+        // The next snapshot tries again.
+        () => wholeApprovalReads.delete(key),
+      );
+    }
+  }
   const runtime = (props.createRuntime ?? createWebWorkspaceRuntime)(
     props.accountId,
     {
@@ -525,13 +580,16 @@ export function createWebWorkspace(
           setState((draft) => {
             draft.hostRestart = event.state === "none" ? null : { state: event.state, version: event.version };
           });
+        // The host sends it at connect and after each change (`host-appearance-v1`).
+        if (event.type === "host-appearance") setHostAppearance(id, event.appearance);
         if (event.type === "status") hooks.onStatus?.(event.status);
         if (event.type === "runtime-snapshot") {
           const { attentionComplete } = event.snapshot;
           setState((draft) => {
+            // The snapshot cuts long texts. A whole copy from an `approval` event or a read stays in its place.
             draft.approvals = reconcilePendingRequests(
               draft.approvals,
-              event.snapshot.pendingApprovals,
+              keepWholeApprovals(draft.approvals, event.snapshot.pendingApprovals),
               attentionComplete,
             );
             draft.prompts = reconcilePendingRequests(
@@ -552,6 +610,7 @@ export function createWebWorkspace(
               (event.snapshot.threadContextStates ?? []).map((context) => [context.threadId, context]),
             );
           });
+          readWholeApprovals();
         } else if (event.type === "prompt") {
           setState((draft) => {
             draft.prompts = [...draft.prompts.filter((item) => item.requestId !== event.requestId), event];
@@ -730,6 +789,23 @@ export function createWebWorkspace(
         });
     },
   );
+  // The unread counts go to the frame when the reads of the load have come, and then on each change.
+  createEffect(
+    () =>
+      state.status === "online" && state.host && !state.panelsLoading && !state.panelsFailed
+        ? {
+            hostId: state.host.hostId,
+            unreadCounts: Object.fromEntries(
+              Object.entries(state.reads).flatMap(([agentId, read]) =>
+                read.unreadCount > 0 ? [[agentId, read.unreadCount]] : [],
+              ),
+            ),
+          }
+        : null,
+    (frame) => {
+      if (frame) saveRemoteFrameUnreadCounts(props.accountId, frame.hostId, frame.unreadCounts);
+    },
+  );
   // A hosted server keeps running while this tab is visible and has focus (`focus-use-v1`).
   const [duplicatingSectionIds, setDuplicatingSectionIds] = createSignal<ReadonlySet<string>>(new Set());
   const [pageFocused, setPageFocused] = createSignal(!document.hidden && document.hasFocus());
@@ -744,29 +820,50 @@ export function createWebWorkspace(
   const [serverOrder, setServerOrder] = createSignal(readWebServerOrder(props.accountId));
   const orderedHosts = createMemo(() => orderWebHosts(state.hosts, serverOrder()));
   // The host sends an `openbot-avatar:` URL, which only the desktop app can open. The image comes
-  // through the host connection; until then, the agent keeps the host URL and its generated avatar.
+  // from this browser's saved copy (`web-agent-pictures`) or through the host connection; until
+  // then, the agent keeps the host URL and its generated avatar.
   const [avatars, setAvatars] = createSignal<ReadonlyMap<string, { source: string; url: string }>>(new Map());
+  // The images that loaded or are loading, and those that the saved copies did not have. The host
+  // is asked for the second group when it is online.
   const avatarLoads = new Set<string>();
+  const avatarMisses = new Set<string>();
   // The images share the host connection and its file slots with the user's downloads, so only a few
   // load at the same time.
   const avatarQueue: { hostId: string; id: string; source: string }[] = [];
   let avatarReads = 0;
   let avatarHost: string | null = null;
+  let avatarOnline = false;
+  let avatarAgents = "";
+  async function loadAvatar(hostId: string, id: string, source: string): Promise<string | null> {
+    const saved = await readSavedAgentPicture(props.accountId, hostId, id, source);
+    if (saved || !avatarOnline || avatarHost !== hostId) return saved;
+    const mark = agentPictureMark(props.accountId, hostId);
+    const url = await runtime.agentAvatar(id, source);
+    if (avatarHost === hostId) void saveAgentPicture(props.accountId, hostId, id, source, url, mark);
+    return url;
+  }
   function loadAvatars() {
     while (avatarReads < 2) {
       const next = avatarQueue.shift();
       if (!next) return;
       const { hostId, id, source } = next;
+      const key = `${id} ${source}`;
       avatarReads += 1;
-      void runtime
-        .agentAvatar(id, source)
+      void loadAvatar(hostId, id, source)
         .then(
           (url) => {
-            if (avatarHost === hostId) setAvatars((current) => new Map(current).set(id, { source, url }));
+            if (avatarHost !== hostId) return;
+            if (url) setAvatars((current) => new Map(current).set(id, { source, url }));
+            // The host came online after the check of the saved copies: ask it now.
+            else if (avatarOnline) avatarQueue.push(next);
+            else {
+              avatarLoads.delete(key);
+              avatarMisses.add(key);
+            }
           },
           // A failed image keeps the generated avatar, and the next agent list tries it again.
           () => {
-            if (avatarHost === hostId) avatarLoads.delete(`${id} ${source}`);
+            if (avatarHost === hostId) avatarLoads.delete(key);
           },
         )
         .finally(() => {
@@ -778,29 +875,41 @@ export function createWebWorkspace(
   createEffect(
     () => ({
       hostId: state.host?.hostId ?? null,
-      // A saved frame shows its agents before the host connects. Their images wait for the connection.
-      sources:
-        state.status === "online"
-          ? state.agents.flatMap((agent) =>
-              agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
-            )
-          : [],
+      // A saved frame shows its agents before the host connects. Their images come from the saved
+      // copies; an image with no copy waits for the connection.
+      online: state.status === "online",
+      listed: state.status === "online" && !state.agentsFromFrame && state.agents.length > 0,
+      sources: state.agents.flatMap((agent) =>
+        agent.avatarUrl?.startsWith("openbot-avatar:") ? [{ id: agent.id, source: agent.avatarUrl }] : [],
+      ),
     }),
-    ({ hostId, sources }) => {
+    ({ hostId, online, listed, sources }) => {
       if (hostId !== avatarHost) {
         avatarHost = hostId;
+        avatarAgents = "";
         avatarLoads.clear();
+        avatarMisses.clear();
         avatarQueue.length = 0;
         setAvatars(new Map());
       }
+      avatarOnline = online;
       if (!hostId) return;
       for (const { id, source } of sources) {
         const key = `${id} ${source}`;
-        if (avatarLoads.has(key)) continue;
+        if (avatarLoads.has(key) || (!online && avatarMisses.has(key))) continue;
         avatarLoads.add(key);
         avatarQueue.push({ hostId, id, source });
       }
       loadAvatars();
+      // The host's list is complete: a copy of an agent that left it, or that lost its picture, goes.
+      const agents = sources.map(({ id }) => id).join(" ");
+      if (!listed || agents === avatarAgents) return;
+      avatarAgents = agents;
+      void keepSavedAgentPictures(
+        props.accountId,
+        hostId,
+        sources.map(({ id }) => id),
+      );
     },
   );
   const shownAgents = createMemo(() => {
@@ -920,6 +1029,14 @@ export function createWebWorkspace(
       };
     });
   }
+  /** Shows the plush look of a host in the server list and on the connected host. */
+  function setHostAppearance(id: string, appearance: ServerAppearance | null): void {
+    setState((draft) => {
+      if (draft.host?.hostId === id) draft.host.appearance = appearance;
+      const listed = draft.hosts.find((host) => host.hostId === id);
+      if (listed) listed.appearance = appearance;
+    });
+  }
   function refreshHosts(): Promise<void> {
     if (hostsRefreshPromise) return hostsRefreshPromise;
     const refreshGeneration = generation;
@@ -937,6 +1054,10 @@ export function createWebWorkspace(
         if (disposed) return;
         // A server that left the list takes its frame with it.
         deleteRemoteWorkspaceFrames(
+          props.accountId,
+          hosts.map((host) => host.hostId),
+        );
+        void deleteSavedAgentPictures(
           props.accountId,
           hosts.map((host) => host.hostId),
         );
@@ -991,6 +1112,10 @@ export function createWebWorkspace(
           if (connected && draft.host?.hostId === connected.hostId) {
             draft.host.name = connected.name;
             draft.host.logoKey = connected.logoKey;
+            // A host with `host-appearance-v1` sends its look itself; the account copy can be older.
+            // An account server from before `host-appearance-v1` lists none.
+            if (connected.appearance !== undefined && !draft.capabilities.includes(HOST_APPEARANCE_CAPABILITY))
+              draft.host.appearance = connected.appearance;
           }
           draft.hosts = hosts;
           draft.hostsLoaded = true;
@@ -1069,7 +1194,10 @@ export function createWebWorkspace(
     // A revoked session must not leave private conversations visible while the directory
     // decides whether this membership still exists. Keep the host shell for a possible
     // authorized reconnect, but invalidate every private read and pending action now.
-    if (hostId) deleteRemoteWorkspaceFrame(props.accountId, hostId);
+    if (hostId) {
+      deleteRemoteWorkspaceFrame(props.accountId, hostId);
+      void deleteSavedServerPictures(props.accountId, hostId);
+    }
     generation += 1;
     selectedId = null;
     setState((draft) => {
@@ -1268,6 +1396,13 @@ export function createWebWorkspace(
           };
           draft.userHiddenAgents = frame.hiddenAgents;
           draft.frameChannels = frame.channels;
+          // The sidebar sorts the unread chats into their group, so the rows keep their place when the host answers.
+          draft.reads = Object.fromEntries(
+            Object.entries(frame.unreadCounts).map(([agentId, unreadCount]) => [
+              agentId,
+              { unreadCount, firstUnreadMessageId: null, throughMessageId: null },
+            ]),
+          );
           if (frameSelected) {
             draft.selectedId = frameSelected.id;
             draft.conversations[frameSelected.id] ??= { page: null, draft: "", attachments: [], loading: true };
@@ -1498,6 +1633,8 @@ export function createWebWorkspace(
         if (older && (item.trimmed || old?.pageInfo.olderCursor !== before)) return;
         // A trimmed conversation can be behind the host by more than one page, so its kept messages go.
         const merge = older ? "older" : old && !item.trimmed ? "latest" : "replace";
+        // A part around an older message keeps its place. The latest page changes only its shown messages.
+        const around = !older && merge === "latest" && item.around === true && page.pageInfo.hasOlder;
         const resolvedRequests = new Set(
           page.messages.flatMap((message) =>
             message.questionPrompt?.resolution ? [String(message.questionPrompt.requestId)] : [],
@@ -1509,11 +1646,21 @@ export function createWebWorkspace(
             prompt.threadId !== page.threadId ||
             !resolvedRequests.has(String(prompt.requestId)),
         );
+        // A latest page that does not meet the loaded messages, after a long time with no connection,
+        // replaces them: joined end to end, the two would hide the messages between with no sign.
+        const pageIds = new Set(page.messages.map((message) => message.id));
+        const apart =
+          merge === "latest" &&
+          !around &&
+          page.pageInfo.hasOlder &&
+          !(old?.messages ?? []).some((message) => pageIds.has(message.id));
         item.page = {
           ...page,
-          messages: mergeConversationPage(old?.messages ?? [], page.messages, merge),
+          messages: around
+            ? windowedSnapshotMessages(old?.messages ?? [], page.messages, { mode: "around", capped: true })
+            : mergeConversationPage(old?.messages ?? [], page.messages, apart ? "replace" : merge),
           references: merge === "replace" ? page.references : { ...old?.references, ...page.references },
-          pageInfo: merge === "latest" ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
+          pageInfo: merge === "latest" && !apart ? (old?.pageInfo ?? page.pageInfo) : page.pageInfo,
           // An older page has the thread's current revision but not its newest messages. The loaded
           // newest messages keep their revision, so a delta held during this read still applies.
           revision: older && old ? old.revision : page.revision,
@@ -1525,10 +1672,14 @@ export function createWebWorkspace(
         if (!older && page.readState) draft.reads[id] = page.readState;
         // A conversation that closed during this read stays trimmed: it gets no new messages until it opens.
         if (!older && draft.selectedId === id) item.trimmed = false;
+        if (!older && !around) item.around = false;
         item.loading = false;
         item.error = null;
         item.olderError = null;
       });
+      if (!older)
+        for (const messageId of openExchangesOutside(state.conversations[id]?.page?.messages ?? [], page.messages))
+          refreshOpenExchange(id, messageId);
     } catch (error) {
       if (!disposed && current === generation && !blockAccess(error))
         setState((draft) => {
@@ -1567,7 +1718,8 @@ export function createWebWorkspace(
     let otherThread = false;
     // The checks read the draft: a page that a read just wrote is not visible outside it until a flush.
     setState((draft) => {
-      const value = draft.conversations[event.agentId]?.page;
+      const item = draft.conversations[event.agentId];
+      const value = item?.page;
       if (!value) return;
       if (value.threadId !== event.threadId) {
         otherThread = true;
@@ -1575,11 +1727,12 @@ export function createWebWorkspace(
       }
       if (event.revision <= value.revision) return;
       // The streamed message is at the end of the page.
-      const message = value.messages.findLast((item) => item.id === event.messageId);
+      const message = value.messages.findLast((entry) => entry.id === event.messageId);
       if (message) {
         message.text += event.delta;
         message.status = "streaming";
-      } else
+      } else if (item.around) return;
+      else
         value.messages.push({
           id: event.messageId,
           turnId: event.turnId,
@@ -1741,6 +1894,45 @@ export function createWebWorkspace(
       if (current === generation) report(error);
     }
   }
+  /** The reads of loaded open requests that a latest page left out. A change during a read reads it again. */
+  const openExchangeReads = new Map<string, { again: boolean }>();
+  /** Puts the host's current copy of one loaded request in place. The rest of the chat stays as it is. */
+  function refreshOpenExchange(id: string, messageId: string) {
+    const readAround = runtime.conversationAround;
+    // A host without pages sends the whole chat in each read, so its copy is never left behind.
+    if (!readAround || !state.capabilities.includes("conversation-pagination")) return;
+    const key = `${id}\0${messageId}`;
+    const running = openExchangeReads.get(key);
+    if (running) {
+      running.again = true;
+      return;
+    }
+    const read = { again: true };
+    openExchangeReads.set(key, read);
+    const current = generation;
+    void (async () => {
+      try {
+        while (read.again && !disposed && current === generation) {
+          read.again = false;
+          // The page around the request holds its whole turn at least, with the request as the host has it.
+          const page = await readAround(id, messageId, 1);
+          const message = page.messages.find((candidate) => candidate.id === messageId);
+          if (disposed || current !== generation || !message) return;
+          setState((draft) => {
+            const loaded = draft.conversations[id]?.page;
+            if (!loaded || loaded.threadId !== page.threadId || page.revision < loaded.revision) return;
+            const index = loaded.messages.findIndex((candidate) => candidate.id === messageId);
+            if (index >= 0) loaded.messages[index] = message;
+          });
+        }
+      } finally {
+        // In the same step as the last check, so a later page starts a new read and is not lost.
+        openExchangeReads.delete(key);
+      }
+    })()
+      // The next latest page reads it again.
+      .catch(() => undefined);
+  }
   // Coalesce event bursts; an event during a read schedules one further authoritative read.
   async function refresh() {
     pendingReload = true;
@@ -1801,8 +1993,10 @@ export function createWebWorkspace(
     const write = (readWrites.get(id) ?? Promise.resolve())
       .catch(() => undefined)
       .then(async () => {
-        const page = state.conversations[id]?.page;
-        if (!page || disposed || current !== generation) return;
+        const conversation = state.conversations[id];
+        const page = conversation?.page;
+        // A part around an older message does not show the newest messages, so they stay unread.
+        if (!page || conversation.around || disposed || current !== generation) return;
         const readState = await runtime.markRead(id, page.messages.at(-1)?.id ?? null);
         if (disposed || current !== generation) return;
         setState((draft) => {
@@ -1882,6 +2076,8 @@ export function createWebWorkspace(
             online: state.status === "online",
             restart: state.hostRestart?.state ?? null,
             version: state.hostRestart?.version ?? null,
+            // Until the agents load, the server could be new; a notice that waits shows after them.
+            firstRun: !state.agentsLoaded || state.agents.length === 0,
           },
         ]
       : [];
@@ -1969,6 +2165,7 @@ export function createWebWorkspace(
     },
     run,
     refreshHosts,
+    setHostAppearance,
     leaveHost,
     removeOwnedHost,
     retryHosts,
@@ -2246,25 +2443,66 @@ export function createWebWorkspace(
         });
     },
     /**
-     * Loads older pages until the message is loaded. It does not go through `run`: another action
-     * would make `run` skip the load, and a jump would then report a message that exists as missing.
+     * Loads the message in the open chat and resolves whether the chat has it. A host with
+     * `conversation-pagination` gives the part around it in one read, however old it is; another host
+     * gives older pages until the message is loaded. It does not go through `run`: another action would
+     * make `run` skip the load, and a jump would then report a message that exists as missing.
      */
-    async openSearchMessage(messageId: string) {
+    async openSearchMessage(messageId: string): Promise<boolean> {
       const id = selectedId;
       const current = generation;
-      if (!id) return;
+      if (!id) return false;
+      const loaded = () => state.conversations[id]?.page?.messages.some((message) => message.id === messageId) === true;
+      if (loaded()) return true;
+      const readAround = runtime.conversationAround;
       try {
+        if (readAround && state.capabilities.includes("conversation-pagination")) {
+          const request = (aroundReads.get(id) ?? 0) + 1;
+          aroundReads.set(id, request);
+          const page = await readAround(id, messageId);
+          if (disposed || current !== generation || selectedId !== id || aroundReads.get(id) !== request) return false;
+          if (loaded()) return true;
+          if (page.agentId !== id || !page.messages.some((message) => message.id === messageId)) return false;
+          setState((draft) => {
+            const item = draft.conversations[id];
+            if (!item) return;
+            item.page = { ...page, messages: [...page.messages] };
+            item.missingReferences = missingReplyOriginals(page);
+            item.around = true;
+            item.trimmed = false;
+            item.loading = false;
+            item.error = null;
+            item.olderError = null;
+          });
+          return true;
+        }
         while (!state.conversations[id]?.page?.messages.some((message) => message.id === messageId)) {
           const page = state.conversations[id]?.page;
           if (!page?.pageInfo.hasOlder || !page.pageInfo.olderCursor) break;
           const cursor = page.pageInfo.olderCursor;
           await load(id, true);
-          if (disposed || current !== generation || selectedId !== id) return;
+          if (disposed || current !== generation || selectedId !== id) return false;
           if (state.conversations[id]?.page?.pageInfo.olderCursor === cursor) break;
         }
       } catch (error) {
         if (current === generation) report(error);
+        return false;
       }
+      return !disposed && current === generation && loaded();
+    },
+    /** Leaves a part around an older message and shows the newest messages again. */
+    loadLatest() {
+      const id = selectedId;
+      if (!id) return Promise.resolve();
+      aroundReads.set(id, (aroundReads.get(id) ?? 0) + 1);
+      setState((draft) => {
+        const item = draft.conversations[id];
+        if (!item?.around) return;
+        // A trimmed conversation takes the host's latest page and cursor at the next read, with no gap.
+        item.around = false;
+        item.trimmed = true;
+      });
+      return refresh();
     },
     async approve(input: RespondToApprovalInput) {
       const current = generation;

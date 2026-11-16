@@ -13,6 +13,7 @@ import { z } from "zod";
 import type { ChannelService } from "../channel-service";
 import type { DynamicToolCallParams } from "../protocol";
 import { loadAvatarFile } from "./avatar-file";
+import { profileToolErrorMessage } from "./profile-tools";
 import { openBotToolResult } from "./routine-tools";
 import { toolCallIdempotencyKey } from "./tool-call-idempotency";
 import { ToolOperationFailed, toToolOperationFailed } from "./tool-operation";
@@ -99,6 +100,26 @@ export const updateChannelToolSchema = z
     "At least one channel change is required.",
   );
 
+const CREATE_CHANNEL_FIELDS = Object.keys(createChannelToolSchema.shape);
+const UPDATE_CHANNEL_FIELDS = Object.keys(updateChannelToolSchema.shape);
+const ICON_FIELDS = Object.keys(channelFields.icon.shape);
+
+/**
+ * Describe a failed `create_channel` or `update_channel` call. A field that the tool does not take
+ * gets the names of the fields that it takes, never the name that the call sent (#1354, #8627).
+ */
+export function channelAgentToolErrorMessage(tool: string, error: unknown): string {
+  return profileToolErrorMessage(error, (path) => {
+    if (path.length === 0) {
+      const fields = tool === "create_channel" ? CREATE_CHANNEL_FIELDS : UPDATE_CHANNEL_FIELDS;
+      return `Remove the fields that ${tool} does not take. It takes: ${fields.join(", ")}.`;
+    }
+    if (path.length === 1 && path[0] === "icon")
+      return `Remove the fields that icon does not take. It takes: ${ICON_FIELDS.join(", ")}.`;
+    return `Remove the fields that ${path.map(String).join(".")} does not take.`;
+  });
+}
+
 type CreateChannelArgs = z.infer<typeof createChannelToolSchema>;
 type UpdateChannelArgs = z.infer<typeof updateChannelToolSchema>;
 
@@ -106,11 +127,10 @@ const UNKNOWN_CHANNEL = "No channel has that channelId. Call openbot.list_channe
 const OWN_CHANNEL_IN_TASK =
   "update_channel does not change the channel of your current task. For this channel, use channel_add_member, channel_remove_member and channel_set_instructions.";
 
-/** An agent that a channel can take: one that exists and that the user has not hidden. */
+/** An agent that a channel can take: one that exists. */
 function requireAvailable(agents: readonly AgentSummary[], id: string): AgentSummary {
   const agent = agents.find((candidate) => candidate.id === id);
   if (!agent) throw new Error(`No agent has the id ${id}. Get the ids from openbot.list_agents.`);
-  if (agent.hiddenAt !== undefined) throw new Error(`${agent.name} is hidden. Ask the user to show it again first.`);
   return agent;
 }
 

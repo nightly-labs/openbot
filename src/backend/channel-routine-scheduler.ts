@@ -13,12 +13,19 @@ import type {
 import { sourceText } from "@openbot/i18n/source";
 import { collapseMissedOccurrences } from "@openbot/team-client/routine-schedule";
 import { Effect, Result, Schema } from "effect";
+import { quietRoutineRun } from "./agent/routine-quiet-runs";
 import type { RoutineTriggerAccess } from "./agent/routine-scheduler";
 import { ChannelRoutineStore } from "./channel-routine-store";
 import type { ChannelService } from "./channel-service";
 import { causeHelpers } from "./effect-boundary";
 import { recordRestartActivity } from "./restart-activity";
-import type { OwnedRoutineRecord, ReceivedWebhookEvent, RoutineHoldWindow, RoutineRecordInput } from "./routine-store";
+import type {
+  ImportedRoutineRun,
+  OwnedRoutineRecord,
+  ReceivedWebhookEvent,
+  RoutineHoldWindow,
+  RoutineRecordInput,
+} from "./routine-store";
 import type { RoutineDueSource } from "./routine-timer";
 
 export interface ChannelRoutineHooks {
@@ -130,6 +137,11 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
       }
     }
     return false;
+  }
+
+  /** Writes the finished runs that a server transfer brought. Returns the new run ids in order. */
+  importRuns(channelId: string, routineId: string, runs: readonly ImportedRoutineRun[]): string[] {
+    return this.#routines.importRuns(this.#requireChannel(channelId), routineId, runs);
   }
 
   listRuns(input: ListChannelRoutineRunsInput, withSkipped = false): ChannelRoutineRun[] {
@@ -252,6 +264,15 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
     return true;
   }
 
+  /**
+   * Whether nobody waits for the answer of the run that posted this request: a scheduled, script or
+   * webhook run, not a Test run (`quietRoutineRun`).
+   */
+  quietRun(requestMessageId: string): boolean {
+    const run = this.#routines.runForRequest(requestMessageId);
+    return run !== null && quietRoutineRun(run);
+  }
+
   skipMissed(now: Date, held?: RoutineHoldWindow): void {
     this.#routines.skipMissed(now, held);
   }
@@ -292,6 +313,9 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
         });
         // A routine set to skip drops the occurrence while a spent plan would only make it wait.
         if (due.routine.limitPolicy === "skip" && this.#hooks.usageLimited(due.routine.channelId)) continue;
+        // A run that has not finished already does this routine's work. Another request with the same
+        // text lets the lead route it into that run, which stops the run's subtasks (#6077).
+        if (yield* channelRoutineStep(() => this.#hasLiveRun(due.routine.channelId, due.routine.id))) continue;
         yield* this.#fireEffect(due.routine, due.triggerId, scheduledFor);
       }
     }).pipe(
@@ -373,6 +397,20 @@ export class ChannelRoutineScheduler implements RoutineDueSource {
 
   reconcileAll(): void {
     for (const channelId of this.#routines.channelsWithOpenRuns()) this.reconcile(channelId);
+  }
+
+  /**
+   * Whether an earlier run of this routine still has open work in the channel. The run row alone is
+   * not enough: a row whose tasks are gone would stop the routine for good.
+   */
+  #hasLiveRun(channelId: string, routineId: string): boolean {
+    const requests = new Set(
+      this.#routines.activeRuns(channelId, routineId).flatMap((run) => run.requestMessageId ?? []),
+    );
+    if (!requests.size) return false;
+    return this.#channels.store
+      .tasks(channelId)
+      .some((task) => requests.has(task.requestMessageId) && task.state !== "completed" && task.state !== "cancelled");
   }
 
   /**

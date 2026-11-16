@@ -11,8 +11,8 @@ commands. The listener runs only while at least one agent has `allowAutomation`,
 `Origin` header or a foreign `Host` before it checks the token, so a web page cannot reach it. Each
 agent accepts at most `automationRunsPerHour` messages and routine runs from scripts in one hour, so
 a script that loops cannot spend the user's quota. The value is an account default
-(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Settings › Agents ›
-Local scripts.
+(`AGENT_DEFAULTS_PREFERENCE_FILE`, 30 when it is missing or invalid), set in Server Settings ›
+Agents › Local scripts.
 
 A run is a manual routine run with the payload after the instruction, so no Team API protocol, run
 kind or sender changes. The payload is in the run row, and `resumePendingRuns` sends it again after a
@@ -53,7 +53,8 @@ waits for the answer of such a run (`quietRoutineRun`). The run history stores w
 run in `run_source` (`test`, `script` or `webhook`); a manual run from before migration 35 has none
 and is read as a Test run. The agent calls the
 `routine_no_update` tool, which the run prompt names, or the user asks in the routine task
-for an answer of only `[[no-update]]`. Models often write a short sentence instead of an exact
+for an answer of only `[[no-update]]`. An answer of only `[SILENT]`, the Hermes Agent cron token
+that the Hermes import copies, is also the marker. Models often write a short sentence instead of an exact
 token, so the tool is the main path. There is no setting. The tool and the marker do not
 depend on the language of the answer (`src/backend/agent/routine-quiet-runs.ts`). The tool call is
 held in memory until the turn completes; the history import finds it again by the tool name, as
@@ -76,6 +77,21 @@ write a visible answer, and without the tool each update put filler in the user'
 of only quiet routine runs and teammate updates settles as above, also on the empty-answer error
 path and in the history import. The desktop chat shows its quiet answers under the marker of the
 last update of the turn, which starts closed (`teammateUpdateAnswers`).
+
+A teammate's answer to a request that a quiet routine run sent continues that run, so nobody waits
+for its turn either (`answeredRequestId`, #8364). Such a turn ends quiet only after a call to
+`routine_no_update`: without the call its answer is a result and shows. The answer to a Test run's
+request always shows.
+
+A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
+or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
+desktop, the web client and the phone show no notification for it and play no completion sound
+(`teammateTurnCompleted` in `packages/team-client/src/agent-notifications.ts`). A prompt, an
+approval, a browser step and a failed turn still notify. So does the result of a task: its turn has
+the same origin, because the agent sends the brief to itself, but it arrives as
+`thread-turn-completed`. The clients decide this from the released
+`origin` field, so it needs no capability and also applies with an older host. The host decides it
+for the phone push.
 
 `quiet` reaches remote clients too, through the optional `quiet-turn-v1` capability
 (`packages/contracts/src/team-protocol/quiet-turn-v1.ts`). The host sends a client with the
@@ -129,7 +145,7 @@ the run marker's "Open thread" link, a test run and the routine's reply digest d
 archived). A later run uses the same thread, and a run reopens an archived one. A run also gives the
 thread the routine's current name, unless a person renamed the thread. `RoutineScheduler`
 enqueues the run with the thread's task id, so the run is a task lane in `DrainScheduler`: it counts
-against the agent's task limit (default 4, `AGENT_TASK_LIMIT_DEFAULT`) and does not wait for the
+against the agent's task limit (the host default, 4 unless an admin changes it) and does not wait for the
 agent's own chat or for other routines. When the agent has `INPUT_LIMITS.agentTasks` open threads, a
 new routine gets no thread and its run goes to the agent's own chat, as before. Routine threads do not
 count against the limits of tasks that the agent starts, and that cleanup does not archive them.
@@ -224,6 +240,12 @@ on a joined host.
   same routine and run, but `reconcileDelivery` finds a run only by its own delivery, so the run status
   does not change. A `routine_report_failure` call in a handoff turn fails only that step, through its
   completed delivery's error, and the agents after it are skipped.
+- Stop (`RoutineFlows.stopRun`) ends a run that has not ended. `RoutineScheduler.stopRun` first records
+  the run as cancelled, so the end of its turn cannot change that, then cancels its queued delivery
+  and interrupts its turn, also in the routine's side thread. A turn that cannot be stopped does not
+  keep the run open. Then each running handoff step ends as cancelled and its turn stops, and each
+  agent that has not started is skipped. The canvas shows Stop in place of Run now while the run of the
+  routine in focus works; a joined host needs `routine-flow-stop-v1`.
 - A canvas shows routines of every trigger kind (`routine-flow-routines.ts`). A webhook routine
   carries its endpoint, event type and filters; the details panel saves them, rotates the secret and
   runs a test through the events API, as the routine settings do. On a joined host only an owner or
@@ -303,7 +325,9 @@ changed, on this computer and on a joined host.
   `read_workflow`, `edit_workflow`, `delete_workflow`, `run_workflow` and `read_workflow_runs`. They
   are not in the visible set, so before `tool_search` finds them they cost only their names. A search
   word `workflow` or `workflows` gives the schemas of all six, and no other schema or guidance, so one
-  search covers a build, a run and a delete. A read gives only the runtime fields of each node and no
+  search covers a build, a run and a delete. The release notes call the Workflows board the Canvas, so
+  `canvas` or `canvases` also gives the six schemas, but keeps the other results: the word can also
+  mean the Routines canvas or a canvas on a web page. A read gives only the runtime fields of each node and no
   positions, unless the agent asks for the layout; then each node has its position and card size. A run read gives each step's kind and a short label
   (the agent id, prompt, rule or question), so the agent does not read the workflow again.
   `edit_workflow` takes a list of operations (add, update, move, remove, connect, disconnect) and saves
@@ -340,23 +364,41 @@ changed, on this computer and on a joined host.
 
 ## Hidden agents
 
-A user hides an agent from its sidebar menu in place of a delete. The agent keeps its thread, files,
-memories, settings, pin and section. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`,
-so the state needs no SQL migration and a duplicate does not copy it. The host refuses new messages
-to a hidden agent with `error.backend.recipientHidden`, on IPC, channels, MCP `send_message`, the
-automation server and external messaging. Its routines do not run, and its queued messages wait
-behind the drain hold `"hidden"`. A turn that runs at the hide finishes. A hidden agent is not in
-`list_agents`, the teammates prompt, the mention picker, the counts or "Needs you". A hidden lead does not
-route channel requests, and `ChannelService.releaseAgent` gives the queued and starting channel
-assignments of the agent back to their channels.
+A user hides an agent from its sidebar menu to take it out of the list. The agent keeps its thread,
+files, memories, settings, pin and section, and it keeps working: it gets messages on each path
+(IPC, channels, MCP `send_message`, the automation server and external messaging), its routines run,
+its queue drains, it routes and does channel work, and other agents see it in `list_agents`, the
+teammates prompt and mentions. `AgentSummary.hiddenAt` is in `projection_agents.agent_json`, so the
+state needs no SQL migration and a duplicate does not copy it. The host reads the flag only to list
+the hidden agents and to lower their notifications. A hide or a restore changes no routine and no
+queue.
 
-Restore marks the missed routine runs as skipped before it clears the flag, so the timer does not
-run a backlog. Then it arms the routines and drains the queue. IPC `agent:hidden:list` and
-`agent:hidden:set` change the state, and the event `hidden-agents-changed` carries the whole list.
-A joined desktop, the web client and the mobile app use the optional `agent-hidden-v1` capability
+A client keeps a hidden agent in the collapsed "Hidden" group of the sidebar, and out of the dock and
+the ⌘1-9 order. It stays in the mention picker, and its unread replies count for "Mark all read". A
+hidden agent that waits for the user (a question, an approval or a browser
+handoff) shows in "Needs you". When the server level is "all" and the user set no level for the
+agent, a hidden agent notifies at "needs-me" (`agentNotificationLevel`), on the desktop, the web
+client and the host's push to a phone. A failed turn does not notify at that level.
+
+Up to version 0.68.0 a hide stopped the agent: the host refused its messages with
+`error.backend.recipientHidden`, held its queue and did not run its routines. The first start of a
+later version turns off, one time, each active routine of an agent that is hidden then
+(`AgentRoutineStore.pauseForAgentsHiddenBeforeWork`, with the command receipt
+`routine:hidden-agent-pause:v1`), so the update starts no routine that the user stopped. The user
+turns each one on again. The queued messages and channel tasks of such an agent run at the update.
+A transfer file from such a version has `preferences.hidden` and no `preferences.hiddenWorks`; the
+import then adds the routines of that agent turned off (`hiddenAgentWasStopped`).
+
+IPC `agent:hidden:list` and `agent:hidden:set` change the state, and the event
+`hidden-agents-changed` carries the whole list. A joined desktop, the web client and the mobile app
+use the optional `agent-hidden-v1` capability
 (`packages/contracts/src/team-protocol/agent-hidden-v1.ts`). Any member reads the list; only an
-owner or an admin hides or restores an agent on a host.
-`/v1/agents` and the released agent codecs do not carry `hiddenAt`.
+owner or an admin hides or restores an agent on a host. `/v1/agents` and the released agent codecs
+do not carry `hiddenAt`. A host that keeps a hidden agent at work also advertises the optional
+marker capability `agent-hidden-work` on protocol 9. It adds no route. Without it, a client shows a
+hidden agent as paused ("Paused since"), keeps it out of "Needs you" and the mention picker, and does
+not lower its notifications, because that host stops the agent. `scripts/agent-hide-restore-e2e.ts` checks the
+routes, a message and a routine run of a hidden agent, and the one-time step.
 
 ## New agent welcome
 
@@ -483,12 +525,20 @@ of a side thread is `legacy_task_id ?? thread_id`, so a stored mailbox message a
 that name the task still find it. A mailbox message with a `taskId` belongs to that side thread, and `DrainScheduler` drains each task as its own lane. The main chat
 lane does not count toward the task limit. At most `limit` task turns of one agent run at the same
 time. `agentTaskLimit` gives the limit: the agent's local `taskLimit` setting (1 to
-`AGENT_TASK_LIMIT_MAX`, in `agent_json`), else `AGENT_TASK_LIMIT_DEFAULT` (4). An owner or admin of
-a joined server reads and sets it on `agent-task-limit-v1`. A provider whose
+`AGENT_TASK_LIMIT_MAX`, 4, in `agent_json`), else the host default. The host default is the
+`agentTaskLimit` of `HostTurnLimitsPreferenceStore` (`openbot-host-turn-limits-v1.json`, 1 to
+`HOST_AGENT_TASK_LIMIT_MAX`, 64), else `AGENT_TASK_LIMIT_DEFAULT` (4). Desktop and web agent settings do
+not show the agent's own limit; Server Settings > General sets the host default. Mobile and older
+desktop apps still read and set the agent's own limit on `agent-task-limit-v1`, and the host keeps it.
+The frozen `agent-tasks-v1` wire carries 1 to 4, so the host sends a higher limit there as 4. A provider whose
 descriptor has `concurrentTurns: false` (custom ACP agents) gets 1, and its chat and tasks run one
 turn at a time. Other task messages wait with a `hold` reason: `task-limit`, `agent-restarting`,
-`usage-limit`, `server-busy`, `agent-busy` or `one-turn`. The server-wide `TurnSlots` limit of a
-hosted server is separate.
+`usage-limit`, `server-busy`, `agent-busy` or `one-turn`. The server-wide `TurnSlots` limit is
+separate: `MemoryHold.turnLimit` gives the `turnLimit` that an owner or admin chose (1 to
+`HOST_TURN_LIMIT_MAX`, 128, also above the automatic value, or `"unlimited"` for no limit), else the
+memory value of a server (2, 8 or 16), else no limit on a desktop computer. Low memory still holds a new turn. Server Settings > General
+reads and sets both host values on `host-turn-limits-v1` (owner or admin), and a save drains the
+queues again, so a higher limit starts waiting turns at once.
 
 The chat header shows a tab for the main thread and one for each open side thread, a "+" button and a
 menu of all threads with an "Archived" group (`packages/ui/src/features/conversation/threads/`). The
@@ -649,14 +699,17 @@ a queued message waits is stored on the agent as `pendingRuntime`. The running w
 sessions. When the drain is about to start the next message and no work has started,
 `AgentService` applies the queued runtime first (the `next-turn` move), then retires the provider
 sessions of the chat and of each task thread, so each one gets a handoff on the new provider. A
-queued change that fails on an idle agent, such as for a provider that is now off, is removed. An
-update that also changes other fields, a move to a backup model, a Team API request (its released
-protocol has no `pendingRuntime`), and the automatic usage-limit, provider-error and endpoint moves
-still wait for idle work (`error.agent.waitForTasksBeforeProviderChange` /
-`error.agent.waitBeforeProviderChange`). A Team API model or effort change keeps the queued
-change, because the remote client cannot see it. The channel threads of the agent
+queued change that fails on an idle agent, such as for a provider that is now off, is removed. A
+joined server's client queues the same change on `agent-pending-runtime-v1` (see
+[team-api.md](team-api.md)). An update that also changes other fields, a move to a backup model, a
+request on the released agent route (its released protocol has no `pendingRuntime`), and the
+automatic usage-limit, provider-error and endpoint moves still wait for idle work
+(`error.agent.waitForTasksBeforeProviderChange` / `error.agent.waitBeforeProviderChange`). A model or
+effort change on the released agent route keeps the queued change, because an older remote client
+cannot see it. The channel threads of the agent
 (`ChannelStore.contextThreadsForAgent`) are retired too, and their work steps are saved. A channel
-turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`.
+turn also carries its own self-contained context packet. The instance transfer file keeps `taskLimit`, and its server
+preferences keep the host turn limits.
 
 ## Deleted chat messages
 
@@ -750,12 +803,64 @@ When the last copy ends, the waiting answers start in one turn, and the prompt n
 whose copy ended with no answer. A message from the person does not wait: it starts at once and
 takes the answers that are already in. Each end of a copy schedules a drain for the requester.
 
-A message from another agent follows the recipient's busy-message mode, as a message from the
-person does. When the mode is "steer", the provider steers natively and the recipient runs a chat
-turn, `send_message` and the result relay take the message into that turn
-(`AgentService.#steerAgentMessage`). Channel, messaging and task work, and each answer to a request
-that went to two or more teammates, stay queued (`MailboxStore.steersChatTurn`), so those answers
-still start together. A message from an agent that cannot steer gets no fallback reason on its row.
+Nothing else wakes the requester, so a turn of teammate results that ends with no answer and no
+step stopped the whole team (#7225). Codex ends such a turn as completed. `TurnLifecycle` fails it
+with the `empty_answer` cause, as an ACP turn with no answer fails, unless the turn wants no answer
+(a quiet teammate update or routine run), compacted, showed a plan, continues a plan, or was stopped
+by the user. The error waits for the end
+of the turn, also with no backup model. A backup model then runs the turn again, as for a provider
+error. With no backup, a turn that only teammate results started runs once more on the same model.
+A thread turn never moves to a backup, so it always runs once more on the same model (#8503). So
+does the turn of an external chat conversation, such as WhatsApp (#8573); a channel task does not.
+`MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
+so the conversation gets no "Stopped." before the answer. The turn did no step, so it repeats
+nothing. A second empty run, or an empty turn from the person, shows the error.
+
+Codex can also write its last words as narration (a `msg_` commentary item) and then send an empty
+answer (#8837). Codex takes that narration as the turn's result, so `TurnLifecycle` makes the
+narration after the turn's last tool step the answer, and removes the empty rows. Outside a channel,
+this applies whether the turn did a step or not. A turn that did a step and wrote no such narration
+ends as before: its output can be a file or an image, or teammates or subagents still work for it. A
+teammate's such turn sends the note of its work (#8214). A channel turn keeps the rule above, since
+text after `channel_result` is a step there. Voice on the desktop does not read the answer again when
+it read that narration as a progress update.
+`scripts/codex-empty-lead-turn-e2e.ts` checks these paths.
+
+A message to an agent that runs a turn follows the busy-message mode: "steer" takes it into the
+running turn, "queue" starts it after the turn. The default is "steer" (`DEFAULT_BUSY_MESSAGE_MODE`).
+Server Settings > Agents changes the app default, and each agent can set its own mode. The preference file
+exists only after the user changes the setting, so a stored "queue" stays "queue". A remote client
+reads the host's default from `agent-host-settings-v1`, so a host on an older version keeps its
+"queue" default. A provider that cannot steer natively (an ACP agent with no steer request of its
+own) queues the message in both modes. OpenCode steers through its `_session/steering` ACP extension
+(`steerOpenCode`). An OpenCode release before the extension does not report
+`_meta.steering.supported` at `initialize`, so `AcpAgentClient` refuses the steer and the message
+waits in the queue. `scripts/opencode-steer-e2e.ts` checks both.
+
+A steered message joins work that the model already does, and a model that gets it as plain user
+text can drop that work. `QueueControls.steer` therefore puts the `<openbot_steer>` block
+(`steerNote` in `src/backend/agent/developer-instructions.ts`) in front of a message from the person
+or a teammate: the message adds to the current work, a question gets a short answer first, a
+correction applies from this point, and the unfinished work continues unless the message stops it.
+The block is a text item of its own, as the turn context blocks are, so the history readers remove
+it and the chat shows only the sender's text. Claude Code and Grok Build tell their model the same
+with a note of their own, so `steerNoteFor` gives them no block; Grok also reads only the first text
+block of a steer. A routine run gets no block. A slash command from the person gets none, as at the
+start of a turn, so the command stays at the start of the input. `scripts/pi-steer-e2e.ts` checks the
+block.
+
+A message from another agent that only gives information follows the recipient's busy-message mode,
+as a message from the person does: an answer, a requested result, or a notice (`expectsReply` false).
+When the mode is "steer", the provider steers natively and the recipient runs a chat turn,
+`send_message` and the result relay take the message into that turn
+(`AgentService.#steerAgentMessage`). A request (a message that expects a reply) never joins a running
+turn automatically, in each mode: it asks for work and a result, and in a running turn that result
+and the answer to the person would be one message. It waits for a turn of its own, and `send_message`
+tells the sender `queuedBecause: "own-turn"`. Routine runs, channel work and messages from Slack,
+Telegram or WhatsApp also do not steer automatically: each starts a turn of its own. Channel,
+messaging and task work, and each answer to a request that went to two or more teammates, stay
+queued (`MailboxStore.chatTurnSteer`), so those answers still start together. A message from an
+agent that cannot steer gets no fallback reason on its row.
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.
@@ -1059,7 +1164,8 @@ chat history.
 Fields added after version 1 shipped are optional, so an older app ignores them:
 
 - `agents[].preferences` (`src/main/instance-transfer-preferences.ts`): access, Computer Use, the agent
-  defaults, fast mode, backup models, hidden state, and the owner's notification level, pin and
+  defaults, fast mode, backup models, hidden state (`hidden`, with `hiddenWorks` from an app that keeps
+  a hidden agent at work), and the owner's notification level, pin and
   approval choice, plus the names of the agent's API keys and the count of its outside folders. A file
   can come from anywhere, so the import applies only values that keep the agent at or below a new
   agent's permissions (`workspace` access, Computer Use off, a setting off, "ask first"). "Local

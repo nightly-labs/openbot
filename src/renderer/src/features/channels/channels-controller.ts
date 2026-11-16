@@ -69,6 +69,12 @@ export interface ChannelsEnvironment {
    */
   isolationSupported: () => boolean;
   /**
+   * Whether the host reads and keeps the Browser setting (`channel-browser-v1`); `supported()` is
+   * checked as well. An older joined server drops the setting on the wire, so its select would always
+   * show every member and never save.
+   */
+  browserSupported: () => boolean;
+  /**
    * Whether this reader can change the picture of a channel. The host keeps a channel picture, and
    * only a phone with `channel-picture-v1` changes it over the Team API, so a joined server and the
    * browser client cannot.
@@ -251,6 +257,8 @@ export function createChannelsController(env: ChannelsEnvironment) {
           reconcile(merged.messages, "id")(state.page.messages);
           reconcile(page.tasks, "id")(state.page.tasks);
           Object.assign(state.page, { channel: page.channel, throughSequence: page.throughSequence });
+          if (page.waits === undefined) delete state.page.waits;
+          else state.page.waits = page.waits;
           if (merged.takeFetchedCursor) takeOlderWindow(state.page, page);
         } else if (withPage || !selectedExists) state.page = page;
         if (withPage || !selectedExists) state.loading = false;
@@ -543,6 +551,7 @@ export function createChannelsController(env: ChannelsEnvironment) {
     deletionSupported: () => supported() && env.deletionSupported(),
     taskCancelSupported: () => supported() && env.taskCancelSupported(),
     isolationSupported: () => supported() && env.isolationSupported(),
+    browserSupported: () => supported() && env.browserSupported(),
     messageDeletionSupported,
     deletesAnyMessage: env.deletesAnyMessage,
     deleteMessage,

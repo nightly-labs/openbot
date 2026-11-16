@@ -504,6 +504,29 @@ try {
     return { shown: shownSince(from) };
   });
 
+  await step("A hidden agent notifies on the desktop only when it needs the user", async () => {
+    const service = agents;
+    assert.ok(service);
+    const from = shown.length;
+    await setLevel("all");
+    await runCauseEffect(service.setAgentHidden({ agentId, hidden: true }));
+    desktop(finished);
+    desktop(startFailure);
+    desktop(prompt(18));
+    // Its own level replaces the rule, as for an agent in the list.
+    ownLevels.set(agentId, "all");
+    desktop(finished);
+    ownLevels.clear();
+    await runCauseEffect(service.setAgentHidden({ agentId, hidden: false }));
+    desktop(startFailure);
+    assert.deepEqual(shownSince(from), [
+      english("notification.needsInput"),
+      english("notification.finished"),
+      english("notification.failed"),
+    ]);
+    return { shown: shownSince(from) };
+  });
+
   await step("The owner's phone follows the level of the agent", async () => {
     // The desktop is muted, so only the level of the agent can keep the phone quiet.
     await setLevel("all", true);

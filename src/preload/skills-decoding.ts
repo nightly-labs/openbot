@@ -15,6 +15,10 @@ import {
   type AgentTemplatePreview,
   type AgentTemplatePublication,
   type AvatarImageInput,
+  GITHUB_SKILL_INSTRUCTIONS_MAX_LENGTH,
+  GITHUB_SKILLS_PER_LINK,
+  type GithubSkill,
+  type GithubSkillSource,
   INSTALLED_SKILL_ORIGINS,
   type InstalledSkill,
   type InstallMarketplaceAgentResult,
@@ -23,6 +27,7 @@ import {
   isAgentTemplateSkill,
   isAvatarHue,
   isAvatarSeed,
+  isGithubCommit,
   isRoutineSchedule,
   isSkillCategory,
   isSkillNote,
@@ -31,6 +36,7 @@ import {
   type MarketplaceAgentSummary,
   type MarketplaceSkillDetail,
   type MarketplaceSkillPage,
+  parseGithubSkillId,
   SKILL_DESCRIPTION_MAX_LENGTH,
   type SkillPackagePreview,
   type SkillSubmission,
@@ -160,6 +166,40 @@ function optionalSkillDescription(value: unknown): string | undefined {
   if (!isString(value)) return undefined;
   const description = value.trim();
   return description && description.length <= SKILL_DESCRIPTION_MAX_LENGTH ? description : undefined;
+}
+
+function decodeGithubSkill(value: unknown): GithubSkill {
+  const item = decodeRecord(value, "GitHub skill");
+  const id = requiredString(item, "id");
+  const instructions = requiredString(item, "instructions");
+  if (!parseGithubSkillId(id) || instructions.length > GITHUB_SKILL_INSTRUCTIONS_MAX_LENGTH)
+    throw new Error("Invalid GitHub skill.");
+  if (!Array.isArray(item.files) || !item.files.every(isString)) throw new Error("Invalid GitHub skill files.");
+  return {
+    id,
+    path: requiredString(item, "path"),
+    slug: requiredString(item, "slug"),
+    name: requiredString(item, "name"),
+    description: requiredString(item, "description"),
+    instructions,
+    files: item.files,
+  };
+}
+
+export function decodeGithubSkillSourceFromMain(value: unknown): GithubSkillSource {
+  const item = decodeRecord(value, "GitHub skills");
+  const commit = requiredString(item, "commit");
+  if (!isGithubCommit(commit)) throw new Error("Invalid GitHub commit.");
+  if (!Array.isArray(item.skills) || item.skills.length > GITHUB_SKILLS_PER_LINK)
+    throw new Error("Invalid GitHub skills.");
+  return {
+    owner: requiredString(item, "owner"),
+    repo: requiredString(item, "repo"),
+    commit,
+    committedAt: requiredString(item, "committedAt"),
+    path: requiredString(item, "path"),
+    skills: item.skills.map(decodeGithubSkill),
+  };
 }
 
 export function decodeInstalledSkillsFromMain(value: unknown): InstalledSkill[] {

@@ -446,3 +446,17 @@
   line-height: var(--openbot-leading-sm);
   text-align: center;
 }
+
+/* Why a request waits, above the composer. It stays in the flow, so the stopped-task panel that
+   follows starts under it instead of pulling up over it. */
+.channel-wait-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 var(--openbot-space-4) var(--openbot-space-2);
+  color: var(--openbot-text-muted);
+  font-size: var(--openbot-text-sm);
+  line-height: var(--openbot-leading-sm);
+}
+.channel-wait-note + .channel-paused-tasks {
+  margin-top: 0;
+}

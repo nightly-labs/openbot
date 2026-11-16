@@ -10,6 +10,7 @@ import {
   customProviderOfModel,
   DEFAULT_CUSTOM_PROVIDER_HARNESS,
   isCustomProviderHarness,
+  type ManagedProviderId,
   type ProviderApiKeyStatus,
   type ProviderRuntimeDownload,
   type ProviderRuntimeStatus,
@@ -88,6 +89,7 @@ interface ProviderSettingsSectionProps {
   onUpdateProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onChooseInstalledCli?: ((provider: ManagedProviderId, installed: boolean) => void | Promise<void>) | undefined;
   onSetProviderOn?: ((provider: AgentProviderId, on: boolean) => void | Promise<void>) | undefined;
   onMeasureProviderDownload?: ((provider: AgentProviderId) => Promise<ProviderRuntimeDownload>) | undefined;
   onRemoveProviderDownload?: ((provider: AgentProviderId) => Promise<void>) | undefined;
@@ -255,7 +257,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
   const editing = () => host.state.editing;
   const editDraft = () => {
     const provider = editing();
-    return provider ? savedCustomProviderDraft(provider) : undefined;
+    return provider ? savedCustomProviderDraft(provider, i18n.format) : undefined;
   };
 
   return (
@@ -287,6 +289,7 @@ function ProviderSettingsSection(props: ProviderSettingsSectionProps) {
         onUpdateProvider={props.onUpdateProvider}
         onRestartProvider={props.onRestartProvider}
         onCancelProviderRestart={props.onCancelProviderRestart}
+        onChooseInstalledCli={props.onChooseInstalledCli}
         onSetProviderOn={props.onSetProviderOn}
         onMeasureProviderDownload={props.onMeasureProviderDownload}
         onRemoveProviderDownload={props.onRemoveProviderDownload}
@@ -534,6 +537,7 @@ export interface HostProviderSettings {
   /** The provider restart is of this computer, so only its section has it. */
   onRestartProvider?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
   onCancelProviderRestart?: ((provider: AgentProviderId) => void | Promise<void>) | undefined;
+  onChooseInstalledCli?: ((provider: ManagedProviderId, installed: boolean) => void | Promise<void>) | undefined;
   /**
    * The off providers when agentStatus does not carry them: a joined server's host with
    * `provider-use-v1`, and the stories. This computer's saved switches are in agentStatus.
@@ -658,6 +662,7 @@ export function HostProviderSettingsPanel(
         onUpdateProvider={props.onUpdateProvider}
         onRestartProvider={props.onRestartProvider}
         onCancelProviderRestart={props.onCancelProviderRestart}
+        onChooseInstalledCli={props.onChooseInstalledCli}
         onSetProviderOn={props.onSetProviderOn}
         onMeasureProviderDownload={props.onMeasureProviderDownload}
         onRemoveProviderDownload={props.onRemoveProviderDownload}

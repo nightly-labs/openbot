@@ -3,9 +3,10 @@ import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord } from "./runtime-values";
 
 /**
- * An agent the user hid. It keeps its thread, files, memories, settings and sidebar section. Its
- * routines do not run and it receives no new messages until the user restores it. The state belongs
- * to the server, so every device that shows the server shows the same hidden agents.
+ * An agent the user hid. It keeps its thread, files, memories, settings and sidebar section, and it
+ * keeps working: its routines run and it gets messages. A server without `agent-hidden-work` stops
+ * it until the user restores it. The state belongs to the server, so every device that shows the
+ * server shows the same hidden agents.
  */
 export interface HiddenAgent {
   agentId: string;

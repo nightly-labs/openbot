@@ -5,11 +5,14 @@ import UniformTypeIdentifiers
 
 private typealias PasteFunction = @convention(c) (AnyObject, Selector, Any?) -> Void
 private typealias CanPerformFunction = @convention(c) (AnyObject, Selector, Selector, Any?) -> Bool
+private typealias KeyCommandsFunction = @convention(c) (AnyObject, Selector) -> NSArray?
 
 /// Wraps the chat composer field. The React Native field pastes text only, so a paste of photos,
 /// videos or other files in it is copied to temporary files and sent to JavaScript.
+/// Return on a hardware keyboard sends the draft. Shift-Return adds a line break.
 final class ComposerPasteView: ExpoView {
   let onPasteFiles = EventDispatcher()
+  let onSubmitKey = EventDispatcher()
   /// The file extensions that the app attaches. An item in more than one format is copied in one of these.
   var extensions: Set<String> = []
 
@@ -142,11 +145,36 @@ private enum ComposerPaste {
       }
       method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
+    // The submit key sends the text of the field to JavaScript.
+    let submitBlock: @convention(block) (UITextView, Any?) -> Void = { view, _ in
+      MainActor.assumeIsolated { view.composerPasteTarget?.onSubmitKey(["text": view.text ?? ""]) }
+    }
+    class_addMethod(field, submit, imp_implementationWithBlock(submitBlock), "v@:@")
+    let keyCommands = #selector(getter: UIResponder.keyCommands)
+    if let method = ownMethod(field, keyCommands) {
+      let original = unsafeBitCast(method_getImplementation(method), to: KeyCommandsFunction.self)
+      let replacement: @convention(block) (UITextView) -> NSArray? = { view in
+        let commands = original(view, keyCommands)
+        // `NSArray` is not Sendable, so only the added commands leave the main actor block.
+        let added: [UIKeyCommand]? = MainActor.assumeIsolated {
+          view.composerPasteTarget == nil ? nil : submitCommands()
+        }
+        guard let added else { return commands }
+        return ((commands as? [UIKeyCommand]) ?? []) + added as NSArray
+      }
+      method_setImplementation(method, imp_implementationWithBlock(replacement))
+    }
     let canPerform = #selector(UIResponder.canPerformAction(_:withSender:))
     if let method = ownMethod(field, canPerform) {
       let original = unsafeBitCast(method_getImplementation(method), to: CanPerformFunction.self)
       // The field shows Paste only for text. Paste also shows when the pasteboard has a file.
       let replacement: @convention(block) (UITextView, Selector, Any?) -> Bool = { view, action, sender in
+        // While an input method composes text, Return goes to the field and ends the composition.
+        if action == submit {
+          return MainActor.assumeIsolated {
+            view.isEditable && view.composerPasteTarget != nil && view.markedTextRange == nil
+          }
+        }
         if original(view, canPerform, action, sender) { return true }
         guard action == paste else { return false }
         return MainActor.assumeIsolated { view.isEditable && view.composerPasteTarget != nil }
@@ -155,6 +183,20 @@ private enum ComposerPaste {
       method_setImplementation(method, imp_implementationWithBlock(replacement))
     }
   }()
+
+  /// The selector of the submit key. The field class gets it as a new method.
+  private static let submit = NSSelectorFromString("openBotComposerSubmit:")
+
+  /// Return and Command-Return send. Other modifiers, such as Shift, keep the line break of the field.
+  @MainActor
+  private static func submitCommands() -> [UIKeyCommand] {
+    [UIKeyModifierFlags(), .command].map { modifiers in
+      let command = UIKeyCommand(input: "\r", modifierFlags: modifiers, action: submit)
+      // Without this, the text system takes Return before the command.
+      command.wantsPriorityOverSystemBehavior = true
+      return command
+    }
+  }
 
   /// The method of the class itself. The inherited method is added first, so UITextView does not change.
   private static func ownMethod(_ cls: AnyClass, _ selector: Selector) -> Method? {
@@ -173,7 +215,7 @@ public class ComposerPasteModule: Module {
     }
 
     View(ComposerPasteView.self) {
-      Events("onPasteFiles")
+      Events("onPasteFiles", "onSubmitKey")
 
       Prop("extensions") { (view: ComposerPasteView, extensions: [String]) in
         view.extensions = Set(extensions.map { $0.lowercased() })

@@ -5,10 +5,13 @@ import { AgentActivityIndicator, nextAgentActivityLabel } from "@openbot/ui/feat
 import { ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerEditor } from "@openbot/ui/features/conversation/ComposerEditor";
 import { ComposerNotice } from "@openbot/ui/features/conversation/ComposerNotice";
+import { ComposerStackCard } from "@openbot/ui/features/conversation/ComposerStackCard";
 import { formatChatTimestamp } from "@openbot/ui/features/conversation/chat-timestamp";
+import { type ChatBubbleStyle, ownMessageAuthor } from "@openbot/ui/features/conversation/own-bubble";
 import { useText } from "@openbot/ui/text";
 import { For, onSettled, Show } from "solid-js";
 import { createScrollFades } from "../../components/createScrollFades";
+import { createComposerRowsResize } from "./createComposerRowsResize";
 
 /** One question of a side question. The answer is null while the agent writes it. */
 export interface SideQuestionExchange {
@@ -21,6 +24,8 @@ export interface SideQuestionExchange {
 
 export interface SideQuestionPanelProps {
   agent: AgentProfile;
+  /** How the reader's questions look: Classic when absent. */
+  bubbleStyle?: ChatBubbleStyle | undefined;
   agents: AgentProfile[];
   exchanges: readonly SideQuestionExchange[];
   /** The agent's skills, for the `$` picker and the skill tags in messages. */
@@ -74,6 +79,7 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
   const activityLabel = nextAgentActivityLabel();
   const fades = createScrollFades();
   onSettled(() => fades.stop);
+  const draftRows = createComposerRowsResize(() => props.agent.id);
   const asking = () => props.exchanges.at(-1)?.answer === null;
   const messages = () => props.exchanges.flatMap(exchangeMessages);
   const ask = () => {
@@ -83,7 +89,12 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
   };
   const author = (message: AgentMessage) =>
     message.author === "you"
-      ? { kind: "you" as const, name: t("chat.message.you") }
+      ? ownMessageAuthor({
+          name: t("chat.message.you"),
+          style: props.bubbleStyle ?? "classic",
+          agent: props.agent,
+          chatColor: undefined,
+        })
       : { kind: "agent" as const, name: props.agent.name, agent: props.agent };
   return (
     <aside
@@ -146,32 +157,36 @@ export function SideQuestionPanel(props: SideQuestionPanelProps) {
         </section>
       </Show>
       <div class="composer-wrap">
-        <Show when={props.error}>
-          {(error) => (
-            <ComposerNotice
-              tone="danger"
-              title={t("conversation.sideQuestion.failed")}
-              body={error()}
-              action={
-                // The failed question is back in the draft, so Retry asks the draft again.
-                <Show when={props.draft.trim()}>
-                  <Button variant="outline" size="sm" type="button" disabled={asking()} onClick={ask}>
-                    {t("common.retry")}
-                  </Button>
-                </Show>
-              }
-            />
-          )}
-        </Show>
+        <div class="composer-stack">
+          <ComposerStackCard when={props.error}>
+            {(error) => (
+              <ComposerNotice
+                tone="danger"
+                title={t("conversation.sideQuestion.failed")}
+                body={error()}
+                action={
+                  // The failed question is back in the draft, so Retry asks the draft again.
+                  <Show when={props.draft.trim()}>
+                    <Button variant="outline" size="sm" type="button" disabled={asking()} onClick={ask}>
+                      {t("common.retry")}
+                    </Button>
+                  </Show>
+                }
+              />
+            )}
+          </ComposerStackCard>
+        </div>
         <form
+          ref={draftRows.form}
           class="composer side-question-composer"
           data-compact="true"
+          data-small=""
           onSubmit={(event) => {
             event.preventDefault();
             ask();
           }}
         >
-          <div class="composer-input-label">
+          <div class="composer-input-label" ref={draftRows.label}>
             <ComposerEditor
               agentId={props.agent.id}
               agents={props.agents}

@@ -14,7 +14,10 @@ import {
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostProviderAccountModels,
+  decodeHostProviderAccountPools,
   decodeHostProviderAccountUsage,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
@@ -24,6 +27,7 @@ import {
   type McpTestResult,
   type PasteProviderRelaySignInInput,
   type ProviderRelaySignInStatus,
+  type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
@@ -39,9 +43,21 @@ import {
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
 import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
+import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-models-v1";
+import {
+  PROVIDER_ACCOUNT_POOL_CAPABILITY,
+  PROVIDER_ACCOUNT_POOL_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import {
   PROVIDER_ACCOUNTS_CAPABILITY,
@@ -107,12 +123,14 @@ import {
 import type { IpcGroupHandlers } from "./define-ipc-group";
 import {
   parseConnectProviderAccountInput,
+  parseConnectProviderAccountKeyInput,
   parseDownloadableProviderId,
   parseProviderApiKeyInput,
   parseProviderUseInput,
   parseRemoveProviderAccountInput,
   parseRenameProviderAccountInput,
   parseResetProviderUsageInput,
+  parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
@@ -134,6 +152,10 @@ interface ProviderAdminIpcDependencies {
     | "startProviderCodeLogin"
     | "submitProviderCodeLogin"
     | "cancelProviderCodeLogin"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "changeProviderCredential"
     | "clearProviderCredential"
     | "signInCodexWithApiKey"
@@ -154,6 +176,9 @@ interface RelayedSignIn {
   fiber: Fiber.Fiber<McpTestResult, unknown>;
   result: { error: string | null } | null;
 }
+
+/** As the host's long provider start (3 minutes), with the key check and the model list after it. */
+const ACCOUNT_KEY_CONNECT_TIMEOUT_MS = 4 * 60_000;
 
 export function providerAdminIpcHandlers({
   service,
@@ -247,6 +272,13 @@ export function providerAdminIpcHandlers({
         return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body: body(input) }));
       },
     });
+
+  /** The code sign-in of an account of a joined server's host, which only a host with `provider-account-code-v1` runs. */
+  function accountCode<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_CODE_CAPABILITY))
+      throw new Error(sourceText("error.team.providersUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  }
 
   /**
    * The provider that a new agent of a joined server's host starts on, which only a host with
@@ -400,17 +432,30 @@ export function providerAdminIpcHandlers({
               body: {},
             },
           );
-          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY))
-            return runCauseEffect(list);
-          const models = remoteServers
-            .request(serverId, PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {
-              method: "POST",
-              body: {},
-            })
-            .pipe(Effect.orElseSucceed(() => null));
+          const models = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_MODELS_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_MODELS_ROUTES.list, decodeHostProviderAccountModels, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
+          // A host with `provider-account-pool-v1` also gives its pools. When that read fails, the
+          // accounts come without them, as from an older host.
+          const pools = remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY)
+            ? remoteServers
+                .request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.list, decodeHostProviderAccountPools, {
+                  method: "POST",
+                  body: {},
+                })
+                .pipe(Effect.orElseSucceed(() => null))
+            : Effect.succeed(null);
           return runCauseEffect(
-            Effect.all([list, models], { concurrency: "unbounded" }).pipe(
-              Effect.map(([accounts, extra]) => (extra ? withHostProviderAccountModels(accounts, extra) : accounts)),
+            Effect.all([list, models, pools], { concurrency: "unbounded" }).pipe(
+              Effect.map(([accounts, extra, pooled]) => {
+                const withModels = extra ? withHostProviderAccountModels(accounts, extra) : accounts;
+                return pooled ? { ...withModels, pools: pooled } : withModels;
+              }),
             ),
           );
         },
@@ -433,8 +478,58 @@ export function providerAdminIpcHandlers({
         acceptEmpty,
         (provider) => ({ provider }),
       ),
+      connectAccountKey: scopedHandler(parseConnectProviderAccountKeyInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_KEYS_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            // The host answers after it checked the key in a new provider process, which can start slowly.
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_KEYS_ROUTES.connect, acceptEmpty, {
+              method: "POST",
+              body: input,
+              timeoutMs: ACCOUNT_KEY_CONNECT_TIMEOUT_MS,
+            }),
+          );
+        },
+      }),
+      startAccountCodeLogin: scopedHandler(parseConnectProviderAccountInput, {
+        local: ({ provider, accountId }) => runCauseEffect(service.startProviderAccountCodeLogin(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.start, input, decodeProviderAccountCodeLoginStart),
+      }),
+      submitAccountCodeLogin: scopedHandler(parseSubmitAccountCodeLoginInput, {
+        local: async ({ provider, accountId, code }) =>
+          service.submitProviderAccountCodeLogin(provider, accountId, code),
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.submit, input, acceptEmpty),
+      }),
+      accountCodeLoginStatus: scopedHandler(parseRemoveProviderAccountInput, {
+        local: ({ provider, accountId }) =>
+          Promise.resolve(service.providerAccountCodeLoginStatus(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.status, input, decodeProviderAccountCodeLoginStatus),
+      }),
+      cancelAccountCodeLogin: scopedHandler(parseRemoveProviderAccountInput, {
+        local: async ({ provider, accountId }) => {
+          await runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId));
+        },
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.cancel, input, acceptEmpty),
+      }),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
+      setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
+        local: () => Promise.reject(new Error(sourceText("error.team.providersUnsupported"))),
+        remote: (input, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_POOL_CAPABILITY))
+            throw new Error(sourceText("error.team.providersUnsupported"));
+          return runCauseEffect(
+            remoteServers.request(serverId, PROVIDER_ACCOUNT_POOL_ROUTES.update, acceptEmpty, {
+              method: "POST",
+              body: input,
+            }),
+          );
+        },
+      }),
       hostDefaultProvider: scopedQueryHandler({
         local: () => Promise.reject(new Error(sourceText("error.team.providerDefaultUnsupported"))),
         remote: (serverId) => hostDefaultProvider(serverId, PROVIDER_DEFAULT_ROUTES.settings, {}),
@@ -608,6 +703,15 @@ export function providerAdminIpcHandlers({
 function parseSubmitCodeLoginInput(value: unknown): SubmitProviderCodeLoginInput {
   if (!isDynamicRecord(value) || !isString(value.code)) throw new Error(sourceText("error.provider.codeLoginBadCode"));
   return { provider: parseProviderId(value.provider), code: normalizePastedCode(value.code) };
+}
+
+/** As `parseSubmitCodeLoginInput`, with the account whose sign-in waits for the code. */
+function parseSubmitAccountCodeLoginInput(value: unknown): SubmitProviderAccountCodeLoginInput {
+  const { provider, code } = parseSubmitCodeLoginInput(value);
+  return {
+    ...parseRemoveProviderAccountInput({ provider, accountId: isDynamicRecord(value) ? value.accountId : null }),
+    code,
+  };
 }
 
 /** The address holds a grant, so the error never quotes it. */

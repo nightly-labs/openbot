@@ -5,7 +5,7 @@
 // sign-in gives the Gemini weekly window and not the Claude and GPT one, that a model with a quota
 // group of its own gets that group's window (#3055), that on a plan with no Gemini group the dock shows
 // the group with the least room left and a Gemini model still has no reading, that the reading names every group for the usage
-// popover and the composer notice, that the fake gets Antigravity's User-Agent, the bearer token and
+// popover and the composer notice, that the fake gets the Antigravity desktop app's User-Agent, the bearer token and
 // the account's project, that an API key sign-in, an access token that expires within a minute, a 403
 // and a missing project give no reading and no error, and that a usage read sends nothing to the ACP
 // server and starts no process. The `/usage` checks are gone: 1.5 has no `/usage`, so no prompt can
@@ -340,7 +340,8 @@ try {
   assert.equal(cli.source, "managed");
   const os = process.platform === "win32" ? "windows" : process.platform;
   const arch = process.arch === "x64" ? "amd64" : process.arch;
-  report.userAgent = `antigravity/${VERSION} ${os}/${arch}`;
+  // The desktop app's version, not the CLI's: Google sends the Gemini group only to it (#7215).
+  report.userAgent = `antigravity/2.31.0 ${os}/${arch}`;
 
   // 1. A Google sign-in: the Gemini group's weekly window, from the account's project.
   await writeToken(ACCESS_TOKEN, inOneHour());

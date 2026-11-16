@@ -19,6 +19,10 @@ export const messages = {
   "composer.update.manual": "יש לעדכן את {provider} במחשב שמריץ אותו כדי להמשיך.",
   "composer.update.pending": "מעדכן…",
   "composer.update.action": "עדכון",
+  "composer.usageLimit.credits": "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים עכשיו בקרדיטים שלך.",
+  "composer.usageLimit.creditsResets":
+    "ניצלת את כל מכסת התוכנית של {provider}. הסוכנים שלך משתמשים בקרדיטים שלך עד שהיא תתאפס {reset}.",
+  "composer.usageLimit.creditsTitle": "שימוש בקרדיטים",
   "composer.usageLimit.resets": "ניצלת את כל המכסה של {provider}. היא תתאפס {reset}.",
   "composer.usageLimit.selectModel": "ניצלת את כל המכסה של {provider}. יש לבחור מודל אחר כדי להמשיך.",
   "composer.usageLimit.title": "הגעת למכסת השימוש",
@@ -75,6 +79,7 @@ export const messages = {
   "composer.placeholder.answer": "הקלדת התשובה",
   "composer.add.label": "הוספה להנחיה",
   "composer.add.files": "צירוף קבצים",
+  "composer.add.teach": "לימוד משימה",
   "composer.add.skill": "שימוש במיומנות",
   "composer.upload.cancel": "ביטול ההעלאה",
   "composer.upload.uploading": "מעלה את {name}",

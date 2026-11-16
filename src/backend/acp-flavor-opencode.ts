@@ -1,14 +1,23 @@
-import { RequestError } from "@agentclientprotocol/sdk";
+import {
+  type ClientSideConnection,
+  type ContentBlock,
+  type InitializeResponse,
+  RequestError,
+} from "@agentclientprotocol/sdk";
+import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import type { CauseCode } from "@openbot/telemetry";
+import { Effect } from "effect";
 import { type AcpCustomEndpoint, type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import {
   isImageCountDiagnostic,
   isImageTooLargeDiagnostic,
   isImageTooSmallDiagnostic,
+  isUnreadableContentDiagnostic,
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
-import { isRecord } from "./protocol";
+import { getString, isRecord } from "./protocol";
+import { providerCall, providerFailure } from "./provider-client-effects";
 
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
@@ -19,6 +28,32 @@ function isOpenCodeStarting(error: unknown): boolean {
     error.data.errorName === "ServiceUnavailableError"
   );
 }
+
+/**
+ * Whether this OpenCode has the `_session/steering` request. OpenCode 2.2.6 does not have it, and a
+ * later release reports it in the `_meta` of `initialize` (anomalyco/opencode#53042, #8231).
+ */
+export function openCodeSteers(initialization: InitializeResponse): boolean {
+  const steering = isRecord(initialization._meta) ? initialization._meta.steering : null;
+  return isRecord(steering) && steering.supported === true;
+}
+
+/**
+ * OpenCode's `_session/steering` puts a message in the running turn, and the agent reads it after its
+ * current tool call or model step. The blocks are those of a `session/prompt`. OpenCode answers
+ * `promptRequired` when the session runs no turn: it did not keep the message, which then waits in
+ * the queue. Each other answer means that OpenCode kept it, so the message must not go a second time.
+ */
+export const steerOpenCode = Effect.fn("OpenCode.steer")(function* (
+  connection: ClientSideConnection,
+  message: { sessionId: string; blocks: ContentBlock[] },
+) {
+  const answer = yield* providerCall(() =>
+    connection.extMethod("_session/steering", { sessionId: message.sessionId, prompt: message.blocks }),
+  );
+  if (getString(answer, "outcome") === "promptRequired")
+    return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+});
 
 /**
  * OpenCode's wrapper error for a failed call to its internal server. It carries no cause: OpenCode
@@ -48,6 +83,11 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * OpenCode 2.2.5 answers an HTTP 401 from a custom endpoint the same way, whether OpenBot sent no
  * key or the endpoint refused the key. Its key is in OpenBot's endpoint settings, so the text for an
  * OpenCode sign-in sent the user to the wrong place.
+ *
+ * OpenCode 2.2.7 also answers this way, with empty data, for a free model that it refuses for the
+ * user's country: `opencode run` shows "This model is not available in your country". A free model
+ * needs no sign-in, so the text told the user to choose a free model while one was chosen. The ID
+ * stands in for the display name: a free ID ends in `-free`, as the name ends in "Free".
  */
 function openCodeAuthRequired(error: unknown, model: string | null, endpoint: AcpCustomEndpoint | null): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
@@ -56,6 +96,8 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
       endpoint.hasCredentials ? "error.provider.customEndpointKeyRefused" : "error.provider.customEndpointKeyMissing",
       { provider: endpoint.name },
     );
+  if (model?.toLowerCase().startsWith("opencode/") && isFreeOpencodeModel(model, model))
+    return sourceText("error.provider.opencodeFreeModelRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   return provider
     ? sourceText("error.provider.opencodeAuthRequired", { provider })
@@ -63,13 +105,14 @@ function openCodeAuthRequired(error: unknown, model: string | null, endpoint: Ac
 }
 
 /**
- * A request that the model refused for a file, image or audio part in the chat. OpenCode 2.1.1
- * sends a part when the model catalog lists its kind, or when the part has a kind it does not know,
- * such as an MCP resource. Each gateway words the refusal differently; OpenCode itself refuses a
- * kind that the protocol cannot carry.
+ * A request that is larger than the model's context window, also after OpenCode 2.2.6 compacted the
+ * chat. OpenCode names its own failure `compaction.failed` ("cannot be reduced further") or
+ * `compaction.unavailable` ("Nothing to compact yet", when only the first exchange is there); a model
+ * server's refusal comes as its own text: LM Studio, llama.cpp, and OpenAI-compatible servers. A local
+ * server often loads a model with a window smaller than the agent's instructions and tools (#6195).
  */
-const OPENCODE_UNREADABLE_CONTENT =
-  /\[unsupported_content_type\]|\bcontent part type "[^"]*" is not supported\b|\bsupports text-only requests\b|\bdoes not support media type\b/iu;
+const OPENCODE_CONTEXT_TOO_SMALL =
+  /\bcannot be reduced further without losing the latest exchange\b|\bnothing to compact yet\b|\bgreater than the context length\b|\bexceeds the available context size\b|\bexceed_context_size_error\b|\bcontext_length_exceeded\b/iu;
 
 /**
  * The kind of a model request that OpenCode gave up on, first match wins. A provider gateway
@@ -119,11 +162,25 @@ function openCodeRequestFailure(
   // A gateway wraps it as an upstream failure; the turn reads the provider's text to start a new session.
   if (isImageTooSmallDiagnostic(reason) || isImageTooLargeDiagnostic(reason) || isImageCountDiagnostic(reason))
     return redact(reason);
-  // The part stays in the session, so each turn on this model fails until the user picks another.
-  // The provider's text says nothing more to the user; it goes to the log.
-  if (OPENCODE_UNREADABLE_CONTENT.test(reason)) {
+  // The part stays in the session, so the turn reads the provider's text to start a new session.
+  if (isUnreadableContentDiagnostic(reason)) {
     log(`OpenCode model refused the chat content: ${reason}`);
-    return sourceText("error.provider.opencodeUnreadableContent");
+    return redact(reason);
+  }
+  // OpenCode 2.2.7 names a model reply that ended with no finish reason, or that it could not read.
+  // OpenCode retries a cut-off reply by itself, and a weak connection can also cut it off (#6872).
+  if (isRecord(error.data) && error.data.errorName === "provider.invalid-output")
+    return sourceText("error.provider.opencodeIncompleteReply", { detail: shownFailureDetail(redact(reason)) });
+  // OpenCode 2.2.7 stops the turn when a model starts a second reasoning block before the first ends.
+  // A route such as Vercel AI Gateway's does this at a higher effort; a send again fails the same way (#8621).
+  if (/\breasoning start before end\b/u.test(reason)) {
+    log(`OpenCode could not read the model's reasoning stream: ${reason}`);
+    return sourceText("error.provider.opencodeReasoningOverlap");
+  }
+  // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
+  if (OPENCODE_CONTEXT_TOO_SMALL.test(reason)) {
+    log(`OpenCode request does not fit the model's context window: ${reason}`);
+    return sourceText("error.provider.opencodeContextTooSmall");
   }
   const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
   if (!key) return detail;
@@ -165,13 +222,16 @@ function openCodeFailureCause(error: unknown): CauseCode | null {
 
 export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.x has a session that 1.x wrote after the one-time `session_v2` copy. It answers with
-  // invalid params and the ID in data.sessionId. The same code with another message is a session of
-  // another directory, which is not missing.
+  // invalid params and the ID in data.sessionId. OpenCode also refuses each resume of a session that
+  // it made in another directory, with data.cwd (#7622): the agent's workspace moved. The agent must
+  // work in its workspace, so the session cannot reopen; the caller replaces it with the transcript.
   sessionNotFound: (error, sessionId) =>
     error.code === -32602
       ? isRecord(error.data) &&
         error.data.sessionId === sessionId &&
-        error.message === `Invalid params: session not found: ${sessionId}`
+        (error.message === `Invalid params: session not found: ${sessionId}` ||
+          (typeof error.data.cwd === "string" &&
+            error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
   turnFailure: (error, detail, redact, log, model, endpoint) => {
     const authRequired = openCodeAuthRequired(error, model, endpoint);
@@ -209,11 +269,20 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.2.0 sends updates only for the execution that a prompt starts. The turn that a
   // finished background subagent starts reaches only its store, so the chat never showed it (#3406).
   unsentBackgroundTurns: true,
+  // OpenCode 2.2.7 sends `usage_update` and has no ACP method that compacts. It compacts by itself
+  // only when the context is full, so a long chat sent an almost full context with each request (#7171).
+  contextCompaction: "handoff",
+  // OpenCode 2.2.7 loads a session from its own store with all of its messages. Each idle release
+  // added one more copy of the instructions to a long chat (#7171).
+  reopenKeepsPrompts: true,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
+  // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
+  relayStdioMcpServers: true,
   // OpenCode 2.2.5 sends each subagent's session as `opencode/session/child_update` when the client
   // asks. Without it, the subagent's tool calls showed as the parent's, and nothing told when it ended.
   childSessionUpdates: true,

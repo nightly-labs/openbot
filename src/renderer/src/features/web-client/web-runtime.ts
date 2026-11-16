@@ -6,6 +6,7 @@ import {
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import type {
   AccountUsage,
+  AgentApproval,
   AgentColors,
   AgentEvent,
   AgentNotificationLevelsSnapshot,
@@ -18,6 +19,8 @@ import type {
   BrowserOpenInput,
   BrowserPreview,
   BrowserTab,
+  BrowserTeachStep,
+  BrowserTeachStopInput,
   CancelQueuedMessageInput,
   Channel,
   ChatColors,
@@ -33,7 +36,9 @@ import type {
   HiddenAgentsSnapshot,
   InvitePreview,
   LocalBrowserSecretResponse,
+  PinnedMessagesSnapshot,
   QueueSnapshot,
+  ReadPendingApprovalInput,
   ReorderQueueInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
@@ -44,6 +49,7 @@ import type {
   SetAgentHiddenInput,
   SetAgentNotificationLevelInput,
   SetChannelImageInput,
+  SetMessagePinnedInput,
   SetMessageReactionInput,
   SidebarLayoutAction,
   SidebarLayoutSnapshot,
@@ -64,6 +70,7 @@ import {
   DEFAULT_PROVIDER_ACCOUNT_ID,
   decodeAgentFastModels,
   decodeAgentModelListings,
+  decodeUsageCredits,
   decodeWorkspaceDirectory,
   isAccountUsage,
   isAgentStatus,
@@ -79,6 +86,7 @@ import {
   isTeamPresenceSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
@@ -89,6 +97,12 @@ import {
   AGENT_FAST_MODE_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
+import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -103,6 +117,11 @@ import {
   BROWSER_PAGE_STATE_ROUTES,
   decodeBrowserPageStateSnapshot,
 } from "@openbot/contracts/team-protocol/browser-page-state-v1";
+import {
+  BROWSER_TEACH_CAPABILITY,
+  BROWSER_TEACH_ROUTES,
+  decodeBrowserTeachSteps,
+} from "@openbot/contracts/team-protocol/browser-teach-v1";
 import {
   BROWSER_USER_CONTROL_CAPABILITY,
   BROWSER_USER_CONTROL_ROUTES,
@@ -137,10 +156,24 @@ import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-prot
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
+  decodeMessagePinsResponse,
+  MESSAGE_PINS_CAPABILITY,
+  MESSAGE_PINS_ROUTES,
+} from "@openbot/contracts/team-protocol/message-pins-v1";
+import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
 } from "@openbot/contracts/team-protocol/model-visibility-v1";
+import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
+import {
+  ROUTINE_FLOW_STOP_CAPABILITY,
+  ROUTINE_FLOW_STOP_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/routine-flows-v1";
 import { ROUTINES_ONCE_CAPABILITY } from "@openbot/contracts/team-protocol/routines-once-v1";
 import {
@@ -153,6 +186,7 @@ import {
   THREAD_MESSAGE_SEARCH_PAGE_LIMIT,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
@@ -287,6 +321,9 @@ export interface WebWorkspaceRuntime {
   /** Behind `browser-user-control`: the owning agent waits on the tab until the release. */
   takeBrowserControl(tabId: string): Promise<void>;
   releaseBrowserControl(tabId: string): Promise<void>;
+  /** Behind `browser-teach-v1`: the host records the steps that this member shows in the tab. */
+  startBrowserTeach(tabId: string): Promise<void>;
+  stopBrowserTeach(input: BrowserTeachStopInput): Promise<BrowserTeachStep[]>;
   respondToBrowserSecret?: (input: LocalBrowserSecretResponse) => Promise<void>;
   getSidebarLayout?: () => Promise<SidebarLayoutSnapshot>;
   mutateSidebarLayout?: (action: SidebarLayoutAction) => Promise<SidebarLayoutSnapshot>;
@@ -322,7 +359,7 @@ export interface WebWorkspaceRuntime {
   listAgents(): Promise<ClientAgentSummary[]>;
   conversation(agentId: string, before?: string): Promise<ConversationPage>;
   /** The page of an agent's conversation around one message, or the newest page from an older host. */
-  conversationAround?: (agentId: string, messageId: string) => Promise<ConversationPage>;
+  conversationAround?: (agentId: string, messageId: string, limit?: number) => Promise<ConversationPage>;
   /** Marks this member's messages from the agent read through `throughMessageId`, or all when it is null. */
   markRead(agentId: string, throughMessageId: string | null): Promise<ConversationReadState>;
   /** With `conversation-unread-from-v1`: marks one message and the messages after it unread, for this member. */
@@ -350,8 +387,17 @@ export interface WebWorkspaceRuntime {
   compactChannelContext?: (channelId: string) => Promise<void>;
   /** The open waits of an agent, with `agent-waits-v1`. A host without it refuses before a request goes out. */
   listWaits?: (agentId: string) => Promise<AgentWaitsSnapshot>;
+  /** The pinned messages of all chats of an agent, with `message-pins-v1`. A host without it refuses before a request goes out. */
+  listPinnedMessages?: (agentId: string) => Promise<PinnedMessagesSnapshot>;
+  /** Pin or Unpin on one message, with `message-pins-v1`. Resolves with the new list of the chat. */
+  setMessagePinned?: (input: SetMessagePinnedInput) => Promise<PinnedMessagesSnapshot>;
   /** Cancel on one open wait of an agent, with `agent-waits-v1`. */
   cancelWait?: (agentId: string, waitId: string) => Promise<void>;
+  /**
+   * The whole copy of an approval that a runtime snapshot cut, with `pending-approval-v1`. Null from a
+   * host without it: the card then keeps the cut copy and offers only Deny.
+   */
+  readPendingApproval?: (input: ReadPendingApprovalInput) => Promise<AgentApproval | null>;
   /** Tells a hosted server that this tab has focus. Send it only to a host with `focus-use-v1`. */
   focusUse(): Promise<void>;
   /** Resolves to the conversation message the host stored: the delivery id of the receipt. */
@@ -989,6 +1035,8 @@ export function createWebWorkspaceRuntime(
   ): Promise<T> {
     if (!capabilities.includes(ROUTINE_FLOWS_CAPABILITY))
       throw new Error(currentText().t("error.team.routineFlowsUnsupported"));
+    if (path === ROUTINE_FLOW_STOP_ROUTES.stopRun && !capabilities.includes(ROUTINE_FLOW_STOP_CAPABILITY))
+      throw new Error(currentText().t("error.team.routineFlowStopUnsupported"));
     return teamApi(method, path, decode, body);
   }
   const routineFlows = teamRoutineFlowsApi(routineFlowsRequest);
@@ -1216,6 +1264,18 @@ export function createWebWorkspaceRuntime(
         throw new Error(currentText().t("error.backend.browserUserControlUnsupported"));
       decodeBrowserUserControlSnapshot(await request("POST", BROWSER_USER_CONTROL_ROUTES.release, { tabId }));
     },
+    async startBrowserTeach(tabId) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      await request("POST", BROWSER_TEACH_ROUTES.start, { tabId });
+    },
+    async stopBrowserTeach(input) {
+      if (!capabilities.includes(BROWSER_TEACH_CAPABILITY))
+        throw new Error(currentText().t("error.backend.browserTeachUnsupported"));
+      return decodeBrowserTeachSteps(
+        await request("POST", BROWSER_TEACH_ROUTES.stop, { tabId: input.tabId, save: input.save }),
+      );
+    },
     async browserPreview(tabId) {
       return decodeWebBrowserPreview(await request("POST", TEAM_API_ROUTES.browser.preview, { tabId }));
     },
@@ -1355,10 +1415,10 @@ export function createWebWorkspaceRuntime(
       const query = new URLSearchParams({ limit: "50", ...(before ? { before } : {}) });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
-    async conversationAround(id, messageId) {
+    async conversationAround(id, messageId, limit = 50) {
       if (!capabilities.includes("conversation-pagination"))
         return decodeWebConversationSnapshot(await request("GET", TEAM_API_ROUTES.agent.conversation(id)));
-      const query = new URLSearchParams({ limit: "50", around: messageId });
+      const query = new URLSearchParams({ limit: String(limit), around: messageId });
       return decodeWebConversationPage(await request("GET", `${TEAM_API_ROUTES.agent.conversationPage(id)}?${query}`));
     },
     async markRead(id, throughMessageId) {
@@ -1413,6 +1473,27 @@ export function createWebWorkspaceRuntime(
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
         throw new Error(currentText().t("error.team.agentWaitsUnsupported"));
       return decodeAgentWaitsResponse(await request("POST", AGENT_WAITS_ROUTES.list, { agentId }));
+    },
+    async listPinnedMessages(agentId) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(await request("POST", MESSAGE_PINS_ROUTES.list, { agentId }));
+    },
+    async setMessagePinned(input) {
+      if (!capabilities.includes(MESSAGE_PINS_CAPABILITY))
+        throw new Error(currentText().t("error.team.messagePinsUnsupported"));
+      return decodeMessagePinsResponse(
+        await request("POST", MESSAGE_PINS_ROUTES.set, {
+          agentId: input.agentId,
+          taskId: input.taskId ?? null,
+          messageId: input.messageId,
+          pinned: input.pinned,
+        }),
+      );
+    },
+    async readPendingApproval(input) {
+      if (!capabilities.includes(PENDING_APPROVAL_CAPABILITY)) return null;
+      return decodePendingApprovalResponse(await request("POST", PENDING_APPROVAL_ROUTES.read, { ...input }));
     },
     async cancelWait(agentId, waitId) {
       if (!capabilities.includes(AGENT_WAITS_CAPABILITY))
@@ -1633,9 +1714,12 @@ export function createWebWorkspaceRuntime(
       // The fast tiers and the picker listing are optional: when a route fails, the picker gets the
       // models with no Fast switch or listing.
       const [fast, listings] = await Promise.all([
-        capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
-          ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
-          : [],
+        // Only `agent-speed-v1` lists Ultrafast tiers and Claude models; an older host keeps `agent-fast-mode-v1`.
+        capabilities.includes(AGENT_SPEED_CAPABILITY)
+          ? request("POST", AGENT_SPEED_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+          : capabilities.includes(AGENT_FAST_MODE_CAPABILITY)
+            ? request("POST", AGENT_FAST_MODE_ROUTES.models, {}).then(decodeAgentFastModels, () => [])
+            : [],
         capabilities.includes(MODEL_VISIBILITY_CAPABILITY)
           ? request("POST", MODEL_VISIBILITY_ROUTES.listing, {}).then(decodeAgentModelListings, () => [])
           : [],
@@ -1648,9 +1732,17 @@ export function createWebWorkspaceRuntime(
       return value;
     },
     async accountUsage() {
-      const value = await request("GET", TEAM_API_ROUTES.agents.usage);
+      // Whether an account works on credits is optional: when its read fails, the reading shows as before.
+      const [value, credits] = await Promise.all([
+        request("GET", TEAM_API_ROUTES.agents.usage),
+        capabilities.includes(USAGE_CREDITS_CAPABILITY)
+          ? request("POST", USAGE_CREDITS_ROUTES.list, {})
+              .then((rows) => decodeUsageCredits(isDynamicRecord(rows) ? rows.accounts : null))
+              .catch(() => [])
+          : [],
+      ]);
       if (!isAccountUsage(value)) throw new Error(currentText().t("error.remote.invalidData"));
-      return value;
+      return withUsageCredits(value, credits);
     },
     async createAgent(input) {
       // The released route keeps the nearest hue. The exact colour goes on `agent-colors-v1` after it.
@@ -1708,6 +1800,16 @@ export function createWebWorkspaceRuntime(
           reasoningEffort,
           ...(providerAccountId ? { providerAccountId } : {}),
         });
+        return;
+      }
+      // While the agent works, the released agent route refuses a provider change. A change of the runtime
+      // alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the account in the
+      // same change.
+      const runtimeChange = capabilities.includes(AGENT_PENDING_RUNTIME_CAPABILITY)
+        ? pendingRuntimeUpdateBody(input)
+        : null;
+      if (runtimeChange) {
+        await request("POST", AGENT_PENDING_RUNTIME_ROUTES.update, runtimeChange);
         return;
       }
       // The released agent route ignores the account, so it goes on `provider-accounts-v1` after the

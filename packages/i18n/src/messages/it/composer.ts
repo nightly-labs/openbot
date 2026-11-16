@@ -19,6 +19,11 @@ export const messages = {
   "composer.update.manual": "Aggiorna {provider} sul computer su cui è in esecuzione per continuare.",
   "composer.update.pending": "Aggiornamento…",
   "composer.update.action": "Aggiorna",
+  "composer.usageLimit.credits":
+    "Hai usato tutto il limite del piano {provider}. I tuoi agenti ora usano i tuoi crediti.",
+  "composer.usageLimit.creditsResets":
+    "Hai usato tutto il limite del piano {provider}. I tuoi agenti usano i tuoi crediti finché non si azzera {reset}.",
+  "composer.usageLimit.creditsTitle": "Uso dei crediti",
   "composer.usageLimit.resets": "Hai usato tutto il limite di {provider}. Si azzera {reset}.",
   "composer.usageLimit.selectModel": "Hai usato tutto il limite di {provider}. Scegli un altro modello per continuare.",
   "composer.usageLimit.title": "Limite di utilizzo raggiunto",
@@ -76,6 +81,7 @@ export const messages = {
   "composer.placeholder.answer": "Scrivi la tua risposta",
   "composer.add.label": "Aggiungi al prompt",
   "composer.add.files": "Allega file",
+  "composer.add.teach": "Insegna un’attività",
   "composer.add.skill": "Usa una skill",
   "composer.upload.cancel": "Annulla caricamento",
   "composer.upload.uploading": "Caricamento di {name}",

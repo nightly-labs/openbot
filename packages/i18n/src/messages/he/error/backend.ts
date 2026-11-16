@@ -45,6 +45,9 @@ export const messages = {
   "error.backend.channelDeleteUnsupported": "השרת הזה אינו תומך במחיקת ערוצים.",
   "error.backend.browserNavigateUnsupported": "המארח המרוחק הזה אינו תומך בניווט בשורת הכתובת בלשונית קיימת.",
   "error.backend.browserUserControlBusy": "לשונית הדפדפן הזו ממתינה לסוד. יש לענות קודם על בקשת הסוד.",
+  "error.backend.browserTeachBusy": "אדם אחר שולט בלשונית הדפדפן הזו. נסו שוב כשיסיים.",
+  "error.backend.browserTeachUnavailable": "ללשונית הדפדפן הזו אין סוכן שיכול ללמוד משימה.",
+  "error.backend.browserTeachUnsupported": "המארח המרוחק הזה אינו תומך בהקלטת משימה.",
   "error.backend.browserUserControlUnsupported": "המארח המרוחק הזה אינו תומך בשליטה בלשונית דפדפן.",
   "error.backend.browserSignInUnsupported": "המארח המרוחק הזה אינו יכול לקבל התחברות מהמחשב הזה.",
   "error.backend.browserSignInOpenFailed": "OpenBot לא הצליח לפתוח את חלון ההתחברות.",
@@ -59,6 +62,8 @@ export const messages = {
     "הדחיסה אינה מקטינה את הצ'אט הזה: אחרי שתי דחיסות הוא עדיין תופס {percent}% מחלון ההקשר של המודל, ולכן OpenBot מפסיק לדחוס אותו. כלים והנחיות תופסים את רוב החלון. יש לכבות את שרתי ה-MCP או את השליטה במחשב שהסוכן הזה לא צריך, או לבחור מודל עם חלון גדול יותר. אחר כך יש להתחיל צ'אט חדש.",
   "error.backend.contextCompactionStopped":
     "שתי דחיסות של הצ'אט הזה נכשלו ברצף, ולכן OpenBot מפסיק לדחוס אותו אוטומטית. כל ניסיון שולח את כל הצ'אט למודל וצורך ממגבלת התוכנית שלך. יש לבחור Compact now כדי לנסות שוב, או להתחיל צ'אט חדש.",
+  "error.backend.providerModelAtCapacity":
+    "המודל בעומס מלא. הספק ינסה שוב בעוד כמה דקות. כדי להמשיך עכשיו, עצור את התור ובחר מודל אחר.",
   "error.backend.providerRetrying":
     "הספק נכשל בבקשה הזו {attempts} פעמים ומנסה שוב. אם הסוכן אינו ממשיך, יש לעצור את התור.",
   "error.backend.providerRetryingLargeContext":
@@ -74,6 +79,9 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
+  "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
+  "error.backend.channelCompactNotSupported":
+    "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",
@@ -104,6 +112,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "פעולת הזיכרון נכשלה. יש לנסות שוב.",
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
@@ -152,6 +161,10 @@ export const messages = {
   "error.backend.attachBetween": "יש לצרף בין קובץ אחד ל-{limit} קבצים.",
   "error.backend.attachmentNotFile": "הקובץ המצורף אינו קובץ: {path}",
   "error.backend.generatedImageTooLarge": "התמונה שנוצרה חורגת ממגבלת 100 MB.",
+  "error.backend.generatedVideoTooLarge": "הסרטון שנוצר חורג ממגבלת 100 MB.",
+  "error.backend.videoGenerationFailed": "יצירת הסרטון נכשלה.",
+  "error.backend.videoGenerationNoVideo": "יצירת הסרטון לא החזירה סרטון.",
+  "error.backend.videoGenerationInterrupted": "יצירת הסרטון הופסקה.",
   "error.backend.attachmentNotRegularFile": "אפשר לצרף רק קבצים רגילים: {name}",
   "error.backend.attachmentCopyFailed": "OpenBot לא הצליח להעתיק את {name}.",
   "error.backend.routineNameRequired": "נדרש שם לשגרה.",
@@ -178,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "סוכן אינו יכול להפסיק את עצמו.",
   "error.backend.interruptOtherWork":
     "הסוכן הזה עובד על משימה שההודעה שלך לא התחילה. רק המשתמש או שולח המשימה יכולים לעצור אותה.",
+  "error.backend.interruptSharedWork":
+    "התור של הסוכן הזה עובד על ההודעה שלך וגם על הודעה מהמשתמש או מסוכן אחר. רק המשתמש יכול לעצור אותו, באמצעות עצירת הסוכן בצ'אט של הסוכן הזה.",
   "error.backend.interruptStarting": "הסוכן הזה עדיין מתחיל תור. יש לנסות שוב אחרי שהתור יתחיל.",
   "error.backend.interruptNoSession": "OpenBot אינו יכול להפסיק את הסוכן הזה כי סשן הספק שלו אינו זמין.",
   "error.backend.memoryTextRequired": "נדרש טקסט לזיכרון.",
@@ -204,6 +219,8 @@ export const messages = {
   "error.backend.messageDeleteNotFound": "ההודעה הזו אינה בצ'אט.",
   "error.backend.messageDeleteBusy": "ההודעה הזו היא חלק מתור שרץ. יש למחוק אותה כשהתור יסתיים.",
   "error.backend.messageDeleteForbidden": "אפשר למחוק רק הודעות ששלחת.",
+  "error.backend.messagePinNotFound": "ההודעה הזו אינה בצ׳אט.",
+  "error.backend.messagePinLimit": "בצ׳אט הזה יש 50 הודעות מוצמדות. בטלו הצמדה של אחת לפני הצמדת הודעה נוספת.",
   "error.backend.routineFlowHandoffFailed": "השגרה לא הצליחה להעביר את העבודה לסוכן הזה.",
   "error.backend.mcpServerLimit": "OpenBot שומר עד {limit} שרתי MCP.",
   "error.backend.mcpServerNameTaken": "כבר קיים שרת MCP בשם {name}.",
@@ -233,6 +250,8 @@ export const messages = {
     "שרת ההתחברות שלח תשובה ש-OpenBot לא יכול לקרוא. אם השירות נותן לך מפתח API או טוקן, יש להוסיף אותו להגדרות של השרת הזה ולבדוק שוב את החיבור.",
   "error.backend.mcpServerExited": "השרת נעצר לפני שענה. יש להריץ את הפקודה במסוף כדי לראות את השגיאה שלו.",
   "error.backend.mcpServerFailedToStart": "השרת לא התחיל: {reason}",
+  "error.backend.mcpToolSchemaRefused":
+    "לכלי {tool} שלו יש תבנית קלט שהספק הזה לא יכול לקרוא. סוכנים אצל ספקים אחרים עדיין מקבלים את השרת.",
   "error.backend.mcpServerSignInForProvider":
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":
@@ -262,6 +281,13 @@ export const messages = {
   "error.backend.sectionNameTooLong": "שם החלק ארוך מדי.",
   "error.backend.sidebarFolderTooDeep": "תיקיות יכולות להיות מקוננות עד שלוש רמות בלבד.",
   "error.backend.sidebarFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
+  "error.backend.libraryFolderName": "שם תיקייה חייב להכיל בין 1 ל-{limit} תווים.",
+  "error.backend.libraryFolderLimit": "בשרת יכולות להיות לכל היותר {limit} תיקיות בספרייה.",
+  "error.backend.libraryFolderFileLimit": "יש יותר מדי קבצים בתיקיות הספרייה.",
+  "error.backend.libraryFolderTooDeep": "תיקיות הספרייה יכולות להגיע ל-{limit} רמות בלבד.",
+  "error.backend.libraryFolderGone": "התיקייה אינה קיימת או שכבר נמחקה.",
+  "error.backend.libraryFolderOtherAgent": "אפשר להעביר קובץ רק לתיקייה של הסוכן שלו.",
+  "error.backend.libraryFolderMoveInvalid": "אי אפשר להעביר את התיקייה הזו לשם.",
   "error.backend.sectionNameDuplicate": "שמות החלקים חייבים להיות ייחודיים.",
   "error.backend.directMessageRequired": "יש לכתוב הודעה קודם.",
   "error.backend.directMessageTooLong": "הודעה ישירה יכולה להכיל עד {limit} תווים.",
@@ -316,7 +342,11 @@ export const messages = {
   "error.backend.browserProxyChanged": "הפרוקסי הזה השתנה אחרי שפתחת אותו. יש לעיין בו שוב ולנסות שוב.",
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
+  "error.backend.browserSystemProxyFailed":
+    "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",

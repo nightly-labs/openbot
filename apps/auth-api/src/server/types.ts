@@ -57,6 +57,11 @@ export interface WorkerBindings {
    * each ticket names `REMOTE_SIGNAL_URL`.
    */
   REMOTE_SIGNAL_HOMES?: string;
+  /**
+   * The place of each home, as `id=latitude:longitude,id=latitude:longitude`. A host that asks for a
+   * home gets one near the place that Cloudflare gives for its request. Empty = any home.
+   */
+  REMOTE_SIGNAL_HOME_LOCATIONS?: string;
   REMOTE_AUTH_WEBHOOK_URL?: string;
   /** Each Signal that gets the auth events, as `url,url`. Empty = only `REMOTE_AUTH_WEBHOOK_URL`. */
   REMOTE_AUTH_WEBHOOK_URLS?: string;
@@ -112,6 +117,8 @@ export interface WorkerBindings {
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
+  /** A Discord webhook for operator messages about the server pool. Without it there are no pool alerts. */
+  HOSTED_POOL_ALERT_WEBHOOK_URL?: string;
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;

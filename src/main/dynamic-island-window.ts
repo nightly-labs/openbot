@@ -68,10 +68,14 @@ export interface DynamicIslandWindowControllerOptions {
   getDisplays: () => Display[];
   getPrimaryDisplay: () => Display;
   getMainWindow: () => BrowserWindow | null;
+  /** The OpenBot window that has the keyboard, if one has it. */
+  getFocusedWindow: () => BrowserWindow | null;
   ensureMainWindow?: () => Promise<BrowserWindow>;
   presentMainWindow: (window: BrowserWindow) => void;
   performHaptic: () => void;
   performCriticalAction: (action: CriticalAction) => Effect.Effect<void, DynamicIslandFailed>;
+  /** Shows the menu of a right-click on the island, outside a text field. */
+  showContextMenu?: (window: BrowserWindow) => void;
   /** Windows: forwards the pointer moves to an island window only while the cursor is on it. */
   pointerForwarding?: PointerForwardingGate | null;
   logger?: Logger;
@@ -89,6 +93,8 @@ export class DynamicIslandWindowController {
   readonly #collapseTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** X11: the parts of each window that the island renderer reported last. */
   readonly #inputRegions = new Map<number, AgentDockInputRect[]>();
+  /** macOS: for each display whose panel has the keyboard, the OpenBot window that had it before. */
+  readonly #keyboardReturn = new Map<number, BrowserWindow | null>();
   readonly #preferenceMutation = Semaphore.makeUnsafe(1);
   readonly #windowReconciliation = Semaphore.makeUnsafe(1);
   #destroyed = false;
@@ -134,16 +140,36 @@ export class DynamicIslandWindowController {
 
   /** Writes run in the order of the calls; each one reconciles the windows before the next. */
   setPreference(preference: DynamicIslandPreference): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference(() => preference);
+  }
+
+  /** `change` reads the preference only after the writes before it end, so it does not undo one of them. */
+  #updatePreference(
+    change: (current: DynamicIslandPreference) => DynamicIslandPreference,
+  ): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
     return this.#preferenceMutation.withPermit(
       Effect.gen({ self: this }, function* () {
-        const savedPreference = yield* writeDynamicIslandPreference(this.#options.preferencePath, preference).pipe(
-          toDynamicIslandFailed,
-        );
+        const savedPreference = yield* writeDynamicIslandPreference(
+          this.#options.preferencePath,
+          change(this.#preference),
+        ).pipe(toDynamicIslandFailed);
         this.#preference = savedPreference;
         yield* this.reconcileWindow();
         this.publishPreference();
         return { ...savedPreference };
       }),
+    );
+  }
+
+  /**
+   * Turns the island off from its own menu, as the switch in Settings does. The main window gets the
+   * saved preference, so its Settings do not turn the island on again with the next change.
+   */
+  hide(): Effect.Effect<DynamicIslandPreference, DynamicIslandFailed> {
+    return this.#updatePreference((current) => ({ ...current, enabled: false })).pipe(
+      Effect.tap((saved) =>
+        Effect.sync(() => sendToRenderer(this.#options.getMainWindow(), IPC_ENDPOINTS.dynamicIsland.preference, saved)),
+      ),
     );
   }
 
@@ -178,9 +204,35 @@ export class DynamicIslandWindowController {
     // focusable only while a text field on it needs key input. A panel becomes key without
     // activating the app, so the main window stays where it is.
     const wantsKeyboard = interactive && keyboard;
+    if (wantsKeyboard && this.#options.windowKind === "panel" && !this.#keyboardReturn.has(displayId)) {
+      const focused = this.#options.getFocusedWindow();
+      // The island of another display had the keyboard: the window that it got the keyboard from gets it back.
+      const island = [...this.#windows].find(([, candidate]) => candidate === focused);
+      this.#keyboardReturn.set(displayId, island ? (this.#keyboardReturn.get(island[0]) ?? null) : focused);
+    }
+    const keyboardReturn = interactive ? undefined : this.#keyboardReturn.get(displayId);
+    if (!interactive) this.#keyboardReturn.delete(displayId);
     window.setFocusable(wantsKeyboard);
     if (wantsKeyboard && !window.isFocused()) window.focus();
-    if (interactive || !bounds) return;
+    if (!interactive && bounds) this.#scheduleCollapse(displayId, window);
+    // On macOS, a panel that is no longer focusable keeps the keyboard, so typing went nowhere (#9450).
+    // When the island closes, the OpenBot window that had the keyboard gets it back. Not before: the
+    // island renderer ends its interaction when its window loses focus, and the pointer can still be on
+    // it. When another app had the keyboard, the panel keeps it: hiding the panel can bring an OpenBot
+    // window to the front (electron/electron#35483, #3497).
+    if (
+      keyboardReturn &&
+      keyboardReturn !== window &&
+      !keyboardReturn.isDestroyed() &&
+      keyboardReturn.isVisible() &&
+      !keyboardReturn.isMinimized() &&
+      window.isFocused()
+    ) {
+      keyboardReturn.focus();
+    }
+  }
+
+  #scheduleCollapse(displayId: number, window: BrowserWindow): void {
     this.#collapseTimers.set(
       displayId,
       setTimeout(() => {
@@ -339,6 +391,7 @@ export class DynamicIslandWindowController {
       this.#interactiveDisplays.delete(displayId);
       this.#notchSizes.delete(displayId);
       this.#inputRegions.delete(displayId);
+      this.#keyboardReturn.delete(displayId);
       this.#cancelCollapse(displayId);
       if (!window.isDestroyed()) window.destroy();
     }
@@ -431,6 +484,10 @@ export class DynamicIslandWindowController {
       this.#show(window);
     });
     window.on("blur", () => this.setInteractive(window.webContents.id, false));
+    window.webContents.on("context-menu", (_event, params) => {
+      if (params.isEditable || this.#windows.get(display.id) !== window || window.isDestroyed()) return;
+      this.#options.showContextMenu?.(window);
+    });
     // macOS moves a window off a display that goes away, for example when the displays sleep, and
     // can do it after the last display event. The island then stays on the wrong display, under the
     // island of that display (#4594). Put it back at the top of its own display.
@@ -450,6 +507,7 @@ export class DynamicIslandWindowController {
         this.#interactiveDisplays.delete(display.id);
         this.#notchSizes.delete(display.id);
         this.#inputRegions.delete(display.id);
+        this.#keyboardReturn.delete(display.id);
         this.#cancelCollapse(display.id);
       }
     });
@@ -490,6 +548,7 @@ export class DynamicIslandWindowController {
     this.#interactiveDisplays.clear();
     this.#notchSizes.clear();
     this.#inputRegions.clear();
+    this.#keyboardReturn.clear();
     for (const window of windows) {
       if (!window.isDestroyed()) window.destroy();
     }

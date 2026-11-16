@@ -3,6 +3,10 @@ import { parseTwoStepKey, twoStepCode, twoStepRemainingMs } from "@openbot/contr
 import { VaultPanel } from "@openbot/ui/features/vault/VaultPanel";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
+import { MANY_AGENTS } from "./marketplace-story-support";
+
+/** The ids of the first agents of the server, for the items that only some agents can use. */
+const chosen = (count: number) => MANY_AGENTS.slice(0, count).map((agent) => agent.id);
 
 const ITEMS: VaultItemSummary[] = [
   {
@@ -13,6 +17,7 @@ const ITEMS: VaultItemSummary[] = [
     notes: "",
     hasPassword: true,
     hasTwoStep: true,
+    agents: chosen(3),
   },
   {
     id: "login-linear",
@@ -78,7 +83,7 @@ const ITEMS: VaultItemSummary[] = [
     notes: "Project billing account",
     hasKey: true,
   },
-  { id: "key-stripe", kind: "apiKey", name: "STRIPE_SECRET_KEY", notes: "", hasKey: true },
+  { id: "key-stripe", kind: "apiKey", name: "STRIPE_SECRET_KEY", notes: "", hasKey: true, agents: chosen(1) },
 ];
 
 /** Demo keys. In the app, main makes the codes and the keys never come to the window. */
@@ -108,8 +113,9 @@ const meta = {
   title: "Settings/VaultPanel",
   component: VaultPanel,
   args: {
-    state: { status: "ready", items: ITEMS },
+    state: { status: "ready", items: ITEMS, agentScope: true },
     apiKeys: true,
+    agents: MANY_AGENTS,
     onSave: fn(async () => undefined),
     onDelete: fn(async () => undefined),
     onReveal: fn(async () => "correct-horse-battery"),
@@ -125,8 +131,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Logins, cards, contact info and API keys, with the filter tabs and search. */
+/** Logins, cards, contact info and API keys, with the filter tabs, search, and the agents of each item. */
 export const Ready: Story = {};
+
+/** A server that does not keep the agents of an item: each item is for every agent, with no choice. */
+export const WithoutAgentChoice: Story = { args: { state: { status: "ready", items: ITEMS } } };
 
 /** Nothing is saved yet. */
 export const Empty: Story = { args: { state: { status: "ready", items: [] } } };
