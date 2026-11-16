@@ -316,6 +316,18 @@ export const messages = {
     "Eenmalig versturen naar {origin}. Deze waarde wordt niet aan de chat toegevoegd.",
   "mobile.chat.browserSecret.submitFailed":
     "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer opnieuw.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat de agent geen van de opgeslagen logins voor deze site heeft gekozen. Vertel de agent welk account hij moet gebruiken.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen wachtwoord voor deze site heeft.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen authenticatorsleutel heeft.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat je wachtwoordmanager niet gelezen kon worden.",
   "mobile.chat.browserSecret.submit": "Versturen",
   "mobile.chat.browserSecret.takeOver": "Overnemen",
   "mobile.chat.starter.title": "Waar zullen we eerst aan werken?",

@@ -355,6 +355,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce":
     "Envoyer une seule fois à {origin}. Cette valeur n’est pas ajoutée à la discussion.",
   "mobile.chat.browserSecret.submitFailed": "La demande n’a pas pu aboutir. Vérifiez la connexion et réessayez.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a choisi le mauvais champ sur la page.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car l’agent n’a choisi aucun des identifiants enregistrés pour ce site. Indiquez à l’agent le compte à utiliser.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de mot de passe pour ce site.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de clé d’authentificateur.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car il n’a pas pu lire votre gestionnaire de mots de passe.",
   "mobile.chat.browserSecret.submit": "Envoyer",
   "mobile.chat.browserSecret.takeOver": "Prendre la main",
   "mobile.chat.starter.title": "Par quoi commençons-nous ?",

@@ -369,6 +369,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "Gotowe",
   "mobile.chat.browserSecret.submitOnce": "Wyślij jednorazowo do {origin}. Ta wartość nie trafi do czatu.",
   "mobile.chat.browserSecret.submitFailed": "Nie udało się zrealizować żądania. Sprawdź połączenie i spróbuj ponownie.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent uruchomił skrypt na tej stronie. Aby ich użyć, poproś agenta o ponowne załadowanie strony i ponowną próbę.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ agent wybrał niewłaściwe pole na stronie.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ agent nie wybrał żadnych z danych logowania zapisanych dla tej witryny. Powiedz agentowi, którego konta ma użyć.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają hasła do tej witryny.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot nie użył Twoich zapisanych danych logowania, ponieważ nie zawierają klucza aplikacji uwierzytelniającej.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot nie użył zapisanych danych logowania, ponieważ nie mógł odczytać Twojego menedżera haseł.",
   "mobile.chat.browserSecret.submit": "Wyślij",
   "mobile.chat.browserSecret.takeOver": "Przejmij",
   "mobile.chat.starter.title": "Od czego zaczniemy?",

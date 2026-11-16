@@ -368,6 +368,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "Готово",
   "mobile.chat.browserSecret.submitOnce": "Однократная отправка на {origin}. Это значение не попадёт в чат.",
   "mobile.chat.browserSecret.submitFailed": "Не удалось выполнить запрос. Проверьте подключение и повторите попытку.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что агент запустил скрипт на этой странице. Чтобы их использовать, попросите агента перезагрузить страницу и попробовать снова.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что агент выбрал не то поле на странице.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot не использовал сохранённые учётные данные, потому что агент не выбрал ни одни из учётных данных, сохранённых для этого сайта. Скажите агенту, какой аккаунт использовать.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что в них нет пароля для этого сайта.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot не использовал ваши сохранённые учётные данные, потому что в них нет ключа аутентификатора.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot не использовал сохранённые учётные данные, потому что не смог прочитать ваш менеджер паролей.",
   "mobile.chat.browserSecret.submit": "Отправить",
   "mobile.chat.browserSecret.takeOver": "Взять управление",
   "mobile.chat.starter.title": "С чего начнём?",
