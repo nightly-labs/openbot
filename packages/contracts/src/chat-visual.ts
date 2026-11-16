@@ -1,6 +1,7 @@
 import { INPUT_LIMITS } from "./input-limits";
 import { type AvatarColor, isAvatarColor } from "./ipc-agent-identity";
-import { isBoundedString } from "./ipc-bounded-values";
+import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
+import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "./ipc-chat-channels";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf } from "./runtime-values";
 
 /**
@@ -150,9 +151,43 @@ export function withChatBackdropBubbles(html: string, bubbles: ChatBackdropBubbl
   ].filter((part) => part !== undefined);
   const page = html.replace(BUBBLES_META_PATTERN, "");
   if (parts.length === 0) return page;
-  const tag = `<meta name="${BUBBLES_META_NAME}" content="${parts.join("; ")}">`;
+  return withLeadingMeta(page, `<meta name="${BUBBLES_META_NAME}" content="${parts.join("; ")}">`);
+}
+
+/** Puts a tag first in the page. It goes after the doctype: a tag before it puts the page in quirks mode. */
+function withLeadingMeta(page: string, tag: string): string {
   const doctype = DOCTYPE_PATTERN.exec(page)?.[0];
   return doctype === undefined ? `${tag}${page}` : `${doctype}${tag}${page.slice(doctype.length)}`;
+}
+
+/**
+ * The people who asked for a backdrop page, as the `senderMember` ids of the messages of its turn, in
+ * `<meta name="openbot-backdrop-for" content="id id">`. On a joined server, members share one agent
+ * chat, so each client shows a page only when its reader asked for it. A message with no sender, such
+ * as one from a person on the host who is signed out, counts as `SIGNED_OUT_CHANNEL_MEMBER_ID`.
+ */
+const REQUESTERS_META_NAME = "openbot-backdrop-for";
+const REQUESTERS_META_SOURCE = String.raw`<meta\b[^>]*\bname\s*=\s*["']openbot-backdrop-for["'][^>]*>`;
+/** Member ids and `local-user:` ids. Other characters could end the attribute. */
+const REQUESTER_ID_PATTERN = /^[\w.:@-]+$/u;
+
+function isRequesterId(value: string): boolean {
+  return isIdentifier(value) && REQUESTER_ID_PATTERN.test(value);
+}
+
+/** The people who asked for a backdrop page. A page with no tag counts as one from the host's signed-out person. */
+export function chatBackdropRequesters(html: string): string[] {
+  const tag = new RegExp(REQUESTERS_META_SOURCE, "iu").exec(html)?.[0];
+  const content = tag ? META_CONTENT_PATTERN.exec(tag) : null;
+  const ids = (content?.[1] ?? content?.[2] ?? "").split(/\s+/u).filter(isRequesterId);
+  return ids.length > 0 ? ids : [SIGNED_OUT_CHANNEL_MEMBER_ID];
+}
+
+/** Puts the requesters first in the page, and removes each tag of that name that the agent wrote. */
+export function withChatBackdropRequesters(html: string, ids: readonly string[]): string {
+  const page = html.replace(new RegExp(REQUESTERS_META_SOURCE, "giu"), "");
+  const content = ids.filter(isRequesterId).join(" ") || SIGNED_OUT_CHANNEL_MEMBER_ID;
+  return withLeadingMeta(page, `<meta name="${REQUESTERS_META_NAME}" content="${content}">`);
 }
 
 /** CSS custom properties that the page can use, such as `--foreground` or `--chart-1`. */

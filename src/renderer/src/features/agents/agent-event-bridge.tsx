@@ -31,6 +31,8 @@ import { useServers } from "../servers/servers-context";
 import { useSettings } from "../settings/settings-context";
 import { useSidebar } from "../sidebar/sidebar-context";
 import { readDictatedReplies } from "../speech/speech-replies";
+import { isReaderAuthor } from "../team/reader-identity";
+import { usePresence } from "../team/team-context";
 import { agentErrorDetails, claimErrorToast, providerErrorTitle, readableAgentError } from "./agent-error-text";
 import { createAgentEventSounds } from "./agent-event-sounds";
 import {
@@ -77,7 +79,18 @@ export function AgentEventBridge() {
   const platform = usePlatform();
   const { activeServer, activeServerId } = useServers();
   const { setSkillsMarketplaceOpen } = useSettings();
-  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage } = useAuth();
+  const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage, centralAuth } = useAuth();
+  const { currentTeamMember } = usePresence();
+  /** Whether a sender id is the reader, so a backdrop that another member asked for stays off. */
+  const isReader = (senderId: string) => {
+    const state = centralAuth();
+    return isReaderAuthor(senderId, {
+      memberId: currentTeamMember()?.id ?? null,
+      accountUserId: state.status === "signed_in" ? state.user.id : null,
+      onOwnComputer: activeServer()?.kind === "local",
+    });
+  };
+  const backdropPage = { ...agentBackdropPage, isReader };
   const { applyAgentStatus, refreshAgentProviders } = useProviders();
   const {
     agentList,
@@ -201,7 +214,7 @@ export function AgentEventBridge() {
         showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
           event.snapshot.agentId,
           event.snapshot.messages,
-          agentBackdropPage,
+          backdropPage,
         );
         scheduleConversation(event.snapshot);
         return;
@@ -218,7 +231,7 @@ export function AgentEventBridge() {
           showNewAgentBackdrop<AttachmentSummary, ConversationMessage>(
             event.page.agentId,
             event.page.messages,
-            agentBackdropPage,
+            backdropPage,
           );
           const pageApplied = applyConversationPage(event.page, "latest", "latest");
           const latestIncomingMessage = markNewMessagesRead

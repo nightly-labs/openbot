@@ -36,24 +36,27 @@ async function attachmentBytes(runtime: ConversationRuntime, attachment: Attachm
 /**
  * Puts a new page that the agent of the open chat set with `set_backdrop` behind the window. The web
  * client reads only the open chat; the desktop also shows the pages of the other chats
- * (`agent-event-bridge.tsx`).
+ * (`agent-event-bridge.tsx`). `isOwnSender` tells whether a sender id is the reader, so a page that
+ * another member of a joined server asked for stays off this window.
  */
 export function watchAgentBackdrops(
   runtime: ConversationRuntime,
   agentId: () => string | undefined,
   messages: () => readonly AgentMessage[],
+  isOwnSender: () => (senderId: string) => boolean,
 ): void {
   createEffect(
     // A store array can grow in place, so its length is read too.
     () => {
       const list = messages();
-      return { agentId: agentId(), messages: list, count: list.length };
+      return { agentId: agentId(), messages: list, count: list.length, isReader: isOwnSender() };
     },
     (current) => {
       if (!current.agentId) return;
       showNewAgentBackdrop<AttachmentSummary, AgentMessage>(current.agentId, current.messages, {
         title: (message) => message.body,
         bytes: (attachment) => attachmentBytes(runtime, attachment),
+        isReader: current.isReader,
       });
     },
   );

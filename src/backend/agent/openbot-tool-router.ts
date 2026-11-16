@@ -2,7 +2,12 @@ import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
-import { CHAT_BACKDROP_ITEM_TYPE, chatVisualItemType, withChatBackdropBubbles } from "@openbot/contracts/chat-visual";
+import {
+  CHAT_BACKDROP_ITEM_TYPE,
+  chatVisualItemType,
+  withChatBackdropBubbles,
+  withChatBackdropRequesters,
+} from "@openbot/contracts/chat-visual";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import {
   BUG_REPORT_AREAS,
@@ -58,6 +63,7 @@ import {
   isMessageReaction,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
+  SIGNED_OUT_CHANNEL_MEMBER_ID,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
@@ -2401,7 +2407,8 @@ export class OpenBotToolRouter {
    * `set_backdrop`: stores the page as an HTML attachment and adds a backdrop message. Each client of
    * the chat puts the newest one behind its window (`agent-backdrops.ts` in the renderer). A channel or
    * external chat turn cannot use it: someone else's request would change the user's window. A task
-   * thread cannot use it either: the clients do not watch it.
+   * thread cannot use it either: the clients do not watch it. On a joined server, members share the
+   * agent's chat, so the page names the people who asked in this turn, and only their clients show it.
    */
   readonly #setBackdrop = Effect.fn("OpenBotToolRouter.setBackdrop")(function* (
     this: OpenBotToolRouter,
@@ -2436,10 +2443,13 @@ export class OpenBotToolRouter {
       file: {
         // The colors go in the page, so each client gets them with the page file.
         bytes: new TextEncoder().encode(
-          withChatBackdropBubbles(args.html, {
-            ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
-            ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
-          }),
+          withChatBackdropRequesters(
+            withChatBackdropBubbles(args.html, {
+              ...(args.bubbles?.yours === undefined ? {} : { yours: lowerCaseColor(args.bubbles.yours) }),
+              ...(args.bubbles?.agents === undefined ? {} : { agents: lowerCaseColor(args.bubbles.agents) }),
+            }),
+            this.#turnRequesters(senderAgentId, params.turnId),
+          ),
         ),
         name: `${visualReplyFileName(args.title)}.html`,
         mimeType: "text/html",
@@ -2823,6 +2833,20 @@ export class OpenBotToolRouter {
   #remoteMember(messageId: string): boolean {
     const member = this.#mailbox.senderMember(messageId);
     return member !== undefined && (this.#channels.hooks.remotePerson?.(member.id) ?? false);
+  }
+
+  /**
+   * The people who sent the messages of this turn, as their `senderMember` ids. A message with no
+   * sender is from a person on this computer who is signed out. A turn with no person's message, such
+   * as a routine run, has none.
+   */
+  #turnRequesters(agentId: string, turnId: string): string[] {
+    const ids = new Set<string>();
+    for (const { delivery } of this.#mailbox.findDeliveriesByTurn(agentId, turnId)) {
+      if (delivery.sender.kind !== "user") continue;
+      ids.add(this.#mailbox.senderMember(delivery.messageId)?.id ?? SIGNED_OUT_CHANNEL_MEMBER_ID);
+    }
+    return [...ids];
   }
 
   /** Whether a team member on another computer sent a message of this turn. */

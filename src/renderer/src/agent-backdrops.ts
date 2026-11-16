@@ -1,4 +1,4 @@
-import { chatBackdropPage } from "@openbot/contracts/chat-visual";
+import { chatBackdropPage, chatBackdropRequesters } from "@openbot/contracts/chat-visual";
 import { toast } from "@openbot/ui";
 import { type ChatBackdropChoice, customBackdropChoice } from "@openbot/ui/features/conversation/chat-backdrop";
 import { currentText } from "@openbot/ui/text";
@@ -53,6 +53,12 @@ function agentSlot(agentId: string): string {
 const pending = new Set<string>();
 /** The message ids whose page could not be read or kept. This page does not fetch them again. */
 const failed = new Set<string>();
+/**
+ * The people who asked for each page that this page read. A page that another member asked for stays
+ * off this window. The reader can be known later, such as when the team roster loads, so the ids stay
+ * and each update asks again with no second read of the page.
+ */
+const requesters = new Map<string, readonly string[]>();
 /** One page goes behind the window at a time, so an older page cannot replace a newer one. */
 let queue: Promise<void> = Promise.resolve();
 
@@ -79,8 +85,9 @@ async function undoAction(slot: string, choice: ChatBackdropChoice): Promise<() 
 }
 
 /**
- * Shows the newest backdrop message of one agent's chat when it is newer than the mark. `title` and
- * `bytes` read the page title and the page file of that message.
+ * Shows the newest backdrop message of one agent's chat when it is newer than the mark and the reader
+ * asked for it. `title` and `bytes` read the page title and the page file of that message, and
+ * `isReader` tells whether a sender id is the reader.
  */
 export function showNewAgentBackdrop<
   Attachment extends { mimeType: string },
@@ -91,6 +98,7 @@ export function showNewAgentBackdrop<
   page: {
     title: (message: Message) => string;
     bytes: (attachment: Attachment) => Promise<Uint8Array>;
+    isReader: (senderId: string) => boolean;
   },
 ): void {
   const mark = readMark();
@@ -99,9 +107,11 @@ export function showNewAgentBackdrop<
     const attachment = chatBackdropPage<Attachment>(message);
     const time = message.createdAt ? Date.parse(message.createdAt) : Number.NaN;
     if (!attachment || !(time > mark) || (newest && newest.time >= time)) continue;
+    if (pending.has(message.id) || failed.has(message.id)) continue;
+    if (requesters.get(message.id)?.some(page.isReader) === false) continue;
     newest = { message, attachment, time };
   }
-  if (!newest || pending.has(newest.message.id) || failed.has(newest.message.id)) return;
+  if (!newest) return;
   const { message, attachment, time } = newest;
   pending.add(message.id);
   queue = queue.then(async () => {
@@ -111,6 +121,10 @@ export function showNewAgentBackdrop<
       if (readMark() >= time) return;
       const title = page.title(message);
       const bytes = await page.bytes(attachment);
+      const askedBy = chatBackdropRequesters(new TextDecoder().decode(bytes));
+      requesters.set(message.id, askedBy);
+      // On a joined server, another member asked for this page. It stays in the chat only.
+      if (!askedBy.some(page.isReader)) return;
       const slot = agentSlot(agentId);
       const choice = customBackdropChoice(slot);
       const undo = await undoAction(slot, choice);

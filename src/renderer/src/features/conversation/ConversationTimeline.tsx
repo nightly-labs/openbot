@@ -367,6 +367,7 @@ export function ConversationTimeline() {
     runtime,
     () => props.agent?.id,
     () => props.messages,
+    () => props.isOwnSender,
   );
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
