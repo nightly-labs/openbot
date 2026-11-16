@@ -16,6 +16,8 @@ export const messages = {
   "error.mcp.relayEnded": "Este inicio de sesión terminó. Vuelve a iniciarlo.",
   "error.mcp.relayNoState":
     "La página de inicio de sesión del servidor no protege su dirección de retorno, así que OpenBot no la abre en este equipo.",
+  "error.mcp.signInPageOnServer":
+    "Esta página de inicio de sesión solo está en el servidor. Pide a un propietario o administrador del servidor que inicie sesión.",
   "error.mcp.relayAddressInvalid":
     "Esta no es la dirección del final de este inicio de sesión. Copia la dirección completa del navegador.",
 } as const satisfies PartialTranslation<typeof source>;

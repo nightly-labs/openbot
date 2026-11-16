@@ -18,6 +18,8 @@ export const messages = {
   "error.mcp.relayEnded": "Cette connexion est terminée. Relancez-la.",
   "error.mcp.relayNoState":
     "La page de connexion du serveur ne protège pas son adresse de retour : OpenBot ne l’ouvre donc pas sur cet ordinateur.",
+  "error.mcp.signInPageOnServer":
+    "Cette page de connexion n’existe que sur le serveur. Demandez à un propriétaire ou à un administrateur du serveur de se connecter.",
   "error.mcp.relayAddressInvalid":
     "Ce n’est pas l’adresse de fin de cette connexion. Copiez l’adresse complète depuis le navigateur.",
 } as const satisfies PartialTranslation<typeof source>;
