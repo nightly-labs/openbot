@@ -46,6 +46,8 @@ export interface BootRecoveryHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   /** Shows a failed turn of the agent's own chat in the sidebar and the runtime work. */
   turnFailed?(agentId: string, turnId: string): void;
+  /** Whether a turn of the agent's own chat that a provider exit cut may continue, as a plan does. */
+  continuesAfterProviderExit?(agentId: string, turnId: string, deliveryId: string): boolean;
 }
 
 export interface BootRecoveryOptions {
@@ -280,10 +282,12 @@ export class BootRecovery {
       recovered.terminal === "interrupted" &&
       target?.streaming.some((message) => message.author === "assistant" && message.text.trim() !== "") === true;
     const ownChat = cut && target !== null && target.threadId === target.agent.threadId ? target : null;
-    // The agent's own chat continues once with a note, as a failed compaction does, when no other message
-    // waits: that message would end the continuation with no error. A second cut shows the error.
+    // The agent's own chat continues once with a note, as a failed compaction does, with the checks of a
+    // plan continuation: no Stop, no requested new chat, and no other message that waits, which would end
+    // the continuation with no error. A second cut shows the error.
     const continuation = yield* recoveryStep(() => {
-      if (!ownChat?.turnId || this.#mailbox.laneQueuedIds(ownChat.agent.id, null).length > 0) return null;
+      if (!ownChat?.turnId || !this.#hooks.continuesAfterProviderExit?.(ownChat.agent.id, ownChat.turnId, delivery.id))
+        return null;
       const { messages } = this.#conversation.ensureSnapshot(ownChat.agent.id, ownChat.threadId);
       return this.#planContinuation.afterProviderExit({
         agentId: ownChat.agent.id,

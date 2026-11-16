@@ -564,6 +564,15 @@ export class TurnLifecycle {
     this.#itemTurns.set(itemId, turnId);
   }
 
+  /**
+   * Whether a turn of the agent's own chat that a provider exit cut may continue: the checks of a plan
+   * continuation, as after a failed compaction (#9729).
+   */
+  continuesAfterProviderExit(agentId: string, turnId: string, deliveryId: string): boolean {
+    const context = this.#mailbox.getDelivery(deliveryId);
+    return context !== null && this.#planContinues(agentId, null, turnId, [context], undefined);
+  }
+
   /** A turn of the agent's own chat that failed outside its turn completion, as a provider exit. */
   markFailedTurn(agentId: string, turnId: string): void {
     this.#failedTurns.set(agentId, turnId);
