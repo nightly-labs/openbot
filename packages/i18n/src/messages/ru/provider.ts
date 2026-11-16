@@ -228,6 +228,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Не удалось переподключиться.",
   "provider.account.add": "Добавить аккаунт",
   "provider.account.addLabel": "Добавить ещё один аккаунт {name}",
+  "provider.account.addWithCode": "Добавить аккаунт по коду",
   "provider.account.count": {
     one: "{count} аккаунт",
     few: "{count} аккаунта",

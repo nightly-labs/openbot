@@ -128,6 +128,15 @@ export interface AgentProviderDescriptor {
    */
   readonly accountSignIn?: "key";
   /**
+   * An account after the first can also sign in with a code: the provider's CLI gives a page, and
+   * the person finishes on any device. `device`: a code or a link that the page confirms by itself.
+   * `paste`: a code that the person copies back, which only a computer where
+   * `pasteCodeSignInSupported` can run. It mirrors `accounts.codeSignIn` of the driver in
+   * `src/backend/provider-drivers.ts`; keep the two in step. A joined server's host runs it only
+   * with `provider-account-code-v1`.
+   */
+  readonly accountCodeSignIn?: "device" | "paste";
+  /**
    * Where the provider's sign-in page ends. `callback`: the page sends the browser to an address on
    * the computer that started it, so a browser tab elsewhere must paste that address back. `page`:
    * the user finishes on the page and the provider sees it by itself, so any browser can run it.
@@ -226,6 +235,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "chatgpt",
     pickerOrder: 1,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",
@@ -249,6 +259,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "claude",
     pickerOrder: 0,
     localCodeSignIn: "paste",
+    accountCodeSignIn: "paste",
     signInPageEnd: "callback",
     skillFolders: [".claude/skills"],
     homeSkills: "plugin",
@@ -272,6 +283,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     authKind: "grok",
     pickerOrder: 2,
     localCodeSignIn: "device",
+    accountCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".agents/skills"],
     homeSkills: "native",

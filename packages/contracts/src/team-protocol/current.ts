@@ -124,6 +124,7 @@ import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_CAPABILITY } from "./provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "./provider-account-pool-v1";
@@ -656,6 +657,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -885,6 +887,7 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
     capability !== PENDING_APPROVAL_CAPABILITY &&
     capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+    capability !== PROVIDER_ACCOUNT_CODE_CAPABILITY &&
     capability !== USAGE_CREDITS_CAPABILITY &&
     capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
     capability !== ROUTINE_FLOW_STOP_CAPABILITY &&
@@ -1003,6 +1006,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   BROWSER_SIGN_IN_STORAGE_CAPABILITY,
   HOST_APPEARANCE_CAPABILITY,
   SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1191,6 +1195,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY &&
       capability !== PENDING_APPROVAL_CAPABILITY &&
       capability !== PROVIDER_ACCOUNT_KEYS_CAPABILITY &&
+      capability !== PROVIDER_ACCOUNT_CODE_CAPABILITY &&
       capability !== USAGE_CREDITS_CAPABILITY &&
       capability !== CHANNEL_TASK_WAITS_CAPABILITY &&
       capability !== ROUTINE_FLOW_STOP_CAPABILITY &&

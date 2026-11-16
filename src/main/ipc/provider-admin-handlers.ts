@@ -16,6 +16,8 @@ import {
   decodeHostProviderAccountModels,
   decodeHostProviderAccountPools,
   decodeHostProviderAccountUsage,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
@@ -25,6 +27,7 @@ import {
   type McpTestResult,
   type PasteProviderRelaySignInInput,
   type ProviderRelaySignInStatus,
+  type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
@@ -39,6 +42,10 @@ import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import {
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_ROUTES,
@@ -145,6 +152,10 @@ interface ProviderAdminIpcDependencies {
     | "startProviderCodeLogin"
     | "submitProviderCodeLogin"
     | "cancelProviderCodeLogin"
+    | "startProviderAccountCodeLogin"
+    | "submitProviderAccountCodeLogin"
+    | "providerAccountCodeLoginStatus"
+    | "cancelProviderAccountSignIn"
     | "changeProviderCredential"
     | "clearProviderCredential"
     | "signInCodexWithApiKey"
@@ -261,6 +272,13 @@ export function providerAdminIpcHandlers({
         return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body: body(input) }));
       },
     });
+
+  /** The code sign-in of an account of a joined server's host, which only a host with `provider-account-code-v1` runs. */
+  function accountCode<T>(serverId: string, path: string, body: unknown, decoder: ResponseDecoder<T>): Promise<T> {
+    if (!remoteServers.supportsCapability(serverId, PROVIDER_ACCOUNT_CODE_CAPABILITY))
+      throw new Error(sourceText("error.team.providersUnsupported"));
+    return runCauseEffect(remoteServers.request(serverId, path, decoder, { method: "POST", body }));
+  }
 
   /**
    * The provider that a new agent of a joined server's host starts on, which only a host with
@@ -475,6 +493,28 @@ export function providerAdminIpcHandlers({
           );
         },
       }),
+      startAccountCodeLogin: scopedHandler(parseConnectProviderAccountInput, {
+        local: ({ provider, accountId }) => runCauseEffect(service.startProviderAccountCodeLogin(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.start, input, decodeProviderAccountCodeLoginStart),
+      }),
+      submitAccountCodeLogin: scopedHandler(parseSubmitAccountCodeLoginInput, {
+        local: async ({ provider, accountId, code }) =>
+          service.submitProviderAccountCodeLogin(provider, accountId, code),
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.submit, input, acceptEmpty),
+      }),
+      accountCodeLoginStatus: scopedHandler(parseRemoveProviderAccountInput, {
+        local: ({ provider, accountId }) =>
+          Promise.resolve(service.providerAccountCodeLoginStatus(provider, accountId)),
+        remote: (input, serverId) =>
+          accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.status, input, decodeProviderAccountCodeLoginStatus),
+      }),
+      cancelAccountCodeLogin: scopedHandler(parseRemoveProviderAccountInput, {
+        local: async ({ provider, accountId }) => {
+          await runCauseEffect(service.cancelProviderAccountSignIn(provider, accountId));
+        },
+        remote: (input, serverId) => accountCode(serverId, PROVIDER_ACCOUNT_CODE_ROUTES.cancel, input, acceptEmpty),
+      }),
       renameAccount: accountsRequest(parseRenameProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.rename, acceptEmpty),
       removeAccount: accountsRequest(parseRemoveProviderAccountInput, PROVIDER_ACCOUNTS_ROUTES.remove, acceptEmpty),
       setAccountPool: scopedHandler(parseSetProviderAccountPoolInput, {
@@ -663,6 +703,15 @@ export function providerAdminIpcHandlers({
 function parseSubmitCodeLoginInput(value: unknown): SubmitProviderCodeLoginInput {
   if (!isDynamicRecord(value) || !isString(value.code)) throw new Error(sourceText("error.provider.codeLoginBadCode"));
   return { provider: parseProviderId(value.provider), code: normalizePastedCode(value.code) };
+}
+
+/** As `parseSubmitCodeLoginInput`, with the account whose sign-in waits for the code. */
+function parseSubmitAccountCodeLoginInput(value: unknown): SubmitProviderAccountCodeLoginInput {
+  const { provider, code } = parseSubmitCodeLoginInput(value);
+  return {
+    ...parseRemoveProviderAccountInput({ provider, accountId: isDynamicRecord(value) ? value.accountId : null }),
+    code,
+  };
 }
 
 /** The address holds a grant, so the error never quotes it. */

@@ -187,6 +187,8 @@ import {
   decodeMcpSignInStatus,
   decodeMcpTestResult,
   decodePromptCacheTtlSetting,
+  decodeProviderAccountCodeLoginStart,
+  decodeProviderAccountCodeLoginStatus,
   decodeProviderApiKeyStatus,
   decodeProviderCodeLoginStart,
   decodeProviderHostSignInStatus,
@@ -243,6 +245,8 @@ import {
   type PasswordManagerStatus,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderCodeLoginStart,
   type ProviderHostSignInStatus,
   type ProviderModelVisibility,
@@ -274,6 +278,7 @@ import {
   type SharedTable,
   type SignInRelayStatus,
   type SignOutMcpServerInput,
+  type SubmitProviderAccountCodeLoginInput,
   type SubmitProviderCodeLoginInput,
   type TestMcpServerInput,
   type UninstallSkillInput,
@@ -338,6 +343,7 @@ import { MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
 import { ONEPASSWORD_CONNECTOR_ROUTES } from "@openbot/contracts/team-protocol/onepassword-connector-v1";
 import { PASSWORD_MANAGERS_ROUTES } from "@openbot/contracts/team-protocol/password-managers-v1";
+import { PROVIDER_ACCOUNT_CODE_ROUTES } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_MODELS_ROUTES } from "@openbot/contracts/team-protocol/provider-account-models-v1";
 import { PROVIDER_ACCOUNT_POOL_ROUTES } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
@@ -1460,6 +1466,43 @@ export function connectProviderAccountKey(
   input: ConnectProviderAccountKeyInput,
 ): Effect.Effect<void, TeamAdminRequestError> {
   return adminCall(() => request("POST", PROVIDER_ACCOUNT_KEYS_ROUTES.connect, ignoreResponse, { ...input }));
+}
+
+/**
+ * `provider-account-code-v1`: starts the code sign-in of an account of a host's provider, a new
+ * account when `accountId` is null. The answer names the account, the page and the code.
+ */
+export function startProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: ConnectProviderAccountInput,
+): Effect.Effect<ProviderAccountCodeLoginStart, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.start, decodeProviderAccountCodeLoginStart, { ...input }),
+  );
+}
+
+/** The code of a `paste` sign-in of an account. It is a credential: it goes in the body, and no reply carries it. */
+export function submitProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: SubmitProviderAccountCodeLoginInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.submit, ignoreResponse, { ...input }));
+}
+
+export function providerAccountCodeLoginStatus(
+  request: TeamApiRequest,
+  input: RemoveProviderAccountInput,
+): Effect.Effect<ProviderAccountCodeLoginStatus, TeamAdminRequestError> {
+  return adminCall(() =>
+    request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.status, decodeProviderAccountCodeLoginStatus, { ...input }),
+  );
+}
+
+export function cancelProviderAccountCodeLogin(
+  request: TeamApiRequest,
+  input: RemoveProviderAccountInput,
+): Effect.Effect<void, TeamAdminRequestError> {
+  return adminCall(() => request("POST", PROVIDER_ACCOUNT_CODE_ROUTES.cancel, ignoreResponse, { ...input }));
 }
 
 /** `provider-account-pool-v1`: turns the pool of a provider's accounts on the host on or off. */
