@@ -29,7 +29,7 @@ export interface CustomEndpointsHooks {
   queueAgentUpdate(input: UpdateAgentInput): Effect.Effect<AgentSummary, EndpointChangeFailed>;
   /** The harness that runs a saved endpoint, or null for an id no endpoint has. */
   endpointHarness(endpointId: string): CustomProviderHarness | null;
-  /** Each saved endpoint by id: the harness that runs it and the model ids the user saved on it. */
+  /** Each saved endpoint by id: the harness that runs it and the models the user saved on it. */
   savedEndpoints(): ReadonlyMap<string, SavedEndpoint>;
   /** Tells the renderer to read the catalogue again. */
   modelsChanged(): void;
@@ -41,6 +41,7 @@ export interface CustomEndpointsHooks {
 
 export interface SavedEndpoint {
   readonly harness: CustomProviderHarness;
+  /** The saved models, as the harness lists them: `<endpoint id>/<model id>`, encoded where Pi encodes it. */
   readonly models: readonly string[];
 }
 
@@ -50,14 +51,14 @@ function choiceKey(provider: string, model: string): string {
 }
 
 /**
- * Whether the user saved `model` on the endpoint. A reasoning variant that a CLI lists as
- * `<model>/<effort>` belongs to its saved model. A saved id can hold a `/` itself, such as
+ * Whether the user saved the listed model `id` on the endpoint. A reasoning variant that a CLI lists
+ * as `<model>/<effort>` belongs to its saved model. A saved id can hold a `/` itself, such as
  * `deepseek/deepseek-v4.1-flash`, so the whole id is compared first.
  */
-function savesModel(saved: readonly string[], model: string): boolean {
-  if (saved.includes(model)) return true;
-  const separator = model.lastIndexOf("/");
-  return separator > 0 && isReasoningEffort(model.slice(separator + 1)) && saved.includes(model.slice(0, separator));
+function savesModel(saved: readonly string[], id: string): boolean {
+  if (saved.includes(id)) return true;
+  const separator = id.lastIndexOf("/");
+  return separator > 0 && isReasoningEffort(id.slice(separator + 1)) && saved.includes(id.slice(0, separator));
 }
 
 export interface CustomEndpointsOptions {
@@ -154,8 +155,8 @@ export class CustomEndpoints {
    * provider, such as `lmstudio` or `google`, and each installed model of a local server under the ids
    * `ollama` and `lmstudio`, which it asks again every 30 s. Checked with OpenCode 2.2.7 and 2.3.0
    * (#7962). The model picker then showed models that the user's server does not have, and a turn on
-   * one failed. A model that an agent uses, as its model, a backup or a usage-limit return, stays, so
-   * no agent moves off its model.
+   * one failed. A model that an agent uses, as its model, a queued model, a backup or a usage-limit
+   * return, stays, so no agent moves off its model.
    */
   #addedEndpointModels(listed: readonly AgentModelOption[]): ReadonlySet<AgentModelOption> {
     const added = new Set<AgentModelOption>();
@@ -167,21 +168,23 @@ export class CustomEndpoints {
       const separator = option.id.indexOf("/");
       if (separator <= 0) continue;
       const endpoint = endpoints.get(option.id.slice(0, separator));
-      if (endpoint?.harness !== option.provider || savesModel(endpoint.models, option.id.slice(separator + 1)))
-        continue;
+      if (endpoint?.harness !== option.provider || savesModel(endpoint.models, option.id)) continue;
       inUse ??= this.#modelsInUse();
       if (!inUse.has(choiceKey(option.provider, option.id))) added.add(option);
     }
     return added;
   }
 
-  /** Each model that an agent names: its model, its backup models and the model it returns to. */
+  /**
+   * Each model that an agent names: its model, the model a queued change moves it to, its backup
+   * models and the model it returns to. The same set as `modelsInUse` of the model picker.
+   */
   #modelsInUse(): ReadonlySet<string> {
     const keys = new Set<string>();
     for (const agent of this.#store.list()) {
       keys.add(choiceKey(providerForAgent(agent), agent.model));
-      for (const backup of agent.backupModels?.order ?? []) keys.add(choiceKey(backup.provider, backup.model));
-      if (agent.usageLimitReturn) keys.add(choiceKey(agent.usageLimitReturn.provider, agent.usageLimitReturn.model));
+      for (const choice of [agent.usageLimitReturn, agent.pendingRuntime, ...(agent.backupModels?.order ?? [])])
+        if (choice) keys.add(choiceKey(choice.provider, choice.model));
     }
     return keys;
   }

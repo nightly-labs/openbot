@@ -19,6 +19,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { Clock, Effect, Result, Semaphore } from "effect";
+import { encodedModelId } from "../backend/encoded-model-id";
 import { isMissingFileError } from "../backend/file-errors";
 import { OPENCODE_CONFINED_ENV } from "../backend/process-confinement";
 import { type PreferenceFileFailure, readPreferenceFile, writePreferenceFile } from "./preference-file";
@@ -421,7 +422,8 @@ function savedEndpointModels(endpoints: readonly CustomProviderSummary[]): Set<M
   return new Set(
     endpoints.flatMap((endpoint) =>
       endpoint.models.map((model) =>
-        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, `${endpoint.id}/${model.id}`),
+        // As the harness lists it: Pi encodes an id that the contract refuses, such as `@cf/...`.
+        modelKey(endpoint.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS, encodedModelId(`${endpoint.id}/`, model.id)),
       ),
     ),
   );
