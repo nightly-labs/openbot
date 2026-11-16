@@ -14,6 +14,12 @@ const { io: vaultCall, sync: vaultDecode } = causeHelpers(PasswordVaultError);
 /** The name of the agent that added an item. Absent when the user added it. */
 const addedBy = Schema.optionalKey(Schema.String);
 
+/**
+ * The ids of the agents that can use an item. Absent means every agent. A build before agent scope
+ * drops the key on its next write, so the item is then for every agent again.
+ */
+const agents = Schema.optionalKey(Schema.Array(Schema.String));
+
 const loginSchema = Schema.Struct({
   id: Schema.String,
   /** An `https:` address or a host name, as the user typed it. */
@@ -27,6 +33,7 @@ const loginSchema = Schema.Struct({
    */
   twoStepKey: Schema.optionalKey(Schema.String),
   addedBy,
+  agents,
 });
 
 const cardSchema = Schema.Struct({
@@ -48,6 +55,7 @@ const cardSchema = Schema.Struct({
     Schema.Array(Schema.Struct({ page: Schema.String, frames: Schema.Array(Schema.String) })),
   ),
   addedBy,
+  agents,
 });
 
 const contactSchema = Schema.Struct({
@@ -63,15 +71,20 @@ const contactSchema = Schema.Struct({
   phone: Schema.String,
   email: Schema.String,
   addedBy,
+  agents,
 });
 
 const apiKeySchema = Schema.Struct({
   id: Schema.String,
-  /** An environment variable name, unique in the Vault. */
+  /**
+   * An environment variable name. It is unique among the keys for every agent; keys for chosen agents
+   * can share it when they share no agent.
+   */
   name: Schema.String,
   key: Schema.String,
   notes: Schema.String,
   addedBy,
+  agents,
 });
 
 const recordSchema = Schema.Struct({

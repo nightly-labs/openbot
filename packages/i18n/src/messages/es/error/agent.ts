@@ -91,8 +91,12 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.toolLoopStopped":
+    "{provider} repitió muchas veces un paso fallido, así que OpenBot detuvo este turno. Envía el mensaje de nuevo o elige otro modelo.",
   "error.agent.compactionConnectionLost":
     "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y envía un mensaje para continuar.",
+  "error.agent.compactionLoopStopped":
+    "{provider} compactó el contexto una y otra vez, y cada vez quedó demasiado lleno para continuar, así que OpenBot detuvo este turno. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita y luego envía un mensaje. Si tú o el agente cambiasteis cuándo compacta {provider}, deshaz ese cambio.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",
   "error.agent.profileEndpointsChanged":
     "Los endpoints personalizados cambiaron durante la generación. Inténtalo de nuevo.",
@@ -147,6 +151,8 @@ export const messages = {
     "Este servidor tiene poca memoria disponible. Tu mensaje espera en la cola y se iniciará cuando se libere memoria.",
   "error.agent.workspaceOnlyToolMissing":
     "Solo espacio de trabajo requiere {tool}, que OpenBot no encontró. Instálalo o elige Acceso completo en los ajustes del agente.",
+  "error.agent.codexSandboxUnavailable":
+    "«Solo espacio de trabajo» necesita el sandbox de Codex, que Codex no puede iniciar en este ordenador, así que los comandos del agente fallan. Elige Preguntar antes o Acceso completo en los ajustes del agente.",
   "error.agent.claudeSandboxUnavailable":
     "«Solo espacio de trabajo» necesita el sandbox de Claude, que Claude no puede iniciar en este ordenador: {reason}. Elige Acceso completo u otro proveedor en los ajustes del agente.",
   "error.agent.screenCaptureOff":

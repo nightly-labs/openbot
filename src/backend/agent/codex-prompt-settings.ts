@@ -18,11 +18,14 @@ export const CODEX_UNFIT_SKILLS = [
 
 export interface CodexPromptSettings {
   /**
-   * `tool_suggest` lists the account's plugins that are not installed and declares
-   * `request_plugin_install` (about 430 tokens). Codex then waits for the client to install the
-   * plugin, and OpenBot only shows Accept and Decline, so the install never completes.
+   * `tool_suggest` lists the account's plugins and ChatGPT apps that are not installed and declares
+   * `list_available_plugins_to_install` and `request_plugin_install` (about 430 tokens).
+   * `recommended_plugins` lists them in the first message. OpenBot cannot install a Codex plugin or
+   * connect a ChatGPT app, so the agent tells the user about a prompt that never shows (#8515).
+   * Always off, also when the user's `config.toml` turns them on: no OpenBot thread can use them.
    */
-  "features.tool_suggest"?: false;
+  "features.tool_suggest": false;
+  "features.recommended_plugins": false;
   /** `[[skills.config]]` entries: Codex selects a skill by `name` or by the `path` of its `SKILL.md`. */
   "skills.config"?: DynamicRecord[];
   /**
@@ -33,23 +36,21 @@ export interface CodexPromptSettings {
 }
 
 /**
- * The prompt settings of an OpenBot thread, without each one that the user's own Codex
- * configuration sets. `read` is the `config/read` answer with its layers; null when Codex did not
- * answer, and then OpenBot changes nothing.
+ * The prompt settings of an OpenBot thread. The plugin install features are always off. The other
+ * settings leave out each one that the user's own Codex configuration sets. `read` is the
+ * `config/read` answer with its layers; null when Codex did not answer, and then OpenBot changes
+ * only the plugin install features.
  *
- * The merged `features` table also holds values that no file sets, so a feature counts as the
- * user's only when a file layer (the user's `config.toml` or the system one) sets it. A thread value
- * for `skills.config` replaces the whole merged list, so the user's entries go first, as they are,
- * and OpenBot adds only the skills that no entry names. An entry by `path` names the skill of its
- * folder, as `…/create-pet/SKILL.md` names `work-pets:create-pet`.
+ * A thread value for `skills.config` replaces the whole merged list, so the user's entries go first,
+ * as they are, and OpenBot adds only the skills that no entry names. An entry by `path` names the
+ * skill of its folder, as `…/create-pet/SKILL.md` names `work-pets:create-pet`.
  */
 export function codexPromptSettings(read: DynamicRecord | null): CodexPromptSettings {
-  if (!read) return {};
-  const settings: CodexPromptSettings = {};
-  const layers = getArray(read, "layers").filter(isRecord);
-  const userSets = (feature: string) =>
-    layers.some((layer) => typeof getRecord(getRecord(layer, "config"), "features")?.[feature] === "boolean");
-  if (!userSets("tool_suggest")) settings["features.tool_suggest"] = false;
+  const settings: CodexPromptSettings = {
+    "features.tool_suggest": false,
+    "features.recommended_plugins": false,
+  };
+  if (!read) return settings;
   // No default fills this value, so the merged one is null unless a file sets it.
   if (getString(getRecord(read, "config"), "model_reasoning_summary") === null)
     settings.model_reasoning_summary = "auto";

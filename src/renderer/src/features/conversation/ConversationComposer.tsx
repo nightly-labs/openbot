@@ -17,7 +17,7 @@ import {
 } from "@openbot/contracts/team-protocol/current";
 import { sourceText } from "@openbot/i18n/source";
 import { spentUsageWindow } from "@openbot/team-client/plan-limits";
-import { Button, Input } from "@openbot/ui";
+import { Button, CopyButton, Input, toast } from "@openbot/ui";
 import { AwaitingReplies } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import { ComposerAttachmentRow } from "@openbot/ui/features/conversation/ComposerAttachmentRow";
@@ -76,6 +76,7 @@ export function ConversationComposer() {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentDraft,
     dismissCurrentChatErrors,
     installedSkills,
@@ -128,10 +129,8 @@ export function ConversationComposer() {
     sideQuestionAvailable,
     openSideQuestion,
     voiceConversationAvailable,
-    openSidePanelPane,
-    closeSidePanelPane,
-    activeRightPanel,
-    sidePanel,
+    voiceConversationOpen,
+    toggleVoiceConversation,
     sendStarting,
     channel,
     providerSilentMinutes,
@@ -166,9 +165,9 @@ export function ConversationComposer() {
       openSideQuestion(text);
     };
   };
-  const openVoiceConversation = () => (voiceConversationAvailable() ? () => openSidePanelPane("voice") : undefined);
-  /** The voice conversation runs while its tab is in the side panel, also when another tab shows. */
-  const voiceTabOpen = () => sidePanel().panes.includes("voice");
+  /** The + menu starts a voice conversation. While one runs, the pill and Send end it. */
+  const openVoiceConversation = () =>
+    voiceConversationAvailable() && !voiceConversationOpen() ? toggleVoiceConversation : undefined;
   /**
    * With nothing to send, Send starts a voice conversation, as on mobile. While the conversation runs,
    * the same button ends it. When Send cannot send to the agent, Send stays and is disabled.
@@ -178,13 +177,9 @@ export function ConversationComposer() {
     if (composerHasContent() || editingDeliveryId() || voicePhase() !== "idle") return undefined;
     if (attachmentBusy() || uploadFailed() || submitting() || !agentReady() || providerUpdateRequired())
       return undefined;
-    if (voiceTabOpen()) return "end";
+    if (voiceConversationOpen()) return "end";
     // Between a send and its turn, Send stays, so the voice icon does not show for a moment before Stop.
     return sendStarting() ? undefined : "start";
-  };
-  const toggleVoiceConversation = () => {
-    if (voiceTabOpen()) closeSidePanelPane("voice");
-    else openSidePanelPane("voice");
   };
   // A pending Save keeps its exact request for retry. Block changes until retry or cancel.
   const savePending = () => Boolean(editingDeliveryId() && editingPendingSave());
@@ -228,13 +223,13 @@ export function ConversationComposer() {
   const queueRows = () => (queueOpen() ? presentedQueueDeliveries() : renderedQueueDeliveries());
   // A channel has many speakers, so it has no voice input.
   const voiceAvailable = () => !channel && !props.runtime;
-  /** The reply of this agent that is read aloud. The voice pane shows its own. */
+  /** The reply of this agent that is read aloud. The voice pill shows its own. */
   const speaking = () => {
     const reading = speechReading();
     return reading &&
       reading.agentId === props.agent?.id &&
       reading.serverId === (props.server?.id ?? "local") &&
-      activeRightPanel() !== "voice"
+      !voiceConversationOpen()
       ? reading
       : null;
   };
@@ -295,6 +290,18 @@ export function ConversationComposer() {
           {t("composer.verifyAccount.action")}
         </Button>
       );
+    // The general sentence names no cause, so the user can copy the provider's text into a report (#6410).
+    const details = currentChatErrorDetails();
+    if (details)
+      return (
+        <CopyButton
+          value={details}
+          variant="outline"
+          size="sm"
+          label={t("agent.error.copyDetails")}
+          onCopyError={() => toast.error(t("app.clipboard.copyFailed"))}
+        />
+      );
     return undefined;
   };
   /** An ACP provider has no steer request, so its queued messages wait for the turn to end (#3689). */
@@ -326,7 +333,7 @@ export function ConversationComposer() {
     const duration = format.number(minutes, { style: "unit", unit: "minute", unitDisplay: "long" });
     return { title: undefined, body: t("composer.providerWait.silent", { provider, duration }) };
   });
-  /** A file the model cannot read is fixed by a model change, not by waiting, so it is not shown as a failure. */
+  /** A file the model cannot read is fixed by a send without it or a model change, not by waiting, so it is not shown as a failure. */
   const unreadableContent = () =>
     props.agent?.provider === "opencode" &&
     currentChatError() === localizeSourceText(sourceText("error.provider.opencodeUnreadableContent"));
@@ -339,21 +346,23 @@ export function ConversationComposer() {
   /** A reading of another account of the same provider says nothing about the quota this agent uses. */
   const agentUsageLimit = (limit: AccountUsageLimit) =>
     limit.id === props.agent?.provider && (limit.accountId ?? DEFAULT_PROVIDER_ACCOUNT_ID) === agentAccountId();
-  /** The first plan window that is spent and has not ended yet. It does not say whether paid credits remain. */
+  /** The first plan window that is spent and has not ended yet, and whether the account keeps working on credits. */
   const usageExhausted = createMemo(() => {
     const provider = props.agent?.provider;
     // The usage of a provider that this build does not know has no notice.
     if (!provider || !isKnownAgentProvider(provider)) return null;
     const spent = spentUsageWindow(props.accountUsage?.limits, provider, agentAccountId(), props.agent?.model, now());
     if (!spent) return null;
-    const { slot, window, covers } = spent;
+    const { slot, window, covers, onCredits } = spent;
     return {
       provider,
       resetsAt: window.resetsAt,
       covers,
+      onCredits,
       // Not the reset time: Codex sends the same window's reset a second or two apart between readings.
       // A window that ends clears the dismissal below, and the clock ends it when no reading comes.
-      key: JSON.stringify([slot, window.windowDurationMins]),
+      // Credits that run out show the notice again.
+      key: JSON.stringify([slot, window.windowDurationMins, onCredits]),
     };
   });
   const usageNoticeAccount = () => {
@@ -631,6 +640,7 @@ export function ConversationComposer() {
               <ComposerUsageLimitNotice
                 provider={spent().provider}
                 resetsAt={spent().resetsAt}
+                onCredits={spent().onCredits}
                 onDismiss={() => {
                   const account = usageNoticeAccount();
                   const chat = currentChatConversationKey() ?? "";
@@ -645,7 +655,7 @@ export function ConversationComposer() {
                     operation: "turn",
                     source: "provider",
                     cause_code: "usage_limit",
-                    severity: "error",
+                    severity: spent().onCredits ? "warning" : "error",
                     presentation: "banner",
                     provider: spent().provider,
                   })

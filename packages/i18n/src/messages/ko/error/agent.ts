@@ -82,8 +82,12 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.toolLoopStopped":
+    "{provider}이(가) 실패한 단계를 여러 번 반복해서 OpenBot이 이 턴을 중지했습니다. 메시지를 다시 보내거나 다른 모델을 선택하세요.",
   "error.agent.compactionConnectionLost":
     "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겨 작업이 멈췄어요. 인터넷 연결을 확인한 다음 메시지를 보내 계속해 주세요.",
+  "error.agent.compactionLoopStopped":
+    "{provider}이(가) 컨텍스트를 계속 압축했지만 매번 너무 가득 차 있어 계속할 수 없어서 OpenBot이 이 턴을 중지했습니다. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끈 다음 메시지를 보내세요. 사용자나 에이전트가 {provider}의 압축 시점을 바꿨다면 그 변경을 되돌리세요.",
   "error.agent.selectedGone": "선택한 에이전트가 더 이상 없어요.",
   "error.agent.profileEndpointsChanged": "생성하는 동안 사용자 지정 엔드포인트가 변경되었어요. 다시 시도해 주세요.",
   "error.agent.profileInvalid": "제공자가 올바르지 않은 프로필을 반환했어요. 프롬프트를 수정해 보세요.",
@@ -135,6 +139,8 @@ export const messages = {
     "이 서버의 메모리가 부족해요. 메시지는 대기열에서 기다리다가 메모리가 확보되면 시작돼요.",
   "error.agent.workspaceOnlyToolMissing":
     "워크스페이스 전용 모드에는 {tool}이(가) 필요한데 OpenBot이 찾지 못했어요. 설치하거나 에이전트 설정에서 전체 접근 권한을 선택하세요.",
+  "error.agent.codexSandboxUnavailable":
+    "워크스페이스 전용 모드에는 Codex 샌드박스가 필요하지만 이 컴퓨터에서는 Codex가 샌드박스를 시작할 수 없어서 에이전트의 명령이 실패해요. 에이전트 설정에서 먼저 묻기나 전체 접근을 선택하세요.",
   "error.agent.claudeSandboxUnavailable":
     "워크스페이스 전용 모드에는 Claude 샌드박스가 필요하지만 이 컴퓨터에서는 Claude가 샌드박스를 시작할 수 없어요: {reason}. 에이전트 설정에서 전체 접근 권한이나 다른 제공자를 선택하세요.",
   "error.agent.screenCaptureOff":

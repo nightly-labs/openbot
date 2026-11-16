@@ -8,7 +8,11 @@ export const messages = {
   "status.agent.instructionsChanged": "Talimatlarını güncelledi",
   "status.agent.modelSwitchedForLimit": "Kullanım sınırına ulaşıldı. {model} modeline geçildi.",
   "status.agent.modelReturnedAfterLimit": "Kullanım sınırı bitti. {model} modeline geri dönüldü.",
+  "status.agent.routineSkippedRunOpen": "Atlandı: son çalıştırma henüz bitmemişti",
+  "status.agent.routineSkippedUsageLimit": "Atlandı: kullanım sınırına ulaşıldı",
   "status.agent.modelSwitchedForError": "Sağlayıcı hatası. {model} modeline geçildi.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",
   "status.agent.marketplaceSuggested": "Bir Pazaryeri uygulaması önerildi: {app}.",
   "status.agent.channelMemberAdded": "{agent}, {member} ajanını kanala ekledi. İsteyen: {person}.",
@@ -34,6 +38,14 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "OpenBot'u başka bir bilgisayara {name} sunucusu olarak kuran ve hesabınızda oturum açan tek kullanımlık bir komut oluştur. Ajan onu orada çalıştırır.",
   "status.agent.serverInstallCard": "{name} sunucusu için kurulum komutu",
+  "status.agent.browserProfileNamed":
+    "{agents} ajanlarını {profile} tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileNew":
+    "Yeni {profile} tarayıcı profilini oluştur ve {agents} ajanlarını oraya taşı. Hiç oturum açma bilgisi yoktur. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileShared":
+    "{agents} ajanlarını paylaşılan tarayıcı profiline taşı. Onun oturum açma bilgilerini ve çerezlerini alırlar. Açık sekmeleri kapanır.",
+  "status.agent.browserProfileOwn":
+    "{agents} ajanlarının her birine kendi tarayıcı profilini ver. Açık sekmeleri kapanır.",
   "status.agent.feedbackSending": "Geri bildiriminiz OpenBot ekibine gönderiliyor…",
   "status.agent.workflowDelete":
     "{title} iş akışını çalıştırmaları ve sürümleriyle birlikte silin. Açık adımları durur.",

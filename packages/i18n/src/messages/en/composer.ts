@@ -18,6 +18,10 @@ export const messages = defineMessages("composer", {
   "composer.update.manual": "Update {provider} on the computer that runs it to continue.",
   "composer.update.pending": "Updating…",
   "composer.update.action": "Update",
+  "composer.usageLimit.credits": "You used all of your {provider} plan limit. Your agents now use your credits.",
+  "composer.usageLimit.creditsResets":
+    "You used all of your {provider} plan limit. Your agents use your credits until it resets {reset}.",
+  "composer.usageLimit.creditsTitle": "Using credits",
   "composer.usageLimit.resets": "You used all of your {provider} limit. It resets {reset}.",
   "composer.usageLimit.selectModel": "You used all of your {provider} limit. Select a different model to continue.",
   "composer.usageLimit.title": "Usage limit reached",

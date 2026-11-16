@@ -94,8 +94,12 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.toolLoopStopped":
+    "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
   "error.agent.compactionConnectionLost":
     "De verbinding viel weg terwijl de agent zijn context comprimeerde, dus de taak is gestopt. Controleer je internetverbinding en stuur dan een bericht om verder te gaan.",
+  "error.agent.compactionLoopStopped":
+    "{provider} heeft de context steeds opnieuw gecomprimeerd, en elke keer bleef die te vol om door te gaan. Daarom heeft OpenBot deze beurt gestopt. Zet de MCP-servers of het computergebruik uit die deze agent niet nodig heeft, en stuur dan een bericht. Als jij of de agent hebt gewijzigd wanneer {provider} comprimeert, maak die wijziging dan ongedaan.",
   "error.agent.selectedGone": "De gekozen agent bestaat niet meer.",
   "error.agent.profileEndpointsChanged":
     "De aangepaste endpoints zijn gewijzigd tijdens het maken. Probeer het opnieuw.",
@@ -150,6 +154,8 @@ export const messages = {
     "Deze server heeft weinig geheugen. Je bericht wacht in de wachtrij en start zodra er geheugen vrij is.",
   "error.agent.workspaceOnlyToolMissing":
     "Alleen werkruimte heeft {tool} nodig, maar OpenBot heeft dit niet gevonden. Installeer het, of kies Volledige toegang in de instellingen van de agent.",
+  "error.agent.codexSandboxUnavailable":
+    "Alleen werkruimte heeft de Codex-sandbox nodig, maar Codex kan die op deze computer niet starten, dus de opdrachten van de agent mislukken. Kies Eerst vragen of Volledige toegang in de instellingen van de agent.",
   "error.agent.claudeSandboxUnavailable":
     "Alleen werkruimte heeft de Claude-sandbox nodig, maar Claude kan die op deze computer niet starten: {reason}. Kies Volledige toegang of een andere aanbieder in de instellingen van de agent.",
   "error.agent.screenCaptureOff":

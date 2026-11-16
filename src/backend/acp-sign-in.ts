@@ -5,7 +5,7 @@ import { delimiter, join } from "node:path";
 import { createInterface } from "node:readline";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { registerSecretValue } from "@openbot/logging";
+import { createOpenBotLogger, registerSecretValue } from "@openbot/logging";
 import { Effect, Fiber } from "effect";
 import { cliSpawnTarget } from "./cli";
 import {
@@ -17,6 +17,8 @@ import {
 import { type ProviderTempOptions, spawnWithProviderTemp } from "./provider-temp";
 import { stopProcessTree } from "./windows-process-tree";
 
+const logger = createOpenBotLogger("acp-sign-in");
+
 /** The messages this client sends: its requests, and a refusal for each request the server makes. */
 type AcpMessage =
   | { id: number; method: "initialize" | "logout" | "authenticate" | AcpExtensionMethod; params: DynamicRecord }
@@ -25,13 +27,23 @@ type AcpMessage =
 /** A method of the agent's own, outside ACP. Its name starts with `_`. */
 export type AcpExtensionMethod = `_${string}`;
 
-/** The server's reason for a refused call, redacted and short, or `null` when it gave none. */
-function serverReason(error: unknown): string | null {
+/** The server's own text for a refused call, or `null` when it gave none. It is not redacted. */
+function serverText(error: unknown): string | null {
   if (!isDynamicRecord(error)) return null;
   const details = isDynamicRecord(error.data) ? error.data.details : undefined;
   const text = typeof details === "string" ? details : error.message;
-  return typeof text === "string" ? signInReason(text) : null;
+  return typeof text === "string" ? text : null;
 }
+
+/**
+ * A server text that says the server could not reach the provider's service: a failed DNS lookup,
+ * or a connection that did not open. Go servers (Antigravity) write `lookup <host> on <dns>: server
+ * misbehaving`, `dial tcp …` or `connect: connection refused` (#9608), Rust servers `dns error` or
+ * `error sending request for url`, and Node servers a system error code. A refused account is an
+ * answer, and has none of them. It is matched on the full text: the short reason can cut it off.
+ */
+const NETWORK_FAILURE_TEXT =
+  /\blookup [\w-]+(?:\.[\w-]+)+\.? on \S+: |\bdial (?:tcp|udp)[46]?\b|\bconnect: (?:connection refused|connection timed out|network is unreachable|no route to host)\b|\bi\/o timeout\b|\bno such host\b|\bserver misbehaving\b|\berror sending request for url\b|\bdns error\b|\btcp connect error\b|\bgetaddrinfo\b|\bfetch failed\b|\b(?:ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENETUNREACH|EHOSTUNREACH)\b/iu;
 
 /**
  * The command line of an ACP server, or a function that makes it from the environment of the process.
@@ -217,12 +229,19 @@ export const startAcpAuthentication = Effect.fnUntraced(function* (options: {
           return;
         }
         if (message.error !== undefined && (message.id === 1 || message.id === 2 || message.id === 3)) {
-          const reason = serverReason(message.error);
+          const text = serverText(message.error);
+          // The reason that the user and the log see: redacted and short.
+          const reason = signInReason(text);
           // A refused sign-out keeps the server's reason, such as a token that the CLI did not save.
           if (options.logoutOnly && reason)
             return fail(
               new ProviderSignInError({ message: sourceText("error.provider.acpSignOutFailedReason", { reason }) }),
             );
+          // The resolver's or socket's words do not help the user, so they stay in the log.
+          if (!options.logoutOnly && text && NETWORK_FAILURE_TEXT.test(text)) {
+            logger.warn("An ACP sign-in could not reach the provider's service.", { reason });
+            return signInFailed(sourceText("error.provider.acpSignInNetwork"));
+          }
           signInFailed(
             reason
               ? sourceText("error.provider.acpSignInFailedReason", { reason })

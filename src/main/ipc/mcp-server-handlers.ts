@@ -28,6 +28,10 @@ import {
 } from "@openbot/contracts/team-protocol/mcp-sign-in-app-v1";
 import { MCP_SIGN_IN_CAPABILITY, MCP_SIGN_IN_ROUTES } from "@openbot/contracts/team-protocol/mcp-sign-in-v1";
 import { MCP_ROUTES } from "@openbot/contracts/team-protocol/mcp-v1";
+import {
+  SIGN_IN_RELAY_DEEP_LINK_CAPABILITY,
+  SIGN_IN_RELAY_DEEP_LINK_ROUTES,
+} from "@openbot/contracts/team-protocol/sign-in-relay-deep-link-v1";
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_ROUTES } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { AgentService } from "../../backend/agent-service";
@@ -131,7 +135,7 @@ interface McpServerIpcDependencies {
   /** What the managed store holds right now, so an installed command waits for no download. */
   toolRuntimes: () => McpToolRuntimes;
   /** Opens the page of a joined server's sign-in in this computer's browser, and relays the callback. */
-  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste">;
+  relay: Pick<SignInRelayClient, "run" | "page" | "open" | "paste" | "receivesDeepLink">;
 }
 
 /** How long a connection test waits for the managed runtimes before probing without them. */
@@ -190,11 +194,19 @@ export function mcpServerIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, MCP_SIGN_IN_CAPABILITY)) signInOnHost();
   }
 
-  /** The `sign-in-relay-v1` routes of one MCP sign-in on a joined server. */
+  /**
+   * The `sign-in-relay-v1` routes of one MCP sign-in on a joined server. When this computer opens
+   * `openbot://mcp-auth`, the host can return there after both loopback names failed: TradingView's
+   * firewall blocks a sign-in page that returns to a loopback name (#9209).
+   */
   function relayRemote(serverId: string, input: TestMcpServerInput): SignInRelayRemote<RemoteWorkflowError> {
     const post = <T>(path: string, decoder: ResponseDecoder<T>, body: unknown) =>
       remoteServers.request(serverId, path, decoder, { method: "POST", body });
-    return signInRelayRemote(post, post(SIGN_IN_RELAY_ROUTES.mcpStart, decodeSignInRelayFlow, input));
+    const start =
+      remoteServers.supportsCapability(serverId, SIGN_IN_RELAY_DEEP_LINK_CAPABILITY) && relay.receivesDeepLink()
+        ? SIGN_IN_RELAY_DEEP_LINK_ROUTES.mcpStart
+        : SIGN_IN_RELAY_ROUTES.mcpStart;
+    return signInRelayRemote(post, post(start, decodeSignInRelayFlow, input));
   }
 
   /** A sign-in app is the host's: an older host cannot keep one, so the reason is stated first. */

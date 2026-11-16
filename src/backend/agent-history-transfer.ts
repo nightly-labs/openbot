@@ -1,4 +1,5 @@
 import type { AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
+import { parseRoutineRunConversationEventItemType, routineRunConversationEventItemType } from "@openbot/contracts/ipc";
 import { Effect, Schema } from "effect";
 import type { AgentThreadRecord, AgentThreadStore } from "./agent-threads/agent-thread-store";
 import { copyBranchMessages } from "./agent-threads/agent-thread-store";
@@ -41,9 +42,10 @@ export interface ImportHistoryThreadInput {
   agentId: string;
   thread: HistoryThread;
   files: ReadonlyMap<string, HistoryFile>;
-  /** Agent and routine ids of the other computer, by the ids that the import made here. */
+  /** Agent, routine and run ids of the other computer, by the ids that the import made here. */
   agentIds: ReadonlyMap<string, string>;
   routineIds: ReadonlyMap<string, string>;
+  runIds: ReadonlyMap<string, string>;
 }
 
 export class AgentHistoryTransferFailed extends Schema.TaggedError<AgentHistoryTransferFailed>()(
@@ -138,7 +140,7 @@ export class AgentHistoryTransfer {
       return record.threadId;
     });
     // New ids for the whole chat first, so a reply keeps its link across batches.
-    const messages = importedMessages(thread.messages, input.agentIds, input.routineIds);
+    const messages = importedMessages(thread.messages, input.agentIds, input.routineIds, input.runIds);
     for (let start = 0; start < messages.length; start += IMPORT_BATCH) {
       const batch = messages.slice(start, start + IMPORT_BATCH);
       const staged: string[] = [];
@@ -201,18 +203,48 @@ function importedMessages(
   messages: readonly ConversationMessage[],
   agentIds: ReadonlyMap<string, string>,
   routineIds: ReadonlyMap<string, string>,
+  runIds: ReadonlyMap<string, string>,
 ): ConversationMessage[] {
   return copyBranchMessages(messages, new Map()).map((message) => {
-    const { exchange: _exchange, senderAgentId, routine, ...copy } = message;
+    const { exchange: _exchange, senderAgentId, ...copy } = withRoutineCopies(message, routineIds, runIds);
     const sender = senderAgentId ? agentIds.get(senderAgentId) : undefined;
-    const routineId = routine ? routineIds.get(routine.routineId) : undefined;
     return {
       ...copy,
       status: copy.status === "streaming" ? "interrupted" : copy.status,
       ...(sender ? { senderAgentId: sender } : {}),
-      ...(routine && routineId ? { routine: { ...routine, routineId } } : {}),
     };
   });
+}
+
+/**
+ * The message with its routine and run pointing to their copies here. A message keeps its routine
+ * only when the import made a copy of it; a run that came without its history keeps its id, which
+ * then only groups the run's messages. A run event names both ids in its item type.
+ */
+export function withRoutineCopies(
+  message: ConversationMessage,
+  routineIds: ReadonlyMap<string, string>,
+  runIds: ReadonlyMap<string, string>,
+): ConversationMessage {
+  const { routine, ...rest } = message;
+  const routineId = routine ? routineIds.get(routine.routineId) : undefined;
+  const event = parseRoutineRunConversationEventItemType(message.itemType);
+  const eventRoutine = event ? routineIds.get(event.routineId) : undefined;
+  return {
+    ...rest,
+    ...(routine && routineId
+      ? { routine: { ...routine, routineId, runId: runIds.get(routine.runId) ?? routine.runId } }
+      : {}),
+    ...(event && eventRoutine
+      ? {
+          itemType: routineRunConversationEventItemType(
+            event.status,
+            eventRoutine,
+            runIds.get(event.runId) ?? event.runId,
+          ),
+        }
+      : {}),
+  };
 }
 
 /** The files a message names: its attachments and its voice recording. */

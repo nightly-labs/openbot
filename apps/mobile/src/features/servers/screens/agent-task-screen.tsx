@@ -28,11 +28,12 @@ import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
 import { dictationVoice } from "@/features/chat/components/composer-voice";
-import { useMarkThreadRead } from "@/features/chat/components/use-agent-thread-reads";
+import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
+import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
 import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
 import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
@@ -41,13 +42,16 @@ import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
   type ChatBubbleMessage,
   chatRowIndex,
+  keptIdSet,
   latestReadBoundaryMessage,
   projectChatMessages,
+  withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
+import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
@@ -58,6 +62,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
 import { MIRROR_IN_RTL } from "@/shared/lib/text-direction";
@@ -65,6 +70,8 @@ import { useAppForeground } from "@/shared/lib/use-app-foreground";
 import { useReducedTransparency } from "@/shared/lib/use-reduced-transparency";
 
 const NO_MESSAGES: never[] = [];
+/** The item of the thread's menu that opens the pinned messages. */
+const PINS_ACTION = "pinned-messages";
 const NO_ALIASES: ReadonlyMap<string, string> = new Map();
 /** As in the agent's chat: a host starts a turn within a second or two; this only ends a wait for a turn that never shows. */
 const AWAIT_TURN_MS = 10_000;
@@ -89,18 +96,20 @@ function leaveTask() {
  */
 export function AgentTaskScreen() {
   const { t } = useText();
-  const { serverId, agentId, taskId, messageId } = useLocalSearchParams<{
+  // `focusAt` changes when a pinned message of this thread opens again, so the thread goes to it again.
+  const { serverId, agentId, taskId, messageId, focusAt } = useLocalSearchParams<{
     serverId: string;
     agentId: string;
     taskId: string;
     messageId?: string;
+    focusAt?: string;
   }>();
   const { agents } = useMobileWorkspace();
   const agent = agents.find((item) => item.id === agentId && item.serverId === serverId);
   if (agent)
     return (
       <AgentTaskChat
-        key={`${serverId}:${taskId}`}
+        key={`${serverId}:${taskId}:${focusAt ?? ""}`}
         target={{ ...agent, kind: "agent" }}
         taskId={taskId}
         focusMessageId={messageId || null}
@@ -159,6 +168,13 @@ function AgentTaskChat({
   const mentionReferences = useAgentMentionReferences(serverId, agentId, taskId);
   // A deleted thread has no screen: the agent's chat takes its place.
   const threadActions = useThreadActions(target.serverId, onThreadDeleted);
+  // The thread's menu also opens the pinned messages of the agent's chats, on a host with `message-pins-v1`.
+  const pins = useMessagePins(serverId, agentId);
+  const pinsEnabled = pins.enabled;
+  const pinnedMessageIds = useMemo(
+    () => new Set(pins.pins.filter((pin) => pin.taskId === taskId).map((pin) => pin.messageId)),
+    [pins.pins, taskId],
+  );
   const {
     servers,
     agents,
@@ -173,6 +189,8 @@ function AgentTaskChat({
     sendAgentTaskMessage,
     respondToTaskPrompt,
     respondToApproval,
+    readsWholeApprovals,
+    readWholeApproval,
     respondToBrowserTakeover,
     respondToBrowserSecret,
     browserViewSupport,
@@ -197,11 +215,18 @@ function AgentTaskChat({
   // The reader's membership marks their own messages, which they can delete, and names the other members.
   const memberId = server?.membershipId ?? null;
   const accountUserId = useMobileSession().session?.user.id ?? null;
-  const messages = useMemo(
-    () => (conversation.data ? projectChatMessages(conversation.data.messages, memberId, accountUserId) : NO_MESSAGES),
-    [conversation.data, memberId, accountUserId],
-  );
+  const progressUpdates = useProgressUpdates(serverId, serverAgents, agentId);
   const activeTurnId = task?.activeTurnId ?? null;
+  const messages = useMemo(
+    () =>
+      conversation.data
+        ? withQuestionContext(
+            projectChatMessages(conversation.data.messages, memberId, accountUserId, progressUpdates),
+            activeTurnId,
+          )
+        : NO_MESSAGES,
+    [conversation.data, memberId, accountUserId, progressUpdates, activeTurnId],
+  );
   const branching = useBranchThread({
     serverId,
     agentId,
@@ -238,7 +263,45 @@ function AgentTaskChat({
       : undefined;
   // The message that the thread opens at, until the list shows it.
   const [focus, setFocus] = useState(focusMessageId);
-  const clearFocus = useCallback(() => setFocus(null), []);
+  // The NEW line of this visit, as in the agent's chat. The open thread reads itself, so the line
+  // keeps the first unread message that the thread had when it opened.
+  const openingUnread = useThreadOpeningUnread(serverId, agentId, isDraft ? null : taskId);
+  const [unreadLine, setUnreadLine] = useState<{ messageId: string | null } | null>(null);
+  // While the server connects or resumes, the host marks are not read yet, and the thread can show
+  // the messages that the phone kept.
+  const connecting = Boolean(server?.initialConnectionPending) || (online && server?.state !== "online");
+  if (unreadLine === null && openingUnread.firstUnread !== undefined && !connecting && (isDraft || conversation.data))
+    setUnreadLine({ messageId: openingUnread.firstUnread });
+  const unreadLineMessageId = unreadLine?.messageId ?? null;
+  // The line shows above the first of these messages that has a row. The set stays the same object
+  // while its ids stay, as the list asks: a streamed reply changes the messages on each chunk.
+  const lastUnreadLineIds = useRef<ReadonlySet<string> | null>(null);
+  const unreadLineMessageIds = useMemo(() => {
+    const entries = conversation.data?.messages ?? [];
+    const start = unreadLineMessageId ? entries.findIndex((message) => message.id === unreadLineMessageId) : -1;
+    lastUnreadLineIds.current =
+      start < 0
+        ? null
+        : keptIdSet(
+            lastUnreadLineIds.current,
+            entries.slice(start).map((message) => message.id),
+          );
+    return lastUnreadLineIds.current;
+  }, [unreadLineMessageId, conversation.data?.messages]);
+  // The thread opens at the NEW line once, after a message that it opens at. A thread that showed
+  // before the line does not move to it later, under the reader. While the marks of this visit load,
+  // the list waits only when the kept marks show the thread as unread, and not while the server
+  // connects or resumes: the thread then shows the messages that the phone kept.
+  const [unreadOpening, setUnreadOpening] = useState<"pending" | "done">("pending");
+  const opensAtUnread =
+    focus === null &&
+    unreadOpening === "pending" &&
+    online &&
+    (unreadLine === null ? !isDraft && !connecting && openingUnread.keptUnread : unreadLineMessageIds !== null);
+  const clearFocus = useCallback(() => {
+    setFocus(null);
+    setUnreadOpening("done");
+  }, []);
   // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
@@ -327,7 +390,8 @@ function AgentTaskChat({
     serverId,
     agentId,
     task ? taskId : null,
-    isFocused && appActive && conversation.data
+    // The mark waits for the NEW line, which reads the mark that the thread had when it opened.
+    isFocused && appActive && conversation.data && unreadLine !== null
       ? (latestReadBoundaryMessage(conversation.data.messages)?.id ?? null)
       : null,
     task?.updatedAt ?? null,
@@ -353,13 +417,21 @@ function AgentTaskChat({
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
     // As a chat that opens at a message from search: the list does not take the latest message first.
-    focus !== null,
+    focus !== null || opensAtUnread,
   );
   // A message that the thread shows no row for opens the thread at its latest message.
   const focusMissing = focus !== null && Boolean(conversation.data) && chatRowIndex(messages, focus) < 0;
   useEffect(() => {
-    if (focusMissing) setFocus(null);
+    if (!focusMissing) return;
+    setFocus(null);
+    setUnreadOpening("done");
   }, [focusMissing]);
+  // The list showed without the NEW line, such as at the latest message while the line's message
+  // was not loaded. A line that comes later does not move the list under the reader.
+  const shownWithoutFocus = motion.historyVisible && focus === null && !opensAtUnread;
+  useEffect(() => {
+    if (shownWithoutFocus) setUnreadOpening("done");
+  }, [shownWithoutFocus]);
   const closed = task?.state === "closed";
   const canSend = online && !closed && (!isDraft || enabled);
   const messageDelete = useMessageDelete(serverId, { kind: "agent", agentId, taskId });
@@ -491,11 +563,19 @@ function AgentTaskChat({
   }
 
   const hold = task ? agentTaskHoldText(task, list.data?.limit ?? 1, t) : null;
+  const pinsAction: MenuAction = { id: PINS_ACTION, title: t("mobile.chat.pins.title"), image: "pin" };
   const actionsMenu = task
     ? {
         label: t("mobile.server.threads.actions"),
-        actions: threadActions.menu(task),
-        onPressAction: (id: string) => threadActions.run(task, id),
+        actions: pinsEnabled && !isDraft ? [...threadActions.menu(task), pinsAction] : threadActions.menu(task),
+        onPressAction: (id: string) => {
+          if (id !== PINS_ACTION) {
+            threadActions.run(task, id);
+            return;
+          }
+          void haptics.impact("soft");
+          router.push({ pathname: "/pinned-messages", params: { agentId, serverId, taskId } });
+        },
       }
     : null;
 
@@ -596,6 +676,8 @@ function AgentTaskChat({
           onRespondApproval={(approval, decision) =>
             respondToApproval(serverId, { requestId: approval.requestId, decision })
           }
+          readsWholeApprovals={readsWholeApprovals(serverId)}
+          onLoadWholeApproval={(approval) => readWholeApproval(serverId, approval)}
           foreground={foreground}
           messages={messages}
           turnSummaries={turnSummaries}
@@ -609,10 +691,17 @@ function AgentTaskChat({
           onBranch={branch ? (message) => void branch(message.id) : undefined}
           onDeleteMessage={deleteMessage}
           deletesAnyMessage={messageDelete.deletesAny}
+          onTogglePin={
+            pinsEnabled && !isDraft ? (message, pinned) => pins.setPinned(taskId, message.id, pinned) : undefined
+          }
+          pinnedMessageIds={pinnedMessageIds}
           branchPoints={branching.branchPoints}
           branchDivider={branchDivider}
           onOpenBranchSource={openBranchSource}
-          focusMessageId={focus}
+          unreadLineMessageIds={unreadLineMessageIds}
+          // The NEW line waits for its message, as in the agent's chat.
+          focusMessageId={focus ?? (opensAtUnread && unreadLineMessageIds ? unreadLineMessageId : null)}
+          focusUnread={focus === null && opensAtUnread}
           onFocusPlaced={clearFocus}
           muted={muted}
           showStarter={false}

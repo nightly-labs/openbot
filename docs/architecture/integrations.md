@@ -183,6 +183,7 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
 | `provider-account/v2/start` | An account after the first of Codex, Claude or Gemini (`PROVIDER_ACCOUNT_RELAY_V2_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v2` adds this route ([`provider-account-relay-v2.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v2.ts)). A host advertises it with v1, and a client uses the newest one that the host advertises | As for `provider-account/start`. |
+| `mcp/start-deep-link` | As `mcp/start`. The separate capability `sign-in-relay-deep-link-v1` adds this route ([`sign-in-relay-deep-link-v1.ts`](../../packages/contracts/src/team-protocol/sign-in-relay-deep-link-v1.ts)). A desktop client sends it only while its operating system opens `openbot://` in OpenBot. After two sign-ins of the same address got no grant back on `127.0.0.1` and on `localhost`, the host registers `openbot://mcp-auth`: TradingView's firewall blocks a page that returns to a loopback name (#9209) | The client takes the callback from `openbot://mcp-auth` by `state` and sends it with `complete`; the host gives the code to `McpOAuth`. |
 
 ### Sequence
 
@@ -550,13 +551,14 @@ host route [`route-whatsapp-working-message.ts`](../../src/main/team-api/route-w
 reads and sets, for each WhatsApp number, whether OpenBot posts “Working on it…” while the agent
 works. The setting is on by default and is kept with the number's connection values, so it needs no
 migration. With the setting off, `MessagingService` posts no “Waiting” and no “Working on it…” line
-and edits no progress into one: the reaction shows that OpenBot read the message, and the end of the
-request (the answer, or a line such as “Stopped”) is the only post. A reply of `stop` still stops the
-request; in a group, the person replies to their own request, because there is no status post to
-reply to. The released `whatsapp-connector-v1`
-overview cannot carry the value, so a client reads this list and merges it
-(`withWhatsAppWorkingMessages`). A client hides the switch while the host does not have the
-capability. Only protocol 9 peers get it.
+and edits no progress into one: the reaction shows that OpenBot read the message, and the answer is
+the only post. A request that is given to a teammate or stopped, or that ends without an answer,
+posts no line and leaves only its reaction. An error still posts its line (“Too many requests are
+waiting”, “OpenBot could not finish this request”), so the person knows that it did not succeed.
+A reply of `stop` still stops the request; in a group, the person replies to their own request,
+because there is no status post to reply to. The released `whatsapp-connector-v1` overview cannot
+carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
+hides the switch while the host does not have the capability. Only protocol 9 peers get it.
 
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a

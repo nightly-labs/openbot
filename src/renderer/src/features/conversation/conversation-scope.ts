@@ -14,6 +14,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { AGENT_FAST_MODE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
+import { AGENT_SPEED_CAPABILITY } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import { toast } from "@openbot/ui";
 import type { QuestionPromptComposerAnswer } from "@openbot/ui/components/QuestionPromptBubble";
 import type { QuoteRequest } from "@openbot/ui/features/conversation/ComposerEditor";
@@ -120,6 +121,10 @@ const CHAT_PUSH_DURATION_MS = 280;
 const CHAT_PUSH_EASING = "cubic-bezier(0.2, 0.9, 0.3, 1)";
 /** After a chat opens or loads, its first follows jump: the reader did not see the earlier place. */
 const CHAT_GLIDE_OPEN_DELAY_MS = 600;
+/** How long after a media load the chat follows the bottom at once: the layout that the load causes. */
+const MEDIA_SETTLE_MS = 150;
+/** The events after which a picture or a video can change its size in the transcript. */
+const MEDIA_LAYOUT_EVENTS = ["load", "error", "loadedmetadata"] as const;
 /**
  * After the user sends, the chat goes to the new message at once, as Grok Bot's does. A glide would
  * move the chat up while the composer closes and moves it down, so the two would go against each other.
@@ -226,10 +231,8 @@ export function createConversationViewScope(props: ConversationProps) {
     setChatSearchMessageIds,
     chatSearchTotal,
     setChatSearchTotal,
-    settingsPanelWidth,
-    setSettingsPanelWidth,
-    browserPanelWidth,
-    setBrowserPanelWidth,
+    sidePanelWidth,
+    setSidePanelWidth,
     hiddenAwaitingReplyIds,
     setHiddenAwaitingReplyIds,
     sideQuestions: sideQuestionStates,
@@ -360,18 +363,23 @@ export function createConversationViewScope(props: ConversationProps) {
   } = sideQuestions;
   /**
    * Save on a skill question: the host writes the skill in the background, not in a turn of the
-   * agent. False when the host saved nothing or cannot be asked; then the card sends the user's yes.
+   * agent. When the host saved nothing or cannot be asked, the user's yes (`reply`) goes to the agent.
+   * The yes goes to the chat of the click, because the user can open another chat while the host
+   * writes (#7593). False when the chat cannot send the yes now.
    */
-  async function saveSkillSuggestion(messageId: string): Promise<boolean> {
+  async function saveSkillSuggestion(messageId: string, reply: string): Promise<boolean> {
+    const target = currentTarget();
     const agentId = props.agent?.id;
-    if (!agentId) return false;
-    const input = { agentId, messageId };
-    const save = props.runtime
-      ? props.runtime.saveSkillSuggestion?.(input)
-      : conversationPort().agent.saveSkillSuggestion(input, props.server?.id);
-    // A failed request falls back to the yes, so the lesson is not lost.
-    const result = await save?.catch(() => null);
-    return result?.saved === true;
+    if (agentId) {
+      const input = { agentId, messageId };
+      const save = props.runtime
+        ? props.runtime.saveSkillSuggestion?.(input)
+        : conversationPort().agent.saveSkillSuggestion(input, props.server?.id);
+      // A failed request falls back to the yes, so the lesson is not lost.
+      const result = await save?.catch(() => null);
+      if (result?.saved === true) return true;
+    }
+    return sendCardMessage(reply, target);
   }
   const skills = createSkillsStore({ props, settingsOpen });
   const { installedSkills, installedSkillsLoadFailed } = skills;
@@ -432,6 +440,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const currentChatErrorRun = () => currentChatErrorEntry()?.run ?? null;
   /** The page that fixes the account behind the shown error (#2419). */
   const currentChatErrorLink = () => currentChatErrorEntry()?.link ?? null;
+  /** The provider's text behind a general sentence, for the user to copy (#6410). */
+  const currentChatErrorDetails = () => currentChatErrorEntry()?.details ?? null;
   /** True while a file import for the chat waits. An import for another chat does not stop this one. */
   const attachmentBusy = (target = currentTarget()) =>
     target !== undefined && importingDrafts().has(composerDraftKey(target));
@@ -524,11 +534,15 @@ export function createConversationViewScope(props: ConversationProps) {
     providerOffline,
   } = activity;
   // A sent message makes room for the working agent's line at once. The chat then moves one time,
-  // with the message, and not again when the line shows.
+  // with the message, and not again when the line shows. The value names the chat, so that a switch
+  // between two chats that both send makes the room again after the activity store resets it.
   createEffect(
-    () => !channel && currentPendingSends().length > 0,
-    (sending) => {
-      if (sending) setAgentActivitySpaceReserved(true);
+    () =>
+      !channel && currentPendingSends().length > 0
+        ? agentConversationKey(props.server?.id ?? "local", props.agent?.id ?? "")
+        : undefined,
+    (sendingChat) => {
+      if (sendingChat) setAgentActivitySpaceReserved(true);
     },
   );
   /** The name of what the agent's turns wait for. OpenCode or Pi serves a custom endpoint, so it names the endpoint (#3234). */
@@ -801,19 +815,50 @@ export function createConversationViewScope(props: ConversationProps) {
         ])
       : new Set<string>(),
   );
-  // Filtered here as well as settled below, so the two rows never stand together for a frame. A send
-  // made while the agent works goes to the queue panel; drawn here first, it would jump there.
-  // A send behind a failed one waits for Retry or Dismiss, and the host does not have it yet, so the
-  // queue panel cannot show it: the chat shows it, queued or not.
+  /**
+   * The host can report the queue before it answers the send. A `late` send has no id then, so its
+   * row and its queued delivery would stand together. Here a send takes a user delivery that came
+   * after it and has its text. The deliveries that were there when the send started do not count,
+   * so an earlier queued message with the same text is not taken.
+   */
+  const deliveriesBefore = new Map<string, ReadonlySet<string>>();
+  const queuedSendIds = createMemo((): ReadonlySet<string> => {
+    const found = new Set<string>();
+    const waiting = currentPendingSends().filter((send) => send.queued && send.state === "sending");
+    for (const id of deliveriesBefore.keys())
+      if (!waiting.some((send) => send.clientMessageId === id)) deliveriesBefore.delete(id);
+    if (waiting.length === 0) return found;
+    const deliveries = (props.queue?.deliveries ?? []).filter((delivery) => delivery.sender.kind === "user");
+    const taken = new Set<string>();
+    for (const send of waiting) {
+      const before = deliveriesBefore.get(send.clientMessageId);
+      if (!before) {
+        deliveriesBefore.set(send.clientMessageId, new Set(deliveries.map((delivery) => delivery.id)));
+        continue;
+      }
+      const match = deliveries.find(
+        (delivery) => !before.has(delivery.id) && !taken.has(delivery.id) && delivery.text.trim() === send.text.trim(),
+      );
+      if (!match) continue;
+      found.add(send.clientMessageId);
+      taken.add(match.id);
+    }
+    return found;
+  });
+  // Filtered here as well as settled below, so the two rows never stand together for a frame.
+  // A send made while the agent works goes to the queue panel. The panel shows only what the host
+  // reports, so the chat shows a failed send, and a send that the host is slow to answer (`late`),
+  // until the host's row is drawn: a message is never out of view while a slow host answers, or
+  // while an earlier send of the chat is in flight.
   const pendingMessages = createMemo(() => {
-    const sends = currentPendingSends();
-    const firstFailed = sends.findIndex((send) => send.state === "failed");
-    return sends
+    // Read on each run, so the deliveries are recorded when the send starts and not when it is late.
+    const queuedIds = queuedSendIds();
+    return currentPendingSends()
       .filter((send) => {
         const messageId = sentMessageId(send);
         return !(messageId && drawnHostIds().has(messageId));
       })
-      .filter((send) => !send.queued || (firstFailed !== -1 && sends.indexOf(send) >= firstFailed))
+      .filter((send) => !send.queued || send.state === "failed" || (send.late && !queuedIds.has(send.clientMessageId)))
       .map(pendingSendMessage);
   });
   /** The pending send a timeline row draws, by the row's message id. */
@@ -978,6 +1023,8 @@ export function createConversationViewScope(props: ConversationProps) {
   const messagePins = createMessagePinsStore({ props });
   /** Moves the open thread's caret to the end of the dictated text. */
   const [threadFocusRequest, setThreadFocusRequest] = createSignal(0);
+  /** Moves the focus to the open thread's message box, as text from a page does in the agent's chat. */
+  const requestThreadFocus = () => setThreadFocusRequest((current) => current + 1);
   const voice = createVoiceStore({
     props,
     resources,
@@ -1315,14 +1362,11 @@ export function createConversationViewScope(props: ConversationProps) {
       return;
     }
     if (pushConversationBottom(element)) return;
-    if (chatGlideFrame !== undefined) return;
+    // A picture that loads during a glide ends it: the glide would show the picture's growth as a move.
+    if (chatGlideFrame !== undefined && !followAtOnce()) return;
     const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
-    if (
-      distance <= 1 ||
-      distance > element.clientHeight ||
-      performance.now() < chatGlideAfter ||
-      prefersReducedMotion()
-    ) {
+    if (distance <= 1 || distance > element.clientHeight || followAtOnce() || prefersReducedMotion()) {
+      stopChatGlides();
       followConversationBottom(element);
       return;
     }
@@ -1354,13 +1398,7 @@ export function createConversationViewScope(props: ConversationProps) {
     if (props.responseStyle !== "natural" || !list) return false;
     if (!agentActivitySlot?.querySelector(".agent-activity-entry")) return false;
     const distance = element.scrollHeight - element.clientHeight - element.scrollTop;
-    if (
-      distance <= 1 ||
-      distance > element.clientHeight ||
-      performance.now() < chatGlideAfter ||
-      prefersReducedMotion()
-    )
-      return false;
+    if (distance <= 1 || distance > element.clientHeight || followAtOnce() || prefersReducedMotion()) return false;
     stopChatGlides();
     const before = element.scrollTop;
     followConversationBottom(element);
@@ -1384,6 +1422,23 @@ export function createConversationViewScope(props: ConversationProps) {
     push?.finished.then(finish, finish);
     if (!push) finish();
     return true;
+  }
+  /**
+   * While a chat opens, and in the frame after an image or a video loads, the chat goes to the bottom
+   * at once. A picture from a joined server arrives seconds after its row, as a square box that then
+   * takes the picture's shape. A glide would show each of these changes as a move of the transcript.
+   */
+  function followAtOnce(): boolean {
+    const now = performance.now();
+    return now < chatGlideAfter || now < mediaSettleUntil;
+  }
+  /** True when a follow of this chat goes to the bottom at once, not with a glide. */
+  function followJumps(element: HTMLDivElement): boolean {
+    return followAtOnce() || element.scrollHeight - element.clientHeight - element.scrollTop > element.clientHeight;
+  }
+  let mediaSettleUntil = 0;
+  function mediaLoaded(): void {
+    mediaSettleUntil = performance.now() + MEDIA_SETTLE_MS;
   }
   function stopChatGlides(): void {
     if (chatGlideFrame !== undefined) cancelAnimationFrame(chatGlideFrame);
@@ -1419,12 +1474,15 @@ export function createConversationViewScope(props: ConversationProps) {
   };
   /**
    * The Speed select of the model pickers, in the chat header and in the agent settings: on this
-   * computer, or on a joined server with `agent-fast-mode-v1`. The picker shows it only for a model
-   * that the host lists with a fast tier (Codex, and Claude since its client lists `fast`). A joined
-   * server lists no Ultrafast tier, so its picker offers Standard and Fast.
+   * computer, or on a joined server with `agent-speed-v1` or `agent-fast-mode-v1`. The picker shows it
+   * only for a model that the host lists with a fast tier (Codex, and Claude since its client lists
+   * `fast`). Only `agent-speed-v1` lists Ultrafast tiers and Claude models, so on an older host the
+   * picker offers Standard and Fast, and no Claude fast mode.
    */
   const fastModeChange = () =>
-    props.server?.kind === "local" || serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
+    props.server?.kind === "local" ||
+    serverSupportsCapability(props.server, AGENT_SPEED_CAPABILITY) ||
+    serverSupportsCapability(props.server, AGENT_FAST_MODE_CAPABILITY)
       ? (next: boolean, nextUltrafast: boolean) => requestFastMode(next, nextUltrafast)
       : undefined;
   /**
@@ -1649,6 +1707,8 @@ export function createConversationViewScope(props: ConversationProps) {
     readerInput?.addEventListener("touchcancel", readerTouchEnd);
     readerInput?.addEventListener("pointerdown", readerPointerDown);
     readerInput?.addEventListener("focusin", readerFocusIn);
+    // Media events do not bubble. The capture phase sees them before the picture takes its shape.
+    for (const type of MEDIA_LAYOUT_EVENTS) readerInput?.addEventListener(type, mediaLoaded, true);
     keyboardTarget.addEventListener("keydown", readerKeyDown);
     keyboardWindow.addEventListener("pointerup", endReaderDrag);
     keyboardWindow.addEventListener("pointercancel", endReaderDrag);
@@ -1706,6 +1766,7 @@ export function createConversationViewScope(props: ConversationProps) {
       readerInput?.removeEventListener("touchcancel", readerTouchEnd);
       readerInput?.removeEventListener("pointerdown", readerPointerDown);
       readerInput?.removeEventListener("focusin", readerFocusIn);
+      for (const type of MEDIA_LAYOUT_EVENTS) readerInput?.removeEventListener(type, mediaLoaded, true);
       keyboardTarget.removeEventListener("keydown", readerKeyDown);
       keyboardWindow.removeEventListener("pointerup", endReaderDrag);
       keyboardWindow.removeEventListener("pointercancel", endReaderDrag);
@@ -1895,7 +1956,6 @@ export function createConversationViewScope(props: ConversationProps) {
         if (lastConversationIdentity !== undefined) closeChatSearch(false);
         lastConversationIdentity = conversationIdentity;
         setStickToLatest(true);
-        setAgentActivitySpaceReserved(false);
         holdChatGlides();
       }
       if (loaded !== lastLoaded) {
@@ -1905,6 +1965,13 @@ export function createConversationViewScope(props: ConversationProps) {
       if (latestScrollFrame !== undefined) cancelAnimationFrame(latestScrollFrame);
       if (latestScrollSettleFrame !== undefined) cancelAnimationFrame(latestScrollSettleFrame);
       const followLatest = stickToLatest;
+      // A follow that would jump goes before the paint. Otherwise a chat whose rows arrive paints a
+      // frame at the top of its first rows, and the follow in the next frame comes after that paint. A
+      // chat with unread messages opens at the divider.
+      if (followLatest && unreadCount === 0 && scrollElement && followJumps(scrollElement)) {
+        updateVirtualScrollMargin();
+        followConversationBottom(scrollElement);
+      }
       latestScrollFrame = requestAnimationFrame(() => {
         latestScrollFrame = undefined;
         if (!scrollElement) return;
@@ -2477,6 +2544,18 @@ export function createConversationViewScope(props: ConversationProps) {
     !channel &&
     (!props.runtime ||
       (props.runtime.liveVoice !== undefined && codexLiveAccess(props.agentStatus.providers) !== "signIn"));
+  /** True while the voice conversation with this chat's agent is on. Its pill shows at the top of the chat. */
+  const voiceConversationOpen = () => Boolean(props.agent && controller.voiceSessions.active(props.agent.id));
+  /** Starts the voice conversation with this chat's agent, or ends it. Another one ends first. */
+  function toggleVoiceConversation() {
+    const agentId = props.agent?.id;
+    if (!agentId) return;
+    if (controller.voiceSessions.active(agentId)) controller.voiceSessions.stop(agentId);
+    else if (voiceConversationAvailable()) controller.voiceSessions.start(agentId);
+  }
+  function endVoiceConversation() {
+    if (props.agent) controller.voiceSessions.stop(props.agent.id);
+  }
   // A transcribed conversation sends its turns through this view, so it ends with the view.
   onCleanup(() => controller.voiceSessions.end("transcribed"));
   /** Starts a voice conversation with an agent. It ends with the owner that calls this. */
@@ -2503,12 +2582,16 @@ export function createConversationViewScope(props: ConversationProps) {
     threadComposer,
     threadQueue,
     threadFocusRequest,
+    requestThreadFocus,
     branchThread,
     threadVoiceLiveText,
     threadVoiceOwned,
     replyJump,
     messagePins,
     voiceConversationAvailable,
+    voiceConversationOpen,
+    toggleVoiceConversation,
+    endVoiceConversation,
     startVoiceConversation,
     sideQuestionAvailable,
     sideQuestion,
@@ -2559,7 +2642,6 @@ export function createConversationViewScope(props: ConversationProps) {
     browserControlAgent,
     browserControlForTab,
     browserControllerForTab,
-    browserPanelWidth,
     browserTabs,
     chatSearchMatches,
     chatSearchOpen,
@@ -2583,6 +2665,7 @@ export function createConversationViewScope(props: ConversationProps) {
     currentChatErrorReference,
     currentChatErrorRun,
     currentChatErrorLink,
+    currentChatErrorDetails,
     currentChatConversationKey,
     dismissCurrentChatErrors,
     dismissAwaitingReplies,
@@ -2720,7 +2803,6 @@ export function createConversationViewScope(props: ConversationProps) {
     openTaggedReference,
     setActiveRightPanel,
     setBrowserAddress,
-    setBrowserPanelWidth,
     setChatSearchQuery,
     setComposerError: setScopedComposerError,
     changeFastMode,
@@ -2737,13 +2819,13 @@ export function createConversationViewScope(props: ConversationProps) {
     setRequiredInteractionElement,
     registerPromptComposerAnswer,
     handleRoutineSettingsRequest,
-    setSettingsPanelWidth,
     setShowComposerActions,
     settingsModel,
     settingsProvider,
     settingsOpen,
-    settingsPanelWidth,
     settingsReasoning,
+    setSidePanelWidth,
+    sidePanelWidth,
     sidebarFilePreview,
     showBrowserPip,
     showComposerActions,

@@ -12,17 +12,19 @@ import { useText } from "@/shared/lib/text";
 /**
  * Server settings › Transfer (`instance-transfer-v1`), for an owner or admin: move this server's
  * agents and server settings to or from an OpenBot transfer file. Each direction has its own page.
+ * A user who administers another such server can also copy agents to it, with no file.
  */
 export function ServerTransferScreen() {
   const { t } = useText();
   const { serverId } = useLocalSearchParams<{ serverId: string }>();
-  const { canTransferServer } = useMobileWorkspace();
+  const { servers, canTransferServer } = useMobileWorkspace();
   if (!canTransferServer(serverId))
     return (
       <SettingsContent>
         <SettingsNote>{t("mobile.server.transfer.unavailable")}</SettingsNote>
       </SettingsContent>
     );
+  const canCopy = servers.some((server) => server.id !== serverId && canTransferServer(server.id));
   return (
     <SettingsContent>
       <SettingsNote>{t("mobile.server.transfer.lede")}</SettingsNote>
@@ -39,6 +41,14 @@ export function ServerTransferScreen() {
         >
           <Typography.Paragraph>{t("mobile.server.transfer.import")}</Typography.Paragraph>
         </SettingsRow>
+        {canCopy ? (
+          <SettingsRow
+            supportingText={t("mobile.server.transfer.copyNote")}
+            onPress={() => router.push({ pathname: "/server-settings/transfer-copy", params: { serverId } })}
+          >
+            <Typography.Paragraph>{t("mobile.server.transfer.copy")}</Typography.Paragraph>
+          </SettingsRow>
+        ) : null}
       </SettingsSection>
     </SettingsContent>
   );

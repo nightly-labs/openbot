@@ -13,7 +13,7 @@ import type {
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
-import { Cause, Deferred, Effect, Result, Schema, Scope, Semaphore } from "effect";
+import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import type { ProgressInfo, UpdateInfo } from "electron-updater";
 import type { HostUpdateState } from "../../packages/contracts/src/host-manager";
 import { causeHelpers } from "../backend/effect-boundary";
@@ -242,6 +242,7 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
   #operation: UpdateOperation = "check";
   #history: UpdateDiagnosticEvent[] = [];
   readonly #logLock = Semaphore.makeUnsafe(1);
+  readonly #logWrites = new Set<Fiber.Fiber<void, UpdateOperationFailure>>();
   readonly #workScope = Scope.makeUnsafe();
   #autoDownload: boolean;
   #downloadedVersion: string | null = null;
@@ -293,9 +294,21 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
     };
     this.on("diagnostic", (event) => {
       const directory = this.#options.logDirectory;
-      if (directory) this.#fork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      if (!directory) return;
+      // `appendUpdateLog` catches every failure, so this write needs no failure log of `#fork`.
+      const write = Effect.runFork(this.#logLock.withPermit(appendUpdateLog(directory, event)));
+      this.#logWrites.add(write);
+      write.addObserver(() => this.#logWrites.delete(write));
     });
     this.#recordStatus();
+  }
+
+  /**
+   * Waits for the `update.log` events that were recorded before this call. The file write is
+   * asynchronous, so an `app.exit` right after a failed install lost its `install_failed` (#5039).
+   */
+  flushLog(): Effect.Effect<void> {
+    return Effect.suspend(() => Fiber.awaitAll([...this.#logWrites])).pipe(Effect.asVoid);
   }
 
   start(scheduleChecks = true): void {

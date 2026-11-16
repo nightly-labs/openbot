@@ -92,8 +92,12 @@ export const messages = {
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
   "error.agent.turnStalled":
     "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.toolLoopStopped":
+    "{provider} が失敗した手順を何度も繰り返したため、OpenBot はこのターンを停止しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.agent.compactionConnectionLost":
     "エージェントがコンテキストを圧縮している間に接続が切れたため、タスクが停止しました。インターネット接続を確認してから、メッセージを送って続けてください。",
+  "error.agent.compactionLoopStopped":
+    "{provider} がコンテキストを何度も圧縮しましたが、毎回いっぱいのままで続行できなかったため、OpenBot はこのターンを停止しました。このエージェントに不要な MCP サーバーやコンピューター操作をオフにしてから、メッセージを送信してください。{provider} が圧縮するタイミングをあなたかエージェントが変更した場合は、その変更を元に戻してください。",
   "error.agent.selectedGone": "選択したエージェントはもう存在しません。",
   "error.agent.profileEndpointsChanged": "生成中にカスタムエンドポイントが変更されました。もう一度お試しください。",
   "error.agent.profileInvalid": "プロバイダーが無効なプロフィールを返しました。指示を修正してみてください。",
@@ -150,6 +154,8 @@ export const messages = {
     "このサーバーはメモリーが不足しています。メッセージはキューで待機し、メモリーが空くと開始します。",
   "error.agent.workspaceOnlyToolMissing":
     "「ワークスペースのみ」には {tool} が必要ですが、OpenBot は見つけられませんでした。インストールするか、エージェントの設定で「フルアクセス」を選んでください。",
+  "error.agent.codexSandboxUnavailable":
+    "「ワークスペースのみ」には Codex のサンドボックスが必要ですが、このコンピューターでは Codex がサンドボックスを開始できないため、エージェントのコマンドが失敗します。エージェントの設定で「事前に確認」か「フルアクセス」を選んでください。",
   "error.agent.claudeSandboxUnavailable":
     "「ワークスペースのみ」には Claude のサンドボックスが必要ですが、このコンピューターでは Claude がサンドボックスを開始できません: {reason}。エージェントの設定で「フルアクセス」か別のプロバイダーを選んでください。",
   "error.agent.screenCaptureOff":

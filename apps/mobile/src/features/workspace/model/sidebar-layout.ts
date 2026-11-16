@@ -11,6 +11,8 @@ import type { MobileAgent } from "./workspace-types";
 
 export type MobileSidebarItem =
   | { kind: "waiting"; id: string; count: number }
+  /** The heading of the "Unread" group of the `unread-group` order. */
+  | { kind: "unread"; id: string; count: number }
   | {
       kind: "section";
       id: string;
@@ -29,20 +31,71 @@ export type MobileSidebarItem =
   | { kind: "agent"; id: string; agent: MobileAgent }
   | { kind: "channel"; id: string; channel: ChannelSummary };
 
+type MobileChatItem = Extract<MobileSidebarItem, { kind: "agent" | "channel" }>;
+
+/**
+ * How the list orders the chats in the sections, as on the desktop. Pins and "Needs you" come first in
+ * each order, and none of them changes the saved `agentOrder`. The phone keeps the choice; it is not
+ * synced.
+ * - `manual`: the saved order of the layout.
+ * - `unread-group`: unread chats leave their section for an "Unread" group under "Needs you", and go
+ *   back to their place when they are read.
+ * - `unread-first`: each section shows its unread chats first, then the others, both by last
+ *   activity. Chats do not move in the list by drag in this order, because the order is not manual.
+ */
+export type MobileChatOrder = "manual" | "unread-group" | "unread-first";
+
+export const MOBILE_CHAT_ORDERS = [
+  "manual",
+  "unread-group",
+  "unread-first",
+] as const satisfies readonly MobileChatOrder[];
+
+/** When a chat last had activity, in epoch milliseconds: the agent's last update, or the channel's last message. */
+function chatActivity(chat: MobileChatItem): number {
+  const at = chat.kind === "agent" ? chat.agent.updatedAt : (chat.channel.lastMessage?.at ?? chat.channel.createdAt);
+  const time = at ? Date.parse(at) : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+/** The most recent chat first. The sort is stable, so chats with the same time keep their order. */
+function byRecent<Item extends MobileChatItem>(chats: readonly Item[]): Item[] {
+  return [...chats].sort((a, b) => chatActivity(b) - chatActivity(a));
+}
+
+function chatItems(layout: SidebarLayoutSnapshot | null, agents: MobileAgent[], channels: ChannelSummary[]) {
+  const chats: MobileChatItem[] = [
+    ...channels.map((channel) => ({ kind: "channel" as const, id: channel.id, channel })),
+    ...agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
+  ];
+  if (!layout) return chats;
+  const positions = new Map(layout.agentOrder.map((id, index) => [id, index]));
+  return chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
+}
+
+/**
+ * `order.unreadFirst`: the unread chats, for the `unread-first` order. Each section then shows them
+ * first and then the other chats, both by last activity. Null keeps the saved order.
+ * `order.aside`: the chats that show in another group, such as "Unread". A folder leaves them out,
+ * but a folder that holds only such chats is not empty.
+ */
 export function mobileSidebarItems(
   layout: SidebarLayoutSnapshot | null,
   agents: MobileAgent[],
   channels: ChannelSummary[],
   collapsedSectionIds: ReadonlySet<string> = new Set(),
   t: MobileTranslate = currentText().t,
+  order: { unreadFirst?: ReadonlySet<string> | null; aside?: ReadonlySet<string> | null } = {},
 ): MobileSidebarItem[] {
-  const chats: MobileSidebarItem[] = [
-    ...channels.map((channel) => ({ kind: "channel" as const, id: channel.id, channel })),
-    ...agents.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
-  ];
-  if (!layout) return chats;
-  const positions = new Map(layout.agentOrder.map((id, index) => [id, index]));
-  chats.sort((a, b) => (positions.get(a.id) ?? positions.size) - (positions.get(b.id) ?? positions.size));
+  const { unreadFirst, aside } = order;
+  const sorted = chatItems(layout, agents, channels);
+  const chats = unreadFirst
+    ? [
+        ...byRecent(sorted.filter((chat) => unreadFirst.has(chat.id))),
+        ...byRecent(sorted.filter((chat) => !unreadFirst.has(chat.id))),
+      ]
+    : sorted;
+  if (!layout) return aside ? chats.filter((chat) => !aside.has(chat.id)) : chats;
   const names = new Map(layout.sections.map((section) => [section.id, section.name]));
   const groups = new Map<string, MobileSidebarItem[]>();
   for (const chat of chats) {
@@ -58,7 +111,8 @@ export function mobileSidebarItems(
   return layout.order.flatMap((id) => {
     const ancestorIds = sidebarFolderAncestors(parents, id);
     if (ancestorIds.some((ancestorId) => collapsedSectionIds.has(ancestorId))) return [];
-    const group = groups.get(id) ?? [];
+    const all = groups.get(id) ?? [];
+    const group = aside ? all.filter((chat) => !aside.has(chat.id)) : all;
     const custom = names.has(id);
     const title = custom
       ? names.get(id)
@@ -77,7 +131,7 @@ export function mobileSidebarItems(
         ancestorIds,
         custom,
         // An open folder with only folders in it is not empty.
-        empty: group.length === 0 && ![...parents.values()].includes(id),
+        empty: all.length === 0 && ![...parents.values()].includes(id),
       },
       ...(collapsedSectionIds.has(id) ? [] : group),
     ];
@@ -99,6 +153,17 @@ export function mobileWaitingItems(layout: SidebarLayoutSnapshot | null, agents:
     { kind: "waiting", id: "needs-you", count: sorted.length },
     ...sorted.map((agent) => ({ kind: "agent" as const, id: agent.id, agent })),
   ];
+}
+
+/** The "Unread" group of the `unread-group` order, above the sections, by last activity. */
+export function mobileUnreadItems(
+  layout: SidebarLayoutSnapshot | null,
+  agents: MobileAgent[],
+  channels: ChannelSummary[],
+): MobileSidebarItem[] {
+  const chats = byRecent(chatItems(layout, agents, channels));
+  if (chats.length === 0) return [];
+  return [{ kind: "unread", id: "unread", count: chats.length }, ...chats];
 }
 
 /**

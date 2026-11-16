@@ -4,9 +4,12 @@
 // error." and ends the turn as a success. A session keeps the servers that its process started, also
 // after a resume without them. This fake does the same: a session with the server `resend` refuses
 // `mcp_resend_get-contact`, and a prompt with `REFUSE_TOOL=<tool>` refuses that tool, as for a server from the
-// user's own `mcp_config.json`. From #7482: the CLI saves the schema of each tool of a server that it starts,
-// and Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its answer
-// names the tool only by its place in the request. A session with the server `ticktick` gets that answer.
+// user's own `mcp_config.json`. A prompt with `CLI_1_5_9` gets the answer of the CLI 1.5.9, which names
+// the tool (#9568). The real 1.5.9 also logs the line; this fake does not, so only the answer can
+// name the tool. From #7482: the CLI saves the schema of each tool of a server that it starts, and
+// Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its
+// answer names the tool only by its place in the request. A session with the server `ticktick` gets
+// that answer, in the log or, with `CLI_1_5_9`, in the answer.
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
@@ -91,15 +94,12 @@ serveFakeAcpAgent({
       (started.get(sessionId)?.includes("resend") ? "mcp_resend_get-contact" : null);
     const googleRefused = !refused && started.get(sessionId)?.includes("ticktick");
     logEntry({ method: request.method, sessionId, pid: process.pid, refused: googleRefused ? "ticktick" : refused });
-    if (googleRefused) {
-      log(
-        `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSAL}, Status: INVALID_ARGUMENT`,
-      );
-      peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
-    } else if (refused) {
-      log(
-        `E1111 00:00:00.200000     294 errorreport.go:273] agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`,
-      );
+    const failure = googleRefused
+      ? `agent executor error: generating and executing: Error 400, Message: ${GOOGLE_REFUSAL}, Status: INVALID_ARGUMENT`
+      : `agent executor error: building toolbox: tool "${refused}" advertises an invalid parameter schema: "schema://tool-parameters.json#" is not valid against metaschema`;
+    if ((refused || googleRefused) && text.includes("CLI_1_5_9")) peer.say(sessionId, `\n⚠ ${failure}\n`);
+    else if (refused || googleRefused) {
+      log(`E1111 00:00:00.200000     294 errorreport.go:273] ${failure}`);
       peer.say(sessionId, "\n⚠ Agent execution terminated due to error.\n");
     } else peer.say(sessionId, "OK");
     peer.reply(request, { stopReason: "end_turn" });

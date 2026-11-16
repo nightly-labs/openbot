@@ -77,8 +77,12 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.toolLoopStopped":
+    "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
   "error.agent.compactionConnectionLost":
     "החיבור נפסק בזמן שהסוכן כיווץ את ההקשר שלו, ולכן המשימה נעצרה. יש לבדוק את חיבור האינטרנט ולשלוח הודעה כדי להמשיך.",
+  "error.agent.compactionLoopStopped":
+    "{provider} דחס את ההקשר שוב ושוב, ובכל פעם הוא נשאר מלא מדי כדי להמשיך, ולכן OpenBot עצר את התור הזה. כבה את שרתי ה-MCP או את השימוש במחשב שהסוכן הזה לא צריך, ואז שלח הודעה. אם אתה או הסוכן שיניתם מתי {provider} דוחס, בטל את השינוי.",
   "error.agent.selectedGone": "הסוכן שנבחר כבר לא קיים.",
   "error.agent.profileEndpointsChanged": "נקודות הקצה המותאמות השתנו בזמן היצירה. יש לנסות שוב.",
   "error.agent.profileInvalid": "הספק החזיר פרופיל לא תקין. יש לנסות לשנות את ההנחיה.",
@@ -127,6 +131,8 @@ export const messages = {
   "error.agent.lowMemoryServer": "בשרת הזה חסר זיכרון. ההודעה שלך ממתינה בתור ותתחיל כשיתפנה זיכרון.",
   "error.agent.workspaceOnlyToolMissing":
     "מצב סביבת עבודה בלבד דורש את {tool}, ש-OpenBot לא מצא. יש להתקין אותו, או לבחור גישה מלאה בהגדרות הסוכן.",
+  "error.agent.codexSandboxUnavailable":
+    "מצב סביבת עבודה בלבד דורש את ארגז החול של Codex, ש-Codex לא מצליח להפעיל במחשב הזה, ולכן הפקודות של הסוכן נכשלות. יש לבחור לשאול קודם או גישה מלאה בהגדרות הסוכן.",
   "error.agent.claudeSandboxUnavailable":
     "מצב סביבת עבודה בלבד דורש את ארגז החול של Claude, ש-Claude לא מצליח להפעיל במחשב הזה: {reason}. יש לבחור גישה מלאה או ספק אחר בהגדרות הסוכן.",
   "error.agent.screenCaptureOff": "צילום מסך כבוי עבור הסוכן הזה. המשתמש יכול להפעיל שליטה במחשב בהגדרות הסוכן.",

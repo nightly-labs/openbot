@@ -4,6 +4,7 @@ import { avatarHeadColor } from "../../bloub-avatar";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
+import { ActivityShine } from "../conversation/ActivityShine";
 import { AgentActivityBody, agentActivityLabelKey, nextAgentActivityLabel } from "../conversation/AgentActivity";
 import type { AgentStep } from "../conversation/AgentSteps";
 import { agentActivityExitDuration } from "../conversation/activity-timing";
@@ -165,7 +166,10 @@ export function ChannelActivityIndicator(props: {
             }
           </For>
         </span>
-        <span class="agent-activity-label">{shownLabel()}</span>
+        <span class="agent-activity-label">
+          {shownLabel()}
+          <ActivityShine text={shownLabel()} />
+        </span>
       </AgentActivityBody>
     </div>
   );

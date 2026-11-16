@@ -21,6 +21,8 @@ export const messages = {
     "缺少 Sunshine 与 Moonlight Web 运行时，或该主机不受支持。请在 Mac、Windows x64 主机或 Linux x64 主机上安装完整的 OpenBot 正式版，然后重启 OpenBot。",
   "error.remote.testActive": "远程桌面测试正在进行，请等它结束后重试。",
   "error.remote.screenRecordingDenied": "主机未允许 OpenBot 录制屏幕。请在主机上授予屏幕录制权限后重试。",
+  "error.remote.windowsSessionDisconnected":
+    "主机上的 Windows 会话已断开，没有可共享的屏幕。请在主机的屏幕上登录 Windows，然后重试。",
   "error.remote.teamSessionExpired": "团队会话已过期。",
   "error.remote.finishTestBeforeSwitch": "切换显示器前请先结束远程桌面测试。",
   "error.remote.displayNotFound": "未找到远程显示器。",

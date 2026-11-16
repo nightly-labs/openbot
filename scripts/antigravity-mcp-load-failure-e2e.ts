@@ -15,6 +15,8 @@
 // its own log, and keeps the server after a resume in the same process. The session opens again on a
 // new process without the server, and the turn answers. A refused tool of the user's own server
 // leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
+// From #9568: the CLI 1.5.9 names the refused tool in its answer, and no longer answers with the
+// short text after which OpenBot reads the log. The server is left out the same way.
 // From #7482: Google refuses a tool schema (an array with no `items`, an empty `enum` value) and names the
 // tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
 // out its server, and the turn answers.
@@ -303,7 +305,32 @@ try {
   assert.equal(ownRefused.status, "failed", "The turn fails.");
   assert.equal(refusedDrops.length, 1, "No server of OpenBot is left out.");
 
-  // 8. Google refuses a tool schema and names the tool only by its place in the request (#7482).
+  // 8. The CLI 1.5.9 names the refused tool in its answer (#9568). The fake writes no log line for
+  // it, so only the answer can name the tool.
+  const dropsBefore = refusedDrops.length;
+  const answerThread = await startThread(refusedClient, { cwd: refusedWorkspace });
+  const answerTurn = await runTurn(refusedClient, answerThread, {
+    text: "CLI_1_5_9 Reply with OK only.",
+    timeoutMs: 30_000,
+  });
+  report.turns.refusedToolAnswer = answerTurn;
+  assert.equal(answerTurn.error, null, "The turn with a refused tool in the answer has no error.");
+  assert.equal(answerTurn.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    refusedDrops.slice(dropsBefore).map((drop) => drop.name),
+    ["resend"],
+    "The server of the tool in the answer is reported as left out.",
+  );
+  const answerPrompts = (await readJsonl<RefusedEntry>(refusedLog)).filter(
+    (entry) => entry.method === "session/prompt" && entry.sessionId === answerThread,
+  );
+  assert.deepEqual(
+    answerPrompts.map((entry) => entry.refused),
+    ["mcp_resend_get-contact", null],
+    "The prompt runs once more, and then without the refused tool.",
+  );
+
+  // 9. Google refuses a tool schema and names the tool only by its place in the request (#7482).
   const googleLog = join(root, "google.jsonl");
   const googleExecutable = join(root, "agy-google", "bin", "antigravity");
   await installFakeAgent(googleExecutable, "antigravity-refused-tool", { FAKE_LOG: googleLog });
@@ -342,6 +369,20 @@ try {
     googlePrompts.map((entry) => entry.refused),
     ["ticktick", null],
     "The prompt runs once more, and then without the refused server.",
+  );
+  // The same refusal in the answer of the CLI 1.5.9, on a new session that gets the server again.
+  const googleAnswerThread = await startThread(googleClient, { cwd: googleWorkspace });
+  const googleAnswer = await runTurn(googleClient, googleAnswerThread, {
+    text: "CLI_1_5_9 Reply with OK only.",
+    timeoutMs: 30_000,
+  });
+  report.turns.googleRefusedToolAnswer = googleAnswer;
+  assert.equal(googleAnswer.error, null, "The turn with Google's refusal in the answer has no error.");
+  assert.equal(googleAnswer.reply, "OK", "The turn answers without the server.");
+  assert.deepEqual(
+    googleDrops.map((drop) => drop.name),
+    ["ticktick", "ticktick"],
+    "The server is left out of the new session too.",
   );
   report.passed = true;
 } catch (error) {

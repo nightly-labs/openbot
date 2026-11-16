@@ -3,7 +3,6 @@ import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
   "error.mcp.redirectByName": "No se puede acceder a esta dirección por nombre.",
-  "error.mcp.redirectGetOnly": "Esta dirección solo responde a GET.",
   "error.mcp.redirectNotSignIn": "Esta dirección no forma parte de un inicio de sesión.",
   "error.mcp.redirectRefused": "Se rechazó el inicio de sesión. Vuelve a OpenBot e inténtalo de nuevo.",
   "error.mcp.redirectNoSignIn": "Ningún inicio de sesión está esperando esto. Es posible que haya terminado.",
