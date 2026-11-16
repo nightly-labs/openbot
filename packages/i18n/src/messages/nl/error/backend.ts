@@ -259,6 +259,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "De inlogserver heeft de inlog-app van deze server niet geaccepteerd. Controleer de client-ID en het clientgeheim van de inlog-app en log daarna opnieuw in.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
+  "error.backend.mcpProviderLimit":
+    "Deze agent kan maar een beperkt aantal MCP-servers gebruiken. Zet een MCP-server uit die de agent niet nodig heeft om deze server te gebruiken.",
   "error.backend.mcpRegistrationRefused":
     "De inlogserver accepteert OpenBot nog niet als app. Dit ligt niet aan je account. Gebruik een andere manier om te verbinden, zoals een lokale MCP-server.",
   "error.backend.mcpSignInAbandonedGeneric": "Het inloggen is afgebroken.",

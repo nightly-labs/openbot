@@ -259,6 +259,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "Il server di accesso non ha accettato l'app di accesso di questo server. Controlla l'ID client e il secret del client dell'app di accesso, poi accedi di nuovo.",
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
+  "error.backend.mcpProviderLimit":
+    "Questo agente può usare solo un numero limitato di server MCP. Per usare questo server, disattiva un server MCP che non serve all’agente.",
   "error.backend.mcpRegistrationRefused":
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",
   "error.backend.mcpSignInAbandonedGeneric": "L'accesso è stato abbandonato.",

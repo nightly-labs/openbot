@@ -252,6 +252,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "Serwer logowania nie zaakceptował aplikacji logowania tego serwera. Sprawdź identyfikator klienta i sekret klienta aplikacji logowania, a potem zaloguj się ponownie.",
   "error.backend.mcpCommandNotFound": "Nie znaleziono polecenia: {command}",
+  "error.backend.mcpProviderLimit":
+    "Ten agent może używać tylko ograniczonej liczby serwerów MCP. Aby użyć tego serwera, wyłącz serwer MCP, którego agent nie potrzebuje.",
   "error.backend.mcpRegistrationRefused":
     "Serwer logowania nie akceptuje jeszcze OpenBot jako aplikacji. Przyczyną nie jest twoje konto. Połącz się w inny sposób, na przykład przez lokalny serwer MCP.",
   "error.backend.mcpSignInAbandonedGeneric": "Logowanie zostało porzucone.",

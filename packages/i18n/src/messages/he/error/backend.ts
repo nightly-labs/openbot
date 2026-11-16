@@ -234,6 +234,8 @@ export const messages = {
   "error.backend.mcpSignInAppRefused":
     "שרת ההתחברות לא קיבל את אפליקציית ההתחברות של השרת הזה. יש לבדוק את ה-Client ID ואת ה-Client secret של אפליקציית ההתחברות, ואז להתחבר שוב.",
   "error.backend.mcpCommandNotFound": "הפקודה לא נמצאה: {command}",
+  "error.backend.mcpProviderLimit":
+    "הסוכן הזה יכול להשתמש רק במספר מוגבל של שרתי MCP. כדי להשתמש בשרת הזה, כבו שרת MCP שהסוכן לא צריך.",
   "error.backend.mcpRegistrationRefused":
     "שרת ההתחברות עדיין אינו מקבל את OpenBot כאפליקציה. החשבון שלך אינו הסיבה. יש להשתמש בדרך חיבור אחרת, כמו שרת MCP מקומי.",
   "error.backend.mcpSignInAbandonedGeneric": "ההתחברות ננטשה.",

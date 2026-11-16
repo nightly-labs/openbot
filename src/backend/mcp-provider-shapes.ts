@@ -109,6 +109,7 @@ type McpDropReason =
   | "command_not_found"
   | "working_directory_unsupported"
   | "name_conflict"
+  | "provider_limit"
   | "unusable"
   | "failed_to_start";
 
@@ -178,7 +179,7 @@ export type UsableMcpServer =
       proxied?: undefined;
       error: string;
       /** Machine-readable beside the sentence, so a reporter never has to match on the wording. */
-      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict">;
+      reason: Exclude<McpDropReason, "working_directory_unsupported" | "name_conflict" | "provider_limit">;
     };
 
 /** The failed arm, for the readers that have already narrowed to it. */
@@ -597,6 +598,11 @@ export function acpMcpServers(
   form?: (name: string) => string,
   /** OpenBot starts the stdio servers itself (`relayStdioMcpServers`), so it can use their directory. */
   relaysStdio = false,
+  /**
+   * The number of the user's servers that the agent takes (`AcpFlavor.mcpServerLimit`). The servers
+   * after it are reported as dropped, so the session still opens.
+   */
+  limit = Number.POSITIVE_INFINITY,
 ): McpHandoff<AcpMcpServer[]> {
   const entries: AcpMcpServer[] = [];
   const dropped: McpServerDrop[] = [];
@@ -607,6 +613,14 @@ export function acpMcpServers(
       continue;
     }
     const { config } = server;
+    if (entries.length >= limit) {
+      dropped.push({
+        name: config.name,
+        reason: "provider_limit",
+        detail: sourceText("error.backend.mcpProviderLimit"),
+      });
+      continue;
+    }
     const name = acpMcpServerName(config, own, form);
     if (
       entries.some((entry) => entry.name === name) ||
