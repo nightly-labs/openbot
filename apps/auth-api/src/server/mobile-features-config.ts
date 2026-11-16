@@ -33,10 +33,10 @@ export const MOBILE_LATEST_VERSIONS: MobileLatestVersions = {
  * with no Google Play (`apps/auth-api/src/lib/android-apk.ts`). A change of this file on main makes
  * the APK of that version public (the `Publish the Android APK` workflow).
  *
- * `null` hides the APK download. Keep it `null`: the APK that Google Play makes does not start
- * when it is not installed from Google Play. It has Play's automatic integrity protection
- * (`com.pairip.licensecheck`), which shows "Get this app from Play". The APK of 1.4.9 was public on
- * 2026-11-13 and showed this. Open the download again only with an APK that starts after an
- * install from the file.
+ * `null` hides the APK download. Builds up to 1.4.10 had Play's automatic integrity protection
+ * (`com.pairip.licensecheck`): after an install from the file, the app shows "Get this app from Play"
+ * and stops. The APK of 1.4.9 was public on 2026-11-13 and showed this. The protection is off in
+ * Play Console since 2026-11-16, so the first APK is the one of 1.4.11. The download opens when
+ * `MOBILE_LATEST_VERSIONS.android` is 1.4.11 or newer.
  */
-export const ANDROID_APK_FIRST_VERSION: string | null = null;
+export const ANDROID_APK_FIRST_VERSION: string | null = "1.4.11";
