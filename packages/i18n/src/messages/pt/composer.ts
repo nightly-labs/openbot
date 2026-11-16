@@ -20,6 +20,10 @@ export const messages = {
   "composer.update.manual": "Atualize {provider} no computador em que ele é executado para continuar.",
   "composer.update.pending": "Atualizando…",
   "composer.update.action": "Atualizar",
+  "composer.usageLimit.credits": "Você usou todo o limite do plano {provider}. Seus agentes agora usam seus créditos.",
+  "composer.usageLimit.creditsResets":
+    "Você usou todo o limite do plano {provider}. Seus agentes usam seus créditos até a renovação em {reset}.",
+  "composer.usageLimit.creditsTitle": "Usando créditos",
   "composer.usageLimit.resets": "Você usou todo o seu limite de {provider}. Ele será renovado em {reset}.",
   "composer.usageLimit.selectModel":
     "Você usou todo o seu limite de {provider}. Selecione outro modelo para continuar.",

@@ -36,6 +36,10 @@ import {
   STORAGE_CHANNEL_ROUTES,
 } from "@openbot/contracts/team-protocol/storage-channel-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { runCauseEffect } from "../../backend/effect-boundary";
@@ -130,6 +134,15 @@ export function storageIpcHandlers({
       getDisk: scopedQueryHandler({
         local: () => runCauseEffect(storage.disk()),
         remote: (serverId) => {
+          // A host with `storage-user-files-v1` also gives the bytes of the user's files; the plan
+          // storage of a hosted server counts from them.
+          if (remoteServers.supportsCapability(serverId, STORAGE_USER_FILES_CAPABILITY))
+            return runCauseEffect(
+              remoteServers.request(serverId, STORAGE_USER_FILES_ROUTES.disk, decodeStorageDisk, {
+                method: "POST",
+                body: {},
+              }),
+            );
           if (!remoteServers.supportsCapability(serverId, STORAGE_DISK_CAPABILITY)) return null;
           return runCauseEffect(
             remoteServers.request(serverId, STORAGE_DISK_ROUTES.disk, decodeStorageDisk, { method: "POST", body: {} }),

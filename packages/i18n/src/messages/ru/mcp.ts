@@ -157,6 +157,7 @@ export const messages = {
     "Войдите на {page} в браузере. Когда закончите, вставьте сюда показанный адрес. Затем OpenBot отправит вход на {host}.",
   "mcp.signIn.relayDeviceDescription": "Войдите на {page} в браузере и завершите вход там. {host} сам обнаружит вход.",
   "mcp.signIn.relayOpen": "Открыть страницу входа",
+  "mcp.signIn.relayCopy": "Копировать ссылку",
   "mcp.signIn.relayPasteHint": "Если браузер не вернулся в OpenBot, скопируйте показанный адрес и вставьте его сюда.",
   "mcp.signIn.relayPasteRequired":
     "OpenBot не может сам получить вход из браузера. Когда закончите, скопируйте показанный адрес и вставьте его сюда.",

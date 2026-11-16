@@ -147,6 +147,16 @@ export function pluginAppSetup(app: MarketplacePluginApp): AppSetup {
   return flow ? FLOW_SETUP[flow.kind] : "open";
 }
 
+/**
+ * The status text of a server that the user added. It says what the user set, as Server settings ›
+ * MCP does: OpenBot connects to the server only for a test, so it cannot say that the server answers.
+ */
+export function customServerStatus(
+  app: Extract<MarketplaceApp, { kind: "custom" }>,
+): "mcp.status.enabled" | "mcp.status.disabled" {
+  return app.server.enabled ? "mcp.status.enabled" : "mcp.status.disabled";
+}
+
 export function appSetup(app: MarketplaceApp): AppSetup {
   switch (app.kind) {
     case "connector":
@@ -291,6 +301,8 @@ export interface MarketplaceModel {
   mcpAccess?: MarketplaceMcpAccess | undefined;
   /** Opens the form that adds a custom MCP server. Absent when the user cannot add one. */
   addServer?: (() => void) | undefined;
+  /** Opens the form that edits a custom MCP server, by its id. Absent when the client cannot open it. */
+  editServer?: ((id: string) => void) | undefined;
   runPrompt?: ((prompt: MarketplacePluginPrompt) => void) | undefined;
   copyLink: (slug: string) => void;
   /** Copies the shared link of an agent or a skill. */

@@ -3,7 +3,6 @@ import type { messages as source } from "../../en/error/mcp";
 
 export const messages = {
   "error.mcp.redirectByName": "Dit adres is niet bereikbaar via een naam.",
-  "error.mcp.redirectGetOnly": "Dit adres antwoordt alleen op GET.",
   "error.mcp.redirectNotSignIn": "Dit adres hoort niet bij een inlog.",
   "error.mcp.redirectRefused": "Het inloggen is geweigerd. Ga terug naar OpenBot en probeer het opnieuw.",
   "error.mcp.redirectNoSignIn": "Er wacht geen inlog op dit adres. Misschien is de inlog afgelopen.",

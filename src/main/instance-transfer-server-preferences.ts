@@ -12,6 +12,7 @@ import {
   type BusyMessageModePreference,
   decodeMachineAlertSettings,
   type HostPersonality,
+  type HostTurnLimitsInput,
   isClaudeCompactWindowTokens,
   isPromptCacheTtl,
   isServerNotificationLevel,
@@ -19,6 +20,7 @@ import {
   type MachineAlertSettings,
   type MemoryReviewPreference,
   type PromptCacheTtl,
+  parseHostTurnLimitsInput,
   type ServerNotificationLevel,
   type SkillLearningPreference,
 } from "@openbot/contracts/ipc";
@@ -62,6 +64,8 @@ export interface TransferServerPreferencePort {
   machineAlerts: Preference<MachineAlertSettings>;
   /** The models that an admin turned off, for each provider. */
   modelVisibility: Preference<HiddenModels>;
+  /** The set starts the turns that a higher limit lets start, as Server settings does. */
+  turnLimits: Preference<HostTurnLimitsInput>;
 }
 
 /** The models that an admin turned off, for each provider. */
@@ -156,6 +160,7 @@ function savers(
     claudeCompactWindow: (value) => save(port.claudeCompactWindow, parseCompactWindow, value),
     machineAlerts: (value) => save(port.machineAlerts, parseMachineAlerts, value),
     modelVisibility: (value) => save(port.modelVisibility, parseHiddenModels, value),
+    turnLimits: (value) => save(port.turnLimits, parseHostTurnLimitsInput, value),
   };
 }
 
@@ -174,6 +179,7 @@ const KEYS: readonly (keyof TransferServerPreferencePort)[] = [
   "claudeCompactWindow",
   "machineAlerts",
   "modelVisibility",
+  "turnLimits",
 ];
 
 /** What the export writes. The owner's notification level only when the owner exports. */
@@ -192,6 +198,7 @@ export function readServerPreferences(port: TransferServerPreferencePort, owner:
     claudeCompactWindow: port.claudeCompactWindow.get(),
     machineAlerts: { ...port.machineAlerts.get(), responsibleMemberId: null },
     modelVisibility: port.modelVisibility.get(),
+    turnLimits: port.turnLimits.get(),
     ...(owner ? { ownerNotificationLevel: port.ownerNotificationLevel.get() } : {}),
   };
 }

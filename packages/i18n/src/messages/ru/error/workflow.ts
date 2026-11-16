@@ -19,6 +19,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "Сообщение агенту было удалено до его ответа.",
   "error.workflow.conditionUnclear": "Модель не ответила «да» или «нет».",
   "error.workflow.modelFailed": "Модель не смогла ответить. Запустите шаг снова.",
+  "error.workflow.modelTimedOut":
+    "Модель не ответила вовремя. Выберите меньшее усилие или более быструю модель для этого шага и запустите его снова.",
+  "error.workflow.modelToolUse":
+    "Модель попыталась использовать инструмент, но этот шаг может отвечать только текстом. Запустите шаг снова или выберите для него другую модель.",
+  "error.workflow.modelUnavailable": "Модель этого шага недоступна. Выберите другую модель для этого шага.",
+  "error.workflow.providerBusy": "Провайдер занят. Подождите несколько минут и запустите шаг снова.",
+  "error.workflow.providerOffline":
+    "OpenBot не смог связаться с провайдером. Проверьте подключение к интернету и запустите шаг снова.",
   "error.workflow.modelBusy": "Выполняется другой запрос к модели. Скоро запустите шаг снова.",
   "error.workflow.mediaFailed": "Модели не удалось создать изображение или видео. Запустите шаг снова.",
   "error.workflow.pictureMissing": "Изображения больше нет на сервере. Отправьте его снова.",
@@ -72,4 +80,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "Изменение остановилось на полпути. Оно может уже быть на GitHub. Проверьте там, прежде чем запускать шаг снова.",
   "error.workflow.githubNoEvent": "На GitHub нет задачи или пул-реквеста, на которых запускается этот триггер.",
+  "error.workflow.sunraSignIn": "Войдите в Sunra в разделе «Приложения», чтобы использовать модели Sunra.",
+  "error.workflow.sunraNoCredits":
+    "На вашем аккаунте Sunra недостаточно кредитов. Пополните кредиты на sunra.ai/pricing и запустите шаг снова.",
+  "error.workflow.sunraNeedsPlan":
+    "Для этой модели Sunra нужен тариф Sunra. Выберите тариф на sunra.ai/pricing или другую модель.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra принимает входные изображения только с личным аккаунтом. Выберите личный аккаунт в Sunra или удалите связи с изображениями.",
+  "error.workflow.sunraFailed": "Sunra не удалось создать файл: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra не завершила файл вовремя. Проверьте проект OpenBot на sunra.ai, прежде чем запускать шаг снова.",
 } as const satisfies PartialTranslation<typeof source>;

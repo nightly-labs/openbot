@@ -385,23 +385,33 @@ export function formatHostedPrice(format: AppFormat, value: number, currency: Ho
   });
 }
 
+/** Characters that are about half as wide as a digit in the price font. */
+const NARROW_PRICE_CHARACTERS = /[\s.,'ł]/gu;
+
+/** The width of a price text in digit widths. */
+function priceTextWidth(text: string): number {
+  return text.length - (text.match(NARROW_PRICE_CHARACTERS)?.length ?? 0) / 2;
+}
+
 /**
- * The most characters that the old and the new yearly price of one plan have together, for example
- * 12 for "zł 440" and "zł 352". The dialog uses it to make the columns wide enough, so that the
- * price line does not break. It uses the yearly prices on both billings, so the width does not
- * change when the billing changes.
+ * The width of the old and the new yearly price of one plan together, in digit widths and rounded up:
+ * a space, a separator or "ł" counts as half. For example 10 for "zł 440" and "zł 352". The dialog
+ * uses it to make the columns wide enough, so that the price line does not break. It uses the yearly
+ * prices on both billings, so the width does not change when the billing changes.
  */
 export function hostedPriceLength(
   plans: readonly HostedServerPlan[],
   currency: HostedCurrency,
   format: AppFormat,
 ): number {
-  return Math.max(
-    0,
-    ...plans.map(
-      (plan) =>
-        formatHostedPrice(format, hostedPrice(plan, "month", currency), currency).length +
-        formatHostedPrice(format, hostedPlanMonthlyPrice(plan, "yearly", currency), currency).length,
+  return Math.ceil(
+    Math.max(
+      0,
+      ...plans.map(
+        (plan) =>
+          priceTextWidth(formatHostedPrice(format, hostedPrice(plan, "month", currency), currency)) +
+          priceTextWidth(formatHostedPrice(format, hostedPlanMonthlyPrice(plan, "yearly", currency), currency)),
+      ),
     ),
   );
 }

@@ -19,6 +19,10 @@ export const messages = {
   "composer.update.manual": "حدّث {provider} على الحاسوب الذي يشغّله للمتابعة.",
   "composer.update.pending": "جارٍ التحديث…",
   "composer.update.action": "تحديث",
+  "composer.usageLimit.credits": "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك الآن.",
+  "composer.usageLimit.creditsResets":
+    "استخدمت كل حدّ خطتك في {provider}. يستخدم وكلاؤك رصيدك حتى إعادة تعيينه {reset}.",
+  "composer.usageLimit.creditsTitle": "استخدام الرصيد",
   "composer.usageLimit.resets": "استخدمت كل حدّك في {provider}. تتم إعادة تعيينه {reset}.",
   "composer.usageLimit.selectModel": "استخدمت كل حدّك في {provider}. اختر نموذجًا آخر للمتابعة.",
   "composer.usageLimit.title": "تم بلوغ حد الاستخدام",

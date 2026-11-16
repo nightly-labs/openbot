@@ -455,7 +455,7 @@ export function decodeAddedAgent(value: unknown): AddedAgent {
   return { id: value.id, name: value.name };
 }
 
-/** A setting of Settings › Agents: the three agent defaults, and "Steer agents while they work". */
+/** A setting of Server Settings › Agents: the three agent defaults, and "Steer agents while they work". */
 export const AGENT_DEFAULT_SETTING_KEYS = [
   "allowAutomation",
   "allowNewChat",
@@ -478,7 +478,7 @@ export interface AgentDefaultsAgentValues {
 }
 
 /**
- * Settings › Agents of one computer: its agent defaults, its default for a message sent to a busy
+ * Server Settings › Agents of one computer: its agent defaults, its default for a message sent to a busy
  * agent, and the own values of its agents. An owner or admin of a joined server reads it on
  * `agent-defaults-v1`.
  */

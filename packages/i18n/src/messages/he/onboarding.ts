@@ -99,7 +99,7 @@ export const messages = {
   "onboarding.action.connect": "חיבור",
   "onboarding.action.open": "פתיחת OpenBot",
   "onboarding.action.next": "הבא",
-  "onboarding.server.title": "הגדרת {server}",
+  "onboarding.server.title": "ברוכים הבאים אל {server}",
   "onboarding.server.description": "OpenBot אינו כולל מנוי לבינה מלאכותית. יש לחבר ספק משלך לשרת הזה לפני יצירת סוכן.",
   "onboarding.server.label": "בחירת ספק הבינה המלאכותית של השרת הזה",
   "onboarding.server.hint": "ההתחברות נשארת בשרת. אפשר לשנות את הספק של כל סוכן בהמשך.",

@@ -379,6 +379,8 @@ export interface ShellProps {
   output?: WfnPortType | undefined;
   toolbar: JSX.Element;
   media?: boolean;
+  /** The media has clear pixels: the card has no fill and no ring, so the canvas shows through. */
+  clear?: boolean;
   /** The image of a result in the results strip. A text step has none. */
   thumb?: (result: WfnResult) => string | undefined;
   style?: JSX.CSSProperties;
@@ -463,7 +465,11 @@ export function NodeShell(props: ShellProps) {
           <RunTime id={props.id} />
         </span>
         <div class="wfn-card-frame">
-          <div class="wfn-card" data-media={props.media ? "" : undefined}>
+          <div
+            class="wfn-card"
+            data-media={props.media ? "" : undefined}
+            data-clear={props.media && props.clear ? "" : undefined}
+          >
             {props.children}
             <Show when={missing() && (selected() || board.status(props.id) !== undefined)}>
               <p class="wfn-alert" data-tone="warning">

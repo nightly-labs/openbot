@@ -75,9 +75,11 @@ export const messages = defineMessages("error.team", {
   "error.team.routinesOnceUnsupported": "This connection cannot save routines that run once.",
   "error.team.routineRunCommandUnsupported": "This connection cannot give the run command of a routine.",
   "error.team.threadQueueUnsupported": "This connection cannot show the queue of a side thread.",
+  "error.team.hostTurnLimitsUnsupported": "This connection cannot show or change the thread limits of the server.",
   "error.team.usageLimitUnsupported": "This connection cannot show or change the usage limits of agents.",
   "error.team.hermesImportUnsupported": "This connection cannot import Hermes profiles from the server.",
   "error.team.providerDetectionUnsupported": "This connection cannot find the model servers and agents of the server.",
+  "error.team.routineFlowStopUnsupported": "This connection cannot stop a routine run.",
   "error.team.sidebarFoldersUnsupported": "Folders in folders are not supported by this connection.",
   "error.team.libraryFoldersUnsupported": "Library folders are not supported by this connection.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -182,6 +184,7 @@ export const messages = defineMessages("error.team", {
   "error.team.signInRelayLinkUnknown": "No agent on this server showed this sign-in link.",
   "error.team.hostPersonalityUnsupported": "The server personality is not supported by this connection.",
   "error.team.agentWaitsUnsupported": "Open waits are not supported by this connection.",
+  "error.team.pendingApprovalUnsupported": "Reading a whole approval is not supported by this connection.",
   "error.team.messagePinsUnsupported": "Pinned messages are not supported by this connection.",
   "error.team.queuedMessageThreadUnsupported":
     "Running a queued message as a new thread is not supported by this connection.",

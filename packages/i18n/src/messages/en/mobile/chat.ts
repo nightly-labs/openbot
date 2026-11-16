@@ -158,6 +158,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.composer.send": "Send message",
   "mobile.chat.composer.stop": "Stop {name}",
   "mobile.chat.composer.dictate": "Dictate message",
+  "mobile.chat.composer.voiceSettings": "Voice settings",
   "mobile.chat.composer.stopDictation": "Stop dictation",
   "mobile.chat.composer.mention": "Mention {name}",
   "mobile.chat.composer.skills": "Skills",
@@ -339,6 +340,18 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.browserSecret.done": "I'm done",
   "mobile.chat.browserSecret.submitOnce": "Submit once to {origin}. This value is not added to chat.",
   "mobile.chat.browserSecret.submitFailed": "The request could not be completed. Check the connection and try again.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot did not use your saved login because the agent ran a script on this page. To use it, ask the agent to reload the page and try again.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot did not use your saved login because the agent selected the wrong field on the page.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot did not use a saved login because the agent did not choose one of the saved logins for this site. Tell the agent which account to use.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot did not use your saved login because it has no password for this site.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot did not use your saved login because it has no authenticator key.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot did not use a saved login because it could not read your password manager.",
   "mobile.chat.browserSecret.submit": "Submit",
   "mobile.chat.browserSecret.takeOver": "Take over",
   "mobile.chat.starter.title": "What should we work on first?",
@@ -405,7 +418,14 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.approval.effect.permissions":
     "Allow gives {name} these permissions on {server}. Deny keeps the current permissions.",
   "mobile.chat.approval.partial":
-    "This request is too long to show on the phone. To allow it, open OpenBot on {server}. You can deny it here.",
+    "{server} sends only the start of this request to the phone. To allow it, update OpenBot on {server}, or open this chat in the OpenBot desktop app. You can deny it here.",
+  "mobile.chat.approval.loading": "Loading the full request…",
+  "mobile.chat.approval.loadFailed": "Could not load the full request. You can deny it here.",
+  "mobile.chat.approval.retry": "Try again",
+  "mobile.chat.approval.report.bugHeadline": "Found a bug? Let's get it fixed.",
+  "mobile.chat.approval.report.ideaHeadline": "Have an idea? Let's make it real.",
+  "mobile.chat.approval.report.dontSend": "Not now",
+  "mobile.chat.approval.report.send": "Send to the OpenBot team",
   "mobile.chat.approval.allow": "Allow",
   "mobile.chat.approval.deny": "Deny",
   "mobile.chat.approval.reconnect": "Connect to {server} to answer this request.",

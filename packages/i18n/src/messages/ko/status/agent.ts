@@ -7,7 +7,11 @@ export const messages = {
   "status.agent.instructionsChanged": "지침을 업데이트했어요",
   "status.agent.modelSwitchedForLimit": "사용 한도에 도달했어요. {model}(으)로 전환했어요.",
   "status.agent.modelReturnedAfterLimit": "사용 한도가 끝났어요. {model}(으)로 다시 전환했어요.",
+  "status.agent.routineSkippedRunOpen": "건너뜀: 이전 실행이 아직 끝나지 않았음",
+  "status.agent.routineSkippedUsageLimit": "건너뜀: 사용 한도에 도달함",
   "status.agent.modelSwitchedForError": "제공자 오류가 발생했어요. {model}(으)로 전환했어요.",
+  "status.agent.modelSwitchedForSpentBalance":
+    "{previous}의 크레딧이 모두 소진되었습니다. {model}(으)로 전환했습니다. 다시 사용하려면 크레딧을 추가한 후 선택하세요.",
   "status.agent.modelReturnedAfterError": "제공자 오류 후 {model}(으)로 다시 전환했어요.",
   "status.agent.marketplaceSuggested": "마켓플레이스 앱을 추천했어요: {app}.",
   "status.agent.channelMemberAdded": "{agent} 에이전트가 {member} 멤버를 채널에 추가했어요. {person} 님이 요청했어요.",
@@ -34,6 +38,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "다른 컴퓨터에 OpenBot을 서버 {name}(으)로 설치하고 계정에 로그인하는 일회용 명령을 만듭니다. 에이전트가 그곳에서 실행합니다.",
   "status.agent.serverInstallCard": "서버 {name}의 설치 명령",
+  "status.agent.browserProfileNamed":
+    "{agents}을(를) 브라우저 프로필 {profile}(으)로 옮깁니다. 그 프로필의 로그인 정보와 쿠키를 사용하게 됩니다. 열린 탭은 닫힙니다.",
+  "status.agent.browserProfileNew":
+    "새 브라우저 프로필 {profile}을(를) 만들고 {agents}을(를) 옮깁니다. 로그인 정보가 없습니다. 열린 탭은 닫힙니다.",
+  "status.agent.browserProfileShared":
+    "{agents}을(를) 공유 브라우저 프로필로 옮깁니다. 그 프로필의 로그인 정보와 쿠키를 사용하게 됩니다. 열린 탭은 닫힙니다.",
+  "status.agent.browserProfileOwn": "{agents}에게 각자 전용 브라우저 프로필을 줍니다. 열린 탭은 닫힙니다.",
   "status.agent.feedbackSending": "피드백을 OpenBot 팀에 보내는 중…",
   "status.agent.workflowDelete":
     "워크플로 {title}을(를) 실행 기록 및 버전과 함께 삭제합니다. 진행 중인 단계는 중지됩니다.",
@@ -89,6 +100,7 @@ export const messages = {
   "status.agent.mcpServerEnable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 켜요.",
   "status.agent.mcpServerDisable": "이 서버의 모든 에이전트에 MCP 서버 {name}을(를) 꺼요.",
   "status.agent.mcpServerRemove": "이 서버의 모든 에이전트에서 MCP 서버 {name}과(와) 로그인 정보를 제거해요.",
+  "status.agent.mcpToolCall": "MCP 서버 {name}의 도구 {tool}을(를) 실행해요.",
   "status.agent.mcpSignInRequested": "MCP 서버 {name}에 로그인이 필요해요. 서버 설정의 MCP에서 로그인해 주세요.",
   "status.agent.uiBlockClosedByMessage": "새 메시지로 종료되었어요",
   "status.agent.nextStepContinues": "에이전트가 다음 단계 전에 멈췄어요. 계속해요 ({current}/{limit}).",

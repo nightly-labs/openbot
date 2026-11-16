@@ -28,6 +28,7 @@ import {
   ZOOM_OUT,
   ZOOM_OUT_DURATION,
 } from "./lightbox-motion";
+import { rememberedMediaSize, rememberMediaSize } from "./media-size-memory";
 import { createSteadyImageUrl } from "./steady-image-url";
 import { type Camera, DOUBLE_CLICK_ZOOM, MAX_SCALE, WHEEL_ZOOM_RATE, ZOOM_STEP, ZoomControls } from "./ZoomControls";
 
@@ -62,6 +63,16 @@ interface Point {
   y: number;
 }
 
+function galleryRatio(width: number, height: number): number {
+  return Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, width / height));
+}
+
+/** A tile is square until its image loads, unless the image loaded before in this window. */
+function rememberedGalleryRatio(attachmentId: string): number {
+  const size = rememberedMediaSize(attachmentId);
+  return size ? galleryRatio(size.width, size.height) : 1;
+}
+
 /** Several images of one message, laid out in justified rows. */
 export function ImageGallery(props: {
   images: AttachmentSummary[];
@@ -78,7 +89,7 @@ export function ImageGallery(props: {
   let gallery: HTMLUListElement | undefined;
   const layout = createMemo(() =>
     justifiedGalleryLayout(
-      props.images.map((_, index) => ratios[index] ?? 1),
+      props.images.map((image, index) => ratios[index] ?? rememberedGalleryRatio(image.id)),
       {
         width: width(),
         rowHeight: GALLERY_ROW_HEIGHT,
@@ -119,7 +130,8 @@ export function ImageGallery(props: {
           const measure = ({ naturalHeight, naturalWidth }: HTMLImageElement) => {
             setLoaded(true);
             if (naturalWidth <= 0 || naturalHeight <= 0) return;
-            const ratio = Math.min(GALLERY_MAX_RATIO, Math.max(GALLERY_MIN_RATIO, naturalWidth / naturalHeight));
+            rememberMediaSize(image().id, { width: naturalWidth, height: naturalHeight });
+            const ratio = galleryRatio(naturalWidth, naturalHeight);
             setRatios((state) => {
               state[index] = ratio;
             });
@@ -228,6 +240,21 @@ function zoomKeyframes(from: DOMRect, to: DOMRect, fromRadius: number, toRadius:
     },
     { transform: "none", clipPath: `inset(0px 0px round ${toRadius}px)` },
   ];
+}
+
+/** Screen pixels for each CSS pixel. A display scale above 100% and a page zoom raise it. */
+const screenPixelRatio = () => window.devicePixelRatio || 1;
+
+/**
+ * Limits an image to one image pixel for each screen pixel, as an image app shows it at 100%. At its
+ * natural CSS size, a display scale above 100% spreads each image pixel over more screen pixels and
+ * blurs a screenshot. A vector image scales without loss, so it keeps its natural CSS size.
+ */
+function fitScreenPixels(image: HTMLImageElement, mimeType: string): void {
+  if (mimeType === "image/svg+xml") return;
+  const ratio = screenPixelRatio();
+  image.style.setProperty("--image-lightbox-screen-width", `${image.naturalWidth / ratio}px`);
+  image.style.setProperty("--image-lightbox-screen-height", `${image.naturalHeight / ratio}px`);
 }
 
 /** A web client on plain HTTP has no clipboard that takes images. */
@@ -377,7 +404,8 @@ export function ImageLightbox(props: {
       return;
     }
     // Layout sizes, not `getBoundingClientRect`: the zoom and the animations transform the image.
-    setZoom((camera.scale * image.offsetWidth) / image.naturalWidth);
+    // The level counts screen pixels, so 100% shows each image pixel on one screen pixel.
+    setZoom((camera.scale * image.offsetWidth * screenPixelRatio()) / image.naturalWidth);
     const glide = animate && motion;
     image.toggleAttribute("data-settling", glide);
     // A glide back to fit keeps the clip and the sharp drawing until the image is fitted.
@@ -494,11 +522,32 @@ export function ImageLightbox(props: {
       if (zoomed()) move(FIT, true);
       else move(zoomAround(camera, stagePoint(event), DOUBLE_CLICK_ZOOM), true);
     };
-    const onResize = new ResizeObserver(() => {
-      // A new fitted size keeps the zoom level, the percent of the natural size.
+    // A new fitted size keeps the zoom level, the percent of the natural size.
+    const keepZoom = () => {
       const image = zoomImage();
-      move(image && zoomed() ? { ...camera, scale: (zoom() * image.naturalWidth) / image.offsetWidth } : camera);
-    });
+      move(
+        image && zoomed()
+          ? { ...camera, scale: (zoom() * image.naturalWidth) / (image.offsetWidth * screenPixelRatio()) }
+          : camera,
+      );
+    };
+    const onResize = new ResizeObserver(keepZoom);
+    // A page zoom, or a window moved to a screen with another scale, changes the screen pixel size.
+    let resolution: MediaQueryList | undefined;
+    const onResolution = () => {
+      for (const entry of images()) {
+        const image = imageElements.get(entry.id);
+        if (image?.isConnected && image.naturalWidth) fitScreenPixels(image, entry.mimeType);
+      }
+      keepZoom();
+      watchResolution();
+    };
+    const watchResolution = () => {
+      resolution?.removeEventListener("change", onResolution);
+      resolution = matchMedia(`(resolution: ${screenPixelRatio()}dppx)`);
+      resolution.addEventListener("change", onResolution);
+    };
+    watchResolution();
     area.addEventListener("wheel", onWheel, { passive: false });
     area.addEventListener("pointerdown", onDown);
     area.addEventListener("pointermove", onMove);
@@ -514,6 +563,7 @@ export function ImageLightbox(props: {
       area.removeEventListener("pointercancel", onUp);
       area.removeEventListener("dblclick", onDoubleClick);
       onResize.disconnect();
+      resolution?.removeEventListener("change", onResolution);
     };
   });
 
@@ -788,7 +838,10 @@ export function ImageLightbox(props: {
                             alt={entry.name}
                             referrerpolicy="no-referrer"
                             draggable={false}
-                            onLoad={(event) => reveal(entry, event.currentTarget)}
+                            onLoad={(event) => {
+                              fitScreenPixels(event.currentTarget, entry.mimeType);
+                              reveal(entry, event.currentTarget);
+                            }}
                             onError={() => {
                               if (entry.id === current()?.id) opened = true;
                               setFailed((state) => {

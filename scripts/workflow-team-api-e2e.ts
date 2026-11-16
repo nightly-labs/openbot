@@ -14,7 +14,14 @@
 // the client shows a workflow with such a node read-only; a member reads the graph of an old version.
 // The host advertises `workflows-media-v1` to a protocol 9 peer, and a member keeps an uploaded PNG
 // as a picture of the host; a GIF, a used draft and a client without the capability are refused.
-// Agent steps answer through stand-ins, so no provider CLI starts and no model turn is sent.
+// The host advertises `workflows-media-account-v1` to a protocol 9 peer. An image step whose account
+// the host does not have fails with "account not found" in the real agent service, and never makes the
+// file on another account; a step with no account reaches the media maker with the own sign-in.
+// The host advertises `workflows-media-transparent-v1` to a protocol 9 peer. An image step of GPT Image
+// or Grok Imagine with `background` "transparent" reaches the media maker as a transparent request
+// with the ask of its provider; a video and a step without the field do not.
+// Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
+// status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
 // Writes .openbot-build/workflow-team-api-e2e/report.json.
 
@@ -37,11 +44,18 @@ import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
   WORKFLOWS_MEDIA_CAPABILITY,
   WORKFLOWS_MEDIA_CODECS,
   WORKFLOWS_MEDIA_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-media-v1";
+import {
+  WORKFLOWS_SUNRA_CAPABILITY,
+  WORKFLOWS_SUNRA_CODECS,
+  WORKFLOWS_SUNRA_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-sunra-v1";
 import {
   WORKFLOW_STEP_TEXT_LIMIT,
   WORKFLOWS_CAPABILITY,
@@ -57,6 +71,7 @@ import {
 } from "@openbot/team-client/workflow-decoding";
 import { plugin } from "bun";
 import { Effect } from "effect";
+import { providerLabel } from "../src/backend/agent/thread-items";
 import type { AgentBrowserHost } from "../src/backend/agent/turn-lifecycle";
 import { AgentService } from "../src/backend/agent-service";
 import { AgentStore } from "../src/backend/agent-store";
@@ -72,6 +87,12 @@ import { createWorkflows, type WorkflowsHandle } from "../src/backend/workflows/
 import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
+/** As the app answers: true while an enabled Sunra row of the host is signed in. */
+let sunraSignedIn = false;
+/** The account of each media request, in order. Null is the provider's own sign-in. */
+const mediaAccounts: (string | null)[] = [];
+/** Whether each media request asks for a transparent image, and its prompt, in order. */
+const mediaRequests: { transparent: boolean; prompt: string }[] = [];
 const HOST_VERSION = "0.0.0-e2e";
 const OWNER = { username: "owner-user", password: "owner-password-123" };
 const MEMBER = { username: "member-user", password: "member-password-123" };
@@ -284,6 +305,22 @@ async function startHost(): Promise<Host> {
       // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
+      mediaProviders: () => ({ sunra: sunraSignedIn }),
+      // As the app answers: no credits with no sign-in, and a team quota after the sign-in. No Sunra call is made.
+      mediaCredits: () => Effect.succeed({ sunra: sunraSignedIn ? { available: 120, quota: 500 } : null }),
+      // A step with an account goes to the real agent service, which must refuse an account that this
+      // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
+      // no file is paid for.
+      generateMedia: (request) => {
+        mediaAccounts.push(request.account);
+        mediaRequests.push({ transparent: request.specs.transparent, prompt: request.prompt });
+        if (request.account === null) return Effect.succeed("e2e-media-file");
+        return agents.generateWorkflowMedia(request).pipe(
+          Effect.mapError((failure) => ({
+            message: failure.cause instanceof Error ? failure.cause.message : sourceText("error.workflow.mediaFailed"),
+          })),
+        );
+      },
       notify: () => {},
       // No messaging connection exists here, so an output to a place fails with its sentence.
       connectionOn: () => false,
@@ -1242,6 +1279,155 @@ try {
         JSON.stringify(used.body),
       );
       return { old: old.status, gif: gif.status, kept: kept.status, file: file.status, used: used.status };
+    },
+  );
+
+  await step(
+    "sunra: a member reads whether the host has a Sunra sign-in and its credits; an old client is refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_SUNRA_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_SUNRA_CAPABILITY));
+      const codec = WORKFLOWS_SUNRA_CODECS.get(WORKFLOWS_SUNRA_ROUTES.providers);
+      assert.ok(codec, "No workflows-sunra-v1 codec for providers.");
+      const read = async (capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) => {
+        codec.request({});
+        const response = await call("POST", WORKFLOWS_SUNRA_ROUTES.providers, {
+          token: member,
+          body: {},
+          protocol: TEAM_PROTOCOL_V9,
+          capabilities,
+        });
+        return { status: response.status, body: codec.response(response.status, response.body) };
+      };
+      const creditsCodec = WORKFLOWS_SUNRA_CODECS.get(WORKFLOWS_SUNRA_ROUTES.credits);
+      assert.ok(creditsCodec, "No workflows-sunra-v1 codec for credits.");
+      const credits = async () => {
+        creditsCodec.request({});
+        const response = await call("POST", WORKFLOWS_SUNRA_ROUTES.credits, {
+          token: member,
+          body: {},
+          protocol: TEAM_PROTOCOL_V9,
+          capabilities: teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9),
+        });
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        return creditsCodec.response(response.status, response.body);
+      };
+      const signedOut = await read();
+      assert.equal(signedOut.status, 200, JSON.stringify(signedOut.body));
+      assert.deepEqual(signedOut.body, { sunra: false });
+      const creditsSignedOut = await credits();
+      assert.deepEqual(creditsSignedOut, { sunra: null });
+      sunraSignedIn = true;
+      const signedIn = await read();
+      assert.equal(signedIn.status, 200, JSON.stringify(signedIn.body));
+      assert.deepEqual(signedIn.body, { sunra: true });
+      const creditsSignedIn = await credits();
+      assert.deepEqual(creditsSignedIn, { sunra: { available: 120, quota: 500 } });
+      const old = await read(
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter((capability) => capability !== WORKFLOWS_SUNRA_CAPABILITY),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      return {
+        signedOut: signedOut.body,
+        signedIn: signedIn.body,
+        creditsSignedOut,
+        creditsSignedIn,
+        old: old.status,
+      };
+    },
+  );
+
+  await step(
+    "media account: the host advertises workflows-media-account-v1; an unknown account fails and never falls back",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY));
+      const imageGraph = (account: string): WorkflowGraph => ({
+        nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields: { model: "gpt-image", account } }],
+        edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+        strokes: [],
+      });
+      const run = async (account: string) => {
+        const workflow = await hostWorkflow(`Image ${account || "own"}`, imageGraph(account));
+        // The graph crosses the wire as the host keeps it: the account field stays.
+        const detail = await ok(WORKFLOWS_ROUTES.get, ownerToken, { workflowId: workflow.id });
+        const image = list(record(detail.graph, "graph").nodes, "nodes")
+          .map((node) => record(node, "node"))
+          .find((node) => node.id === "image");
+        assert.equal(record(image?.fields, "fields").account, account);
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        return settled(text(record(started.run, "run").id, "run id"), "image");
+      };
+      const missing = await run("acct-not-on-this-host");
+      assert.equal(missing.status, "failed");
+      assert.equal(
+        missing.error,
+        sourceText("error.provider.accountNotFound", { provider: providerLabel("codex") }),
+        JSON.stringify(missing.error),
+      );
+      const own = await run("");
+      assert.equal(own.status, "done", JSON.stringify(own.error));
+      const fallback = await run("default");
+      assert.equal(fallback.status, "done", JSON.stringify(fallback.error));
+      assert.deepEqual(mediaAccounts, ["acct-not-on-this-host", null, null]);
+      return { missing: missing.error, own: own.status, default: fallback.status, accounts: mediaAccounts };
+    },
+  );
+
+  await step(
+    "transparent image: the host advertises workflows-media-transparent-v1; GPT Image and Grok Imagine get a transparent request",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY));
+      const run = async (fields: WorkflowNode["fields"]) => {
+        const before = mediaRequests.length;
+        const workflow = await hostWorkflow(`Transparent ${String(fields.model)}`, {
+          nodes: [promptNode, { id: "image", kind: "image", at: at(300), fields }],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        const request = mediaRequests[before];
+        assert.ok(request, "the step reached the media maker");
+        return request;
+      };
+      const gpt = await run({ model: "gpt-image", background: "transparent" });
+      assert.equal(gpt.transparent, true);
+      assert.match(gpt.prompt, /transparent background/);
+      const grok = await run({ model: "grok-imagine", background: "transparent" });
+      assert.equal(grok.transparent, true);
+      assert.match(grok.prompt, /#00FF00/);
+      const video = await run({ model: "grok-imagine", media: "video", background: "transparent" });
+      assert.equal(video.transparent, false);
+      assert.doesNotMatch(video.prompt, /#00FF00/);
+      const solid = await run({ model: "gpt-image" });
+      assert.equal(solid.transparent, false);
+      assert.doesNotMatch(solid.prompt, /transparent background/);
+      return { gpt: gpt.transparent, grok: grok.transparent, video: video.transparent, solid: solid.transparent };
     },
   );
 

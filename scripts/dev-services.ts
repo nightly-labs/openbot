@@ -288,12 +288,35 @@ async function readHostingDeveloperKey(): Promise<string> {
   return environment.HOSTED_SERVERS_DEVELOPER_KEY ?? "";
 }
 
+/**
+ * Dictation and voice conversations load the sherpa-onnx runtime from `.openbot-build/voice` in
+ * development. A new worktree does not have it, so the first start downloads it (the models download
+ * in the app when they are first used). Without the network, or when the download stops, the app still
+ * starts after the time limit, without local voice.
+ */
+function prepareVoiceRuntime(): void {
+  // The script checks the version and every runtime file itself, so a partial or old runtime is repaired.
+  try {
+    execFileSync(process.execPath, ["run", "voice:prepare-runtime"], {
+      cwd: projectRoot,
+      stdio: "inherit",
+      timeout: 300_000,
+    });
+  } catch (error) {
+    logger.warn(
+      "Could not prepare the local voice runtime. Local voice is off until `bun run voice:prepare-runtime` completes.",
+      toLogValue(error),
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const { target, dryRun, force, shared, hostingTest, slack } = parseDevelopmentTarget(process.argv.slice(2));
   if (!dryRun && prepareDevelopmentEnvironment() === "created") {
     logger.info("Prepared local development state.");
   }
   const services = servicesForTarget(target);
+  if (!dryRun && services.includes("app")) prepareVoiceRuntime();
   const developmentEnvironment = dryRun ? {} : await loadDevelopmentEnvironment(projectRoot);
   const sharedEnvironment = developmentEnvironmentForTarget(target);
   if (hostingTest) {
@@ -823,10 +846,13 @@ export function signalOwnedProcess(
   if (!child.pid) return;
   try {
     if (platform === "win32") {
-      // Windows has no process groups to signal, so this reaches the process
-      // alone; anything it started outlives it. `exitCode` guards a child this
-      // runner already reaped, which a recorded pid never has.
-      if (child.exitCode === null) killProcess(child.pid, signal);
+      // `exitCode` guards a child this runner already reaped, which a recorded pid never has.
+      if (child.exitCode !== null) return;
+      // Windows has no process groups. A service pid is a launcher such as `bun run`, and Vite,
+      // workerd and Electron run below it, so "group" stops the whole tree while the launcher
+      // still holds it. `process.kill` then stops the launcher alone if the tree stop failed.
+      if (scope === "group" && stopWindowsProcessTree(child.pid, killProcess)) return;
+      killProcess(child.pid, signal);
     } else {
       killProcess(scope === "group" ? -child.pid : child.pid, signal);
     }
@@ -872,14 +898,45 @@ function ownedProcessIsRunning(
   scope: SignalScope = "group",
 ): boolean {
   if (!child.pid) return false;
-  if (platform === "win32") return child.exitCode === null;
+  if (platform === "win32" && child.exitCode !== null) return false;
   try {
-    killProcess(scope === "group" ? -child.pid : child.pid, 0);
+    // Windows has no groups: signal 0 asks about the process itself.
+    killProcess(scope === "group" && platform !== "win32" ? -child.pid : child.pid, 0);
     return true;
   } catch (error) {
     if (isUnavailableProcess(error, platform)) return false;
+    // On Windows, EPERM means that the process exists.
+    if (platform === "win32" && error instanceof Error && "code" in error && error.code === "EPERM") return true;
     throw error;
   }
+}
+
+// `taskkill /T` finds the tree only while its root process runs. A child that exits while
+// `taskkill` walks the tree makes it fail part-way, so it runs once more while the root still
+// holds the tree, as `src/backend/windows-process-tree.ts` does. True when the tree is stopped.
+function stopWindowsProcessTree(pid: number, killProcess: KillProcess): boolean {
+  const taskkill = (): boolean => {
+    try {
+      execFileSync("taskkill", ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        timeout: 10_000,
+        windowsHide: true,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const rootRunning = (): boolean => {
+    try {
+      killProcess(pid, 0);
+      return true;
+    } catch (error) {
+      return error instanceof Error && "code" in error && error.code === "EPERM";
+    }
+  };
+  if (taskkill() || !rootRunning()) return true;
+  return taskkill() || !rootRunning();
 }
 
 function isUnavailableProcess(error: unknown, platform: NodeJS.Platform): error is NodeJS.ErrnoException {

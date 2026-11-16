@@ -164,7 +164,7 @@ export function SkillsMarketplace() {
   const { selectAgent } = useNavigation();
   const { activeServer } = useServers();
   const { openInstalledMarketplaceAgent } = useServerSelection();
-  const { openMcpAdd } = useServerSettings();
+  const { openMcpAdd, openMcpEdit } = useServerSettings();
   const connectors = useConnectors();
   const platform = usePlatform();
   const { remoteDesktopWorkspaceVisible, hideRemoteDesktopWorkspace } = useRemoteDesktop();
@@ -197,6 +197,10 @@ export function SkillsMarketplace() {
       onAddServer={(serverId) => {
         setSkillsMarketplaceOpen(false);
         openMcpAdd(serverId, null);
+      }}
+      onEditServer={(serverId, mcpServerId) => {
+        setSkillsMarketplaceOpen(false);
+        openMcpEdit(serverId, mcpServerId);
       }}
     />
   );
@@ -317,7 +321,7 @@ function InstallServer() {
 function AddServer() {
   const { servers, addServerOpen, addServerEntryPoint, setAddServerOpen, setJoinServerOpen } = useServers();
   const { select, createLocal, installServer } = useServerActions();
-  const { openAppSettings } = useSettings();
+  const { openAppSettings, setAppSettingsOpen } = useSettings();
   const windowPage = useWindowPage();
   const onCreateLocal =
     createLocal &&
@@ -345,6 +349,8 @@ function AddServer() {
       onClose={() => setAddServerOpen(false)}
       onOpenServer={(serverId) => {
         setAddServerOpen(false);
+        // The server menu can open this dialog over Settings; the server opens in front of them.
+        setAppSettingsOpen(false);
         void select(serverId);
       }}
       onContactUs={() => void appPort().openExternal("hosted-server-contact")}
@@ -598,6 +604,7 @@ function ServerSettings() {
     serverSettingsError,
     refreshServerSettings,
     saveServerIdentity,
+    saveServerAppearance,
     recheckScreenRecording,
     rotateHostKey,
     setServerPublished,
@@ -613,6 +620,8 @@ function ServerSettings() {
     clearMcpSignInRequest,
     serverSettingsMcpAddRequest,
     clearMcpAddRequest,
+    serverSettingsMcpEditRequest,
+    clearMcpEditRequest,
     serverSettingsMcpSignInPages,
     serverSettingsMcpSignInRelays,
     openMcpSignInRelay,
@@ -928,6 +937,7 @@ function ServerSettings() {
           loadError={serverSettingsError()}
           onRetry={() => refreshServerSettings(server().id)}
           onSaveIdentity={saveServerIdentity}
+          onSaveAppearance={saveServerAppearance}
           onSetPublished={setServerPublished}
           onRotateHostKey={serverRotatesHostKey(server()) ? rotateHostKey : undefined}
           onCreateInvite={createServerInvite}
@@ -955,6 +965,8 @@ function ServerSettings() {
           onTestMcpServer={testMcpServer}
           mcpAddRequest={serverSettingsMcpAddRequest()}
           onMcpAddRequestHandled={clearMcpAddRequest}
+          mcpEditRequest={serverSettingsMcpEditRequest()}
+          onMcpEditRequestHandled={clearMcpEditRequest}
           // A remote host with `sign-in-relay-v1` opens the page in this computer's browser. An older
           // host's page shows here through the live view, which streams the active server only.
           mcpSignInRequest={serverSettingsMcpSignInRequest()}
@@ -1009,6 +1021,7 @@ function ServerSettings() {
           }
           hostUpdate={{}}
           hostTimezone={{}}
+          hostTurnLimits={{}}
           hostPersonality={{}}
           hostMemoryLimit={{}}
           memoryReview={{}}

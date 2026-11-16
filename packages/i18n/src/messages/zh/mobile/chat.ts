@@ -154,6 +154,7 @@ export const messages = {
   "mobile.chat.composer.send": "发送消息",
   "mobile.chat.composer.stop": "停止 {name}",
   "mobile.chat.composer.dictate": "口述消息",
+  "mobile.chat.composer.voiceSettings": "语音设置",
   "mobile.chat.composer.stopDictation": "停止听写",
   "mobile.chat.composer.mention": "提及 {name}",
   "mobile.chat.composer.skills": "技能",
@@ -331,6 +332,17 @@ export const messages = {
   "mobile.chat.browserSecret.done": "我已完成",
   "mobile.chat.browserSecret.submitOnce": "只会向 {origin} 提交一次。该值不会加入对话。",
   "mobile.chat.browserSecret.submitFailed": "无法完成该请求，请检查网络后重试。",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "由于助手在此页面上运行了脚本，OpenBot 没有使用你保存的登录信息。如需使用，请让助手重新加载页面后再试一次。",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "由于助手在页面上选择了错误的字段，OpenBot 没有使用你保存的登录信息。",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "由于助手没有选择此网站已保存的任何一个登录信息，OpenBot 没有使用已保存的登录信息。请告诉助手要使用哪个账户。",
+  "mobile.chat.browserSecret.vaultSkip.noPassword": "由于你保存的登录信息中没有此网站的密码，OpenBot 没有使用它。",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "由于你保存的登录信息中没有身份验证器密钥，OpenBot 没有使用它。",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "由于无法读取你的密码管理器，OpenBot 没有使用已保存的登录信息。",
   "mobile.chat.browserSecret.submit": "提交",
   "mobile.chat.browserSecret.takeOver": "接管",
   "mobile.chat.starter.title": "我们先一起做什么？",
@@ -394,7 +406,14 @@ export const messages = {
   "mobile.chat.approval.effect.fileChange": "“允许”会让 {name} 在 {server} 上修改这些文件；“拒绝”则保持文件不变。",
   "mobile.chat.approval.effect.permissions": "“允许”会在 {server} 上授予 {name} 这些权限；“拒绝”则保持当前权限。",
   "mobile.chat.approval.partial":
-    "该请求内容过长，无法在手机上显示。如需允许，请在 {server} 上打开 OpenBot。你也可以在这里拒绝。",
+    "{server} 只把该请求的开头发送到手机。如需允许，请更新 {server} 上的 OpenBot，或在 OpenBot 桌面应用中打开此聊天。你也可以在这里拒绝。",
+  "mobile.chat.approval.loading": "正在加载完整请求…",
+  "mobile.chat.approval.loadFailed": "无法加载完整请求。你可以在这里拒绝。",
+  "mobile.chat.approval.retry": "重试",
+  "mobile.chat.approval.report.bugHeadline": "发现了问题？我们来修复它。",
+  "mobile.chat.approval.report.ideaHeadline": "有想法？我们来实现它。",
+  "mobile.chat.approval.report.dontSend": "暂不",
+  "mobile.chat.approval.report.send": "发送给 OpenBot 团队",
   "mobile.chat.approval.allow": "允许",
   "mobile.chat.approval.deny": "拒绝",
   "mobile.chat.approval.reconnect": "请连接 {server} 以处理该请求。",

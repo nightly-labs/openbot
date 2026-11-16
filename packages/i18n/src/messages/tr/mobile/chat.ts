@@ -160,6 +160,7 @@ export const messages = {
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",
   "mobile.chat.composer.dictate": "Mesajı sesle yaz",
+  "mobile.chat.composer.voiceSettings": "Ses ayarları",
   "mobile.chat.composer.stopDictation": "Dikteyi durdur",
   "mobile.chat.composer.mention": "{name} ajanından bahset",
   "mobile.chat.composer.skills": "Beceriler",
@@ -344,6 +345,18 @@ export const messages = {
   "mobile.chat.browserSecret.done": "Bitirdim",
   "mobile.chat.browserSecret.submitOnce": "{origin} adresine bir kez gönderin. Bu değer sohbete eklenmez.",
   "mobile.chat.browserSecret.submitFailed": "İstek tamamlanamadı. Bağlantıyı kontrol edip tekrar deneyin.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "Ajan bu sayfada bir betik çalıştırdığı için OpenBot kayıtlı oturum bilgilerinizi kullanmadı. Kullanmak için ajandan sayfayı yeniden yüklemesini ve tekrar denemesini isteyin.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "Ajan sayfada yanlış alanı seçtiği için OpenBot kayıtlı oturum bilgilerinizi kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "Ajan bu site için kayıtlı oturum bilgilerinden birini seçmediği için OpenBot kayıtlı bir oturum bilgisi kullanmadı. Ajana hangi hesabı kullanacağını söyleyin.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "Kayıtlı oturum bilgilerinizde bu site için şifre olmadığı için OpenBot bunları kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "Kayıtlı oturum bilgilerinizde kimlik doğrulayıcı anahtarı olmadığı için OpenBot bunları kullanmadı.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "Şifre yöneticiniz okunamadığı için OpenBot kayıtlı bir oturum bilgisi kullanmadı.",
   "mobile.chat.browserSecret.submit": "Gönder",
   "mobile.chat.browserSecret.takeOver": "Devral",
   "mobile.chat.starter.title": "İlk önce ne üzerinde çalışalım?",
@@ -412,7 +425,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "“İzin ver”, {name} ajanına {server} üzerinde bu izinleri verir. “Reddet” mevcut izinleri korur.",
   "mobile.chat.approval.partial":
-    "Bu istek telefonda gösterilemeyecek kadar uzun. İzin vermek için {server} üzerinde OpenBot'u açın. Burada reddedebilirsiniz.",
+    "{server}, bu isteğin yalnızca başını telefona gönderiyor. İzin vermek için {server} üzerindeki OpenBot'u güncelleyin veya bu sohbeti OpenBot masaüstü uygulamasında açın. Burada reddedebilirsiniz.",
+  "mobile.chat.approval.loading": "Tam istek yükleniyor…",
+  "mobile.chat.approval.loadFailed": "Tam istek yüklenemedi. Burada reddedebilirsiniz.",
+  "mobile.chat.approval.retry": "Tekrar dene",
+  "mobile.chat.approval.report.bugHeadline": "Bir hata mı buldun? Hadi düzeltelim.",
+  "mobile.chat.approval.report.ideaHeadline": "Bir fikrin mi var? Hadi hayata geçirelim.",
+  "mobile.chat.approval.report.dontSend": "Şimdi değil",
+  "mobile.chat.approval.report.send": "OpenBot ekibine gönder",
   "mobile.chat.approval.allow": "İzin ver",
   "mobile.chat.approval.deny": "Reddet",
   "mobile.chat.approval.reconnect": "Bu isteği yanıtlamak için {server} sunucusuna bağlanın.",

@@ -1,10 +1,10 @@
 {
-  "version": "1.4.9",
+  "version": "1.4.10",
   "highlights": [
-    "Get fixes without a store update: when a fix is ready, the home screen shows A new OpenBot is ready. Tap Update and the app restarts with the fix.",
-    "Attach MOV or MP4 videos from Photos, and search the model list in agent settings and Create agent.",
-    "New provider pages: add an API key for ChatGPT and Claude, choose a default provider for new agents, and sign in through the browser.",
-    "Give a channel its own picture, and get a notification when an agent finishes or stops with an error in a thread. The server needs the new OpenBot version.",
-    "Connect Postiz from the Apps marketplace so agents can draft, schedule and publish social media posts."
+    "Added 207 new marketplace apps, including Dropbox, monday.com, Miro, Zapier, Webflow and Datadog, plus support for long-term agent memory via Honcho and Hindsight.",
+    "Added chat pinning, agent muting, improved file handling (up to 100 MB), in-chat video playback, and image/file sharing.",
+    "Added server management features, including provider account pooling, custom provider editing, agent personality settings, MCP access controls, and one-step agent transfers between servers.",
+    "Improved chat experience with unread-first sorting, smoother scrolling, persistent message positioning, and reduced rendering overhead during streaming replies.",
+    "Fixed numerous chat, synchronization, networking, Android sharing, provider model selection, and UI issues."
   ]
 }

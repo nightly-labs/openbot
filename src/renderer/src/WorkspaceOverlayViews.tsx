@@ -1,6 +1,5 @@
 import type { AddedAgent, McpServerConfig, ServerSummary } from "@openbot/contracts/ipc";
 import type { MarketplaceListingLink } from "@openbot/contracts/marketplace-links";
-import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import type { MarketplaceAppsBlock } from "@openbot/ui/features/marketplace/marketplace-model";
 import type { ComponentProps } from "@solidjs/web";
 import { createMemo, Loading, omit, Show } from "solid-js";
@@ -10,7 +9,7 @@ import { useChannels } from "./features/channels/channels-context";
 import type { ConnectorRegistry } from "./features/connectors/connector-registry";
 import { useConversationController } from "./features/conversation/conversation-controller-context";
 import type { ServerStorageOptions } from "./features/files/ServerStoragePanel";
-import { canManageStorage, serverHasStorage } from "./features/files/storage-usage";
+import { canManageStorage, serverHasBackgroundProcesses, serverHasStorage } from "./features/files/storage-usage";
 import type { ServerSettingsModalProps } from "./features/servers/ServerSettingsModal";
 import type { ServerUpdateOptions } from "./features/servers/ServerUpdatePanel";
 import {
@@ -87,6 +86,8 @@ export function MarketplaceOverlay(props: {
   macOS?: boolean | undefined;
   /** Opens the form that adds a custom MCP server to the server with this ID. */
   onAddServer?: ((serverId: string) => void) | undefined;
+  /** Opens the form that edits one custom MCP server of the server with this ID. */
+  onEditServer?: ((serverId: string, mcpServerId: string) => void) | undefined;
 }) {
   const controller = useConversationController();
   const manage = createMemo(() => serverCanAdminister(props.server, "skills-admin-v1"));
@@ -111,6 +112,13 @@ export function MarketplaceOverlay(props: {
     const open = props.onAddServer;
     if (serverId === undefined || !open) return undefined;
     return () => open(serverId);
+  };
+  /** Edit on a custom server's page, for a user who can change the servers of the host. */
+  const editServer = () => {
+    const serverId = pluginServerId();
+    const open = props.onEditServer;
+    if (serverId === undefined || !open) return undefined;
+    return (mcpServerId: string) => open(serverId, mcpServerId);
   };
   /* What both example controls need: a managed agent whose composer is free to take another line. */
   const composerFree = createMemo(
@@ -173,6 +181,7 @@ export function MarketplaceOverlay(props: {
           pluginServerId={pluginServerId()}
           pluginsBlocked={pluginsBlocked()}
           onAddServer={addServer()}
+          onEditServer={editServer()}
           pluginHostName={
             props.server?.kind === "remote" && serverCanManageMcp(props.server) ? props.server.name : undefined
           }
@@ -247,9 +256,7 @@ export function ServerSettingsOverlay(
             ? {
                 ...props.storage,
                 canManage: canManageStorage(props.server),
-                backgroundProcesses:
-                  props.server.kind === "remote" &&
-                  serverSupportsCapability(props.server, BACKGROUND_PROCESSES_CAPABILITY),
+                backgroundProcesses: serverHasBackgroundProcesses(props.server),
               }
             : undefined
         }

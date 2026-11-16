@@ -140,6 +140,7 @@ export const messages = {
     "在浏览器中登录 {page}。完成后，把浏览器显示的地址粘贴到这里，OpenBot 会把登录结果发送到 {host}。",
   "mcp.signIn.relayDeviceDescription": "在浏览器中登录 {page} 并完成。{host} 会自动获取登录结果。",
   "mcp.signIn.relayOpen": "打开登录页面",
+  "mcp.signIn.relayCopy": "复制链接",
   "mcp.signIn.relayPasteHint": "如果浏览器没有跳回 OpenBot，请复制它显示的地址并粘贴到这里。",
   "mcp.signIn.relayPasteRequired": "OpenBot 无法自行从浏览器获取登录结果。完成后，请复制浏览器显示的地址并粘贴到这里。",
   "mcp.signIn.relayAddress": "浏览器地址",

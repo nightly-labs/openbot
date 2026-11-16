@@ -177,18 +177,32 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API 密钥",
   "provider.geminiKey.description":
     "在这台电脑上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
+  "provider.geminiKey.descriptionHost":
+    "在主机上保存 Gemini API 密钥。保存后会替代 Google 账号登录。若要用 Google 登录，请先移除密钥，再在 Gemini 行上选择“连接”。",
   "provider.geminiKey.label": "Gemini API 密钥",
+  "provider.cursorKey.title": "Cursor API 密钥",
+  "provider.cursorKey.description":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在这台电脑上。",
+  "provider.cursorKey.descriptionHost":
+    "第一个之后的每个 Cursor 账号都使用 API 密钥。在 Cursor 控制台的 Integrations 中创建密钥，然后粘贴到这里。密钥保存在主机上。",
+  "provider.cursorKey.label": "Cursor API 密钥",
   "provider.inceptionKey.title": "Inception API 密钥",
   "provider.inceptionKey.description":
     "在这台电脑上保存 Inception API 密钥，即可使用 Mercury 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.inceptionKey.descriptionHost":
+    "在主机上保存 Inception API 密钥，即可使用 Mercury 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.inceptionKey.label": "Inception API 密钥",
   "provider.deepseekKey.title": "DeepSeek API 密钥",
   "provider.deepseekKey.description":
     "在这台电脑上保存 DeepSeek API 密钥，即可使用 DeepSeek 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.deepseekKey.descriptionHost":
+    "在主机上保存 DeepSeek API 密钥，即可使用 DeepSeek 模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.deepseekKey.label": "DeepSeek API 密钥",
   "provider.openrouterKey.title": "OpenRouter API 密钥",
   "provider.openrouterKey.description":
     "在这台电脑上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
+  "provider.openrouterKey.descriptionHost":
+    "在主机上保存 OpenRouter API 密钥，即可使用 OpenRouter 提供的模型。OpenBot 会在它下载的 Pi CLI 中运行这些模型。",
   "provider.openrouterKey.label": "OpenRouter API 密钥",
 
   // The optional OpenCode Go key dialog.
@@ -206,6 +220,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "无法重新连接。",
   "provider.account.add": "添加账号",
   "provider.account.addLabel": "添加另一个 {name} 账号",
+  "provider.account.addWithCode": "用验证码添加账号",
   "provider.account.count": { one: "{count} 个账号", other: "{count} 个账号" },
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",

@@ -98,6 +98,18 @@ export const messages = {
   "browser.secret.submitting": "Versturen…",
   "browser.secret.takeOver": "Overnemen",
   "browser.secret.failed": "Het verzoek kan niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent een script op deze pagina heeft uitgevoerd. Vraag de agent de pagina opnieuw te laden en het nog eens te proberen.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat de agent het verkeerde veld op de pagina heeft gekozen.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat de agent geen van de opgeslagen logins voor deze site heeft gekozen. Vertel de agent welk account hij moet gebruiken.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen wachtwoord voor deze site heeft.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot heeft je opgeslagen login niet gebruikt, omdat die geen authenticatorsleutel heeft.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot heeft geen opgeslagen login gebruikt, omdat je wachtwoordmanager niet gelezen kon worden.",
   "browser.error.openAddress": "Kan het adres niet openen in dit tabblad.",
   "browser.error.channelNoBrowserMember": "Geen lid kan een nieuw tabblad openen in dit kanaal.",
   "browser.error.closeTab": "Kan het browsertabblad niet sluiten.",

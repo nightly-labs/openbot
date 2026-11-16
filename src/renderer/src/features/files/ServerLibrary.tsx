@@ -211,7 +211,6 @@ function LibraryViewer(props: {
           preview={props.viewing.preview}
           agents={props.agents}
           sourceUrl={file().previewUrl ?? null}
-          defaultWidth={() => VIEWER_WIDTH}
           maxWidth={() => VIEWER_WIDTH}
           onWidthChange={() => undefined}
           onOpenLink={props.onOpenUrl}

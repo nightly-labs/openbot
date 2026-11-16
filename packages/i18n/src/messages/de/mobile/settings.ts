@@ -149,6 +149,9 @@ export const messages = {
     "Suchergebnisse und Suchhinweise blenden mit einer kurzen Unschärfe ein und aus, wenn sie sich ändern. Wenn Bewegungen reduziert sind, blenden sie nur ein und aus. Wenn dies aus ist, ändern sie sich sofort.",
   "mobile.settings.feedback.footer": "Haptisches Feedback für Aktionen in der App auf diesem Gerät.",
   "mobile.settings.feedback.haptics": "Haptik",
+  "mobile.settings.feedback.replies": "Antwort-Haptik",
+  "mobile.settings.feedback.repliesFooter":
+    "Vibration, während die Antwort eines Agenten im Chat erscheint. Die übrige Haptik bleibt an.",
   "mobile.settings.feedback.retry": "Haptikeinstellung erneut speichern",
   "mobile.settings.liveActivities.title": "Live-Aktivitäten",
   "mobile.settings.liveActivities.footer":
@@ -233,6 +236,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.fullQualityPhotos": "Fotos in voller Qualität senden",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Wenn dies aus ist, sendet die App eine kleinere Kopie jedes Fotos, bis zu 2048 Pixel an der langen Seite. Sie kommt bei einer langsamen Verbindung schneller an. Schalte dies ein, um das Originalfoto zu senden.",
   "mobile.settings.profile.nameUnsafe": "Entferne Zeilenumbrüche und Steuerzeichen aus deinem Namen.",
   "mobile.settings.profile.nameLength": "Verwende 3–20 Zeichen für deinen Anzeigenamen.",
   "mobile.settings.profile.saveFailed": "Die Änderungen konnten nicht gespeichert werden. Versuche es erneut.",
@@ -500,4 +506,24 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Der Prozess konnte nicht gestoppt werden.",
   "mobile.settings.agents.processes.stopTitle": "Dieses Programm stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Prozess {pid} stoppen",
+  "mobile.settings.shortcuts.title": "Kurzbefehle",
+  "mobile.settings.shortcuts.agent": "Agent",
+  "mobile.settings.shortcuts.none": "Keiner",
+  "mobile.settings.shortcuts.unsupported": "Kurzbefehle brauchen iOS 26 oder neuer.",
+  "mobile.settings.shortcuts.card.agents": "Agenten",
+  "mobile.settings.shortcuts.card.noAgents": "Noch keine Agenten",
+  "mobile.settings.shortcuts.card.setUp.title": "Öffne OpenBot, um Kurzbefehle einzurichten",
+  "mobile.settings.shortcuts.card.setUp.action": "OpenBot öffnen",
+  "mobile.settings.shortcuts.card.noAgent.title": "Wähle einen Agenten für Kurzbefehle",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Kurzbefehle senden an einen Agenten.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Agent wählen",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot ist gesperrt",
+  "mobile.settings.shortcuts.card.locked.action": "OpenBot öffnen",
+  "mobile.settings.shortcuts.footer":
+    "Send Message in der Kurzbefehle-App sendet an diesen Agenten. Die App öffnet sich nicht.",
+  "mobile.settings.shortcuts.send.sent": "Gesendet",
+  "mobile.settings.shortcuts.send.failed": "OpenBot konnte das nicht senden.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Keine Antwort vom Server. Die Nachricht kann im Chat sein.",
+  "mobile.settings.shortcuts.send.inApp": "In OpenBot senden",
+  "mobile.settings.shortcuts.send.openChat": "Chat öffnen",
 } as const satisfies PartialTranslation<typeof source>;

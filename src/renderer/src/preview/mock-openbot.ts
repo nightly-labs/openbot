@@ -233,6 +233,7 @@ import { createMockEvents } from "./mock-events";
 import { createMockGitHubConnector } from "./mock-github-connector";
 import { createMockHostPersonality } from "./mock-host-personality";
 import { createMockHostTimezone } from "./mock-host-timezone";
+import { createMockHostTurnLimits } from "./mock-host-turn-limits";
 import { createMockHostUpdate, type MockHostUpdateOptions } from "./mock-host-update";
 import { createMockHostedServers } from "./mock-hosted-servers";
 import { createMockLicense } from "./mock-license";
@@ -515,6 +516,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
+  const hostTurnLimits = createMockHostTurnLimits();
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
   let memoryReview: MemoryReviewPreference = { interval: DEFAULT_MEMORY_REVIEW_INTERVAL };
   let skillLearning: SkillLearningPreference = { mode: DEFAULT_SKILL_LEARNING_MODE };
@@ -1363,16 +1365,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       remoteNetworkRoute = { ...remoteNetworkRoute, route };
       return clone(remoteNetworkRoute);
     },
-    setBusyMessageModePreference: async ({ mode }) => {
-      busyMessageMode = { mode };
-      return clone(busyMessageMode);
-    },
     getAgentDefaults: async () => clone(agentDefaults),
-    setAgentDefaults: async (next) => {
-      agentDefaults = { ...next };
-      emitAgentEvent({ type: "agents-changed", agents });
-      return clone(agentDefaults);
-    },
     getAgentMemoryLimitPreference: async () => clone(agentMemoryLimit),
     onAgentMemoryLimitPreference: (listener) => {
       agentMemoryLimitListeners.add(listener);
@@ -1614,6 +1607,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
                 id: `a${(accounts.length + 1).toString(16).padStart(16, "0")}`,
                 label: null,
                 email: `account${accounts.length + 1}@example.com`,
+                state: "connected",
+                message: null,
+              },
+            ],
+      );
+      return clone(changed);
+    },
+    // The preview accepts each key. A key account has no email.
+    connectProviderAccountKey: async ({ provider, accountId }) => {
+      const changed = changeProviderAccounts(provider, (accounts) =>
+        accountId
+          ? accounts.map((account) =>
+              account.id === accountId ? { ...account, state: "connected", message: null } : account,
+            )
+          : [
+              ...accounts,
+              {
+                id: `a${(accounts.length + 1).toString(16).padStart(16, "0")}`,
+                label: null,
+                email: null,
                 state: "connected",
                 message: null,
               },
@@ -1939,6 +1952,26 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       startAccountSignIn: async () => undefined,
       accountSignInStatus: async () => ({ tabId: null, result: null }),
       cancelAccountSignIn: async () => undefined,
+      connectAccountKey: async (input) => {
+        await api.connectProviderAccountKey(input);
+      },
+      // The preview has no provider to finish a code sign-in: the code stays until the dialog closes.
+      startAccountCodeLogin: async ({ provider, accountId }) => {
+        const status = await api.connectProviderAccount({ provider, accountId });
+        const accounts = status.providers?.find((row) => row.id === provider)?.accounts ?? [];
+        return {
+          accountId: accountId ?? accounts.at(-1)?.id ?? "a0000000000000001",
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://example.com/device",
+            expiresAt: Date.now() + 15 * 60_000,
+          },
+        };
+      },
+      submitAccountCodeLogin: async () => undefined,
+      accountCodeLoginStatus: async () => ({ result: null }),
+      cancelAccountCodeLogin: async () => undefined,
       renameAccount: async (input) => {
         await api.renameProviderAccount(input);
       },
@@ -2347,15 +2380,6 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       revealAgentInstructions: async (agentId) => {
         requireMockAgent(agentId);
       },
-      getAgentTaskLimit: async (agentId) => {
-        const agent = agents.find((candidate) => candidate.id === agentId);
-        if (!agent) throw new Error("Agent not found");
-        return { taskLimit: agent.taskLimit ?? null };
-      },
-      updateAgentTaskLimit: async (input) => {
-        await api.agent.updateAgent(input);
-        return api.agent.getAgentTaskLimit(input.agentId);
-      },
       getAgentNewChat: async (agentId) => {
         const agent = agents.find((candidate) => candidate.id === agentId);
         if (!agent) throw new Error("Agent not found");
@@ -2445,6 +2469,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       updateAgentDefaultsOverview: async ({ busyMessageMode: mode, ...changes }, serverId) => {
         if (mode) busyMessageMode = { mode };
         agentDefaults = { ...agentDefaults, ...changes };
+        // Main sends this after each change, and the settings of the window read the defaults again.
+        emitAgentEvent({ type: "agents-changed", agents });
         return api.agent.getAgentDefaultsOverview(serverId);
       },
       setAgentDefaultChoice: async ({ agentIds, setting, choice }, serverId) => {
@@ -3559,6 +3585,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emit(promptResponseListeners, input);
       },
       respondToApproval: async () => undefined,
+      readPendingApproval: async () => null,
       respondToBrowserSecret: async (input) => {
         for (const listener of agentListeners)
           listener({ type: "browser-takeover-resolved", requestId: input.requestId, agentId: input.agentId });
@@ -3667,7 +3694,11 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
     // Preview has one host, so every server's name and logo are this computer's.
     hostAdmin: {
       updateIdentity: async (input, serverId) => {
-        await mockTeam.host.updateIdentity(input);
+        const { appearance, ...identity } = input;
+        if (identity.serverName !== undefined || identity.logo !== undefined)
+          await mockTeam.host.updateIdentity(identity);
+        // The look belongs to the server that the admin changes, as on a joined host.
+        if (appearance !== undefined) mockTeam.setServerAppearance(serverId, appearance);
         const server = (await mockTeam.servers.list()).find((candidate) => candidate.id === serverId);
         if (!server) throw new Error("Server not found");
         return server;
@@ -3679,6 +3710,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       restartHost: async () => {},
       ...createMockHostUpdate(options),
       ...createMockHostTimezone(),
+      ...hostTurnLimits,
       ...createMockHostPersonality(),
       // Preview has one host, so every server shares one limit. Main tells the window, as here.
       getAgentMemoryLimit: async () => hostAgentMemoryLimit(agentMemoryLimit),
@@ -3769,7 +3801,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getAuditLog: async () => ({ entries: clone(serverAudit) }),
     },
-    storage: createMockStorage(),
+    storage: createMockStorage(() => emitAgentEvent({ type: "library-folders-changed" })),
     agentImport: {
       choose: async () => clone(AGENT_IMPORT_PREVIEW),
       apply: async ({ token, keys, channelKeys }) => {

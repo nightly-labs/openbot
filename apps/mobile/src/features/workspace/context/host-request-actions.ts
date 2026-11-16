@@ -20,7 +20,9 @@ import {
   decodeChannelRoutines,
   decodeChannelSummaries,
   decodeInstalledSkills,
+  decodeLibraryFoldersSnapshot,
   decodeMachineMetrics,
+  decodeStorageDisk,
   decodeStorageUsage,
   type HiddenAgent,
   isAgentMemory,
@@ -137,6 +139,10 @@ import { HOST_TIMEZONE_CAPABILITY } from "@openbot/contracts/team-protocol/host-
 import { HOST_UPDATE_CAPABILITY } from "@openbot/contracts/team-protocol/host-update-v1";
 import { HOSTED_SITES_CAPABILITY } from "@openbot/contracts/team-protocol/hosted-sites-v1";
 import { INSTANCE_TRANSFER_CAPABILITY } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import {
+  LIBRARY_FOLDERS_CAPABILITY,
+  LIBRARY_FOLDERS_ROUTES,
+} from "@openbot/contracts/team-protocol/library-folders-v1";
 import { LIVE_VOICE_CAPABILITY } from "@openbot/contracts/team-protocol/live-voice-v1";
 import {
   MACHINE_RESOURCES_CAPABILITY,
@@ -161,9 +167,16 @@ import { SHARED_TABLES_CAPABILITY } from "@openbot/contracts/team-protocol/share
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
+import { USAGE_CREDITS_CAPABILITY } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import type { TeamProtocolV1Capability } from "@openbot/contracts/team-protocol/v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
+import { decodeTeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { VAULT_IMPORT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-import-v1";
 import { VAULT_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v1";
 import { VAULT_V2_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v2";
@@ -421,6 +434,9 @@ type HostRequestActions = Pick<
   | "uninstallAgentSkill"
   | "loadAgentStorage"
   | "loadServerStorage"
+  | "loadLibraryFolders"
+  | "changeLibraryFolders"
+  | "loadServerDisk"
   | "loadMachineMetrics"
   | "clearServerStorage"
   | "loadAgentAdminSettings"
@@ -658,6 +674,8 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
       has(serverId, WORKFLOWS_CHATS_CAPABILITY) &&
       has(serverId, ROUTINE_RESULTS_CAPABILITY),
     canReadServerStorage: (serverId) => has(serverId, STORAGE_CAPABILITY),
+    // The folders lay out the files of the storage scan, so the Library needs both.
+    canOrganizeLibrary: (serverId) => has(serverId, STORAGE_CAPABILITY) && has(serverId, LIBRARY_FOLDERS_CAPABILITY),
     canControlComputer: (serverId) => has(serverId, REMOTE_DESKTOP_CAPABILITY),
     canSetAgentNotificationLevel: (serverId) => has(serverId, AGENT_NOTIFICATION_LEVELS_CAPABILITY),
     canStartNewChat: (serverId) => has(serverId, CONTEXT_RESET_CAPABILITY),
@@ -1294,6 +1312,37 @@ export function createHostRequestActions({
         input,
       );
     },
+    loadLibraryFolders: async (serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        LIBRARY_FOLDERS_CAPABILITY,
+        "mobile.server.library.folders.unsupported",
+      );
+      return request("POST", LIBRARY_FOLDERS_ROUTES.read, decodeLibraryFoldersSnapshot, {}, serverId);
+    },
+    changeLibraryFolders: async (action, serverId) => {
+      requireCapability(
+        capabilities,
+        serverId,
+        LIBRARY_FOLDERS_CAPABILITY,
+        "mobile.server.library.folders.unsupported",
+      );
+      return request(
+        "POST",
+        LIBRARY_FOLDERS_ROUTES.actions,
+        decodeLibraryFoldersSnapshot,
+        decodeTeamProtocolV2Json(action),
+        serverId,
+      );
+    },
+    loadServerDisk: async (serverId) => {
+      if (has(serverId, STORAGE_USER_FILES_CAPABILITY))
+        return request("POST", STORAGE_USER_FILES_ROUTES.disk, decodeStorageDisk, {}, serverId);
+      if (has(serverId, STORAGE_DISK_CAPABILITY))
+        return request("POST", STORAGE_DISK_ROUTES.disk, decodeStorageDisk, {}, serverId);
+      return null;
+    },
     loadMachineMetrics: async (serverId) => {
       requireCapability(capabilities, serverId, MACHINE_RESOURCES_CAPABILITY, "mobile.server.machine.unsupported");
       return request("POST", MACHINE_RESOURCES_ROUTES.metrics, decodeMachineMetrics, {}, serverId);
@@ -1460,7 +1509,8 @@ export function createHostRequestActions({
             ),
           )
         : null,
-    loadPlanLimits: (serverId, accounts) => runTeamRequest(readPlanLimits(teamApi(serverId), accounts)),
+    loadPlanLimits: (serverId, accounts) =>
+      runTeamRequest(readPlanLimits(teamApi(serverId), accounts, has(serverId, USAGE_CREDITS_CAPABILITY))),
     setAgentProviderAccount: async (input, serverId) => {
       requireCapability(
         capabilities,

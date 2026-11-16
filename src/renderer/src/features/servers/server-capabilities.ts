@@ -7,6 +7,7 @@ import {
   type ServerSummary,
 } from "@openbot/contracts/ipc";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { PROVIDER_HOST_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/provider-host-sign-in-v1";
 import { PROVIDERS_ADMIN_CODE_SIGN_IN_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v1";
 import { PROVIDERS_SIGN_IN_V3_PROVIDERS } from "@openbot/contracts/team-protocol/providers-v3";
@@ -85,7 +86,9 @@ export function serverSupportsCapability(
       capability === "host-member-update-v1" ||
       capability === "host-release-v1" ||
       capability === "host-timezone-v1" ||
+      capability === "host-turn-limits-v1" ||
       capability === "host-restart-v1" ||
+      capability === "host-appearance-v1" ||
       capability === "agent-memory-limit-v1" ||
       capability === "memory-review-v1" ||
       capability === "skill-learning-v1" ||
@@ -95,6 +98,7 @@ export function serverSupportsCapability(
       capability === "model-visibility-v1" ||
       capability === "claude-api-key-v1" ||
       capability === "codex-api-key-v1" ||
+      capability === "mistral-code-sign-in-v1" ||
       capability === "host-personality-v1" ||
       capability === "agent-access-v1" ||
       capability === "sidebar-folders-v1" ||
@@ -105,6 +109,7 @@ export function serverSupportsCapability(
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
+      capability === "routine-flow-stop-v1" ||
       capability === "routine-recovery-v1" ||
       capability === "routine-run-place-v1" ||
       capability === "webhook-tests-v1" ||
@@ -254,8 +259,9 @@ export function serverCanAdminister(
  *
  * A host with `providers-v8` also signs in each later provider that has a device code, such as Kimi
  * and Hermes: it takes any provider id, and the descriptor's `localCodeSignIn` mirrors the driver's
- * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. The
- * mobile app's `codeSignInProviders` uses the same rule.
+ * code sign-in. A provider that the relay already signs in, such as Muse, keeps the relay. Mistral's
+ * code sign-in is a page, not a device code, so it needs `mistral-code-sign-in-v1`. The mobile app's
+ * `codeSignInProviders` uses the same rule.
  */
 export function serverCodeRouteProviders(server: ServerSummary | undefined): readonly AgentProviderId[] {
   if (server?.kind !== "remote") return [];
@@ -269,7 +275,8 @@ export function serverCodeRouteProviders(server: ServerSummary | undefined): rea
     return AGENT_PROVIDERS.filter(
       (provider) =>
         v4.includes(provider) ||
-        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)),
+        (agentProviderDescriptor(provider).localCodeSignIn === "device" && !earlier.includes(provider)) ||
+        (provider === "mistral" && serverSupportsCapability(server, MISTRAL_CODE_SIGN_IN_CAPABILITY)),
     );
   }
   if (serverSupportsCapability(server, "providers-v3")) return PROVIDERS_SIGN_IN_V3_PROVIDERS;
@@ -313,6 +320,14 @@ export function remoteAdminServer(
  */
 export function activeServerHasProviderSettings(server: ServerSummary): boolean {
   return server.kind === "local" || remoteAdminServer(server, "providers-v1") !== undefined;
+}
+
+/**
+ * Server Settings > Agents shows: this computer, or an online joined server that this account
+ * administers and whose host serves `agent-defaults-v1`.
+ */
+export function serverHasAgentDefaults(server: ServerSummary): boolean {
+  return serverCanAdminister(server, "agent-defaults-v1") && (server.kind === "local" || server.state === "online");
 }
 
 /**

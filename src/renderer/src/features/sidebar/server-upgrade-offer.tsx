@@ -1,11 +1,11 @@
 import {
-  BILLING_PLAN_IDS,
-  type BillingPlanId,
   type BillingServerPlan,
+  type BillingStorageUpgradeTier,
   isOpenBillingStatus,
+  serverStorageGb,
 } from "@openbot/contracts/billing";
 import type { ServerSummary } from "@openbot/contracts/ipc";
-import { ServerUpgradeDialog } from "@openbot/ui/features/servers/ServerUpgradeDialog";
+import { StorageTierDialog } from "@openbot/ui/features/billing/StorageTierDialog";
 import type { SidebarStorageLevel } from "@openbot/ui/features/sidebar/SidebarStorageCard";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createStore, Show, untrack } from "solid-js";
@@ -14,11 +14,6 @@ import { usePlatform } from "../../platform";
 import { readUpgradeOffered, writeUpgradeOffered } from "./storage-card";
 
 const LEVEL_RANK: Record<SidebarStorageLevel, number> = { low: 1, full: 2 };
-
-/** The plan after `plan`, or null for the largest plan. */
-function nextPlan(plan: BillingPlanId): BillingPlanId | null {
-  return BILLING_PLAN_IDS[BILLING_PLAN_IDS.indexOf(plan) + 1] ?? null;
-}
 
 interface StorageCard {
   level: SidebarStorageLevel;
@@ -31,13 +26,13 @@ interface Offer {
   card: StorageCard;
   serverName: string;
   plan: BillingServerPlan;
-  nextPlan: BillingPlanId;
 }
 
 /**
- * Offers the next plan when the disk of a hosted server is almost full. Only the account that pays for
- * the server gets the offer, because the plan change needs its subscription. The largest plan, a plan
- * that ends, and a server that the account does not pay for get only the sidebar card.
+ * Offers a larger storage tier when the disk of a hosted server is almost full. Only the account that
+ * pays for the server gets the offer, because the tier is added to its subscription. A server with no
+ * tier to buy (a boat sandbox, the largest tier, a plan that ends, or an account server from before
+ * storage tiers) and a server that the account does not pay for get only the sidebar card.
  */
 export function ServerUpgradeOffer(props: {
   card: StorageCard | null;
@@ -54,10 +49,10 @@ export function ServerUpgradeOffer(props: {
     error: null,
   });
 
-  /** The offer of the selected server only. The plan change applies to the server that the dialog names. */
+  /** The offer of the selected server only. The tier applies to the server that the dialog names. */
   const shown = () => (state.offer?.card.serverId === props.server?.id ? state.offer : null);
 
-  /** "<server>:<level>" pairs that have no plan to offer. They are asked again after space comes back. */
+  /** "<server>:<level>" pairs that have no tier to offer. They are asked again after space comes back. */
   const noOffer = new Set<string>();
   createEffect(
     () => props.card === null,
@@ -92,16 +87,18 @@ export function ServerUpgradeOffer(props: {
             if (!current || !card || !server || `${card.serverId}:${card.level}` !== key) return;
             const plan = billing.servers.find(
               (entry) =>
-                entry.serverId === card.serverId && isOpenBillingStatus(entry.status) && !entry.cancelAtPeriodEnd,
+                entry.serverId === card.serverId &&
+                isOpenBillingStatus(entry.status) &&
+                !entry.cancelAtPeriodEnd &&
+                (entry.storageUpgrades?.length ?? 0) > 0,
             );
-            const next = plan ? nextPlan(plan.plan) : null;
-            if (!plan || !next) {
+            if (!plan) {
               noOffer.add(key);
               return;
             }
             if (!writeUpgradeOffered(card.serverId, card.level)) return;
             setState((draft) => {
-              draft.offer = { card: { ...card }, serverName: server.name, plan, nextPlan: next };
+              draft.offer = { card: { ...card }, serverName: server.name, plan };
               draft.pending = false;
               draft.error = null;
             });
@@ -122,18 +119,18 @@ export function ServerUpgradeOffer(props: {
     });
   }
 
-  async function upgrade(offer: Offer): Promise<void> {
+  async function buy(offer: Offer, tier: BillingStorageUpgradeTier): Promise<void> {
     if (state.pending) return;
     setState((draft) => {
       draft.pending = true;
       draft.error = null;
     });
     try {
-      await appPort().billing.openPortal({ flow: "update", subscriptionId: offer.plan.subscriptionId });
+      await appPort().billing.buyStorage({ subscriptionId: offer.plan.subscriptionId, tier });
       close();
     } catch (error) {
       setState((draft) => {
-        draft.error = errorMessage(error, t("billing.portalFailed"));
+        draft.error = errorMessage(error, t("billing.storage.failed"));
       });
     } finally {
       setState((draft) => {
@@ -148,26 +145,26 @@ export function ServerUpgradeOffer(props: {
   return (
     <Show when={shown()}>
       {(offer) => (
-        <ServerUpgradeDialog
+        <StorageTierDialog
+          mode="offer"
           serverName={offer().serverName}
-          level={disk(offer()).level}
-          freeBytes={disk(offer()).freeBytes}
-          totalBytes={disk(offer()).totalBytes}
-          plan={offer().plan.plan}
-          storageGb={offer().plan.storageGb}
-          nextPlan={offer().nextPlan}
+          disk={disk(offer())}
+          storageGb={serverStorageGb(offer().plan)}
           interval={offer().plan.interval}
           currency={offer().plan.currency}
           amount={offer().plan.amount}
+          upgrades={offer().plan.storageUpgrades ?? []}
           pending={state.pending}
           error={state.error}
-          onUpgrade={() => void upgrade(offer())}
+          onBuy={(tier) => void buy(offer(), tier)}
           onFreeUpSpace={() => {
             const { serverId } = offer().card;
             close();
             props.onFreeUpSpace(serverId);
           }}
-          onClose={close}
+          onClose={() => {
+            if (!state.pending) close();
+          }}
         />
       )}
     </Show>

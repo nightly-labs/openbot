@@ -11,6 +11,7 @@
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
+// the whole copy of a pending approval (`pending-approval-v1`),
 // direct-message isolation, agents hidden from an older
 // protocol, the queue routes, message delete (`message-delete-v1`) under the agent roles, the attachment and file routes with their size limits,
 // a Grok Bot export sent in parts (`agent-import-v2`) to the real import service, and the error
@@ -120,6 +121,10 @@ import {
   AGENT_NOTIFICATION_LEVELS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_PLAN_CARD_CAPABILITY,
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
@@ -170,6 +175,11 @@ import {
   BROWSER_SECRET_VAULT_CAPABILITY,
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
+import {
+  BROWSER_SIGN_IN_STORAGE_CAPABILITY,
+  BROWSER_SIGN_IN_STORAGE_ROUTES,
+  decodeBrowserSignInStorageResult,
+} from "@openbot/contracts/team-protocol/browser-sign-in-storage-v1";
 import {
   BROWSER_TEACH_CAPABILITY,
   BROWSER_TEACH_ROUTES,
@@ -226,10 +236,21 @@ import {
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_EVENT,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+  serverAppearanceOrNull,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
 import { HOST_RESTART_CAPABILITY, HOST_RESTART_ROUTES } from "@openbot/contracts/team-protocol/host-restart-v1";
+import {
+  HOST_TURN_LIMITS_CAPABILITY,
+  HOST_TURN_LIMITS_ROUTES,
+} from "@openbot/contracts/team-protocol/host-turn-limits-v1";
 import {
   INSTANCE_TRANSFER_CHUNK_BYTES,
   INSTANCE_TRANSFER_CHUNKS_CAPABILITY,
@@ -243,6 +264,7 @@ import {
   INSTANCE_TRANSFER_CAPABILITY,
   INSTANCE_TRANSFER_ROUTES,
 } from "@openbot/contracts/team-protocol/instance-transfer-v1";
+import { LIBRARY_FOLDERS_EVENTS_CAPABILITY } from "@openbot/contracts/team-protocol/library-folders-events-v1";
 import {
   LIBRARY_FOLDERS_CAPABILITY,
   LIBRARY_FOLDERS_ROUTES,
@@ -263,11 +285,24 @@ import {
 import { MEMORY_REVIEW_CAPABILITY, MEMORY_REVIEW_ROUTES } from "@openbot/contracts/team-protocol/memory-review-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import { MESSAGE_PINS_CAPABILITY, MESSAGE_PINS_ROUTES } from "@openbot/contracts/team-protocol/message-pins-v1";
+import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import {
   PASSWORD_MANAGERS_CAPABILITY,
   PASSWORD_MANAGERS_CODECS,
   PASSWORD_MANAGERS_ROUTES,
 } from "@openbot/contracts/team-protocol/password-managers-v1";
+import {
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
+  PROVIDER_ACCOUNT_KEYS_CAPABILITY,
+  PROVIDER_ACCOUNT_KEYS_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import {
   PROVIDER_ACCOUNT_MODELS_CAPABILITY,
   PROVIDER_ACCOUNT_MODELS_ROUTES,
@@ -317,11 +352,16 @@ import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY, SKILLS_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/skills-admin-v1";
 import { STORAGE_DISK_CAPABILITY, STORAGE_DISK_ROUTES } from "@openbot/contracts/team-protocol/storage-disk-v1";
+import {
+  STORAGE_USER_FILES_CAPABILITY,
+  STORAGE_USER_FILES_ROUTES,
+} from "@openbot/contracts/team-protocol/storage-user-files-v1";
 import { STORAGE_ROUTES } from "@openbot/contracts/team-protocol/storage-v1";
 import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
   TEAM_CAPABILITIES_HEADER,
@@ -390,6 +430,7 @@ import {
 import { createCustomProviderChanges } from "../src/main/custom-provider-changes";
 import { CustomProviderStore } from "../src/main/custom-provider-store";
 import { githubSkillSource } from "../src/main/github-skill-source";
+import { HostTurnLimitsPreferenceStore } from "../src/main/host-turn-limits-preference-store";
 import {
   INSTANCE_TRANSFER_FORMAT,
   INSTANCE_TRANSFER_MANIFEST,
@@ -471,6 +512,10 @@ const root = mkdtempSync(join(tmpdir(), "openbot-team-api-routes-"));
 const agentDefaultsPath = join(root, "agent-defaults.json");
 const agentDefaultsPreferences = createAgentDefaultsPreferenceStore(agentDefaultsPath);
 const busyMessageModePreferences = new BusyMessageModePreferenceStore(join(root, "busy-message-mode.json"));
+// The real turn limits file. The memory of this stand-in host sets an automatic limit of 8.
+const hostTurnLimitsPath = join(root, "host-turn-limits.json");
+const hostTurnLimits = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+await runCauseEffect(hostTurnLimits.load());
 const transferUploads = join(root, "user-data", "instance-transfer-uploads");
 const checks: Check[] = [];
 const calls: RecordedCall[] = [];
@@ -507,6 +552,9 @@ let providerDefault: { provider: AgentProviderId | null; model: AgentModelId | n
 function check(name: string, passed: boolean, detail: unknown = null): void {
   checks.push({ name, passed, detail });
 }
+
+/** The page of a Mistral sign-in, as Vibe's `browser-auth-delegated` gives it. */
+const MISTRAL_SIGN_IN_PAGE = "https://console.mistral.ai/vibe/sign-in/e2e";
 
 function record(method: string, ...args: unknown[]): void {
   calls.push({ method, args });
@@ -577,6 +625,8 @@ const FAST_MODE_MODELS: AgentModelOption[] = [
     supportedReasoningEfforts: ["medium"],
   },
 ];
+
+const SPENT_WEEK = { usedPercent: 100, windowDurationMins: 10_080, resetsAt: 1_900_000_000 };
 
 function unused(name: string): () => never {
   return () => {
@@ -717,8 +767,16 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The account that the fake host adds for a code sign-in (`provider-account-code-v1`). */
+const CODE_ACCOUNT = "ac0de000000000001";
+/** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
+const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
+const ACCOUNT_KEY = "key_e2e_accepted";
+
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
+/** The account whose code sign-in runs on the fake host. */
+let codeSignInAccount: string | null = null;
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -1031,7 +1089,7 @@ const fakeAgents: TeamApiAgents = {
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
   steerQueuedMessage: (input) => {
     record("steerQueuedMessage", input);
-    // OpenCode defers steering: the queue keeps the message and refuses the steer.
+    // This agent cannot steer: the queue keeps the message and refuses the steer.
     if (input.agentId === "agent-oc")
       return Effect.fail(
         new AgentLifecycleFailed({ operation: "steerQueuedMessage", cause: new SteerUnsupportedError() }),
@@ -1125,7 +1183,15 @@ const fakeAgents: TeamApiAgents = {
     ],
     failedModels: [{ provider: "codex", model: "gpt-5", providerAccountId: "a0123456789abcdef" }],
   }),
-  getUsage: unused("getUsage"),
+  // Codex reports credits for its own sign-in; Claude reports none; an account after the first is not a member's.
+  getUsage: () =>
+    Effect.succeed({
+      limits: [
+        { id: "codex", primary: null, secondary: SPENT_WEEK, creditsAvailable: true },
+        { id: "claude", primary: null, secondary: SPENT_WEEK },
+        { id: "codex", accountId: "a0123456789abcdef", primary: null, secondary: SPENT_WEEK, creditsAvailable: false },
+      ],
+    }),
   getAnalytics: unused("getAnalytics"),
   getHostAnalytics: unused("getHostAnalytics"),
   listModels: unused("listModels"),
@@ -1152,21 +1218,32 @@ const fakeAgents: TeamApiAgents = {
   committedAgentDuplication: unused("committedAgentDuplication"),
   duplicateAgent: unused("duplicateAgent"),
   commitAgentDuplication: unused("commitAgentDuplication"),
-  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`) or a move at a usage
-  // limit (`agent-usage-limit-v1`) reaches this writer in this run. A chat colour change sends
-  // `agents-changed`, as the agent service does.
-  updateAgent: (input) =>
+  // Only an exact colour (`agent-colors-v1`), a chat colour (`chat-colors-v1`), a move at a usage
+  // limit (`agent-usage-limit-v1`) or a runtime change (`agent-pending-runtime-v1`) reaches this writer
+  // in this run. A chat colour change sends `agents-changed`, as the agent service does. A runtime change
+  // is kept for the next turn, as for an agent that works.
+  updateAgent: (input, _initiatingAgentId, queueWhileBusy) =>
     Effect.sync(() => {
-      record(
-        input.leaveUsageLimit
-          ? "updateAgentModel"
-          : input.chatColor === undefined
-            ? "updateAgentColor"
-            : "updateAgentChatColor",
-        input,
-      );
+      const runtime = !input.leaveUsageLimit && (input.provider ?? input.model ?? input.reasoningEffort) !== undefined;
+      if (runtime) record("updateAgentRuntime", input, queueWhileBusy);
+      else
+        record(
+          input.leaveUsageLimit
+            ? "updateAgentModel"
+            : input.chatColor === undefined
+              ? "updateAgentColor"
+              : "updateAgentChatColor",
+          input,
+        );
       const target = agents.find((item) => item.id === input.agentId);
       if (!target) throw new Error("Agent not found.");
+      if (runtime && input.provider && input.model && input.reasoningEffort)
+        target.pendingRuntime = {
+          provider: input.provider,
+          model: input.model,
+          reasoningEffort: input.reasoningEffort,
+          ...(input.providerAccountId ? { providerAccountId: input.providerAccountId } : {}),
+        };
       if (input.avatarColor === null) delete target.avatarColor;
       else if (input.avatarColor !== undefined) target.avatarColor = input.avatarColor;
       if (input.chatColor === null) delete target.chatColor;
@@ -1379,6 +1456,24 @@ const fakeAgents: TeamApiAgents = {
     return Effect.void;
   },
   agentIdForRequest: () => undefined,
+  pendingApproval: (requestId) => {
+    record("pendingApproval", requestId);
+    // Longer than a runtime snapshot carries (240 characters), so only this read gives all of it.
+    if (requestId === 7)
+      return {
+        requestId: 7,
+        agentId: "agent-ada",
+        threadId: "thread-ada",
+        turnId: "turn-ada",
+        kind: "permissions",
+        command: `Long report\n\n${"r".repeat(5_000)}`,
+        cwd: null,
+        reason: sourceText("status.agent.reportProblem"),
+        grantRoot: null,
+        permissions: null,
+      };
+    return undefined;
+  },
   respondToPrompt: unused("respondToPrompt"),
   respondToApproval: unused("respondToApproval"),
   respondToBrowserSecret: (input) => Effect.sync(() => record("respondToBrowserSecret", input)),
@@ -1596,7 +1691,11 @@ const browser: TeamApiBrowser = {
   startView: unused("startView"),
   dispatchViewInput: unused("dispatchViewInput"),
   copyViewSelection: unused("copyViewSelection"),
-  importSignIn: unused("importSignIn"),
+  // The values never reach the record; only counts and the origin do.
+  importSignIn: (tabId, cookies, storage = null) => {
+    record("importSignIn", tabId, cookies.length, storage?.origin ?? null, storage?.entries.length ?? 0);
+    return Effect.succeed({ cookies: cookies.length, storage: storage?.entries.length ?? 0 });
+  },
 };
 
 // Account tickets that the fake account service redeems. Anything else is a ticket it refuses.
@@ -2121,6 +2220,10 @@ try {
   );
 
   await Effect.runPromise(libraryStore.initialize());
+  // As in application-services: each saved folder change is an agent event (library-folders-events-v1).
+  libraryStore.onChanged(() => {
+    for (const listener of agentEventListeners) listener({ type: "library-folders-changed" });
+  });
   server = new TeamApiServer({
     appVersion: APP_VERSION,
     agentImport,
@@ -2245,6 +2348,21 @@ try {
       // A stand-in for the server-mode restart, which closes the app under its service manager. This
       // checks the gate and that a refused request never reaches the host.
       restart: { request: (memberId) => record("restartHost", memberId) },
+      // The real team store, as the host service writes it. The host service then sends the new
+      // look to each event socket, so this does the same.
+      identity: {
+        updateIdentity: (input) =>
+          store.updateIdentity(input).pipe(
+            Effect.tap(() =>
+              Effect.sync(() => {
+                record("updateIdentity", input);
+                server?.refreshAppearance();
+              }),
+            ),
+            Effect.asVoid,
+          ),
+      },
+      turnLimits: hostTurnLimits,
       // A stand-in for `LocalServers`; `local-servers-e2e.ts` starts real children. This checks the gate
       // and the wire, and that a refused request never reaches the desktop app.
       localServers: {
@@ -2359,7 +2477,12 @@ try {
       // A credential store in memory. The service runs the change as the host's does.
       providers: {
         service: {
-          startProviderCodeLogin: unused("providers.startProviderCodeLogin"),
+          // Mistral's code sign-in answers with the page that the user opens on any device.
+          startProviderCodeLogin: (provider) => {
+            record("startProviderCodeLogin", provider);
+            if (provider !== "mistral") throw new Error(sourceText("error.provider.noCodeSignIn", { provider }));
+            return Effect.succeed({ kind: "link", verificationUrl: MISTRAL_SIGN_IN_PAGE, expiresAt: 1 });
+          },
           submitProviderCodeLogin: unused("providers.submitProviderCodeLogin"),
           cancelProviderCodeLogin: unused("providers.cancelProviderCodeLogin"),
           changeProviderCredential: (provider, change) => {
@@ -2519,6 +2642,12 @@ try {
           record("disk");
           return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 };
         }),
+      // As a hosted server: the host measures the files of its user (`du`) for the plan storage.
+      diskUse: () =>
+        Effect.sync(() => {
+          record("diskUse");
+          return { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+        }),
     },
     // The real host service over a fake status: only the models and pool routes run in this run.
     providerAccounts: new ProviderAccountsHost({
@@ -2539,6 +2668,67 @@ try {
         listAgents: () => [],
         updateAgent: unused("providerAccounts.updateAgent"),
         signInProviderAccountOnHost: unused("providerAccounts.signInProviderAccountOnHost"),
+        // As the backend: Cursor refuses one key, and each other key gives an account.
+        connectProviderAccountKey: (provider, accountId, key) => {
+          record("connectProviderAccountKey", { provider, accountId, keyLength: key.length });
+          return key === REFUSED_ACCOUNT_KEY
+            ? Effect.fail(
+                new AgentLifecycleFailed({
+                  operation: "connectProviderAccount",
+                  cause: new Error(sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })),
+                }),
+              )
+            : Effect.sync(accountModelsStatus);
+        },
+        // As the backend: Cursor has no code sign-in; ChatGPT gives a page and a code, and the sign-in
+        // of the new account goes on until a cancel.
+        startProviderAccountCodeLogin: (provider, accountId) => {
+          record("startProviderAccountCodeLogin", { provider, accountId });
+          if (provider === "claude") {
+            codeSignInAccount = accountId ?? CODE_ACCOUNT;
+            return Effect.succeed({
+              accountId: codeSignInAccount,
+              start: {
+                kind: "paste" as const,
+                verificationUrl: "https://claude.ai/oauth/authorize",
+                expiresAt: clock + 900_000,
+              },
+            });
+          }
+          if (provider !== "codex")
+            return Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "connectProviderAccount",
+                cause: new Error(sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+              }),
+            );
+          codeSignInAccount = accountId ?? CODE_ACCOUNT;
+          return Effect.succeed({
+            accountId: codeSignInAccount,
+            start: {
+              kind: "code" as const,
+              userCode: "ABCD-12345",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              expiresAt: clock + 900_000,
+            },
+          });
+        },
+        // As the backend: only a sign-in that waits takes a code, and a refusal can quote the code.
+        submitProviderAccountCodeLogin: (provider, accountId, code) => {
+          record("submitProviderAccountCodeLogin", { provider, accountId, code });
+          if (codeSignInAccount !== accountId) throw new Error(`The provider refused ${code}`);
+        },
+        providerAccountCodeLoginStatus: (provider, accountId) => {
+          record("providerAccountCodeLoginStatus", { provider, accountId });
+          // The error is longer than the wire limit, so the host must shorten it.
+          return codeSignInAccount === accountId ? { result: null } : { result: { error: "e".repeat(2_500) } };
+        },
+        cancelProviderAccountSignIn: (provider, accountId) =>
+          Effect.sync(() => {
+            record("cancelProviderAccountSignIn", { provider, accountId });
+            codeSignInAccount = null;
+            return accountModelsStatus();
+          }),
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -3439,6 +3629,94 @@ try {
     );
   }
 
+  // ---- Host turn limits (host-turn-limits-v1) ----
+  {
+    const v9 = { capabilities: [HOST_TURN_LIMITS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const automatic = { turnLimit: null, automaticTurnLimit: 8, agentTaskLimit: null, defaultAgentTaskLimit: 4 };
+    const adminRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {}, ...v9 });
+    check(
+      "an admin reads the automatic turn limits of a host with no choice",
+      adminRead.status === 200 && isDeepStrictEqual(adminRead.body, automatic),
+      summary(adminRead),
+    );
+    const unsupported = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: adaToken, json: {} });
+    const memberRead = await call("POST", HOST_TURN_LIMITS_ROUTES.settings, { token: bobToken, json: {}, ...v9 });
+    const memberSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: bobToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    check(
+      "a member cannot read or set the turn limits, and a client without host-turn-limits-v1 gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.hostTurnLimitsUnsupported")) &&
+        errorIs(memberRead, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(memberSet, 403, sourceText("error.team.adminRequired")) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic),
+      [summary(unsupported), summary(memberRead), summary(memberSet)],
+    );
+    const outOfRange = await Promise.all(
+      [
+        { turnLimit: 0, agentTaskLimit: null },
+        { turnLimit: 129, agentTaskLimit: null },
+        { turnLimit: "infinite", agentTaskLimit: null },
+        { turnLimit: null, agentTaskLimit: "unlimited" },
+        { turnLimit: null, agentTaskLimit: 65 },
+        { turnLimit: 2.5, agentTaskLimit: null },
+      ].map((json) => call("POST", HOST_TURN_LIMITS_ROUTES.update, { token: adaToken, json, ...v9 })),
+    );
+    check(
+      "the host refuses a turn limit outside 1 to 128 or unlimited, or an agent default outside 1 to 64, and saves nothing",
+      outOfRange.every((reply) => reply.status === 400) &&
+        isDeepStrictEqual(hostTurnLimits.get(), automatic) &&
+        !existsSync(hostTurnLimitsPath),
+      outOfRange.map(summary),
+    );
+    // Above the automatic limit: an owner or admin can choose any value in range.
+    const adminSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: 32, agentTaskLimit: 8 },
+      ...v9,
+    });
+    const reloaded = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloaded.load());
+    const chosen = { turnLimit: 32, automaticTurnLimit: 8, agentTaskLimit: 8, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets limits above the automatic one, the file keeps them, and agents on the default get 8",
+      adminSet.status === 200 &&
+        isDeepStrictEqual(adminSet.body, chosen) &&
+        isDeepStrictEqual(reloaded.get(), chosen) &&
+        reloaded.agentTaskLimit() === 8,
+      summary(adminSet),
+    );
+    // Unlimited: no total even where the memory sets one.
+    const unlimitedSet = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: "unlimited", agentTaskLimit: 64 },
+      ...v9,
+    });
+    const reloadedUnlimited = new HostTurnLimitsPreferenceStore(hostTurnLimitsPath, () => 8);
+    await runCauseEffect(reloadedUnlimited.load());
+    const unlimited = { turnLimit: "unlimited", automaticTurnLimit: 8, agentTaskLimit: 64, defaultAgentTaskLimit: 4 };
+    check(
+      "an admin sets no total limit and 64 for each agent, and the file keeps them",
+      unlimitedSet.status === 200 &&
+        isDeepStrictEqual(unlimitedSet.body, unlimited) &&
+        isDeepStrictEqual(reloadedUnlimited.get(), unlimited) &&
+        reloadedUnlimited.turnLimit() === "unlimited",
+      summary(unlimitedSet),
+    );
+    const adminReset = await call("POST", HOST_TURN_LIMITS_ROUTES.update, {
+      token: adaToken,
+      json: { turnLimit: null, agentTaskLimit: null },
+      ...v9,
+    });
+    check(
+      "an admin returns both limits to their defaults",
+      adminReset.status === 200 && isDeepStrictEqual(adminReset.body, automatic),
+      summary(adminReset),
+    );
+  }
+
   // ---- Agent folders (agent-folders-v1) ----
   {
     const capabilities = [AGENT_FOLDERS_CAPABILITY];
@@ -3794,6 +4072,194 @@ try {
       "an admin turns the pool off again",
       offAgain.status === 200 && isDeepStrictEqual(cleared.body, { pools: [] }),
       [summary(offAgain), summary(cleared)],
+    );
+  }
+
+  // ---- Account keys (provider-account-keys-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_KEYS_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const connect = PROVIDER_ACCOUNT_KEYS_ROUTES.connect;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-keys-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_KEYS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "cursor", accountId: null, key: ACCOUNT_KEY };
+    const unsupported = await call("POST", connect, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account key route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const writes = callsOf("connectProviderAccountKey").length;
+    const member = await call("POST", connect, { token: bobToken, json: body, ...v9 });
+    check(
+      "a member cannot give an account a key, and the host saves nothing",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("connectProviderAccountKey").length === writes,
+      summary(member),
+    );
+    const noKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "  " }, ...v9 });
+    const badAccount = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const longKey = await call("POST", connect, { token: adaToken, json: { ...body, key: "k".repeat(513) }, ...v9 });
+    check(
+      "an empty key, a key that is too long and an account id that is not one get 400, and the host saves nothing",
+      noKey.status === 400 &&
+        badAccount.status === 400 &&
+        longKey.status === 400 &&
+        callsOf("connectProviderAccountKey").length === writes,
+      [summary(noKey), summary(badAccount), summary(longKey)],
+    );
+    const added = await call("POST", connect, { token: adaToken, json: body, ...v9 });
+    const replaced = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, accountId: ULTRA_ACCOUNT, key: ` ${ACCOUNT_KEY} ` },
+      ...v9,
+    });
+    check(
+      "an admin adds an account from a key and gives an account a new key; the answer holds no key",
+      added.status === 200 &&
+        isDeepStrictEqual(added.body, {}) &&
+        replaced.status === 200 &&
+        isDeepStrictEqual(callsOf("connectProviderAccountKey").slice(writes), [
+          [{ provider: "cursor", accountId: null, keyLength: ACCOUNT_KEY.length }],
+          [{ provider: "cursor", accountId: ULTRA_ACCOUNT, keyLength: ACCOUNT_KEY.length }],
+        ]),
+      [summary(added), summary(replaced)],
+    );
+    const refused = await call("POST", connect, {
+      token: adaToken,
+      json: { ...body, key: REFUSED_ACCOUNT_KEY },
+      ...v9,
+    });
+    check(
+      "a key that the provider refuses fails with the reason, and the answer does not repeat the key",
+      errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
+        !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
+      summary(refused),
+    );
+  }
+
+  // ---- Account code sign-in (provider-account-code-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_CODE_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const { start, submit, status, cancel } = PROVIDER_ACCOUNT_CODE_ROUTES;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-code-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "codex", accountId: null };
+    const account = { provider: "codex", accountId: CODE_ACCOUNT };
+    const unsupported = await call("POST", start, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account code route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const starts = callsOf("startProviderAccountCodeLogin").length;
+    const memberStart = await call("POST", start, { token: bobToken, json: body, ...v9 });
+    const memberStatus = await call("POST", status, { token: bobToken, json: account, ...v9 });
+    const memberCancel = await call("POST", cancel, { token: bobToken, json: account, ...v9 });
+    check(
+      "a member cannot start, read or cancel an account code sign-in",
+      [memberStart, memberStatus, memberCancel].every((answer) =>
+        errorIs(answer, 403, sourceText("error.team.adminRequired")),
+      ) &&
+        callsOf("startProviderAccountCodeLogin").length === starts &&
+        callsOf("cancelProviderAccountSignIn").length === 0,
+      [summary(memberStart), summary(memberStatus), summary(memberCancel)],
+    );
+    const badAccount = await call("POST", start, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const noAccount = await call("POST", status, { token: adaToken, json: body, ...v9 });
+    check(
+      "an account id that is not one, and a status with no account, get 400",
+      badAccount.status === 400 &&
+        noAccount.status === 400 &&
+        callsOf("startProviderAccountCodeLogin").length === starts,
+      [summary(badAccount), summary(noAccount)],
+    );
+    const noCode = await call("POST", start, { token: adaToken, json: { ...body, provider: "cursor" }, ...v9 });
+    check(
+      "a provider whose accounts have no code sign-in fails with the reason",
+      errorIs(noCode, 409, sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+      summary(noCode),
+    );
+    const started = await call("POST", start, { token: adaToken, json: body, ...v9 });
+    const running = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    check(
+      "an admin starts the code sign-in of a new account: the answer names the account, the page and the code",
+      started.status === 200 &&
+        isDeepStrictEqual(started.body, {
+          accountId: CODE_ACCOUNT,
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            expiresAt: clock + 900_000,
+          },
+        }) &&
+        isDeepStrictEqual(running.body, { result: null }),
+      [summary(started), summary(running)],
+    );
+    const cancelled = await call("POST", cancel, { token: adaToken, json: account, ...v9 });
+    const ended = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    const endedError = field(ended.body, "result", "error");
+    check(
+      "an admin cancels the sign-in; the status then holds a result with a bounded error",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(cancelled.body, {}) &&
+        isDeepStrictEqual(callsOf("cancelProviderAccountSignIn"), [[{ provider: "codex", accountId: CODE_ACCOUNT }]]) &&
+        ended.status === 200 &&
+        typeof endedError === "string" &&
+        endedError.length === 2_000,
+      [summary(cancelled), `status ${ended.status}`],
+    );
+    // A `paste` sign-in (Claude): the page shows a code, and `submit` sends it to the host.
+    const pasteCode = "paste-code-e2e-0123456789";
+    const claude = { provider: "claude", accountId: CODE_ACCOUNT };
+    const memberSubmit = await call("POST", submit, { token: bobToken, json: { ...claude, code: pasteCode }, ...v9 });
+    const idle = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "a member cannot submit a code, and a refusal does not quote the code",
+      errorIs(memberSubmit, 403, sourceText("error.team.adminRequired")) &&
+        idle.status === 409 &&
+        !JSON.stringify(idle.body).includes(pasteCode) &&
+        callsOf("submitProviderAccountCodeLogin").length === 1,
+      [summary(memberSubmit), summary(idle)],
+    );
+    const pasteStarted = await call("POST", start, {
+      token: adaToken,
+      json: { provider: "claude", accountId: null },
+      ...v9,
+    });
+    const submitted = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "an admin starts a paste sign-in and submits the code: the host gets it, and no answer carries it",
+      isDeepStrictEqual(pasteStarted.body, {
+        accountId: CODE_ACCOUNT,
+        start: { kind: "paste", verificationUrl: "https://claude.ai/oauth/authorize", expiresAt: clock + 900_000 },
+      }) &&
+        submitted.status === 200 &&
+        isDeepStrictEqual(submitted.body, {}) &&
+        isDeepStrictEqual(callsOf("submitProviderAccountCodeLogin").at(-1), [{ ...claude, code: pasteCode }]),
+      [summary(pasteStarted), summary(submitted)],
     );
   }
 
@@ -5596,6 +6062,71 @@ try {
     );
   }
 
+  // ---- A sign-in kept in the page storage (browser-sign-in-storage-v1, #8686) ----
+  {
+    const capabilities = [BROWSER_SIGN_IN_STORAGE_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises browser-sign-in-storage-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(BROWSER_SIGN_IN_STORAGE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const cookie = {
+      name: "session",
+      value: "fixture",
+      domain: "shop.example",
+      path: "/",
+      secure: true,
+      httpOnly: true,
+      sameSite: "lax",
+      expirationDate: null,
+    };
+    const storage = { origin: "https://shop.example", entries: [{ name: "token", value: "fixture" }] };
+    const json = { tabId: "tab-1", cookies: [cookie], storage };
+    const unsupported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json });
+    check(
+      "the storage sign-in route without the capability gets 400 browserSignInUnsupported",
+      errorIs(unsupported, 400, sourceText("error.backend.browserSignInUnsupported")) &&
+        callsOf("importSignIn").length === 0,
+      summary(unsupported),
+    );
+    const imported = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, { token: bobToken, json, capabilities });
+    const cookiesOnly = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: null },
+      capabilities,
+    });
+    check(
+      "a member sends cookies and the page storage of one origin; the answer has both counts, which the client decoder takes",
+      imported.status === 200 &&
+        isDeepStrictEqual(decodeBrowserSignInStorageResult(imported.body), { cookies: 1, storage: 1 }) &&
+        cookiesOnly.status === 200 &&
+        isDeepStrictEqual(cookiesOnly.body, { cookies: 1, storage: 0 }) &&
+        isDeepStrictEqual(callsOf("importSignIn"), [
+          ["tab-1", 1, "https://shop.example", 1],
+          ["tab-1", 1, null, 0],
+        ]),
+      [summary(imported), summary(cookiesOnly)],
+    );
+    const withPath = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, storage: { ...storage, origin: "https://shop.example/account" } },
+      capabilities,
+    });
+    const extra = await call("POST", BROWSER_SIGN_IN_STORAGE_ROUTES.import, {
+      token: bobToken,
+      json: { ...json, sessionStorage: [] },
+      capabilities,
+    });
+    check(
+      "an origin with a path, or an unknown field, gets 400 and sets nothing",
+      withPath.status === 400 && extra.status === 400 && callsOf("importSignIn").length === 2,
+      [summary(withPath), summary(extra)],
+    );
+  }
+
   // ---- Learn from my browsing (browsing-memory-v1) ----
   {
     const capabilities = [BROWSING_MEMORY_CAPABILITY];
@@ -6855,6 +7386,46 @@ try {
     );
   }
 
+  // ---- Disk space and the files of the server's user (storage-user-files-v1) ----
+  {
+    const unsupported = await call("POST", STORAGE_USER_FILES_ROUTES.disk, {
+      token: bobToken,
+      json: {},
+      protocol: TEAM_PROTOCOL_V9,
+    });
+    check(
+      "the user-files route without the capability gets 400 storageUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.storageUnsupported")) && callsOf("diskUse").length === 0,
+      summary(unsupported),
+    );
+    const userFiles = { protocol: TEAM_PROTOCOL_V9, capabilities: [STORAGE_USER_FILES_CAPABILITY] };
+    // Every signed-in member reads it: the clients show the plan storage that is left to each member.
+    const member = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: bobToken, json: {} });
+    const owner = await call("POST", STORAGE_USER_FILES_ROUTES.disk, { ...userFiles, token: adaToken, json: {} });
+    const expected = { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3, userBytes: 5 * 1024 ** 3 };
+    check(
+      "a member and the owner read the free, total and user-file bytes of the host disk",
+      member.status === 200 &&
+        owner.status === 200 &&
+        isDeepStrictEqual(member.body, expected) &&
+        isDeepStrictEqual(owner.body, expected) &&
+        callsOf("diskUse").length === 2,
+      [summary(member), summary(owner)],
+    );
+    // The frozen storage-disk-v1 reply does not get the new field.
+    const old = await call("POST", STORAGE_DISK_ROUTES.disk, {
+      ...userFiles,
+      capabilities: [STORAGE_DISK_CAPABILITY, STORAGE_USER_FILES_CAPABILITY],
+      token: bobToken,
+      json: {},
+    });
+    check(
+      "the storage-disk-v1 reply keeps its two fields when the peer also has storage-user-files-v1",
+      old.status === 200 && isDeepStrictEqual(old.body, { freeBytes: 2 * 1024 ** 3, totalBytes: 64 * 1024 ** 3 }),
+      summary(old),
+    );
+  }
+
   // ---- Machine use and alerts (machine-resources-v1) ----
   {
     const unsupported = await call("POST", MACHINE_RESOURCES_ROUTES.metrics, { token: adaToken, json: {} });
@@ -6971,6 +7542,43 @@ try {
         typeof bobId === "string" &&
         machine.pending(bobId).length === 0,
       [first, delivered],
+    );
+  }
+
+  // ---- Mistral code sign-in (mistral-code-sign-in-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises mistral-code-sign-in-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(MISTRAL_CODE_SIGN_IN_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const v9 = {
+      token: adaToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [PROVIDERS_V8_CAPABILITY, MISTRAL_CODE_SIGN_IN_CAPABILITY],
+    };
+    const started = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, { ...v9, json: { provider: "mistral" } });
+    check(
+      "an admin starts the Mistral sign-in on providers-v8 and gets the Mistral page as a link",
+      started.status === 200 &&
+        field(started.body, "kind") === "link" &&
+        field(started.body, "verificationUrl") === MISTRAL_SIGN_IN_PAGE &&
+        isDeepStrictEqual(callsOf("startProviderCodeLogin"), [["mistral"]]),
+      summary(started),
+    );
+    const member = await call("POST", PROVIDERS_V8_ROUTES.codeLoginStart, {
+      ...v9,
+      token: bobToken,
+      json: { provider: "mistral" },
+    });
+    check(
+      "a member gets 403 and starts no Mistral sign-in",
+      member.status === 403 && callsOf("startProviderCodeLogin").length === 1,
+      summary(member),
     );
   }
 
@@ -7823,6 +8431,29 @@ try {
         isDeepStrictEqual(adminReset.body, { outcome: "reset" }) &&
         isDeepStrictEqual(callsOf("resetProviderUsage"), [[{ provider: "codex", accountId: "default" }]]),
       [summary(badAccount), summary(adminReset)],
+    );
+  }
+
+  // ---- Credit state of the host's accounts (usage-credits-v1) ----
+  {
+    const unsupported = await call("POST", USAGE_CREDITS_ROUTES.list, { token: bobToken, json: {} });
+    check(
+      "the usage credits route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const memberList = await call("POST", USAGE_CREDITS_ROUTES.list, {
+      token: bobToken,
+      json: {},
+      capabilities: [USAGE_CREDITS_CAPABILITY],
+    });
+    check(
+      "a member reads the credit state of the provider's own sign-ins only, and no provider that reports none",
+      memberList.status === 200 &&
+        isDeepStrictEqual(memberList.body, {
+          accounts: [{ provider: "codex", accountId: "default", available: true }],
+        }),
+      summary(memberList),
     );
   }
 
@@ -10531,6 +11162,126 @@ try {
     );
   }
 
+  // ---- The whole copy of a pending approval (pending-approval-v1) ----
+  {
+    const capabilities = [PENDING_APPROVAL_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises pending-approval-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(PENDING_APPROVAL_CAPABILITY),
+      summary(compatibility),
+    );
+    const unsupported = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const hiddenAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi", requestId: 7 },
+    });
+    const missingAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-gone", requestId: 7 },
+    });
+    accessLevels = { revision: 22, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    accessLevels = { revision: 23, everyone: {}, roles: [] };
+    check(
+      "a read without the capability, of a hidden or missing agent, or by a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.pendingApprovalUnsupported")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missingAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewer, 403, sourceText("error.team.agentViewOnly")) &&
+        callsOf("pendingApproval").length === 0,
+      [summary(unsupported), summary(hiddenAgent), summary(missingAgent), summary(viewer)],
+    );
+    const read = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: 7 },
+    });
+    const command = String(field(read.body, "approval", "command"));
+    check(
+      "a member reads the whole copy of a pending approval, with the text that a runtime snapshot cuts",
+      read.status === 200 &&
+        field(read.body, "approval", "requestId") === 7 &&
+        field(read.body, "approval", "agentId") === "agent-ada" &&
+        command.length > 5_000 &&
+        command.endsWith("r".repeat(5_000)),
+      { status: read.status, commandLength: command.length },
+    );
+    const otherAgent = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-oc", requestId: 7 },
+    });
+    const closed = await call("POST", PENDING_APPROVAL_ROUTES.read, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", requestId: "request-closed" },
+    });
+    check(
+      "a request of another agent and a request that no longer waits are refused as closed",
+      errorIs(otherAgent, 409, sourceText("error.backend.approvalInactive")) &&
+        errorIs(closed, 409, sourceText("error.backend.approvalInactive")) &&
+        !JSON.stringify(otherAgent.body).includes("r".repeat(100)),
+      [summary(otherAgent), summary(closed)],
+    );
+  }
+
+  /**
+   * An event socket of bob. `scope` is the capabilities that its first message sends; null sends no
+   * scope. `arrived` waits for an event that matches, until the deadline.
+   */
+  const openEventSocket = async (scope: readonly string[] | null) => {
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const events: DynamicRecord[] = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (isDynamicRecord(value)) {
+        events.push(value);
+        for (const wake of waiters) wake();
+      }
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    if (scope)
+      socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
+    /** Whether an event that matches arrives before the deadline. */
+    const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
+      new Promise<boolean>((resolveArrived) => {
+        if (events.some(matches)) return resolveArrived(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveArrived(false);
+        }, deadlineMs);
+        const wake = () => {
+          if (!events.some(matches)) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveArrived(true);
+        };
+        waiters.add(wake);
+      });
+    return { socket, events, arrived };
+  };
+
   // ---- Pinned messages of a chat (message-pins-v1) ----
   {
     const capabilities = [MESSAGE_PINS_CAPABILITY];
@@ -10706,44 +11457,6 @@ try {
     );
 
     // A pin change reaches a client with the capability, and no client without it.
-    const openEventSocket = async (scope: readonly string[] | null) => {
-      const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
-        TEAM_PROTOCOL_V1_WEBSOCKET,
-        `openbot-token.${bobToken}`,
-      ]);
-      const events: DynamicRecord[] = [];
-      const waiters = new Set<() => void>();
-      socket.addEventListener("message", (message) => {
-        const value = JSON.parse(String(message.data));
-        if (isDynamicRecord(value)) {
-          events.push(value);
-          for (const wake of waiters) wake();
-        }
-      });
-      await new Promise<void>((resolveOpen, reject) => {
-        socket.addEventListener("open", () => resolveOpen(), { once: true });
-        socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
-      });
-      if (scope)
-        socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities: scope }));
-      /** Whether an event that matches arrives before the deadline. */
-      const arrived = (matches: (event: DynamicRecord) => boolean, deadlineMs: number) =>
-        new Promise<boolean>((resolveArrived) => {
-          if (events.some(matches)) return resolveArrived(true);
-          const timer = setTimeout(() => {
-            waiters.delete(wake);
-            resolveArrived(false);
-          }, deadlineMs);
-          const wake = () => {
-            if (!events.some(matches)) return;
-            clearTimeout(timer);
-            waiters.delete(wake);
-            resolveArrived(true);
-          };
-          waiters.add(wake);
-        });
-      return { socket, events, arrived };
-    };
     const isPinsChanged = (event: DynamicRecord) => event.type === "message-pins-changed";
     const emitPins = () => {
       for (const listener of agentEventListeners) listener({ type: "message-pins-changed", agentId: "agent-ada" });
@@ -10977,6 +11690,108 @@ try {
         ]),
       [summary(moved), summary(adminMoved)],
     );
+  }
+
+  // ---- A runtime change that waits for the next turn (agent-pending-runtime-v1) ----
+  {
+    const capabilities = [AGENT_PENDING_RUNTIME_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const change = { agentId: "agent-ada", provider: "grok", model: "grok-4", reasoningEffort: "high" };
+    const changesBefore = callsOf("updateAgentRuntime").length;
+    const unsupported = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, json: change });
+    const hiddenAgent = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { ...change, agentId: "agent-pi" },
+    });
+    const empty = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada" },
+    });
+    accessLevels = { revision: 28, everyone: { "agent-ada": "chat" }, roles: [] };
+    const chatOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    accessLevels = { revision: 29, everyone: {}, roles: [] };
+    const namedAccount = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    // The move of an agent on a named account to its provider's own sign-in, with no provider change.
+    const named = agents.find((item) => item.id === "agent-ada");
+    if (named) named.providerAccountId = "a0123456789abcdef";
+    const ownSignInOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", providerAccountId: "default" },
+    });
+    if (named) delete named.providerAccountId;
+    check(
+      "the runtime change route without the capability, with no change, of a hidden agent, for a member with only chat, or to another account by a member is refused",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")) &&
+        empty.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(chatOnly, 403, sourceText("error.team.agentManageDenied")) &&
+        errorIs(namedAccount, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(ownSignInOnly, 403, sourceText("error.team.adminRequired")) &&
+        callsOf("updateAgentRuntime").length === changesBefore,
+      [
+        summary(unsupported),
+        summary(empty),
+        summary(hiddenAgent),
+        summary(chatOnly),
+        summary(namedAccount),
+        summary(ownSignInOnly),
+      ],
+    );
+    const effortOnly = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { agentId: "agent-ada", reasoningEffort: "low" },
+    });
+    const ownSignIn = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: bobToken,
+      ...v9,
+      json: { ...change, providerAccountId: "default" },
+    });
+    const adminChanged = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, {
+      token: adaToken,
+      ...v9,
+      json: { ...change, providerAccountId: "a0123456789abcdef" },
+    });
+    const changed = await call("POST", AGENT_PENDING_RUNTIME_ROUTES.update, { token: bobToken, ...v9, json: change });
+    check(
+      "a member with manage access changes the runtime or the effort alone, and an admin names an account; the host may keep each change for the next turn",
+      effortOnly.status === 200 &&
+        ownSignIn.status === 200 &&
+        adminChanged.status === 200 &&
+        changed.status === 200 &&
+        isDeepStrictEqual(callsOf("updateAgentRuntime").slice(changesBefore), [
+          [{ agentId: "agent-ada", reasoningEffort: "low" }, true],
+          [{ ...change, providerAccountId: null }, true],
+          [{ ...change, providerAccountId: "a0123456789abcdef" }, true],
+          [change, true],
+        ]),
+      [summary(effortOnly), summary(ownSignIn), summary(adminChanged), summary(changed)],
+    );
+    const pendingOf = (reply: Reply) => list(reply.body).find((item) => field(item, "id") === "agent-ada");
+    const withCapability = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, ...v9 });
+    const released = await call("GET", TEAM_API_ROUTES.agents.all, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the agent list carries the change that waits only for a client with the capability",
+      withCapability.status === 200 &&
+        isDeepStrictEqual(field(pendingOf(withCapability), "pendingRuntime"), {
+          provider: "grok",
+          model: "grok-4",
+          reasoningEffort: "high",
+        }) &&
+        released.status === 200 &&
+        field(pendingOf(released), "pendingRuntime") === undefined,
+      [summary(withCapability), summary(released)],
+    );
+    const ada = agents.find((item) => item.id === "agent-ada");
+    if (ada) delete ada.pendingRuntime;
   }
 
   // ---- The Hermes folder of the host (hermes-import-v1) ----
@@ -11518,6 +12333,109 @@ try {
     );
   }
 
+  // ---- Server shape and colour (host-appearance-v1) ----
+  {
+    const capabilities = [HOST_APPEARANCE_CAPABILITY];
+    const identityUpdates = () => callsOf("updateIdentity").length;
+    const storedAppearance = () => store.getIdentity()?.appearance;
+    const set = (token: string, json: Json, use: { capabilities?: string[] } = { capabilities }) =>
+      call("POST", HOST_APPEARANCE_ROUTES.appearance, { ...use, token, json });
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises host-appearance-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(HOST_APPEARANCE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+
+    // A socket that declares the capability gets the look at once, and again after each change.
+    const socket = new WebSocket(`ws://127.0.0.1:${port}${TEAM_API_ROUTES.events}`, [
+      TEAM_PROTOCOL_V1_WEBSOCKET,
+      `openbot-token.${bobToken}`,
+    ]);
+    const looks: Array<ServerAppearance | null> = [];
+    const waiters = new Set<() => void>();
+    socket.addEventListener("message", (message) => {
+      const value = JSON.parse(String(message.data));
+      if (!isDynamicRecord(value) || value.type !== HOST_APPEARANCE_EVENT || value.serverId !== serverId) return;
+      looks.push(value.appearance === null ? null : serverAppearanceOrNull(value.appearance));
+      for (const wake of waiters) wake();
+    });
+    await new Promise<void>((resolveOpen, reject) => {
+      socket.addEventListener("open", () => resolveOpen(), { once: true });
+      socket.addEventListener("error", () => reject(new Error("The event socket did not open.")), { once: true });
+    });
+    const until = (count: number) =>
+      new Promise<boolean>((resolveReady) => {
+        if (looks.length >= count) return resolveReady(true);
+        const timer = setTimeout(() => {
+          waiters.delete(wake);
+          resolveReady(false);
+        }, 5_000);
+        const wake = () => {
+          if (looks.length < count) return;
+          clearTimeout(timer);
+          waiters.delete(wake);
+          resolveReady(true);
+        };
+        waiters.add(wake);
+      });
+    socket.send(JSON.stringify({ type: "agent-event-scope", includeConversations: false, capabilities }));
+    const atConnect = await until(1);
+    check(
+      "a member's event socket that declares host-appearance-v1 gets the automatic look at once",
+      atConnect && looks.length === 1 && looks[0] === null && storedAppearance() === null,
+      looks,
+    );
+
+    const look: ServerAppearance = { shape: "hexagone", color: "#3b82f6" };
+    // The same look as the request body sends it.
+    const sent: Json = { shape: "hexagone", color: "#3b82f6" };
+    const member = await set(bobToken, { appearance: sent });
+    const noCapability = await set(adaToken, { appearance: sent }, {});
+    const invalid = await set(adaToken, { appearance: { shape: "star", color: "#3b82f6" } });
+    const badColor = await set(adaToken, { appearance: { shape: "hexagone", color: "blue" } });
+    check(
+      "a member gets 403, a client without the capability gets 400, a bad look gets 400, and the look does not change",
+      errorIs(member, 403, sourceText("error.team.adminRequired")) &&
+        errorIs(noCapability, 400, sourceText("error.team.hostIdentityUnsupported")) &&
+        invalid.status === 400 &&
+        badColor.status === 400 &&
+        identityUpdates() === 0 &&
+        storedAppearance() === null,
+      [summary(member), summary(noCapability), summary(invalid), summary(badColor)],
+    );
+
+    const admin = await set(adaToken, { appearance: sent });
+    const changed = await until(2);
+    check(
+      "an admin sets the look: 200, the store keeps it, and the member's socket gets it",
+      admin.status === 200 &&
+        isDeepStrictEqual(admin.body, {}) &&
+        isDeepStrictEqual(storedAppearance(), look) &&
+        changed &&
+        isDeepStrictEqual(looks[1], look),
+      [summary(admin), storedAppearance(), looks],
+    );
+
+    const reset = await set(owner.sessionToken, { appearance: null });
+    const resetSent = await until(3);
+    check(
+      "the owner sends null: the server has the automatic look again, and the socket gets null",
+      reset.status === 200 &&
+        storedAppearance() === null &&
+        resetSent &&
+        looks[2] === null &&
+        isDeepStrictEqual(
+          callsOf("updateIdentity").map(([input]) => input),
+          [{ appearance: look }, { appearance: null }],
+        ),
+      [summary(reset), storedAppearance(), looks, callsOf("updateIdentity")],
+    );
+    socket.close();
+  }
+
   // ---- Library folders (library-folders-v1) ----
   {
     const use = { protocol: TEAM_PROTOCOL_V9, capabilities: [LIBRARY_FOLDERS_CAPABILITY] };
@@ -11953,6 +12871,53 @@ try {
         isDeepStrictEqual(reopened.getSnapshot(), stored()) &&
         stored().folders.length === 4,
       { revision: stored().revision, folders: stored().folders.length },
+    );
+
+    // library-folders-events-v1: each saved change reaches a client with the capability at once, with
+    // no data, and no client without it. A phone and the web client then read the folders again.
+    const v9Compatibility = list(field(compatibility.body, "capabilities"));
+    const isFoldersChanged = (event: DynamicRecord) => event.type === "library-folders-changed";
+    const withEvents = await openEventSocket([LIBRARY_FOLDERS_EVENTS_CAPABILITY]);
+    const withoutEvents = await openEventSocket(null);
+    // The host reads the scope of a socket from its first message, and no answer says that it did.
+    let changeArrived = false;
+    let eventFolders = 0;
+    for (let attempt = 0; attempt < 20 && !changeArrived; attempt += 1) {
+      const id = `folder-event-${attempt}`;
+      await act(bobToken, { type: "create", id, agentId: "agent-ada", name: `Event ${attempt}` });
+      eventFolders += 1;
+      changeArrived = await withEvents.arrived(isFoldersChanged, 250);
+    }
+    const eventsBeforeDelete = withEvents.events.filter(isFoldersChanged).length;
+    for (let attempt = 0; attempt < eventFolders; attempt += 1)
+      await act(bobToken, { type: "delete", folderId: `folder-event-${attempt}` });
+    const deleteArrived = await withEvents.arrived(
+      () => withEvents.events.filter(isFoldersChanged).length >= eventsBeforeDelete + eventFolders,
+      5_000,
+    );
+    for (const listener of agentEventListeners)
+      listener({ type: "conversation-invalidated", agentId: "agent-ada", revision: 92_000 });
+    const foldersBarrier = await withoutEvents.arrived(
+      (event) => event.type === "conversation-invalidated" && event.revision === 92_000,
+      5_000,
+    );
+    withEvents.socket.close();
+    withoutEvents.socket.close();
+    check(
+      "a folder change reaches a client with library-folders-events-v1 with no data, and no client without it",
+      v9Compatibility.includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(LIBRARY_FOLDERS_EVENTS_CAPABILITY) &&
+        changeArrived &&
+        deleteArrived &&
+        withEvents.events.filter(isFoldersChanged).every((event) => isDeepStrictEqual(Object.keys(event), ["type"])) &&
+        foldersBarrier &&
+        !withoutEvents.events.some(isFoldersChanged) &&
+        stored().folders.length === 4,
+      {
+        with: withEvents.events.filter(isFoldersChanged).length,
+        without: withoutEvents.events.map((event) => event.type),
+        folders: stored().folders.length,
+      },
     );
   }
 

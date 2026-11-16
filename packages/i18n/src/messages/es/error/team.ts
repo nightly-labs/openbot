@@ -77,10 +77,13 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Esta conexión no puede mostrar ni cambiar los límites de hilos del servidor.",
   "error.team.usageLimitUnsupported": "Esta conexión no puede mostrar ni cambiar los límites de uso de los agentes.",
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
+  "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -180,6 +183,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Ningún agente de este servidor mostró este enlace de inicio de sesión.",
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
+  "error.team.pendingApprovalUnsupported": "Esta conexión no permite leer una aprobación completa.",
   "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",

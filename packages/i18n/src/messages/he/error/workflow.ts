@@ -17,6 +17,13 @@ export const messages = {
   "error.workflow.agentStepEnded": "ההודעה של הסוכן לשלב הזה הוסרה לפני שהוא ענה.",
   "error.workflow.conditionUnclear": "המודל לא ענה כן או לא.",
   "error.workflow.modelFailed": "המודל לא הצליח לענות. יש להריץ את השלב שוב.",
+  "error.workflow.modelTimedOut":
+    "המודל לא ענה בזמן. יש לבחור רמת מאמץ נמוכה יותר או מודל מהיר יותר לשלב הזה, ואז להריץ אותו שוב.",
+  "error.workflow.modelToolUse":
+    "המודל ניסה להשתמש בכלי, אבל השלב הזה יכול לענות רק בטקסט. יש להריץ את השלב שוב, או לבחור לו מודל אחר.",
+  "error.workflow.modelUnavailable": "המודל של השלב הזה לא זמין. יש לבחור מודל אחר לשלב הזה.",
+  "error.workflow.providerBusy": "הספק עמוס. יש להמתין כמה דקות ואז להריץ את השלב שוב.",
+  "error.workflow.providerOffline": "ל-OpenBot אין גישה לספק. יש לבדוק את החיבור לאינטרנט ואז להריץ את השלב שוב.",
   "error.workflow.modelBusy": "בקשה אחרת למודל רצה כעת. יש להריץ את השלב שוב בעוד רגע.",
   "error.workflow.mediaFailed": "המודל לא הצליח ליצור את התמונה או את הווידאו. יש להריץ את השלב שוב.",
   "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
@@ -63,4 +70,14 @@ export const messages = {
   "error.workflow.githubUncertain":
     "השינוי נעצר באמצע. ייתכן שהוא נמצא ב-GitHub. יש לבדוק שם לפני שמריצים את השלב שוב.",
   "error.workflow.githubNoEvent": "ב-GitHub אין issue או pull request שהטריגר הזה מתחיל מהם.",
+  "error.workflow.sunraSignIn": "כדי להשתמש במודלים של Sunra, צריך להתחבר ל-Sunra באפליקציות.",
+  "error.workflow.sunraNoCredits":
+    "אין מספיק קרדיטים בחשבון Sunra שלך. אפשר להוסיף קרדיטים ב-sunra.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.sunraNeedsPlan":
+    "המודל הזה של Sunra דורש תוכנית Sunra. אפשר לבחור תוכנית ב-sunra.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra משתמש בתמונות קלט רק עם חשבון אישי. צריך לבחור את החשבון האישי ב-Sunra או להסיר את חיבורי התמונות.",
+  "error.workflow.sunraFailed": "Sunra לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra לא סיים את הקובץ בזמן. כדאי לבדוק את הפרויקט OpenBot ב-sunra.ai לפני שמריצים את השלב שוב.",
 } as const satisfies PartialTranslation<typeof source>;

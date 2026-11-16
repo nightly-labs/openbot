@@ -47,14 +47,12 @@ import { readSetupState, writeSetupState } from "../setup-store";
 import { systemHourCycle } from "../system-hour-cycle";
 import type { UpdateService } from "../update-service";
 import {
-  parseAgentDefaults,
   parseAnalyticsPreference,
   parseAppAppearancePreference,
   parseAppBehaviorPreferenceChange,
   parseAppInterfaceSizePreference,
   parseAppLanguagePreference,
   parseAppLogoColorPreference,
-  parseBusyMessageModePreference,
   parseChatWindowTarget,
   parseExternalDestination,
   parseExternalLinkPreference,
@@ -253,20 +251,7 @@ export function appIpcHandlers({
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
-      // The `agents-changed` event tells the open Server Settings of other devices to read the mode again.
-      setBusyMessageModePreference: payloadHandler(parseBusyMessageModePreference, async (parsed) => {
-        const saved = await runCauseEffect(busyMessageMode.set(parsed));
-        service.agentDefaultsChanged(agentDefaults.get());
-        return saved;
-      }),
       getAgentDefaults: handler(() => agentDefaults.get()),
-      // The agents that follow a changed default get it at once: see `AgentService.agentDefaultsChanged`.
-      setAgentDefaults: payloadHandler(parseAgentDefaults, async (parsed) => {
-        const previous = agentDefaults.get();
-        const saved = await runCauseEffect(agentDefaults.set(parsed));
-        service.agentDefaultsChanged(previous);
-        return saved;
-      }),
       getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),
       // Off removes the kept sessions at once. The sessions of this run then end when the app quits.

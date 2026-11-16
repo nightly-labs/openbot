@@ -32,7 +32,7 @@ import type { AppAppearancePreference, SetAppAppearancePreferenceInput } from ".
 import type { AppInterfaceSizePreference, SetAppInterfaceSizePreferenceInput } from "./app-interface-size";
 import type { AppLanguagePreference, SetAppLanguagePreferenceInput } from "./app-language";
 import type { AppLogoColorPreference, SetAppLogoColorPreferenceInput } from "./app-logo-color";
-import type { BillingPortalRequest, BillingState } from "./billing";
+import type { BillingPortalRequest, BillingState, BillingStorageRequest } from "./billing";
 import type {
   CreateHostedServerInput,
   DeleteHostedServerInput,
@@ -51,7 +51,6 @@ import type {
   AgentHostSettings,
   AgentNewChatSettings,
   AgentPlanCardSettings,
-  AgentTaskLimitSettings,
   SetAgentDefaultChoiceInput,
   UpdateAgentAdminSettingsInput,
   UpdateAgentBackupModelsInput,
@@ -60,7 +59,6 @@ import type {
   UpdateAgentHostSettingsInput,
   UpdateAgentNewChatInput,
   UpdateAgentPlanCardInput,
-  UpdateAgentTaskLimitInput,
 } from "./ipc-agent-admin";
 import type { AgentAnalytics, AgentAnalyticsInput } from "./ipc-agent-analytics";
 import type {
@@ -118,8 +116,11 @@ import type {
   AgentProviderId,
   AgentStatus,
   ConnectProviderAccountInput,
+  ConnectProviderAccountKeyInput,
   HostProviderAccounts,
   PasteProviderRelaySignInInput,
+  ProviderAccountCodeLoginStart,
+  ProviderAccountCodeLoginStatus,
   ProviderApiKeyState,
   ProviderCodeLoginStart,
   ProviderHostSignInStatus,
@@ -131,6 +132,7 @@ import type {
   ResetProviderUsageInput,
   SetProviderAccountPoolInput,
   SetProviderApiKeyInput,
+  SubmitProviderAccountCodeLoginInput,
   SubmitProviderCodeLoginInput,
 } from "./ipc-agent-status";
 import type {
@@ -203,7 +205,9 @@ import type {
 } from "./ipc-app-auth";
 import type { AppBehaviorPreference, AppBehaviorPreferenceChange } from "./ipc-app-behavior";
 import type {
+  AgentApproval,
   ApprovalAutomationPreference,
+  ReadPendingApprovalInput,
   RespondToApprovalInput,
   RespondToBrowserTakeoverInput,
 } from "./ipc-approvals";
@@ -361,6 +365,7 @@ import type { HostAnalytics, HostAnalyticsInput } from "./ipc-host-analytics";
 import type { HostPersonality } from "./ipc-host-personality";
 import type { HostReleaseStatus } from "./ipc-host-release";
 import type { HostTimezoneSettings } from "./ipc-host-timezone";
+import type { HostTurnLimits, HostTurnLimitsInput } from "./ipc-host-turn-limits";
 import type {
   DeleteHostedSiteInput,
   HostedSiteList,
@@ -494,6 +499,7 @@ import type {
   RoutineFlowCanvas,
   RoutineFlowLink,
   SaveRoutineFlowPositionInput,
+  StopRoutineFlowRunInput,
   UpdateRoutineFlowLinkInput,
 } from "./ipc-routine-flows";
 import type {
@@ -628,6 +634,8 @@ import type {
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
+  WorkflowMediaCredits,
+  WorkflowMediaProviders,
   WorkflowRunDetail,
   WorkflowRunPage,
   WorkflowRunsInput,
@@ -752,11 +760,7 @@ export const IPC_ENDPOINTS = {
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
-    setBusyMessageModePreference: request<BusyMessageModePreference, BusyMessageModePreference>()(
-      "app:set-busy-message-mode",
-    ),
     getAgentDefaults: request<undefined, AgentDefaults>()("app:get-agent-defaults"),
-    setAgentDefaults: request<AgentDefaults, AgentDefaults>()("app:set-agent-defaults"),
     getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
     // Server settings set the limit of this computer (`hostAdmin.setAgentMemoryLimit`), here or from a
     // joined admin, so main tells the window.
@@ -904,6 +908,13 @@ export const IPC_ENDPOINTS = {
      * `connecting` account cancels its sign-in.
      */
     connectProviderAccount: request<ConnectProviderAccountInput, AgentStatus>()("app:connect-provider-account"),
+    /**
+     * Adds one more account of a provider from an API key, or gives an account a new key. It answers
+     * when the provider accepted the key, and fails with the reason when it did not.
+     */
+    connectProviderAccountKey: request<ConnectProviderAccountKeyInput, AgentStatus>()(
+      "app:connect-provider-account-key",
+    ),
     /** Stops a `connecting` account's sign-in: a new account goes, another one shows as signed out. */
     cancelProviderAccountSignIn: request<RemoveProviderAccountInput, AgentStatus>()(
       "app:cancel-provider-account-sign-in",
@@ -1190,6 +1201,27 @@ export const IPC_ENDPOINTS = {
       "provider-admin:account-sign-in-status",
     ),
     cancelAccountSignIn: scopedRequest<AgentProviderId, void, "required">()("provider-admin:cancel-account-sign-in"),
+    // An account of a joined server's host that is an API key (`provider-account-keys-v1`).
+    connectAccountKey: scopedRequest<ConnectProviderAccountKeyInput, void, "required">()(
+      "provider-admin:connect-account-key",
+    ),
+    // A code sign-in of an account: the provider's CLI gives a page and a code, and the person opens
+    // the page on any device. This computer runs it for its own accounts; a joined server's host
+    // needs `provider-account-code-v1`. `start` adds an account when `accountId` is null and answers
+    // with its id. `submitAccountCodeLogin` sends the code of a `paste` sign-in.
+    // `accountCodeLoginStatus` tells how the sign-in ended.
+    startAccountCodeLogin: scopedRequest<ConnectProviderAccountInput, ProviderAccountCodeLoginStart, "required">()(
+      "provider-admin:start-account-code-login",
+    ),
+    submitAccountCodeLogin: scopedRequest<SubmitProviderAccountCodeLoginInput, void, "required">()(
+      "provider-admin:submit-account-code-login",
+    ),
+    accountCodeLoginStatus: scopedRequest<RemoveProviderAccountInput, ProviderAccountCodeLoginStatus, "required">()(
+      "provider-admin:account-code-login-status",
+    ),
+    cancelAccountCodeLogin: scopedRequest<RemoveProviderAccountInput, void, "required">()(
+      "provider-admin:cancel-account-code-login",
+    ),
     // The provider that a new agent of a joined server's host starts on (`provider-default-v1`).
     // This computer's own is `app.saveSetup`.
     hostDefaultProvider: scopedQuery<HostDefaultProvider, "required">()("provider-admin:host-default-provider"),
@@ -1400,6 +1432,8 @@ export const IPC_ENDPOINTS = {
     // The server timezone. `null` is automatic: the host system zone.
     getTimezone: scopedQuery<HostTimezoneSettings, "required">()("host-admin:get-timezone"),
     setTimezone: scopedRequest<string | null, HostTimezoneSettings, "required">()("host-admin:set-timezone"),
+    getTurnLimits: scopedQuery<HostTurnLimits, "required">()("host-admin:get-turn-limits"),
+    setTurnLimits: scopedRequest<HostTurnLimitsInput, HostTurnLimits, "required">()("host-admin:set-turn-limits"),
     // The server personality: how the server's agents talk while they work. Any member can read it;
     // only an owner or admin can set it.
     getPersonality: scopedQuery<HostPersonality, "required">()("host-admin:get-personality"),
@@ -1587,6 +1621,7 @@ export const IPC_ENDPOINTS = {
   billing: {
     getState: request<undefined, BillingState>()("billing:get-state"),
     openPortal: request<BillingPortalRequest, void>()("billing:open-portal"),
+    buyStorage: request<BillingStorageRequest, BillingState>()("billing:buy-storage"),
   },
   // The commercial license of the account. Main opens the Checkout page; the renderer never sends a URL.
   license: {
@@ -1832,6 +1867,9 @@ export const IPC_ENDPOINTS = {
     compactTaskContext: scopedRequest<AgentTaskInput, void>()("agent:tasks:compact-context"),
     respondToPrompt: scopedRequest<RespondToPromptInput, void>()("agent:respond-to-prompt"),
     respondToApproval: scopedRequest<RespondToApprovalInput, void>()("agent:respond-to-approval"),
+    // The whole copy of an approval that a runtime snapshot cut, or null when the server cannot send it.
+    // A joined server takes it through `pending-approval-v1`.
+    readPendingApproval: scopedRequest<ReadPendingApprovalInput, AgentApproval | null>()("agent:read-pending-approval"),
     respondToBrowserSecret: scopedRequest<LocalBrowserSecretResponse, void>()("agent:respond-to-browser-secret"),
     respondToBrowserTakeover: scopedRequest<RespondToBrowserTakeoverInput, void>()("agent:respond-to-browser-takeover"),
     scopedEvent: event<ScopedAgentEvent>()("agent:event"),
@@ -1894,6 +1932,8 @@ export const IPC_ENDPOINTS = {
     connect: scopedRequest<ConnectRoutineFlowInput, RoutineFlowLink>()("routine-flows:connect"),
     disconnect: scopedRequest<DisconnectRoutineFlowInput, void>()("routine-flows:disconnect"),
     updateLink: scopedRequest<UpdateRoutineFlowLinkInput, RoutineFlowLink>()("routine-flows:update-link"),
+    /** Stops a run that has not ended. A joined server answers through `routine-flow-stop-v1`. */
+    stopRun: scopedRequest<StopRoutineFlowRunInput, void>()("routine-flows:stop-run"),
   },
   /**
    * Workflows: graphs of steps drawn on a canvas, their versions and their runs. The agent event
@@ -1939,6 +1979,16 @@ export const IPC_ENDPOINTS = {
      * `workflows-media-v1`.
      */
     keepPicture: scopedRequest<string, string>()("workflows:keep-picture"),
+    /**
+     * Whether the host can use Sunra for an image step now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has no Sunra.
+     */
+    mediaProviders: scopedQuery<WorkflowMediaProviders>()("workflows:media-providers"),
+    /**
+     * The credits that the host's Sunra sign-in can spend now. A joined server answers through
+     * `workflows-sunra-v1`; an older one has none.
+     */
+    mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
   },
   /**
    * Routine results: an agent routine's answer sent on to a messaging place. Only this computer's host
@@ -2100,11 +2150,6 @@ export const IPC_ENDPOINTS = {
     updateAgentBackupModels: scopedRequest<UpdateAgentBackupModelsInput, AgentBackupModelSettings>()(
       "agent:admin:update-backup-models",
     ),
-    // Task limit: `agent-task-limit-v1` on a joined server.
-    getAgentTaskLimit: scopedRequest<string, AgentTaskLimitSettings>()("agent:admin:get-task-limit"),
-    updateAgentTaskLimit: scopedRequest<UpdateAgentTaskLimitInput, AgentTaskLimitSettings>()(
-      "agent:admin:update-task-limit",
-    ),
     // Whether the agent starts a new chat itself: `agent-new-chat-v1` on a joined server.
     getAgentNewChat: scopedRequest<string, AgentNewChatSettings>()("agent:admin:get-new-chat"),
     updateAgentNewChat: scopedRequest<UpdateAgentNewChatInput, AgentNewChatSettings>()("agent:admin:update-new-chat"),
@@ -2138,7 +2183,7 @@ export const IPC_ENDPOINTS = {
     updateAgentBrowserProfile: scopedRequest<UpdateAgentBrowserProfileInput, AgentBrowserProfile>()(
       "agent:admin:update-browser-profile",
     ),
-    // Settings › Agents: the agent defaults of a computer. `agent-defaults-v1` on a joined server.
+    // Server Settings › Agents: the agent defaults of this computer. `agent-defaults-v1` on a joined server.
     getAgentDefaultsOverview: scopedQuery<AgentDefaultsOverview, "required">()("agent:admin:get-agent-defaults"),
     updateAgentDefaultsOverview: scopedRequest<UpdateAgentDefaultsInput, AgentDefaultsOverview, "required">()(
       "agent:admin:update-agent-defaults",

@@ -1,4 +1,4 @@
-// Settings › Agents of this computer: the agent defaults, the default for a message sent to a busy
+// Server Settings › Agents of this computer: the agent defaults, the default for a message sent to a busy
 // agent, and the own values of the agents. The local window and the `agent-defaults-v1` host route use
 // this, so a remote owner or admin changes the same state as the local Settings.
 

@@ -27,6 +27,10 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "Het verbindingsbestand van 1Password is te groot.",
   "error.connector.bitwardenFailed":
     "Kan Bitwarden niet lezen. Installeer de bw-CLI, log in, ontgrendel deze en maak één map met de naam Shared with OpenBot. Verbind met een nieuwe sessiesleutel.",
+  "error.connector.bitwardenCliMissing":
+    "OpenBot kan de Bitwarden CLI niet vinden. Installeer bw, controleer dat het in een nieuwe terminal werkt en maak daarna opnieuw verbinding.",
+  "error.connector.bitwardenFolderMissing":
+    "Bitwarden moet precies één map met de naam Shared with OpenBot hebben. Maak die map of verwijder de extra map en maak daarna opnieuw verbinding.",
   "error.connector.bitwardenHostInput":
     "Voer een HTTPS-serveradres, de client_id en client_secret van de API-sleutel en het hoofdwachtwoord in.",
   "error.connector.bitwardenHostFailed":

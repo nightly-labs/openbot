@@ -19,6 +19,14 @@ export const messages = {
   "error.workflow.agentStepEnded": "El mensaje al agente se eliminó antes de que respondiera.",
   "error.workflow.conditionUnclear": "El modelo no respondió sí o no.",
   "error.workflow.modelFailed": "El modelo no pudo responder. Ejecuta el paso de nuevo.",
+  "error.workflow.modelTimedOut":
+    "El modelo no respondió a tiempo. Elige un esfuerzo menor o un modelo más rápido para este paso y ejecútalo de nuevo.",
+  "error.workflow.modelToolUse":
+    "El modelo intentó usar una herramienta, pero este paso solo puede responder con texto. Ejecuta el paso de nuevo o elige otro modelo para él.",
+  "error.workflow.modelUnavailable": "El modelo de este paso no está disponible. Elige otro modelo para este paso.",
+  "error.workflow.providerBusy": "El proveedor está ocupado. Espera unos minutos y ejecuta el paso de nuevo.",
+  "error.workflow.providerOffline":
+    "OpenBot no pudo conectar con el proveedor. Comprueba la conexión a internet y ejecuta el paso de nuevo.",
   "error.workflow.modelBusy": "Hay otra solicitud al modelo en curso. Ejecuta el paso de nuevo en breve.",
   "error.workflow.mediaFailed": "El modelo no pudo crear la imagen o el vídeo. Ejecuta el paso de nuevo.",
   "error.workflow.pictureMissing": "La imagen ya no está en el servidor. Envíala de nuevo.",
@@ -74,4 +82,14 @@ export const messages = {
     "El cambio se detuvo a medio camino. Puede que ya esté en GitHub. Revísalo antes de ejecutar el paso de nuevo.",
   "error.workflow.githubNoEvent":
     "GitHub no tiene ninguna incidencia ni pull request con la que se inicie este activador.",
+  "error.workflow.sunraSignIn": "Inicia sesión en Sunra en Apps para usar los modelos de Sunra.",
+  "error.workflow.sunraNoCredits":
+    "Tu cuenta de Sunra no tiene créditos suficientes. Añade créditos en sunra.ai/pricing y vuelve a ejecutar el paso.",
+  "error.workflow.sunraNeedsPlan":
+    "Este modelo de Sunra necesita un plan de Sunra. Elige un plan en sunra.ai/pricing o selecciona otro modelo.",
+  "error.workflow.sunraTeamInputs":
+    "Sunra usa imágenes de entrada solo con una cuenta personal. Selecciona tu cuenta personal en Sunra o quita las conexiones de imágenes.",
+  "error.workflow.sunraFailed": "Sunra no pudo crear el archivo: {reason}",
+  "error.workflow.sunraTimeout":
+    "Sunra no terminó el archivo a tiempo. Revisa el proyecto OpenBot en sunra.ai antes de volver a ejecutar el paso.",
 } as const satisfies PartialTranslation<typeof source>;

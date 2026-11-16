@@ -10,8 +10,10 @@ import {
   type AgentStatus,
   type ClientAgentModelOption,
   type MessagingPlatform,
+  type ProviderAccountStatus,
   type StoredFileRow,
   WORKFLOW_NODE_KINDS,
+  type WorkflowMediaAspect,
   type WorkflowMediaKind,
   type WorkflowNodeKind,
   type WorkflowOutputTarget,
@@ -96,10 +98,25 @@ export interface WorkflowImageModel {
   subscription: string;
   /** True when the provider uses an API key in place of the subscription, so each file costs money. */
   apiKey?: boolean;
+  /** True when each file spends credits of the provider account, such as Sunra credits. */
+  credits?: boolean;
   /** What the model can make. */
   kinds: readonly WorkflowMediaKind[];
   /** Whether a video can speak in a preset voice. */
   voices?: boolean;
+  /** The aspect ratios that it makes. Every one when absent. */
+  aspects?: readonly WorkflowMediaAspect[];
+  /** The lengths of a video in seconds. The default lengths when absent. */
+  durations?: readonly number[];
+  /** The resolutions that it makes, the default first. */
+  resolutions?: readonly string[];
+  /** Whether an image can have a transparent background. */
+  transparent?: boolean;
+  /**
+   * The accounts of the provider, when it has more than one and the host makes a file on the account
+   * of the step (`workflows-media-account-v1`). The picker then has one entry for each account.
+   */
+  accounts?: readonly ProviderAccountStatus[];
 }
 
 /**

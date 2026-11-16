@@ -89,6 +89,8 @@ import type {
   InstallSkillInput,
   InstanceTransferPreview,
   InstanceTransferSummary,
+  LibraryFolderAction,
+  LibraryFoldersSnapshot,
   MachineMetrics,
   MarkAgentTaskReadInput,
   McpAccessSnapshot,
@@ -143,6 +145,7 @@ import type {
   SidebarPin,
   SignInRelayStatus,
   StartWhatsAppLinkInput,
+  StorageDisk,
   StorageUsage,
   UninstallSkillInput,
   UpdateAgentAdminSettingsInput,
@@ -191,6 +194,7 @@ import type {
   SaveEventRoutineResult,
   WebhookSecret,
 } from "@openbot/contracts/ipc-events";
+import type { ServerAppearance } from "@openbot/contracts/team-protocol/host-appearance-v1";
 import type { LiveVoiceSessionResponse, LiveVoiceStartRequest } from "@openbot/contracts/team-protocol/live-voice-v1";
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import type { RemoteConnectionFailure, RemoteRecoveryStatus, RemoteTeamDirectoryClient } from "@openbot/team-client";
@@ -211,6 +215,7 @@ import type { ProviderAdmin } from "@/features/servers/model/provider-admin";
 import type { RemoteDesktopConnection } from "@/features/workspace/components/remote-team-transport";
 import type { MobileConversationStore } from "./conversation-store";
 import type { LiveWorkspaceStore } from "./live-workspace-store";
+import type { PendingApproval } from "./pending-approvals";
 
 /** An export file on this phone, read when it is sent. */
 export interface AgentExportFile extends AgentExportParts {
@@ -235,6 +240,11 @@ export interface MobileServer {
   name: string;
   /** The logo version in the account directory, or null when the server has no logo. */
   logoKey: string | null;
+  /**
+   * The shape and colour of the plush that the server shows with no logo (`host-appearance-v1`).
+   * Null or absent keeps the flat tile with the initials.
+   */
+  appearance?: ServerAppearance | null;
   kind: MobileServerKind;
   state: MobileServerState;
   initialConnectionPending: boolean;
@@ -256,6 +266,8 @@ export interface MobileServer {
   memberLimit?: number;
   /** A hosted server, which its owner and its admins can restart. Absent when the account server did not say. */
   hosted?: boolean;
+  /** The plan storage of a hosted server in GB. Absent for each other server, or when the account server gave none. */
+  storageGb?: number;
   /** False for a hosted server that the account service cannot restart. Absent for each other server. */
   restartAvailable?: boolean;
   /** When the host last changed its key, from a handover that both keys signed. Absent when it did not. */
@@ -339,6 +351,13 @@ export interface MobileWorkspaceContextValue {
    * `InactiveRequestError`, and drops the request, when it no longer waits on the host.
    */
   respondToApproval: (serverId: string, input: RespondToApprovalInput) => Promise<void>;
+  /** True when the server can send the whole copy of an approval that a runtime snapshot cut. */
+  readsWholeApprovals: (serverId: string) => boolean;
+  /**
+   * Reads the whole copy of a cut approval with `pending-approval-v1` and puts it in place of the cut
+   * one. Rejects with `InactiveRequestError`, and drops the request, when it no longer waits on the host.
+   */
+  readWholeApproval: (serverId: string, approval: PendingApproval) => Promise<void>;
   respondToBrowserTakeover: (
     serverId: string,
     input: { requestId: string | number; decision: "complete" | "cancel" },
@@ -434,6 +453,8 @@ export interface MobileWorkspaceContextValue {
   knownServerChecks: (serverId: string) => ServerChecks | null;
   /** An owner or admin of an online host that serves `host-admin-v1`. The host checks the role again. */
   canEditServerIdentity: (serverId: string) => boolean;
+  /** An owner or admin of an online host that serves `host-appearance-v1`. The host checks the role again. */
+  canEditServerAppearance: (serverId: string) => boolean;
   /**
    * An online host that sends notifications to this phone: `push-notifications-v1` for an iPhone,
    * `push-notifications-android-v1` for an Android phone.
@@ -467,6 +488,8 @@ export interface MobileWorkspaceContextValue {
     serverId: string,
     input: { serverName?: string; logo?: AvatarImageInput | null },
   ) => Promise<void>;
+  /** Saves the plush of a server with no logo. `null` gives the automatic look. */
+  setServerAppearance: (serverId: string, appearance: ServerAppearance | null) => Promise<void>;
   /** The owner of an online host that serves `host-key-rotation-v1`. The host checks the role again. */
   canRotateServerKey: (serverId: string) => boolean;
   /**
@@ -863,6 +886,11 @@ export interface MobileWorkspaceContextValue {
   loadAgentStorage: (agentId: string, serverId: string, force?: boolean) => Promise<StorageUsage | null>;
   /** True when the host advertises `storage-v1`. Every member reads the host's storage. */
   canReadServerStorage: (serverId: string) => boolean;
+  /**
+   * True when the host advertises `library-folders-v1` and `storage-v1`. Every member reads the
+   * folders; a member changes the folders of an agent that they can chat with, and the host checks it.
+   */
+  canOrganizeLibrary: (serverId: string) => boolean;
   /** An owner or admin of an online host that serves `machine-resources-v1`. The host checks the role again. */
   canReadMachineMetrics: (serverId: string) => boolean;
   /** The disk, memory and CPU use of the machine that runs the host. Owners and admins only. */
@@ -873,6 +901,15 @@ export interface MobileWorkspaceContextValue {
   remoteDesktopConnection: (serverId: string) => RemoteDesktopConnection | null;
   /** Every location on the host, its agents, its largest chats and its stored files. */
   loadServerStorage: (serverId: string, force?: boolean) => Promise<StorageUsage>;
+  /** The Library folders of the host that this member can see (`library-folders-v1`). */
+  loadLibraryFolders: (serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /** Applies one folder change. The host answers with all folders that this member can see. */
+  changeLibraryFolders: (action: LibraryFolderAction, serverId: string) => Promise<LibraryFoldersSnapshot>;
+  /**
+   * The disk of the host data, with the bytes of the user's files from a host with
+   * `storage-user-files-v1`. Null when the host has neither that nor `storage-disk-v1`.
+   */
+  loadServerDisk: (serverId: string) => Promise<StorageDisk | null>;
   /** Owners and admins only; the host refuses a member. */
   clearServerStorage: (category: ClearableStorageCategory, serverId: string) => Promise<void>;
   /** Null when the host does not advertise `agent-admin-v1`. Owners and admins only; the host refuses a member. */
@@ -1241,6 +1278,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canUseWorkflowGitHub"
   | "canUseWorkflowChats"
   | "canReadServerStorage"
+  | "canOrganizeLibrary"
   | "canControlComputer"
   | "canSetAgentNotificationLevel";
 
@@ -1248,6 +1286,7 @@ export type MobileWorkspaceCapabilityCheck =
 type ServerCheckKey =
   | Exclude<MobileWorkspaceCapabilityCheck, "browserViewSupport">
   | "canEditServerIdentity"
+  | "canEditServerAppearance"
   | "canRotateServerKey"
   | "canCreateLocalServers"
   | "canRestartServerItself"

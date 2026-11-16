@@ -161,6 +161,7 @@ export const messages = {
   "mobile.chat.composer.send": "メッセージを送信",
   "mobile.chat.composer.stop": "{name} を停止",
   "mobile.chat.composer.dictate": "メッセージを音声入力",
+  "mobile.chat.composer.voiceSettings": "音声設定",
   "mobile.chat.composer.stopDictation": "音声入力を停止",
   "mobile.chat.composer.mention": "{name} をメンション",
   "mobile.chat.composer.skills": "スキル",
@@ -346,6 +347,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "{origin} に一度だけ送信します。この値はチャットに追加されません。",
   "mobile.chat.browserSecret.submitFailed":
     "リクエストを完了できませんでした。接続を確認して、もう一度お試しください。",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "エージェントがこのページでスクリプトを実行したため、OpenBot は保存したログイン情報を使いませんでした。使うには、ページを再読み込みしてもう一度試すようにエージェントに頼んでください。",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "エージェントがページ上の違う欄を選んだため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "エージェントがこのサイトの保存済みログイン情報を選ばなかったため、OpenBot は保存したログイン情報を使いませんでした。どのアカウントを使うかエージェントに伝えてください。",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "このサイトのパスワードがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "認証アプリのキーがないため、OpenBot は保存したログイン情報を使いませんでした。",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "パスワードマネージャーを読み取れなかったため、OpenBot は保存したログイン情報を使いませんでした。",
   "mobile.chat.browserSecret.submit": "送信",
   "mobile.chat.browserSecret.takeOver": "操作を引き継ぐ",
   "mobile.chat.starter.title": "何から始めますか？",
@@ -408,7 +421,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "許可すると {name} に {server} 上のこれらの権限を付与します。拒否すると現在の権限のままです。",
   "mobile.chat.approval.partial":
-    "このリクエストは長すぎるため、スマートフォンでは表示できません。許可するには {server} で OpenBot を開いてください。拒否はここでできます。",
+    "{server} はこのリクエストの冒頭だけをスマートフォンに送ります。許可するには、{server} の OpenBot を更新するか、OpenBot デスクトップアプリでこのチャットを開いてください。拒否はここでできます。",
+  "mobile.chat.approval.loading": "リクエスト全体を読み込み中…",
+  "mobile.chat.approval.loadFailed": "リクエスト全体を読み込めませんでした。拒否はここでできます。",
+  "mobile.chat.approval.retry": "再試行",
+  "mobile.chat.approval.report.bugHeadline": "バグを見つけましたか？直しましょう。",
+  "mobile.chat.approval.report.ideaHeadline": "アイデアがありますか？形にしましょう。",
+  "mobile.chat.approval.report.dontSend": "今はしない",
+  "mobile.chat.approval.report.send": "OpenBot チームに送信",
   "mobile.chat.approval.allow": "許可",
   "mobile.chat.approval.deny": "拒否",
   "mobile.chat.approval.reconnect": "このリクエストに回答するには {server} に接続してください。",

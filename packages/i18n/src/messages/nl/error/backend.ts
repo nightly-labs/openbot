@@ -88,6 +88,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "Wacht tot het werk in dit kanaal stopt en wis dan de geschiedenis.",
   "error.backend.channelCompactUnavailable":
     "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
+  "error.backend.channelCompactNoSession":
+    "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
+  "error.backend.channelCompactNotSupported":
+    "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
@@ -121,6 +125,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "De geheugenbewerking is mislukt. Probeer het opnieuw.",
   "error.backend.memoryGone": "Deze herinnering bestaat niet meer.",
   "error.backend.routineGone": "Deze routine bestaat niet meer.",
+  "error.backend.routineRunGone": "Deze routine-uitvoering bestaat niet meer.",
   "error.backend.turnNotStarted": "De aanbieder heeft deze beurt niet gestart.",
   "error.backend.routineResultConnectionOff":
     "Deze berichtenverbinding staat uit of is verwijderd. Kies een andere plek.",
@@ -203,6 +208,8 @@ export const messages = {
   "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
   "error.backend.interruptOtherWork":
     "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptSharedWork":
+    "De beurt van deze agent werkt aan je bericht en ook aan een bericht van de gebruiker of een andere agent. Alleen de gebruiker kan hem stoppen, met Agent stoppen in de chat van die agent.",
   "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
   "error.backend.interruptNoSession":
     "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
@@ -276,6 +283,10 @@ export const messages = {
     "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -370,8 +381,12 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxySignInRefused":
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserSystemProxyFailed":
+    "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "De computer die dit profiel gebruikt, opent alleen openbare sites. Hij opent geen adressen in een lokaal netwerk, dus de pagina is niet geopend.",
   "error.backend.browserCertificateUntrusted":
     "Het beveiligingscertificaat van deze site wordt niet vertrouwd, dus de pagina is niet geopend.",
   "error.backend.browserLowMemory":
@@ -401,6 +416,8 @@ export const messages = {
     "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
   "error.backend.mcpServerHttpUrl":
     "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpServerBearerKey":
+    "Deze server gebruikt een API-sleutel, geen aanmelding. Zet bij Headers de sleutel op Authorization en de waarde op Bearer, een spatie en je API-sleutel.",
   "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
   "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
   "error.backend.mcpSignInAppIssuerChanged":

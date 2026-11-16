@@ -82,11 +82,14 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.hostTurnLimitsUnsupported":
+    "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":
     "Questa connessione non può mostrare né modificare i limiti di utilizzo degli agenti.",
   "error.team.hermesImportUnsupported": "Questa connessione non può importare profili Hermes dal server.",
   "error.team.providerDetectionUnsupported":
     "Questa connessione non può trovare i server di modelli e gli agenti del server.",
+  "error.team.routineFlowStopUnsupported": "Questa connessione non può fermare l’esecuzione di una routine.",
   "error.team.sidebarFoldersUnsupported": "Le cartelle nelle cartelle non sono supportate da questa connessione.",
   "error.team.libraryFoldersUnsupported": "Le cartelle della Libreria non sono supportate da questa connessione.",
   "error.team.agentNotificationLevelsUnsupported":
@@ -191,6 +194,7 @@ export const messages = {
   "error.team.signInRelayLinkUnknown": "Nessun agente su questo server ha mostrato questo link di accesso.",
   "error.team.hostPersonalityUnsupported": "Questa connessione non supporta la personalità del server.",
   "error.team.agentWaitsUnsupported": "Questa connessione non supporta le attese aperte.",
+  "error.team.pendingApprovalUnsupported": "Questa connessione non permette di leggere un'approvazione completa.",
   "error.team.messagePinsUnsupported": "Questa connessione non supporta i messaggi fissati.",
   "error.team.queuedMessageThreadUnsupported":
     "Questa connessione non supporta l’esecuzione di un messaggio in coda come nuovo thread.",

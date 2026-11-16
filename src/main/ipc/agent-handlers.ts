@@ -5,6 +5,11 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -68,6 +73,7 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
@@ -135,6 +141,11 @@ import {
   MESSAGE_PINS_ROUTES,
 } from "@openbot/contracts/team-protocol/message-pins-v1";
 import {
+  decodePendingApprovalResponse,
+  PENDING_APPROVAL_CAPABILITY,
+  PENDING_APPROVAL_ROUTES,
+} from "@openbot/contracts/team-protocol/pending-approval-v1";
+import {
   PROVIDER_ACCOUNTS_CAPABILITY,
   PROVIDER_ACCOUNTS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-accounts-v1";
@@ -144,6 +155,7 @@ import {
   SIDE_QUESTION_ROUTES,
 } from "@openbot/contracts/team-protocol/side-question-v1";
 import { SKILL_LEARNING_CAPABILITY, SKILL_LEARNING_ROUTES } from "@openbot/contracts/team-protocol/skill-learning-v1";
+import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
@@ -181,6 +193,7 @@ import {
   decodeRemoteTaskWindow,
   decodeSidebarLayoutSnapshot,
   decodeSidebarPinsFromHost,
+  decodeUsageCreditsList,
 } from "../remote-agent-decoding";
 import { decodeConversationReadState } from "../remote-conversation-decoding";
 import { acceptEmpty, decodeVoid, type ResponseDecoder } from "../remote-host-decoding";
@@ -214,6 +227,7 @@ import {
   parseReadAgentTaskAround,
   parseReadAgentTaskPage,
   parseReadConversationPage,
+  parseReadPendingApprovalInput,
   parseRenameAgentTask,
   parseReorderQueue,
   parseRunQueuedMessageAsTask,
@@ -446,14 +460,25 @@ export function agentIpcHandlers({
       }),
       getUsage: scopedHandler(parseOptionalAgentId, {
         local: (agentId) => runCauseEffect(service.getUsage(agentId)),
-        remote: (agentId, serverId) =>
-          agentId
-            ? remoteServers.supportsCapability(serverId, "model-scoped-usage")
-              ? runCauseEffect(
-                  remoteServers.request(serverId, TEAM_API_ROUTES.agent.usage(agentId), decodeAccountUsageFromHost),
-                )
-              : { limits: [] }
-            : runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.usage, decodeAccountUsageFromHost)),
+        remote: (agentId, serverId) => {
+          if (agentId && !remoteServers.supportsCapability(serverId, "model-scoped-usage")) return { limits: [] };
+          const usage = remoteServers.request(
+            serverId,
+            agentId ? TEAM_API_ROUTES.agent.usage(agentId) : TEAM_API_ROUTES.agents.usage,
+            decodeAccountUsageFromHost,
+          );
+          // The released usage routes do not say whether an account works on credits. `usage-credits-v1`
+          // does, and it is optional: when its read fails, the reading shows as from a host without it.
+          if (!remoteServers.supportsCapability(serverId, USAGE_CREDITS_CAPABILITY)) return runCauseEffect(usage);
+          const credits = remoteServers
+            .request(serverId, USAGE_CREDITS_ROUTES.list, decodeUsageCreditsList, { method: "POST", body: {} })
+            .pipe(Effect.orElseSucceed(() => []));
+          return runCauseEffect(
+            Effect.all([usage, credits], { concurrency: "unbounded" }).pipe(
+              Effect.map(([reading, rows]) => withUsageCredits(reading, rows)),
+            ),
+          );
+        },
       }),
       listModels: scopedQueryHandler({
         local: () => runCauseEffect(modelVisibility.picker(logRejectedModels(service.listModels(), "local"))),
@@ -610,12 +635,7 @@ export function agentIpcHandlers({
           runCauseEffect(remoteServers.request(serverId, CHANNEL_ROUTES.list, decodeChannelSummaries)),
       }),
       readChannel: scopedHandler(parseChannelRead, {
-        local: (input) => {
-          const page = service.channels.store.page(input.channelId, input.beforeSequence);
-          // An older page adds only messages: the view keeps the tasks of the first page.
-          if (input.beforeSequence !== undefined) return page;
-          return { ...page, tasks: service.channels.store.withSeenDependencies(input.channelId, page.tasks) };
-        },
+        local: (input) => service.channels.page(input.channelId, input.beforeSequence),
         remote: (input, serverId) =>
           runCauseEffect(
             remoteServers.request(serverId, CHANNEL_ROUTES.read, decodeChannelPage, { method: "POST", body: input }),
@@ -859,7 +879,7 @@ export function agentIpcHandlers({
           if (input.busyMessageMode !== undefined) {
             throw new Error(sourceText("error.agent.busyMessageModeLocalOnly"));
           }
-          // The released agent route does not carry the task limit; the renderer sends it on `agent-task-limit-v1`.
+          // The released agent route does not carry the task limit; mobile sets it on `agent-task-limit-v1`.
           if (input.taskLimit !== undefined) {
             throw new Error(sourceText("error.agent.taskLimitLocalOnly"));
           }
@@ -899,6 +919,30 @@ export function agentIpcHandlers({
             if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
             const agent = remoteServers.agentWithColor(serverId, moved);
             return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          // While the agent works, the released agent route refuses a provider change. A change of the
+          // runtime alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the
+          // account in the same change.
+          const runtimeChange = remoteServers.supportsCapability(serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+            ? pendingRuntimeUpdateBody(input)
+            : null;
+          if (runtimeChange) {
+            const { agentId, providerAccountId } = input;
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_PENDING_RUNTIME_ROUTES.update, acceptEmpty, {
+                method: "POST",
+                body: runtimeChange,
+              }),
+            );
+            const changed = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!changed) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, changed);
+            // The released agent list does not carry the account. A queued account is in `pendingRuntime`.
+            return !agent.pendingRuntime && providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
               ? { ...agent, providerAccountId }
               : agent;
           }
@@ -1534,6 +1578,23 @@ export function agentIpcHandlers({
               body: parsed,
             }),
           ),
+      }),
+      // A joined server sends the whole copy through `pending-approval-v1`. An older host cannot, so the
+      // card keeps the cut copy and offers only Deny.
+      readPendingApproval: scopedHandler(parseReadPendingApprovalInput, {
+        local: ({ agentId, requestId }) => {
+          const approval = service.pendingApproval(requestId);
+          return approval?.agentId === agentId ? approval : null;
+        },
+        remote: (parsed, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, PENDING_APPROVAL_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, PENDING_APPROVAL_ROUTES.read, decodePendingApprovalResponse, {
+              method: "POST",
+              body: { ...parsed },
+            }),
+          );
+        },
       }),
       respondToBrowserSecret: scopedHandler(parseLocalBrowserSecretResponse, {
         local: (parsed) => runCauseEffect(service.respondToBrowserSecret(parsed)),

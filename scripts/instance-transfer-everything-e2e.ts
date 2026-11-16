@@ -26,6 +26,7 @@ import {
   type BusyMessageMode,
   DEFAULT_AGENT_DEFAULTS,
   DEFAULT_MACHINE_ALERT_SETTINGS,
+  type HostTurnLimitsInput,
   type MachineAlertSettings,
   type MemoryReviewInterval,
   type PromptCacheTtl,
@@ -246,6 +247,7 @@ function profile(name: string) {
     claudeCompactWindow: number | null;
     machineAlerts: MachineAlertSettings;
     modelVisibility: { provider: string; hidden: string[] }[];
+    turnLimits: HostTurnLimitsInput;
   } = {
     timezone: null,
     personality: { responseStyle: "natural" },
@@ -261,6 +263,7 @@ function profile(name: string) {
     claudeCompactWindow: null,
     machineAlerts: DEFAULT_MACHINE_ALERT_SETTINGS,
     modelVisibility: [],
+    turnLimits: { turnLimit: null, agentTaskLimit: null },
   };
   // The server's name and logo, as Server settings > General keeps them.
   const identity: {
@@ -325,6 +328,7 @@ function profile(name: string) {
       claudeCompactWindow: preference("claudeCompactWindow"),
       machineAlerts: preference("machineAlerts"),
       modelVisibility: preference("modelVisibility"),
+      turnLimits: preference("turnLimits"),
     },
     memberPreferences: {
       read: () => [...members.values()],
@@ -636,6 +640,7 @@ try {
     // The member who gets the alerts belongs to the old server; the import gives them to the owner.
     machineAlerts: { diskPercent: 70, memoryPercent: 75, cpuPercent: 80, responsibleMemberId: "member-on-old-server" },
     modelVisibility: [{ provider: "codex", hidden: ["gpt-old-model"] }],
+    turnLimits: { turnLimit: "unlimited", agentTaskLimit: 6 },
   } satisfies typeof source.serverPreferences);
 
   // Shared skills that no agent has. The target already has one with the same name and other files.

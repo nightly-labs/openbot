@@ -7,7 +7,7 @@ import {
   type WorkflowFeatures,
 } from "@openbot/ui/features/workflows/workflow-model";
 import { currentText } from "@openbot/ui/text";
-import { createMemo, Show, untrack } from "solid-js";
+import { createMemo, createSignal, onCleanup, Show, untrack } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
 import { createWorkflowsController, type WorkflowRequest } from "./workflows-controller";
 import type { WorkflowHost } from "./workflows-port";
@@ -33,6 +33,26 @@ export function WorkflowsCanvas(props: {
     () => desktopAnalytics.scope(),
     untrack(() => props.request),
   );
+  // Sunra makes files on the host's Sunra sign-in, which the person makes in Apps and finishes in the
+  // browser. The canvas reads it again when the window comes back to the front.
+  // A failed read keeps the last answer.
+  const [sunra, setSunra] = createSignal(false);
+  let disposed = false;
+  const readMediaProviders = () => {
+    if (!props.host.mediaSupported()) return;
+    void props.host.workflows
+      .mediaProviders()
+      .then((providers) => {
+        if (!disposed) setSunra(providers.sunra);
+      })
+      .catch(() => undefined);
+  };
+  readMediaProviders();
+  window.addEventListener("focus", readMediaProviders);
+  onCleanup(() => {
+    disposed = true;
+    window.removeEventListener("focus", readMediaProviders);
+  });
   const catalogs: WorkflowCatalogs = {
     get agents() {
       return props.agents;
@@ -59,14 +79,30 @@ export function WorkflowsCanvas(props: {
       return workflows.channels();
     },
     // Only the models of a provider that is on and signed in now. The host makes the file with that
-    // subscription, or with the provider's API key when it uses one.
+    // subscription, or with the provider's API key when it uses one. Sunra models need the host's
+    // Sunra sign-in, and its credits pay for each file.
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
       return WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+        if (model.provider === "sunra") return sunra() ? [model] : [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];
-        return [{ ...model, ...(status.apiKeyInUse ? { apiKey: true } : {}) }];
+        // The picker lists each account of a provider that has more than one, when the host makes the
+        // file on the account of the step.
+        const accounts = props.host.mediaAccountSupported()
+          ? props.status.providers?.find((row) => row.id === model.provider)?.accounts
+          : undefined;
+        // An older host ignores the background of a step, so its models make no transparent image.
+        const { transparent, ...rest } = model;
+        return [
+          {
+            ...rest,
+            ...(transparent && props.host.mediaTransparentSupported() ? { transparent } : {}),
+            ...(status.apiKeyInUse ? { apiKey: true } : {}),
+            ...(accounts && accounts.length > 1 ? { accounts } : {}),
+          },
+        ];
       });
     },
     get media() {

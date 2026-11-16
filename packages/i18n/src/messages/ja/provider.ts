@@ -168,22 +168,36 @@ export const messages = {
   "provider.geminiKey.title": "Gemini API キー",
   "provider.geminiKey.description":
     "このコンピューターに Gemini API キーを保存します。保存したキーは Google アカウントの代わりに使われます。Google でサインインするには、キーを削除してから Gemini の行で「接続」を選択してください。",
+  "provider.geminiKey.descriptionHost":
+    "ホストに Gemini API キーを保存します。保存したキーは Google アカウントの代わりに使われます。Google でサインインするには、キーを削除してから Gemini の行で「接続」を選択してください。",
   "provider.geminiKey.label": "Gemini API キー",
   "provider.claudeKey.title": "Anthropic API キー",
   "provider.claudeKey.description":
     "ホストに Anthropic API キーを保存します。Anthropic は各リクエストをキーの API クレジットに請求し、Claude のプランには請求しません。エージェントで使うには、エージェントのモデルメニューで「APIキー」アカウントを選択します。Claude にサインインしていない場合、すべてのエージェントがキーを使います。",
   "provider.claudeKey.label": "Anthropic API キー",
+  "provider.cursorKey.title": "Cursor API キー",
+  "provider.cursorKey.description":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはこのコンピューターに保存されます。",
+  "provider.cursorKey.descriptionHost":
+    "2 つ目以降の Cursor アカウントは API キーを使います。Cursor ダッシュボードの Integrations でキーを作成し、ここに貼り付けてください。キーはホストに保存されます。",
+  "provider.cursorKey.label": "Cursor API キー",
   "provider.inceptionKey.title": "Inception API キー",
   "provider.inceptionKey.description":
     "Mercury モデルを使うには、このコンピューターに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.inceptionKey.descriptionHost":
+    "Mercury モデルを使うには、ホストに Inception API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.inceptionKey.label": "Inception API キー",
   "provider.deepseekKey.title": "DeepSeek API キー",
   "provider.deepseekKey.description":
     "DeepSeek モデルを使うには、このコンピューターに DeepSeek API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.deepseekKey.descriptionHost":
+    "DeepSeek モデルを使うには、ホストに DeepSeek API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.deepseekKey.label": "DeepSeek API キー",
   "provider.openrouterKey.title": "OpenRouter API キー",
   "provider.openrouterKey.description":
     "OpenRouter のモデルを使うには、このコンピューターに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
+  "provider.openrouterKey.descriptionHost":
+    "OpenRouter のモデルを使うには、ホストに OpenRouter API キーを保存します。OpenBot はダウンロードした Pi CLI でモデルを実行します。",
   "provider.openrouterKey.label": "OpenRouter API キー",
 
   "provider.openCodeKey.title": "OpenCode Go にサインイン",
@@ -200,6 +214,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "再接続できませんでした。",
   "provider.account.add": "アカウントを追加",
   "provider.account.addLabel": "別の {name} アカウントを追加",
+  "provider.account.addWithCode": "コードでアカウントを追加",
   "provider.account.count": { other: "アカウント {count} 件" },
   "provider.account.numbered": "アカウント {number}",
   "provider.account.apiKey": "APIキー",

@@ -259,15 +259,34 @@ export function activeChannelRuns(page: ChannelPage): string[] {
   return [...runs];
 }
 
-/** The newest question of an agent that nobody answered yet. An archived channel takes no answer. */
+/**
+ * The newest question of an agent that the host still waits on. An archived channel takes no answer.
+ * The saved row can miss the end of its question, so only a question in the host's list is open, as
+ * an approval is. Before, a stale row stayed open and its answer failed (#8142). The request must
+ * also come from the channel's thread: a custom agent counts its request ids again after a restart.
+ */
 export function waitingChannelPrompt(
   page: ChannelPage,
+  threads: readonly ChannelThread[] | undefined,
+  waiting: readonly { agentId: string; threadId: string; requestId: string | number }[],
 ): { entry: ChannelMessage; prompt: ConversationQuestionPrompt } | null {
   if (page.channel.archived) return null;
   for (let index = page.messages.length - 1; index >= 0; index -= 1) {
     const entry = page.messages[index];
     const prompt = entry?.message.questionPrompt;
-    if (entry && prompt && entry.author.kind !== "member" && !prompt.resolution) return { entry, prompt };
+    if (
+      entry &&
+      prompt &&
+      entry.author.kind !== "member" &&
+      !prompt.resolution &&
+      waiting.some(
+        (request) =>
+          request.agentId === entry.author.id &&
+          String(request.requestId) === String(prompt.requestId) &&
+          channelOwnsRequest(page, threads, request),
+      )
+    )
+      return { entry, prompt };
   }
   return null;
 }

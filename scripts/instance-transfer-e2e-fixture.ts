@@ -2,7 +2,11 @@
 // agents that have only workspace files. Every other boundary call fails.
 
 import { dirname, join } from "node:path";
-import { DEFAULT_AGENT_DEFAULTS, DEFAULT_MACHINE_ALERT_SETTINGS } from "@openbot/contracts/ipc";
+import {
+  DEFAULT_AGENT_DEFAULTS,
+  DEFAULT_MACHINE_ALERT_SETTINGS,
+  type HostTurnLimitsInput,
+} from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { type InstanceTransferOptions, InstanceTransferService } from "../src/main/instance-transfer-service";
 import { LocalSkillFailure } from "../src/main/local-skill-library";
@@ -168,6 +172,7 @@ export function emptyInstanceTransferService(
     claudeCompactWindow: preference<number | null>("claudeCompactWindow", null),
     machineAlerts: preference("machineAlerts", DEFAULT_MACHINE_ALERT_SETTINGS),
     modelVisibility: preference<{ provider: string; hidden: string[] }[]>("modelVisibility", []),
+    turnLimits: preference<HostTurnLimitsInput>("turnLimits", { turnLimit: null, agentTaskLimit: null }),
   };
   const options: InstanceTransferOptions = {
     uploadDirectory,

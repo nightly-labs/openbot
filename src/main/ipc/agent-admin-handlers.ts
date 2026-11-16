@@ -17,7 +17,6 @@ import {
   decodeAgentDefaultsOverview,
   decodeAgentPlanCardSettings,
   decodeAgentSpeedSettings,
-  decodeAgentTaskLimitSettings,
   decodeBrowserComputerSharing,
   decodeBrowserProfileList,
   decodeBrowserProfileSummary,
@@ -44,7 +43,6 @@ import {
   parseUpdateAgentHostSettingsInput,
   parseUpdateAgentNewChatInput,
   parseUpdateAgentPlanCardInput,
-  parseUpdateAgentTaskLimitInput,
   parseUpdateBrowserProfileInput,
   type UpdateAgentFastModeInput,
 } from "@openbot/contracts/ipc";
@@ -74,10 +72,6 @@ import {
   AGENT_PUBLISH_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-publish-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
-import {
-  AGENT_TASK_LIMIT_CAPABILITY,
-  AGENT_TASK_LIMIT_ROUTES,
-} from "@openbot/contracts/team-protocol/agent-task-limit-v1";
 import { AGENT_UPDATE_CAPABILITY, AGENT_UPDATE_ROUTES } from "@openbot/contracts/team-protocol/agent-update-v1";
 import {
   BROWSER_PROFILES_CAPABILITY,
@@ -203,14 +197,6 @@ export function agentAdminIpcHandlers({
       updateAgentBackupModels: scopedHandler(parseUpdateAgentBackupModelsInput, {
         local: (input) => runCauseEffect(hostSettings.updateBackupModels(input)),
         remote: (input, serverId) => remoteBackupModels(serverId, AGENT_BACKUP_MODELS_ROUTES.update, input),
-      }),
-      getAgentTaskLimit: scopedHandler((value) => requireString(value, "agentId"), {
-        local: (agentId) => hostSettings.readTaskLimit(agentId),
-        remote: (agentId, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.settings, { agentId }),
-      }),
-      updateAgentTaskLimit: scopedHandler(parseUpdateAgentTaskLimitInput, {
-        local: (input) => runCauseEffect(hostSettings.updateTaskLimit(input)),
-        remote: (input, serverId) => remoteTaskLimit(serverId, AGENT_TASK_LIMIT_ROUTES.update, input),
       }),
       getAgentNewChat: scopedHandler((value) => requireString(value, "agentId"), {
         local: (agentId) => hostSettings.readNewChat(agentId),
@@ -436,14 +422,6 @@ export function agentAdminIpcHandlers({
     if (!remoteServers.supportsCapability(serverId, BROWSER_PROXIES_CAPABILITY))
       throw new Error(sourceText("error.team.agentSettingsUnsupported"));
     return runCauseEffect(remoteServers.request(serverId, path, decode, { method: "POST", body }));
-  }
-
-  function remoteTaskLimit(serverId: string, path: string, body: unknown) {
-    if (!remoteServers.supportsCapability(serverId, AGENT_TASK_LIMIT_CAPABILITY))
-      throw new Error(sourceText("error.team.agentSettingsUnsupported"));
-    return runCauseEffect(
-      remoteServers.request(serverId, path, decodeAgentTaskLimitSettings, { method: "POST", body }),
-    );
   }
 
   function remoteAgentDefaults(serverId: string, path: string, body: unknown) {
