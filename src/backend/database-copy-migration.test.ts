@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, truncate, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -13,7 +13,8 @@ import { migrateOpenBotDatabase, readSchemaVersion } from "./openbot-database-sc
 
 // Failure modes: a start copies the database when no migration runs, or a new database; the copy misses rows or has
 // the migrated schema in place of the old one; old copies fill the disk; a failed copy or a full disk stops the start;
-// a failed migration changes the database or the copy that was made before it.
+// a removed copy gives back less space than its size; a failed migration changes the database or the copy that was
+// made before it.
 const APP_VERSION = "1.2.3";
 const roots: string[] = [];
 const opened: OpenBotDatabase[] = [];
@@ -209,28 +210,41 @@ describe("the copy of openbot.db before a migration", () => {
     expect(readContents(join(root, "openbot.db")).version).toBe(LATEST_VERSION);
   });
 
-  it("removes the oldest copy first when only that gives enough free space", async () => {
+  it("removes the oldest copy first and measures the free space again", async () => {
     const root = await userData();
     const directory = join(root, DATABASE_COPY_DIRECTORY);
     await mkdir(directory, { recursive: true });
     const oldest = "20200101T000000000Z-schema-40-before-0.40.0.db";
     const old = "20210101T000000000Z-schema-50-before-0.50.0.db";
-    await writeFile(join(directory, oldest), "older");
-    await writeFile(join(directory, old), "old");
+    const writeOldCopies = async () => {
+      await writeFile(join(directory, oldest), "older");
+      await writeFile(join(directory, old), "old");
+    };
+    await writeOldCopies();
     writeDatabaseAt(root, LATEST_VERSION - 1);
 
-    // The old copies are too small to give enough space: the start removes none of them and makes no copy.
+    // The removal gives back no space (a sparse file, a compressed file system or a snapshot):
+    // the start makes no copy, keeps the newest old copy, and migrates.
     await start(root, { freeDiskBytes: async () => 0 });
     closeAll();
-    expect(await copyNames(root)).toEqual([oldest, old]);
+    expect(await copyNames(root)).toEqual([old]);
+    expect(readContents(join(root, "openbot.db")).version).toBe(LATEST_VERSION);
 
-    // A large oldest copy (a sparse file) gives enough space when the start removes it.
-    await truncate(join(directory, oldest), 256 * 1024 * 1024);
+    // The removal gives back enough space: the start makes the copy.
+    await writeOldCopies();
     await rm(join(root, "openbot.db"));
     writeDatabaseAt(root, LATEST_VERSION - 1);
-    await start(root, { freeDiskBytes: async () => 0 });
+    const measured: boolean[] = [];
+    await start(root, {
+      freeDiskBytes: async () => {
+        const oldestExists = existsSync(join(directory, oldest));
+        measured.push(oldestExists);
+        return oldestExists ? 0 : Number.MAX_SAFE_INTEGER;
+      },
+    });
     closeAll();
 
+    expect(measured).toEqual([true, false]);
     const names = await copyNames(root);
     expect(names).toHaveLength(2);
     expect(names[0]).toBe(old);

@@ -238,8 +238,8 @@ Before an update changes the format of your data, OpenBot copies the database in
 
 On Windows, the folder is `%APPDATA%\OpenBot\openbot-db-copies`. A copy is named
 `<time>-schema-<n>-before-<version>.db`: OpenBot made it before version `<version>` updated the data.
-Releases before this one made no copy, and OpenBot makes no copy when the disk has too little free
-space.
+Releases before this one made no copy. When the disk has too little free space, OpenBot first removes
+the older copy. When the space is still too little, OpenBot makes no copy.
 
 Use a copy only when the new version does not work with your data. The copy does not have the
 messages, agents and settings that came after it. To go back:

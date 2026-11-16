@@ -244,7 +244,7 @@ export class DatabaseCore {
           } else {
             logger.warn(
               `The disk has not enough free space for a copy of the OpenBot database. The migration from schema version ${sourceVersion} continues without a copy.`,
-              { requiredBytes: result.requiredBytes, freeBytes: result.freeBytes },
+              { requiredBytes: result.requiredBytes, freeBytes: result.freeBytes, removedCopies: result.removedCopies },
             );
           }
         }),

@@ -24,8 +24,10 @@ Report a finding when the diff:
   or integrity checks skipped before startup continues.
 - Adds a migration without data-preservation fixtures for every affected released schema, or without
   failure, rollback, retry, downgrade, missing-version, foreign-key, and integrity coverage.
-- Adds an automatic full-database backup before a migration. Conversation history lives in SQLite, so
-  the time and disk cost is unbounded; the migration itself has to be safe.
+- Adds an automatic full-database backup other than the copy in
+  `src/backend/database/pre-migration-copy.ts`, makes that copy block the start, or makes code read a
+  copy or assume that one exists. Conversation history lives in SQLite, so the time and disk cost is
+  unbounded; the migration itself has to be safe.
 - Changes a released Team API protocol under `packages/contracts/src/team-protocol` — a required
   field, a removed field, or a changed meaning. That needs a new version, not an edit.
 - Removes a registered adapter, or serializes current IPC types directly across the Team API

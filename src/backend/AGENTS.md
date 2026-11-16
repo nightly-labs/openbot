@@ -6,8 +6,8 @@ of something remote — which is what makes the first section below non-negotiab
 
 ## Database migrations
 
-- Nothing copies `openbot.db` before an upgrade. Every migration is an irreversible production data
-  operation: preserve all user data, support every shipped source schema, never depend on a backup.
+- Every migration is an irreversible production data operation: preserve all user data, support
+  every shipped source schema, never depend on a copy or a backup.
 - Keep each schema change and its `schema_migrations` marker in one transaction. Roll back on any
   error, restore foreign-key enforcement in `finally`, and run the integrity checks before startup
   continues.
@@ -19,8 +19,14 @@ of something remote — which is what makes the first section below non-negotiab
 - A migration change needs data-preservation fixtures for every affected released schema, plus
   failure, rollback, retry, downgrade, missing-version, foreign-key and integrity coverage at the
   stable database boundary.
-- No automatic full-database backups: conversation history lives in SQLite, so their time and disk
-  cost is unbounded. Make the migration itself safe instead.
+- Before the first pending migration, `database/pre-migration-copy.ts` copies `openbot.db` into
+  `openbot-db-copies/` when the disk has space, and keeps the newest two copies (developer decision,
+  2026-11-17, plan 011). The copy is a recovery aid for a manual return to the earlier release, not a
+  rollback path. Releases before it made no copy, and a copy can fail, so no code may read a copy or
+  assume that one exists. Make the migration itself safe.
+- Keep the copy non-blocking: a failed or skipped copy never stops the start. Do not add other
+  automatic full-database backups: conversation history lives in SQLite, so their time and disk cost
+  is unbounded.
 
 ### The two build paths
 

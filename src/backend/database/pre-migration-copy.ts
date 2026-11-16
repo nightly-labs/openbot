@@ -1,4 +1,4 @@
-import { chmod, mkdir, readdir, rename, rm, stat, statfs } from "node:fs/promises";
+import { chmod, mkdir, readdir, rename, rm, statfs } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -27,7 +27,7 @@ export interface DatabaseCopyOptions {
 type DatabaseCopyResult =
   | { status: "copied"; fileName: string; removedCopies: number }
   | { status: "kept"; fileName: string }
-  | { status: "skipped"; requiredBytes: number; freeBytes: number };
+  | { status: "skipped"; requiredBytes: number; freeBytes: number; removedCopies: number };
 
 /** A copy step failed. The cause stays private: a file system error message holds a user path. */
 export class DatabaseCopyFailure extends Schema.TaggedError<DatabaseCopyFailure>()("DatabaseCopyFailure", {
@@ -48,8 +48,9 @@ interface DatabaseCopyInput extends DatabaseCopyOptions {
  * final name only after it opens and passes `PRAGMA integrity_check` with the source schema version,
  * so a file with that name is always a complete copy. Then only the newest `KEPT_DATABASE_COPIES`
  * copies stay. When the disk has not enough free space, it first removes the copies that this
- * rotation removes anyway. When that also does not give enough space, it removes nothing, makes no
- * copy and returns `skipped`.
+ * rotation removes anyway, and measures the free space again: a removed file can give back less
+ * space than its size (a sparse file, a compressed file system or a snapshot). When the space is
+ * still not enough, it makes no copy and returns `skipped`.
  *
  * A start after a failed migration tries again. When this app version already copied the database
  * at a lower schema version, some of its migrations committed before the failure, and only that
@@ -86,15 +87,16 @@ export const copyDatabaseBeforeMigration = Effect.fn("copyDatabaseBeforeMigratio
     storedSync(() => readSizes(input.db)),
   );
   const requiredBytes = sizes.copyBytes + sizes.databaseBytes + SPACE_RESERVE_BYTES;
-  const freeBytes = yield* step("prepare", () => freeDiskBytes(directory));
+  let freeBytes = yield* step("prepare", () => freeDiskBytes(directory));
   let removedFirst = 0;
-  if (freeBytes < requiredBytes) {
-    const surplusBytes = surplus.reduce((total, copy) => total + copy.bytes, 0);
-    if (freeBytes + surplusBytes < requiredBytes) {
-      return { status: "skipped", requiredBytes, freeBytes } satisfies DatabaseCopyResult;
-    }
+  if (freeBytes < requiredBytes && surplus.length > 0) {
     const names = new Set(surplus.map((copy) => copy.name));
-    removedFirst = yield* step("rotate", () => removeFiles(directory, (name) => names.has(name)));
+    // Not the "rotate" stage: no new copy exists yet, so a failure here means that no copy was made.
+    removedFirst = yield* step("prepare", () => removeFiles(directory, (name) => names.has(name)));
+    freeBytes = yield* step("prepare", () => freeDiskBytes(directory));
+  }
+  if (freeBytes < requiredBytes) {
+    return { status: "skipped", requiredBytes, freeBytes, removedCopies: removedFirst } satisfies DatabaseCopyResult;
   }
 
   const fileName = copyFileName(input.sourceVersion, appVersion, input.now ?? new Date());
@@ -183,7 +185,6 @@ interface StoredCopy {
   name: string;
   sourceVersion: number;
   appVersion: string;
-  bytes: number;
 }
 
 /** The copies in `directory`, oldest first. Files with other names are not copies. */
@@ -191,9 +192,7 @@ async function readCopies(directory: string): Promise<StoredCopy[]> {
   const copies: StoredCopy[] = [];
   for (const name of (await readdir(directory)).sort()) {
     const match = COPY_NAME.exec(name);
-    if (!match) continue;
-    const { size } = await stat(join(directory, name));
-    copies.push({ name, sourceVersion: Number(match[1]), appVersion: match[2] ?? "", bytes: size });
+    if (match) copies.push({ name, sourceVersion: Number(match[1]), appVersion: match[2] ?? "" });
   }
   return copies;
 }
