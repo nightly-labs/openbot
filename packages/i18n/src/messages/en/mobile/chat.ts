@@ -540,6 +540,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.discardMessage": "The queued message keeps the text the agent already has.",
   "mobile.chat.queue.discard": "Discard",
   "mobile.chat.queue.alreadyReceived": "The agent already received this message, so it cannot be changed.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "The agent already received this message, so it cannot be changed. When you close this screen, your text goes to the message box.",
   "mobile.chat.queue.holding": "Holding the message for you…",
   "mobile.chat.queue.holdFailed": "OpenBot could not hold this message for editing.",
   "mobile.chat.queue.messageLabel": "Message",

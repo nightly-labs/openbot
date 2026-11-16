@@ -1014,6 +1014,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.ensuring(
               Effect.sync(() => {
                 for (const agent of this.#store.list()) this.#drain.scheduleDrain(agent.id);
+                // An edit from before the restart holds its message for a new time.
+                for (const agentId of this.#mailbox.agentsWithEditHolds()) this.#queue.wakeAfterEditHold(agentId);
               }),
             ),
             toProviderOperationFailed,
@@ -5743,6 +5745,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     yield* this.#turn.dispose();
     yield* this.#usageLimits.dispose();
     this.#drain.dispose();
+    this.#queue.dispose();
     this.#planContinuation.dispose();
     this.#browser.clearControls();
     yield* Effect.forEach(clients, (client) => client.stop().pipe(Effect.catch(() => Effect.void)), {

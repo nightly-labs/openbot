@@ -113,6 +113,13 @@ export const messages = {
   "composer.error.holdQueued": "Impossibile bloccare il messaggio in coda per modificarlo.",
   "composer.error.cancelEdit": "Impossibile annullare la modifica della coda. Riprova.",
   "composer.error.updateQueued": "Impossibile aggiornare il messaggio in coda. Riprova.",
+  "composer.queueEdit.received": "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata.",
+  "composer.queueEdit.receivedKept":
+    "L’agente ha già ricevuto questo messaggio, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.deletedKept":
+    "Questo messaggio è stato eliminato, quindi la modifica è terminata. Le tue modifiche sono ancora nella casella del messaggio.",
+  "composer.queueEdit.endedKept":
+    "Questa modifica è terminata prima del salvataggio. Le tue modifiche sono ancora nella casella del messaggio.",
   "composer.voice.prepareFailed": "Impossibile preparare il modello vocale. Riprova.",
   "composer.voice.noSpeechRecorded": "Nessuna voce registrata.",
   "composer.voice.noSpeechDetected": "Nessuna voce rilevata.",

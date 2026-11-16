@@ -527,6 +527,7 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "排队消息会保留助手已经收到的文本。",
   "mobile.chat.queue.discard": "放弃",
   "mobile.chat.queue.alreadyReceived": "助手已收到该消息，因此无法修改。",
+  "mobile.chat.queue.alreadyReceivedKept": "助手已收到该消息，因此无法修改。关闭此页面后，你的文字会放回消息框。",
   "mobile.chat.queue.holding": "正在为你占用该消息…",
   "mobile.chat.queue.holdFailed": "OpenBot 无法占用该消息以供编辑。",
   "mobile.chat.queue.messageLabel": "消息",
