@@ -1788,7 +1788,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           }),
         ),
       reply: (agentId, deliveryId) => this.#liveVoiceReply(agentId, deliveryId),
-      busy: (agentId) => this.#runsTurn(agentId),
+      // Only a turn of the agent's own chat holds a new message back: a task or a channel runs beside it.
+      busy: (agentId) => this.#conversation.workingSnapshot(agentId) != null || !this.#compaction.mayDrain(agentId),
       answer: (agentId, threadId, turnId) =>
         this.#store.list().find((agent) => agent.id === agentId)?.threadId === threadId
           ? this.#turnAnswer(agentId, turnId)
@@ -5771,6 +5772,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
+   * The model of a small Codex side job that only passes on or reads text: the default Codex model, with
+   * low effort when the model has it.
+   */
+  #sideCodexModel(): AgentModelOption | undefined {
+    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
+    const model =
+      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    if (!model) return undefined;
+    return model.supportedReasoningEfforts.includes("low") ? { ...model, defaultReasoningEffort: "low" } : model;
+  }
+
+  /**
    * The Codex process of a live voice session. An agent on Codex lends its own Codex account; any other
    * agent uses the Codex sign-in of this computer. The relay model only passes requests on, so it is
    * the small default model, with low effort.
@@ -5781,19 +5794,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     const signIn = () => ({ cause: new Error(sourceText("error.voice.live.signIn")) });
     yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError(signIn));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail({ cause: new Error(sourceText("error.provider.noModel")) });
     const client = yield* Effect.try({
       try: () =>
         this.#providers.createProfileClient("codex", agent.provider === "codex" ? agent.providerAccountId : undefined),
       catch: signIn,
     });
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
-    return { client, model: model.id, effort };
+    return { client, model: model.id, effort: model.defaultReasoningEffort };
   }).bind(this);
 
   /**
@@ -5822,13 +5830,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // Codex can take a while to start, and a shutdown or other generations can begin in that time.
     if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
     if (!this.#profileClients.hasSpare()) return yield* failed(sourceText("error.agent.webSearchBusy"));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* failed(sourceText("error.provider.noModel"));
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
     const client = yield* Effect.try({
       try: () => this.#providers.createProfileClient("codex"),
       catch: () => failed(sourceText("error.agent.webSearchSignIn")),
@@ -5837,7 +5840,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          { ...model, defaultReasoningEffort: effort },
+          model,
           query,
           cancelled,
           sideSessionUsageObserver("web-search", this.#store.database.usage, agent.id, "codex", model.id),
@@ -5901,8 +5904,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * A spoken summary of a long answer for live voice, from one turn on a new Codex thread with no tools,
-   * on the Codex sign-in of this computer. Like the relay, it uses the small default model with low effort,
+   * A spoken summary of a long answer for live voice, from one turn on a new Codex thread with no tools.
+   * Like the relay, it uses the agent's own Codex account when the agent is on Codex, and else the Codex
+   * sign-in of this computer. Also like the relay, it uses the small default model with low effort,
    * and its usage counts for the agent. Like other background work, it leaves one generation slot for the
    * user's own.
    */
@@ -5915,22 +5919,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
     yield* this.#providers.ensureProvider("codex").pipe(Effect.mapError((failure) => ({ cause: failure })));
     if (this.#stopping || !this.#profileClients.hasSpare()) return yield* Effect.fail(failed("No generation slot."));
-    const models = this.#endpoints.available().filter((model) => model.provider === "codex");
-    const model =
-      models.find((candidate) => candidate.id === agentProviderDescriptor("codex").defaultModel) ?? models[0];
+    const model = this.#sideCodexModel();
     if (!model) return yield* Effect.fail(failed("No Codex model."));
-    const effort: AgentReasoningEffort = model.supportedReasoningEfforts.includes("low")
-      ? "low"
-      : model.defaultReasoningEffort;
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const client = yield* Effect.try({
-      try: () => this.#providers.createProfileClient("codex"),
+      try: () =>
+        this.#providers.createProfileClient("codex", agent?.provider === "codex" ? agent.providerAccountId : undefined),
       catch: (cause) => ({ cause }),
     });
     return yield* this.#profileClients
       .run(client, (cancelled) =>
         generateTextWithoutTools(
           client,
-          { ...model, defaultReasoningEffort: effort },
+          model,
           prompt,
           cancelled,
           sideSessionUsageObserver("voice-summary", this.#store.database.usage, agentId, "codex", model.id),

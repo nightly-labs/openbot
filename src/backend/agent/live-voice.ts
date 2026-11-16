@@ -72,14 +72,17 @@ const RELAY_VERBATIM_BYTES = 600;
 const RELAY_SUMMARY_WORDS = 150;
 /** The first line of a tool result with a longer answer. The relay model does not measure the length reliably. */
 const LONG_ANSWER_MARK = "[long answer]";
+/** How a model makes the spoken summary of a long answer: the relay, or a summary without a request. */
+const SUMMARY_RULES =
+  `its most important facts in ${RELAY_SUMMARY_WORDS} words or fewer, in the language of the answer. ` +
+  "Use only facts from the answer, and never add or change one. " +
+  "Write plain sentences without links, lists, formatting or code. " +
+  "End with one sentence that says that the full answer is in the chat. ";
 const RELAY_INSTRUCTIONS =
   "You relay requests. For every user request, call ask_agent exactly once with the request verbatim. " +
   "Never answer on your own. The tool result is the agent's answer, and a voice says your reply aloud. " +
   `If the first line of the result is ${LONG_ANSWER_MARK}, the answer is too long for the voice: reply with ` +
-  `its most important facts in ${RELAY_SUMMARY_WORDS} words or fewer, in the language of the answer. ` +
-  "Use only facts from the answer, and never add or change one. " +
-  "Write plain sentences without links, lists, formatting or code. " +
-  "End with one sentence that says that the full answer is in the chat. " +
+  SUMMARY_RULES +
   "If the result has no such first line, your reply is the complete result, word for word and nothing else: " +
   "do not shorten it, and do not change its form.";
 /**
@@ -105,11 +108,10 @@ const QUEUED_NOTICE =
 const LONG_ANSWER_FALLBACK = "The agent gave a long answer. It is in the chat.";
 /** The prompt that makes the summary of a long answer that the voice says without a request. */
 const summaryPrompt = (answer: string) =>
-  `A voice says your reply aloud. Give the most important facts of the answer below in ${RELAY_SUMMARY_WORDS} ` +
-  "words or fewer, in the language of the answer. Use only facts from the answer, and never add or change one. " +
-  "Write plain sentences without links, lists, formatting or code. " +
-  "End with one sentence that says that the full answer is in the chat. Reply with the summary only.\n\n" +
-  `Answer:\n${answer}`;
+  `A voice says your reply aloud. The answer below is too long for the voice: reply with ${SUMMARY_RULES}` +
+  `Reply with the summary only.\n\nAnswer:\n${answer}`;
+/** What the relay gets for a request that the agent answered in the same turn as an earlier request. */
+const SAME_TURN_REPLY = "The agent answered this request together with the previous one.";
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -186,6 +188,8 @@ interface LiveSession {
   readonly speech: Semaphore.Semaphore;
   /** The turns whose answer went to the voice already. */
   readonly answeredTurns: Set<string>;
+  /** The texts that wait for the voice, so that the end of the session stops them. */
+  readonly speaking: Set<Fiber.Fiber<void>>;
 }
 
 /**
@@ -257,6 +261,7 @@ export class LiveVoice {
       onExit: () => this.#end(session, sourceText("error.voice.live.disconnected")),
       speech: Semaphore.makeUnsafe(1),
       answeredTurns: new Set(),
+      speaking: new Set(),
     };
     this.#sessions.set(session.id, session);
     relay.client.on("notification", session.onNotification);
@@ -372,7 +377,7 @@ export class LiveVoice {
       if (session.agentId !== event.agentId || !session.threadId) continue;
       if (session.answeredTurns.delete(event.turnId)) continue;
       const answer = this.#hooks.answer(event.agentId, event.threadId, event.turnId);
-      if (answer) this.#speak(session, answer);
+      if (answer) this.#say(session, this.#speech(session.agentId, answer));
     }
   }
 
@@ -458,7 +463,7 @@ export class LiveVoice {
               { once: true },
             );
             this.#answerSettled();
-            if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE));
+            if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE), false);
           },
         }),
       ),
@@ -470,9 +475,12 @@ export class LiveVoice {
       const reply = this.#hooks.reply(ask.session.agentId, ask.deliveryId);
       if (!reply) continue;
       this.#asks.delete(ask);
+      // The agent answers the requests that waited together in one turn: the voice says the answer once.
+      const repeat = reply.turnId !== undefined && ask.session.answeredTurns.has(reply.turnId);
       if (reply.turnId) ask.session.answeredTurns.add(reply.turnId);
-      if (ask.requestId === null) this.#speak(ask.session, reply.text);
-      else this.#respond(ask.session, ask.requestId, reply);
+      if (ask.requestId !== null)
+        this.#respond(ask.session, ask.requestId, repeat ? { success: true, text: SAME_TURN_REPLY } : reply);
+      else if (!repeat) this.#say(ask.session, this.#speech(ask.session.agentId, reply.text));
     }
   }
 
@@ -483,46 +491,44 @@ export class LiveVoice {
   }
 
   /**
-   * Makes the voice say an answer that no open request waits for: a short answer as plain sentences,
-   * a long one as a summary. The text goes to OpenAI, so it loses the configured secrets first. The
-   * answers go to the voice in the order that they came.
+   * What the voice says for an answer that no open request waits for: a short answer as plain sentences,
+   * a long one as a summary. The text goes to OpenAI, so it loses the configured secrets first.
    */
-  #speak(session: LiveSession, answer: string): void {
+  #speech(agentId: string, answer: string): Effect.Effect<string> {
     const redacted = this.#hooks.redact(answer);
-    this.#say(
-      session,
-      Buffer.byteLength(redacted) > RELAY_VERBATIM_BYTES
-        ? this.#hooks.summarize(session.agentId, summaryPrompt(redacted)).pipe(
-            Effect.map((summary) => this.#hooks.redact(summary.trim()) || LONG_ANSWER_FALLBACK),
-            Effect.catch((failure) =>
-              Effect.sync(() => {
-                logger.warn("Could not make a summary of an answer for live voice.", { error: failure.cause });
-                return LONG_ANSWER_FALLBACK;
-              }),
-            ),
-          )
-        : Effect.succeed(speechTextFromMarkdown(redacted)),
+    if (Buffer.byteLength(redacted) <= RELAY_VERBATIM_BYTES) return Effect.succeed(speechTextFromMarkdown(redacted));
+    return this.#hooks.summarize(agentId, summaryPrompt(redacted)).pipe(
+      Effect.map((summary) => this.#hooks.redact(summary.trim()) || LONG_ANSWER_FALLBACK),
+      Effect.catch((failure) =>
+        Effect.sync(() => {
+          logger.warn("Could not make a summary of an answer for live voice.", { error: failure.cause });
+          return LONG_ANSWER_FALLBACK;
+        }),
+      ),
     );
   }
 
-  /** Gives text to the voice to say, after the texts that came before it. */
-  #say(session: LiveSession, text: Effect.Effect<string>): void {
-    Effect.runFork(
-      text.pipe(
-        Effect.flatMap((speech) => {
-          const threadId = session.threadId;
-          if (!speech || !threadId || !this.#sessions.has(session.id)) return Effect.void;
-          return session.client
-            .request("thread/realtime/appendSpeech", { threadId, text: speech }, decodeRecordResponse)
-            .pipe(
-              Effect.catch((failure) =>
-                Effect.sync(() => logger.warn("Live voice could not say an answer.", { error: failure })),
-              ),
-            );
-        }),
-        session.speech.withPermit,
-      ),
+  /**
+   * Gives text to the voice to say. An answer waits for the answers that came before it. A notice
+   * (`ordered` false) does not wait for a summary that OpenBot still makes. The end of the session stops it.
+   */
+  #say(session: LiveSession, text: Effect.Effect<string>, ordered = true): void {
+    const say = text.pipe(
+      Effect.flatMap((speech) => {
+        const threadId = session.threadId;
+        if (!speech || !threadId || !this.#sessions.has(session.id)) return Effect.void;
+        return session.client
+          .request("thread/realtime/appendSpeech", { threadId, text: speech }, decodeRecordResponse)
+          .pipe(
+            Effect.catch((failure) =>
+              Effect.sync(() => logger.warn("Live voice could not say an answer.", { error: failure })),
+            ),
+          );
+      }),
     );
+    const fiber = Effect.runFork(ordered ? session.speech.withPermit(say) : say);
+    session.speaking.add(fiber);
+    fiber.addObserver(() => session.speaking.delete(fiber));
   }
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
@@ -576,6 +582,7 @@ export class LiveVoice {
     session.client.off("request", session.onRequest);
     session.client.off("exit", session.onExit);
     for (const ask of this.#asks) if (ask.session === session) this.#asks.delete(ask);
+    for (const fiber of session.speaking) Effect.runFork(Fiber.interrupt(fiber));
     Deferred.doneUnsafe(session.answer, Effect.fail(liveFailure(error ?? sourceText("error.voice.live.disconnected"))));
     const closing = Effect.runFork(
       stopToolless(session.client).pipe(

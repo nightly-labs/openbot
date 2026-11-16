@@ -10,3 +10,4 @@
   answer to a typed message. It says a long answer as a short summary.
 - When you speak a request while the agent works on an earlier one, the voice tells you at once that
   your request is in the queue. It says the answer when the agent finishes.
+- On a joined server, these changes need the new version on the server too.
