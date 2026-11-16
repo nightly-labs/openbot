@@ -330,7 +330,7 @@ export interface AgentIpcDependencies {
   openExternal: (url: string) => Promise<void>;
   /** The models that the model picker shows. Only the local list is filtered here; a host filters its own. */
   modelVisibility: Pick<ModelVisibility, "picker">;
-  /** Closes the shown notifications of a chat. A read comes only while the user looks at the chat. */
+  /** Closes the shown notifications of a chat that the user read while an app window has focus. */
   closeChatNotifications: (serverId: string, chat: NotificationChat) => void;
 }
 

@@ -208,6 +208,10 @@ export function createRendererForwarders({
 
   /** Closes the shown notifications of a chat that the user read. */
   function closeChatNotifications(serverId: string, chat: NotificationChat): void {
+    // The agent dock reads while it is on screen, also when no app window has focus. Its notifications
+    // are then still news.
+    const window = getMainWindow();
+    if (!window || window.isDestroyed() || !appFocused(window)) return;
     const key = chatKey(serverId, chat);
     const shown = chatNotifications.get(key);
     if (!shown) return;
