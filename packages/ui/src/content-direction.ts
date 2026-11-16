@@ -22,6 +22,42 @@ export function firstTextDirection(texts: Iterable<string>): "ltr" | "rtl" | und
   return undefined;
 }
 
+/**
+ * The direction of one line of user text. A line that opens with a Latin word but has more
+ * right-to-left words is right to left, as "OpenBot روی ویندوز نصب شد" is Persian. Otherwise it is
+ * the direction of the first letter, so a line that starts right to left stays so.
+ */
+function lineDirection(line: string): "ltr" | "rtl" | undefined {
+  const first = textDirection(line);
+  if (first !== "ltr" || !hasRightToLeftLetter(line)) return first;
+  let rightToLeftLead = 0;
+  for (const word of line.split(/\s+/u)) {
+    const direction = textDirection(word);
+    if (direction === "rtl") rightToLeftLead += 1;
+    else if (direction === "ltr") rightToLeftLead -= 1;
+  }
+  return rightToLeftLead > 0 ? "rtl" : "ltr";
+}
+
+/**
+ * The `dir` for a block whose lines otherwise take the direction of their first letter
+ * (`unicode-bidi: plaintext`), or undefined to keep that. It is set only when a line opens with a
+ * Latin word but reads right to left, and all lines of the block read in the same direction, so
+ * no line takes a direction that its words do not give it.
+ */
+export function blockDirectionOverride(text: string): "ltr" | "rtl" | undefined {
+  let direction: "ltr" | "rtl" | undefined;
+  let differs = false;
+  for (const line of text.split("\n")) {
+    const own = lineDirection(line);
+    if (!own) continue;
+    if (direction && own !== direction) return undefined;
+    direction = own;
+    if (own !== textDirection(line)) differs = true;
+  }
+  return differs ? direction : undefined;
+}
+
 /** The text has a letter of a right-to-left script. Arabic-Indic digits are not letters. */
 export function hasRightToLeftLetter(text: string): boolean {
   for (const character of text) if (LETTER.test(character) && RTL_LETTER.test(character)) return true;
