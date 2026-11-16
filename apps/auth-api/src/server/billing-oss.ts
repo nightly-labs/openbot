@@ -13,7 +13,7 @@ import type { StripeEvent } from "./stripe-client";
  * buyer's country, through the One Stop Shop, and no longer Polish VAT. The alert comes first, so that
  * there is time to register.
  */
-export const OSS_ALERT_EUR = 900_000;
+const OSS_ALERT_EUR = 900_000;
 const OSS_LIMIT_EUR = 1_000_000;
 const CURRENCIES: readonly BillingUsdCurrency[] = ["eur", "usd", "pln", "brl"];
 /** USD per euro is read with a large amount, so that the rounding to cents changes nothing. */
@@ -125,6 +125,6 @@ function euro(cents: number): string {
   return new Intl.NumberFormat("en", { style: "currency", currency: "EUR" }).format(cents / 100);
 }
 
-export function ossAlertText(year: number, totalEur: number): string {
+function ossAlertText(year: number, totalEur: number): string {
   return `VAT limit: in ${year}, sales to consumers in other EU countries reached ${euro(totalEur)} (net). Above ${euro(OSS_LIMIT_EUR)} a year, OpenBot must charge the VAT of the buyer's country through the One Stop Shop, not Polish VAT. Register for OSS and change the VAT before the limit.`;
 }

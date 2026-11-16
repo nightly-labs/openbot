@@ -62,7 +62,7 @@ const taxIdSchema = Schema.Struct({
   /** Stripe's own check of an EU VAT ID with VIES, for an ID that Checkout collected. */
   verification: Schema.optional(Schema.NullOr(Schema.Struct({ status: Schema.String }))),
 });
-export type StripeTaxId = typeof taxIdSchema.Type;
+type StripeTaxId = typeof taxIdSchema.Type;
 const customerTaxSchema = Schema.Struct({
   id: Schema.String,
   deleted: Schema.optional(Schema.Boolean),

@@ -1,7 +1,7 @@
 import { Effect, Option, Schema } from "effect";
 
 /** The EU Commission's VAT ID check (VIES). A test passes the test service, which answers set numbers. */
-export const VIES_CHECK_URL = "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number";
+const VIES_CHECK_URL = "https://ec.europa.eu/taxation_customs/vies/rest-api/check-vat-number";
 const VIES_TIMEOUT_MS = 10_000;
 
 export type ViesFetch = (input: string, init: RequestInit) => Promise<Response>;
