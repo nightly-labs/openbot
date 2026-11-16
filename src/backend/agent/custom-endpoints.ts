@@ -156,7 +156,7 @@ export class CustomEndpoints {
    * `ollama` and `lmstudio`, which it asks again every 30 s. Checked with OpenCode 2.2.7 and 2.3.0
    * (#7962). The model picker then showed models that the user's server does not have, and a turn on
    * one failed. A model that an agent uses, as its model, a queued model, a backup or a usage-limit
-   * return, stays, so no agent moves off its model.
+   * return, stays, so no agent moves off its model. The default model of new agents stays too.
    */
   #addedEndpointModels(listed: readonly AgentModelOption[]): ReadonlySet<AgentModelOption> {
     const added = new Set<AgentModelOption>();
@@ -177,10 +177,13 @@ export class CustomEndpoints {
 
   /**
    * Each model that an agent names: its model, the model a queued change moves it to, its backup
-   * models and the model it returns to. The same set as `modelsInUse` of the model picker.
+   * models and the model it returns to, as `modelsInUse` of the model picker. Also the default model
+   * of new agents, so that a new agent does not start on another model.
    */
   #modelsInUse(): ReadonlySet<string> {
     const keys = new Set<string>();
+    const preference = this.#hooks.preference();
+    if (preference.model !== null) keys.add(choiceKey(preference.provider, preference.model));
     for (const agent of this.#store.list()) {
       keys.add(choiceKey(providerForAgent(agent), agent.model));
       for (const choice of [agent.usageLimitReturn, agent.pendingRuntime, ...(agent.backupModels?.order ?? [])])
