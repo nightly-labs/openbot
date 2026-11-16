@@ -180,6 +180,7 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         workspaceId: record.workspaceId,
         ownNumber: this.#ownNumber(record.connectionId),
         workingMessage: this.workingMessage(record.connectionId),
+        statusReactions: this.statusReactions(record.connectionId),
         allowedSenders: this.#store.allowedSenders(record.connectionId).slice(0, MESSAGING_LIMITS.allowedSenders),
         pendingRequests: this.#requests.list(record.workspaceId),
       }));
@@ -265,6 +266,17 @@ export class WhatsAppConnect implements WhatsAppPolicy {
     yield* this.#credentials.set(connectionId, { ...values, workingMessage: workingMessage ? "1" : "0" });
   });
 
+  readonly setStatusReactions = Effect.fn("WhatsAppConnect.setStatusReactions")(function* (
+    this: WhatsAppConnect,
+    workspaceId: string,
+    statusReactions: boolean,
+  ) {
+    const connectionId = yield* this.#connectionId(workspaceId);
+    const values = this.#credentials.get(connectionId);
+    if (!values) return yield* failure("error.messaging.whatsappNotConnected");
+    yield* this.#credentials.set(connectionId, { ...values, statusReactions: statusReactions ? "1" : "0" });
+  });
+
   readonly groups = Effect.fn("WhatsAppConnect.groups")(function* (this: WhatsAppConnect, workspaceId: string) {
     const connectionId = yield* this.#connectionId(workspaceId);
     const handle = this.#handle(connectionId);
@@ -310,8 +322,9 @@ export class WhatsAppConnect implements WhatsAppPolicy {
         whatsappStoreKey: Buffer.from(key).toString("base64"),
         storeId: link.storeId,
         ownNumber: ownNumber ? "1" : "0",
-        // A number that links again keeps this setting, as it keeps its allowed senders.
+        // A number that links again keeps these settings, as it keeps its allowed senders.
         ...(earlier?.workingMessage === "0" ? { workingMessage: "0" } : {}),
+        ...(earlier?.statusReactions === "0" ? { statusReactions: "0" } : {}),
       });
       // The number's earlier device was replaced by this link, so its keys go, but only once the new
       // link is saved: a failed save keeps the device that worked before.
@@ -393,6 +406,12 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   workingMessage(connectionId: string): boolean {
     const values = this.#credentials.get(connectionId);
     return values ? whatsAppCredentials(values).workingMessage : true;
+  }
+
+  /** True unless the owner turned off the status reactions of this number. */
+  statusReactions(connectionId: string): boolean {
+    const values = this.#credentials.get(connectionId);
+    return values ? whatsAppCredentials(values).statusReactions : true;
   }
 
   #connectionId(workspaceId: string): Effect.Effect<string, WhatsAppConnectFailed> {

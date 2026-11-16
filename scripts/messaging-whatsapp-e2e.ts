@@ -1328,6 +1328,26 @@ try {
       return { reactions: phone.reactionsTo(OWNER_JID) };
     });
 
+    await step("status reactions: a number with the setting off gets no reaction, and its posts stay", async () => {
+      const busy = () => phone.textsTo(OWNER_JID).filter((text) => text.includes("Too many requests")).length;
+      const posts = busy();
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true, "Reactions are not on by default.");
+      await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, false));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, false);
+      // The owner still has requests waiting, so each new message gets the busy answer.
+      const quiet = message({ chat: OWNER_JID, fromMe: true, text: "no reaction, please" });
+      phone.current().receive([quiet]);
+      await until(() => busy() === posts + 1, "the busy answer with reactions off");
+      // The reverse action. The host reads messages in order, so this reaction shows that the first one is done.
+      await runCauseEffect(messaging.setWhatsAppStatusReactions(OWNER, true));
+      assert.equal(messaging.whatsappOverview().accounts[0]?.statusReactions, true);
+      const loud = message({ chat: OWNER_JID, fromMe: true, text: "a reaction again" });
+      phone.current().receive([loud]);
+      await until(() => phone.reactedTo(loud.key.id), "the reaction with reactions on");
+      assert.equal(phone.reactedTo(quiet.key.id), false, "A number with reactions off got a reaction.");
+      return { busyPosts: busy() - posts };
+    });
+
     await step(
       "saved history: the messages stay after a restart, and one older than 90 days goes with its file",
       async () => {
