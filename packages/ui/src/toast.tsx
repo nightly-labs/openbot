@@ -145,7 +145,7 @@ export function Toaster(props: ToasterProps): JSX.Element {
     };
   });
   return (
-    <div ref={layer} data-kb-top-layer="" class="ui-toast-layer" hidden={props.hidden}>
+    <div ref={layer} data-kb-top-layer="" class={cx("ui-toast-layer", props.hidden && "ui-toast-layer-hidden")}>
       <Sonner
         {...sonnerProps}
         class={cx("ui-toaster", (props.closeButton ?? true) && "ui-toaster-closeable", props.class)}
