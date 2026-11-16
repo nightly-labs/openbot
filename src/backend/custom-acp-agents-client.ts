@@ -24,7 +24,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Exit } from "effect";
 import { assertAgentArgs, assertWindowsScriptArgs, resolveAgentCommand } from "./acp-agent-command";
 import type { AcpHistoryPersistence } from "./acp-client";
-import { customAgentFlavor } from "./acp-flavor";
+import { type AcpFlavor, customAgentFlavor } from "./acp-flavor";
 import { type AgentClient, AgentProcessExitError, type DiagnosticOrigin } from "./agent-client";
 import { agentLaunchPath } from "./cli";
 import { causeHelpers } from "./effect-boundary";
@@ -258,18 +258,18 @@ export class CustomAcpAgentsClient extends EventEmitter<ClientEvents> implements
   });
 
   /** The rule of the custom agent that the session belongs to, from its command, as its process uses. */
-  readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean => {
-    const agentId = sessionAgent(externalThreadId);
-    const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
-    return config !== undefined && customAgentFlavor(config.command).mcpToolsFixedAtStart === true;
-  };
+  readonly mcpToolsFixedAtStart = (externalThreadId: string): boolean =>
+    this.#flavorOf(sessionAgent(externalThreadId))?.mcpToolsFixedAtStart === true;
 
   /** The rule of the custom agent that `model` names, from its command, as its process uses. */
-  readonly catalogAsMcpTools = (model: string): boolean => {
-    const agentId = customAgentIdOfModel(model);
+  readonly catalogAsMcpTools = (model: string): boolean =>
+    this.#flavorOf(customAgentIdOfModel(model))?.catalogAsMcpTools === true;
+
+  /** The flavor of a saved custom agent, from its command, or undefined for an agent that is not saved. */
+  #flavorOf(agentId: string | null): AcpFlavor | undefined {
     const config = agentId ? this.#source().find((candidate) => candidate.id === agentId) : undefined;
-    return config !== undefined && customAgentFlavor(config.command).catalogAsMcpTools === true;
-  };
+    return config ? customAgentFlavor(config.command) : undefined;
+  }
 
   readonly releaseThread = Effect.fn("CustomAcp.releaseThread")(function* (
     this: CustomAcpAgentsClient,

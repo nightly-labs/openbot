@@ -204,38 +204,32 @@ export function visibleDynamicTools(provider: AgentProviderId) {
 }
 
 /**
- * The guidance of every browser tool. The first browser result brings it (`browserToolsPrimer`), so
+ * The catalog tools as MCP tools, by qualified name. The guidance that tool_describe gives goes in the
+ * root description of the schema, which an agent's own tool_describe shows: in the tool description, it
+ * put channel_result fourth in a Hermes search for its own name, and list_agents out of the results for
+ * "list agents". The first browser result brings the browser core guidance (`browserToolsPrimer`), so
  * the browser schemas do not each repeat its 2 KB.
  */
-const BROWSER_CORE_GUIDANCE: ReadonlySet<string> = new Set(toolGuidance(OPENBOT_BROWSER_NAMESPACE, "snapshot"));
-
-/**
- * The catalog tools as MCP tools. The guidance that tool_describe gives goes in the root description of
- * the schema, which an agent's own tool_describe shows: in the tool description, it put channel_result
- * fourth in a Hermes search for its own name, and list_agents out of the results for "list agents".
- */
-function mcpCatalogTools(
-  catalog: typeof BUILTIN_TOOL_CATALOG,
-): Array<{ namespace: string; tool: DynamicToolNamespace["tools"][number] }> {
-  return catalog.map((entry) => {
-    const guidance = toolGuidance(entry.namespace, entry.tool)
-      .filter((section) => !BROWSER_CORE_GUIDANCE.has(section))
-      .join("\n");
-    return {
-      namespace: entry.namespace,
-      tool: {
-        type: "function" as const,
-        name: entry.tool,
-        description: entry.description,
-        // Each catalog schema is a `z.strictObject`, so its type is already "object".
-        inputSchema: { ...entry.inputSchema, type: "object", ...(guidance ? { description: guidance } : {}) },
-      },
-    };
-  });
+function mcpCatalogTools(catalog: typeof BUILTIN_TOOL_CATALOG): Map<string, DynamicToolNamespace["tools"][number]> {
+  const browserCore = new Set(toolGuidance(OPENBOT_BROWSER_NAMESPACE, "snapshot"));
+  return new Map(
+    catalog.map((entry) => {
+      const guidance = toolGuidance(entry.namespace, entry.tool)
+        .filter((section) => !browserCore.has(section))
+        .join("\n");
+      // Each catalog schema is a `z.strictObject`, so its type is already "object".
+      const inputSchema = {
+        ...entry.inputSchema,
+        type: "object" as const,
+        ...(guidance ? { description: guidance } : {}),
+      };
+      return [entry.name, { type: "function" as const, name: entry.tool, description: entry.description, inputSchema }];
+    }),
+  );
 }
 
-const MCP_CATALOG_TOOLS = mcpCatalogTools(BUILTIN_TOOL_CATALOG);
-const OWN_WEB_SEARCH_MCP_CATALOG_TOOLS = mcpCatalogTools(OWN_WEB_SEARCH_CATALOG);
+/** Built on first use: only agents with `catalogAsMcpTools` need them. */
+const mcpCatalogs = new Map<typeof BUILTIN_TOOL_CATALOG, ReturnType<typeof mcpCatalogTools>>();
 
 /**
  * OpenBot's search and describe, which an agent with its own search does not get. Their catalog put
@@ -246,23 +240,25 @@ const OWN_SEARCH_TOOLS: ReadonlySet<string> = new Set(["tool_search", "tool_desc
 /**
  * `namespaces` with each catalog tool of `provider` in its namespace, for an agent that hides MCP tools
  * behind its own search (`AcpFlavor` `catalogAsMcpTools`). Its search then finds each tool, and its
- * tool_call runs it. OpenBot's tool_call stays, so `openbot.tool_call` in channel rules still works.
+ * tool_call runs it. A listed tool gets its guidance too, because OpenBot's tool_describe is not listed.
+ * OpenBot's tool_call stays, so `openbot.tool_call` in channel rules still works.
  */
 export function withCatalogTools(
   namespaces: readonly DynamicToolNamespace[],
   provider: AgentProviderId,
 ): DynamicToolNamespace[] {
-  const catalog = OWN_WEB_SEARCH_PROVIDERS.has(provider) ? OWN_WEB_SEARCH_MCP_CATALOG_TOOLS : MCP_CATALOG_TOOLS;
+  const catalog = catalogFor(provider);
+  const tools = mcpCatalogs.get(catalog) ?? mcpCatalogTools(catalog);
+  mcpCatalogs.set(catalog, tools);
   return namespaces.map((namespace) => {
-    const tools =
-      namespace.name === OPENBOT_DYNAMIC_TOOLS.name
-        ? namespace.tools.filter((tool) => !OWN_SEARCH_TOOLS.has(tool.name))
-        : namespace.tools;
-    const listed = new Set(tools.map((tool) => tool.name));
+    const listed = namespace.tools
+      .filter((tool) => namespace.name !== OPENBOT_DYNAMIC_TOOLS.name || !OWN_SEARCH_TOOLS.has(tool.name))
+      .map((tool) => tools.get(`${namespace.name}.${tool.name}`) ?? tool);
+    const names = new Set(listed.map((tool) => tool.name));
     const added = catalog
-      .filter((entry) => entry.namespace === namespace.name && !listed.has(entry.tool.name))
-      .map((entry) => entry.tool);
-    return { ...namespace, tools: [...tools, ...added] };
+      .filter((entry) => entry.namespace === namespace.name && !names.has(entry.tool))
+      .flatMap((entry) => tools.get(entry.name) ?? []);
+    return { ...namespace, tools: [...listed, ...added] };
   });
 }
 

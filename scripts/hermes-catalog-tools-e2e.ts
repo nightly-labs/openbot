@@ -62,7 +62,8 @@ searches = {q: json.loads(ts.dispatch_tool_search({"queries": [q]}, current_tool
             for q in listed["queries"]}
 openbot = next(n for n, s in servers.items() if s == "openbot")
 described = json.loads(ts.dispatch_tool_describe(
-    {"names": [f"mcp__{openbot}__channel_result", f"mcp__{openbot}__edit_workflow"]}, current_tool_defs=defs, config=config))
+    {"names": [f"mcp__{openbot}__channel_result", f"mcp__{openbot}__edit_workflow", f"mcp__{openbot}__send_message"]},
+    current_tool_defs=defs, config=config))
 session = ts.session_tool_names(defs)
 call = lambda name, arguments: list(ts.resolve_underlying_call({"calls": [{"name": name, "arguments": arguments}]}, session))
 print(json.dumps({
@@ -209,13 +210,16 @@ try {
       `Hermes search "${query}" finds ${tool}: ${hermes.searches[query]?.join(", ")}`,
     );
   const describedTools = Object.entries(described.tools);
-  assert.equal(describedTools.length, 2, "Hermes describes both tools.");
+  assert.equal(describedTools.length, 3, "Hermes describes each tool.");
   const workflow = describedTools.find(([name]) => name.endsWith("__edit_workflow"))?.[1];
   assert.match(
     workflow?.parameters.description ?? "",
     /Read a workflow before a change/,
     "Describe gives the guidance.",
   );
+  // send_message is a direct tool of every agent, and OpenBot's tool_describe is not listed for Hermes.
+  const message = describedTools.find(([name]) => name.endsWith("__send_message"))?.[1];
+  assert.match(message?.parameters.description ?? "", /Choose recipients/, "A direct tool gives its guidance too.");
 
   const [fullName, fullArguments, fullError] = hermes.calls.full;
   assert.equal(fullError, null, "Hermes tool_call accepts the full name.");

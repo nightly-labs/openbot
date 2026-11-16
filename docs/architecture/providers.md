@@ -1370,9 +1370,10 @@ which adds each catalog tool to its namespace and removes OpenBot's `tool_search
 OpenBot's `tool_call` stays for the instructions that name it. Hermes names a tool
 `mcp__editor_openbot_<tag>__<tool>`, and the developer instructions give that form. A tool's guidance
 goes in the root `description` of its schema, which the Hermes `tool_describe` shows and its search
-does not read; in the tool description it moved results down. The browser core guidance comes with
-the first browser result (`browserToolsPrimer`), as for the other providers. With the Hermes search
-off, the model gets all tools, about 230 KB of schemas. `bun run test:hermes-catalog-tools`
+does not read; in the tool description it moved results down. The tools that every agent has directly
+get it too, because OpenBot's `tool_describe` is not listed. The browser core guidance comes with the
+first browser result (`browserToolsPrimer`), as for the other providers. With the Hermes search off,
+the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun run test:hermes-catalog-tools`
 (`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
 checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
 

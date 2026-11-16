@@ -512,7 +512,7 @@ export function developerInstructions(
       // Hermes hides each MCP tool behind its own tool_search and tool_call, which refused the name
       // openbot.channel_result (#9312). With `tools.tool_search.enabled: off`, the tools are direct.
       options.catalogAsMcpTools
-        ? "Each OpenBot and browser tool is its own tool named mcp__<server>__<tool>, such as mcp__editor_openbot_<tag>__channel_result for openbot.channel_result. Call it directly when it is in your tool list. Otherwise find it with your tool_search and run it with your tool_call under the exact name that tool_search lists, never as openbot.<tool>; tool_describe gives its guidance."
+        ? "Each OpenBot and browser tool is its own tool named mcp__<server>__<tool>, such as mcp__editor_openbot_<tag>__channel_result for openbot.channel_result. A name such as openbot.<tool> or openbot_browser.<tool> in these instructions or in a tool result means that tool. Call it directly when it is in your tool list. Otherwise find it with your tool_search and run it with your tool_call under the exact name that tool_search lists, never under the dotted name; tool_describe gives its guidance."
         : "openbot.tool_search finds the other OpenBot and browser tools by short capability phrases, openbot.tool_describe loads their schemas and guidance, and openbot.tool_call runs one. Use the returned namespace.tool names exactly. tool_call does not run bridge tools."
     }${
       // Codex makes the `openbot` namespace direct-only (`CODEX_DIRECT_ONLY_NAMESPACES`), so `exec`
