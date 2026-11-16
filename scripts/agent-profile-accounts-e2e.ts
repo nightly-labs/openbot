@@ -296,8 +296,10 @@ const idle = (agentId: string) =>
     .listQueue(agentId)
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
-/** Sends a chat message that makes the fake call the tool, and returns the tool result it logged. */
-/** A refused call can also send fields that the tool does not take, as a model does. */
+/**
+ * Sends a chat message that makes the fake call the tool, and returns the tool result it logged. A refused
+ * call can also send fields that the tool does not take, as a model does.
+ */
 async function callTool(
   name: string,
   agentId: string,

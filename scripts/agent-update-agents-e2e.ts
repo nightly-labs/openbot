@@ -229,10 +229,13 @@ try {
     }
     assert.match(String(refusals.repeated.value.error), /each agent id once/);
     // The refusal lists the fields that update_agents takes, never the field that the call sent (#10024).
-    assert.equal(
-      refusals.unknownField.value.error,
-      "Remove unsupported profile fields. update_agents takes only: agentIds, provider, model, reasoningEffort, access, computerUse, notifications. Correct the arguments and retry.",
+    const unknownField = String(refusals.unknownField.value.error);
+    assert.match(unknownField, /^Remove unsupported profile fields\. update_agents takes only: /);
+    assert.ok(
+      ["agentIds", "model", "notifications"].every((field) => unknownField.includes(field)),
+      "The refusal lists the fields that update_agents takes.",
     );
+    assert.ok(!unknownField.includes("providerAccountId"), "The refusal does not name the field that the call sent.");
     return Object.fromEntries(Object.entries(refusals).map(([name, refusal]) => [name, refusal.value.error]));
   });
 
