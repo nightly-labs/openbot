@@ -291,13 +291,11 @@ export function MarketplaceBrowse(props: { scope: MarketplaceScope; lists: Brows
                   }}
                 />
               </label>
-              <Show when={model().addServer}>
-                {(add) => (
-                  <Button type="button" size="sm" onClick={() => add()()}>
-                    <Plus aria-hidden="true" />
-                    {t("marketplace.app.addCustom")}
-                  </Button>
-                )}
+              <Show when={model().servers}>
+                <Button type="button" size="sm" onClick={() => nav().go({ kind: "server", id: null })}>
+                  <Plus aria-hidden="true" />
+                  {t("marketplace.app.addCustom")}
+                </Button>
               </Show>
             </div>
           </header>

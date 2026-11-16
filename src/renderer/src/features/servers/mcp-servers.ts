@@ -1,5 +1,5 @@
 /**
- * What the MCP settings panel needs beyond the shared contract: a blank draft, a reopened draft,
+ * What the Marketplace MCP server form and controls need beyond the shared contract: a blank draft, a reopened draft,
  * the dirty check, and the badge text and variant.
  *
  * The types and the rules the main process also applies - validation, normalization, the id - live

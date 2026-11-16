@@ -1,5 +1,4 @@
-// The relayed sign-ins of the browser client (`sign-in-relay-v1`), for the server settings, the
-// marketplace and the sign-in links of the host's agents. The host starts the sign-in and opens no page. This browser cannot listen for the
+// The relayed sign-ins of the browser client (`sign-in-relay-v1`), for the marketplace and the sign-in links of the host's agents. The host starts the sign-in and opens no page. This browser cannot listen for the
 // callback, so the user opens the page from the dialog and pastes the address that the browser shows
 // at the end. Only its query goes to the host.
 

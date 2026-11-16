@@ -87,18 +87,14 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const connectors = useConnectors();
   const { servers, serversLoaded, activeServer, activeServerSupportsCapability, joinServerOpen } = useServers();
   const { select: selectServer } = useServerActions();
-  const {
-    serverSettingsOpen,
-    openServerSettings,
-    openMcpSignIn,
-    serverSettingsTargetId,
-    serverSettingsMcpSignIns,
-    refreshMcpSignIns,
-  } = useServerSettings();
+  const { serverSettingsOpen, openServerSettings } = useServerSettings();
   const {
     appSettingsOpen,
     skillsMarketplaceOpen,
     setSkillsMarketplaceOpen,
+    setPendingMcpSignIn,
+    mcpSignIns,
+    refreshMcpSignIns,
     setPendingPluginSlug,
     setPendingPluginConnect,
     agentAutoApproves,
@@ -549,16 +545,20 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
           setPendingPluginSlug(request.appId);
           setSkillsMarketplaceOpen(true);
         }}
-        // The server settings sign in as their MCP panel does: on this computer, or through a host that
-        // relays its sign-in page.
+        // Sign in opens the server's Marketplace page, which signs in as its own button does: on this
+        // computer, or through a host that relays its sign-in page.
         onOpenMcpSignIn={(() => {
           const server = activeServer();
           if (!server || (server.kind === "remote" && !remoteMcpSignIn(server))) return undefined;
-          return (mcpServerId: string, trigger: HTMLElement | null) => openMcpSignIn(server.id, mcpServerId, trigger);
+          return (mcpServerId: string) => {
+            setPendingMcpSignIn(mcpServerId);
+            setSkillsMarketplaceOpen(true);
+          };
         })()}
-        mcpSignedIn={(mcpServerId) =>
-          serverSettingsTargetId() === activeServer()?.id && serverSettingsMcpSignIns()[mcpServerId]?.signedIn === true
-        }
+        mcpSignedIn={(mcpServerId) => {
+          const known = mcpSignIns();
+          return known?.serverId === activeServer()?.id && known?.states[mcpServerId]?.signedIn === true;
+        }}
         refreshMcpSignIns={() => refreshMcpSignIns(activeServer()?.id)}
         serverInstall={{
           get servers() {
@@ -644,7 +644,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
         activityKind={activeAgent() ? turnProgress()[activeAgent()?.id ?? ""]?.activity : undefined}
         turnStepLines={turnStepLines()}
         skillsMarketplaceOpen={skillsMarketplaceOpen()}
-        mcpSettingsOpen={serverSettingsOpen() || skillsMarketplaceOpen()}
+        mcpSettingsOpen={skillsMarketplaceOpen()}
         globalOverlayOpen={
           globalSearchOpen() ||
           joinServerOpen() ||

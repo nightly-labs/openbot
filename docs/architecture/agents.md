@@ -763,12 +763,13 @@ approval of `AttentionRegistry.awaitToolApproval`, which states that every agent
 the tools. Full access answers it, as for other built-in tool approvals. `save_mcp_server` connects
 before it saves (`inspectMcpServer`, the silent Test): a server that does not answer is not saved; a
 server that needs an OAuth sign-in or a key is saved. The tools never take or return a header or
-environment value, and show an address without its query: the user enters a key in Server settings,
-MCP. An edit keeps the row's headers and environment, and an edit that would send them to another
+environment value, and show an address without its query: the user enters a key with Edit on the
+server's page in Marketplace, Apps. An edit keeps the row's headers and environment, and an edit that would send them to another
 transport, origin, command, arguments or folder is refused. The approval masks known secrets in the command line and names
 the folder a stdio server starts in. A sign-in shows an `mcp-sign-in:<id>` card in
-the conversation. Its Sign in opens Server settings, MCP, and starts the row's normal sign-in, so a
-joined server signs in through its relay or live page. Continue sends a message that tells the agent
+the conversation. Its Sign in opens the row's page in Marketplace, Apps, and starts the row's normal sign-in,
+so a joined server signs in through its relay (`sign-in-relay-v1`). A host without the relay shows no
+Sign in on the card. Continue sends a message that tells the agent
 to test again. A saved change reaches the agents from their next turn.
 
 When its own tools fail, the agent checks its teammates. When a teammate reports that it is blocked

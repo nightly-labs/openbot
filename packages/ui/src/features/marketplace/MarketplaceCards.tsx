@@ -87,7 +87,7 @@ export function AppAction(props: {
         </Show>
       }
     >
-      {/* A custom server is turned on in Server settings › MCP, not here. The Apps tab lists only the
+      {/* A custom server is turned on on its own page, not here. The Apps tab lists only the
           connectors that this account can connect. While the app reads what a joined server serves,
           the app page shows Connect as busy; a list leaves it out. */}
       <Show

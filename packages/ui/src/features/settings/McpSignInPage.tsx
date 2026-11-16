@@ -55,47 +55,6 @@ export function McpSignInPageNote(props: { hostName: string }) {
   );
 }
 
-export interface McpSignInPageDialogProps {
-  /** The server the sign-in is for, as its row names it. */
-  name: string;
-  /** The icon of the server, when its listing has one. */
-  iconUrl?: string | null | undefined;
-  hostName: string;
-  page: McpSignInPageSource;
-  /**
-   * Stops the sign-in. The dialog stays until the wait ends, and the caller removes it then, the
-   * same as when the host took the grant.
-   */
-  onCancel: () => void;
-}
-
-/** The page in its own dialog, for the MCP list. It is there for as long as the sign-in waits. */
-export function McpSignInPageDialog(props: McpSignInPageDialogProps) {
-  const { t } = useText();
-  const [cancelling, setCancelling] = createSignal(false);
-  const cancel = () => {
-    if (cancelling()) return;
-    setCancelling(true);
-    props.onCancel();
-  };
-  return (
-    <WizardDialog
-      open
-      nested
-      wide
-      closeLabel={t("mcp.panel.cancelSignIn")}
-      onClose={cancel}
-      logo={<McpConnectMark iconUrl={props.iconUrl} />}
-      title={t("mcp.panel.signInTo", { name: props.name })}
-      description={t("mcp.signIn.pageDescription", { host: props.hostName })}
-      footer={<CancelSignIn cancelling={cancelling()} onCancel={cancel} />}
-    >
-      <McpSignInPage page={props.page} />
-      <McpSignInPageNote hostName={props.hostName} />
-    </WizardDialog>
-  );
-}
-
 /** The one button of a sign-in that waits: it stops the sign-in. */
 function CancelSignIn(props: { cancelling: boolean; onCancel: () => void }) {
   const { t } = useText();
