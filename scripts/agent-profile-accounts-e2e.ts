@@ -18,6 +18,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
+import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { Effect } from "effect";
 import type { z } from "zod";
 import type {
@@ -296,7 +297,13 @@ const idle = (agentId: string) =>
     .deliveries.every((delivery) => !["queued", "starting", "running"].includes(delivery.status));
 
 /** Sends a chat message that makes the fake call the tool, and returns the tool result it logged. */
-async function callTool(name: string, agentId: string, tool: string, args: Partial<ProfileToolArgs> = {}) {
+/** A refused call can also send fields that the tool does not take, as a model does. */
+async function callTool(
+  name: string,
+  agentId: string,
+  tool: string,
+  args: Partial<ProfileToolArgs> | DynamicRecord = {},
+) {
   const receipt = await runCauseEffect(
     agents.sendMessage({ agentId, text: `${CALL_MARK} <<ARGS${JSON.stringify({ __tool: tool, ...args })}ARGS>>` }),
   );
@@ -522,6 +529,35 @@ try {
       refused(unknownBackupModel, `Available models: ${[MODEL, ...EXTRA_MODELS.slice(0, 7), "…"].join(", ")}.`) &&
       refused(badId, "Use an account id from list_models"),
     [unknownAccount, unknownBackupAccount, unknownBackupModel, badId].map((call) => call.text).join("\n"),
+  );
+  // A field that the tool does not take gets the fields that its object takes, never the name that the
+  // call sent, so the agent can correct the call (#10024).
+  const extraBackupField = await callTool("extra backupModels field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    name: "Renamed",
+    backupModels: { models: [{ provider: "codex", model: MODEL }], automatic: true, order: [] },
+  });
+  const extraEntryField = await callTool("extra backup entry field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    backupModels: { automatic: true, order: [{ provider: "codex", model: MODEL, effortLevel: "high" }] },
+  });
+  const extraToolField = await callTool("extra update_profile field", coordinator.id, "update_profile", {
+    agentId: worker.id,
+    fallbackModels: [MODEL],
+  });
+  const entryFields = "Each backupModels.order entry takes only: provider, model, providerAccountId.";
+  pass(
+    "A field that update_profile does not take is refused with the fields that its object takes",
+    refused(
+      extraBackupField,
+      `Remove unsupported profile fields. backupModels takes only: automatic, order. ${entryFields}`,
+    ) &&
+      refused(extraEntryField, `Remove unsupported profile fields. ${entryFields}`) &&
+      refused(extraToolField, "Remove unsupported profile fields. update_profile takes only: agentId, name,") &&
+      [extraBackupField, extraEntryField, extraToolField].every(
+        (call) => !call.text.includes("effortLevel") && !call.text.includes("fallbackModels"),
+      ),
+    [extraBackupField, extraEntryField, extraToolField].map((call) => call.text).join("\n"),
   );
   const afterFailures = storedAgent(worker.id);
   pass(
