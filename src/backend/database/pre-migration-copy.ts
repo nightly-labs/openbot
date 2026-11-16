@@ -14,6 +14,10 @@ const KEPT_DATABASE_COPIES = 2;
 // rebuilds a table, and the VACUUM after it, need about that much. A copy must not take the space
 // that the migration needs.
 const SPACE_RESERVE_BYTES = 64 * 1024 * 1024;
+// A larger database gets no copy. Migrations ship several times a week, and a copy, its check and two
+// kept copies of a database this large add tens of seconds to each start and tens of GB of disk. A
+// hosted server had a 17 GB database on 2026-11-17 (plan 011).
+const MAX_COPY_BYTES = 4 * 1024 * 1024 * 1024;
 const COPY_NAME = /^\d{8}T\d{9}Z-schema-(\d+)-before-([A-Za-z0-9._-]+)\.db$/u;
 const PARTIAL_SUFFIX = ".partial";
 
@@ -22,12 +26,15 @@ export interface DatabaseCopyOptions {
   appVersion?: string;
   /** The free bytes on the disk that holds `directory`. Tests replace it. */
   freeDiskBytes?: (directory: string) => Promise<number>;
+  /** The largest database, without its free pages, that gets a copy. Tests replace it. */
+  maxCopyBytes?: number;
 }
 
 type DatabaseCopyResult =
   | { status: "copied"; fileName: string; removedCopies: number }
   | { status: "kept"; fileName: string }
-  | { status: "skipped"; requiredBytes: number; freeBytes: number; removedCopies: number };
+  | { status: "skipped"; requiredBytes: number; freeBytes: number; removedCopies: number }
+  | { status: "too-large"; copyBytes: number; maxCopyBytes: number };
 
 /** A copy step failed. The cause stays private: a file system error message holds a user path. */
 export class DatabaseCopyFailure extends Schema.TaggedError<DatabaseCopyFailure>()("DatabaseCopyFailure", {
@@ -45,12 +52,13 @@ interface DatabaseCopyInput extends DatabaseCopyOptions {
 /**
  * Copies the open database, before its first pending migration, into `openbot-db-copies` next to
  * it. `VACUUM INTO` reads one consistent snapshot, the write-ahead log included. The copy gets its
- * final name only after it opens and passes `PRAGMA integrity_check` with the source schema version,
+ * final name only after it opens and passes `PRAGMA quick_check` with the source schema version,
  * so a file with that name is always a complete copy. Then only the newest `KEPT_DATABASE_COPIES`
  * copies stay. When the disk has not enough free space, it first removes the copies that this
  * rotation removes anyway, and measures the free space again: a removed file can give back less
  * space than its size (a sparse file, a compressed file system or a snapshot). When the space is
- * still not enough, it makes no copy and returns `skipped`.
+ * still not enough, it makes no copy and returns `skipped`. A database larger than `MAX_COPY_BYTES`
+ * gets no copy (`too-large`), and its older copies stay.
  *
  * A start after a failed migration tries again. When this app version already copied the database
  * at a lower schema version, some of its migrations committed before the failure, and only that
@@ -86,6 +94,11 @@ export const copyDatabaseBeforeMigration = Effect.fn("copyDatabaseBeforeMigratio
     "prepare",
     storedSync(() => readSizes(input.db)),
   );
+  // Before the free-space step: a database this large removes no copy that a smaller one made.
+  const maxCopyBytes = input.maxCopyBytes ?? MAX_COPY_BYTES;
+  if (sizes.copyBytes > maxCopyBytes) {
+    return { status: "too-large", copyBytes: sizes.copyBytes, maxCopyBytes } satisfies DatabaseCopyResult;
+  }
   const requiredBytes = sizes.copyBytes + sizes.databaseBytes + SPACE_RESERVE_BYTES;
   let freeBytes = yield* step("prepare", () => freeDiskBytes(directory));
   let removedFirst = 0;
@@ -153,11 +166,13 @@ function verifyCopy(path: string, sourceVersion: number): void {
   const copy = new DatabaseSync(path, { readOnly: true });
   try {
     const problems = copy
-      .prepare("PRAGMA integrity_check(20)")
+      // `quick_check` reads every page and finds a torn or damaged copy, but it does not compare each
+      // index with its table, so it takes a fraction of the `integrity_check` time on a large copy.
+      .prepare("PRAGMA quick_check(20)")
       .all()
-      .map((row) => (isDynamicRecord(row) ? row.integrity_check : row));
+      .map((row) => (isDynamicRecord(row) ? row.quick_check : row));
     if (problems.length !== 1 || problems[0] !== "ok") {
-      throw new Error("The database copy failed its integrity check.");
+      throw new Error("The database copy failed its quick check.");
     }
     if (readSchemaVersion(copy) !== sourceVersion) {
       throw new Error("The database copy has a different schema version than the database.");

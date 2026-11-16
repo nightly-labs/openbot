@@ -20,9 +20,9 @@ of something remote — which is what makes the first section below non-negotiab
   failure, rollback, retry, downgrade, missing-version, foreign-key and integrity coverage at the
   stable database boundary.
 - Before the first pending migration, `database/pre-migration-copy.ts` copies `openbot.db` into
-  `openbot-db-copies/` when the disk has space, and keeps the newest two copies (developer decision,
-  2026-11-17, plan 011). The copy is a recovery aid for a manual return to the earlier release, not a
-  rollback path. Releases before it made no copy, and a copy can fail, so no code may read a copy or
+  `openbot-db-copies/` when the disk has space and the database is 4 GB or smaller, and keeps the
+  newest two copies (developer decision, 2026-11-17, plan 011). The copy is a recovery aid for a
+  manual return to the earlier release, not a rollback path. Releases before it made no copy, and a copy can fail, so no code may read a copy or
   assume that one exists. Make the migration itself safe.
 - Keep the copy non-blocking: a failed or skipped copy never stops the start. Do not add other
   automatic full-database backups: conversation history lives in SQLite, so their time and disk cost

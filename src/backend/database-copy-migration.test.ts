@@ -66,10 +66,14 @@ function writeDatabaseAt(root: string, version: number, options: { failAtVersion
   db.close();
 }
 
-function start(root: string, options: { appVersion?: string; freeDiskBytes?: () => Promise<number> } = {}) {
+function start(
+  root: string,
+  options: { appVersion?: string; freeDiskBytes?: () => Promise<number>; maxCopyBytes?: number } = {},
+) {
   const database = new OpenBotDatabase(root, {
     appVersion: options.appVersion ?? APP_VERSION,
     ...(options.freeDiskBytes ? { freeDiskBytes: options.freeDiskBytes } : {}),
+    ...(options.maxCopyBytes !== undefined ? { maxCopyBytes: options.maxCopyBytes } : {}),
   });
   opened.push(database);
   return runCauseEffect(database.initialize());
@@ -208,6 +212,27 @@ describe("the copy of openbot.db before a migration", () => {
 
     expect(await copyNames(root)).toEqual([]);
     expect(readContents(join(root, "openbot.db")).version).toBe(LATEST_VERSION);
+  });
+
+  it("migrates without a copy and keeps the older copies when the database is too large", async () => {
+    const root = await userData();
+    const directory = join(root, DATABASE_COPY_DIRECTORY);
+    await mkdir(directory, { recursive: true });
+    const oldest = "20200101T000000000Z-schema-40-before-0.40.0.db";
+    const old = "20210101T000000000Z-schema-50-before-0.50.0.db";
+    await writeFile(join(directory, oldest), "older");
+    await writeFile(join(directory, old), "old");
+    writeDatabaseAt(root, LATEST_VERSION - 1);
+    const before = readContents(join(root, "openbot.db"));
+
+    await start(root, { maxCopyBytes: 0, freeDiskBytes: async () => 0 });
+    closeAll();
+
+    expect(await copyNames(root)).toEqual([oldest, old]);
+    const after = readContents(join(root, "openbot.db"));
+    expect(after.version).toBe(LATEST_VERSION);
+    expect(after.contents.orchestration_events).toEqual(before.contents.orchestration_events);
+    expect(after.contents.projection_threads).toEqual(before.contents.projection_threads);
   });
 
   it("removes the oldest copy first and measures the free space again", async () => {

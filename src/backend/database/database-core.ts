@@ -241,6 +241,11 @@ export class DatabaseCore {
               `Kept the copy from before the first migration attempt of this version. The migration continues from schema version ${sourceVersion}.`,
               { fileName: result.fileName },
             );
+          } else if (result.status === "too-large") {
+            logger.info(
+              `The OpenBot database is too large for a copy. The migration from schema version ${sourceVersion} continues without a copy.`,
+              { copyBytes: result.copyBytes, maxCopyBytes: result.maxCopyBytes },
+            );
           } else {
             logger.warn(
               `The disk has not enough free space for a copy of the OpenBot database. The migration from schema version ${sourceVersion} continues without a copy.`,
