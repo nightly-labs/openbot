@@ -349,6 +349,17 @@ try {
     await answer(id, {}, MEMBER);
     assert.deepEqual(client.answers.get(id)?.value, { status: "skipped", blockId: `block-${id}` });
     assert.equal(message.uiBlock?.state.status, "closed");
+    // The person pressed Skip, so the card gives no reason of its own: it says "Closed without an answer".
+    assert.equal(message.uiBlock?.state.outcome, undefined);
+  });
+
+  await step("a chat message closes the block, and the card says why (#7678)", async () => {
+    const { id, message } = ask(repliesSpec, "turn-11");
+    registry.releaseForUserMessage("agent-1", THREAD, "turn-11");
+    assert.equal(client.answers.get(id)?.value?.status, "skipped");
+    assert.equal(message.uiBlock?.state.status, "closed");
+    assert.equal(message.uiBlock?.state.outcome, "Closed by a new message");
+    return message.uiBlock?.state;
   });
 
   await step("nobody answers a plan card: the host presses Start after its delay", async () => {

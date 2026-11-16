@@ -90,9 +90,12 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
   };
   // An answered form that asked for a secret shows its answer as rows, not as disabled inputs.
   const summarized = () => state().status === "answered" && props.spec.fields.some(isSecretFormField);
-  // One that closed or expired without an answer shows only its outcome: an empty, disabled key field
-  // looks like a field that does not work (#7678).
-  const unanswered = () => frozen() && state().status !== "answered" && props.spec.fields.some(isSecretFormField);
+  // One that closed or expired without an answer leaves out its secret fields: an empty, disabled key
+  // field looks like a field that does not work (#7678). The other fields still show what was asked.
+  const shownFields = () =>
+    frozen() && state().status !== "answered"
+      ? props.spec.fields.filter((field) => !isSecretFormField(field))
+      : props.spec.fields;
   const answerRows = (): AnswerRow[] =>
     props.spec.fields.flatMap((field): AnswerRow[] => {
       if (isSecretFormField(field)) return [{ field }];
@@ -145,7 +148,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
       elementRef={props.elementRef}
     >
       <Show
-        when={!summarized() && !unanswered()}
+        when={!summarized() && shownFields().length > 0}
         fallback={summarized() ? <FormAnswerRows rows={answerRows()} /> : undefined}
       >
         <form
@@ -157,7 +160,7 @@ export function UiFormBlock(props: UiBlockProps<UiFormSpec>) {
             submit();
           }}
         >
-          <For each={props.spec.fields}>
+          <For each={shownFields()}>
             {(field) => (
               <Switch>
                 <Match when={field.kind === "segmented" ? field : undefined}>
