@@ -658,25 +658,33 @@
  * A table or an image can need more than the wide width. The bubble then grows to the width that
  * the table or the image needs, up to the full chat row, so a data table does not scroll sideways
  * while the chat has free space. The text does not ask for width, so a long sentence does not make
- * the bubble wider. Beside a small image, the text keeps a readable measure.
+ * the bubble wider. Beside a small image, the text keeps a readable measure. Only the reply body
+ * counts: a table in the quote of the replied message does not make the bubble wider.
  */
 .message-entry-agent
-.ui-bubble:has(:is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)) {
+.ui-bubble:has(
+  .message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)
+) {
   width: fit-content;
   min-width: min(100%, 560px);
   max-width: 100%;
 }
 
 /* A table or code keeps at least the wide width, as it has without an image. */
-.message-entry-agent .ui-bubble:has(:is(.message-data-table-scroll, .message-markdown-table-scroll)),
-.message-entry-agent .ui-bubble:has(.message-markdown-image):has(.message-code-block) {
+.message-entry-agent
+.ui-bubble:has(.message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll)),
+.message-entry-agent .ui-bubble:has(.message-content-blocks .message-markdown-image):has(.message-code-block) {
   min-width: var(--message-wide-bubble-width);
 }
 
+/* The "Show full" button keeps its own width: with containment, its width would be its padding only. */
 .message-entry-agent
-  .ui-bubble:has(:is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image))
+  .ui-bubble:has(
+    .message-content-blocks :is(.message-data-table-scroll, .message-markdown-table-scroll, .message-markdown-image)
+  )
   :is(
-    .message-content-blocks > :not(.message-markdown, .message-data-table-frame),
+    .message-content-blocks
+      > :not(.message-markdown, .message-data-table-frame, .message-table-frame, .message-show-full),
     .message-markdown > :not(.message-table-frame, :has(.message-markdown-image))
   ) {
   contain: inline-size;
