@@ -61,9 +61,13 @@ export class RoutineStartRetry {
     return true;
   }
 
-  /** True while this run waits for its next start. */
-  waiting(deliveryId: string): boolean {
-    return Boolean(this.#waits.get(deliveryId)?.timer);
+  /**
+   * True while this run waits for its next start on `provider`. A run whose agent moved to another
+   * provider does not wait for the old one.
+   */
+  waiting(deliveryId: string, provider: AgentProvider): boolean {
+    const wait = this.#waits.get(deliveryId);
+    return Boolean(wait?.timer) && wait?.provider === provider;
   }
 
   /** True while a run of this agent waits. The drain reads this before it reads the queue. */
@@ -72,13 +76,19 @@ export class RoutineStartRetry {
     return false;
   }
 
-  /** The provider is available again, so the runs that wait for it can start now. */
-  providerResumed(provider: AgentProvider): void {
+  /**
+   * The provider is available again, so the runs that wait for it can start now. Gives the agents of
+   * those runs, so that their queues drain.
+   */
+  providerResumed(provider: AgentProvider): Set<string> {
+    const agentIds = new Set<string>();
     for (const wait of this.#waits.values()) {
       if (wait.provider !== provider || !wait.timer) continue;
       clearTimeout(wait.timer);
       wait.timer = null;
+      agentIds.add(wait.agentId);
     }
+    return agentIds;
   }
 
   /** The run started, failed, or left the queue. */

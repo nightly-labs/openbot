@@ -406,11 +406,16 @@ export class DrainScheduler {
       this.#lanesOf(agentId).some((other) => other.taskId !== taskId && this.#laneRunning(other))
     )
       return "agent-client-changing";
-    // A routine run whose provider did not start waits for its next start. A message that comes in
-    // the meantime ends the wait: the lane starts again, as it did before the run waited.
-    if (this.#startRetry.agentWaits(agentId)) {
+    // A routine run whose provider did not start waits for its next start, and the routine runs
+    // behind it wait with it. A message that comes in the meantime, or a move of the agent to another
+    // provider, ends the wait: the lane starts again, as it did before the run waited.
+    if (agent && this.#startRetry.agentWaits(agentId)) {
       const head = this.#mailbox.nextQueued(agentId, taskId)?.delivery;
-      if (head && this.#startRetry.waiting(head.id) && this.#mailbox.laneQueuedIds(agentId, taskId).length === 1)
+      if (
+        head &&
+        this.#startRetry.waiting(head.id, providerForAgent(agent)) &&
+        this.#onlyRoutineRunsQueued(agentId, taskId)
+      )
         return "provider-start";
     }
     // No turn starts on a provider that waits for a sign-in, so its messages wait for the sign-in
@@ -1183,7 +1188,7 @@ export class DrainScheduler {
           // The provider of a routine run did not start, such as with no internet connection. Nothing
           // ran, so the run waits in the queue and starts again later, instead of failing until its
           // next occurrence (#6751). A message behind it ends the wait, and the run fails as before.
-          if (providerStartFailed && recipient && this.#mayRetryStart(context, error, laneId)) {
+          if (providerStartFailed && recipient && batch.length === 1 && this.#mayRetryStart(context, error, laneId)) {
             const provider = providerForAgent(recipient);
             if (this.#startRetry.schedule(delivery.id, delivery.recipientAgentId, provider)) {
               for (const item of batch)
@@ -1312,7 +1317,7 @@ export class DrainScheduler {
    * Whether a routine run whose provider did not start can wait for a new start. Channel work and an
    * external conversation fail at once, so that their channel or their sender hears of it. An expired
    * sign-in waits for the user, not for time, and a run with a message behind it does not hold that
-   * message back.
+   * message back. Other routine runs behind it can wait: their provider cannot start either.
    */
   #mayRetryStart(context: DeliveryContext, error: unknown, laneId: string | null): boolean {
     const { delivery } = context;
@@ -1322,13 +1327,20 @@ export class DrainScheduler {
       !this.#messaging?.ownsDelivery(delivery.id) &&
       !(error instanceof ProviderSignInError) &&
       classifyUserError(error) !== "auth" &&
-      this.#mailbox.laneQueuedIds(delivery.recipientAgentId, laneId).length === 0
+      this.#onlyRoutineRunsQueued(delivery.recipientAgentId, laneId)
     );
+  }
+
+  /** Whether each queued delivery of this lane is a routine run. */
+  #onlyRoutineRunsQueued(agentId: string, laneId: string | null): boolean {
+    return this.#mailbox
+      .laneQueuedIds(agentId, laneId)
+      .every((id) => this.#mailbox.getDelivery(id)?.delivery.sender.kind === "routine");
   }
 
   /** The provider is available again: the routine runs that wait for it start now. */
   providerResumed(provider: AgentProvider): void {
-    this.#startRetry.providerResumed(provider);
+    for (const agentId of this.#startRetry.providerResumed(provider)) this.scheduleDrain(agentId);
   }
 
   /**
@@ -1345,6 +1357,13 @@ export class DrainScheduler {
     if (this.#hooks.isStopping()) return;
     if (this.#mailbox.getDelivery(deliveryId)?.delivery.status !== "queued") {
       this.#startRetry.forget(deliveryId);
+      return;
+    }
+    // The agent moved to another provider: the run starts there, with no wait for the old one.
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent || providerForAgent(agent) !== provider) {
+      this.#startRetry.forget(deliveryId);
+      this.scheduleDrain(agentId);
       return;
     }
     yield* this.#providers.refreshProvider(provider).pipe(Effect.ignore);
