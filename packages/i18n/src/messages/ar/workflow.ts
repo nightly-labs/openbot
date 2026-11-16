@@ -555,7 +555,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "تم حذف {name}",
   "workflow.canvas.deleteUndo.action": "تراجع",
   "workflow.page.failed": "تعذّر على OpenBot تنفيذ هذا. حاول مرة أخرى.",
-  "workflow.page.conflict": "تم التغيير على جهاز آخر. تراجع لاستعادة تعديلاتك.",
   "workflow.page.needsNewerApp": "يحتوي سير العمل هذا على خطوات من إصدار أحدث من OpenBot. حدّث OpenBot لتغييره.",
   "workflow.page.manageOnly": "لتغيير سير العمل هذا، تحتاج إلى إذن «يمكنه الإدارة» على كل وكيل فيه.",
 } as const satisfies PartialTranslation<typeof source>;

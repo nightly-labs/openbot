@@ -169,6 +169,14 @@ export function createCanvasHistory(options: {
       future = [];
       count();
     },
+    /**
+     * Changes each snapshot of both stacks, as when the edits of another device merge into the canvas:
+     * undo then takes back only the edits of this device.
+     */
+    rebase: (change: (snapshot: CanvasSnapshot) => CanvasSnapshot) => {
+      past = past.map(change);
+      future = future.map(change);
+    },
     /** Joins the next changes to the open step. The returned function ends the join. */
     join: () => {
       joined += 1;

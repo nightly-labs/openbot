@@ -133,7 +133,15 @@ export function webWorkflowHost(options: WebWorkflowHostOptions): WorkflowHost {
   const empty = () => undefined;
   const run = <T>(effect: (request: TeamApiRequest) => Effect.Effect<T, TeamAdminRequestError>) =>
     runTeamEffect(Effect.suspend(() => effect(options.request())).pipe(Effect.mapError((error) => error.cause)));
-  const connectionOptions = () => run(listRoutineResultOptions);
+  /** The places, Telegram chats and Slack workspaces read the connections at the same time, so they share one call. */
+  let optionsCall: ReturnType<typeof readOptions> | undefined;
+  const readOptions = () => run(listRoutineResultOptions);
+  const connectionOptions = () => {
+    optionsCall ??= readOptions().finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
 
   return {
     workflows: {
