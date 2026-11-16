@@ -323,6 +323,8 @@ export const messages = {
     "Para compartilhar várias imagens, é necessário ter a versão mais recente do app.",
   "mobile.chat.video.play": "Reproduzir {name}",
   "mobile.chat.video.retry": "Recarregar vídeo",
+  "mobile.chat.video.downloaded": "{received} de {total}",
+  "mobile.chat.video.loading": "Carregando {name}",
   "mobile.chat.video.share": "Compartilhar {name}",
   "mobile.chat.video.save": "Salvar {name} em Fotos",
   "mobile.chat.video.photosPermission": "Permita que o OpenBot adicione fotos em Ajustes para salvar este vídeo.",

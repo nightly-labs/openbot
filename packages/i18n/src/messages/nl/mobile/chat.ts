@@ -290,6 +290,8 @@ export const messages = {
     "Voor het delen van meerdere afbeeldingen is de nieuwste versie van de app nodig.",
   "mobile.chat.video.play": "Speel {name} af",
   "mobile.chat.video.retry": "Laad video opnieuw",
+  "mobile.chat.video.downloaded": "{received} van {total}",
+  "mobile.chat.video.loading": "{name} laden",
   "mobile.chat.video.share": "Deel {name}",
   "mobile.chat.video.save": "Bewaar {name} in Foto’s",
   "mobile.chat.video.photosPermission":

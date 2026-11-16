@@ -322,6 +322,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "Birden çok görseli paylaşmak uygulamanın en son sürümünü gerektirir.",
   "mobile.chat.video.play": "{name} adlı videoyu oynat",
   "mobile.chat.video.retry": "Videoyu tekrar dene",
+  "mobile.chat.video.downloaded": "{received} / {total}",
+  "mobile.chat.video.loading": "{name} yükleniyor",
   "mobile.chat.video.share": "{name} adlı videoyu paylaş",
   "mobile.chat.video.save": "{name} adlı videoyu Fotoğraflar'a kaydet",
   "mobile.chat.video.photosPermission": "Bu videoyu kaydetmek için Ayarlar'da OpenBot'un fotoğraf eklemesine izin ver.",

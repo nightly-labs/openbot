@@ -325,6 +325,8 @@ export const messages = {
     "Para compartir varias imágenes necesitas la versión más reciente de la app.",
   "mobile.chat.video.play": "Reproducir {name}",
   "mobile.chat.video.retry": "Reintentar vídeo",
+  "mobile.chat.video.downloaded": "{received} de {total}",
+  "mobile.chat.video.loading": "Cargando {name}",
   "mobile.chat.video.share": "Compartir {name}",
   "mobile.chat.video.save": "Guardar {name} en Fotos",
   "mobile.chat.video.photosPermission": "Permite que OpenBot añada fotos en Ajustes para guardar este vídeo.",

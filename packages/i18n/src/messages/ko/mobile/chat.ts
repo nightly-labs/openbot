@@ -317,6 +317,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "여러 이미지를 공유하려면 앱을 최신 버전으로 업데이트해야 해요.",
   "mobile.chat.video.play": "{name} 재생",
   "mobile.chat.video.retry": "동영상 다시 시도",
+  "mobile.chat.video.downloaded": "{received} / {total}",
+  "mobile.chat.video.loading": "{name} 불러오는 중",
   "mobile.chat.video.share": "{name} 공유",
   "mobile.chat.video.save": "{name}을(를) 사진에 저장",
   "mobile.chat.video.photosPermission": "이 동영상을 저장하려면 설정에서 OpenBot이 사진을 추가하도록 허용해 주세요.",

@@ -323,6 +323,8 @@ export const messages = {
   "mobile.chat.imageGallery.shareNeedsUpdate": "Per condividere più immagini serve l'ultima versione dell'app.",
   "mobile.chat.video.play": "Riproduci {name}",
   "mobile.chat.video.retry": "Riprova a caricare il video",
+  "mobile.chat.video.downloaded": "{received} di {total}",
+  "mobile.chat.video.loading": "Caricamento di {name}",
   "mobile.chat.video.share": "Condividi {name}",
   "mobile.chat.video.save": "Salva {name} in Foto",
   "mobile.chat.video.photosPermission":

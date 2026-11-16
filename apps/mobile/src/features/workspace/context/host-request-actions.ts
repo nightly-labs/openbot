@@ -190,7 +190,7 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { sourceText } from "@openbot/i18n/source";
 import { readHostAnalytics } from "@openbot/team-client";
 import { readPlanLimits } from "@openbot/team-client/plan-limits";
-import type { RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
+import type { RemoteDownloadWatch, RemoteFileUpload, RemoteLargeDownload } from "@openbot/team-client/remote-peer";
 import { buildRoutineCalendar, type RoutineCalendarSource } from "@openbot/team-client/routine-calendar";
 import {
   addAgentFolder,
@@ -378,6 +378,7 @@ export type WorkspaceRequest = <T>(
   upload?: RemoteFileUpload,
   onUploadProgress?: (fraction: number) => void,
   largeDownload?: RemoteLargeDownload,
+  download?: RemoteDownloadWatch,
 ) => Promise<T>;
 
 /** The capability checks that only read what a host advertised. */
@@ -1644,7 +1645,7 @@ export function createHostRequestActions({
         await request("POST", MESSAGE_DELETE_ROUTES.agent, ignoreResponse, body, serverId);
       }
     },
-    downloadAttachment: (serverId, attachmentId, largeDownload) => {
+    downloadAttachment: (serverId, attachmentId, largeDownload, progress) => {
       const download = () =>
         request(
           "GET",
@@ -1655,6 +1656,7 @@ export function createHostRequestActions({
           undefined,
           undefined,
           largeDownload,
+          progress,
         );
       // Limit native/DOM copies when a message contains several large images. A file above the
       // attachment limit has its own lane: the images of the chat do not wait behind it, and two
