@@ -418,8 +418,16 @@ export class TurnLifecycle {
       lastEventAt: number;
       /** The provider started this turn itself, such as Claude after a background subagent ended. */
       unprompted: boolean;
+      /** The background subagents whose reports this turn reads, with the turn that started each. */
+      reports: Map<string, string>;
     }
   >();
+  /**
+   * The background subagents that ended while no turn of their thread ran, by agent and thread, with
+   * the turn that started each. Claude starts a turn by itself to read their reports. A subagent that
+   * ends during a turn is left out: that turn can read its report.
+   */
+  readonly #unreadReports = new Map<string, Map<string, string>>();
   /** The drain's start of each starting delivery, until its turn starts. */
   readonly #deliveryStarts = new Map<string, DeliveryStart>();
   /** The timing of each finished turn, until host analytics takes it. */
@@ -600,6 +608,7 @@ export class TurnLifecycle {
     this.#turnRetries.clear();
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
+    this.#unreadReports.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
@@ -965,37 +974,27 @@ export class TurnLifecycle {
   }
 
   /**
-   * The finished requests of this thread whose background subagents ended after the start of the last
-   * turn that completed, each with a limit continuation that carries the reports of its own subagents.
-   * A turn that started after a subagent ended and completed has read its report. Null when there is
-   * none, such as for a turn that a scheduled wakeup started.
+   * The finished requests that started the background subagents whose reports the turn `turnId` was to
+   * read, each with a limit continuation that carries the reports of its own subagents. Null when there
+   * is none.
    */
   #backgroundWork(
     agentId: string,
     turnId: string,
     snapshot: ConversationSnapshot,
+    unread: ReadonlyMap<string, string>,
   ): { deliveries: DeliveryContext[]; continuations: Map<string, UsageLimitContinuation> } | null {
-    const starts = new Map<string, number>();
-    const completed = new Set<string>();
-    for (const message of snapshot.messages) {
-      if (message.turnId === undefined || message.turnId === turnId || message.author !== "assistant") continue;
-      const at = Date.parse(message.createdAt);
-      starts.set(message.turnId, Math.min(starts.get(message.turnId) ?? at, at));
-      if (message.status === "completed") completed.add(message.turnId);
-    }
-    let readFrom = Number.NEGATIVE_INFINITY;
-    for (const [id, at] of starts) if (completed.has(id)) readFrom = Math.max(readFrom, at);
     const reports = new Map<string, string[]>();
-    for (const message of snapshot.messages) {
-      if (message.turnId === undefined || message.turnId === turnId) continue;
-      for (const subagent of message.subagents ?? []) {
-        if (!subagent.background || subagent.endedAt === null || Date.parse(subagent.endedAt) <= readFrom) continue;
-        // `pushSubagentReport` adds no result step when the last text step already holds the report.
-        const text = subagent.steps.findLast((step) => step.kind === "text")?.text ?? null;
-        const report = subagent.status === "completed" ? text : (subagent.error ?? text);
-        const line = `Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`;
-        reports.set(message.turnId, [...(reports.get(message.turnId) ?? []), this.#hooks.redactMcp(line)]);
-      }
+    for (const [subagentId, earlier] of unread) {
+      const subagent = snapshot.messages
+        .find((message) => message.id === `${earlier}:subagents`)
+        ?.subagents?.find((candidate) => candidate.id === subagentId);
+      if (!subagent) continue;
+      // `pushSubagentReport` adds no result step when the last text step already holds the report.
+      const text = subagent.steps.findLast((step) => step.kind === "text")?.text ?? null;
+      const report = subagent.status === "completed" ? text : (subagent.error ?? text);
+      const line = `Background subagent "${subagent.title}" ${subagent.status}${report ? `: ${report}` : "."}`;
+      reports.set(earlier, [...(reports.get(earlier) ?? []), this.#hooks.redactMcp(line)]);
     }
     const deliveries: DeliveryContext[] = [];
     const continuations = new Map<string, UsageLimitContinuation>();
@@ -1094,9 +1093,16 @@ export class TurnLifecycle {
           failureReports: new Set(),
           lastEventAt: Date.now(),
           unprompted,
+          reports: new Map(),
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
+        // Each turn takes the unread reports of its thread: a turn that Claude started reads them.
+        const reportsKey = `${agentId}\u0000${publicThreadId}`;
+        const reports = this.#unreadReports.get(reportsKey);
+        this.#unreadReports.delete(reportsKey);
+        const started = this.#runningTurns.get(turnId);
+        if (started && reports && unprompted) started.reports = reports;
         const snapshot = this.#conversation.ensureSnapshot(agentId, publicThreadId);
         snapshot.activeTurnId = turnId;
         if (laneId === null) this.#failedTurns.delete(agentId);
@@ -1944,7 +1950,7 @@ export class TurnLifecycle {
       // to the queue with the report, so a backup or the reset continues the work (#9493).
       const resumed =
         limited && running?.unprompted === true && deliveries.length === 0 && !channelTurn && !routineSession
-          ? this.#backgroundWork(agentId, turnId, snapshot)
+          ? this.#backgroundWork(agentId, turnId, snapshot, running.reports)
           : null;
       // The limit belongs to the model the turn ran on, which the agent may have left since.
       const model = this.#hooks.turnModel(agentId, turnId);
@@ -2842,6 +2848,22 @@ export class TurnLifecycle {
       this.#itemTurns.set(id, turnId);
     }
     const previous = message.subagents;
+    if (
+      ![...this.#runningTurns.values()].some(
+        (running) =>
+          running.agentId === agentId &&
+          this.#conversation.publicThreadId(agentId, running.threadId) === snapshot.threadId,
+      )
+    ) {
+      const key = `${agentId}\u0000${snapshot.threadId}`;
+      for (const subagent of subagents)
+        if (
+          subagent.background &&
+          subagent.status !== "running" &&
+          previous?.find((candidate) => candidate.id === subagent.id)?.status === "running"
+        )
+          this.#unreadReports.set(key, (this.#unreadReports.get(key) ?? new Map()).set(subagent.id, turnId));
+    }
     message.itemType = CONVERSATION_SUBAGENTS_ITEM_TYPE;
     message.text = conversationSubagentsText(subagents);
     message.subagents = subagents;
