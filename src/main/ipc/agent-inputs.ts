@@ -89,6 +89,7 @@ import {
   type UpdateChannelRoutineInput,
   type UpdateQueuedMessageInput,
   type UpdateRoutineInput,
+  type WithdrawFeedbackInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
@@ -720,6 +721,14 @@ export function parseDeleteConversationMessage(value: unknown): DeleteConversati
     agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
     messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
     ...(value.taskId === undefined ? {} : { taskId: requireString(value.taskId, "taskId", INPUT_LIMITS.identifier) }),
+  };
+}
+
+export function parseWithdrawFeedback(value: unknown): WithdrawFeedbackInput {
+  if (!isObject(value)) throw new Error("Invalid feedback withdraw request.");
+  return {
+    agentId: requireString(value.agentId, "agentId", INPUT_LIMITS.identifier),
+    messageId: requireString(value.messageId, "messageId", INPUT_LIMITS.identifier),
   };
 }
 

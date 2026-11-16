@@ -182,7 +182,17 @@ export type ChatActionMarkerModel =
    */
   | { kind: "server-install"; name: string | null; expiresAt: number; timestamp: string }
   /** The OpenBot team got the user's feedback. The chat shows a thank-you card with the issue link. */
-  | { kind: "feedback-sent"; title: string; number: number; url: string; timestamp: string }
+  | {
+      kind: "feedback-sent";
+      /** The thank-you card, for its Remove action. */
+      messageId: string;
+      title: string;
+      number: number;
+      url: string;
+      /** True after the user took the report off GitHub. */
+      withdrawn: boolean;
+      timestamp: string;
+    }
   /** The user started a new chat: the agent does not see the messages above this marker. */
   | { kind: "context-reset"; timestamp: string }
   /** The agent left its model for a usage limit, or went back to it. `text` is the host's note. */

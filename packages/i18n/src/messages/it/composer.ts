@@ -4,6 +4,9 @@ import type { messages as source } from "../en/composer";
 export const messages = {
   "composer.queueEdit.body": "Stai modificando un messaggio in coda. Salva o annulla la modifica per farlo partire.",
   "composer.queueEdit.cancel": "Annulla modifica",
+  "composer.feedbackFix.body":
+    "Correzione della segnalazione #{number}. Invia la richiesta, oppure annulla per lasciare la segnalazione com'è.",
+  "composer.feedbackFix.cancel": "Annulla",
   "composer.providerWait.offlineTitle": "Nessuna connessione a Internet",
   "composer.providerWait.offline": "{provider} non può rispondere finché questo computer non torna online.",
   "composer.providerWait.silent": "{provider} non invia nulla da {duration}.",

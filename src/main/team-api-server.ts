@@ -368,6 +368,7 @@ import { routeCustomAgents } from "./team-api/route-custom-agents";
 import { routeDirect } from "./team-api/route-direct";
 import { routeDiscordAccess } from "./team-api/route-discord-access";
 import { routeEvents } from "./team-api/route-events";
+import { routeFeedbackWithdraw } from "./team-api/route-feedback-withdraw";
 import { routeFiles } from "./team-api/route-files";
 import { routeFocusUse } from "./team-api/route-focus-use";
 import { routeGithubSkills } from "./team-api/route-github-skills";
@@ -1373,6 +1374,7 @@ export class TeamApiServer {
       if ((await routeThreadMessageSearch(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeSideQuestion(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeSkillSuggestionSave(context, this.#options.agents, hidden)) === "handled") return;
+      if ((await routeFeedbackWithdraw(context, this.#options.agents, hidden)) === "handled") return;
       if (
         (await routeLiveVoice(context, {
           liveVoice: this.#options.liveVoice,
