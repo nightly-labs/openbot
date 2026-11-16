@@ -87,17 +87,23 @@ const stripeCall = <A>(call: () => Effect.Effect<A, StripeRequestError | StripeT
   stripeRequest(call).pipe(Effect.mapError(stripeFailure));
 
 /**
- * The VAT of a new Checkout page of the customer. The customer must have a country: a client from before
- * the billing details step sends none, and the account then updates OpenBot. The tax exemption of the
- * customer follows the decision, so that the invoice of a reverse charge says so.
+ * The VAT of a new Checkout page of the customer. The tax exemption of the customer follows the decision,
+ * so that the invoice of a reverse charge says so.
+ *
+ * A client from before the billing details step sends no country. While `countryRequired` is off
+ * (`BILLING_COUNTRY_REQUIRED`), such a customer gets `null`: a Stripe Tax page, as before this step, so that
+ * a desktop app that is not updated can still buy. When it is on, the account must update OpenBot.
  */
 export const checkoutTax = Effect.fn("BillingTax.checkoutTax")(function* (
   stripe: StripeClient,
   customerId: string,
-): Effect.fn.Return<CheckoutTax, BillingError | BillingOperationError> {
+  countryRequired: boolean,
+): Effect.fn.Return<CheckoutTax | null, BillingError | BillingOperationError> {
   const tax = yield* stripeCall(() => stripe.getCustomerTax(customerId));
-  if (!tax.country || !isBillingCountry(tax.country))
+  if (!tax.country || !isBillingCountry(tax.country)) {
+    if (!countryRequired) return null;
     return yield* new BillingError(409, "billing_country_required", sourceText("error.billing.countryRequired"));
+  }
   const treatment = vatTreatment(tax.country, confirmedVatId(tax) !== null);
   const rateId =
     treatment === "standard"

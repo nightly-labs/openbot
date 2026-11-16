@@ -478,8 +478,11 @@ export class StripeClient {
       metadata?: Readonly<Record<string, string>>;
       /** Metadata for the session only, such as the order that a later page for the same server repeats. */
       sessionMetadata?: Readonly<Record<string, string>>;
-      /** The VAT of every invoice of the subscription (`checkoutTax`). */
-      tax: CheckoutTax;
+      /**
+       * The VAT of every invoice of the subscription (`checkoutTax`). `null` is a customer with no country
+       * while the country is not required: Stripe Tax sets the VAT, as before the billing details step.
+       */
+      tax: CheckoutTax | null;
       /** The subscription is free until this time. Stripe refuses a time less than 48 hours away. */
       trialEndSeconds?: number;
       successUrl: string;
@@ -521,13 +524,21 @@ export class StripeClient {
     }
     if (input.serverId) body.set("client_reference_id", input.serverId);
     if (input.trialEndSeconds !== undefined) body.set("subscription_data[trial_end]", String(input.trialEndSeconds));
-    // The rate goes on top of the Price. Reverse charge and a buyer outside the EU have no rate.
-    if (input.tax.rateId) body.set("subscription_data[default_tax_rates][0]", input.tax.rateId);
-    body.set(`metadata[${VAT_METADATA.country}]`, input.tax.country);
-    body.set(`metadata[${VAT_METADATA.treatment}]`, input.tax.treatment);
-    // The subscription keeps its VAT treatment, so that a change of the billing details changes only the
-    // subscriptions that got their VAT from OpenBot (`billing-tax.ts`).
-    body.set(`subscription_data[metadata][${VAT_METADATA.treatment}]`, input.tax.treatment);
+    if (input.tax) {
+      // The rate goes on top of the Price. Reverse charge and a buyer outside the EU have no rate.
+      if (input.tax.rateId) body.set("subscription_data[default_tax_rates][0]", input.tax.rateId);
+      body.set(`metadata[${VAT_METADATA.country}]`, input.tax.country);
+      body.set(`metadata[${VAT_METADATA.treatment}]`, input.tax.treatment);
+      // The subscription keeps its VAT treatment, so that a change of the billing details changes only the
+      // subscriptions that got their VAT from OpenBot (`billing-tax.ts`).
+      body.set(`subscription_data[metadata][${VAT_METADATA.treatment}]`, input.tax.treatment);
+    } else {
+      // No country yet: Stripe Tax sets the VAT from the Checkout address and collects the VAT ID.
+      // `scripts/stripe-vat-migrate.ts` later moves the subscription to the rate.
+      body.set("automatic_tax[enabled]", "true");
+      body.set("tax_id_collection[enabled]", "true");
+      body.set("tax_id_collection[required]", "never");
+    }
     for (const prefix of ["metadata", "subscription_data[metadata]"]) {
       body.set(`${prefix}[${BILLING_METADATA.userId}]`, input.userId);
       if (input.serverId) body.set(`${prefix}[${BILLING_METADATA.serverId}]`, input.serverId);

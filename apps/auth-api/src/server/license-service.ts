@@ -160,6 +160,8 @@ export interface LicenseServiceOptions {
   secretKey: string;
   /** A license bought before this time is free until then, in milliseconds since the epoch. */
   trialEnd?: number | null;
+  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
+  countryRequired?: boolean;
   now: () => number;
   /** The Stripe customer of the account. Server plans and the license use the same customer. */
   ensureCustomer: (user: { id: string; email: string }) => Effect.Effect<string, BillingError | BillingOperationError>;
@@ -204,6 +206,7 @@ export class LicenseService {
   readonly #analytics: AccountAnalytics;
   readonly #sales: BillingSales | null;
   readonly #trialEnd: number | null;
+  readonly #countryRequired: boolean;
   readonly #now: () => number;
   readonly #onLicenseChanged: LicenseServiceOptions["onLicenseChanged"] | null;
   readonly #onLicenseEmail: LicenseServiceOptions["onLicenseEmail"] | null;
@@ -212,6 +215,7 @@ export class LicenseService {
   constructor(options: LicenseServiceOptions) {
     this.#secretKey = options.secretKey;
     this.#trialEnd = options.trialEnd ?? null;
+    this.#countryRequired = options.countryRequired ?? false;
     this.#now = options.now;
     this.#ensureCustomer = options.ensureCustomer;
     this.#analytics = options.analytics ?? NO_ACCOUNT_ANALYTICS;
@@ -337,7 +341,7 @@ export class LicenseService {
       if (locked && locked !== request.currency)
         return yield* new BillingError(409, "license_currency", sourceText("error.billing.licenseCurrency"));
       const customerId = yield* this.#ensureCustomer(user);
-      const tax = yield* checkoutTax(dependencies.stripe, customerId);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
       const returnUrl = licenseReturnUrl(origin, target);
       const trialEnd = this.trialEnd();
       const session = yield* this.#stripeCall(() =>

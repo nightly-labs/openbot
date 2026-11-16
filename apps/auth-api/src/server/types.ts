@@ -120,6 +120,13 @@ export interface WorkerBindings {
    * a new license is paid at once.
    */
   LICENSE_TRIAL_END?: string;
+  /**
+   * `true`: a Checkout page needs the billing country of the account (409 `billing_country_required`).
+   * Otherwise a customer with no country gets a Stripe Tax page, so that a desktop app from before the
+   * billing details step can still buy. Turn it on after that desktop release and the run of
+   * `scripts/stripe-vat-migrate.ts --live`.
+   */
+  BILLING_COUNTRY_REQUIRED?: string;
   HOSTED_SERVERS_ENABLED?: string;
   /** Comma-separated account IDs or emails that can create hosted servers. `*` allows each account. */
   HOSTED_SERVERS_ALLOWED_USER_IDS?: string;

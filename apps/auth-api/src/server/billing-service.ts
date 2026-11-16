@@ -172,6 +172,8 @@ export interface BillingServiceOptions {
   webhookSecret: string | null;
   /** A license bought before this time is free until then, in milliseconds since the epoch. */
   licenseTrialEnd?: number | null;
+  /** A Checkout page needs the billing country (`checkoutTax`). Off: Stripe Tax for a customer with none. */
+  countryRequired?: boolean;
   fetch: StripeFetch;
   now?: () => number;
   /**
@@ -277,6 +279,7 @@ export class BillingService {
   readonly #vies: ViesClient;
   readonly #onVatMismatch: ((text: string) => void) | null;
   readonly #oss: BillingOss | null;
+  readonly #countryRequired: boolean;
   /** The commercial license. It shares the Stripe customer and the webhook with the server plans. */
   readonly license: LicenseService;
 
@@ -294,6 +297,7 @@ export class BillingService {
     this.#vies = options.vies ?? new ViesClient(options.fetch, null);
     this.#onVatMismatch = options.onVatMismatch ?? null;
     this.#oss = options.oss ?? null;
+    this.#countryRequired = options.countryRequired ?? false;
     this.#layer = Layer.succeed(BillingDependencies, {
       database,
       stripe,
@@ -306,6 +310,7 @@ export class BillingService {
       stripe,
       secretKey: options.secretKey,
       trialEnd: options.licenseTrialEnd ?? null,
+      countryRequired: this.#countryRequired,
       now,
       ensureCustomer: (user) => this.ensureCustomer(user),
       analytics: this.#analytics,
@@ -449,7 +454,7 @@ export class BillingService {
       if (order) yield* this.license.assertCanOrder(request.user.id, order.users);
       yield* this.license.assertCurrency(request.user.id, request.currency);
       const customerId = yield* this.ensureCustomer(request.user);
-      const tax = yield* checkoutTax(dependencies.stripe, customerId);
+      const tax = yield* checkoutTax(dependencies.stripe, customerId, this.#countryRequired);
       const returnUrl = checkoutReturnUrl(request.origin, request.target, request.serverId);
       const returnToken = this.#sales ? crypto.randomUUID() : null;
       // During a promotion the license is free until its trial end, so the order pays for the server only.

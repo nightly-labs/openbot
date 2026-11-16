@@ -48,6 +48,9 @@ The optional Worker variable `VIES_REQUESTER_VAT_ID` is the seller's EU VAT ID (
 Stripe customer keeps as proof of the check. Without it, the check works and has no number.
 `bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
 a dry run unless you give `--apply`.
+The Worker variable `BILLING_COUNTRY_REQUIRED=true` refuses a Checkout of an account with no billing
+country (409 `billing_country_required`). Unset, such an account gets a Stripe Tax Checkout, so that an
+older desktop app can still buy.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:

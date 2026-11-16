@@ -32,6 +32,7 @@ export type HostedBillingBindings = HostedServerBindings &
       | "STRIPE_WEBHOOK_SECRET"
       | "VIES_REQUESTER_VAT_ID"
       | "LICENSE_TRIAL_END"
+      | "BILLING_COUNTRY_REQUIRED"
       | "OPENPANEL_CLIENT_ID"
       | "OPENPANEL_CLIENT_SECRET"
     >
@@ -80,6 +81,7 @@ export function createHostedBilling(
         secretKey,
         webhookSecret: bindings.STRIPE_WEBHOOK_SECRET?.trim() || null,
         licenseTrialEnd: parseLicenseTrialEnd(bindings.LICENSE_TRIAL_END),
+        countryRequired: bindings.BILLING_COUNTRY_REQUIRED?.trim() === "true",
         fetch: send,
         analytics,
         ...(sales ? { sales } : {}),

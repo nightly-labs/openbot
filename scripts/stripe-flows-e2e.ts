@@ -317,6 +317,7 @@ const checkoutLinesSchema = z.object({
   currency: z.string().nullable(),
   amount_total: z.number().nullable(),
   metadata: z.record(z.string(), z.string()).nullable(),
+  automatic_tax: z.object({ enabled: z.boolean() }),
   amount_subtotal: z.number().nullable(),
   total_details: z.object({ amount_tax: z.number() }).nullable(),
   line_items: z.object({
@@ -3706,16 +3707,30 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
     );
 
-    // A customer from before the billing details step that never paid has no address.
+    // A customer from before the billing details step that never paid has no address. The Worker reads
+    // BILLING_COUNTRY_REQUIRED from the same shell as this script.
     await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
-    const refused = await account.checkout(serverId);
+    const noCountry = await account.checkout(serverId);
     const cleared = await details();
-    record(
-      "vat",
-      "with no billing country a Checkout page is refused: 409 billing_country_required",
-      refused.status === 409 && refused.code === "billing_country_required" && cleared?.country === null,
-      { status: refused.status, code: refused.code, details: cleared },
-    );
+    if (process.env.BILLING_COUNTRY_REQUIRED?.trim() === "true") {
+      record(
+        "vat",
+        "with no billing country a Checkout page is refused: 409 billing_country_required",
+        noCountry.status === 409 && noCountry.code === "billing_country_required" && cleared?.country === null,
+        { status: noCountry.status, code: noCountry.code, details: cleared },
+      );
+    } else {
+      const stripeTax = noCountry.checkoutUrl ? await licenseSession(noCountry.checkoutUrl) : null;
+      record(
+        "vat",
+        "with no billing country, while the country is not required, Checkout uses Stripe Tax as before",
+        noCountry.status === 200 &&
+          cleared?.country === null &&
+          stripeTax?.automatic_tax.enabled === true &&
+          stripeTax.metadata?.[VAT_METADATA.treatment] === undefined,
+        { status: noCountry.status, code: noCountry.code, details: cleared, vat: vatView(stripeTax) },
+      );
+    }
 
     // Cloudflare sets CF-IPCountry; a local Worker reads the header that the client sends.
     const located = async (country: string) =>
