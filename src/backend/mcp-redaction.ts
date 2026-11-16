@@ -33,7 +33,9 @@ export function redactMcpValues(text: string, values: Iterable<string>, rules = 
  * The same for a record that a provider sends, such as a notification or a history item.
  *
  * The record is the agent's own chat, so an email address stays, as `redactSecrets` keeps it: the
- * user wrote it or needs to read it (#9988). The shared rules run first, so a key such as `refresh_token` is redacted before a known value can
+ * user wrote it or needs to read it (#9988).
+ *
+ * The shared rules run first, so a key such as `refresh_token` is redacted before a known value can
  * change its name. Then each string, key and number is masked on its own. Masking the serialized
  * record instead would cut a JSON literal out of it when a known value is `true` or `null`.
  */
