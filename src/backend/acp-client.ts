@@ -2688,11 +2688,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         for (let steer = turn.steerReplies.shift(); steer; steer = turn.steerReplies.shift()) {
           const run = this.#flavor.promptRun?.(response);
           if (run === undefined) this.#reportPromptUsage(thread, turn, response);
-          const previous = response;
-          response = providerResult(yield* Deferred.await(steer));
+          const reply = yield* Deferred.await(steer);
+          // The earlier run's usage is kept when the turn ends or the steer fails during the wait.
+          if (run !== undefined && !(Result.isSuccess(reply) && this.#flavor.promptRun?.(reply.success) === run))
+            this.#reportPromptUsage(thread, turn, response);
           if (thread.activeTurn !== turn || turn.completing) return;
-          if (run !== undefined && this.#flavor.promptRun?.(response) !== run)
-            this.#reportPromptUsage(thread, turn, previous);
+          response = providerResult(reply);
         }
         // A command still runs in the background (`AcpFlavor.wakesAfterPromptEnds`). The turn stays
         // open until the session changes, and a prompt then connects the agent's wake-up to it.
