@@ -242,6 +242,11 @@ import {
   CUSTOM_PROVIDER_HARNESS_CODECS,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
+import {
+  decodeFeedbackWithdrawResult,
+  FEEDBACK_WITHDRAW_CAPABILITY,
+  FEEDBACK_WITHDRAW_ROUTES,
+} from "@openbot/contracts/team-protocol/feedback-withdraw-v1";
 import { GITHUB_SKILLS_CAPABILITY, GITHUB_SKILLS_ROUTES } from "@openbot/contracts/team-protocol/github-skills-v1";
 import { HERMES_IMPORT_CAPABILITY, HERMES_IMPORT_ROUTES } from "@openbot/contracts/team-protocol/hermes-import-v1";
 import {
@@ -362,6 +367,7 @@ import {
   ROUTINE_RUN_PLACE_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-run-place-v1";
 import { ROUTINES_ONCE_CAPABILITY, ROUTINES_ONCE_ROUTES } from "@openbot/contracts/team-protocol/routines-once-v1";
+import { SETTING_LINK_MARKERS_CAPABILITY } from "@openbot/contracts/team-protocol/setting-link-markers-v1";
 import { SIDE_QUESTION_CAPABILITY, SIDE_QUESTION_ROUTES } from "@openbot/contracts/team-protocol/side-question-v1";
 import { teamSideRouteCodec } from "@openbot/contracts/team-protocol/side-routes";
 import { SIDEBAR_PINS_CAPABILITY, SIDEBAR_PINS_ROUTES } from "@openbot/contracts/team-protocol/sidebar-pins-v1";
@@ -1260,6 +1266,10 @@ const fakeAgents: TeamApiAgents = {
   saveSkillSuggestion: (input) => {
     record("saveSkillSuggestion", input);
     return Effect.succeed({ saved: input.messageId === "suggestion-1" });
+  },
+  withdrawFeedback: (input) => {
+    record("withdrawFeedback", input);
+    return Effect.succeed({ status: input.messageId === "feedback-card-1" ? "withdrawn" : "notYours" });
   },
   saveProfile: unused("saveProfile"),
   createAgent: unused("createAgent"),
@@ -5763,6 +5773,7 @@ try {
               excludeRoutineRunEvents: true,
               excludeHostedSiteEvents: true,
               excludeRoutineQuietAnswers: true,
+              excludeSettingLinks: true,
             },
           ],
         ]),
@@ -5869,6 +5880,42 @@ try {
       "an admin turns the memory review on again at 40 turns",
       on.status === 200 && field(on.body, "interval") === 40 && memoryReview.get().interval === 40,
       summary(on),
+    );
+  }
+
+  // ---- Setting cards (setting-link-markers-v1) ----
+  {
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises setting-link-markers-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(SETTING_LINK_MARKERS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    // The database leaves the setting cards out of a page for a client that cannot show them.
+    const pagePath = `${TEAM_API_ROUTES.agent.conversationPage("agent-ada")}?around=setting-card`;
+    const pageExclusions = () => {
+      const options = callsOf("readConversationPageFor").at(-1)?.[4];
+      return options && typeof options === "object" && "excludeSettingLinks" in options
+        ? options.excludeSettingLinks
+        : undefined;
+    };
+    const withCards = await call("GET", pagePath, {
+      token: bobToken,
+      protocol: TEAM_PROTOCOL_V9,
+      capabilities: [SETTING_LINK_MARKERS_CAPABILITY],
+    });
+    const withCardsExcluded = pageExclusions();
+    const withoutCards = await call("GET", pagePath, { token: bobToken, protocol: TEAM_PROTOCOL_V9 });
+    const withoutCardsExcluded = pageExclusions();
+    check(
+      "a conversation page keeps the setting cards only for a client with setting-link-markers-v1",
+      withCards.status === 200 &&
+        withCardsExcluded === false &&
+        withoutCards.status === 200 &&
+        withoutCardsExcluded === true,
+      [summary(withCards), withCardsExcluded, summary(withoutCards), withoutCardsExcluded],
     );
   }
 
@@ -13601,6 +13648,85 @@ try {
         without: withoutEvents.events.map((event) => event.type),
         folders: stored().folders.length,
       },
+    );
+  }
+
+  // ---- Remove on a feedback thank-you card (feedback-withdraw-v1) ----
+  {
+    const capabilities = [FEEDBACK_WITHDRAW_CAPABILITY];
+    const ownerToken = owner.sessionToken;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises feedback-withdraw-v1 on protocol 9 only",
+      list(field(compatibility.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(FEEDBACK_WITHDRAW_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+    });
+    const malformed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "" },
+      capabilities,
+    });
+    // Protocol 6 does not know Pi, so the host hides `agent-pi`.
+    const hidden = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      protocol: 6,
+      json: { agentId: "agent-pi", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const missing = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-gone", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    // Only the owner approves a report, so a member and an admin ask the agent instead.
+    const member = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: bobToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const admin = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: adaToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    check(
+      "a feedback removal without the capability, with a bad body, to a hidden or missing agent, or from a member or an admin reaches no agent",
+      errorIs(unsupported, 400, sourceText("error.backend.feedbackWithdrawRemoteUnsupported")) &&
+        malformed.status === 400 &&
+        errorIs(hidden, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(member, 403, sourceText("error.team.ownerRequired")) &&
+        errorIs(admin, 403, sourceText("error.team.ownerRequired")) &&
+        callsOf("withdrawFeedback").length === 0,
+      [summary(unsupported), summary(malformed), summary(hidden), summary(missing), summary(member), summary(admin)],
+    );
+    const removed = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-1" },
+      capabilities,
+    });
+    const refused = await call("POST", FEEDBACK_WITHDRAW_ROUTES.withdraw, {
+      token: ownerToken,
+      json: { agentId: "agent-ada", messageId: "feedback-card-2" },
+      capabilities,
+    });
+    check(
+      "the owner removes a report; the host gets the agent and card, and the client decodes each result",
+      removed.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(removed.body), { status: "withdrawn" }) &&
+        refused.status === 200 &&
+        isDeepStrictEqual(decodeFeedbackWithdrawResult(refused.body), { status: "notYours" }) &&
+        isDeepStrictEqual(callsOf("withdrawFeedback"), [
+          [{ agentId: "agent-ada", messageId: "feedback-card-1" }],
+          [{ agentId: "agent-ada", messageId: "feedback-card-2" }],
+        ]),
+      [summary(removed), summary(refused)],
     );
   }
 

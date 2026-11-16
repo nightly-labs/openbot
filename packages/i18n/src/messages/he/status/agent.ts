@@ -14,6 +14,7 @@ export const messages = {
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
   "status.agent.modelReturnedAfterError": "חזר אל {model} אחרי שגיאת הספק.",
   "status.agent.marketplaceSuggested": "הציע אפליקציה מהחנות: {app}.",
+  "status.agent.settingShown": "הציג הגדרה: {setting}.",
   "status.agent.channelMemberAdded": "{agent} הוסיף את {member} לערוץ. {person} ביקש זאת.",
   "status.agent.channelMemberRemoved": "{agent} הסיר את {member} מהערוץ. {person} ביקש זאת.",
   "status.agent.channelInstructionsChanged": "{agent} שינה את הוראות הערוץ. {person} ביקש זאת.",
@@ -36,6 +37,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
   "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
   "status.agent.feedbackSent": "נשלח לצוות OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "הוסר מ-GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "הסרת הדיווח #{issue} מ-GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "אף אחד לא יוכל לראות את הדיווח הזה ב-GitHub. אי אפשר לבטל את הפעולה. כדי לתקן אותו, הסוכן יכול לשלוח דיווח מתוקן.",
+  "status.agent.feedbackWithdrawing": "מסיר את הדיווח שלך מ-GitHub…",
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",

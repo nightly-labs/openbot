@@ -1948,7 +1948,8 @@ export function createWebWorkspaceRuntime(
 
 /**
  * The largest file that the browser sends or reads through the host connection: the host's limit, as
- * on desktop. The phone keeps its smaller limit, because its native bridge copies each file.
+ * on desktop. The phone sends a large file in parts, but reads with a smaller limit, because its
+ * native bridge copies each file that it reads.
  */
 const WEB_FILE_BYTES = TEAM_PROTOCOL_V2_MAX_FILE_BYTES;
 /** A file read asks for the larger limit. Without it, the connection refuses a file above the phone's limit. */

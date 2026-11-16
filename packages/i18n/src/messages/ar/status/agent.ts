@@ -14,6 +14,7 @@ export const messages = {
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
   "status.agent.modelReturnedAfterError": "تمت العودة إلى {model} بعد خطأ المزوّد.",
   "status.agent.marketplaceSuggested": "اقترح تطبيقًا من المتجر: {app}.",
+  "status.agent.settingShown": "عرض إعدادًا: {setting}.",
   "status.agent.channelMemberAdded": "أضاف {agent} العضو {member} إلى القناة. بطلب من {person}.",
   "status.agent.channelMemberRemoved": "أزال {agent} العضو {member} من القناة. بطلب من {person}.",
   "status.agent.channelInstructionsChanged": "غيّر {agent} تعليمات القناة. بطلب من {person}.",
@@ -37,6 +38,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
   "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
   "status.agent.feedbackSent": "أُرسل إلى فريق OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "أُزيل من GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "إزالة البلاغ #{issue} من GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "لن يتمكن أحد من رؤية هذا البلاغ على GitHub بعد الآن. لا يمكنك التراجع عن ذلك. لتصحيحه، يمكن للوكيل إرسال بلاغ مصحَّح.",
+  "status.agent.feedbackWithdrawing": "جارٍ إزالة بلاغك من GitHub…",
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",
   "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",

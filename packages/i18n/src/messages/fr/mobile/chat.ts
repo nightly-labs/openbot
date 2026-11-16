@@ -182,7 +182,7 @@ export const messages = {
     "{name} : l’ordinateur hôte n’accepte pas ces fichiers. Mettez OpenBot à jour sur cet ordinateur pour les joindre.",
   "mobile.chat.attachment.nameTooLong": "Choisissez un fichier dont le nom est plus court.",
   "mobile.chat.attachment.damaged": "La pièce jointe est endommagée. Sélectionnez-la de nouveau.",
-  "mobile.chat.attachment.tooLarge": "{name} dépasse 10 Mo.",
+  "mobile.chat.attachment.tooLarge": "{name} dépasse {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Autorisez l’accès à l’appareil photo dans Réglages pour prendre une photo.",
   "mobile.chat.composer.send": "Envoyer le message",

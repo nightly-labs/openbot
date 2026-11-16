@@ -44,6 +44,7 @@ import type { ThreadHeaderProps, ThreadItem } from "@openbot/ui/features/convers
 import type { SidebarAgentWait } from "@openbot/ui/features/sidebar/sidebar-agent-states";
 import type { JSX } from "@solidjs/web";
 import type { ConnectorRegistry } from "../connectors/connector-registry";
+import type { AppSettingLinkId } from "../settings/setting-link-targets";
 import type { ConversationRuntime } from "./conversation-runtime";
 import type { ServerInstallWatch } from "./ServerInstallChatCard";
 import type { TurnStepLines } from "./turn-step-lines";
@@ -156,6 +157,11 @@ export interface ConversationProps {
    * pressed Connect or Install on the card: the page then starts the connect step.
    */
   onOpenMarketplaceApp?: ((request: { appId: string; connect: boolean }) => void) | undefined;
+  /**
+   * The action that opens Settings of this computer at the row of an app setting card, or undefined where
+   * this window does not show the row's tab. Absent in the web client: the card then says where it is.
+   */
+  appSettingOpener?: ((settingId: AppSettingLinkId) => (() => void) | undefined) | undefined;
   /** The connectors of the server on screen, which a suggestion card for a connector reads. */
   connectors?: ConnectorRegistry | undefined;
   /**

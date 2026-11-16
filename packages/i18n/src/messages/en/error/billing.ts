@@ -21,6 +21,15 @@ export const messages = defineMessages("error.billing", {
   "error.billing.licenseOneUser": "This license is for 1 user. Change it to Team to add users.",
   "error.billing.licensePlanChange": "This license cannot change to that plan. Cancel it and buy the new plan.",
   "error.billing.noLicense": "This account has no license.",
+  // Billing details and VAT errors.
+  "error.billing.countryRequired":
+    "Give your billing country before you pay. Update OpenBot to do this, then try again.",
+  "error.billing.detailsInvalid": "Check the country and the VAT ID. The VAT ID must be one of the selected country.",
+  "error.billing.vatIdInvalid":
+    "The EU VAT system does not know this VAT ID. Check the number, or continue without a VAT ID.",
+  "error.billing.vatIdUnverified":
+    "The EU VAT system cannot check the VAT ID now. Try again later, or continue without a VAT ID.",
+  "error.billing.vatUnavailable": "Payment is not available now. Try again later.",
   // Billing errors that the desktop and web clients make.
   "error.billing.invalidRequest": "The billing request is invalid.",
   "error.billing.invalidResponse": "The billing response is invalid.",

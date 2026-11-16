@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Vous modifiez un message en attente. Enregistrez ou annulez la modification pour permettre son exécution.",
   "composer.queueEdit.cancel": "Annuler",
+  "composer.feedbackFix.body":
+    "Correction du rapport #{number}. Envoyez la demande, ou annulez pour garder le rapport tel quel.",
+  "composer.feedbackFix.cancel": "Annuler",
   "composer.providerWait.offlineTitle": "Pas de connexion Internet",
   "composer.providerWait.offline":
     "{provider} ne peut pas répondre tant que cet ordinateur n’est pas de nouveau en ligne.",

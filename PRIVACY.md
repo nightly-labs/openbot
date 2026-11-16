@@ -439,6 +439,9 @@ The service stores:
   and whether it ends at the period end. For a license, it keeps the same fields and the number of
   users in place of the plan. The service also keeps the ID, type and receive time of each
   Stripe webhook event for 7 days, to ignore a repeated event. These records hold no card data.
+- for the EU VAT limit: for each paid invoice of a consumer in an EU country other than Poland, the
+  Stripe invoice ID, the year, the country and the net amount in euro, with no account ID. The service
+  deletes them after the end of the next year.
 - hosted sites: the hostname, title, description, framework, state, owner account ID, lifecycle
   times, and for each deployment the file list, sizes and content types. The published site files
   are in R2. Anyone can read a published site. Deleting a site removes its files.
@@ -830,7 +833,13 @@ account and server IDs that the subscription names, never the card number. When 
 for a new hosted server, the account service sends Stripe your account email and account ID (to
 make the Stripe customer), and the server ID, the plan, the billing period and the currency (to
 open Stripe Checkout, `checkout.stripe.com`). When you buy or change a license, it sends Stripe
-your account ID, the number of users and the currency, and no names or emails of the users. When you delete a hosted server, the account service
+your account ID, the number of users and the currency, and no names or emails of the users. Before the payment page opens, you give
+your billing country and, for a company in the EU, an optional EU VAT ID. The account service saves
+them on your Stripe customer, because they decide the VAT. When the VAT ID is of an EU country other
+than Poland, the account service first sends only that VAT ID to the EU VAT check service (VIES,
+`ec.europa.eu`) of the European Commission, which says if it is valid. When the billing address that you enter on the
+payment page is in another country than the one you gave, the account service sends the OpenBot team
+the ID of that payment page and the two countries, through a Discord webhook, to check the VAT. When you delete a hosted server, the account service
 tells Stripe to cancel its plan. When you manage billing,
 the account service sends Stripe your Stripe customer ID, and the subscription ID of the plan you
 change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Stripe keeps the
@@ -1300,7 +1309,12 @@ Network traffic can also occur when:
   report without them. The service opens it as a public
   issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
-  the account. The service does not store or log the text. For the limit of a few issues each minute and
+  the account. The service does not store or log the text. It adds a hidden owner mark to the end of
+  the text: a random value and a keyed hash of that value and the account ID. The mark does not name
+  the account, and the service stores nothing for it. When the user removes the report (Fix or remove on the
+  thank-you card, or the agent's `withdraw_feedback` after the user approves), OpenBot sends the issue
+  number with the account session. The service checks the mark, then deletes a comment, or moves an
+  issue with its edit history to a private repository that only the OpenBot team can read. For the limit of a few issues each minute and
   10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the
   count, and deletes the earlier days of an account when the account sends again, or when the account
   is deleted. When the user is not signed in or the send fails, OpenBot gives a link to the GitHub

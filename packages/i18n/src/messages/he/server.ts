@@ -395,7 +395,7 @@ export const messages = {
   "server.settings.agentsDescription": "בחרו מה הסוכנים בשרת הזה יכולים לעשות כשלא הגדרתם זאת לסוכן.",
   "server.settings.timezone": "אזור זמן",
   "server.settings.timezoneDescription":
-    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח.",
+    "שגרות חדשות משתמשות באזור הזמן הזה כשההודעה אינה מציינת את אזור הזמן של השולח. בשרת, גם הדפדפן משתמש בו אחרי ההפעלה מחדש הבאה.",
   "server.settings.timezoneAutomatic": "אוטומטי ({zone})",
   "server.settings.timezoneLoadFailed": "לא ניתן לטעון את אזור הזמן של השרת.",
   "server.settings.turnLimit": "שרשורים בו־זמנית",

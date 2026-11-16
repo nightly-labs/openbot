@@ -14,6 +14,7 @@ import { useMobileSession } from "@/features/auth/context/mobile-session-context
 import { ChannelHistoryRefreshError } from "@/features/channels/model/channel-store";
 import { donateShareTarget } from "@/features/share/model/share-extension";
 import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspace-context";
+import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import type { MobileWorkspaceContextValue } from "@/features/workspace/model/workspace-types";
 import { currentText } from "@/shared/lib/text";
 import type { OutboxMessage } from "../model/outbox";
@@ -114,7 +115,10 @@ async function deliverOutboxMessage(
     const repeatSafe = workspace.canRetryMessage(target.serverId);
     const messageId = await uploadChatAttachments(delivery.files, {
       ...control,
-      upload: (file, onProgress) => workspace.uploadAttachment(target.agentId, file, target.serverId, onProgress),
+      upload: (file, onProgress) =>
+        withUploadCancel(file, delivery.cancelled, () =>
+          workspace.uploadAttachment(target.agentId, file, target.serverId, onProgress),
+        ),
       discard: (id) => workspace.discardAttachment(target.agentId, id, target.serverId),
       send: async (ids) => {
         await delivery.beforeStore(repeatSafe);

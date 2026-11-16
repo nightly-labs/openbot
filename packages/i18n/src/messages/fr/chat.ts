@@ -168,6 +168,9 @@ export const messages = {
   "chat.usageLimit.send": "Envoyer à {model}",
   "chat.usageLimit.failed": "Le modèle n’a pas pu être changé. Réessayez.",
   "chat.marker.marketplaceSuggestion": "A suggéré une app de la Marketplace",
+  "chat.marker.settingLink": "A montré un réglage",
+  "chat.settingLink.desktopOnly": "Ouvrez-le dans l'app OpenBot sur votre ordinateur.",
+  "chat.settingLink.agentChatOnly": "Ouvrez-le dans votre discussion avec cet agent.",
   "chat.marker.skillSuggestion": "A suggéré une compétence",
   "chat.marker.serverInstall": "A créé une commande pour installer un serveur",
   "chat.marker.skill.created": "Compétence créée",
@@ -488,4 +491,32 @@ export const messages = {
   "chat.feedbackSent.badge": "Envoyé",
   "chat.feedbackSent.body": "L'équipe OpenBot va le lire et s'en occuper 💜",
   "chat.feedbackSent.openNamed": "Ouvrir l'issue #{number} sur GitHub",
+  "chat.feedbackSent.remove": "Supprimer",
+  "chat.feedbackSent.removeConfirm":
+    "Supprimer ce rapport de GitHub ? Il est supprimé pour tout le monde, et vous ne pourrez pas annuler.",
+  "chat.feedbackSent.fixOrRemove": "Corriger ou supprimer",
+  "chat.feedbackSent.fixChoice": "Envoyer un rapport corrigé",
+  "chat.feedbackSent.fixChoiceHint":
+    "L’agent supprime ce rapport et l’envoie de nouveau sans les parties que vous choisissez.",
+  "chat.feedbackSent.removeChoice": "Le supprimer",
+  "chat.feedbackSent.removeChoiceHint": "Le retirer de GitHub. Vous ne pourrez pas annuler.",
+  "chat.feedbackSent.fixPrompt": "Supprime mon rapport #{number} de GitHub et envoie-le de nouveau sans ceci :",
+  "chat.feedbackSent.removePrompt": "Supprime mon rapport #{number} de GitHub.",
+  "chat.feedbackSent.composerFilled": "La demande est dans votre zone de message. Complétez-la, puis envoyez-la.",
+  "chat.feedbackSent.keep": "Le garder",
+  "chat.feedbackSent.removing": "Suppression…",
+  "chat.feedbackSent.removeFailed": "OpenBot n’a pas pu le supprimer. Vérifiez votre connexion, puis réessayez.",
+  "chat.feedbackSent.removeSignedOut": "Connectez-vous à OpenBot pour le supprimer.",
+  "chat.feedbackSent.removeNotYours":
+    "OpenBot ne peut pas supprimer ce rapport. Il a été envoyé avant que la suppression soit possible, ou avec un autre compte.",
+  "chat.feedbackSent.removeUnavailable":
+    "OpenBot ne peut pas supprimer de rapports pour le moment. Réessayez plus tard.",
+  "chat.feedbackSent.removeLimited": "Trop de tentatives. Attendez une minute, puis réessayez.",
+  "chat.feedbackSent.removeNotFound": "OpenBot ne trouve pas ce rapport dans la conversation.",
+  "chat.feedbackSent.removeMoved":
+    "OpenBot ne peut pas supprimer ce rapport. Il a été déplacé ailleurs sur GitHub. Demandez à l'équipe OpenBot de le supprimer.",
+  "chat.feedbackWithdrawn.title": "Rapport supprimé",
+  "chat.feedbackWithdrawn.badge": "Supprimé",
+  "chat.feedbackWithdrawn.body":
+    "Votre rapport n’est plus sur GitHub. Pour envoyer un rapport corrigé, demandez-le à l’agent.",
 } as const satisfies PartialTranslation<typeof source>;

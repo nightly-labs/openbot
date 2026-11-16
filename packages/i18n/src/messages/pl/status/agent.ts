@@ -15,6 +15,7 @@ export const messages = {
     "{previous} nie ma już kredytów. Przełączono na {model}. Aby znowu go używać, dodaj kredyty, a potem go wybierz.",
   "status.agent.modelReturnedAfterError": "Po błędzie dostawcy przełączono z powrotem na {model}.",
   "status.agent.marketplaceSuggested": "Zaproponowano aplikację z Marketplace: {app}.",
+  "status.agent.settingShown": "Pokazano ustawienie: {setting}.",
   "status.agent.channelMemberAdded": "Agent {agent} dodał {member} do kanału. Prośba od: {person}.",
   "status.agent.channelMemberRemoved": "Agent {agent} usunął {member} z kanału. Prośba od: {person}.",
   "status.agent.channelInstructionsChanged": "Agent {agent} zmienił instrukcje kanału. Prośba od: {person}.",
@@ -38,6 +39,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Ostatnie błędy w czacie:",
   "status.agent.feedbackSameAs": "Dodaje do zgłoszenia #{issue}",
   "status.agent.feedbackSent": "Wysłano do zespołu OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Usunięto z GitHuba: {title}",
+  "status.agent.feedbackWithdrawCommand": "Usuń zgłoszenie #{issue} z GitHuba",
+  "status.agent.feedbackWithdrawReason":
+    "Nikt już nie zobaczy tego zgłoszenia na GitHubie. Tego nie można cofnąć. Aby je poprawić, agent może wysłać poprawione zgłoszenie.",
+  "status.agent.feedbackWithdrawing": "Usuwanie zgłoszenia z GitHuba…",
   "status.agent.serverInstallCommand":
     "Utwórz jednorazowe polecenie, które instaluje OpenBot na innym komputerze jako serwer {name} i loguje go do Twojego konta. Agent uruchamia je tam.",
   "status.agent.serverInstallCard": "Polecenie instalacji dla serwera {name}",

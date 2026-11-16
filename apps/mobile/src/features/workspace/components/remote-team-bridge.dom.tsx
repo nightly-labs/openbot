@@ -39,6 +39,8 @@ export type RemoteTeamBridgeHandle = {
    * WebView's `online` event does not fire for that move, and the old path and socket can be dead.
    */
   networkChanged: (value: BridgeJson) => void;
+  /** The user cancelled the upload in progress. The peer stops it and tells the host. */
+  cancelUpload: (value: BridgeJson) => void;
 };
 
 interface RemoteTeamBridgeProps extends RemoteTeamPeerActions {
@@ -158,6 +160,9 @@ export default function RemoteTeamBridge({
     };
   const setActive = applyActive.current;
   const networkChanged = useRef(() => peer.networkMoved()).current;
+  const cancelUpload = useRef(() => {
+    void peer.cancelUpload().catch(() => undefined);
+  }).current;
 
   useDOMImperativeHandle<RemoteTeamBridgeHandle>(
     ref ?? null,
@@ -167,8 +172,9 @@ export default function RemoteTeamBridge({
       teamCommands,
       setActive,
       networkChanged,
+      cancelUpload,
     }),
-    [views, desktopStreams, teamCommands, setActive, networkChanged],
+    [views, desktopStreams, teamCommands, setActive, networkChanged, cancelUpload],
   );
 
   // After the handle effect above, so the native side knows the handle before it sends the commands.

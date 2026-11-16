@@ -109,6 +109,7 @@ export * from "./ipc-workflows";
 export * from "./marketplace-suggestion-events";
 export * from "./mcp-sign-in-events";
 export * from "./mobile-connect";
+export * from "./setting-links";
 export * from "./skill-conversation-events";
 export * from "./skill-suggestion-events";
 export * from "./ui-blocks";

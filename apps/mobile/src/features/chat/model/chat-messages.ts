@@ -31,6 +31,7 @@ import {
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
+  SETTING_LINK_ITEM_TYPE_PREFIX,
 } from "@openbot/contracts/ipc";
 import type { ConversationUiBlock } from "@openbot/contracts/ui-blocks";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
@@ -288,6 +289,15 @@ function suggestedApp(message: ConversationMessage): string | null {
   return isMobileConnectorId(appId) || MOBILE_PLUGINS.some((plugin) => plugin.slug === appId) ? appId : null;
 }
 
+/**
+ * A setting card that an agent showed. It opens a row of the desktop app's settings or of the agent
+ * settings side panel, and the phone has neither, so the phone shows no row. The agent's reply still
+ * says what the setting does.
+ */
+function settingLinkMessage(message: ConversationMessage): boolean {
+  return message.author === "system" && message.itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX) === true;
+}
+
 const ROUTINE_RUN_LABELS = {
   queued: "mobile.chat.routine.invoked",
   running: "mobile.chat.routine.running",
@@ -500,6 +510,7 @@ export function projectChatMessages(
         );
       continue;
     }
+    if (settingLinkMessage(message)) continue;
     if (message.delivery?.status === "queued" || message.delivery?.status === "cancelled") continue;
     if (message.exchange) {
       const { exchange } = message;
@@ -938,6 +949,7 @@ function projectChannelMessage(
     const appId = suggestedApp(entry.message);
     return appId ? { id: entry.id, kind: "app-suggestion", appId } : null;
   }
+  if (settingLinkMessage(entry.message)) return null;
   const routing = channelRoutingConversationEvent(entry.message);
   if (routing) return { id: entry.id, kind: "channel-routing", event: routing };
   // Older hosts stored only the receipt text. Never reinterpret a typed event as legacy text.

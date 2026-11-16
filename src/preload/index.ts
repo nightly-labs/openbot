@@ -165,6 +165,7 @@ import {
   decodeAppLogoColorPreference,
   decodeApprovalAutomationPreference,
   decodeAppSetupState,
+  decodeBillingDetails,
   decodeBillingState,
   decodeBitwardenConnectorStatus,
   decodeBusyMessageModePreference,
@@ -279,6 +280,7 @@ import {
   decodeTaskPage,
   decodeTaskWindow,
   decodeWaits,
+  decodeWithdrawFeedbackResult,
 } from "./conversation-decoding";
 import {
   decodeCrmActivityPage,
@@ -672,6 +674,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   sendMessage: decodeReceipt,
   setMessageReaction: decodeVoid,
   deleteConversationMessage: decodeVoid,
+  withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
@@ -1137,6 +1140,8 @@ const openbotApi: OpenBotDesktopApi = {
     getState: decodeBillingState,
     openPortal: decodeVoid,
     buyStorage: decodeBillingState,
+    getDetails: decodeBillingDetails,
+    setDetails: decodeBillingDetails,
   }),
   license: bridgeGroup(IPC_ENDPOINTS.license, {
     getState: decodeLicenseState,

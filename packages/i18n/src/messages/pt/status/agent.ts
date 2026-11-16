@@ -15,6 +15,7 @@ export const messages = {
     "{previous} ficou sem créditos. Trocado para {model}. Para usá-lo de novo, adicione créditos e depois selecione-o.",
   "status.agent.modelReturnedAfterError": "Após o erro do provedor, o modelo voltou para {model}.",
   "status.agent.marketplaceSuggested": "App da loja sugerido: {app}.",
+  "status.agent.settingShown": "Configuração mostrada: {setting}.",
   "status.agent.channelMemberAdded": "{agent} adicionou {member} ao canal. {person} pediu.",
   "status.agent.channelMemberRemoved": "{agent} removeu {member} do canal. {person} pediu.",
   "status.agent.channelInstructionsChanged": "{agent} mudou as instruções do canal. {person} pediu.",
@@ -37,6 +38,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Erros recentes no chat:",
   "status.agent.feedbackSameAs": "Adiciona à issue #{issue}",
   "status.agent.feedbackSent": "Enviado para a equipe do OpenBot: {title}",
+  "status.agent.feedbackWithdrawn": "Removido do GitHub: {title}",
+  "status.agent.feedbackWithdrawCommand": "Remover o relato #{issue} do GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Ninguém mais poderá ver este relato no GitHub. Não é possível desfazer. Para corrigi-lo, o agente pode enviar um relato corrigido.",
+  "status.agent.feedbackWithdrawing": "Removendo seu relato do GitHub…",
   "status.agent.serverInstallCommand":
     "Criar um comando de uso único que instala o OpenBot em outro computador como o servidor {name} e o conecta à sua conta. O agente o executa lá.",
   "status.agent.serverInstallCard": "Comando de instalação para o servidor {name}",

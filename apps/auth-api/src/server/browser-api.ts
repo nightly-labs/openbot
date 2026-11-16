@@ -1,5 +1,6 @@
 import { isAvatarMimeType } from "@openbot/contracts/avatar-images";
 import { parseBillingPortalRequest, parseBillingStorageRequest } from "@openbot/contracts/billing";
+import { parseBillingDetailsRequest } from "@openbot/contracts/billing-details";
 import { WEB_APP_COMPANY_SIGN_IN_ERROR_PARAM } from "@openbot/contracts/company-sign-in";
 import { parseHostedServerLifecycleInput } from "@openbot/contracts/hosted-servers";
 import {
@@ -16,6 +17,7 @@ import { type AccountAttribution, requestFirstTouch } from "./account-attributio
 import { type AuthService, AuthServiceError, readAnalyticsAnswer, readChatColor } from "./auth-service";
 import { AvatarUploadError, readAvatarUpload, removeAccountAvatar, storeAccountAvatar } from "./avatar-storage";
 import { BILLING_UNAVAILABLE_STATE, BillingError, type BillingService } from "./billing-service";
+import { withSuggestedCountry } from "./billing-tax";
 import { companySignInApiOrigin } from "./canonical-redirect";
 import { CompanySignInError, type CompanySignInService, WEB_RETURN_PATH } from "./company-sign-in";
 import { randomToken, sha256 } from "./crypto";
@@ -83,7 +85,10 @@ export interface BrowserApiServices {
   inviteEmailDelivery: () => TeamInviteEmailDelivery | null;
   attribution: () => Pick<AccountAttribution, "recordCheckout">;
   /** The billing service, or null when this deployment has no Stripe key. */
-  billing: () => Pick<BillingService, "getState" | "createPortal" | "buyStorage" | "license"> | null;
+  billing: () => Pick<
+    BillingService,
+    "getState" | "createPortal" | "buyStorage" | "getBillingDetails" | "setBillingDetails" | "license"
+  > | null;
   avatarBucket: () => R2Bucket;
   hostedSites: () => Pick<HostedSiteService, "list" | "delete">;
   sourceIp: (request: Request) => string;
@@ -446,6 +451,13 @@ const handleBilling = Effect.fn("BrowserApi.handleBilling")(function* (
   const billing = services.billing();
   if (path === "v1/me/billing" && request.method === "GET")
     return json(billing ? yield* billing.getState(user.id) : BILLING_UNAVAILABLE_STATE);
+  if (path === "v1/me/billing/details" && (request.method === "GET" || request.method === "PUT")) {
+    if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
+    if (request.method === "GET") return json(withSuggestedCountry(yield* billing.getBillingDetails(user.id), request));
+    const input = parseBillingDetailsRequest(yield* readJsonObject(request));
+    if (!input) return failure(400, "invalid_billing_details", sourceText("error.billing.detailsInvalid"));
+    return json(yield* billing.setBillingDetails(user, input));
+  }
   if (path === "v1/me/billing/portal" && request.method === "POST") {
     if (!billing) return failure(503, "billing_unavailable", "Billing is not available.");
     const input = parseBillingPortalRequest(yield* readJsonObject(request));

@@ -23,6 +23,7 @@ import {
   parseConversationPlanText,
   routineConversationEvent,
   routineRunConversationEvent,
+  settingLinkEvent,
   skillConversationEvent,
   skillSuggestionEvent,
 } from "@openbot/contracts/ipc";
@@ -44,8 +45,11 @@ import { isRoutineEventItem } from "./features/conversation/conversation-read-st
 
 /** The title in the host's thank-you text, which ends with it. Text from another host gives none. */
 function feedbackSentTitle(text: string): string {
-  const prefix = englishSourceText("status.agent.feedbackSent", { title: "" });
-  return text.startsWith(prefix) ? text.slice(prefix.length) : "";
+  for (const key of ["status.agent.feedbackSent", "status.agent.feedbackWithdrawn"] as const) {
+    const prefix = englishSourceText(key, { title: "" });
+    if (text.startsWith(prefix)) return text.slice(prefix.length);
+  }
+  return "";
 }
 
 export function toAgentProfile(stored: ClientAgentSummary): AgentProfile {
@@ -421,6 +425,8 @@ function chatActionMarker(
   if (skillEvent) return { ...skillEvent, kind: "skill-lifecycle", timestamp: message.createdAt };
   const suggestion = marketplaceSuggestionEvent(message);
   if (suggestion) return { kind: "marketplace-suggestion", appId: suggestion.appId, timestamp: message.createdAt };
+  const settingLink = settingLinkEvent(message);
+  if (settingLink) return { kind: "setting-link", settingId: settingLink.settingId, timestamp: message.createdAt };
   const skillSuggestion = skillSuggestionEvent(message);
   if (skillSuggestion) return { ...skillSuggestion, kind: "skill-suggestion", timestamp: message.createdAt };
   const signIn = mcpSignInEvent(message);
@@ -429,7 +435,13 @@ function chatActionMarker(
   if (install) return { kind: "server-install", ...install, timestamp: message.createdAt };
   const issue = feedbackSentIssue(message);
   if (issue)
-    return { kind: "feedback-sent", ...issue, title: feedbackSentTitle(message.text), timestamp: message.createdAt };
+    return {
+      kind: "feedback-sent",
+      messageId: message.id,
+      ...issue,
+      title: feedbackSentTitle(message.text),
+      timestamp: message.createdAt,
+    };
   if (routineEvent) {
     return {
       kind: "routine-lifecycle",

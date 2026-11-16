@@ -27,6 +27,7 @@ import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /** The open side thread of the agent, in the place of the agent's own chat and its message box. */
@@ -231,6 +232,7 @@ export function ConversationThread() {
     (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
   );
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
   /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
   const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey, requestThreadFocus);
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
@@ -324,7 +326,10 @@ export function ConversationThread() {
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
             messageCard={(message, quote) =>
-              visualReplyCard(message, quote) ?? mcpSignInCard(message) ?? marketplaceCard(message)
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
             }
             olderMessages={current().threads.olderMessages}
             newerMessages={current().threads.newerMessages}

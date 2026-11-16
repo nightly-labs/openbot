@@ -768,6 +768,18 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
     },
   },
   {
+    name: "show_setting",
+    description:
+      "When the user asks how to do something in OpenBot or asks for a feature, find the setting that does it and show a card in the chat that opens it: a row of OpenBot Settings, or of your own agent settings. Only the user changes it. Words return the matching settings; then call again with one id.",
+    shape: {
+      setting: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("A setting id from an earlier result, or a few words for the feature, such as dark mode or speech."),
+    },
+  },
+  {
     name: "send_feedback",
     description:
       "Send a bug report or a feature idea for OpenBot itself as a public GitHub issue. OpenBot adds the version, system, model and errors. The user reads the text and approves it before it is sent.",
@@ -814,6 +826,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .describe("A similar issue that is the same problem. The report becomes a comment on it.")
         .optional(),
     },
+  },
+  {
+    name: "withdraw_feedback",
+    description:
+      "Remove a report that the user sent from GitHub, when they ask. The user approves first. To correct one, remove it, then send it again.",
+    shape: { issue: z.number().int().min(1).describe("Its issue number.") },
   },
   {
     name: "react_to_user_message",

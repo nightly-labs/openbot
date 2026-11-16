@@ -45,6 +45,7 @@ import { ClaudeAgentClient } from "./claude-client";
 import {
   type AgentCliInfo,
   antigravityTakesStateFolders,
+  COPILOT_ENV,
   cliPathEnvironment,
   kimiLoginArgs,
   resolveAntigravityCli,
@@ -537,12 +538,6 @@ function confineWithState(
 
 /** `devin acp` serves the Agent Client Protocol on stdio. */
 const DEVIN_ARGV: readonly string[] = ["acp"];
-
-/**
- * GitHub Copilot CLI 1.0.105 updates itself unless told not to. OpenBot owns the version, so every
- * process gets the variable: `copilot login` rejects the `--no-auto-update` flag.
- */
-const COPILOT_ENV: Readonly<Record<string, string>> = { COPILOT_AUTO_UPDATE: "false" };
 
 /** `copilot --acp` serves the Agent Client Protocol on stdio. */
 const COPILOT_ARGV: readonly string[] = ["--acp", "--no-auto-update"];

@@ -15,6 +15,7 @@ export const messages = {
     "{previous} için kredi kalmadı. {model} modeline geçildi. Yeniden kullanmak için kredi ekleyin ve sonra seçin.",
   "status.agent.modelReturnedAfterError": "Sağlayıcı hatasından sonra {model} modeline geri dönüldü.",
   "status.agent.marketplaceSuggested": "Bir Pazaryeri uygulaması önerildi: {app}.",
+  "status.agent.settingShown": "Bir ayar gösterildi: {setting}.",
   "status.agent.channelMemberAdded": "{agent}, {member} ajanını kanala ekledi. İsteyen: {person}.",
   "status.agent.channelMemberRemoved": "{agent}, {member} ajanını kanaldan çıkardı. İsteyen: {person}.",
   "status.agent.channelInstructionsChanged": "{agent}, kanal talimatlarını değiştirdi. İsteyen: {person}.",
@@ -37,6 +38,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Sohbetteki son hatalar:",
   "status.agent.feedbackSameAs": "#{issue} numaralı issue'ya eklenir",
   "status.agent.feedbackSent": "OpenBot ekibine gönderildi: {title}",
+  "status.agent.feedbackWithdrawn": "GitHub'dan kaldırıldı: {title}",
+  "status.agent.feedbackWithdrawCommand": "#{issue} numaralı raporu GitHub'dan kaldır",
+  "status.agent.feedbackWithdrawReason":
+    "Bu raporu artık kimse GitHub'da göremez. Bu işlem geri alınamaz. Düzeltmek için ajan düzeltilmiş bir rapor gönderebilir.",
+  "status.agent.feedbackWithdrawing": "Raporunuz GitHub'dan kaldırılıyor…",
   "status.agent.serverInstallCommand":
     "OpenBot'u başka bir bilgisayara {name} sunucusu olarak kuran ve hesabınızda oturum açan tek kullanımlık bir komut oluştur. Ajan onu orada çalıştırır.",
   "status.agent.serverInstallCard": "{name} sunucusu için kurulum komutu",

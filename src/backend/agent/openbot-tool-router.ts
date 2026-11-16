@@ -61,9 +61,12 @@ import {
   channelAllowsBrowser,
   channelBrowserAgent,
   isMessageReaction,
+  isSettingLinkId,
   marketplaceSuggestionItemType,
   mcpSignInItemType,
+  SETTING_LINK_SCOPES,
   SIGNED_OUT_CHANNEL_MEMBER_ID,
+  settingLinkItemType,
   skillConversationEventItemType,
   VAULT_CHANGE_ITEM_TYPE,
   workspaceAccessEnforced,
@@ -150,6 +153,7 @@ import {
   visualReplyMessageId,
 } from "./delivery-content";
 import type { DrainScheduler } from "./drain-scheduler";
+import type { FeedbackWithdrawal } from "./feedback-withdrawal";
 import { HistoryTools, historyCursorThread, isHistoryBrowse, MAIN_CHAT_TASK_ID } from "./history-tools";
 import type { HostedSiteCoordinator } from "./hosted-site-coordinator";
 import { isHostedSiteMutationTool } from "./hosted-site-events";
@@ -210,6 +214,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
+import { searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -297,6 +302,18 @@ export type FeedbackSendResult =
   | { readonly status: "limited"; readonly daily: boolean; readonly retryAfterSeconds: number | null };
 
 /**
+ * What became of a withdrawal: the report is off GitHub, or the account did not send it, or the
+ * account service cannot move an issue now.
+ */
+export type FeedbackWithdrawResult =
+  | { readonly status: "withdrawn" }
+  | { readonly status: "signedOut" }
+  | { readonly status: "notYours" }
+  | { readonly status: "unavailable" }
+  | { readonly status: "moved" }
+  | { readonly status: "limited"; readonly retryAfterSeconds: number | null };
+
+/**
  * What became of a message from another agent while its recipient's chat turn runs: `steered` into
  * that turn, or the reason it waits for the next one. Null when no running chat turn could take it,
  * so the message starts when the recipient is free.
@@ -317,6 +334,8 @@ export interface AgentFeedback {
   /** The open issues with a similar title; empty when the search fails. */
   similar(title: string): Effect.Effect<SimilarFeedbackIssue[]>;
   send(feedback: Feedback): Effect.Effect<FeedbackSendResult, ToolOperationFailed>;
+  /** Takes a report that this account sent off GitHub, by its issue number. */
+  withdraw(number: number): Effect.Effect<FeedbackWithdrawResult, ToolOperationFailed>;
 }
 
 /** The errors of a chat that a report takes: the last few, from the last hour. */
@@ -325,6 +344,15 @@ const FEEDBACK_ERROR_AGE_MS = 60 * 60 * 1000;
 const FEEDBACK_ERROR_LENGTH = 280;
 /** The chats whose OpenBot tool failures the router keeps for reports. */
 const FEEDBACK_ERROR_THREADS = 200;
+/** The routine run turns whose pause or failure the router keeps; a run reports both in one turn. */
+const ROUTINE_RUN_TURNS = 200;
+
+/** What a routine run turn did to its own routines, so a failure and a pause in it agree (#9856). */
+interface RoutineRunTurn {
+  failed: boolean;
+  /** Each routine that the turn paused, with its `updatedAt` just after that pause. */
+  paused: { agentId: string; routineId: string; updatedAt: string }[];
+}
 
 /** Makes one-time claims for new servers of the signed-in account (`POST /v2/server-claims`). */
 export interface AgentServerClaims {
@@ -512,6 +540,8 @@ export interface OpenBotToolRouterOptions {
   feedbackFacts?: FeedbackFacts | null | undefined;
   /** Sends approved `send_feedback` text; null where this process has no account service. */
   feedback?: AgentFeedback | null | undefined;
+  /** Takes sent reports off GitHub for `withdraw_feedback`; absent where this process has no account service. */
+  feedbackWithdrawal?: FeedbackWithdrawal | undefined;
   /** Makes claims for `create_server_install_command`; null where this process has no account service. */
   serverClaims?: AgentServerClaims | null | undefined;
   /** The named browser profiles, for `read_agent` and `set_browser_profile`; null where this process has none. */
@@ -573,10 +603,13 @@ export class OpenBotToolRouter {
   readonly #githubConnected: () => boolean;
   readonly #feedbackFacts: FeedbackFacts | null;
   readonly #feedback: AgentFeedback | null;
+  readonly #feedbackWithdrawal: FeedbackWithdrawal | null;
   /** The last OpenBot tool failures of each provider thread, for the errors of a report. */
   readonly #toolFailures = new Map<string, { at: number; text: string }[]>();
   /** The turns whose report already got the similar issues, so the next call sends it. */
   readonly #feedbackSearched = new Set<string>();
+  /** Per routine run turn: whether it reported a failure, and the routines of its runs that it paused (#9856). */
+  readonly #routineRunTurns = new Map<string, RoutineRunTurn>();
   readonly #serverClaims: AgentServerClaims | null;
   readonly #browserProfiles: () => AgentBrowserProfiles | null;
   readonly #crm: () => CrmHandle | null;
@@ -639,6 +672,7 @@ export class OpenBotToolRouter {
     this.#githubConnected = options.githubConnected ?? (() => false);
     this.#feedbackFacts = options.feedbackFacts ?? null;
     this.#feedback = options.feedback ?? null;
+    this.#feedbackWithdrawal = options.feedbackWithdrawal ?? null;
     this.#serverClaims = options.serverClaims ?? null;
     this.#browserProfiles = options.browserProfiles ?? (() => null);
     this.#crm = options.crm ?? (() => null);
@@ -1568,6 +1602,85 @@ export class OpenBotToolRouter {
     });
   });
 
+  /**
+   * `withdraw_feedback`: takes a report that this account sent off GitHub after the owner approves, and
+   * marks its card in this chat as removed. The account service checks that this account sent it.
+   */
+  readonly #withdrawFeedback = Effect.fn("OpenBotToolRouter.withdrawFeedback")(function* (
+    this: OpenBotToolRouter,
+    client: AgentClient,
+    request: AppServerRequest,
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): Effect.fn.Return<OpenBotToolResponse, ToolOperationFailed> {
+    const issue = isRecord(params.arguments) ? params.arguments.issue : undefined;
+    if (!isIssueNumber(issue)) return openBotToolFailure("issue must be the number of a sent report.");
+    const withdrawal = this.#feedbackWithdrawal;
+    if (!withdrawal || !this.#feedback?.signedIn())
+      return openBotToolFailure(
+        "OpenBot cannot remove the report, because the user is not signed in to OpenBot. Ask them to sign in and try again.",
+      );
+    if (!this.#requestedByPerson(senderAgentId, params.turnId, params.threadId))
+      return openBotToolFailure(
+        "Only a person's message, in your OpenBot chat or a thread they opened, can remove a report.",
+      );
+    const threadId = this.#conversation.publicThreadId(senderAgentId, params.threadId);
+    const decision = yield* this.#attention.awaitToolApproval(
+      client,
+      request,
+      {
+        requestId: request.id,
+        agentId: senderAgentId,
+        threadId,
+        turnId: params.turnId,
+        kind: "permissions",
+        command: sourceText("status.agent.feedbackWithdrawCommand", { issue: String(issue) }),
+        cwd: null,
+        reason: sourceText("status.agent.feedbackWithdrawReason"),
+        grantRoot: null,
+        permissions: null,
+      },
+      // The report went out with the owner's account, so only the owner takes it back.
+      { ownerOnly: true },
+    );
+    if (decision === "cancel")
+      return openBotToolResult({
+        status: "cancelled",
+        next: "Nobody answered the card, so the report is still on GitHub.",
+      });
+    if (decision !== "accept")
+      return openBotToolResult({
+        status: "declined",
+        next: "The user selected Not now. The report is still on GitHub. Do not remove it another way.",
+      });
+    const result = yield* withdrawal.withdraw(senderAgentId, threadId, issue);
+    switch (result.status) {
+      case "withdrawn":
+        return openBotToolResult({
+          status: "withdrawn",
+          next: "The report is not on GitHub anymore. Tell the user in one short sentence. If they wanted to correct it, call send_feedback with the corrected text: it becomes a new report.",
+        });
+      case "signedOut":
+        return openBotToolFailure(
+          "The user is not signed in to OpenBot, so OpenBot cannot remove the report. Ask them to sign in and try again.",
+        );
+      case "notYours":
+        return openBotToolFailure(
+          "This account did not send a report on that issue, or the report was sent before OpenBot could remove reports. Tell the user that only the OpenBot team can remove it now, at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "unavailable":
+        return openBotToolFailure(
+          "OpenBot cannot remove a whole issue now. Tell the user to try again later, or to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "moved":
+        return openBotToolFailure(
+          "The issue moved to another public repository, so OpenBot cannot remove the report. Tell the user to ask the OpenBot team at https://github.com/nightly-labs/openbot/discussions.",
+        );
+      case "limited":
+        return openBotToolFailure("Too many tries. Wait one minute, then try again once.");
+    }
+  });
+
   /** Keeps a failed OpenBot tool call of a thread, so that a report can show what failed. */
   #rememberToolFailure(
     threadId: string,
@@ -2226,7 +2339,21 @@ export class OpenBotToolRouter {
         );
       if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
-      return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
+      // A failure is not a stop condition: a run that paused its own routine turns it on again (#9856).
+      // The failure ends every routine run of the turn, so each routine that the turn paused counts.
+      const paused = this.#routineRunTurns.get(params.turnId)?.paused ?? [];
+      this.#noteRoutineRunTurn(params.turnId, { failed: true, paused: [] });
+      if (paused.length === 0)
+        return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
+      const results = paused.map((pause) => this.#routines.resumeAfterFailedRun(pause, params));
+      return openBotToolResult({
+        status: "failed",
+        note: results.includes("failed")
+          ? "This run ends as failed. OpenBot could not turn the routine on again, so it stays paused. Tell the user that the routine is paused and that they can turn it on again."
+          : results.includes("resumed")
+            ? "This run ends as failed. A failed run does not stop its routine, so the routine is on again. Give your answer as usual."
+            : "This run ends as failed. Give your answer as usual.",
+      });
     }
 
     const sidebarResult = yield* handleSidebarTool(
@@ -2239,9 +2366,25 @@ export class OpenBotToolRouter {
     );
     if (sidebarResult) return sidebarResult;
 
+    const runPause = this.#runRoutinePause(params, senderAgentId);
+    const runTurn = this.#routineRunTurns.get(params.turnId);
+    if (runPause !== null && runTurn?.failed)
+      return openBotToolFailure(
+        "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual.",
+      );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
       this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
     );
+    // The saved `updatedAt` lets a later resume see a change that the user made after this pause.
+    const pausedRoutine =
+      runPause !== null && routineResult?.success
+        ? this.#routines.listFor(runPause.agentId).find((routine) => routine.id === runPause.routineId)
+        : undefined;
+    if (runPause !== null && pausedRoutine)
+      this.#noteRoutineRunTurn(params.turnId, {
+        failed: false,
+        paused: [...(runTurn?.paused ?? []), { ...runPause, updatedAt: pausedRoutine.updatedAt }],
+      });
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -2441,7 +2584,41 @@ export class OpenBotToolRouter {
       });
     }
 
+    if (params.tool === "show_setting") {
+      const args = params.arguments;
+      if (!isRecord(args) || !isString(args.setting)) throw new Error("setting must be a setting id or words.");
+      const setting = args.setting.trim();
+      if (!isSettingLinkId(setting)) {
+        const matches = searchSettingLinks(setting);
+        return openBotToolResult({
+          status: matches.length > 0 ? "matches" : "not_found",
+          matches,
+          next:
+            matches.length > 0
+              ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id. When none fits, try other words once, then say that OpenBot has no such setting."
+              : "No setting matches. Try other words once, such as the name of the feature. Otherwise say that OpenBot has no setting for it, and offer openbot.send_feedback with an idea.",
+        });
+      }
+      const shown = settingLinkSummary(setting);
+      this.#postSystemCard(senderAgentId, executionThreadId, params.turnId, {
+        itemType: settingLinkItemType(setting),
+        text: sourceText("status.agent.settingShown", { setting: shown.title }),
+        eventType: "setting.shown",
+        detail: { settingId: setting },
+      });
+      return openBotToolResult({
+        status: "shown",
+        setting: shown,
+        next:
+          SETTING_LINK_SCOPES[setting] === "agent"
+            ? "The card is in the chat. Its Open button shows the row in your agent settings in the side panel. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card."
+            : "The card is in the chat. On the OpenBot desktop app, its Open button shows the row in OpenBot Settings of the computer that shows the chat; the web client shows only where it is. In one or two sentences, tell the user what the setting does and what to choose there. Do not describe the card.",
+      });
+    }
+
     if (params.tool === "send_feedback") return yield* this.#sendFeedback(client, request, params, senderAgentId);
+    if (params.tool === "withdraw_feedback")
+      return yield* this.#withdrawFeedback(client, request, params, senderAgentId);
 
     if (params.tool === "create_server_install_command")
       return yield* this.#serverInstallCommand(client, request, params, senderAgentId);
@@ -2907,6 +3084,35 @@ export class OpenBotToolRouter {
   }
 
   /**
+   * The routine, with its agent, that this `update_routine` call pauses when the call comes from a run
+   * of that same active routine; null for every other call. A one-time routine is already off when
+   * its run starts, so it never counts.
+   */
+  #runRoutinePause(
+    params: DynamicToolCallParams,
+    senderAgentId: string,
+  ): { agentId: string; routineId: string } | null {
+    if (params.tool !== "update_routine" || !isRecord(params.arguments) || params.arguments.active !== false)
+      return null;
+    const { agentId, routineId } = params.arguments;
+    if ((agentId !== undefined && agentId !== senderAgentId) || !isString(routineId)) return null;
+    const ownRun = this.#mailbox
+      .findDeliveriesByTurn(senderAgentId, params.turnId)
+      .some(({ delivery }) => delivery.sender.kind === "routine" && delivery.sender.routineId === routineId);
+    const active =
+      ownRun && this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
+    return active ? { agentId: senderAgentId, routineId } : null;
+  }
+
+  #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {
+    this.#routineRunTurns.delete(turnId);
+    this.#routineRunTurns.set(turnId, state);
+    if (this.#routineRunTurns.size <= ROUTINE_RUN_TURNS) return;
+    const [oldest] = this.#routineRunTurns.keys();
+    if (oldest !== undefined) this.#routineRunTurns.delete(oldest);
+  }
+
+  /**
    * Whether only a person in this computer's own chat asked for the turn. As for webhook routines: an
    * external chat, a routine or workflow run, or an agent message can carry text from outside, such
    * as a webhook body. A message steered into a run shares the run's turn. A team member's message is
@@ -2993,7 +3199,7 @@ export class OpenBotToolRouter {
       itemType: string;
       text: string;
       eventType: string;
-      detail: { appId: string } | { mcpServerId: string } | Record<string, never>;
+      detail: { appId: string } | { mcpServerId: string } | { settingId: string } | Record<string, never>;
     },
   ): void {
     const snapshot = structuredClone(this.#conversation.ensureSnapshot(agentId, threadId));

@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Вы редактируете сообщение в очереди. Сохраните или отмените правку, чтобы разрешить его выполнение.",
   "composer.queueEdit.cancel": "Отменить правку",
+  "composer.feedbackFix.body":
+    "Исправление отчёта #{number}. Отправьте запрос или отмените, чтобы оставить отчёт как есть.",
+  "composer.feedbackFix.cancel": "Отмена",
   "composer.providerWait.offlineTitle": "Нет подключения к интернету",
   "composer.providerWait.offline": "{provider} не сможет ответить, пока этот компьютер не подключится к сети.",
   "composer.providerWait.silent": "Время без обновлений от {provider}: {duration}.",

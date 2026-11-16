@@ -15,6 +15,7 @@ export const messages = {
     "{previous} n’a plus de crédits. Passage à {model}. Pour l’utiliser à nouveau, ajoutez des crédits, puis sélectionnez-le.",
   "status.agent.modelReturnedAfterError": "Retour à {model} après l’erreur du fournisseur.",
   "status.agent.marketplaceSuggested": "Application de la Marketplace suggérée : {app}.",
+  "status.agent.settingShown": "Réglage montré : {setting}.",
   "status.agent.channelMemberAdded": "{agent} a ajouté {member} au canal. {person} l’a demandé.",
   "status.agent.channelMemberRemoved": "{agent} a retiré {member} du canal. {person} l’a demandé.",
   "status.agent.channelInstructionsChanged": "{agent} a modifié les instructions du canal. {person} l’a demandé.",
@@ -37,6 +38,11 @@ export const messages = {
   "status.agent.feedbackRecentErrors": "Erreurs récentes dans le chat :",
   "status.agent.feedbackSameAs": "S'ajoute à l'issue #{issue}",
   "status.agent.feedbackSent": "Envoyé à l'équipe OpenBot : {title}",
+  "status.agent.feedbackWithdrawn": "Supprimé de GitHub : {title}",
+  "status.agent.feedbackWithdrawCommand": "Supprimer le rapport #{issue} de GitHub",
+  "status.agent.feedbackWithdrawReason":
+    "Plus personne ne pourra voir ce rapport sur GitHub. Vous ne pourrez pas annuler. Pour le corriger, l’agent peut envoyer un rapport corrigé.",
+  "status.agent.feedbackWithdrawing": "Suppression de votre rapport de GitHub…",
   "status.agent.serverInstallCommand":
     "Créer une commande à usage unique qui installe OpenBot sur un autre ordinateur comme serveur {name} et le connecte à ton compte. L'agent l'exécute là-bas.",
   "status.agent.serverInstallCard": "Commande d'installation pour le serveur {name}",

@@ -178,7 +178,7 @@ export const messages = {
     "{name}: ana makine bu dosyaları kabul etmiyor. Bunları eklemek için oradaki OpenBot'u güncelleyin.",
   "mobile.chat.attachment.nameTooLong": "Daha kısa ada sahip bir dosya seçin.",
   "mobile.chat.attachment.damaged": "Ek bozuk. Tekrar seçin.",
-  "mobile.chat.attachment.tooLarge": "{name} 10 MB'tan daha büyük.",
+  "mobile.chat.attachment.tooLarge": "{name} {limit}'tan daha büyük.",
   "mobile.chat.attachment.cameraPermission": "Fotoğraf çekmek için Ayarlar'da kamera erişimine izin verin.",
   "mobile.chat.composer.send": "Mesaj gönder",
   "mobile.chat.composer.stop": "{name} ajanını durdur",

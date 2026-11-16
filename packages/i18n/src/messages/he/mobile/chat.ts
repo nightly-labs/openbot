@@ -182,7 +182,7 @@ export const messages = {
     "{name}: המחשב המארח לא מקבל את הקבצים האלה. יש לעדכן שם את OpenBot כדי לצרף אותם.",
   "mobile.chat.attachment.nameTooLong": "יש לבחור קובץ עם שם קצר יותר.",
   "mobile.chat.attachment.damaged": "הקובץ המצורף פגום. יש לבחור אותו שוב.",
-  "mobile.chat.attachment.tooLarge": "{name} גדול מ-10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} גדול מ-{limit}.",
   "mobile.chat.attachment.cameraPermission": "יש לאפשר גישה למצלמה בהגדרות כדי לצלם תמונה.",
   "mobile.chat.composer.send": "שליחת הודעה",
   "mobile.chat.composer.stop": "עצירת {name}",
