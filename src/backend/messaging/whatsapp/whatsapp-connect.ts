@@ -151,11 +151,13 @@ export class WhatsAppConnect implements WhatsAppPolicy {
 
   rules(workspaceId: string): WhatsAppSenderRules {
     const record = this.#store.connectionForWorkspace("whatsapp", workspaceId);
-    if (!record) return { ownNumber: true, contacts: new Set(), groups: new Set() };
+    if (!record) return { ownNumber: true, contacts: new Map(), groups: new Set() };
     const senders = this.#store.allowedSenders(record.connectionId);
     return {
       ownNumber: this.#ownNumber(record.connectionId),
-      contacts: new Set(senders.filter((sender) => sender.kind === "contact").map((sender) => sender.id)),
+      contacts: new Map(
+        senders.filter((sender) => sender.kind === "contact").map((sender) => [sender.id, savedName(sender.name)]),
+      ),
       groups: new Set(senders.filter((sender) => sender.kind === "group").map((sender) => sender.id)),
     };
   }
@@ -433,4 +435,13 @@ function failureError(key: WhatsAppErrorKey): WhatsAppConnectFailed {
 
 function failure(key: WhatsAppErrorKey): Effect.Effect<never, WhatsAppConnectFailed> {
   return Effect.fail(failureError(key));
+}
+
+/**
+ * The name that the settings keep for a contact, or empty. An approved pairing request without a
+ * profile name saved only the number, which must not hide the profile name that WhatsApp sends later.
+ */
+function savedName(name: string): string {
+  const trimmed = name.trim();
+  return /^[0-9]+$/u.test(trimmed) ? "" : trimmed;
 }

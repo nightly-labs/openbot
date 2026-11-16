@@ -1155,7 +1155,7 @@ try {
           me: { number: OWNER, lid: `${OWNER_LID}@lid` },
           openedAt: Date.now(),
           now: Date.now(),
-          rules: { ownNumber: true, contacts: new Set<string>(), groups: new Set<string>() },
+          rules: { ownNumber: true, contacts: new Map<string, string>(), groups: new Set<string>() },
           chats,
           isOwnPost: () => false,
           threadOf: () => null,
