@@ -65,8 +65,9 @@ function useSubagents(agentId: string, messageId: string): readonly Conversation
  */
 export function SubagentsScreen() {
   const colors = useSubagentColors();
-  const params = useLocalSearchParams<{ agentId: string; messageId: string }>();
+  const params = useLocalSearchParams<{ agentId: string; serverId?: string; messageId: string }>();
   const agentId = firstParam(params.agentId) ?? "";
+  const serverId = firstParam(params.serverId);
   const messageId = firstParam(params.messageId) ?? "";
   const subagents = useSubagents(agentId, messageId);
   const { title, progress, elapsed, now } = useSubagentGroupSummary(subagents);
@@ -92,7 +93,7 @@ export function SubagentsScreen() {
               onOpen={() =>
                 router.push({
                   pathname: "/subagent/detail",
-                  params: { agentId, messageId, subagentId: subagent.id },
+                  params: { agentId, ...(serverId ? { serverId } : {}), messageId, subagentId: subagent.id },
                 })
               }
             />
@@ -111,12 +112,17 @@ export function SubagentScreen() {
   const text = useText();
   const { t } = text;
   const colors = useSubagentColors();
-  const params = useLocalSearchParams<{ agentId: string; messageId: string; subagentId: string }>();
+  const params = useLocalSearchParams<{ agentId: string; serverId?: string; messageId: string; subagentId: string }>();
   const agentId = firstParam(params.agentId) ?? "";
+  const serverId = firstParam(params.serverId);
   const messageId = firstParam(params.messageId) ?? "";
   const subagentId = firstParam(params.subagentId) ?? "";
+  // Two servers can hold an agent with the same id, so the server picks the one of this chat.
   const agentName = useMobileWorkspaceSelector(
-    (current) => current.agents.find((candidate) => candidate.id === agentId)?.name ?? "",
+    (current) =>
+      current.agents.find(
+        (candidate) => candidate.id === agentId && (serverId === undefined || candidate.serverId === serverId),
+      )?.name ?? "",
   );
   const subagent = useSubagents(agentId, messageId).find((candidate) => candidate.id === subagentId);
   const now = useSubagentClock(subagent?.status === "running");

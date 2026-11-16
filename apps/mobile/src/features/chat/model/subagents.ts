@@ -40,7 +40,7 @@ export function subagentDuration(ms: number, { t, format }: Pick<MobileText, "t"
   if (total < 60) return t("mobile.chat.subagents.seconds", { seconds: format.number(total) });
   return t("mobile.chat.subagents.minutes", {
     minutes: format.number(Math.floor(total / 60)),
-    seconds: String(total % 60).padStart(2, "0"),
+    seconds: format.number(total % 60, { minimumIntegerDigits: 2 }),
   });
 }
 

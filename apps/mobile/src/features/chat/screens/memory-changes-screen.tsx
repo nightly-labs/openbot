@@ -62,6 +62,14 @@ export function MemoryChangesScreen() {
     useCallback(() => conversationStore.get(agentId), [agentId, conversationStore]),
   );
   const changes = conversation?.messages.find((message) => message.id === messageId)?.memoryChanges ?? NO_CHANGES;
+  // One turn can change the same memory twice in the same way, so the key counts each repeat.
+  const seen = new Map<string, number>();
+  const keys = changes.map((change) => {
+    const base = `${change.memoryId}:${change.action}`;
+    const repeat = seen.get(base) ?? 0;
+    seen.set(base, repeat + 1);
+    return repeat === 0 ? base : `${base}:${repeat}`;
+  });
   return (
     <SheetScrollView contentContainerClassName="gap-4 px-5 pb-safe-offset-8 pt-5" keyboardAware={false}>
       {changes.length > 0 ? (
@@ -78,7 +86,7 @@ export function MemoryChangesScreen() {
             const Icon = ACTION_ICONS[change.action];
             const color = actionColor(change.action, colors);
             return (
-              <View key={`${change.memoryId}:${change.action}`} className="flex-row gap-2.5 py-3 pl-3.5 pr-3.5">
+              <View key={keys[index]} className="flex-row gap-2.5 py-3 pl-3.5 pr-3.5">
                 {index === 0 ? null : (
                   <View
                     className="absolute top-0 right-0"

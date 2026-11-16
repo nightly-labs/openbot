@@ -492,9 +492,13 @@ export function ChatView({
   );
   const openSubagents = useCallback(
     (messageId: string) => {
-      if (thinkingAgentId) router.push({ pathname: "/subagent", params: { agentId: thinkingAgentId, messageId } });
+      if (thinkingAgentId)
+        router.push({
+          pathname: "/subagent",
+          params: { agentId: thinkingAgentId, serverId: target.serverId, messageId },
+        });
     },
-    [thinkingAgentId],
+    [thinkingAgentId, target.serverId],
   );
   const queuedMessageIds = useMemo(
     () =>
