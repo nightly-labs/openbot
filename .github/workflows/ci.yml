@@ -625,6 +625,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-quota-failover
 
+      - name: Run the Gemini failing session E2E test
+        if: ${{ !cancelled() }}
+        run: bun run test:antigravity-failing-session
+
       - name: Run the Gemini Windows zip E2E test
         if: ${{ !cancelled() }}
         run: bun run test:antigravity-windows-zip
@@ -784,6 +788,7 @@ jobs:
             .openbot-build/antigravity-accounts-e2e/
             .openbot-build/antigravity-usage-metering-e2e/
             .openbot-build/antigravity-quota-failover-e2e/
+            .openbot-build/antigravity-failing-session-e2e/
             .openbot-build/workflow-model-steps-e2e/
             .openbot-build/workflow-discord-e2e/
             .openbot-build/workflow-telegram-e2e/

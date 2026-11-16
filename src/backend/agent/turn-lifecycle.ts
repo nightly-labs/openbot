@@ -119,6 +119,13 @@ function modelAtCapacity(error: DynamicRecord | null, details: string | null): b
 }
 const ENDED_TURN_LIMIT = 256;
 /**
+ * Failed turns in a row after which OpenBot closes an Antigravity session. Antigravity keeps the
+ * history of each session in its CLI, and a session can fail each turn while a new session of the
+ * same agent works: a stopped turn left one that failed in 2 s (#8115), and another stalled for
+ * minutes (#10284). The next turn opens a new session from the OpenBot transcript.
+ */
+const SESSION_FAILURE_LIMIT = 2;
+/**
  * How long a quiet turn may send nothing after its no-update call before OpenBot ends it. A model
  * that ends its turn does so in seconds; Grok tries a reply with only reasoning again for minutes
  * with no update, until the stall watch fails the finished run (#8629).
@@ -429,6 +436,8 @@ export class TurnLifecycle {
   readonly #failoverRetries = new Map<string, Set<string>>();
   /** The deliveries run again after a refused session history. Each one gets a single retry. */
   readonly #refusedRetries = new Set<string>();
+  /** Failed turns in a row of each Antigravity session (`SESSION_FAILURE_LIMIT`). */
+  readonly #sessionFailures = new Map<string, number>();
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
   /**
@@ -593,6 +602,7 @@ export class TurnLifecycle {
     this.#reportedFailures.clear();
     this.#endedTurns.clear();
     this.#refusedRetries.clear();
+    this.#sessionFailures.clear();
     this.#lastEventAt.clear();
     this.#codexChildren.clear();
     this.#itemTurns.clear();
@@ -1767,8 +1777,22 @@ export class TurnLifecycle {
       const mayRunAgain = failedOnProvider && !running.acted;
       const mayContinue =
         failedOnProvider && failover.context.causeCode === "usage_limit" && this.#carriesWork(agentId, turnId, running);
+      // A spent quota, a failed compaction and a routine run's own session have their own handling.
+      const failingSession =
+        running !== undefined &&
+        !refused &&
+        this.#countSessionFailure(
+          running,
+          threadId,
+          status,
+          !limited &&
+            failover?.context.causeCode !== "usage_limit" &&
+            compactionFailure === undefined &&
+            !routineSession,
+        );
       const shouldCompact =
         !refused &&
+        !failingSession &&
         !limited &&
         !mayRunAgain &&
         !mayContinue &&
@@ -1959,6 +1983,8 @@ export class TurnLifecycle {
         );
         // A turn that runs again on the same model keeps it.
         if (failedOver) this.#markFailed(agentId, model, failover);
+        // After the requeue, as for a refused session: the turn runs again on a new session.
+        if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
         this.#hooks.scheduleDrain(agentId);
         return;
       }
@@ -1998,6 +2024,8 @@ export class TurnLifecycle {
           this.#hooks.taskFailed(laneTaskId, failure);
         } else this.#hooks.emitError("agent_error", failure, agentId);
       }
+      // The error shows as for any failed turn. The next message opens a new session (#10284).
+      if (failingSession) yield* this.#dropFailingSession(agentId, threadId, running.client.provider);
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
@@ -2292,6 +2320,44 @@ export class TurnLifecycle {
       this.#hooks.scheduleDrain(agentId);
     }).pipe(Effect.catchCause(report));
   }, Effect.uninterruptible);
+
+  /**
+   * Counts a failed turn of an Antigravity session, and true when the session failed
+   * `SESSION_FAILURE_LIMIT` turns in a row. A completed turn resets the count. A stop by the user
+   * (`interrupted`) and a failure that does not `count` do not change it.
+   */
+  #countSessionFailure(running: { client: AgentClient }, threadId: string, status: string, count: boolean): boolean {
+    if (running.client.provider !== "antigravity") return false;
+    if (status === "completed") this.#sessionFailures.delete(threadId);
+    if (status !== "failed" || !count) return false;
+    const failures = (this.#sessionFailures.get(threadId) ?? 0) + 1;
+    if (failures >= SESSION_FAILURE_LIMIT) {
+      this.#sessionFailures.delete(threadId);
+      return true;
+    }
+    this.#sessionFailures.set(threadId, failures);
+    // Another path can close a session after one failure, such as a refused session or a deleted
+    // thread. Its entry goes when the map is full.
+    if (this.#sessionFailures.size > ENDED_TURN_LIMIT) {
+      const [oldest] = this.#sessionFailures.keys();
+      if (oldest !== undefined) this.#sessionFailures.delete(oldest);
+    }
+    return false;
+  }
+
+  /** Closes a session that `#countSessionFailure` found failing. The public thread stays. */
+  readonly #dropFailingSession = Effect.fn("TurnLifecycle.dropFailingSession")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    threadId: string,
+    provider: AgentClient["provider"],
+  ) {
+    logger.warn("A provider session failed turns in a row; OpenBot opens a new one.", {
+      provider,
+      failures: SESSION_FAILURE_LIMIT,
+    });
+    yield* this.#hooks.dropRefusedSession(agentId, threadId);
+  });
 
   #markEnded(turnId: string): void {
     this.#endedTurns.add(turnId);
