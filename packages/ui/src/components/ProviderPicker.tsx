@@ -491,6 +491,8 @@ export function ProviderPicker(props: ProviderPickerProps) {
                 accountsOffered,
                 accountError,
                 addAccount,
+                accountCodeOffered,
+                addAccountWithCode,
                 installOffered,
                 signInOffered,
                 apiKeyOffered,
@@ -499,6 +501,7 @@ export function ProviderPicker(props: ProviderPickerProps) {
               const actionsMenu = () =>
                 alternative() !== null ||
                 mainlandChinaSite() !== null ||
+                (accountCodeOffered() && !hasKeyAccounts(option().id)) ||
                 updateOffered() ||
                 restartOffered() ||
                 diagnosticsOffered();
@@ -810,6 +813,12 @@ export function ProviderPicker(props: ProviderPickerProps) {
                                     {t("provider.action.signInMainlandChina", { site: site() })}
                                   </DropdownMenu.Item>
                                 )}
+                              </Show>
+                              <Show when={accountCodeOffered() && !hasKeyAccounts(option().id)}>
+                                <DropdownMenu.Item onSelect={addAccountWithCode}>
+                                  <Smartphone aria-hidden="true" />
+                                  {t("provider.account.addWithCode")}
+                                </DropdownMenu.Item>
                               </Show>
                               <Show when={diagnosticsOffered()}>
                                 <DropdownMenu.Item

@@ -8,7 +8,7 @@ import {
 import { isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Effect, Fiber, type Scope, Semaphore } from "effect";
+import { Effect, Exit, Fiber, type Scope, Semaphore } from "effect";
 import type { AcpConnection } from "./acp-connection";
 import type { AgentProvider } from "./agent-client";
 import { isRecord } from "./protocol";
@@ -87,6 +87,8 @@ export interface AcpConfigurationOptions {
   discoveryCwd?: (() => string) | undefined;
   /** `AcpFlavor.processWideModel`. */
   processWideModel?: boolean;
+  /** `AcpFlavor.setsConfigOnlyOnChange`. */
+  setsConfigOnlyOnChange?: boolean;
   /** `AcpFlavor.modelSetUnsaved`. */
   modelSetUnsaved?: ((error: RequestError) => boolean) | undefined;
   /** `AcpFlavor.configSetUnsaved`. */
@@ -114,6 +116,11 @@ export class AcpConfiguration {
   #modelSetsOverlapped = false;
   /** A set that timed out or was interrupted can still apply later, so on this connection each set is sent. */
   #modelSetTimedOut: ClientSideConnection | null = null;
+  /**
+   * The options of each session whose last set failed or stopped (`setsConfigOnlyOnChange`). That set
+   * can still apply later, so the option's value is not trusted, and it is sent until a set succeeds.
+   */
+  readonly #unconfirmedSets = new WeakMap<AcpConfigurationState, Set<string>>();
   /** The probe session that discovery resumes on this connection (`keepProbeSession`). */
   #probe: { connection: ClientSideConnection; sessionId: string } | null = null;
   /** One kept-probe discovery at a time: two at once would each open a probe, and one is kept. */
@@ -409,6 +416,16 @@ export class AcpConfiguration {
       const listed = values.some((candidate) => candidate.value === wanted);
       const selected = listed ? wanted : unlisted && option.id === "model" ? value : undefined;
       if (!selected) continue;
+      // The session's options follow the agent's `config_option_update`, so they hold its value.
+      if (
+        this.options.setsConfigOnlyOnChange &&
+        listed &&
+        option.currentValue === selected &&
+        !this.#unconfirmedSets.get(thread)?.has(option.id)
+      ) {
+        if (category === "model") thread.currentModelId = selected;
+        continue;
+      }
       for (const [configId, configValue] of listed ? [] : Object.entries(unlisted?.config ?? {})) {
         const required = thread.configOptions.find((candidate) => candidate.id === configId);
         if (required?.type !== "select" || required.currentValue === configValue) continue;
@@ -469,7 +486,7 @@ export class AcpConfiguration {
               }),
             ),
           )
-        : yield* request;
+        : yield* this.#confirmingSet(thread, option.id, request);
       thread.configOptions = response.configOptions;
       if (category === "model") thread.currentModelId = selected;
     }
@@ -498,6 +515,21 @@ export class AcpConfiguration {
     thread.configOptions = response.configOptions;
     return sessionSettingsSnapshot(thread.configOptions);
   });
+
+  /** A set whose failure or stop makes its option unconfirmed, for an agent with `setsConfigOnlyOnChange`. */
+  #confirmingSet<A, E>(thread: AcpConfigurationState, configId: string, set: Effect.Effect<A, E>): Effect.Effect<A, E> {
+    if (!this.options.setsConfigOnlyOnChange) return set;
+    return set.pipe(
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          const unconfirmed = this.#unconfirmedSets.get(thread) ?? new Set<string>();
+          if (Exit.isSuccess(exit)) unconfirmed.delete(configId);
+          else unconfirmed.add(configId);
+          this.#unconfirmedSets.set(thread, unconfirmed);
+        }),
+      ),
+    );
+  }
 
   /**
    * A `session/set_config_option`. After a failure that `configSetUnsaved` accepts, the session
@@ -530,8 +562,15 @@ export class AcpConfiguration {
     return providerCall(request).pipe(
       Effect.timeoutOrElse({
         duration: this.options.requestTimeoutMs,
-        orElse: () =>
-          Effect.fail(providerFailure(new TimeoutError(`${this.options.label()} request timed out: ${method}`))),
+        // The chat shows this text, so the protocol method goes to the log only (#9738).
+        orElse: () => {
+          logger.warn("An agent did not answer a configuration request in time.", {
+            provider: this.options.provider,
+            method,
+          });
+          const message = sourceText("error.provider.acpSettingsTimedOut", { provider: this.options.label() });
+          return Effect.fail(providerFailure(new TimeoutError(message)));
+        },
       }),
     );
   }

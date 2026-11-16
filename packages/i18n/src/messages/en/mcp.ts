@@ -149,6 +149,7 @@ export const messages = defineMessages("mcp", {
   "mcp.signIn.relayDeviceDescription":
     "Sign in on {page} in your browser and finish there. {host} sees the sign-in by itself.",
   "mcp.signIn.relayOpen": "Open sign-in page",
+  "mcp.signIn.relayCopy": "Copy link",
   "mcp.signIn.relayPasteHint":
     "If the browser does not come back to OpenBot, copy the address that it shows and paste it here.",
   "mcp.signIn.relayPasteRequired":

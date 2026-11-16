@@ -295,6 +295,10 @@ import {
   PENDING_APPROVAL_ROUTES,
 } from "@openbot/contracts/team-protocol/pending-approval-v1";
 import {
+  PROVIDER_ACCOUNT_CODE_CAPABILITY,
+  PROVIDER_ACCOUNT_CODE_ROUTES,
+} from "@openbot/contracts/team-protocol/provider-account-code-v1";
+import {
   PROVIDER_ACCOUNT_KEYS_CAPABILITY,
   PROVIDER_ACCOUNT_KEYS_ROUTES,
 } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
@@ -759,12 +763,16 @@ const ARGON_MODEL: AgentModelOption = {
   supportedReasoningEfforts: ["low", "high"],
   listing: "new",
 };
+/** The account that the fake host adds for a code sign-in (`provider-account-code-v1`). */
+const CODE_ACCOUNT = "ac0de000000000001";
 /** The key that the fake host's Cursor refuses (`provider-account-keys-v1`). */
 const REFUSED_ACCOUNT_KEY = "key_e2e_refused";
 const ACCOUNT_KEY = "key_e2e_accepted";
 
 /** The fake host's Gemini pool (`provider-account-pool-v1`): off until the pool update route turns it on. */
 let antigravityPool: ProviderAccountPool | undefined;
+/** The account whose code sign-in runs on the fake host. */
+let codeSignInAccount: string | null = null;
 function accountModelsStatus(): AgentStatus {
   const account = (id: string, models?: AgentModelOption[]) => ({
     id,
@@ -1077,7 +1085,7 @@ const fakeAgents: TeamApiAgents = {
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
   steerQueuedMessage: (input) => {
     record("steerQueuedMessage", input);
-    // OpenCode defers steering: the queue keeps the message and refuses the steer.
+    // This agent cannot steer: the queue keeps the message and refuses the steer.
     if (input.agentId === "agent-oc")
       return Effect.fail(
         new AgentLifecycleFailed({ operation: "steerQueuedMessage", cause: new SteerUnsupportedError() }),
@@ -2663,6 +2671,55 @@ try {
               )
             : Effect.sync(accountModelsStatus);
         },
+        // As the backend: Cursor has no code sign-in; ChatGPT gives a page and a code, and the sign-in
+        // of the new account goes on until a cancel.
+        startProviderAccountCodeLogin: (provider, accountId) => {
+          record("startProviderAccountCodeLogin", { provider, accountId });
+          if (provider === "claude") {
+            codeSignInAccount = accountId ?? CODE_ACCOUNT;
+            return Effect.succeed({
+              accountId: codeSignInAccount,
+              start: {
+                kind: "paste" as const,
+                verificationUrl: "https://claude.ai/oauth/authorize",
+                expiresAt: clock + 900_000,
+              },
+            });
+          }
+          if (provider !== "codex")
+            return Effect.fail(
+              new AgentLifecycleFailed({
+                operation: "connectProviderAccount",
+                cause: new Error(sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+              }),
+            );
+          codeSignInAccount = accountId ?? CODE_ACCOUNT;
+          return Effect.succeed({
+            accountId: codeSignInAccount,
+            start: {
+              kind: "code" as const,
+              userCode: "ABCD-12345",
+              verificationUrl: "https://auth.openai.com/codex/device",
+              expiresAt: clock + 900_000,
+            },
+          });
+        },
+        // As the backend: only a sign-in that waits takes a code, and a refusal can quote the code.
+        submitProviderAccountCodeLogin: (provider, accountId, code) => {
+          record("submitProviderAccountCodeLogin", { provider, accountId, code });
+          if (codeSignInAccount !== accountId) throw new Error(`The provider refused ${code}`);
+        },
+        providerAccountCodeLoginStatus: (provider, accountId) => {
+          record("providerAccountCodeLoginStatus", { provider, accountId });
+          // The error is longer than the wire limit, so the host must shorten it.
+          return codeSignInAccount === accountId ? { result: null } : { result: { error: "e".repeat(2_500) } };
+        },
+        cancelProviderAccountSignIn: (provider, accountId) =>
+          Effect.sync(() => {
+            record("cancelProviderAccountSignIn", { provider, accountId });
+            codeSignInAccount = null;
+            return accountModelsStatus();
+          }),
         renameProviderAccount: unused("providerAccounts.renameProviderAccount"),
         removeProviderAccount: unused("providerAccounts.removeProviderAccount"),
       },
@@ -4079,6 +4136,121 @@ try {
       errorIs(refused, 409, sourceText("error.provider.accountKeyRefused", { provider: "Cursor" })) &&
         !JSON.stringify(refused.body).includes(REFUSED_ACCOUNT_KEY),
       summary(refused),
+    );
+  }
+
+  // ---- Account code sign-in (provider-account-code-v1) ----
+  {
+    const v9 = { capabilities: [PROVIDER_ACCOUNT_CODE_CAPABILITY], protocol: TEAM_PROTOCOL_V9 };
+    const { start, submit, status, cancel } = PROVIDER_ACCOUNT_CODE_ROUTES;
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises provider-account-code-v1 to a protocol 9 peer only",
+      list(field(compatibility.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY) &&
+        older.status === 200 &&
+        !list(field(older.body, "capabilities")).includes(PROVIDER_ACCOUNT_CODE_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const body = { provider: "codex", accountId: null };
+    const account = { provider: "codex", accountId: CODE_ACCOUNT };
+    const unsupported = await call("POST", start, { token: adaToken, json: body, protocol: TEAM_PROTOCOL_V9 });
+    check(
+      "the account code route without the capability gets 400 providersUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.providersUnsupported")),
+      summary(unsupported),
+    );
+    const starts = callsOf("startProviderAccountCodeLogin").length;
+    const memberStart = await call("POST", start, { token: bobToken, json: body, ...v9 });
+    const memberStatus = await call("POST", status, { token: bobToken, json: account, ...v9 });
+    const memberCancel = await call("POST", cancel, { token: bobToken, json: account, ...v9 });
+    check(
+      "a member cannot start, read or cancel an account code sign-in",
+      [memberStart, memberStatus, memberCancel].every((answer) =>
+        errorIs(answer, 403, sourceText("error.team.adminRequired")),
+      ) &&
+        callsOf("startProviderAccountCodeLogin").length === starts &&
+        callsOf("cancelProviderAccountSignIn").length === 0,
+      [summary(memberStart), summary(memberStatus), summary(memberCancel)],
+    );
+    const badAccount = await call("POST", start, {
+      token: adaToken,
+      json: { ...body, accountId: "not-an-account" },
+      ...v9,
+    });
+    const noAccount = await call("POST", status, { token: adaToken, json: body, ...v9 });
+    check(
+      "an account id that is not one, and a status with no account, get 400",
+      badAccount.status === 400 &&
+        noAccount.status === 400 &&
+        callsOf("startProviderAccountCodeLogin").length === starts,
+      [summary(badAccount), summary(noAccount)],
+    );
+    const noCode = await call("POST", start, { token: adaToken, json: { ...body, provider: "cursor" }, ...v9 });
+    check(
+      "a provider whose accounts have no code sign-in fails with the reason",
+      errorIs(noCode, 409, sourceText("error.provider.noCodeSignIn", { provider: "Cursor" })),
+      summary(noCode),
+    );
+    const started = await call("POST", start, { token: adaToken, json: body, ...v9 });
+    const running = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    check(
+      "an admin starts the code sign-in of a new account: the answer names the account, the page and the code",
+      started.status === 200 &&
+        isDeepStrictEqual(started.body, {
+          accountId: CODE_ACCOUNT,
+          start: {
+            kind: "code",
+            userCode: "ABCD-12345",
+            verificationUrl: "https://auth.openai.com/codex/device",
+            expiresAt: clock + 900_000,
+          },
+        }) &&
+        isDeepStrictEqual(running.body, { result: null }),
+      [summary(started), summary(running)],
+    );
+    const cancelled = await call("POST", cancel, { token: adaToken, json: account, ...v9 });
+    const ended = await call("POST", status, { token: adaToken, json: account, ...v9 });
+    const endedError = field(ended.body, "result", "error");
+    check(
+      "an admin cancels the sign-in; the status then holds a result with a bounded error",
+      cancelled.status === 200 &&
+        isDeepStrictEqual(cancelled.body, {}) &&
+        isDeepStrictEqual(callsOf("cancelProviderAccountSignIn"), [[{ provider: "codex", accountId: CODE_ACCOUNT }]]) &&
+        ended.status === 200 &&
+        typeof endedError === "string" &&
+        endedError.length === 2_000,
+      [summary(cancelled), `status ${ended.status}`],
+    );
+    // A `paste` sign-in (Claude): the page shows a code, and `submit` sends it to the host.
+    const pasteCode = "paste-code-e2e-0123456789";
+    const claude = { provider: "claude", accountId: CODE_ACCOUNT };
+    const memberSubmit = await call("POST", submit, { token: bobToken, json: { ...claude, code: pasteCode }, ...v9 });
+    const idle = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "a member cannot submit a code, and a refusal does not quote the code",
+      errorIs(memberSubmit, 403, sourceText("error.team.adminRequired")) &&
+        idle.status === 409 &&
+        !JSON.stringify(idle.body).includes(pasteCode) &&
+        callsOf("submitProviderAccountCodeLogin").length === 1,
+      [summary(memberSubmit), summary(idle)],
+    );
+    const pasteStarted = await call("POST", start, {
+      token: adaToken,
+      json: { provider: "claude", accountId: null },
+      ...v9,
+    });
+    const submitted = await call("POST", submit, { token: adaToken, json: { ...claude, code: pasteCode }, ...v9 });
+    check(
+      "an admin starts a paste sign-in and submits the code: the host gets it, and no answer carries it",
+      isDeepStrictEqual(pasteStarted.body, {
+        accountId: CODE_ACCOUNT,
+        start: { kind: "paste", verificationUrl: "https://claude.ai/oauth/authorize", expiresAt: clock + 900_000 },
+      }) &&
+        submitted.status === 200 &&
+        isDeepStrictEqual(submitted.body, {}) &&
+        isDeepStrictEqual(callsOf("submitProviderAccountCodeLogin").at(-1), [{ ...claude, code: pasteCode }]),
+      [summary(pasteStarted), summary(submitted)],
     );
   }
 

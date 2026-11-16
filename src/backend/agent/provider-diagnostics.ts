@@ -378,6 +378,18 @@ export function isImageCountDiagnostic(message: string): boolean {
 }
 
 /**
+ * Whether the model endpoint refused the request because its body is larger than the endpoint
+ * accepts. The ChatGPT backend that Codex uses writes "request body exceeds 67108864 bytes", or
+ * "decompressed request body exceeds 67108864 bytes" for a compressed request. Codex counts each
+ * image of the session at a small fixed token cost, so a session with many images grows past this
+ * byte limit before its token-based compaction starts, and each later turn fails the same way until
+ * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ */
+export function isRequestBodyLimitDiagnostic(message: string): boolean {
+  return /\brequest body exceeds \d+ bytes\b/iu.test(message);
+}
+
+/**
  * Whether a model endpoint refused a file, image or audio part in the request. OpenCode 2.1.1 sends
  * a part when the model catalog lists its kind, or when the part has a kind it does not know, such as
  * an MCP resource; OpenCode itself refuses a kind that the protocol cannot carry. The part stays in

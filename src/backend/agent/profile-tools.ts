@@ -59,7 +59,7 @@ export const createAgentToolSchema = z
     provider: z
       .enum(AGENT_PROVIDERS)
       .describe(
-        "Provider for the new agent. Omit provider and model to give it your own provider and model. See list_models.",
+        "Provider for the new agent. Omit provider and model for your provider, model and account. See list_models.",
       )
       .optional(),
     model: z

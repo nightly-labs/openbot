@@ -28,6 +28,8 @@ export interface AccountUsageWindowRow {
   label: string;
   remainingPercent: number;
   tone: AccountUsageTone;
+  /** The length of the window. Null for a line that is not a window in time. */
+  durationMins: number | null;
   /** Unix seconds. */
   resetsAt: number | null;
   resetsAtLabel: string | null;
@@ -122,6 +124,7 @@ function usageRow(
       label,
       remainingPercent,
       tone: usageTone(remainingPercent),
+      durationMins: window.windowDurationMins,
       resetsAt: window.resetsAt,
       resetsAtLabel: formatUsageReset(window.resetsAt, text),
     };

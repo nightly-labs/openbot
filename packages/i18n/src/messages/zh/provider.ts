@@ -220,6 +220,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "无法重新连接。",
   "provider.account.add": "添加账号",
   "provider.account.addLabel": "添加另一个 {name} 账号",
+  "provider.account.addWithCode": "用验证码添加账号",
   "provider.account.count": { one: "{count} 个账号", other: "{count} 个账号" },
   "provider.account.numbered": "账号 {number}",
   "provider.account.listLabel": "{name} 的账号",

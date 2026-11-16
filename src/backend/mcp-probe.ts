@@ -14,7 +14,7 @@ import {
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import type { FetchLike, Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
+import { type CallToolRequest, ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type { McpServerConfig } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -24,6 +24,7 @@ import { causeHelpers } from "./effect-boundary";
 import {
   isLoopback,
   MCP_CLIENT_NAME,
+  MCP_TOKEN_TIMEOUT_MS,
   type McpOAuthAuthority,
   type McpSignIn,
   namesAuthorizationServer,
@@ -32,6 +33,7 @@ import {
 } from "./mcp-oauth-provider";
 import {
   clearMcpCommandCache,
+  type McpShapeFailed,
   type McpToolRuntimes,
   mcpHandoffHeaders,
   mcpLaunchEnvironment,
@@ -42,7 +44,12 @@ import {
 } from "./mcp-provider-shapes";
 import { redactMcpSecrets, redactMcpValues } from "./mcp-redaction";
 
-const MCP_PROBE_TIMEOUT_MS = 10_000;
+/**
+ * The deadline for an http server, from the handshake to the last tool page. A hosted server can
+ * need more than 10 seconds to start (#9625). Codex gives each MCP step 30 seconds, so a server that
+ * passes this test also starts in a Codex turn.
+ */
+const MCP_PROBE_TIMEOUT_MS = 30_000;
 
 /**
  * The deadline for a stdio server. Its first start can download the package and all its
@@ -138,6 +145,65 @@ export const inspectMcpServer = Effect.fnUntraced(function* (
   );
 });
 
+/** A call rarely takes long. The limit only stops a tool that never answers, as for GitHub's server. */
+const MCP_TOOL_CALL_TIMEOUT_MS = 5 * 60_000;
+
+export type McpToolCallResult = Awaited<ReturnType<Client["callTool"]>>;
+export type McpToolArguments = NonNullable<CallToolRequest["params"]["arguments"]>;
+
+/**
+ * Runs one tool of a server for an agent whose provider left that tool out (#7427). Silent like
+ * `inspectMcpServer`: the stored sign-in only, never a browser. One connection for the call, closed
+ * after it. A failure is a sentence with the secrets masked.
+ */
+export const callMcpServerTool = Effect.fnUntraced(function* (
+  config: McpServerConfig,
+  name: string,
+  args: McpToolArguments,
+  tools: McpToolRuntimes,
+  oauth?: Pick<McpOAuthAuthority, "accessToken">,
+): Effect.fn.Return<{ result: McpToolCallResult } | { error: string }, McpShapeFailed> {
+  const server = yield* usableMcpServer(
+    config,
+    tools,
+    oauth
+      ? (subject) =>
+          oauth
+            .accessToken(subject.url)
+            .pipe(Effect.map((authorization) => ({ url: subject.url, authorization, proxied: false })))
+      : undefined,
+  );
+  if (server.error !== undefined) return { error: boundedError(server.error) };
+  const timeoutMs = probeTimeoutMs(config);
+  const called = yield* Effect.result(
+    Effect.acquireUseRelease(
+      Effect.try({
+        try: () => ({
+          client: new Client({ name: "openbot", version: "1" }, { capabilities: {} }),
+          transport: createTransport(server, null, () => undefined),
+        }),
+        catch: (cause) => new McpProbeFailure({ cause }),
+      }),
+      ({ client, transport }) =>
+        probeIo((signal) => client.connect(transport, { signal })).pipe(
+          Effect.timeoutOrElse({
+            duration: timeoutMs,
+            orElse: () => Effect.fail(new McpProbeFailure({ cause: new McpTimeout(timeoutMs) })),
+          }),
+          Effect.andThen(
+            probeIo((signal) =>
+              client.callTool({ name, arguments: args }, undefined, { signal, timeout: MCP_TOOL_CALL_TIMEOUT_MS }),
+            ),
+          ),
+        ),
+      ({ client, transport }) => closeQuietlyEffect(client, transport),
+    ),
+  );
+  if (Result.isSuccess(called)) return { result: called.success };
+  const described = describeMcpError(called.failure.cause, config);
+  return { error: boundedError(redactMcpValues(described, probeSecrets(server, null))) };
+});
+
 /** The last refusal an http server answered a connection without a sign-in provider. */
 interface McpChallenge {
   status: number;
@@ -164,7 +230,7 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     seen.challenge = next;
   };
   const failure = (error: unknown, signedIn = false): McpProbeOutcome => {
-    const described = describeProbeFailure(error, config, timeoutMs, signIn, seen.challenge, signInPlace, signedIn);
+    const described = describeProbeFailure(error, config, signIn, seen.challenge, signInPlace, signedIn);
     return {
       toolCount: 0,
       error: boundedError(redactMcpValues(described, probeSecrets(server, signIn))),
@@ -188,7 +254,11 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
     return Result.isFailure(retry) ? failure(retry.failure.cause, true) : found(retry.success);
   });
   const startedAt = Date.now();
-  const first = yield* Effect.result(connectAndCountEffect(server, timeoutMs, signIn, record));
+  // In a sign-in, the SDK answers a 401 inside this connection: it reads the OAuth documents and
+  // registers OpenBot before the page address exists. That start gets the time `begin` gives it, on
+  // top of the server's own, or a slow host ends the sign-in before any page opens (#9741).
+  const firstTimeoutMs = signIn ? timeoutMs + MCP_TOKEN_TIMEOUT_MS : timeoutMs;
+  const first = yield* Effect.result(connectAndCountEffect(server, firstTimeoutMs, signIn, record));
   if (Result.isSuccess(first)) {
     // The user pressed Sign in, and the server answered without a sign-in: it can still want one
     // to run a tool. Its sign-in starts here, or the press ends with nothing opened and nothing said.
@@ -244,7 +314,6 @@ const probeMcpServerEffect = Effect.fnUntraced(function* (
 function describeProbeFailure(
   error: unknown,
   config: McpServerConfig,
-  timeoutMs: number,
   signIn: McpSignIn | null,
   challenge: McpChallenge | null,
   signInPlace: McpSignInPlace | null,
@@ -264,7 +333,7 @@ function describeProbeFailure(
     const described = describeSignInChallenge(config.url, challenge.url, signInPlace);
     if (described) return described;
   }
-  return describeMcpError(error, config, timeoutMs);
+  return describeMcpError(error, config);
 }
 
 /**
@@ -564,17 +633,18 @@ class McpTimeout extends Error {
 }
 
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
-function describeMcpError(error: unknown, config: McpServerConfig, timeoutMs: number): string {
-  const described = describeMcpErrorText(error, config, timeoutMs);
+function describeMcpError(error: unknown, config: McpServerConfig): string {
+  const described = describeMcpErrorText(error, config);
   // A bridge that never answers is the case the native connection replaces: say where to go.
   const bridgeUrl = mcpRemoteBridgeUrl(config);
   if (bridgeUrl === null || !(error instanceof McpTimeout || isConnectionClosed(error))) return described;
   return sourceText("error.backend.mcpRemoteBridge", { reason: described, url: bridgeUrl });
 }
 
-function describeMcpErrorText(error: unknown, config: McpServerConfig, timeoutMs: number): string {
+function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
+  // The deadline that ran out: a sign-in's first connection has a longer one than the test.
   if (error instanceof McpTimeout)
-    return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(timeoutMs / 1000) });
+    return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(error.timeoutMs / 1000) });
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
   // The child exited before the handshake: the process failed to start, not the network.

@@ -159,6 +159,7 @@ export const messages = {
   "mobile.chat.composer.send": "메시지 보내기",
   "mobile.chat.composer.stop": "{name} 중지",
   "mobile.chat.composer.dictate": "음성으로 메시지 입력",
+  "mobile.chat.composer.voiceSettings": "음성 설정",
   "mobile.chat.composer.stopDictation": "음성 입력 중지",
   "mobile.chat.composer.mention": "{name} 멘션",
   "mobile.chat.composer.skills": "스킬",

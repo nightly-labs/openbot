@@ -285,6 +285,7 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
                     }),
                     remainingPercent: percent(),
                     tone: usageTone(percent()),
+                    durationMins: null,
                     resetsAt: null,
                     resetsAtLabel: null,
                   },

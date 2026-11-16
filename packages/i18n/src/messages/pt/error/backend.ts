@@ -380,6 +380,8 @@ export const messages = {
     "Este proxy mudou depois que você o abriu. Verifique-o novamente e tente de novo.",
   "error.backend.browserProxyUnreachable": "O proxy {name} não responde, por isso a página não abriu.",
   "error.backend.browserProxySignInRefused": "O proxy {name} recusou o início de sessão, por isso a página não abriu.",
+  "error.backend.browserSystemProxyFailed":
+    "O proxy nas configurações do computador que executa o OpenBot não responde ou recusou a conexão, por isso a página não abriu. Verifique as configurações de proxy desse computador.",
   "error.backend.browserProxyComputerUnreachable":
     "O computador que este perfil usa não responde, por isso a página não abriu.",
   "error.backend.browserProxyComputerLocalAddress":

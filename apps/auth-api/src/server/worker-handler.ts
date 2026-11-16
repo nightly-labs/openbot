@@ -7,6 +7,7 @@ import { captureBillingSnapshot } from "./billing-snapshots";
 import { canonicalHostRedirect, permanentTrailingSlashRedirect } from "./canonical-redirect";
 import { runApiEffect } from "./effect-runtime";
 import { createHostedBilling } from "./hosted-billing";
+import { createHostedPoolAlert } from "./hosted-pool-alert";
 import { readHostedPool } from "./hosted-pool-snapshot";
 import type { HostedServerBindings } from "./hosted-server-service";
 import { HostedSiteService } from "./hosted-site-service";
@@ -153,7 +154,12 @@ async function runSignalEntryCheck(bindings: Partial<SignalEntryBindings>): Prom
 }
 
 type SalesBindings = Pick<WorkerBindings, "DB"> &
-  Partial<Pick<WorkerBindings, "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET">>;
+  Partial<
+    Pick<
+      WorkerBindings,
+      "STRIPE_SECRET_KEY" | "OPENPANEL_CLIENT_ID" | "OPENPANEL_CLIENT_SECRET" | "HOSTED_POOL_ALERT_WEBHOOK_URL"
+    >
+  >;
 
 const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings: SalesBindings, now: number) {
   if (!bindings.OPENPANEL_CLIENT_ID?.trim() || !bindings.OPENPANEL_CLIENT_SECRET?.trim()) return;
@@ -163,7 +169,9 @@ const tickSalesAnalytics = Effect.fn("SalesAnalytics.tick")(function* (bindings:
     clientSecret: bindings.OPENPANEL_CLIENT_SECRET,
     fetch: (input: string, init: RequestInit) => fetch(input, init),
   };
-  const payments = yield* Effect.exit(new BillingSales(options).processPending());
+  // The scheduled handler has no `waitUntil`, so the run waits for each sale message.
+  const saleAlert = createHostedPoolAlert(bindings.HOSTED_POOL_ALERT_WEBHOOK_URL, options.fetch);
+  const payments = yield* Effect.exit(new BillingSales({ ...options, saleAlert }).processPending());
   const snapshot = yield* Effect.exit(captureBillingSnapshot(bindings, now));
   const result = yield* new SalesAnalyticsDelivery(options).drain();
   console.info("Sales analytics delivery completed.", result);

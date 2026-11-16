@@ -229,6 +229,7 @@ export const messages = {
   "provider.openCodeKey.reconnectFailed": "Nie udało się połączyć ponownie.",
   "provider.account.add": "Dodaj konto",
   "provider.account.addLabel": "Dodaj kolejne konto {name}",
+  "provider.account.addWithCode": "Dodaj konto kodem",
   "provider.account.count": {
     one: "{count} konto",
     few: "{count} konta",

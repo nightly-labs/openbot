@@ -286,7 +286,7 @@ function historyResult(history: MessagingHistory, scope: "channel" | "conversati
 const FINISHED_TURN_LIMIT = 256;
 /** What a messaging tool answers when its connection does not run. */
 export const MESSAGING_NOT_RUNNING = "This connection does not run now.";
-const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
+export const PLATFORM_NAMES: Record<MessagingPlatform, string> = {
   slack: "Slack",
   discord: "Discord",
   telegram: "Telegram",
