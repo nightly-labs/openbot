@@ -237,7 +237,7 @@ export const messages = {
     "{name}: компьютер-хост не принимает такие файлы. Обновите там OpenBot, чтобы прикреплять их.",
   "mobile.chat.attachment.nameTooLong": "Выберите файл с более коротким именем.",
   "mobile.chat.attachment.damaged": "Вложение повреждено. Выберите его заново.",
-  "mobile.chat.attachment.tooLarge": "{name} больше 10 МБ.",
+  "mobile.chat.attachment.tooLarge": "{name} больше 100 МБ.",
   "mobile.chat.attachment.cameraPermission": "Чтобы сделать фото, разрешите доступ к камере в настройках.",
   "mobile.chat.composer.send": "Отправить сообщение",
   "mobile.chat.composer.stop": "Остановить: {name}",

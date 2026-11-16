@@ -172,7 +172,7 @@ export const messages = {
   "mobile.chat.attachment.hostRejects": "{name}：主机电脑不接受这些文件。请更新该电脑上的 OpenBot 后再附加。",
   "mobile.chat.attachment.nameTooLong": "请选择名称较短的文件。",
   "mobile.chat.attachment.damaged": "附件已损坏，请重新选择。",
-  "mobile.chat.attachment.tooLarge": "{name} 大于 10 MB。",
+  "mobile.chat.attachment.tooLarge": "{name} 大于 100 MB。",
   "mobile.chat.attachment.cameraPermission": "请在系统设置中允许使用相机以拍照。",
   "mobile.chat.composer.send": "发送消息",
   "mobile.chat.composer.stop": "停止 {name}",

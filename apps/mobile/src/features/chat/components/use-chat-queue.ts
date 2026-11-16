@@ -17,7 +17,7 @@ import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
 import { type AwaitingReply, awaitingReplies } from "../model/awaiting-replies";
 import {
-  readQueueAttachment,
+  queueAttachmentUpload,
   removeQueueAttachment,
   restoredQueueAttachments,
   writeQueueAttachment,
@@ -325,7 +325,7 @@ export function useChatQueue(
             const stored = edit.addedAttachments.find((item) => item.id === file.id);
             return workspace().uploadAttachment(
               agentId,
-              stored ? { ...file, base64: await readQueueAttachment(edit.editId, stored) } : file,
+              stored ? await queueAttachmentUpload(edit.editId, stored, file) : file,
               serverId,
             );
           },

@@ -1,3 +1,4 @@
+import { MOBILE_ATTACHMENT_BYTES } from "@openbot/team-client/remote-peer";
 import type { ChatAttachment } from "../components/use-chat-attachments";
 import {
   type DecodedOutbox,
@@ -401,14 +402,20 @@ export class OutboxStore {
     const { storage } = this.options;
     if (!storage) return [];
     return Promise.all(
-      message.files.map(async (file) => ({
-        id: file.id,
-        name: file.name,
-        mimeType: file.mimeType,
-        size: file.size,
-        base64: await storage.readFile(message.clientMessageId, file),
-        ...(file.dimensions ? { dimensions: file.dimensions } : {}),
-      })),
+      message.files.map(async (file) => {
+        const item = {
+          id: file.id,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+          ...(file.dimensions ? { dimensions: file.dimensions } : {}),
+        };
+        // A large file is sent from its saved copy in parts, not read into memory.
+        if (file.size <= MOBILE_ATTACHMENT_BYTES)
+          return { ...item, base64: await storage.readFile(message.clientMessageId, file) };
+        const uri = storage.fileUri(message.clientMessageId, file);
+        return { ...item, base64: "", uri, file: { ref: uri, size: file.size } };
+      }),
     );
   }
 

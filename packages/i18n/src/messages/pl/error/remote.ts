@@ -150,6 +150,7 @@ export const messages = {
   "error.remote.attachmentRejected": "Host odrzucił załącznik.",
   "error.remote.attachmentTooLarge": "Załączniki mogą mieć najwyżej 10 MB.",
   "error.remote.attachmentBusy": "Poczekaj, aż przesyłanie bieżącego załącznika się zakończy.",
+  "error.remote.attachmentChanged": "Plik się zmienił lub jest niedostępny. Wybierz go ponownie.",
   "error.remote.uploadTimeout": "Przekroczono limit czasu przesyłania załącznika.",
   "error.remote.hostSessionActive": "Host ma już aktywną zdalną sesję.",
   "error.remote.tooManyConnections": "Zbyt wiele aktywnych zdalnych połączeń.",
