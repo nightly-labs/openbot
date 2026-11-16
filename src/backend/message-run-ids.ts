@@ -4,7 +4,7 @@
  * keeps the message's uuid and changes its last 8 digits by `n`, so provider history names the
  * message again without a stored list of the run ids.
  */
-const MAX_RUNS = 16;
+export const MAX_RUNS = 16;
 
 function withRun(id: string, run: number): string {
   const tail = Number.parseInt(id.slice(-8), 16);

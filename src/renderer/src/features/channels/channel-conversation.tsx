@@ -56,6 +56,8 @@ export interface ChannelConversationEnvironment {
   approvals: () => readonly AgentApproval[];
   /** Every browser takeover that waits on the host. */
   takeovers: () => readonly BrowserTakeoverRequest[];
+  /** Every question that waits on the host. A saved card with no answer is open only while its question is here. */
+  prompts: () => readonly Extract<AgentEvent, { type: "prompt" }>[];
   /** The hidden agents that the host stops. A host with `agent-hidden-work` stops none. */
   pausedAgentIds: () => ReadonlySet<string>;
 }
@@ -134,7 +136,7 @@ export function createChannelConversation(env: ChannelConversationEnvironment) {
 
   const waiting = createMemo(() => {
     const current = page();
-    return current ? waitingChannelPrompt(current) : null;
+    return current ? waitingChannelPrompt(current, threads(), env.prompts()) : null;
   });
   const prompt = createMemo((): Extract<AgentEvent, { type: "prompt" }> | undefined => {
     const found = waiting();

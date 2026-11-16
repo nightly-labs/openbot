@@ -115,6 +115,10 @@ export const messages = {
   "marketplace.app.remove.action": "削除",
   "marketplace.app.remove.confirmTitle": "{name} を削除しますか？",
   "marketplace.app.remove.keep": "残す",
+  "marketplace.app.replace.title": "{server} を置き換えますか?",
+  "marketplace.app.replace.description":
+    "{server} という名前のサーバーがすでにありますが、{name} ではありません。{name} に置き換えますか? そのアドレスと保存されたキーは削除されます。",
+  "marketplace.app.replace.action": "置き換え",
   "marketplace.app.connection": "接続",
   "marketplace.app.access.use": "使用可能",
   "marketplace.app.access.noAgents": "エージェントなし",

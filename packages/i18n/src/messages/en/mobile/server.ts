@@ -385,6 +385,13 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.identityNotAllowed": "Only an owner or admin can change the server name and logo.",
   "mobile.server.settings.identityUnsupported": "Update OpenBot on this server to change its name and logo here.",
   "mobile.server.settings.identityOffline": "Connect to this server to change its name and logo.",
+  "mobile.server.settings.appearance": "Shape and color",
+  "mobile.server.settings.appearanceShape": "Shape",
+  "mobile.server.settings.appearanceShapeOption": "Shape {number}",
+  "mobile.server.settings.appearanceColor": "Server color",
+  "mobile.server.settings.appearanceAutomatic": "Automatic",
+  "mobile.server.settings.appearanceReset": "Reset",
+  "mobile.server.settings.appearanceSaveFailed": "Could not save the server shape and color. Try again.",
   "mobile.server.route.cropLogo": "Crop logo",
   "mobile.server.members.remove": "Remove member",
   "mobile.server.members.invitePeople": "Invite people",
@@ -479,6 +486,34 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.library.noMatches": "No matching files",
   "mobile.server.library.showInChat": "Show in chat",
   "mobile.server.library.share": "Share",
+  // Library folders: the folder capsule, the folder sheet and the move sheet. The desktop says the same.
+  "mobile.server.library.folders.title": "Folders",
+  "mobile.server.library.folders.allFiles": "All files",
+  "mobile.server.library.folders.removedAgents": "Deleted agents",
+  "mobile.server.library.folders.notInFolder": "Not in a folder",
+  "mobile.server.library.folders.path": "Folder: {path}",
+  "mobile.server.library.folders.pathHint": "Shows the folders",
+  "mobile.server.library.folders.new": "New folder",
+  "mobile.server.library.folders.name": "Folder name",
+  "mobile.server.library.folders.inFolder": "In {name}",
+  "mobile.server.library.folders.create": "Create",
+  "mobile.server.library.folders.rename": "Rename",
+  "mobile.server.library.folders.renameTitle": "Rename folder",
+  "mobile.server.library.folders.save": "Save",
+  "mobile.server.library.folders.delete": "Delete folder",
+  "mobile.server.library.folders.deleteTitle": "Delete “{name}”?",
+  "mobile.server.library.folders.deleteBody": "The folders in it are deleted too. Its files stay with the agent.",
+  "mobile.server.library.folders.moveTo": "Move to folder",
+  "mobile.server.library.folders.actions": "Actions for {name}",
+  "mobile.server.library.folders.expand": "Show folders of {name}",
+  "mobile.server.library.folders.collapse": "Hide folders of {name}",
+  "mobile.server.library.folders.emptyTitle": "No files in this folder",
+  "mobile.server.library.folders.emptyBody": "{agent} can save files here with the folder path {path}.",
+  "mobile.server.library.folders.loadFailed": "Could not load the folders",
+  "mobile.server.library.folders.changeFailed": "Could not change the folders",
+  "mobile.server.library.folders.gone": "This folder is no longer on the server.",
+  "mobile.server.library.folders.fileGone": "This file is no longer on the server, or you cannot move it.",
+  "mobile.server.library.folders.unsupported": "This server has no Library folders. Update the server to use them.",
   "mobile.server.route.providers": "Providers",
   "mobile.server.route.provider": "Provider",
   "mobile.server.route.providerModels": "Models",
@@ -685,7 +720,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.contacts": "Contact info",
   "mobile.server.vault.apiKeys": "API keys",
   "mobile.server.vault.apiKeysFooter":
-    "Agents on {host} read each key from a private file by its variable name. The keys stay on {host}. This phone cannot show them.",
+    "Agents on {host} read each key from a file by its variable name. All agents run as the same system user, so an agent can also read a key file that is for other agents. The keys stay on {host}. This phone cannot show them.",
   "mobile.server.vault.empty": "No items",
   "mobile.server.vault.addLogin": "Add login",
   "mobile.server.vault.addCard": "Add card",
@@ -1000,6 +1035,7 @@ export const messages = defineMessages("mobile.server", {
     "OpenBot cannot read the saved tokens on {host}. Disconnect the workspace, then connect it again.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot on {host} cannot receive Slack events. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
+  "mobile.server.connectors.slack.helpNotLinked": "This workspace is not linked to {host}. Tap Reconnect to link it.",
   "mobile.server.connectors.slack.orchestratorTitle": "Slack Orchestrator",
   "mobile.server.connectors.slack.orchestratorDescription":
     "This agent receives every request from Slack. It answers short ones itself, gives other work to the right agent, and posts the answer in the thread.",
@@ -1048,6 +1084,8 @@ export const messages = defineMessages("mobile.server", {
     "OpenBot cannot read the saved tokens on {host}. Disconnect the Discord server, then connect it again.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot on {host} cannot receive Discord events. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "This Discord server is not linked to {host}. Tap Reconnect to link it.",
   "mobile.server.connectors.discord.orchestratorTitle": "Discord Orchestrator",
   "mobile.server.connectors.discord.orchestratorDescription":
     "This agent receives every request from Discord. It answers short ones itself, gives other work to the right agent, and replies with the answer in the channel.",
@@ -1084,6 +1122,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.telegram.helpRelay":
     "OpenBot on {host} cannot receive Telegram messages. On {host}, sign in, give the server a name in Server settings, and keep OpenBot open.",
   "mobile.server.connectors.telegram.helpError": "OpenBot cannot reach this chat. Reconnect, or disconnect the chat.",
+  "mobile.server.connectors.telegram.helpNotLinked": "This chat is not linked to {host}. Tap Reconnect to link it.",
   // {time} is a time, such as 14:30.
   "mobile.server.connectors.telegram.retryAt": "Telegram asked OpenBot to wait. It tries again at {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Link a chat",
@@ -1125,6 +1164,8 @@ export const messages = defineMessages("mobile.server", {
     "WhatsApp removed this server from the linked devices. Link the number again.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot cannot reach WhatsApp on this number. Reconnect, or disconnect the number.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot cannot read the saved keys of this number. Link the number again.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp asked OpenBot to wait. It tries again at {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Link again",
   "mobile.server.connectors.whatsapp.ownNumber": "Personal number",
@@ -1321,6 +1362,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.accountNameHint":
     "Only for you and the admins of this server. Leave it empty to show the email.",
   "mobile.server.providers.accountSignInAgain": "Sign in again",
+  // An account that is an API key of the provider (`provider-account-keys-v1`), such as a Cursor account after the first.
+  "mobile.server.providers.accountsKeyHint":
+    "Each agent uses one account. Choose it in the agent's settings. A new account needs an API key of that account.",
+  "mobile.server.providers.accountChangeKey": "Change key",
+  "mobile.server.providers.accountKeyHint":
+    "Paste an API key of the {provider} account. The key goes to the server. This phone does not keep it.",
+  "mobile.server.providers.accountKeyChecking": "Checking the key…",
+  "mobile.server.providers.accountKeyAddFailed": "Could not add the account. Try again.",
   "mobile.server.providers.removeAccount": "Remove account",
   "mobile.server.providers.removeAccountTitle": "Remove {name}?",
   "mobile.server.providers.removeAccountBody": "The server removes this account and its sign-in.",
@@ -1940,6 +1989,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.route.transfer": "Transfer",
   "mobile.server.route.transferExport": "Export",
   "mobile.server.route.transferImport": "Import",
+  "mobile.server.route.transferCopy": "Copy to another server",
   "mobile.server.transfer.unsupported": "Update OpenBot on this server to transfer it here.",
   "mobile.server.transfer.unavailable": "Connect to this server as an owner or admin to transfer it.",
   "mobile.server.transfer.title": "Move this server to another computer",
@@ -2003,4 +2053,20 @@ export const messages = defineMessages("mobile.server", {
     "These providers were signed in on the other server and are not signed in here. Sign in to them in Server settings › Providers.",
   "mobile.server.transfer.notImported": "Not imported",
   "mobile.server.transfer.warnings": "Check these",
+  "mobile.server.transfer.copy": "Copy to another server",
+  "mobile.server.transfer.copyNote": "Send agents to another of your servers.",
+  "mobile.server.transfer.copyTo": "To",
+  "mobile.server.transfer.copyNoAgents": "This server has no agents.",
+  "mobile.server.transfer.copyNotMoved":
+    "Their channels and the Shared folder are copied too. API keys, sign-ins, connectors, and chat history are not copied. Set them up again on the other server.",
+  "mobile.server.transfer.copySubmit": { one: "Copy {count} agent", other: "Copy {count} agents" },
+  "mobile.server.transfer.copying": "Copying…",
+  "mobile.server.transfer.copyFailed": "The copy did not finish.",
+  "mobile.server.transfer.copied": {
+    one: "{count} agent copied to {server}.",
+    other: "{count} agents copied to {server}.",
+  },
+  "mobile.server.transfer.copyAgents": "Agents to copy",
+  "mobile.server.transfer.copyNext": "Copied agents use the approval rules of {server}.",
+  "mobile.server.transfer.copyNoServer": "Connect to another server as an owner or admin to copy agents to it.",
 });

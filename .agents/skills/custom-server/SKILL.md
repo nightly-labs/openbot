@@ -15,7 +15,7 @@ they do. This skill adds the rules for an agent.
 - The customer is the owner. The server signs in with a server claim for the customer's email, which
   the command makes. Never sign the server in to an operator account, and never invite the customer
   to a server that an operator owns.
-- Take only a VPS with no reference. Never take a VPS with a reference, also `pool-free`. The
+- Take only a VPS with no reference. Never take a VPS with a reference, also `pool`. The
   command refuses both.
 - The repository is public. Do not write a customer name, an email, an address or a VPS ID in a
   commit, a PR, an issue or a document. Keys files and logs go in `.openbot-build/custom/`, which git

@@ -223,7 +223,9 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     const pool = status?.accountPool;
     if (!pool) return null;
     const accounts = status?.accounts ?? [];
-    const members = accounts.filter((account) => !isApiKeyAccount(account.id) && !pool.leftOut.includes(account.id));
+    const members = accounts.filter(
+      (account) => !isApiKeyAccount(account.id, rail) && !pool.leftOut.includes(account.id),
+    );
     const accountsText = t("provider.account.count", { count: members.length });
     const summary = t("provider.account.poolCount", { accounts: accountsText });
     return {
@@ -241,7 +243,7 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
   const railAccounts = (rail: RailId): readonly ProviderAccountStatus[] => {
     if (!props.accountChoice || rail === CUSTOM_RAIL) return [];
     const accounts = props.agentStatus?.providers?.find((status) => status.id === rail)?.accounts ?? [];
-    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id));
+    if (railPool(rail)) return accounts.filter((account) => isApiKeyAccount(account.id, rail));
     return accounts.length > 1 ? accounts : [];
   };
   const railKeys = createMemo<RailKey[]>(() =>
@@ -444,7 +446,8 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
       model,
       now(),
     );
-    return spent?.covers ? spent.window : undefined;
+    // An account on credits keeps working, so its model is not stopped.
+    return spent?.covers && !spent.onCredits ? spent.window : undefined;
   };
   /** The spent window of each model of a rail entry, in the order of the models. */
   const entrySpentWindows = (key: RailKey): (AccountUsageWindow | undefined)[] => {

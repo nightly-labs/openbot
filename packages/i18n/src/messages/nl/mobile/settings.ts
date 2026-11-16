@@ -144,6 +144,9 @@ export const messages = {
     "Zoekresultaten en zoekberichten faden in en uit met een korte vervaging als ze veranderen. Als beweging beperkt is, faden ze alleen. Als dit uitstaat, veranderen ze direct.",
   "mobile.settings.feedback.footer": "Tastbare feedback voor acties in de app op dit apparaat.",
   "mobile.settings.feedback.haptics": "Haptische feedback",
+  "mobile.settings.feedback.replies": "Haptiek bij antwoorden",
+  "mobile.settings.feedback.repliesFooter":
+    "Tikjes terwijl het antwoord van een agent in een chat verschijnt. De andere haptiek blijft aan.",
   "mobile.settings.feedback.retry": "Opslaan van haptische instelling opnieuw proberen",
   "mobile.settings.liveActivities.title": "Live activiteiten",
   "mobile.settings.liveActivities.footer":
@@ -226,6 +229,9 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Grote bestanden automatisch downloaden",
   "mobile.settings.conversations.largeFilesFooter":
     "Afbeeldingen, video’s en audio groter dan {small} worden pas gedownload als je erop tikt. Zet dit aan om ze meteen te downloaden, tot {large}. Dit kan veel mobiele data gebruiken.",
+  "mobile.settings.conversations.fullQualityPhotos": "Foto’s in volle kwaliteit versturen",
+  "mobile.settings.conversations.fullQualityPhotosFooter":
+    "Als dit uit staat, verstuurt de app een kleinere kopie van elke foto, tot 2048 pixels aan de lange zijde. Die komt sneller aan op een trage verbinding. Zet dit aan om de originele foto te versturen.",
   "mobile.settings.profile.nameUnsafe": "Verwijder regeleinden en stuurtekens uit je naam.",
   "mobile.settings.profile.nameLength": "Gebruik 3–20 tekens voor je weergavenaam.",
   "mobile.settings.profile.saveFailed": "Kan de wijzigingen niet opslaan. Probeer het opnieuw.",
@@ -356,4 +362,24 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Het proces kon niet worden gestopt.",
   "mobile.settings.agents.processes.stopTitle": "Dit programma stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Proces {pid} stoppen",
+  "mobile.settings.shortcuts.title": "Opdrachten",
+  "mobile.settings.shortcuts.agent": "Agent",
+  "mobile.settings.shortcuts.none": "Geen",
+  "mobile.settings.shortcuts.unsupported": "Opdrachten hebben iOS 26 of nieuwer nodig.",
+  "mobile.settings.shortcuts.card.agents": "Agents",
+  "mobile.settings.shortcuts.card.noAgents": "Nog geen agents",
+  "mobile.settings.shortcuts.card.setUp.title": "Open OpenBot om opdrachten in te stellen",
+  "mobile.settings.shortcuts.card.setUp.action": "Open OpenBot",
+  "mobile.settings.shortcuts.card.noAgent.title": "Kies een agent voor opdrachten",
+  "mobile.settings.shortcuts.card.noAgent.detail": "Opdrachten sturen naar één agent.",
+  "mobile.settings.shortcuts.card.noAgent.action": "Kies agent",
+  "mobile.settings.shortcuts.card.locked.title": "OpenBot is vergrendeld",
+  "mobile.settings.shortcuts.card.locked.action": "Open OpenBot",
+  "mobile.settings.shortcuts.footer":
+    "Send Message in de Opdrachten-app stuurt naar deze agent. De app gaat niet open.",
+  "mobile.settings.shortcuts.send.sent": "Verzonden",
+  "mobile.settings.shortcuts.send.failed": "OpenBot kon dit niet verzenden.",
+  "mobile.settings.shortcuts.send.unconfirmed": "Geen antwoord van de server. Het bericht kan in de chat staan.",
+  "mobile.settings.shortcuts.send.inApp": "Stuur in OpenBot",
+  "mobile.settings.shortcuts.send.openChat": "Open chat",
 } as const satisfies PartialTranslation<typeof source>;

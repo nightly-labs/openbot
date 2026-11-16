@@ -42,6 +42,8 @@ async function main(): Promise<void> {
   await putOptionalSecret("COMPANY_SIGN_IN_SECRET");
   // Without the token, no one can make a server claim.
   await putOptionalSecret("SERVER_CLAIMS_ADMIN_TOKEN");
+  // Without the Discord webhook, the Worker sends no pool alerts (docs/hosted-servers.md#pool-alerts).
+  if (!cloudflareEnvironment) await putOptionalSecret("HOSTED_POOL_ALERT_WEBHOOK_URL");
   // Slack is optional: without these, the Slack routes answer 503 slack_not_configured. The test
   // Worker takes the development app's values from the .env.dev file.
   await putOptionalSecretSet("SLACK_CLIENT_ID", "SLACK_CLIENT_SECRET", "SLACK_STATE_SECRET");

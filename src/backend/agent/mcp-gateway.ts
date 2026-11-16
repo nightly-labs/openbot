@@ -19,9 +19,21 @@ import type { AgentProvider } from "../agent-client";
 import { causeHelpers } from "../effect-boundary";
 import type { McpOperationError } from "../mcp-effects";
 import { McpHandoffLog } from "../mcp-handoff-log";
-import { type McpOAuthAuthority, type McpSignInOpener, mcpOAuthAccountKey } from "../mcp-oauth-provider";
+import {
+  type McpOAuthAuthority,
+  type McpSignInOffer,
+  type McpSignInOpener,
+  mcpOAuthAccountKey,
+} from "../mcp-oauth-provider";
 import { McpOAuthProxy, type McpOAuthProxyTarget, mcpOAuthProxyAgentKey, mcpOAuthProxyRoute } from "../mcp-oauth-proxy";
-import { hasCredentialHeader, inspectMcpServer, type McpProbeOutcome, type McpSignInPlace } from "../mcp-probe";
+import {
+  callMcpServerTool,
+  hasCredentialHeader,
+  inspectMcpServer,
+  type McpProbeOutcome,
+  type McpSignInPlace,
+  type McpToolArguments,
+} from "../mcp-probe";
 import {
   type McpEndpoint,
   type McpEndpointRefusal,
@@ -52,6 +64,8 @@ export interface TestMcpServerOptions {
   signInPlace?: McpSignInPlace;
   /** Where an interactive sign-in shows its page, when not in this computer's own browser. */
   open?: McpSignInOpener;
+  /** The link that the computer of `open` returns to OpenBot on. See `McpOAuth.signIn`. */
+  deepLinkRedirectUrl?: string;
 }
 
 export interface McpGatewayHooks {
@@ -209,16 +223,21 @@ export class McpGateway {
     this: McpGateway,
     configs: readonly McpServerConfig[],
   ): Effect.fn.Return<string | null, McpGatewayFailed> {
-    const proxied = configs
-      .filter((config) => config.enabled && this.#proxied(config))
-      .map((config) => config.id)
-      .sort();
+    const proxied = this.proxiedServerIds(configs);
     if (proxied.length === 0) return null;
     const identity = yield* this.#proxy.identity().pipe(Effect.result);
     // The hand-off leaves these rows out in this case, and the manifest records that.
     if (Result.isFailure(identity)) return JSON.stringify([null, proxied]);
     return JSON.stringify([identity.success, proxied]);
   });
+
+  /** The sorted ids of the enabled rows in `configs` that go through the proxy: the rows with a sign-in. */
+  proxiedServerIds(configs: readonly McpServerConfig[]): string[] {
+    return configs
+      .filter((config) => config.enabled && this.#proxied(config))
+      .map((config) => config.id)
+      .sort();
+  }
 
   /** Stops the OAuth proxy. Called once, after every provider process has stopped. */
   readonly close = Effect.fnUntraced(function* (this: McpGateway) {
@@ -375,7 +394,10 @@ export class McpGateway {
     const open = options.open;
     const opened: Pick<McpOAuthAuthority, "accessToken" | "signIn"> | undefined =
       stored && open
-        ? { accessToken: (url) => stored.accessToken(url), signIn: (url) => stored.signIn(url, open) }
+        ? {
+            accessToken: (url) => stored.accessToken(url),
+            signIn: (url) => stored.signIn(url, open, options.deepLinkRedirectUrl),
+          }
         : (stored ?? undefined);
     const oauth = options.interactive ? opened : silent;
     const outcome = yield* inspectMcpServer(
@@ -395,7 +417,8 @@ export class McpGateway {
    * this run did not see from that row. A provider lists a server's tools when it loads a session,
    * and a server can add tools behind the same address: no saved value changes, so nothing else
    * replaces a session that has the old list (#6199). The first test of a row in a run refreshes
-   * too, because a loaded session can be older than the change. A draft refreshes nothing.
+   * too, because a loaded session can be older than the change. So does a test after a provider's
+   * start through the sign-in proxy failed for that row. A draft refreshes nothing.
    */
   readonly #refreshForTestedTools = Effect.fnUntraced(function* (
     this: McpGateway,
@@ -407,9 +430,14 @@ export class McpGateway {
     const [key] = saved ? mcpFingerprintValues([saved]) : [];
     if (key === undefined || key !== mcpFingerprintValues([{ ...config, enabled: true }])[0]) return;
     const tools = [String(outcome.toolCount), ...[...outcome.tools].sort()].join("\u0000");
-    if (this.#testedTools.get(key) === tools) return;
+    // A provider whose start through the proxy failed keeps the server without tools until its
+    // session gets the new address (`McpOAuthProxy.route`), also when the tools did not change (#9526).
+    const route = saved !== undefined && this.#proxied(saved) ? mcpOAuthProxyRoute(saved.id, saved.url) : null;
+    const failedStart = route !== null && this.#proxy.failedStart(route);
+    if (this.#testedTools.get(key) === tools && !failedStart) return;
     // Recorded after the refresh, so a refresh that fails is tried again at the next test.
     yield* this.#hooks.refreshAllAgentRuntimes();
+    if (route !== null && failedStart) this.#proxy.reportedFailedStart(route);
     this.#testedTools.set(key, tools);
   });
 
@@ -436,13 +464,43 @@ export class McpGateway {
   });
 
   /**
+   * One tool of a saved server, for an agent whose provider left the tool out. Silent like `inspect`:
+   * the sign-in of the row's address, which is also the token that the agent's own route spends.
+   */
+  readonly callTool = Effect.fnUntraced(function* (
+    this: McpGateway,
+    config: McpServerConfig,
+    name: string,
+    args: McpToolArguments,
+  ) {
+    const stored = this.#oauth;
+    return yield* callMcpServerTool(
+      config,
+      name,
+      args,
+      this.#toolRuntimes(),
+      stored ? { accessToken: (url) => stored.accessToken(url) } : undefined,
+    ).pipe(toMcpGatewayFailed);
+  });
+
+  /**
    * The test that may open a browser: the user pressed Sign in. A sign-in that ends with a working
    * connection to an address an enabled row names marks every agent's session for refresh, so the
    * next turn is handed the new token rather than the tools staying absent until a restart. A draft
    * no agent uses yet refreshes nothing: its save does that.
    */
-  readonly signIn = Effect.fnUntraced(function* (this: McpGateway, input: TestMcpServerInput, open?: McpSignInOpener) {
-    const result = yield* this.test(input, { interactive: true, signInPlace: "here", ...(open ? { open } : {}) });
+  readonly signIn = Effect.fnUntraced(function* (
+    this: McpGateway,
+    input: TestMcpServerInput,
+    open?: McpSignInOpener,
+    deepLinkRedirectUrl?: string,
+  ) {
+    const result = yield* this.test(input, {
+      interactive: true,
+      signInPlace: "here",
+      ...(open ? { open } : {}),
+      ...(open && deepLinkRedirectUrl !== undefined ? { deepLinkRedirectUrl } : {}),
+    });
     const resource = mcpOAuthAccountKey(input.config.url);
     const inUse =
       resource !== null &&
@@ -577,13 +635,13 @@ export class McpGateway {
   }
 
   /**
-   * Whether an http row that answered without a sign-in offers one. A key the user pasted into a
-   * header is theirs to manage: a sign-in would not replace it.
+   * What Sign in would do for an http row that answered without a sign-in. A key the user pasted
+   * into a header is theirs to manage: a sign-in would not replace it.
    */
-  offersSignIn(config: McpServerConfig): Effect.Effect<boolean> {
+  signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer> {
     const oauth = this.#oauth;
-    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed(false);
-    return oauth.offersSignIn(config.url);
+    if (!oauth || config.transport !== "http" || hasCredentialHeader(config)) return Effect.succeed("none");
+    return oauth.signInOffer(config.url);
   }
 
   /**

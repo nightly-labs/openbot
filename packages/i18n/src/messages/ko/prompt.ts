@@ -25,6 +25,8 @@ export const messages = {
   "prompt.approval.allow": "허용",
   "prompt.approval.alwaysAllow": "항상 허용",
   "prompt.approval.deny": "거부",
+  "prompt.approval.cut":
+    "이 카드에는 요청의 앞부분만 표시되어 거부만 할 수 있어요. 허용 버튼이 곧 나타나지 않으면 서버의 OpenBot을 업데이트해 주세요.",
   "prompt.approval.report.bugHeadline": "버그를 찾으셨나요? 고쳐 봅시다.",
   "prompt.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
   "prompt.approval.report.dontSend": "나중에",

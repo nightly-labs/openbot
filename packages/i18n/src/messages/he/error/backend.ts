@@ -79,6 +79,9 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "המתינו עד שהעבודה בערוץ הזה תיפסק, ואז מחקו את ההיסטוריה שלו.",
   "error.backend.channelCompactUnavailable":
     "אף חבר בערוץ הזה לא יכול לדחוס את ההקשר שלו כעת. חבר צריך לענות בערוץ קודם, והספק שלו צריך לתמוך בדחיסה.",
+  "error.backend.channelCompactNoSession": "לחברי הערוץ הזה אין עדיין שיחה לדחוס. דחסו אותו אחרי שחבר עונה בערוץ.",
+  "error.backend.channelCompactNotSupported":
+    "אף חבר בערוץ הזה לא יכול לדחוס לפי בקשה. חברים שתומכים בזה דוחסים את ההקשר שלהם אוטומטית כשהוא כמעט מלא.",
   "error.backend.channelArchived": "יש לשחזר את הערוץ הזה לפני שליחת הודעות או שינוי משימות.",
   "error.backend.channelReferenceUnavailable": "הודעת הערוץ שאליה מפנים אינה זמינה.",
   "error.backend.channelTaskNotFound": "משימת הערוץ לא נמצאה.",
@@ -109,6 +112,7 @@ export const messages = {
   "error.backend.memoryOperationFailed": "פעולת הזיכרון נכשלה. יש לנסות שוב.",
   "error.backend.memoryGone": "הזיכרון הזה כבר אינו קיים.",
   "error.backend.routineGone": "השגרה הזו כבר אינה קיימת.",
+  "error.backend.routineRunGone": "הרצת השגרה הזו כבר אינה קיימת.",
   "error.backend.turnNotStarted": "הספק לא התחיל את התור הזה.",
   "error.backend.routineResultConnectionOff": "חיבור ההודעות הזה כבוי או הוסר. יש לבחור מקום אחר.",
   "error.backend.routineResultNoDelivery": "להרצה הזו אין תשובה לשלוח שוב.",
@@ -187,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "סוכן אינו יכול להפסיק את עצמו.",
   "error.backend.interruptOtherWork":
     "הסוכן הזה עובד על משימה שההודעה שלך לא התחילה. רק המשתמש או שולח המשימה יכולים לעצור אותה.",
+  "error.backend.interruptSharedWork":
+    "התור של הסוכן הזה עובד על ההודעה שלך וגם על הודעה מהמשתמש או מסוכן אחר. רק המשתמש יכול לעצור אותו, באמצעות עצירת הסוכן בצ'אט של הסוכן הזה.",
   "error.backend.interruptStarting": "הסוכן הזה עדיין מתחיל תור. יש לנסות שוב אחרי שהתור יתחיל.",
   "error.backend.interruptNoSession": "OpenBot אינו יכול להפסיק את הסוכן הזה כי סשן הספק שלו אינו זמין.",
   "error.backend.memoryTextRequired": "נדרש טקסט לזיכרון.",
@@ -250,6 +256,10 @@ export const messages = {
     "{provider} לא הצליח להשתמש בשרת ה-MCP {name}, כי השרת דורש התחברות. יש לפתוח את הגדרות ה-MCP ולבחור Sign in.",
   "error.backend.mcpServerFailedForProvider":
     "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. יש לפתוח את הגדרות ה-MCP ולבחור Test connection כדי לראות את הסיבה.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}. הכלים שלו אינם זמינים ל-{provider}. {provider} מפעיל את השרת בעצמו, ולכן בדיקת החיבור ב-OpenBot יכולה לעבור. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} לא הצליח להפעיל את שרת ה-MCP {name}, כי השרת לא ענה בזמן. יש להתחיל צ׳אט חדש כדי לנסות שוב.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
@@ -336,7 +346,11 @@ export const messages = {
   "error.backend.browserProxyChanged": "הפרוקסי הזה השתנה אחרי שפתחת אותו. יש לעיין בו שוב ולנסות שוב.",
   "error.backend.browserProxyUnreachable": "הפרוקסי {name} אינו עונה, ולכן הדף לא נפתח.",
   "error.backend.browserProxySignInRefused": "הפרוקסי {name} דחה את ההתחברות, ולכן הדף לא נפתח.",
+  "error.backend.browserSystemProxyFailed":
+    "הפרוקסי בהגדרות של המחשב שמריץ את OpenBot אינו עונה או דחה את החיבור, ולכן הדף לא נפתח. בדקו את הגדרות הפרוקסי של המחשב הזה.",
   "error.backend.browserProxyComputerUnreachable": "המחשב שהפרופיל הזה משתמש בו אינו עונה, ולכן הדף לא נפתח.",
+  "error.backend.browserProxyComputerLocalAddress":
+    "המחשב שהפרופיל הזה משתמש בו פותח רק אתרים ציבוריים. הוא לא פותח כתובות ברשת מקומית, ולכן הדף לא נפתח.",
   "error.backend.browserCertificateUntrusted": "תעודת האבטחה של האתר הזה אינה מהימנה, ולכן הדף לא נפתח.",
   "error.backend.browserLowMemory":
     "בשרת הזה נותר מעט זיכרון, ולכן הדפדפן אינו יכול לפתוח לשונית נוספת. יש לסגור לשונית או להמתין לסיום העבודה של סוכנים אחרים.",
@@ -364,6 +378,8 @@ export const messages = {
     "הטקסט נמצא בשדה, אבל הדף העביר את המוקד, ולכן Enter לא נשלח. אין להקליד את הטקסט שוב. יש לצלם snapshot חדש.",
   "error.backend.mcpServerHttpCredentials": "השרת ענה {status}. יש לבדוק את מפתח ה-API או פרטי גישה אחרים.",
   "error.backend.mcpServerHttpUrl": "השרת ענה {status}. יש לבדוק את ה-URL. ייתכן שהקישור שגוי, פג תוקפו או נמחק.",
+  "error.backend.mcpServerBearerKey":
+    "השרת הזה משתמש במפתח API, לא בהתחברות. בכותרות, הגדר את המפתח ל-Authorization ואת הערך ל-Bearer, רווח, ומפתח ה-API שלך.",
   "error.backend.mcpSignInAppUrl": "אפליקציית ההתחברות דורשת כתובת שרת תקינה.",
   "error.backend.mcpSignInAppClientId": "יש להזין את מזהה הלקוח של אפליקציית ההתחברות.",
   "error.backend.mcpSignInAppIssuerChanged":

@@ -32,6 +32,12 @@ export interface AgentClient {
    * instructions, and the provider's cached prefix with them.
    */
   readonly turnContext?: boolean;
+  /**
+   * True when the client gives the model the `note` of an `item/tool/requestUserInput` result, such
+   * as the note that the user wrote a new message instead of answering. Optional, because Codex sends
+   * the result on as it is, and its `request_user_input` response has no field for a note.
+   */
+  readonly userInputNote?: boolean;
   readonly running: boolean;
   readonly readHistory?: ReadProviderHistory;
   /**
@@ -40,6 +46,12 @@ export interface AgentClient {
    * because the other providers declare the MCP tools or load them on their own.
    */
   readonly deferredMcpTools?: (externalThreadId: string) => boolean;
+  /**
+   * True when the provider keeps the MCP tools of this session's first turn (`AcpFlavor`
+   * `mcpToolsFixedAtStart`). A changed MCP set then needs a new session, not a resume. Optional,
+   * because the other providers take the current servers on resume.
+   */
+  readonly mcpToolsFixedAtStart?: (externalThreadId: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
   start(): void;

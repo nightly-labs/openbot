@@ -78,6 +78,11 @@ import {
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import { HOST_ADMIN_CAPABILITY, HOST_ADMIN_ROUTES } from "@openbot/contracts/team-protocol/host-admin-v1";
 import {
+  HOST_APPEARANCE_CAPABILITY,
+  HOST_APPEARANCE_ROUTES,
+  type ServerAppearance,
+} from "@openbot/contracts/team-protocol/host-appearance-v1";
+import {
   HOST_KEY_ROTATION_CAPABILITY,
   HOST_KEY_ROTATION_ROUTES,
 } from "@openbot/contracts/team-protocol/host-key-rotation-v1";
@@ -142,6 +147,10 @@ interface HostAdminRemoteServers {
     init?: RemoteRequestInit,
   ): Effect.Effect<T, RemoteWorkflowError>;
   refreshIdentity(serverId: string): Effect.Effect<ServerSummary, RemoteWorkflowError>;
+  applyAppearance(
+    serverId: string,
+    appearance: ServerAppearance | null,
+  ): Effect.Effect<ServerSummary, RemoteWorkflowError>;
 }
 
 interface HostAdminIpcDependencies {
@@ -307,14 +316,32 @@ export function hostAdminIpcHandlers({
           return summary;
         },
         remote: async (input, serverId) => {
-          if (!remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
+          const { appearance, ...identity } = input;
+          const changesIdentity = identity.serverName !== undefined || identity.logo !== undefined;
+          // Both gates first, so a change that the host cannot take in full sends nothing.
+          if (changesIdentity && !remoteServers.supportsCapability(serverId, HOST_ADMIN_CAPABILITY))
             throw new Error(sourceText("error.host.identityLocalOnly"));
-          await runCauseEffect(
-            remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
-              method: "POST",
-              body: wireIdentity(input),
-            }),
-          );
+          if (appearance !== undefined && !remoteServers.supportsCapability(serverId, HOST_APPEARANCE_CAPABILITY))
+            throw new Error(sourceText("error.team.hostIdentityUnsupported"));
+          if (changesIdentity) {
+            await runCauseEffect(
+              remoteServers.request(serverId, HOST_ADMIN_ROUTES.identity, acceptEmpty, {
+                method: "POST",
+                body: wireIdentity(identity),
+              }),
+            );
+          }
+          if (appearance !== undefined) {
+            await runCauseEffect(
+              remoteServers.request(serverId, HOST_APPEARANCE_ROUTES.appearance, acceptEmpty, {
+                method: "POST",
+                body: { appearance },
+              }),
+            );
+            // The host also sends `host-appearance`; this shows the change before that event arrives.
+            if (!changesIdentity) return runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
+            await runCauseEffect(remoteServers.applyAppearance(serverId, appearance));
+          }
           // The host has published the change before it answered, so this reads the new name and logo.
           return runCauseEffect(remoteServers.refreshIdentity(serverId));
         },

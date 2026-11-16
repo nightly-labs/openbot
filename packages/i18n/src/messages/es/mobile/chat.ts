@@ -162,6 +162,7 @@ export const messages = {
   "mobile.chat.composer.send": "Enviar mensaje",
   "mobile.chat.composer.stop": "Detener a {name}",
   "mobile.chat.composer.dictate": "Dictar mensaje",
+  "mobile.chat.composer.voiceSettings": "Ajustes de voz",
   "mobile.chat.composer.stopDictation": "Detener dictado",
   "mobile.chat.composer.mention": "Mencionar a {name}",
   "mobile.chat.composer.skills": "Habilidades",
@@ -348,6 +349,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce": "Enviar una vez a {origin}. Este valor no se añade al chat.",
   "mobile.chat.browserSecret.submitFailed":
     "No se pudo completar la solicitud. Comprueba la conexión y vuelve a intentarlo.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente ejecutó un script en esta página. Para usarlo, pide al agente que recargue la página y lo intente de nuevo.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot no usó tu inicio de sesión guardado porque el agente eligió un campo incorrecto en la página.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot no usó ningún inicio de sesión guardado porque el agente no eligió ninguno de los guardados para este sitio. Dile al agente qué cuenta debe usar.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene contraseña para este sitio.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot no usó tu inicio de sesión guardado porque no tiene clave de autenticador.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot no usó ningún inicio de sesión guardado porque no pudo leer tu gestor de contraseñas.",
   "mobile.chat.browserSecret.submit": "Enviar",
   "mobile.chat.browserSecret.takeOver": "Intervenir",
   "mobile.chat.starter.title": "¿En qué trabajamos primero?",
@@ -417,7 +430,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "«Permitir» le da a {name} estos permisos en {server}. «Rechazar» mantiene los permisos actuales.",
   "mobile.chat.approval.partial":
-    "Esta solicitud es demasiado larga para mostrarla en el teléfono. Para permitirla, abre OpenBot en {server}. Puedes rechazarla aquí.",
+    "{server} envía al teléfono solo el inicio de esta solicitud. Para permitirla, actualiza OpenBot en {server} o abre este chat en la app de escritorio de OpenBot. Puedes rechazarla aquí.",
+  "mobile.chat.approval.loading": "Cargando la solicitud completa…",
+  "mobile.chat.approval.loadFailed": "No se pudo cargar la solicitud completa. Puedes rechazarla aquí.",
+  "mobile.chat.approval.retry": "Reintentar",
+  "mobile.chat.approval.report.bugHeadline": "¿Encontraste un error? Vamos a corregirlo.",
+  "mobile.chat.approval.report.ideaHeadline": "¿Tienes una idea? Vamos a hacerla realidad.",
+  "mobile.chat.approval.report.dontSend": "Ahora no",
+  "mobile.chat.approval.report.send": "Enviar al equipo de OpenBot",
   "mobile.chat.approval.allow": "Permitir",
   "mobile.chat.approval.deny": "Rechazar",
   "mobile.chat.approval.reconnect": "Conéctate a {server} para responder a esta solicitud.",

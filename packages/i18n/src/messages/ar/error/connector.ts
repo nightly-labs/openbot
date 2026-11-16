@@ -35,6 +35,10 @@ export const messages = {
   "error.connector.onePasswordFileTooLarge": "ملف اتصال 1Password كبير جدًا.",
   "error.connector.bitwardenFailed":
     "تعذّرت قراءة Bitwarden. ثبّت bw CLI، وسجّل الدخول، وافتح قفله، وأنشئ مجلدًا واحدًا باسم Shared with OpenBot. اتصل بمفتاح جلسة جديد.",
+  "error.connector.bitwardenCliMissing":
+    "لا يجد OpenBot واجهة سطر أوامر Bitwarden. ثبّت bw وتأكد أنه يعمل في طرفية جديدة، ثم اتصل مرة أخرى.",
+  "error.connector.bitwardenFolderMissing":
+    "يجب أن يحتوي Bitwarden على مجلد واحد فقط باسم Shared with OpenBot. أنشئه أو احذف المجلد الزائد، ثم اتصل مرة أخرى.",
   "error.connector.bitwardenHostInput":
     "أدخل عنوان خادم HTTPS، وclient_id وclient_secret لمفتاح API، وكلمة المرور الرئيسية.",
   "error.connector.bitwardenHostFailed":

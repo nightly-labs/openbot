@@ -130,6 +130,7 @@ export const requestJson = Effect.fn("RemoteHttp.requestJson")(function* <T>(
               channelPicture: true,
               channelBrowser: true,
               channelSeenSubtasks: true,
+              channelTaskWaits: true,
               mcpManyServers: true,
             })
           : codec.decodeResponse(method, path, response.status, input),

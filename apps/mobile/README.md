@@ -80,6 +80,10 @@ missing, the command stops with setup instructions. The standard command does no
 look for RocketSim, even if `ROCKETSIM_APP_PATH` or the old `OPENBOT_ROCKETSIM`
 variable is set.
 
+A build for an iPhone signs all targets with the Apple team of `ios.appleTeamId` in `app.json`, so
+Expo does not ask for a team. To build with a different team, change that value on your computer and
+do not commit it: the app config is in the runtime version.
+
 The iOS commands keep the Xcode build in `ios/DerivedData`, not in
 `~/Library/Developer/Xcode/DerivedData`, so removing a worktree removes its build. Do not remove
 `ios/build`: CocoaPods writes codegen output there. When that output is missing, `bun mobile:ios`
@@ -256,6 +260,37 @@ recent apps show a blank card. The lock screen draws in `FullWindowOverlay` on i
 Android, above sheets. Notification, Live Activity, quick action and share navigation waits until
 the user unlocks. Expo Go does not have the module: it measures with the phone clock and cannot see a phone lock.
 
+## iOS shortcuts
+
+The Shortcuts app of iOS 26 and later has two OpenBot shortcuts: List Agents and Send Message. An
+older iOS has none: their cards need `SnippetIntent`.
+
+The shortcuts run in native code, with no JavaScript of the app. iOS runs a shortcut in the
+background, also when the app is not in memory. There the app has no window, React Native does not
+start, and iOS suspends the app soon after the intent returns.
+
+- The App Intents, their cards and the `AppShortcutsProvider` are Swift files in `plugins/shortcuts`.
+  `plugins/with-shortcuts.js` adds them to the app target, because Xcode reads the shortcuts of an
+  app from that target. iOS reads the names and the phrases of the shortcuts at build time, so they
+  are English and not from the `@openbot/i18n` catalog. The text of the cards is from the catalog.
+- The app writes `shortcuts.json` to the App Group
+  (`src/features/shortcuts/model/shortcut-directory.ts`): the agents, the agent of Settings >
+  Shortcuts, the app lock and the card text. Sign-out deletes it. The servers with their public
+  keys and the agent pictures are the ones that the app writes for the share extension.
+- List Agents reads that file. A tap on an agent opens its chat.
+- Send Message sends to the agent of Settings > Shortcuts with the sender of the share extension
+  (`plugins/share-extension/ShareSender.swift` and the page `share-sender.html`, which the plugin
+  also adds to the app target). A hidden web view with the Team client connects to the agent's
+  server, sends the message and closes. The session token is the keychain item of the share
+  extension. The intent returns when the server has the message, or after 24 seconds: iOS stops an
+  intent after about 30. The reply comes as the notification of the server.
+- A message that did not go opens in the composer of the chat from the card. A message with no
+  answer from the server does not: it can be in the chat.
+- A button of a card opens the app through `modules/shortcuts` (`ShortcutBridge`), which gives the
+  target to `src/features/shortcuts/shortcuts-native.ts`.
+
+Check the shortcuts on an iPhone, also with the app removed from the app switcher.
+
 ## Source structure
 
 The mobile app uses a feature-first structure. Expo Router files stay deliberately thin: `src/app`
@@ -273,6 +308,7 @@ src/
     search/             search model, controls, results, and screen
     servers/            server drawer and joining a server
     settings/           account settings screen
+    shortcuts/          iOS shortcuts: the data that the native intents read, and Settings > Shortcuts
     workspace/          remote directory, WebRTC transport, live events, and workspace state
   shared/
     components/         UI used by more than one feature
@@ -567,7 +603,17 @@ Do not publish the draft by hand in the GitHub page with the prerelease mark cle
 The site makes the link from the version and does not ask GitHub. So the publish workflow fails when
 the version has no release: the link on the site is then dead. Stage the APK of that version, then
 start `Publish the Android APK` again. `ANDROID_APK_FIRST_VERSION` in the same file hides the APK
-download while the newest Google Play version is from before these workflows.
+download while it is `null` or newer than the newest Google Play version. It is `null` now.
+
+**The APK that Google Play makes does not work as a direct download.** Play's automatic integrity
+protection is on for the app, so the generated APK has an installer check
+(`com.pairip.licensecheck`). After an install from the file, the app shows "Get this app from Play"
+and does not continue. The APK of 1.4.9 was public on 2026-11-13 and showed this. Keep the download
+hidden until an APK starts after an install from the file: test each new source on a phone first.
+
+The service account must have the Play Console permission to download the generated APKs of the
+app. Without it, Google Play answers "The caller does not have permission" (run 43252109769). The
+account of 2026-11-12 has it: run 43385420725 downloaded the APK of build 25.
 
 When the stage job fails, the store build and its record are not affected. Run the failed jobs
 again. To stage the APK of a bundle that Google Play already has, such as a build that you uploaded

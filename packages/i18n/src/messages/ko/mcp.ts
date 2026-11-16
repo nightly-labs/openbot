@@ -147,6 +147,7 @@ export const messages = {
   "mcp.signIn.relayDeviceDescription":
     "브라우저에서 {page}에 로그인하고 그곳에서 완료하세요. {host}가 로그인을 자동으로 인식해요.",
   "mcp.signIn.relayOpen": "로그인 페이지 열기",
+  "mcp.signIn.relayCopy": "링크 복사",
   "mcp.signIn.relayPasteHint":
     "브라우저가 OpenBot으로 돌아오지 않으면 브라우저에 표시되는 주소를 복사해 여기에 붙여넣으세요.",
   "mcp.signIn.relayPasteRequired":

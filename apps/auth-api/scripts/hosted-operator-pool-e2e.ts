@@ -64,6 +64,10 @@ async function run() {
   ] as const) {
     machine.run(id, location, product, removedAt);
   }
+  // Two machines wait for a new server. Only the free one counts as ready, and only while it was seen.
+  database
+    .prepare("UPDATE operator_hosts SET assign_token_hash = 'hash-' || host_id, seen_at = ? WHERE host_id IN (?, ?)")
+    .run(t0 - 1000, "leaseweb:101", "leaseweb:104");
 
   const insert = database.prepare(
     `INSERT INTO hosted_servers(
@@ -254,6 +258,7 @@ async function run() {
     group && {
       machines: group.machines,
       free: group.free,
+      ready: group.ready,
       to_reinstall: group.to_reinstall,
       plan_ended: group.plan_ended,
       cancel_scheduled: group.cancel_scheduled,
@@ -278,6 +283,7 @@ async function run() {
     same(before.find("AMS-01", "VPS02"), {
       machines: 5,
       free: 1,
+      ready: 1,
       to_reinstall: 0,
       plan_ended: 0,
       cancel_scheduled: 1,
@@ -288,6 +294,7 @@ async function run() {
       same(before.find("WDC-02", "VPS02"), {
         machines: 1,
         free: 0,
+        ready: 0,
         to_reinstall: 0,
         plan_ended: 1,
         cancel_scheduled: 0,
@@ -298,6 +305,7 @@ async function run() {
       same(before.find("unknown", "unknown"), {
         machines: 1,
         free: 0,
+        ready: 0,
         to_reinstall: 1,
         plan_ended: 0,
         cancel_scheduled: 0,
@@ -334,6 +342,7 @@ async function run() {
     same(afterEnd.find("AMS-01", "VPS02"), {
       machines: 5,
       free: 1,
+      ready: 0,
       to_reinstall: 0,
       plan_ended: 2,
       cancel_scheduled: 1,
@@ -344,6 +353,7 @@ async function run() {
       same(afterEnd.find("SYD-12", "VPS03"), {
         machines: 1,
         free: 0,
+        ready: 0,
         to_reinstall: 0,
         plan_ended: 1,
         cancel_scheduled: 0,

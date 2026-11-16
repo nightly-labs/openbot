@@ -53,6 +53,8 @@ export const messages = {
   "error.skill.localNotFound": "이 로컬 스킬은 없어요. 로컬 스킬 목록에서 ID를 확인해 주세요.",
   "error.skill.localRevisionNotFound": "이 로컬 스킬에는 수정본 {revision}이(가) 없어요. 최신 수정본은 {latest}이에요.",
   "error.skill.localNameTaken": "이 이름의 로컬 스킬이 이미 있어요. 대신 그 스킬을 수정해 주세요.",
+  "error.skill.localNameClash":
+    '이 이름과 로컬 스킬 "{name}"은(는) 모두 "{slug}"(으)로 바뀌어요. 그 스킬을 바꾸려면 수정해 주세요. 새 스킬을 추가하려면 이 이름의 영문자나 숫자를 바꿔 주세요.',
   "error.skill.localKeepName": "스킬을 수정할 때는 스킬 이름을 그대로 유지해 주세요.",
   "error.skill.localRelativeFolder": "현재 에이전트 워크스페이스 안의 상대 경로 스킬 폴더를 사용해 주세요.",
   "error.skill.localSourceOutside": "스킬 소스는 에이전트 워크스페이스 안에 있어야 해요.",

@@ -165,6 +165,7 @@ export const messages = {
   "mobile.chat.composer.send": "Envoyer le message",
   "mobile.chat.composer.stop": "Arrêter {name}",
   "mobile.chat.composer.dictate": "Dicter un message",
+  "mobile.chat.composer.voiceSettings": "Réglages de la voix",
   "mobile.chat.composer.stopDictation": "Arrêter la dictée",
   "mobile.chat.composer.mention": "Mentionner {name}",
   "mobile.chat.composer.skills": "Compétences",
@@ -354,6 +355,18 @@ export const messages = {
   "mobile.chat.browserSecret.submitOnce":
     "Envoyer une seule fois à {origin}. Cette valeur n’est pas ajoutée à la discussion.",
   "mobile.chat.browserSecret.submitFailed": "La demande n’a pas pu aboutir. Vérifiez la connexion et réessayez.",
+  "mobile.chat.browserSecret.vaultSkip.agentScript":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a exécuté un script sur cette page. Pour l’utiliser, demandez à l’agent de recharger la page et de réessayer.",
+  "mobile.chat.browserSecret.vaultSkip.fieldKind":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car l’agent a choisi le mauvais champ sur la page.",
+  "mobile.chat.browserSecret.vaultSkip.loginChoice":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car l’agent n’a choisi aucun des identifiants enregistrés pour ce site. Indiquez à l’agent le compte à utiliser.",
+  "mobile.chat.browserSecret.vaultSkip.noPassword":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de mot de passe pour ce site.",
+  "mobile.chat.browserSecret.vaultSkip.noAuthenticatorKey":
+    "OpenBot n’a pas utilisé votre identifiant enregistré, car il n’a pas de clé d’authentificateur.",
+  "mobile.chat.browserSecret.vaultSkip.vaultUnreadable":
+    "OpenBot n’a utilisé aucun identifiant enregistré, car il n’a pas pu lire votre gestionnaire de mots de passe.",
   "mobile.chat.browserSecret.submit": "Envoyer",
   "mobile.chat.browserSecret.takeOver": "Prendre la main",
   "mobile.chat.starter.title": "Par quoi commençons-nous ?",
@@ -423,7 +436,14 @@ export const messages = {
   "mobile.chat.approval.effect.permissions":
     "« Autoriser » donne à {name} ces autorisations sur {server}. « Refuser » conserve les autorisations actuelles.",
   "mobile.chat.approval.partial":
-    "Cette demande est trop longue pour s’afficher sur le téléphone. Pour l’autoriser, ouvrez OpenBot sur {server}. Vous pouvez la refuser ici.",
+    "{server} n’envoie au téléphone que le début de cette demande. Pour l’autoriser, mettez à jour OpenBot sur {server} ou ouvrez cette discussion dans l’app de bureau OpenBot. Vous pouvez la refuser ici.",
+  "mobile.chat.approval.loading": "Chargement de la demande complète…",
+  "mobile.chat.approval.loadFailed": "Impossible de charger la demande complète. Vous pouvez la refuser ici.",
+  "mobile.chat.approval.retry": "Réessayer",
+  "mobile.chat.approval.report.bugHeadline": "Un bug ? Corrigeons-le.",
+  "mobile.chat.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
+  "mobile.chat.approval.report.dontSend": "Pas maintenant",
+  "mobile.chat.approval.report.send": "Envoyer à l'équipe OpenBot",
   "mobile.chat.approval.allow": "Autoriser",
   "mobile.chat.approval.deny": "Refuser",
   "mobile.chat.approval.reconnect": "Connectez-vous à {server} pour répondre à cette demande.",

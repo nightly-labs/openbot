@@ -36,6 +36,10 @@ export const MESSAGING_CONNECTION_STATES = [
   "relay_unavailable",
   // The OpenBot bot is no longer in the Telegram chat.
   "removed",
+  // Signal sends the events of this Slack workspace, Discord server or Telegram chat to another host,
+  // or to none: the account service links it to that host. Reconnect links it to this host again. An
+  // older client shows it as `error`.
+  "not_linked",
 ] as const;
 export type MessagingConnectionState = (typeof MESSAGING_CONNECTION_STATES)[number];
 
