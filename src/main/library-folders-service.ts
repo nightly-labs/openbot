@@ -134,7 +134,10 @@ export class LibraryFoldersService {
     const fileAgents =
       targets.fileIds.length === 0
         ? new Map<string, string | null>()
-        : yield* this.fileAgents(targets.fileIds.map((id) => ({ id, storedAt: null })));
+        : yield* this.#lookUp(
+            targets.fileIds.map((id) => ({ id, storedAt: null })),
+            false,
+          );
     const agentIds = new Set(this.#sources.agents().map((agent) => agent.id));
     if (authorize) {
       const agents = actionAgents(targets, snapshot, fileAgents, agentIds);
@@ -154,6 +157,12 @@ export class LibraryFoldersService {
    * the delete: the next start removes the entries.
    */
   removeFiles(fileIds: readonly string[]) {
+    const known = this.#known;
+    if (known) {
+      const agents = new Map(known.agents);
+      for (const fileId of fileIds) agents.delete(fileId);
+      this.#known = { at: known.at, agents };
+    }
     return this.#sources.store.removeFiles(fileIds).pipe(Effect.catch(() => Effect.void));
   }
 
@@ -168,30 +177,34 @@ export class LibraryFoldersService {
       placeInPath: (agentId, names, fileIds, context) => store.placeInPath(agentId, names, fileIds, context),
       mutate: (action, context) => store.mutate(action, context),
       removeAgent: (agentId) => store.removeAgent(agentId),
-      fileAgents: (fileIds) => this.fileAgents(fileIds),
+      fileAgents: (files) => this.#lookUp(files, true),
     };
   }
 
   /**
    * The last host scan: the agent of each file that it lists, and the time of the scan. The agent of a
-   * stored file does not change, so the map stays valid with no time limit.
+   * stored file does not change, so the agent tools use the map with no time limit: they find a deleted
+   * file in the stored files first. A member's change uses the scan of the storage service, which is
+   * kept for a short time only, so it refuses a file that a path other than `removeFiles` deleted.
    */
   #known: KnownFileAgents | null = null;
 
   /**
-   * The agent of each file that the host scan lists. A new scan runs only when a file is not in the last
-   * one and was stored after it, or has no stored time. A file that the scan leaves out (it lists the
-   * largest files only) thus does not start a scan on each call.
+   * The agent of each file that the host scan lists. With `useKept`, the kept map answers, and a new scan
+   * runs only when a file is not in it and was stored after it, or has no stored time: a file that the
+   * scan leaves out (it lists the largest files only) thus does not start a scan on each call. Without
+   * `useKept`, the scan of the storage service answers.
    */
-  readonly fileAgents = Effect.fn("LibraryFolders.fileAgents")(function* (
+  readonly #lookUp = Effect.fn("LibraryFolders.fileAgents")(function* (
     this: LibraryFoldersService,
     files: readonly LibraryFileStamp[],
+    useKept: boolean,
   ) {
     const missing = (known: KnownFileAgents) =>
       files.some(
         (file) => !known.agents.has(file.id) && (file.storedAt === null || Date.parse(file.storedAt) >= known.at),
       );
-    if (this.#known && !missing(this.#known)) return this.#known.agents;
+    if (useKept && this.#known && !missing(this.#known)) return this.#known.agents;
     const scan = () =>
       this.#sources.storage.usage({ scope: "host" }).pipe(
         Effect.map((usage) => {

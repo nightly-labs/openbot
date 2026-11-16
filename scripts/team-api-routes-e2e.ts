@@ -13119,16 +13119,16 @@ try {
     const scansAfterPlace = scans();
     const takenOut = await act(bobToken, { type: "place", fileIds: ["file-ada-1"], folderId: null });
     check(
-      "a place puts a file of the kept scan result into a folder, and takes a file out of its folder, with no new scan",
+      "a place puts a file into a folder with one scan, and takes a file out of its folder with none",
       placed.status === 200 &&
         isDeepStrictEqual(field(placed.body, "placement"), {
           "file-ada-1": "folder-campaign",
           "file-ada-2": "folder-images",
         }) &&
-        scansAfterPlace === 1 &&
+        scansAfterPlace === 2 &&
         takenOut.status === 200 &&
         isDeepStrictEqual(field(takenOut.body, "placement"), { "file-ada-2": "folder-images" }) &&
-        scans() === 1,
+        scans() === 2,
       [summary(placed), summary(takenOut)],
     );
 
