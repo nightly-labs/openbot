@@ -72,6 +72,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Aktualizowanie wspomnień…",
   "status.agent.skillUsing": "Używanie umiejętności {name}…",
+  "status.agent.backdropSetting": "Zmienianie tła…",
   "status.agent.skillReading": "Czytanie umiejętności…",
   "status.agent.toolStepFailed": "Krok narzędzia nie powiódł się; sprawdzam wynik i decyduję, co spróbuję dalej…",
   "status.agent.toolResultReviewing": "Sprawdzanie najnowszego wyniku narzędzia…",

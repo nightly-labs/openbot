@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Accesso a {host} annullato",
   "prompt.browser.signInBlocked.body":
     "Accedi su questo computer. OpenBot invia solo l’accesso a {host} a {server}, e {name} continua.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} non accetta un accesso dal server. Apri questa chat nell’app desktop di OpenBot sul tuo computer e accedi da lì. Poi {name} continua.",
   "prompt.browser.signInBlocked.cancelledBody": "L’accesso è stato annullato.",
   "prompt.browser.signInBlocked.waiting": "In attesa dell’accesso",
   "prompt.browser.signInBlocked.waitingButton": "In attesa dell’accesso…",

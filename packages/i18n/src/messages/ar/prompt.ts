@@ -57,6 +57,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "أُلغي تسجيل الدخول إلى {host}",
   "prompt.browser.signInBlocked.body":
     "سجّل الدخول على هذا الحاسوب. يرسل OpenBot تسجيل الدخول إلى {host} فقط إلى {server}، ويتابع {name}.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "لا يقبل {host} تسجيل الدخول من الخادم. افتح هذه المحادثة في تطبيق OpenBot لسطح المكتب على حاسوبك، وسجّل الدخول هناك. بعد ذلك يتابع {name}.",
   "prompt.browser.signInBlocked.cancelledBody": "أُلغي تسجيل الدخول.",
   "prompt.browser.signInBlocked.waiting": "جارٍ انتظار تسجيل الدخول",
   "prompt.browser.signInBlocked.waitingButton": "جارٍ انتظار تسجيل الدخول…",

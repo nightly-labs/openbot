@@ -352,6 +352,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "一次性验证码",
   "mobile.chat.browserSecret.takeoverTitle": "接管浏览器",
   "mobile.chat.browserSecret.takeoverBody": "请在运行 OpenBot 的电脑上的浏览器中完成该步骤。",
+  "mobile.chat.browserSecret.signInBlockedTitle": "请在你的电脑上登录",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "此网站不接受来自服务器的登录。请在你电脑上的 OpenBot 桌面应用中打开此聊天，并在那里登录。",
   "mobile.chat.browserSecret.takeoverReload": "然后刷新页面，再选择“我已完成”。",
   "mobile.chat.browserSecret.takeoverFailed": "无法完成该请求。",
   "mobile.chat.browserSecret.done": "我已完成",

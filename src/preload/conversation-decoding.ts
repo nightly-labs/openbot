@@ -75,6 +75,13 @@ export function decodeAttachmentImportProgress(value: unknown): AttachmentImport
   };
 }
 
+/** The address of a temporary page that main keeps, or null when its page store is full. */
+export function decodeOptionalFilePreviewPageUrl(value: unknown): string | null {
+  if (value === null) return null;
+  if (!isFilePreviewPageUrl(value)) throw new Error("Invalid file preview page URL response.");
+  return value;
+}
+
 export function decodeFilePreview(value: unknown): FilePreview {
   const preview = decodeRecord(value, "file preview");
   if (

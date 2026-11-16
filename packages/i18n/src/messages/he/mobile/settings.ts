@@ -121,6 +121,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "בהירות",
   "mobile.settings.appearance.messageColorFooter":
     "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
+  "mobile.settings.appearance.chatBackground": "רקע הצ'אט",
+  "mobile.settings.appearance.chatBackgroundDefault": "ברירת מחדל",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",

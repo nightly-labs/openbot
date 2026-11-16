@@ -433,6 +433,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Одноразовый код",
   "mobile.chat.browserSecret.takeoverTitle": "Управление браузером",
   "mobile.chat.browserSecret.takeoverBody": "Выполните этот шаг в браузере на компьютере, где работает OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Войдите на своём компьютере",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Этот сайт не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там.",
   "mobile.chat.browserSecret.takeoverReload": "Затем обновите страницу и только потом нажмите «Готово».",
   "mobile.chat.browserSecret.takeoverFailed": "Не удалось выполнить запрос.",
   "mobile.chat.browserSecret.done": "Готово",

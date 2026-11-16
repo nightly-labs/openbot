@@ -69,6 +69,7 @@ export const messages = {
   },
   "status.agent.memoriesUpdating": "Atualizando suas memórias…",
   "status.agent.skillUsing": "Usando a habilidade {name}…",
+  "status.agent.backdropSetting": "Mudando o fundo…",
   "status.agent.skillReading": "Lendo uma habilidade…",
   "status.agent.toolStepFailed":
     "Uma etapa da ferramenta falhou; revisando o resultado e decidindo o que tentar em seguida…",

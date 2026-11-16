@@ -102,7 +102,6 @@ import { VAULT_V4_CAPABILITY } from "@openbot/contracts/team-protocol/vault-v4";
 import { WEBHOOK_SENDER_SECRET_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-sender-secret-v1";
 import { WEBHOOK_TESTS_CAPABILITY } from "@openbot/contracts/team-protocol/webhook-tests-v1";
 import { WHATSAPP_CONNECTOR_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-connector-v1";
-import { WHATSAPP_WORKING_MESSAGE_CAPABILITY } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKFLOWS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-v1";
 import { runTeamEffect } from "@openbot/team-client";
 import { channelForThread } from "@openbot/team-client/channel-notifications";
@@ -323,6 +322,7 @@ import {
   SettingsPageFrame,
   SettingsSearchField,
 } from "../window/SettingsPageFrame";
+import { WindowBackdrop } from "../window/WindowBackdrop";
 import type { SettingsKind, WindowPage } from "../window/window-page-context";
 import { createWorkflowMediaCredits } from "../workflows/workflow-media-credits";
 import { WebAgentSettings } from "./WebAgentSettings";
@@ -1386,9 +1386,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(DISCORD_ACCESS_CAPABILITY),
   );
   onCleanup(webMessaging.dispose);
-  const webWhatsApp = webHostWhatsApp(hostRequest, () =>
-    workspace.state.capabilities.includes(WHATSAPP_WORKING_MESSAGE_CAPABILITY),
-  );
+  const webWhatsApp = webHostWhatsApp(hostRequest, (capability) => workspace.state.capabilities.includes(capability));
   const whatsappPort = hostWhatsAppPort(
     () => remoteAdminServer(server(), WHATSAPP_CONNECTOR_CAPABILITY)?.id,
     () => webWhatsApp,
@@ -2954,6 +2952,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
             </div>
           }
         >
+          <WindowBackdrop pages="srcdoc" />
           {/* As on desktop: the page rail sits at the left of the frame. */}
           <div class="app-window web-app-window">
             <PageRail
