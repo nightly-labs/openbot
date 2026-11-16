@@ -1177,6 +1177,13 @@ organization's managed configuration from Mistral is a higher layer, so it can t
 again. Only the terminal app checks for updates; `vibe-acp` does not update itself (from the source,
 not confirmed in a run).
 
+Each Mistral session runs in a `vibe-acp` process of its own (`sessionProcesses`). Vibe 3.1.2 keeps
+one MCP server of each name for the whole process, and its server fingerprint holds the header names
+but not their values. In one shared process, each session's `openbot` call went out with the bearer
+token of the session that opened last, so OpenBot ran it in that session's chat (#9805). Vibe loads
+a session that another process created (`session/load`), so an idle session closes with its
+process and opens again in a new one. A process with one session uses about 150 MB on Linux.
+
 Vibe 3.1.0 lists the ACP auth method `browser-auth`. Sign in calls `authenticate` with it: the CLI
 opens Mistral's sign-in page in the browser of the host and polls Mistral until the sign-in ends. It
 has no `127.0.0.1` callback and no device code (`localCodeSignIn: null`). A client that sets
