@@ -184,7 +184,10 @@ internal class SpeechCapture(
     meter = LoudnessMeter()
     val minimum = AudioRecord.getMinBufferSize(CAPTURE_SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_FLOAT)
     val created = AudioRecord(
-      MediaRecorder.AudioSource.VOICE_RECOGNITION,
+      // MIC, not VOICE_RECOGNITION: on many devices the voice source runs the call audio
+      // pipeline (noise suppression, AGC), which low-passes the microphone at about
+      // 2.8 kHz, so fricatives and plosives never reach the recognizer.
+      MediaRecorder.AudioSource.MIC,
       CAPTURE_SAMPLE_RATE,
       AudioFormat.CHANNEL_IN_MONO,
       AudioFormat.ENCODING_PCM_FLOAT,
