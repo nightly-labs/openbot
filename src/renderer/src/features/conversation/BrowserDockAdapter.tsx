@@ -9,6 +9,7 @@ import {
   type BrowserDockSkill,
   type BrowserTab,
   isBrowserDockIsland,
+  routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import { BROWSER_USER_CONTROL_CAPABILITY } from "@openbot/contracts/team-protocol/browser-user-control-v1";
 import type { ComposerAgent, ComposerMcpServer, ComposerSkill } from "@openbot/ui/data";
@@ -169,6 +170,8 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
   };
 
   const deliveries = presentedQueueDeliveries;
+  /** A routine run's turn takes no steer, so its queued messages wait for the next turn. */
+  const canSteer = () => Boolean(props.activeTurnId) && !routineRunsTurn(props.queue?.deliveries, props.activeTurnId);
   const hold = () => {
     const current = props.queue?.hold;
     return current && current.agentId !== props.agent?.id ? current : null;
@@ -286,7 +289,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
       deliveries: deliveries().slice(0, BROWSER_DOCK_LIMITS.deliveries),
       hold: hold(),
       editingDeliveryId: editingDeliveryId() ?? null,
-      canSteer: Boolean(props.activeTurnId),
+      canSteer: canSteer(),
       steerSupported: agentSteersTurns(agent, props.modelOptions),
       canRunAsTask: Boolean(props.threads?.onRunQueuedMessage),
       island: dockIsland(island()),
@@ -400,7 +403,7 @@ export function BrowserDockAdapter(adapterProps: { tab: BrowserTab | undefined; 
             deliveries={deliveries()}
             hold={hold()}
             editingDeliveryId={editingDeliveryId()}
-            canSteer={Boolean(props.activeTurnId)}
+            canSteer={canSteer()}
             island={island()}
             handoffPending={handoffPending()}
             onValueChange={(text) => updateCurrentDraft({ text })}

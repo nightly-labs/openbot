@@ -207,7 +207,7 @@ function ChatQueueCard({
           {queue.activeTurnId ? (
             <CardAction
               accessibilityLabel={t(queue.steers ? "mobile.chat.queue.steerNext" : "mobile.chat.queue.sendNowNext")}
-              disabled={locked || editedElsewhere}
+              disabled={locked || editedElsewhere || queue.steerRefused}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();

@@ -94,6 +94,23 @@ export function isQueuedAgentReply(delivery: QueueDelivery): boolean {
   );
 }
 
+/**
+ * A routine run has its own provider session, which ends with the run, so the host does not steer a
+ * message into its turn: the message waits for the next turn. A client does not offer Steer then.
+ */
+export function routineRunsTurn(
+  deliveries: readonly QueueDelivery[] | undefined,
+  turnId: string | null | undefined,
+): boolean {
+  if (!turnId) return false;
+  return (deliveries ?? []).some(
+    (delivery) =>
+      delivery.sender.kind === "routine" &&
+      (delivery.status === "starting" || delivery.status === "running") &&
+      (delivery.turnId === null || delivery.turnId === turnId),
+  );
+}
+
 export function isQueueDelivery(value: unknown): value is QueueDelivery {
   return (
     isDynamicRecord(value) &&

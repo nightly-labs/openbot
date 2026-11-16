@@ -1,11 +1,12 @@
-import type {
-  AgentApproval,
-  AgentContextState,
-  AgentEvent,
-  AgentModelChoice,
-  AgentWaitsSnapshot,
-  QueueSnapshot,
-  RoutineFields,
+import {
+  type AgentApproval,
+  type AgentContextState,
+  type AgentEvent,
+  type AgentModelChoice,
+  type AgentWaitsSnapshot,
+  type QueueSnapshot,
+  type RoutineFields,
+  routineRunsTurn,
 } from "@openbot/contracts/ipc";
 import { approvalIsCut, withWholeApproval } from "@openbot/team-client/runtime-attention";
 import { currentText } from "@openbot/ui/text";
@@ -481,6 +482,8 @@ const Turns = createSimpleContext({
       const agent = activeAgent();
       const turnId = agent ? activeTurns()[agent.id] : null;
       if (!agent || !turnId) return;
+      // A routine run takes no steer. The message waits for the next turn, as it does when the host refuses.
+      if (routineRunsTurn(queues()[agent.id]?.deliveries, turnId)) return;
       const serverId = activeServerId();
       const analytics = desktopAnalytics.scope();
       void turnsPort()
@@ -494,6 +497,8 @@ const Turns = createSimpleContext({
           // sent while it works can take it first.
           const delivery = queues()[agent.id]?.deliveries.find((item) => item.id === deliveryId);
           if (delivery && delivery.status !== "queued") return;
+          // A routine run that started meanwhile refuses the steer. The queue row says why the message waits.
+          if (routineRunsTurn(queues()[agent.id]?.deliveries, turnId)) return;
           appendUiError(agent.id, error, currentText().t("app.errorStatus.steer"), serverId);
         });
     }
