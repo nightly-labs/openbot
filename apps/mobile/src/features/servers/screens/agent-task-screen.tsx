@@ -692,7 +692,7 @@ function AgentTaskChat({
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
-          <ChatEndPullRing pull={endPull} target={target} />
+          {pullOn ? <ChatEndPullRing pull={endPull} target={target} /> : null}
           <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
             <ConnectionStatus server={server} />
           </View>

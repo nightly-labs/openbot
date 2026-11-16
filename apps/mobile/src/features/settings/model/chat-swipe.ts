@@ -45,8 +45,8 @@ export function saveChatSwipePreference(action: ChatSwipeAction): Promise<void> 
 const pullKey = "openbot.mobile.chatPullInfo.v1";
 
 /**
- * Whether a pull past the latest message of an agent's chat opens the agent's info. Each phone keeps
- * its own choice. On by default.
+ * Whether a pull past the latest message of a chat opens its info: the agent's info in an agent's
+ * chat or thread, and the channel's info in a channel. Each phone keeps its own choice. On by default.
  */
 export const useChatPullPreference = create<{ enabled: boolean; ready: boolean }>(() => ({
   enabled: true,

@@ -1284,7 +1284,7 @@ export function ChatView({
             <ChatMessageList
               // Only an agent's chat has the swipe: it is off in a channel. Every chat has the pull.
               swipeGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
-              listGesture={swipeForwardGesture}
+              listGesture={target.kind === "agent" ? swipeForwardGesture : undefined}
               pullGesture={endPull.gesture}
               pullShift={endPull.shift}
               agents={serverAgents}
@@ -1367,7 +1367,9 @@ export function ChatView({
               pointerEvents="box-none"
               onLayout={motion.onComposerLayout}
             >
-              <ChatEndPullRing pull={endPull} target={target} leadAgentId={channelLeadAgentId} />
+              {onPullPastEnd !== null ? (
+                <ChatEndPullRing pull={endPull} target={target} leadAgentId={channelLeadAgentId} />
+              ) : null}
               {!voiceOpen && (detached || !atLatest) && motion.historyVisible && messages.length > 0 ? (
                 <View className="absolute -top-14 self-center">
                   <ChatGlassIconButton

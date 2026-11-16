@@ -47,7 +47,14 @@ const ANDROID_BAND_FACTOR = 0.95;
  * than the touch slop of the Android scroll view, 8 dp: when the scroll view takes the touch, it
  * cancels the pull.
  */
-const ANDROID_START = 4;
+const ANDROID_START = 6;
+/**
+ * A drag starts to move within this time. A finger that rests longer first is a touch and hold, such
+ * as on a message, and its small drift is no pull.
+ */
+const ANDROID_HOLD_MS = 350;
+/** The finger moved this far: it drags, it does not rest. */
+const ANDROID_MOVE = 2;
 /** A drag down or sideways of this many points is a scroll or a swipe: no pull. */
 const ANDROID_CANCEL = 12;
 const ANDROID_SETTLE = { duration: 350, dampingRatio: 1, reduceMotion: ReduceMotion.System };
@@ -107,7 +114,7 @@ export function useChatEndPull({
   /** Android: how far the list moves up with the pull. Attach it to the list as `pullShift`. */
   const shift = useSharedValue(0);
   /** Android: the first touch of this drag, and the finger's travel when the pull started. */
-  const touchStart = useSharedValue({ x: 0, y: 0 });
+  const touchStart = useSharedValue({ x: 0, y: 0, at: 0, moving: false });
   const pullStart = useSharedValue(0);
   /** Android: the pull has started. Its finger can then move sideways or back down freely. */
   const pulling = useSharedValue(false);
@@ -192,7 +199,7 @@ export function useChatEndPull({
           GestureStateManager.fail(event.handlerTag);
           return;
         }
-        touchStart.set({ x: touch.absoluteX, y: touch.absoluteY });
+        touchStart.set({ x: touch.absoluteX, y: touch.absoluteY, at: Date.now(), moving: false });
         pulling.set(false);
       },
       onTouchesMove: (event) => {
@@ -202,8 +209,16 @@ export function useChatEndPull({
         if (!touch || pulling.get()) return;
         const start = touchStart.get();
         const up = start.y - touch.absoluteY;
-        if (Math.abs(touch.absoluteX - start.x) > ANDROID_CANCEL || up < -ANDROID_CANCEL)
-          GestureStateManager.fail(event.handlerTag);
+        const side = touch.absoluteX - start.x;
+        if (!start.moving && Math.hypot(up, side) > ANDROID_MOVE) {
+          // A finger that rested before it moved holds a message or a control: leave the touch to it.
+          if (Date.now() - start.at > ANDROID_HOLD_MS) {
+            GestureStateManager.fail(event.handlerTag);
+            return;
+          }
+          touchStart.set({ ...start, moving: true });
+        }
+        if (Math.abs(side) > ANDROID_CANCEL || up < -ANDROID_CANCEL) GestureStateManager.fail(event.handlerTag);
         else if (up > ANDROID_START && atEnd.get()) GestureStateManager.activate(event.handlerTag);
       },
       onActivate: (event) => {
@@ -270,7 +285,10 @@ export function ChatEndPullRing({
 }) {
   const { t } = useText();
   const [foreground, accent] = useThemeColor(["foreground", "accent"]);
-  const colors = ringColors(target, leadAgentId, String(foreground), String(accent));
+  const colors = useMemo(
+    () => ringColors(target, leadAgentId, String(foreground), String(accent)),
+    [target, leadAgentId, foreground, accent],
+  );
   const gradientId = `chat-pull-ring-${useId().replace(/:/g, "")}`;
   const members = useMemo(
     () => new Map(target.kind === "channel" ? target.members.map((member) => [member.id, member]) : []),
