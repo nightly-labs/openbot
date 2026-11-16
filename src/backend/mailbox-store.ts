@@ -2313,8 +2313,13 @@ export class MailboxStore {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     if (!delivery) return false;
     const request = this.#state.messages.find((message) => message.id === delivery.messageId);
-    return (
-      request?.sender.kind === "agent" && !request.channelId && this.hasReplyFrom(delivery.recipientAgentId, request.id)
+    if (request?.sender.kind !== "agent" || request.channelId) return false;
+    // A linked question from this agent is not an answer.
+    return this.#state.messages.some(
+      (message) =>
+        isAnswer(message) &&
+        message.sender.agentId === delivery.recipientAgentId &&
+        message.replyToMessageId === request.id,
     );
   }
 
