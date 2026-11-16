@@ -254,6 +254,11 @@ const DIALOG_ACTION_WAIT_MS = 10_000;
 const OPEN_REDIRECT_WAIT_MS = 5_000;
 /** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
+/**
+ * How long the purge of a site after an agent script waits for the session's loads before it deletes
+ * the site's service workers. A fill waits for that purge.
+ */
+const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -2068,22 +2073,68 @@ export class BrowserHost {
 
   /**
    * Clears the origin's Cache Storage and service workers after the purge that already runs for it.
-   * A later purge that succeeds clears what an earlier one that failed left.
+   * A later purge that succeeds clears what an earlier one that failed left. A deleted service worker
+   * fails the requests that it handles, such as those of the page that just replaced a scripted page,
+   * so the service workers go when no page of the session loads (#9981).
    */
   #purgeOrigin(target: Session, origin: string): Promise<boolean> {
     const purges = this.#originPurges.get(target) ?? new Map<string, Promise<boolean>>();
     this.#originPurges.set(target, purges);
     const purge = (purges.get(origin) ?? Promise.resolve(true)).then(() =>
-      target.clearStorageData({ origin, storages: ["cachestorage", "serviceworkers"] }).then(
-        () => true,
-        (error: unknown) => {
-          logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
-          return false;
-        },
-      ),
+      target
+        .clearStorageData({ origin, storages: ["cachestorage"] })
+        .then(() => this.#sessionStoppedLoading(target))
+        .then(() => target.clearStorageData({ origin, storages: ["serviceworkers"] }))
+        .then(
+          () => true,
+          (error: unknown) => {
+            logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
+            return false;
+          },
+        ),
     );
     purges.set(origin, purge);
     return purge;
+  }
+
+  /** Settles when no tab of the session loads, or after `SERVICE_WORKER_CLEAR_WAIT_MS`. */
+  #sessionStoppedLoading(target: Session): Promise<void> {
+    return new Promise((resolve) => {
+      const watched = new Set<WebContents>();
+      let settled = false;
+      let timer: NodeJS.Timeout | undefined;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        for (const contents of watched) {
+          contents.off("did-stop-loading", check);
+          contents.off("destroyed", check);
+        }
+        resolve();
+      };
+      // A tab that starts to load while others load is watched from the next check.
+      const check = () => {
+        if (settled) return;
+        const loading = this.#sessionTabs(target)
+          .map((tab) => tab.contents)
+          .filter((contents) => !contents.isDestroyed() && contents.isLoading());
+        if (loading.length === 0) {
+          finish();
+          return;
+        }
+        for (const contents of loading) {
+          if (watched.has(contents)) continue;
+          watched.add(contents);
+          contents.on("did-stop-loading", check);
+          contents.once("destroyed", check);
+        }
+      };
+      // A page that never stops loading must not keep the service workers.
+      timer = setTimeout(finish, SERVICE_WORKER_CLEAR_WAIT_MS);
+      timer.unref();
+      check();
+    });
   }
 
   /** Whether a page of the origin other than the tab's own is open in the session. */
