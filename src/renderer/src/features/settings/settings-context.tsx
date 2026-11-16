@@ -34,7 +34,7 @@ import { isOpenSettingsShortcut } from "./settings-shortcut";
 import type { SettingsTab } from "./settings-tabs";
 
 /** A row of the app settings that a setting card asked for. `anchor` is the row's `data-settings-row`. */
-export interface AppSettingRowRequest {
+interface AppSettingRowRequest {
   tab: SettingsTab;
   anchor: AppTextKey;
   nonce: number;
