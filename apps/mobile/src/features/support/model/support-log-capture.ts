@@ -207,6 +207,33 @@ export function phoneFeedback(): FeedbackPhone {
   };
 }
 
+/** The data that a card showed, for each report: Send sends only what the user saw. */
+const shown = new Map<string, FeedbackPhone>();
+
+function shownKey(approval: { agentId: string; requestId: string | number }): string {
+  return `${approval.agentId}\n${String(approval.requestId)}`;
+}
+
+/** Reads `phoneFeedback()` for the card of this report, and keeps it for the Send of that card. */
+export function showPhoneFeedback(approval: { agentId: string; requestId: string | number }): FeedbackPhone {
+  const phone = phoneFeedback();
+  shown.set(shownKey(approval), phone);
+  return phone;
+}
+
+/**
+ * What the card of this report showed, or null when no card showed it. The network line is the
+ * current one: the card shows it as it changes.
+ */
+export function shownPhoneFeedback(approval: { agentId: string; requestId: string | number }): FeedbackPhone | null {
+  const phone = shown.get(shownKey(approval));
+  return phone ? { ...phone, network: phoneNetwork().slice(0, FEEDBACK_LIMITS.fact) } : null;
+}
+
+export function forgetPhoneFeedback(approval: { agentId: string; requestId: string | number }): void {
+  shown.delete(shownKey(approval));
+}
+
 export function clearSupportLog(): void {
   // The cleared entries of the earlier launch must not come back with a later read.
   restored = true;

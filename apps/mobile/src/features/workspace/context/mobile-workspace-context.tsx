@@ -157,9 +157,8 @@ import { setSyncedNotificationLevels } from "@/features/settings/model/notificat
 import { ShareExtensionSync } from "@/features/share/share-extension-sync";
 import { ShortcutsSync } from "@/features/shortcuts/shortcuts-sync";
 import { fetch } from "@/features/support/model/logged-fetch";
-import { refreshPhoneNetwork } from "@/features/support/model/phone-network-capture";
 import { supportLog } from "@/features/support/model/support-log";
-import { phoneFeedback } from "@/features/support/model/support-log-capture";
+import { forgetPhoneFeedback, shownPhoneFeedback } from "@/features/support/model/support-log-capture";
 import type { RemoteTeamTransportRef } from "@/features/workspace/components/remote-team-transport";
 import {
   ServerConnection,
@@ -1407,22 +1406,25 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
   foregroundRef.current = foreground;
   /**
    * Sends an answer to a request that the host waits on. A Send of a bug report about the phone app
-   * goes with this phone's version, system, network and support log: the host takes no other Send
-   * of it. The network is read again first, so the report has the VPN that is on now.
+   * goes with this phone's version, system, network and support log, as its card showed them: the
+   * host takes no other Send of it. Without a card that showed them, the phone sends a plain answer,
+   * which the host refuses with a message to open the chat.
    */
   const sendApproval = useCallback(
     async (serverId: string, input: RespondToApprovalInput, approval: PendingApproval) => {
-      const phoneReport =
+      const phone =
         input.decision === "accept" &&
         feedbackApproval(approval)?.phone === true &&
-        hasCapability(serverCapabilities.current, serverId, PHONE_FEEDBACK_CAPABILITY);
+        hasCapability(serverCapabilities.current, serverId, PHONE_FEEDBACK_CAPABILITY)
+          ? shownPhoneFeedback(approval)
+          : null;
       try {
-        if (phoneReport) await refreshPhoneNetwork();
         await runTeamRequest(
-          phoneReport
-            ? sendPhoneFeedback(teamApi(serverId), { requestId: input.requestId, phone: phoneFeedback() })
+          phone
+            ? sendPhoneFeedback(teamApi(serverId), { requestId: input.requestId, phone })
             : respondToApproval(teamApi(serverId), input),
         );
+        forgetPhoneFeedback(approval);
       } catch (error) {
         // Another device answered first, or the turn ended. The request is gone on the host too.
         if (error instanceof InactiveRequestError)

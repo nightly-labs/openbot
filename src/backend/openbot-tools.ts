@@ -761,12 +761,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
           "Default user. agent: you found it yourself; send that unasked only when OpenBot fails again after one retry, not for the user's code, network, accounts or provider limits.",
         )
         .optional(),
-      surface: z
-        .enum(FEEDBACK_SURFACES)
-        .describe(
-          'Where the user saw it, when the chat makes it clear. When the user says only "the app", ask whether it is the phone app before you call. Phone app: each problem in the iPhone or Android app, also when the user tells you on the computer, and also when the phone cannot connect. The phone then sends the bug report, with its version, system and support log.',
-        )
-        .optional(),
+      surface: z.enum(FEEDBACK_SURFACES).describe("Where the user saw it, when the chat makes it clear.").optional(),
       same_as: z
         .number()
         .int()

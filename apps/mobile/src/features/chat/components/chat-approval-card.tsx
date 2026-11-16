@@ -12,7 +12,7 @@ import {
   refreshPhoneNetwork,
   subscribePhoneNetwork,
 } from "@/features/support/model/phone-network-capture";
-import { phoneFeedback } from "@/features/support/model/support-log-capture";
+import { showPhoneFeedback } from "@/features/support/model/support-log-capture";
 import {
   approvalIsPartial,
   InactiveRequestError,
@@ -92,10 +92,14 @@ export function ChatApprovalCard({
   const disabled = !canAnswer || pending !== null;
   const report = feedbackApproval(approval);
   const reading = partial && readsWhole && canAnswer;
-  // What this phone adds to a report about the phone app, read one time for the card. The Send reads
-  // the log again, so it can have newer lines of the same kinds.
+  // What this phone adds to a report about the phone app, read one time for the card. Send sends this
+  // same data, so the public issue has no line that the user did not see.
   const phoneReport = report?.phone === true;
-  const phone = useMemo(() => (phoneReport ? phoneFeedback() : null), [phoneReport]);
+  const { agentId, requestId } = approval;
+  const phone = useMemo(
+    () => (phoneReport ? showPhoneFeedback({ agentId, requestId }) : null),
+    [phoneReport, agentId, requestId],
+  );
   // The network and the VPN can change while the card is open, so the card shows each new read.
   const network = useSyncExternalStore(subscribePhoneNetwork, phoneNetwork);
   useEffect(() => {

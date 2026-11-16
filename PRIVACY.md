@@ -626,7 +626,7 @@ connection object with no server and no other side, which sends nothing. No syst
 the VPN app, so the name comes from the address range of the VPN's tunnel, and "probably" marks a
 name that comes from a default range. The line has the name, and at most the first two numbers of a
 private range (`10.8.x.x`); it never has an address. The app reads this at its start, at each change
-of the network and before a Send, and it writes each change to the support log.
+of the network and when a report card opens, and it writes each change to the support log.
 
 These lines must not point to you. Tokens, keys and email addresses were masked when each line was
 written. For the report, the phone also masks:
@@ -638,7 +638,7 @@ written. For the report, the phone also masks:
 - each record ID and hash, which becomes `[id]`, and the name of a user folder.
 
 The message of an error is free text, so it can still hold a word that these rules do not know. The
-card shows all of this text before you send it. The phone sends it to the server of the agent over
+card shows all of this text before you send it, and Send sends only the text that the card shows. The phone sends it to the server of the agent over
 the Team connection. The server masks secrets and these values again and sends the text with the
 report, as described under [Other network connections](#other-network-connections). It becomes part
 of the public GitHub issue. No report about the phone app is sent without this data.
