@@ -25,13 +25,27 @@ export function createRetryNotices() {
         shown.set(key, readable);
       else shown.delete(key);
     },
-    /** The banner text to remove when the turn ends, or null when the banner is not a retry notice. */
-    takeAtTurnEnd(key: string): string | null {
-      const readable = shown.get(key) ?? null;
+    /** Removes the banner of `key` when it still shows the retry notice, with the run line above it. */
+    clearAtTurnEnd<Run extends { message: string }>(
+      key: string,
+      setErrors: BannerUpdate<string>,
+      setRuns: BannerUpdate<Run>,
+    ): void {
+      const notice = shown.get(key);
+      if (notice === undefined) return;
       shown.delete(key);
-      return readable;
+      setErrors((current) => (current[key] === notice ? withoutBanner(current, key) : current));
+      setRuns((current) => (current[key]?.message === notice ? withoutBanner(current, key) : current));
     },
   };
+}
+
+/** A setter of the banners of each chat, keyed like `composerDraftKey`. */
+type BannerUpdate<T> = (update: (current: Record<string, T>) => Record<string, T>) => unknown;
+
+function withoutBanner<T>(banners: Record<string, T>, key: string): Record<string, T> {
+  const { [key]: _removed, ...rest } = banners;
+  return rest;
 }
 
 /** A provider quotes what it was given, so an error can carry a whole request body back. */

@@ -281,15 +281,7 @@ export function AgentEventBridge() {
       case "turn-completed": {
         completedTurnByAgent.set(event.agentId, event.turnId);
         const bannerKey = composerDraftKey({ agentId: event.agentId, serverId: activeServerId() });
-        const retryNotice = retryNotices.takeAtTurnEnd(bannerKey);
-        if (retryNotice !== null) {
-          setConversationErrors((current) =>
-            current[bannerKey] === retryNotice ? withoutAgent(current, bannerKey) : current,
-          );
-          setConversationErrorRuns((current) =>
-            current[bannerKey]?.message === retryNotice ? withoutAgent(current, bannerKey) : current,
-          );
-        }
+        retryNotices.clearAtTurnEnd(bannerKey, setConversationErrors, setConversationErrorRuns);
         setTurnProgress((current) =>
           current[event.agentId]?.turnId === event.turnId ? withoutAgent(current, event.agentId) : current,
         );

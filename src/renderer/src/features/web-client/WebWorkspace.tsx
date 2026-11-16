@@ -208,12 +208,7 @@ import "katex/contrib/copy-tex";
 import "../../selection-copy";
 import { actionToast } from "../../action-toast";
 import { desktopAnalytics } from "../../analytics";
-import {
-  collectThreadMessageMatches,
-  formatMessageTime,
-  toAgentMessage,
-  withoutAgent,
-} from "../../app-message-projection";
+import { collectThreadMessageMatches, formatMessageTime, toAgentMessage } from "../../app-message-projection";
 import { ProviderSignInDialogs } from "../../components/ProviderSignInDialogs";
 import { isGlobalSearchShortcut } from "../../global-search-shortcut";
 import { LayoutProvider, useLayout } from "../../layout";
@@ -2051,12 +2046,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
       if (event.type === "turn-completed") {
         if (!serverId) return;
         const key = composerDraftKey({ agentId: event.agentId, serverId });
-        const notice = retryNotices.takeAtTurnEnd(key);
-        if (notice === null) return;
-        controller.setConversationErrors((current) => (current[key] === notice ? withoutAgent(current, key) : current));
-        controller.setConversationErrorRuns((current) =>
-          current[key]?.message === notice ? withoutAgent(current, key) : current,
-        );
+        retryNotices.clearAtTurnEnd(key, controller.setConversationErrors, controller.setConversationErrorRuns);
         return;
       }
       if (event.type !== "error") return;
