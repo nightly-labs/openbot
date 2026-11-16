@@ -371,13 +371,13 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "list_sections",
     description:
-      "List sidebar sections (folders), their stable ids, and agent assignments before choosing message recipients or grouping agents.",
+      "List sidebar sections (folders), their stable ids, and the agents and channels in them (agentAssignments) before choosing message recipients or grouping agents and channels.",
     shape: {},
   },
   {
     name: "create_section",
     description:
-      "Create a sidebar section (folder) to group existing agents. List sections first and reuse an existing matching section.",
+      "Create a sidebar section (folder) to group existing agents and channels. List sections first and reuse an existing matching section.",
     shape: createSectionToolSchema.shape,
   },
   {
@@ -392,7 +392,8 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   },
   {
     name: "assign_agent_section",
-    description: "Move an existing agent into a sidebar section. Pass null for sectionId to ungroup it.",
+    description:
+      "Move an existing agent (agentId) or channel (channelId) into a sidebar section. Pass null for sectionId to ungroup it.",
     shape: assignAgentSectionToolSchema.shape,
   },
   {

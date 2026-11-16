@@ -3,17 +3,20 @@ import type { SidebarLayoutAction } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { SidebarLayoutStore } from "../sidebar-layout-store";
-import { openBotToolResult } from "./routine-tools";
+import { openBotToolFailure, openBotToolResult } from "./routine-tools";
 import { ToolOperationFailed, toolStep, toToolOperationFailed } from "./tool-operation";
 
-const sectionId = z.string().min(1).max(INPUT_LIMITS.identifier);
+const chatId = z.string().min(1).max(INPUT_LIMITS.identifier);
+const sectionId = chatId;
 const name = z.string().trim().min(1).max(INPUT_LIMITS.sidebarSectionName);
 export const createSectionToolSchema = z.object({ name }).strict();
 export const renameSectionToolSchema = z.object({ sectionId, name }).strict();
 export const deleteSectionToolSchema = z.object({ sectionId }).strict();
+/** One of `agentId` and `channelId`: the sidebar files a channel in a folder as it does an agent. */
 export const assignAgentSectionToolSchema = z
   .object({
-    agentId: z.string().min(1).max(INPUT_LIMITS.identifier),
+    agentId: chatId.optional(),
+    channelId: chatId.optional(),
     sectionId: sectionId.nullable(),
   })
   .strict();
@@ -25,8 +28,10 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
   args: unknown,
   sidebar: AgentSidebar | null,
   agentIds: ReadonlySet<string>,
+  channelIds: () => ReadonlySet<string>,
 ) {
   let action: SidebarLayoutAction | null;
+  let sidebarIds = agentIds;
   switch (tool) {
     case "list_sections":
       action = null;
@@ -40,13 +45,28 @@ export const handleSidebarTool = Effect.fn("SidebarTools.handle")(function* (
     case "delete_section":
       action = { type: "delete", ...(yield* toolStep(() => deleteSectionToolSchema.parse(args))) };
       break;
-    case "assign_agent_section":
-      action = { type: "assign", ...(yield* toolStep(() => assignAgentSectionToolSchema.parse(args))) };
+    case "assign_agent_section": {
+      const { agentId, channelId, sectionId } = yield* toolStep(() => assignAgentSectionToolSchema.parse(args));
+      const id = channelId ?? agentId;
+      if (id === undefined || (agentId !== undefined && channelId !== undefined))
+        return openBotToolFailure("Pass one of agentId and channelId.");
+      // A channel id passed as agentId is accepted too: agents tried that before channelId existed.
+      if (!agentIds.has(id)) {
+        if (!channelIds().has(id))
+          return openBotToolFailure(
+            channelId === undefined
+              ? "Unknown agent. Use an agent id from openbot.list_agents, or a channel id from openbot.list_channels as channelId."
+              : "Unknown channel. Use a channel id from openbot.list_channels.",
+          );
+        sidebarIds = new Set([...agentIds, id]);
+      }
+      action = { type: "assign", agentId: id, sectionId };
       break;
+    }
     default:
       return null;
   }
   if (!sidebar) return yield* new ToolOperationFailed({ cause: new Error("Sidebar sections are unavailable.") });
-  const layout = action ? yield* sidebar.mutate(action, agentIds).pipe(toToolOperationFailed) : sidebar.getSnapshot();
+  const layout = action ? yield* sidebar.mutate(action, sidebarIds).pipe(toToolOperationFailed) : sidebar.getSnapshot();
   return openBotToolResult(layout);
 });
