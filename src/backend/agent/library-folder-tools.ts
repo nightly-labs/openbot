@@ -33,7 +33,7 @@ export const libraryFolderArgument = z.string().max(FOLDER_PATH_CHARACTERS);
 
 export const listLibraryFoldersToolSchema = z.strictObject({ folder: libraryFolderArgument.optional() });
 
-export const ORGANIZE_LIBRARY_ACTIONS = ["create", "rename", "move", "delete", "place"] as const;
+const ORGANIZE_LIBRARY_ACTIONS = ["create", "rename", "move", "delete", "place"] as const;
 
 /**
  * `organize_library`: one flat shape for each change, so the model reads one short schema. `folder`

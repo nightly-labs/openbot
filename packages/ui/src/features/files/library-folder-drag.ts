@@ -51,7 +51,7 @@ export type LibraryDropMark = "into" | "before" | "after";
  * Why the place under the pointer does not take the drop. `agent`: it is a place of another agent.
  * `mixed`: the files are of more than one agent, so no place takes them.
  */
-export type LibraryDropBlock = "agent" | "mixed";
+type LibraryDropBlock = "agent" | "mixed";
 
 interface LibraryFolderDragOptions {
   /** A press can start a drag now. */
