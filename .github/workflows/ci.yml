@@ -10,9 +10,11 @@ on:
 permissions:
   contents: read
 
+# A new PR push cancels the old run. On main, each commit gets its own complete run: merges come
+# faster than one run takes, and a shared group cancelled almost every main run and its deploy.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 env:
   GIT_CONFIG_COUNT: 1
@@ -1319,12 +1321,42 @@ jobs:
       queue: max
     permissions:
       contents: read
+      deployments: read
     steps:
+      # Main runs can finish out of order. Do not replace a newer deployed commit with an older one.
+      # Only a successful deployment counts. To roll back, merge a revert.
+      - name: Skip when a newer commit is deployed
+        id: order
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          deployed="$(gh api graphql -F owner="${GITHUB_REPOSITORY%/*}" -F name="${GITHUB_REPOSITORY#*/}" -f query='
+            query($owner: String!, $name: String!) {
+              repository(owner: $owner, name: $name) {
+                deployments(environments: ["cloudflare-production"], first: 30, orderBy: {field: CREATED_AT, direction: DESC}) {
+                  nodes { commitOid ref { name } latestStatus { state } }
+                }
+              }
+            }' --jq '.data.repository.deployments.nodes[] | select(.ref.name == "main" and .latestStatus.state == "SUCCESS") | .commitOid' | sort -u)"
+          deploy=true
+          for sha in $deployed; do
+            [ "$sha" = "$GITHUB_SHA" ] && continue
+            if [ "$(gh api "repos/$GITHUB_REPOSITORY/compare/$GITHUB_SHA...$sha?per_page=1" --jq .status)" = "ahead" ]; then
+              echo "::notice title=Deploy skipped::Production already has $sha, which is newer than $GITHUB_SHA."
+              deploy=false
+              break
+            fi
+          done
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
       - name: Check out repository
+        if: steps.order.outputs.deploy == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Production always has the home page beam. Without the key, the deploy stops here.
       - name: Check out the home page beam
+        if: steps.order.outputs.deploy == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: nightly-labs/openbot-laser-flow
@@ -1333,16 +1365,20 @@ jobs:
           persist-credentials: false
 
       - name: Set up Bun
+        if: steps.order.outputs.deploy == 'true'
         uses: ./.github/actions/setup-bun
 
       - name: Build production Worker
+        if: steps.order.outputs.deploy == 'true'
         run: bun run api:build
 
       # A deploy replaces every file under /assets/. Open tabs keep loading the files of their build.
       - name: Keep the code files of earlier builds
+        if: steps.order.outputs.deploy == 'true'
         run: bun apps/auth-api/scripts/keep-previous-assets.ts
 
       - name: Prepare runtime secrets
+        if: steps.order.outputs.deploy == 'true'
         id: runtime-secrets
         shell: bash
         env:
@@ -1454,6 +1490,7 @@ jobs:
           echo "path=$secrets_path" >> "$GITHUB_OUTPUT"
 
       - name: Apply production D1 migrations
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
@@ -1461,6 +1498,7 @@ jobs:
         run: ../../node_modules/.bin/wrangler d1 migrations apply DB --remote --config wrangler.jsonc
 
       - name: Deploy public site router
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/site-router
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_SITE_ROUTER_DEPLOY_TOKEN }}
@@ -1469,6 +1507,7 @@ jobs:
 
       # The production Worker sends email through this Worker, so it must exist first.
       - name: Deploy email relay Worker
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
@@ -1476,6 +1515,7 @@ jobs:
         run: ../../node_modules/.bin/wrangler deploy --config wrangler.email-relay.jsonc
 
       - name: Deploy production Worker
+        if: steps.order.outputs.deploy == 'true'
         working-directory: apps/auth-api
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PRODUCTION_DEPLOY_TOKEN }}
@@ -1487,6 +1527,7 @@ jobs:
         run: rm -f "${{ steps.runtime-secrets.outputs.path }}"
 
       - name: Verify production deployment
+        if: steps.order.outputs.deploy == 'true'
         shell: bash
         env:
           SITE_HOSTING_EXPECTED_ENABLED: ${{ vars.SITE_HOSTING_EXPECTED_ENABLED }}
