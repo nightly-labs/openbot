@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} oturum açma işlemi iptal edildi",
   "prompt.browser.signInBlocked.body":
     "Bu bilgisayarda oturum açın. OpenBot {server} sunucusuna yalnızca {host} oturumunu gönderir ve {name} devam eder.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın. Ardından {name} devam eder.",
   "prompt.browser.signInBlocked.cancelledBody": "Oturum açma iptal edildi.",
   "prompt.browser.signInBlocked.waiting": "Oturum açma bekleniyor",
   "prompt.browser.signInBlocked.waitingButton": "Oturum açma bekleniyor…",

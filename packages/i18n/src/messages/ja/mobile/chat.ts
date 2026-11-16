@@ -366,6 +366,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "ブラウザーの引き継ぎ",
   "mobile.chat.browserSecret.takeoverBody":
     "OpenBot を実行しているコンピューターのブラウザーで、この手順を完了してください。",
+  "mobile.chat.browserSecret.signInBlockedTitle": "お使いのコンピューターでサインインしてください",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "このサイトはサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。",
   "mobile.chat.browserSecret.takeoverReload": "その後、ページを再読み込みしてから「完了しました」を選択してください。",
   "mobile.chat.browserSecret.takeoverFailed": "リクエストを完了できませんでした。",
   "mobile.chat.browserSecret.done": "完了しました",

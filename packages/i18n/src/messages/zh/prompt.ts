@@ -56,6 +56,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "已取消登录 {host}",
   "prompt.browser.signInBlocked.body":
     "请在这台电脑上登录。OpenBot 只会把 {host} 的登录状态发送给 {server}，{name} 随后继续工作。",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} 不接受来自服务器的登录。请在你电脑上的 OpenBot 桌面应用中打开此聊天，并在那里登录。之后 {name} 会继续。",
   "prompt.browser.signInBlocked.cancelledBody": "登录已取消。",
   "prompt.browser.signInBlocked.waiting": "正在等待登录",
   "prompt.browser.signInBlocked.waitingButton": "正在等待登录…",

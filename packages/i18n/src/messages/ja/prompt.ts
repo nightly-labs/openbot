@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} へのサインインはキャンセルされました",
   "prompt.browser.signInBlocked.body":
     "このコンピュータでサインインしてください。OpenBot は {host} のサインインだけを {server} に送信し、{name} が続行します。",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} はサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。その後、{name} が続行します。",
   "prompt.browser.signInBlocked.cancelledBody": "サインインはキャンセルされました。",
   "prompt.browser.signInBlocked.waiting": "サインインを待っています",
   "prompt.browser.signInBlocked.waitingButton": "サインインを待っています…",

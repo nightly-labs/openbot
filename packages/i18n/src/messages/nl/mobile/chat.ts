@@ -334,6 +334,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Eenmalige code",
   "mobile.chat.browserSecret.takeoverTitle": "Browser overnemen",
   "mobile.chat.browserSecret.takeoverBody": "Voltooi deze stap in de browser op de computer waarop OpenBot draait.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Log in op je computer",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Deze site accepteert geen aanmelding vanaf de server. Open deze chat in de OpenBot-desktopapp op je computer en log daar in.",
   "mobile.chat.browserSecret.takeoverReload": "Laad daarna de pagina opnieuw voordat je Ik ben klaar kiest.",
   "mobile.chat.browserSecret.takeoverFailed": "Het verzoek kan niet worden voltooid.",
   "mobile.chat.browserSecret.done": "Ik ben klaar",

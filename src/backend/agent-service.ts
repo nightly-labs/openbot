@@ -7095,9 +7095,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
   }
 
-  respondToBrowserTakeover(input: RespondToBrowserTakeoverInput): Effect.Effect<void, AgentLifecycleFailed> {
+  /** `fromMember`: the answer came from a member's device through the Team API. */
+  respondToBrowserTakeover(
+    input: RespondToBrowserTakeoverInput,
+    fromMember = false,
+  ): Effect.Effect<void, AgentLifecycleFailed> {
     return this.#attention
-      .respondToBrowserTakeover(input)
+      .respondToBrowserTakeover(input, fromMember)
       .pipe(
         Effect.mapError(
           (failure) => new AgentLifecycleFailed({ operation: "respondToBrowserTakeover", cause: failure.cause }),

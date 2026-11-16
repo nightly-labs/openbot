@@ -58,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Вход в {host} отменён",
   "prompt.browser.signInBlocked.body":
     "Войдите на этом компьютере. OpenBot отправит на {server} только вход в {host}, и {name} продолжит работу.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там. Затем {name} продолжит работу.",
   "prompt.browser.signInBlocked.cancelledBody": "Вход отменён.",
   "prompt.browser.signInBlocked.waiting": "Ожидание входа",
   "prompt.browser.signInBlocked.waitingButton": "Ожидание входа…",

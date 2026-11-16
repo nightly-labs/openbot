@@ -452,6 +452,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "رمز لمرة واحدة",
   "mobile.chat.browserSecret.takeoverTitle": "تولي التحكم في المتصفح",
   "mobile.chat.browserSecret.takeoverBody": "أكمل هذه الخطوة في المتصفح على الحاسوب الذي يشغّل OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "سجّل الدخول على حاسوبك",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "لا يقبل هذا الموقع تسجيل الدخول من الخادم. افتح هذه المحادثة في تطبيق OpenBot لسطح المكتب على حاسوبك، وسجّل الدخول هناك.",
   "mobile.chat.browserSecret.takeoverReload": "ثم أعد تحميل الصفحة قبل اختيار «انتهيت».",
   "mobile.chat.browserSecret.takeoverFailed": "تعذّر إكمال الطلب.",
   "mobile.chat.browserSecret.done": "انتهيت",

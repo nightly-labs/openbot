@@ -360,6 +360,9 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.browserSecret.oneTimeCode": "One-time code",
   "mobile.chat.browserSecret.takeoverTitle": "Browser takeover",
   "mobile.chat.browserSecret.takeoverBody": "Complete this step in the browser on the computer running OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Sign in on your computer",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "This site does not accept a sign-in from the server. Open this chat in the OpenBot desktop app on your computer, and sign in there.",
   "mobile.chat.browserSecret.takeoverReload": "Then reload the page before choosing I’m done.",
   "mobile.chat.browserSecret.takeoverFailed": "The request could not be completed.",
   "mobile.chat.browserSecret.done": "I'm done",

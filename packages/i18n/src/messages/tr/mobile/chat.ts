@@ -365,6 +365,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Tek kullanımlık kod",
   "mobile.chat.browserSecret.takeoverTitle": "Tarayıcı devralma",
   "mobile.chat.browserSecret.takeoverBody": "Bu adımı OpenBot çalıştıran bilgisayardaki tarayıcıda tamamlayın.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Bilgisayarınızda oturum açın",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Bu site sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın.",
   "mobile.chat.browserSecret.takeoverReload": "Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
   "mobile.chat.browserSecret.takeoverFailed": "İstek tamamlanamadı.",
   "mobile.chat.browserSecret.done": "Bitirdim",

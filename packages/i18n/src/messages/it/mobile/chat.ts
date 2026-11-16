@@ -367,6 +367,9 @@ export const messages = {
   "mobile.chat.browserSecret.oneTimeCode": "Codice monouso",
   "mobile.chat.browserSecret.takeoverTitle": "Intervento nel browser",
   "mobile.chat.browserSecret.takeoverBody": "Completa questo passaggio nel browser sul computer su cui gira OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Accedi dal tuo computer",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Questo sito non accetta un accesso dal server. Apri questa chat nell’app desktop di OpenBot sul tuo computer e accedi da lì.",
   "mobile.chat.browserSecret.takeoverReload": "Poi ricarica la pagina prima di scegliere «Ho finito».",
   "mobile.chat.browserSecret.takeoverFailed": "Impossibile completare la richiesta.",
   "mobile.chat.browserSecret.done": "Ho finito",
