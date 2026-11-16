@@ -1806,6 +1806,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
   const [serverSettingsSection, setServerSettingsSection] = createSignal<ServerSettingsSection | null>(null);
   /** The MCP row that a chat card asked to sign in to. Its Marketplace page starts the sign-in, as its Sign in button does. */
   const [mcpSignInRequest, setMcpSignInRequest] = createSignal<string | null>(null);
+  // The request ends with the page, also when another page or a server switch closes it.
+  createEffect(marketplaceOpen, (open) => {
+    if (!open) setMcpSignInRequest(null);
+  });
   /** The host's MCP sign-in state as the Marketplace last read it, so a chat card shows Signed in. */
   const [mcpSignIns, setMcpSignIns] = createSignal<{
     serverId: string;
@@ -2998,11 +3002,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       fallback={
                         <MarketplaceOverlay
                           open={page() === "marketplace"}
-                          onOpenChange={(open) => {
-                            // A sign-in that a chat card asked for ends with the page.
-                            if (!open) setMcpSignInRequest(null);
-                            setMarketplaceOpen(open);
-                          }}
+                          onOpenChange={setMarketplaceOpen}
                           calls={marketplaceCalls}
                           connectors={connectors}
                           server={server()}

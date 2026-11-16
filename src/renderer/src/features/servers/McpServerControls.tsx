@@ -14,9 +14,9 @@ import {
   Switch,
   Text,
 } from "@openbot/ui";
-import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, Show } from "solid-js";
+import { McpRelaySignIn } from "./McpRelaySignIn";
 import { asksForSignIn, type McpServerTools, type SettledTest, useMcpRuns } from "./mcp-server-tools";
 import {
   type McpServerConfig,
@@ -141,35 +141,6 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
     },
   );
 
-  /** The relayed page of the sign-in that waits, with what its dialog needs. */
-  const relayPage = createMemo(
-    () => {
-      const relay = props.tools.signIn()?.relay;
-      const pending = waiting();
-      const page = relay && pending ? relay.page(pending.url) : undefined;
-      return relay && pending && page ? { relay, url: pending.url, name: pending.name, page } : null;
-    },
-    {
-      equals: (previous, next) =>
-        previous?.url === next?.url &&
-        previous?.page.authorizeHost === next?.page.authorizeHost &&
-        previous?.page.url === next?.page.url &&
-        previous?.page.listening === next?.page.listening,
-    },
-  );
-
-  // The dialog leaves with its sign-in; Test connection gets the focus one frame later.
-  createEffect(
-    () => relayPage() !== null,
-    (open, previous) => {
-      if (open || !previous) return;
-      requestAnimationFrame(() => {
-        if (testButton?.isConnected && !document.querySelector(".integration-wizard-dialog"))
-          testButton.focus({ preventScroll: true });
-      });
-    },
-  );
-
   return (
     <Show when={config()}>
       {(server) => (
@@ -285,19 +256,12 @@ export function McpServerControls(props: { tools: McpServerTools; id: string }) 
             )}
           </Show>
 
-          {/* Keyed by the page, so each sign-in opens a dialog of its own and a Cancel does not carry over. */}
-          <Show when={relayPage()} keyed>
-            {(open) => (
-              <McpSignInRelayDialog
-                name={open.name}
-                hostName={open.relay.hostName}
-                page={open.page}
-                onOpen={() => open.relay.open(open.url)}
-                onPaste={(address) => open.relay.paste(open.url, address)}
-                onCancel={() => cancelSignIn(open.url)}
-              />
-            )}
-          </Show>
+          <McpRelaySignIn
+            tools={props.tools}
+            pending={waiting()}
+            onCancel={cancelSignIn}
+            returnFocus={() => testButton}
+          />
         </SettingsSection>
       )}
     </Show>

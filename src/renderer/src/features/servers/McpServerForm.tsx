@@ -11,10 +11,10 @@ import {
   Text,
   Trash2,
 } from "@openbot/ui";
-import { McpSignInRelayDialog } from "@openbot/ui/features/settings/McpSignInPage";
 import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
-import { createEffect, createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { createMemo, createStore, For, onCleanup, Show, untrack } from "solid-js";
+import { McpRelaySignIn } from "./McpRelaySignIn";
 import { McpSignInAppSection } from "./McpSignInAppSection";
 import { type McpServerTools, mcpTestTone, type SettledTest, useMcpRuns } from "./mcp-server-tools";
 import {
@@ -67,10 +67,11 @@ const URL_PLACEHOLDER = "https://mcp.example.com/mcp";
 export function McpServerForm(props: McpServerFormProps) {
   const { t, errorMessage } = useText();
   const runs = useMcpRuns(() => props.tools);
-  const stored = untrack(() =>
-    props.id === null ? undefined : props.tools.servers().find((candidate) => candidate.id === props.id),
-  );
-  const start = stored ? mcpConfigDraft(stored) : emptyMcpConfig();
+  // The form starts once from the stored row, copied with its fields; later reads of the row do not reset it.
+  const start = untrack(() => {
+    const stored = props.id === null ? undefined : props.tools.servers().find((candidate) => candidate.id === props.id);
+    return stored ? mcpConfigDraft(stored) : emptyMcpConfig();
+  });
   const [state, setState] = createStore<McpFormState>({
     draft: start,
     // Copy, not alias: the form edits `draft` in place while the baseline holds still.
@@ -231,34 +232,16 @@ export function McpServerForm(props: McpServerFormProps) {
     return signedIn?.status === "passed";
   }
 
-  /** The relayed page of the form's sign-in, with what its dialog needs. */
-  const relayPage = createMemo(
-    () => {
-      const relay = props.tools.signIn()?.relay;
-      const pending = signingIn();
-      const page = relay && pending ? relay.page(pending.url) : undefined;
-      return relay && pending && page ? { relay, url: pending.url, name: state.draft.name, page } : null;
-    },
-    {
-      equals: (previous, next) =>
-        previous?.url === next?.url &&
-        previous?.page.authorizeHost === next?.page.authorizeHost &&
-        previous?.page.url === next?.page.url &&
-        previous?.page.listening === next?.page.listening,
-    },
-  );
-
-  // The dialog leaves with its sign-in; Test connection gets the focus one frame later.
-  createEffect(
-    () => relayPage() !== null,
-    (open, previous) => {
-      if (open || !previous) return;
-      requestAnimationFrame(() => {
-        if (testButton?.isConnected && !document.querySelector(".integration-wizard-dialog"))
-          testButton.focus({ preventScroll: true });
-      });
-    },
-  );
+  /* Escape goes back a page. With changes not saved, it does nothing, also when the focus is on the
+     page title or nowhere: Cancel drops them. A dialog or a menu keeps its own Escape. */
+  const holdEscape = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !changed()) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("[role=dialog], [role=alertdialog], [role=menu], [role=listbox]")) return;
+    event.preventDefault();
+  };
+  document.addEventListener("keydown", holdEscape, true);
+  onCleanup(() => document.removeEventListener("keydown", holdEscape, true));
 
   return (
     <SlidingTabs.Root
@@ -269,10 +252,6 @@ export function McpServerForm(props: McpServerFormProps) {
         setState((current) => {
           current.draft.transport = value;
         });
-      }}
-      onKeyDown={(event: KeyboardEvent) => {
-        // Escape goes back a page. With changes not saved, it does nothing: Cancel drops them.
-        if (event.key === "Escape" && changed()) event.preventDefault();
       }}
     >
       {/* The page header already names the page, so this section only labels the group. */}
@@ -704,19 +683,12 @@ export function McpServerForm(props: McpServerFormProps) {
         </Button>
       </div>
 
-      {/* Keyed by the page, so each sign-in opens a dialog of its own and a Cancel does not carry over. */}
-      <Show when={relayPage()} keyed>
-        {(open) => (
-          <McpSignInRelayDialog
-            name={open.name}
-            hostName={open.relay.hostName}
-            page={open.page}
-            onOpen={() => open.relay.open(open.url)}
-            onPaste={(address) => open.relay.paste(open.url, address)}
-            onCancel={() => cancelSignIn(open.url)}
-          />
-        )}
-      </Show>
+      <McpRelaySignIn
+        tools={props.tools}
+        pending={signingIn()}
+        onCancel={cancelSignIn}
+        returnFocus={() => testButton}
+      />
     </SlidingTabs.Root>
   );
 }

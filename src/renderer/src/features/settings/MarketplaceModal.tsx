@@ -123,20 +123,19 @@ export function MarketplaceModal(props: MarketplaceModalProps) {
   );
 
   /* Sign in on an agent's card opens the row's page once the rows are read. A custom row's card
-     then starts the sign-in; an app's page has its own Reconnect. */
+     then starts the sign-in; an app's page has its own Reconnect. The page id, not an object, so a
+     new read of the rows does not open the page again. */
   createEffect(
     () => {
       const id = props.open ? props.mcpSignInRequest : undefined;
-      if (!id) return null;
-      const app = controller.mcpServerApp(id);
-      return app === undefined ? null : { id, app };
+      return id ? controller.mcpServerApp(id) : undefined;
     },
-    (request) => {
-      if (!request) return;
+    (app) => {
+      if (app === undefined) return;
       nav.reset();
-      if (request.app) nav.go({ kind: "app", id: request.app });
+      if (app) nav.go({ kind: "app", id: app });
       // Only a custom row's card takes the request; another page, or no row, ends it here.
-      if (!request.app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
+      if (!app?.startsWith("custom:")) untrack(() => props.onMcpSignInRequestHandled)?.();
     },
   );
 

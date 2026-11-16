@@ -1339,8 +1339,8 @@ export function createMarketplaceController(
       const next = await changeMcpServers("mcp_server_saved", "mcp_server_save_failed", (serverId) =>
         calls().mcp.saveMcpServer({ config }, serverId),
       );
-      // The host keeps names unique, and a new row gets its id there.
-      const saved = next.find((row) => row.name === config.name);
+      // An edit keeps its id. A new row gets its id on the host, which keeps names unique.
+      const saved = next.find((row) => (config.id ? row.id === config.id : row.name === config.name));
       if (!saved) throw new Error(t("mcp.panel.saveFailed"));
       return saved;
     },

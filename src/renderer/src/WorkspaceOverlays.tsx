@@ -183,18 +183,16 @@ export function SkillsMarketplace() {
   };
   // The remote desktop covers the window card, so a link or a search that opens the page hides it.
   // The remote desktop session stays.
+  // A sign-in that an agent's card asked for ends with the page, also when another page closes it.
   createEffect(skillsMarketplaceOpen, (open) => {
-    if (open && untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
+    if (!open) setPendingMcpSignIn(null);
+    else if (untrack(remoteDesktopWorkspaceVisible)) hideRemoteDesktopWorkspace();
   });
 
   return (
     <MarketplaceOverlay
       open={skillsMarketplaceOpen()}
-      onOpenChange={(open) => {
-        // A sign-in that an agent's card asked for ends with the page.
-        if (!open) setPendingMcpSignIn(null);
-        setSkillsMarketplaceOpen(open);
-      }}
+      onOpenChange={setSkillsMarketplaceOpen}
       server={activeServer()}
       agents={agentList()}
       activeAgentId={activeAgent()?.id ?? ""}
