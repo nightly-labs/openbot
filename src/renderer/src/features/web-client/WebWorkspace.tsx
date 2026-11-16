@@ -2275,6 +2275,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
     workspace.state.capabilities.includes(SIGN_IN_RELAY_CAPABILITY) ||
     (workspace.state.capabilities.includes(MCP_SIGN_IN_CAPABILITY) &&
       workspace.state.capabilities.includes("browser-view"));
+  /** Reads the sign-in states again for a new Sign in card in a chat, as the MCP section does when it opens. */
+  const refreshMcpSignInsFromChat = () => {
+    if (mcpSignInSupported()) void serverSettings.refreshMcpSignIns().catch(() => undefined);
+  };
   const clearSelectedAgentContext = createMemo(() => {
     const agent = workspace.selected();
     if (!agent || !workspace.runtime.admin || !workspace.state.capabilities.includes(CONTEXT_RESET_CAPABILITY))
@@ -3802,6 +3806,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         // A member's Sign in card signs in as the agent chat's does (#6228).
                         onOpenMcpSignIn={openMcpSignInFromChat()}
                         mcpSignedIn={(mcpServerId) => serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true}
+                        refreshMcpSignIns={refreshMcpSignInsFromChat}
                         onSelectAgent={(id) => {
                           setMobilePane("conversation");
                           void select(id);
@@ -3917,6 +3922,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                   onOpenNotificationSettings={(serverId) => openNotificationSettings(serverId)}
                   onOpenMcpSignIn={openMcpSignInFromChat()}
                   mcpSignedIn={(mcpServerId) => serverSettings.state.mcpSignIns[mcpServerId]?.signedIn === true}
+                  refreshMcpSignIns={refreshMcpSignInsFromChat}
                   onOpenUsage={(trigger) => {
                     const id = server()?.id;
                     if (id) void openHostPage(id, "usage", trigger);
