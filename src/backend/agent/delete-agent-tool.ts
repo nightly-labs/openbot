@@ -21,7 +21,7 @@ export const deleteAgentToolSchema = z.strictObject({
     .min(1)
     .max(DELETE_AGENT_LIMIT)
     .refine((ids) => new Set(ids).size === ids.length, "Pass each agent id once.")
-    .describe("Ids from list_agents of the agents to delete. Not your own id."),
+    .describe("Agent ids from list_agents, not yours."),
 });
 
 export interface DeleteAgentToolOptions {

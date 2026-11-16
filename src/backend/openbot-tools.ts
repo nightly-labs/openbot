@@ -471,7 +471,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "delete_agent",
     description:
-      "Delete other local OpenBot agents with their chats and files when the user asks. The owner approves each call on a card, and a deletion cannot be undone. Only a person's message can ask for it. You cannot delete yourself. An agent that works or has queued messages cannot be deleted. The result has deleted and failed counts and, for each agent id, ok or the error.",
+      "Delete other local agents with their chats and files when the user asks. The owner approves each call on a card; it cannot be undone. A busy agent cannot be deleted. The result gives ok or the error for each agent.",
     shape: deleteAgentToolSchema.shape,
   },
   {
