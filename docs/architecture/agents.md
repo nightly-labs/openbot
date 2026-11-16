@@ -788,8 +788,9 @@ description to 300 characters (`read_agent` returns all of it), its
 `status` (a starting delivery and a context compaction count as `working`), `queuedMessages`
 (channel work excluded), `turnStartedAt`, `waitingFor`, and `lastActivityAt`. A turn that waits for
 a person's approval, answer or browser takeover stays open, so its agent stays `working`;
-`waitingFor` names what it waits for, from `AttentionRegistry.waitsFor`. A detached question holds
-no turn, so it does not count. `turnStartedAt` and `lastActivityAt` come from the provider
+`waitingFor` names what a turn of the agent waits for, from `AttentionRegistry.waitsFor`. Another
+turn of the agent, such as a channel turn, can still work. A detached question holds no turn, so it
+does not count. `turnStartedAt` and `lastActivityAt` come from the provider
 notifications that `TurnLifecycle` sees; they are in memory only, so after a restart
 `lastActivityAt` falls back to the newest message for the agent. OpenBot does not record which
 files a turn changed. `openbot.interrupt_agent` (`src/backend/agent/agent-interrupt-tool.ts`)

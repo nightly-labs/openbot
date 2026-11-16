@@ -1957,7 +1957,7 @@ export class OpenBotToolRouter {
             ?.activeTurnId ??
           null;
         const { startedAt, lastEventAt } = this.#hooks.turnActivity(agent.id, activeTurnId);
-        // A turn that waits for a person stays open, so status stays "working" and waitingFor says why.
+        // A turn that waits for a person stays open, so status stays "working" and waitingFor says what it waits for.
         const waitingFor = working ? this.#attention.waitsFor(agent.id) : [];
         // A restart loses the provider clock, so the newest message for the agent stands in for it.
         const lastActivity = deliveries.reduce(
