@@ -88,6 +88,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "Wacht tot het werk in dit kanaal stopt en wis dan de geschiedenis.",
   "error.backend.channelCompactUnavailable":
     "Geen lid van dit kanaal kan zijn context nu comprimeren. Een lid moet eerst in het kanaal antwoorden, en zijn provider moet comprimeren ondersteunen.",
+  "error.backend.channelCompactNoSession":
+    "De leden van dit kanaal hebben nog geen gesprek om te comprimeren. Comprimeer het nadat een lid in het kanaal heeft geantwoord.",
+  "error.backend.channelCompactNotSupported":
+    "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
@@ -204,6 +208,8 @@ export const messages = {
   "error.backend.interruptSelf": "Een agent kan zichzelf niet onderbreken.",
   "error.backend.interruptOtherWork":
     "Deze agent werkt aan een taak die jouw bericht niet heeft gestart. Alleen de gebruiker of de afzender van die taak kan deze stoppen.",
+  "error.backend.interruptSharedWork":
+    "De beurt van deze agent werkt aan je bericht en ook aan een bericht van de gebruiker of een andere agent. Alleen de gebruiker kan hem stoppen, met Agent stoppen in de chat van die agent.",
   "error.backend.interruptStarting": "Deze agent start nog een beurt. Probeer het opnieuw als de beurt is gestart.",
   "error.backend.interruptNoSession":
     "OpenBot kan deze agent niet onderbreken, omdat de sessie bij de aanbieder niet beschikbaar is.",
@@ -246,6 +252,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot kan deze MCP-serverconfiguratie niet opslaan.",
   "error.backend.mcpServerNoAnswer": "De server reageerde niet binnen {seconds} seconden.",
   "error.backend.mcpSignInNotAccepted": "De server heeft die inlog niet geaccepteerd.",
+  "error.backend.mcpSignInAccountRefused":
+    "De server heeft het account geweigerd waarmee je bent ingelogd. Controleer of dit account de dienst mag gebruiken. Log uit en log opnieuw in om een ander account te gebruiken.",
   "error.backend.mcpSignInClientRefused":
     "De inlogserver heeft OpenBot niet geaccepteerd bij het voltooien van de aanmelding. Meld je opnieuw aan: OpenBot registreert zich dan opnieuw bij de server.",
   "error.backend.mcpCommandNotFound": "Opdracht niet gevonden: {command}",
@@ -271,12 +279,18 @@ export const messages = {
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
   "error.backend.mcpToolSchemaRefused":
     "De tool {tool} heeft een invoerformaat dat deze provider niet kan lezen. Agents met andere providers krijgen de server nog steeds.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open de MCP-instellingen en kies Inloggen.",
+    "{provider} kon de MCP-server {name} niet gebruiken, omdat de server om inloggen vraagt. Open {name} in Marktplaats, Apps, en kies Inloggen.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} kon de MCP-server {name} niet starten. Open de MCP-instellingen en kies Verbinding testen om de oorzaak te zien.",
+    "{provider} kon de MCP-server {name} niet starten. Open {name} in Marktplaats, Apps, en kies Verbinding testen om de oorzaak te zien.",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} kon de MCP-server {name} niet starten. De tools ervan zijn niet beschikbaar voor {provider}. {provider} start de server zelf, dus de verbindingstest in OpenBot kan slagen. Begin een nieuwe chat om het opnieuw te proberen.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} kon de MCP-server {name} niet starten, omdat de server niet op tijd antwoordde. Begin een nieuwe chat om het opnieuw te proberen.",
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -342,6 +356,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "Alleen de eigenaar van de server of een beheerder kan deze actie kiezen.",
   "error.backend.approvalInactive": "Deze goedkeuring is niet meer actief.",
   "error.backend.approvalOwnerOnly": "Alleen de eigenaar van de server kan deze actie goedkeuren.",
+  "error.backend.feedbackNeedsPhone":
+    "Alleen de OpenBot-app op de telefoon kan dit rapport sturen, omdat die de versie en het ondersteuningslog van de telefoon toevoegt. Open deze chat op de telefoon. Zie je dit bericht daar, werk dan de telefoon-app bij.",
   "error.backend.takeoverInactive": "Deze overname van de browser is niet meer actief.",
   "error.backend.authSubmitting": "De verificatie wordt al verstuurd.",
   "error.backend.apiKeySaveFailed": "OpenBot kon de API-sleutel niet opslaan. Probeer het opnieuw.",
@@ -371,6 +387,8 @@ export const messages = {
   "error.backend.browserProxyUnreachable": "De proxy {name} reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxySignInRefused":
     "De proxy {name} heeft de aanmelding geweigerd, dus de pagina is niet geopend.",
+  "error.backend.browserSystemProxyFailed":
+    "De proxy in de instellingen van de computer waarop OpenBot draait reageert niet of heeft de verbinding geweigerd, dus de pagina is niet geopend. Controleer de proxy-instellingen van die computer.",
   "error.backend.browserProxyComputerUnreachable":
     "De computer van dit profiel reageert niet, dus de pagina is niet geopend.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -404,6 +422,8 @@ export const messages = {
     "De server antwoordde met {status}. Controleer de API-sleutel of andere inloggegevens.",
   "error.backend.mcpServerHttpUrl":
     "De server antwoordde met {status}. Controleer de URL. De link kan onjuist, verlopen of verwijderd zijn.",
+  "error.backend.mcpServerBearerKey":
+    "Deze server gebruikt een API-sleutel, geen aanmelding. Zet bij Headers de sleutel op Authorization en de waarde op Bearer, een spatie en je API-sleutel.",
   "error.backend.mcpSignInAppUrl": "De inlogapp heeft een geldige server-URL nodig.",
   "error.backend.mcpSignInAppClientId": "Voer de client-ID van de inlogapp in.",
   "error.backend.mcpSignInAppIssuerChanged":

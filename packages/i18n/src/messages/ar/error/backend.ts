@@ -80,6 +80,10 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "انتظر حتى يتوقف العمل في هذه القناة، ثم احذف سجلها.",
   "error.backend.channelCompactUnavailable":
     "لا يمكن لأي عضو في هذه القناة ضغط سياقه الآن. يجب أن يرد العضو في القناة أولًا، وأن يدعم مزوده الضغط.",
+  "error.backend.channelCompactNoSession":
+    "لا توجد لأعضاء هذه القناة محادثة لضغطها بعد. اضغطها بعد أن يرد عضو في القناة.",
+  "error.backend.channelCompactNotSupported":
+    "لا يمكن لأي عضو في هذه القناة الضغط عند الطلب. الأعضاء الذين يدعمونه يضغطون سياقهم تلقائيًا عندما يكاد يمتلئ.",
   "error.backend.channelArchived": "استعد هذه القناة قبل إرسال الرسائل أو تغيير المهام.",
   "error.backend.channelReferenceUnavailable": "رسالة القناة المشار إليها غير متاحة.",
   "error.backend.channelTaskNotFound": "لم يتم العثور على مهمة القناة.",
@@ -187,6 +191,8 @@ export const messages = {
   "error.backend.interruptSelf": "لا يمكن للوكيل مقاطعة نفسه.",
   "error.backend.interruptOtherWork":
     "يعمل هذا الوكيل على مهمة لم تبدأها رسالتك. يمكن للمستخدم أو لمرسل تلك المهمة فقط إيقافها.",
+  "error.backend.interruptSharedWork":
+    "يعمل دور هذا الوكيل على رسالتك وأيضًا على رسالة من المستخدم أو من وكيل آخر. المستخدم وحده يمكنه إيقافه، باستخدام إيقاف الوكيل في محادثة ذلك الوكيل.",
   "error.backend.interruptStarting": "لا يزال هذا الوكيل يبدأ دورًا. حاول مرة أخرى بعد بدء الدور.",
   "error.backend.interruptNoSession": "لا يمكن لـ OpenBot مقاطعة هذا الوكيل لأن جلسة المزوّد غير متاحة.",
   "error.backend.memoryTextRequired": "يلزم نص الذكرى.",
@@ -221,6 +227,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "لا يمكن لـ OpenBot حفظ إعداد خادم MCP هذا.",
   "error.backend.mcpServerNoAnswer": "لم يُجب الخادم خلال {seconds} ثانية.",
   "error.backend.mcpSignInNotAccepted": "لم يقبل الخادم تسجيل الدخول هذا.",
+  "error.backend.mcpSignInAccountRefused":
+    "رفض الخادم الحساب الذي سجّلت الدخول به. تحقّق من أن هذا الحساب يمكنه استخدام الخدمة. لاستخدام حساب آخر، سجّل الخروج ثم سجّل الدخول مرة أخرى.",
   "error.backend.mcpSignInClientRefused":
     "لم يقبل خادم تسجيل الدخول OpenBot عند إكمال تسجيل الدخول. سجّل الدخول مرة أخرى: سيسجّل OpenBot لدى الخادم مرة أخرى.",
   "error.backend.mcpCommandNotFound": "لم يتم العثور على الأمر: {command}",
@@ -244,12 +252,18 @@ export const messages = {
     "أرسل خادم تسجيل الدخول ردًا لا يستطيع OpenBot قراءته. إذا كانت الخدمة تمنحك مفتاح API أو رمزًا، فأضفه إلى إعدادات هذا الخادم، ثم اختبر الاتصال مرة أخرى.",
   "error.backend.mcpServerExited": "توقف الخادم قبل أن يُجيب. شغّل الأمر في الطرفية لرؤية الخطأ.",
   "error.backend.mcpServerFailedToStart": "لم يبدأ الخادم: {reason}",
+  "error.backend.mcpServerStartAbandoned":
+    "توقف {provider} عن الانتظار قبل أن يبدأ الخادم، لذلك لا يحصل وكلاؤه على أدوات هذا الخادم.",
   "error.backend.mcpToolSchemaRefused":
     "أداته {tool} لها صيغة إدخال لا يستطيع هذا المزوّد قراءتها. الوكلاء على مزوّدين آخرين ما زالوا يحصلون على الخادم.",
   "error.backend.mcpServerSignInForProvider":
-    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح إعدادات MCP واختر تسجيل الدخول.",
+    "تعذّر على {provider} استخدام خادم MCP {name}، لأن الخادم يطلب تسجيل الدخول. افتح {name} في المتجر، التطبيقات، واختر تسجيل الدخول.",
   "error.backend.mcpServerFailedForProvider":
-    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح إعدادات MCP واختر اختبار الاتصال لمعرفة السبب.",
+    "تعذّر على {provider} تشغيل خادم MCP {name}. افتح {name} في المتجر، التطبيقات، واختر اختبار الاتصال لمعرفة السبب.",
+  "error.backend.mcpServerFailedInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}. أدواته غير متاحة لـ {provider}. يشغّل {provider} الخادم بنفسه، لذلك قد ينجح اختبار الاتصال في OpenBot. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
+  "error.backend.mcpServerTimedOutInProvider":
+    "تعذّر على {provider} تشغيل خادم MCP {name}، لأن الخادم لم يردّ في الوقت المحدد. ابدأ محادثة جديدة للمحاولة مرة أخرى.",
   "error.backend.mcpOAuthProxyUnavailable":
     "تعذّر على OpenBot بدء اتصال تسجيل الدخول المحلي لهذا الخادم. أعد تشغيل OpenBot، ثم حاول مرة أخرى.",
   "error.backend.mcpOAuthSignInNeeded":
@@ -312,6 +326,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "يمكن لمالك الخادم أو المسؤول فقط اختيار هذا الإجراء.",
   "error.backend.approvalInactive": "هذه الموافقة لم تعد نشطة.",
   "error.backend.approvalOwnerOnly": "يمكن لمالك الخادم فقط الموافقة على هذا الإجراء.",
+  "error.backend.feedbackNeedsPhone":
+    "يمكن لتطبيق OpenBot على الهاتف فقط إرسال هذا البلاغ، لأنه يضيف إصدار الهاتف وسجل الدعم. افتح هذه المحادثة على الهاتف. إذا ظهرت لك هذه الرسالة هناك، فحدّث تطبيق الهاتف.",
   "error.backend.takeoverInactive": "تولي التحكم في المتصفح هذا لم يعد نشطًا.",
   "error.backend.authSubmitting": "إرسال المصادقة قيد التنفيذ بالفعل.",
   "error.backend.apiKeySaveFailed": "تعذّر على OpenBot حفظ مفتاح API. حاول مرة أخرى.",
@@ -338,6 +354,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "تغيّر هذا البروكسي بعد أن فتحته. راجعه مرة أخرى، ثم حاول مجددًا.",
   "error.backend.browserProxyUnreachable": "الوكيل {name} لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxySignInRefused": "رفض الوكيل {name} تسجيل الدخول، لذلك لم تُفتح الصفحة.",
+  "error.backend.browserSystemProxyFailed":
+    "الوكيل في إعدادات الكمبيوتر الذي يشغّل OpenBot لا يستجيب أو رفض الاتصال، لذلك لم تُفتح الصفحة. تحقّق من إعدادات الوكيل في ذلك الكمبيوتر.",
   "error.backend.browserProxyComputerUnreachable":
     "الكمبيوتر الذي يستخدمه هذا الملف الشخصي لا يستجيب، لذلك لم تُفتح الصفحة.",
   "error.backend.browserProxyComputerLocalAddress":
@@ -372,6 +390,8 @@ export const messages = {
   "error.backend.mcpServerHttpCredentials": "أجاب الخادم بـ {status}. تحقق من مفتاح API أو بيانات الاعتماد الأخرى.",
   "error.backend.mcpServerHttpUrl":
     "أجاب الخادم بـ {status}. تحقق من URL. قد يكون الرابط خاطئًا أو منتهي الصلاحية أو محذوفًا.",
+  "error.backend.mcpServerBearerKey":
+    "يستخدم هذا الخادم مفتاح API، وليس تسجيل الدخول. في الترويسات، اجعل المفتاح Authorization والقيمة Bearer ثم مسافة ثم مفتاح API.",
   "error.backend.mcpSignInAppUrl": "يحتاج تطبيق تسجيل الدخول إلى URL خادم صالح.",
   "error.backend.mcpSignInAppClientId": "أدخل Client ID لتطبيق تسجيل الدخول.",
   "error.backend.mcpSignInAppIssuerChanged":

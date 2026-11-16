@@ -32,7 +32,14 @@ import {
 import type { ProfileClients } from "./profile-clients";
 import { type GenerationObserver, GenerationUsageLimitError, generateTextWithoutTools } from "./profile-generation";
 import type { ProviderOperationFailed } from "./provider-runtime";
-import { type LearnedSkillDraft, type SkillLearner, SkillWriterResult, skillWriterPrompt } from "./skill-learning";
+import {
+  type LearnedSkillDraft,
+  revisionKeepsSkill,
+  type SkillLearner,
+  SkillWriterResult,
+  skillWriterPrompt,
+  writerCanRevise,
+} from "./skill-learning";
 import { reviewedChat, skillSuggestionMessages, skillSuggestionSaved } from "./skill-suggestion";
 
 const logger = createOpenBotLogger("memory-review");
@@ -572,6 +579,10 @@ export class MemoryReview {
       };
       if (shown && (shown.description !== current.description || shown.instructions !== current.instructions))
         return yield* Effect.fail(new Error("The skill holds redacted text, so the review does not rewrite it."));
+      if (current && !writerCanRevise(current))
+        return yield* Effect.fail(
+          new Error("The skill is too long to write again, so the review does not rewrite it."),
+        );
       const free = userAsked ? !options.profileClients.busy() : options.profileClients.hasSpare();
       if (!free || options.stopping()) return null;
       const prompt = skillWriterPrompt(
@@ -593,6 +604,10 @@ export class MemoryReview {
       const written = yield* Schema.decodeUnknownEffect(SkillWriterResult)(
         yield* Effect.try(() => extractJsonObject(answer)),
       );
+      if (current && !revisionKeepsSkill(current, written.instructions))
+        return yield* Effect.fail(
+          new Error("The revision drops text or letters of the skill, so the review does not save it."),
+        );
       if (options.stopping()) return null;
       const draft: LearnedSkillDraft =
         skillId && current

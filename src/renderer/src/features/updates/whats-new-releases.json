@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Update each joined server to this version too. On a server, Stop for routine runs, files that agents send with no text, and API keys at their old path work only when the server has this version."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Pinch on a touchpad or a touch screen to zoom in on the area under the pointer. Diagrams, canvases and the image viewer keep their own zoom.",
+          "Stop a routine run from the Routines canvas: select Stop in the top bar or in the routine details. The run ends as Cancelled.",
+          "Agents can send a file or an image with no text to a WhatsApp, Telegram, Slack or Discord chat.",
+          "Buy a Starter hosted server again. It has 25 GB of storage.",
+          "Use a ClinePass subscription with Cline agents. The model menu shows the ClinePass models."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "On the Canvas, drag a note, free text, a shape or a step by its text. A click on the text puts the caret where you clicked.",
+          "A message that you send while an Antigravity agent works goes into the running turn. This needs Antigravity CLI 1.5.0 or later.",
+          "A routine whose task says to stop when the work is done now pauses itself. Turn it on again from your list of routines.",
+          "The Vault now says that every agent can read the API key files of the other agents, because all agents run as the same system user."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Scripts, MCP servers and provider settings that read Vault API keys from their files work again after the update to 0.70.0.",
+          "A Claude agent keeps the model in its profile when Claude Code changes its default model.",
+          "When Claude stops a turn at the monthly spend limit, an agent with backup models continues on its next model.",
+          "Agents get the full transcript of a video that has captions, such as a YouTube video.",
+          "OpenBot uses less CPU: browser tabs that you do not see slow down, and the moving light on an agent's activity line is lighter."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

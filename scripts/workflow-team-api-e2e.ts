@@ -44,6 +44,11 @@ import { TEAM_PROTOCOL_V7 } from "@openbot/contracts/team-protocol/v7";
 import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { WORKFLOWS_CHANNELS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-channels-v1";
 import { WORKFLOWS_CHATS_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-chats-v1";
+import {
+  WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  WORKFLOWS_HIGGSFIELD_CODECS,
+  WORKFLOWS_HIGGSFIELD_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -89,6 +94,8 @@ import type { TeamApiBrowser } from "../src/main/team-api/dependencies";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/workflow-team-api-e2e");
 /** As the app answers: true while an enabled Sunra row of the host is signed in. */
 let sunraSignedIn = false;
+/** As the app answers: true while an enabled Higgsfield row of the host is signed in. */
+let higgsfieldSignedIn = false;
 /** The account of each media request, in order. Null is the provider's own sign-in. */
 const mediaAccounts: (string | null)[] = [];
 /** Whether each media request asks for a transparent image, and its prompt, in order. */
@@ -305,9 +312,14 @@ async function startHost(): Promise<Host> {
       // As the app does: the mailbox keeps the draft as a file with no owner agent.
       keepPicture: (draftId, types) =>
         mailbox.keepDraft(draftId, types).pipe(Effect.map((kept) => (typeof kept === "string" ? kept : kept.id))),
-      mediaProviders: () => ({ sunra: sunraSignedIn }),
-      // As the app answers: no credits with no sign-in, and a team quota after the sign-in. No Sunra call is made.
-      mediaCredits: () => Effect.succeed({ sunra: sunraSignedIn ? { available: 120, quota: 500 } : null }),
+      mediaProviders: () => ({ sunra: sunraSignedIn, higgsfield: higgsfieldSignedIn }),
+      // As the app answers: no credits with no sign-in, a Sunra team quota and Higgsfield credits with no
+      // quota after the sign-in. No Sunra or Higgsfield call is made.
+      mediaCredits: () =>
+        Effect.succeed({
+          sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
+          higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
+        }),
       // A step with an account goes to the real agent service, which must refuse an account that this
       // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
       // no file is paid for.
@@ -1338,6 +1350,75 @@ try {
         signedIn: signedIn.body,
         creditsSignedOut,
         creditsSignedIn,
+        old: old.status,
+      };
+    },
+  );
+
+  await step(
+    "higgsfield: a member reads whether the host has a Higgsfield sign-in and its credits; each media route answers only its own field; an old client is refused",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_HIGGSFIELD_CAPABILITY));
+      const codec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+      assert.ok(codec, "No workflows-higgsfield-v1 codec for providers.");
+      const creditsCodec = WORKFLOWS_HIGGSFIELD_CODECS.get(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+      assert.ok(creditsCodec, "No workflows-higgsfield-v1 codec for credits.");
+      // The raw body, so that a field of another media service in the answer fails the check.
+      const raw = async (route: string, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body: {}, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const read = async () => {
+        codec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.providers);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        codec.response(response.status, response.body);
+        return response.body;
+      };
+      const credits = async () => {
+        creditsCodec.request({});
+        const response = await raw(WORKFLOWS_HIGGSFIELD_ROUTES.credits);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        creditsCodec.response(response.status, response.body);
+        return response.body;
+      };
+      // Sunra is still signed in from the step before; Higgsfield is not.
+      assert.equal(sunraSignedIn, true);
+      higgsfieldSignedIn = false;
+      const signedOut = await read();
+      assert.deepEqual(signedOut, { higgsfield: false });
+      const creditsSignedOut = await credits();
+      assert.deepEqual(creditsSignedOut, { higgsfield: null });
+      higgsfieldSignedIn = true;
+      const signedIn = await read();
+      assert.deepEqual(signedIn, { higgsfield: true });
+      const creditsSignedIn = await credits();
+      assert.deepEqual(creditsSignedIn, { higgsfield: { available: 42, quota: null } });
+      // The frozen Sunra routes keep their `{ sunra }` answer while Higgsfield is signed in too.
+      const sunraProviders = await raw(WORKFLOWS_SUNRA_ROUTES.providers);
+      assert.deepEqual(sunraProviders.body, { sunra: true });
+      const sunraCredits = await raw(WORKFLOWS_SUNRA_ROUTES.credits);
+      assert.deepEqual(sunraCredits.body, { sunra: { available: 120, quota: 500 } });
+      const old = await raw(
+        WORKFLOWS_HIGGSFIELD_ROUTES.providers,
+        teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+          (capability) => capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+        ),
+      );
+      assert.equal(old.status, 400, JSON.stringify(old.body));
+      assert.ok(JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")), JSON.stringify(old.body));
+      higgsfieldSignedIn = false;
+      return {
+        signedOut,
+        signedIn,
+        creditsSignedOut,
+        creditsSignedIn,
+        sunraProviders: sunraProviders.body,
+        sunraCredits: sunraCredits.body,
         old: old.status,
       };
     },

@@ -49,6 +49,8 @@ export const messages = {
   "sidebar.section.nameUnique": "Ordnernamen müssen eindeutig sein.",
   "sidebar.section.saveFailed": "Dieser Ordner konnte nicht gespeichert werden. Versuche es erneut.",
   "sidebar.section.unassigned": "Nicht zugeordnet",
+  "sidebar.section.chatCount": { one: "{count} Chat", other: "{count} Chats" },
+  "sidebar.section.count": { one: "({count})", other: "({count})" },
   "sidebar.section.people": "Personen",
   "sidebar.section.fallback": "Ordner",
   "sidebar.folder.newInside": "Neuer Unterordner",

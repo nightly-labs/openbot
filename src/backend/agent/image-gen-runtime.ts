@@ -258,7 +258,7 @@ export class ImageGenRuntime {
             .storeGeneratedAttachment({
               sourcePath: savedPath,
               kind,
-              name: kind === "video" ? generatedVideoName(savedPath) : generatedImageName(savedPath),
+              name: kind === "video" ? generatedVideoName(savedPath, prompt) : generatedImageName(savedPath),
               ownerAgentId: agentId,
               ownerThreadId: threadId,
             })

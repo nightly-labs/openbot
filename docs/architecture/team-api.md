@@ -423,6 +423,22 @@ the whole copy when the next snapshot comes (`keepWholeApprovals` in
 404, a member needs `chat` on the agent (else 403), and a request that no longer waits, or a request of
 another agent, gets 409.
 
+The optional `phone-feedback-v1` capability (protocol 9 only) adds
+`POST /v1/agent-approvals/send-phone-feedback` (`requestId`, `phone`). `phone` is what only the phone
+has: `platform` (`iOS` or `Android`), `appVersion`, `system`, `network` (the kind of connection and
+the name of the VPN or mesh network that is on, never an address) and `log`, the last redacted lines
+of its support log. An agent's bug report with the surface `Phone app` (`openbot.send_feedback`) waits on an
+approval whose notice is `status.agent.reportPhoneProblem`. This route answers that approval with
+"accept" and gives the phone's data to the report. The agent service refuses a plain "accept" of such
+an approval on each path (`POST /v1/respond/approval`, the local IPC), with
+`error.backend.feedbackNeedsPhone` and 403, and the approval keeps waiting; a decline works on each
+client. So no bug report about the phone app goes out without the phone's version, system and log,
+and the account Worker refuses one too (`feedback_needs_phone`), which also stops a host of an older
+version. The desktop and web cards of such a report have no Send and tell the user to send it from
+the phone app. `src/main/team-api/route-phone-feedback.ts` owns the authorization: `chat` on the
+agent of the request (else 403, or 404 for an agent the member cannot see), the owner only (else
+403), and 409 for a request that no longer waits or that is not such a report.
+
 The optional `agent-queue-task-v1` capability (protocol 9 only) adds
 `POST /v1/agent-tasks/from-queued-message` (`agentId`, `deliveryId`, no other keys). It is "Run as a
 new thread" on a message that waits in the queue of the agent's own chat. The host advertises it only
@@ -526,6 +542,19 @@ the list again; the desktop main process adds the list to the snapshot that it f
 `src/main/team-api/route-agent-usage-limit.ts` owns them. Without the capability a client does not show
 the usage-limit card for that host. Only an owner or admin sees "Next time, switch without asking" on
 the card, because the backup models use `agent-backup-models-v1`.
+
+The optional `agent-pending-runtime-v1` capability (protocol 9 only) adds
+`POST /v1/agent-pending-runtime/update` (`agentId`, and one or more of `provider`, `model`,
+`reasoningEffort` and `providerAccountId`, where `default` is the provider's own sign-in). It changes the
+runtime as the pickers on the host's computer do: while the agent works, the host keeps the change as
+`pendingRuntime` and applies it before the next turn, where the released `PATCH /v1/agents/:agentId`
+refuses a provider change. It needs a visible agent (else 404) and `manage` on it (else 403); another
+account needs an owner or admin (else 403), except the new provider's own sign-in on a provider change. For a peer with the
+capability, the host also adds `pendingRuntime` to each agent of `GET /v1/agents` and of the
+`bots-changed` event, so the "After this turn" badge shows on the client.
+`src/main/team-api/route-agent-pending-runtime.ts` owns the route. The desktop with a joined server and
+the web client send a runtime change alone on it when the host has the capability; mobile still uses the
+released route. Without the capability a provider change during work is refused as before.
 
 The optional `hermes-import-v1` capability (protocol 9 only) adds `POST /v1/hermes-import/read` (empty
 body), `POST /v1/hermes-import/apply` (`token`, `profiles` with `key` and `allow`) and

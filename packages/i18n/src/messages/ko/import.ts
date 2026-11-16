@@ -145,7 +145,7 @@ export const messages = {
   "import.hermes.reason.invalidSkill": "SKILL.md에 올바른 이름과 설명이 없어요.",
   "import.hermes.reason.duplicateSkill": "이 프로필의 다른 스킬과 이름이 같아요.",
   "import.hermes.reason.builtIn": "Hermes에 기본 제공되는 스킬이에요. OpenBot에는 자체 스킬이 있어요.",
-  "import.hermes.reason.mcpOff": "꺼진 상태로 추가돼요. 확인한 후 MCP 설정에서 켜세요.",
+  "import.hermes.reason.mcpOff": "꺼진 상태로 추가돼요. 확인한 후 마켓플레이스, 앱에서 켜세요.",
   "import.hermes.reason.mcpNameTaken": "같은 이름의 서버가 이미 있어요.",
   "import.hermes.reason.routineSchedule": "OpenBot이 일정을 실행할 수 없거나 시간이 지났어요.",
   "import.hermes.reason.routineScript": "에이전트가 아니라 스크립트를 실행해요.",

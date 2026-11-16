@@ -12,6 +12,12 @@ export const messages = {
     "Das Werkzeug wurde nicht ausgeführt. In tool_call muss arguments ein JSON-Objekt sein, kein Text. Sende den Aufruf erneut mit arguments als Objekt.",
   "error.agent.toolCallDiscoveryTool":
     "Das Werkzeug wurde nicht ausgeführt. tool_call kann openbot.tool_search und openbot.tool_describe nicht ausführen. Rufe sie direkt mit denselben Argumenten auf.",
+  "error.agent.toolCallEnvelopeKeys":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call nimmt nur name und arguments an. Gib die Argumente des Werkzeugs in arguments als Objekt an und sende den Aufruf erneut.",
+  "error.agent.toolCallUnknownTool":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Verwende den genauen qualifizierten Namen aus tool_search, zum Beispiel openbot_browser.snapshot.",
+  "error.agent.toolCallUnknownToolSuggest":
+    "Das Werkzeug wurde nicht ausgeführt. tool_call hat kein Werkzeug mit diesem Namen gefunden. Der qualifizierte Name ist möglicherweise {name}. Wenn ja, sende den Aufruf mit diesem Namen erneut.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Der Zeitplan der Routine ist ungültig: {detail} Korrigiere den Zeitplan und versuche es erneut. openbot.tool_describe liefert das Schema.",
   "error.agent.approvalWhileDeleting": "Während der Agent gelöscht wird, kann keine Genehmigung erteilt werden.",
@@ -101,6 +107,8 @@ export const messages = {
     "{provider} hat einen fehlgeschlagenen Schritt viele Male wiederholt, daher hat OpenBot diesen Durchgang beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
   "error.agent.compactionConnectionLost":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und sende dann eine Nachricht, um fortzufahren.",
+  "error.agent.compactionLoopStopped":
+    "{provider} hat den Kontext immer wieder komprimiert, und jedes Mal blieb er zu voll, um weiterzumachen. Daher hat OpenBot diesen Durchlauf angehalten. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, und sende dann eine Nachricht. Wenn du oder der Agent geändert habt, wann {provider} komprimiert, mach diese Änderung rückgängig.",
   "error.agent.selectedGone": "Der gewählte Agent existiert nicht mehr.",
   "error.agent.profileEndpointsChanged":
     "Die benutzerdefinierten Endpunkte wurden während der Erstellung geändert. Versuche es erneut.",
@@ -163,8 +171,12 @@ export const messages = {
     "Dieser Server hat wenig freien Arbeitsspeicher. Deine Nachricht wartet in der Warteschlange und startet, wenn Speicher frei ist.",
   "error.agent.workspaceOnlyToolMissing":
     "„Nur Arbeitsbereich“ benötigt {tool}, das OpenBot nicht gefunden hat. Installiere es oder wähle „Voller Zugriff“ in den Agenteneinstellungen.",
+  "error.agent.codexSandboxUnavailable":
+    "„Nur Arbeitsbereich“ braucht die Codex-Sandbox, die Codex auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Erst fragen“ oder „Voller Zugriff“ in den Agenteneinstellungen.",
   "error.agent.claudeSandboxUnavailable":
     "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann: {reason}. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
+  "error.agent.claudeSandboxBlocked":
+    "„Nur Arbeitsbereich“ braucht die Claude-Sandbox, die Claude auf diesem Computer nicht starten kann. Deshalb schlagen die Befehle des Agenten fehl. Wähle „Voller Zugriff“ oder einen anderen Anbieter in den Agenteneinstellungen.",
   "error.agent.screenCaptureOff":
     "Die Bildschirmaufnahme ist für diesen Agenten deaktiviert. Der Benutzer kann die Computersteuerung in den Agenteneinstellungen aktivieren.",
   "error.agent.screenCaptureUnavailable": "Die Bildschirmaufnahme ist auf diesem Computer nicht verfügbar.",
@@ -172,6 +184,8 @@ export const messages = {
     "Die Bildschirmaufnahme funktioniert nicht in einer Slack-, Discord- oder Telegram-Unterhaltung, da andere Personen ihre Dateien erhalten.",
   "error.agent.screenCaptureDeclined":
     "Der Benutzer hat diese Bildschirmaufnahme nicht erlaubt. Es wurde nichts aufgenommen.",
+  "error.agent.mcpToolDeclined":
+    "Der Benutzer hat diesen MCP-Toolaufruf nicht erlaubt. Das Tool wurde nicht ausgeführt.",
   "error.agent.screenCaptureWindowMissing":
     "Dieses Fenster ist gerade nicht geöffnet. Rufe list_capture_sources auf, um die aktuellen Fenster-IDs zu erhalten.",
   "error.agent.screenCaptureDisplayMissing":

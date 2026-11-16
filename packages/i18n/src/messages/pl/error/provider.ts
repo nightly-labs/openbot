@@ -10,6 +10,9 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} nie odpowiedział na czas, więc OpenBot zakończył jego proces.",
   "error.provider.acpSignInLost":
     "{provider} utracił logowanie, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} odrzucił wiadomość, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
+  "error.provider.acpSettingsTimedOut": "{provider} nie odpowiedział na czas. Spróbuj ponownie za chwilę.",
   "error.provider.acpPlanUsedUp":
     "{provider} zgłasza, że limit Twojego planu się wyczerpał. Wybierz inny model lub przejdź na wyższy plan {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -202,6 +205,8 @@ export const messages = {
     "Endpoint „{provider}” wymaga klucza API. Dodaj klucz w Ustawieniach serwera → Dostawcy, a potem spróbuj ponownie.",
   "error.provider.opencodeKeyExpired":
     "Twój klucz API OpenCode wygasł. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go odrzucił Twój zapisany klucz API. Klucz mógł wygasnąć. Utwórz nowy klucz w OpenCode Console, wklej go w ustawieniach OpenCode, potem spróbuj ponownie.",
   "error.provider.opencodeServiceFailure":
     "OpenCode nie ukończył tej tury, ponieważ jego lokalna usługa uległa awarii. Spróbuj ponownie. Jeśli błąd się powtarza, połącz ponownie OpenCode w Ustawieniach.",
   "error.provider.opencodeRateLimited":
@@ -220,6 +225,8 @@ export const messages = {
     "Wystąpił błąd po stronie dostawcy modelu. Twoje połączenie nie jest przyczyną. Spróbuj ponownie później lub wybierz inny model.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Odpowiedź modelu została przerwana lub była nieprawidłowa. Wyślij wiadomość ponownie lub wybierz inny model.\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode nie mógł odczytać rozumowania tego modelu przy tym poziomie wysiłku. Wybierz niższy wysiłek lub inny model, a potem wyślij wiadomość ponownie.",
   "error.provider.opencodeNetwork":
     "OpenCode nie połączył się z dostawcą modelu. Sprawdź połączenie sieciowe komputera, na którym działa OpenBot, a potem spróbuj ponownie.\n{detail}",
   "error.provider.codexStateBusy":
@@ -253,6 +260,8 @@ export const messages = {
     "Serwer Gemini z OPENBOT_ANTIGRAVITY_PATH nie istnieje lub nie jest wykonywalny. Popraw ścieżkę lub usuń zmienną, a potem uruchom ponownie OpenBot.",
   "error.provider.antigravityVersionUnreadable": "Nie można odczytać wersji serwera Gemini.",
   "error.provider.antigravitySignIn": "Zaloguj się przez Google, aby używać Gemini.",
+  "error.provider.antigravityModelAtCapacity":
+    "Google nie ma teraz wolnej mocy dla tego modelu Gemini. Limit planu nie jest przyczyną. Spróbuj ponownie za kilka minut albo wybierz inny model.\n{detail}",
   "error.provider.antigravityRateLimited":
     "Gemini odrzucił żądanie, ponieważ osiągnięto limit zapytań lub limit planu. Zaczekaj kilka minut lub wybierz inny model, a potem spróbuj ponownie.\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -263,8 +272,14 @@ export const messages = {
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini utracił połączenie ze swoim agentem i się zatrzymał. Wyślij wiadomość, aby kontynuować.",
+  "error.provider.grokServiceFailure":
+    "Usługa Grok jest przeciążona lub zgłasza błąd. Spróbuj ponownie za kilka minut albo wybierz inny model.",
+  "error.provider.grokConnectionFailed":
+    "Grok nie może połączyć się ze swoją usługą. Sprawdź połączenie z internetem, a potem wyślij wiadomość ponownie.",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Na hoście z Windows Gemini otwiera stronę Google na samym hoście. Połącz Gemini na komputerze hosta.",
   "error.provider.cursorArchivePath": "Archiwum Cursor zawiera nieoczekiwany plik.",
@@ -300,7 +315,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Zaloguj się przez Nous Portal lub uruchom `hermes setup` w terminalu, aby używać Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Ustawienia serwera › MCP, a potem wyślij wiadomość ponownie.",
+    "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Marketplace, Aplikacje, a potem wyślij wiadomość ponownie.",
+  "error.provider.hermesRefused":
+    "Hermes odrzucił tę wiadomość, zanim się zaczęła. Wyślij ją ponownie. Jeśli Hermes odrzuca każdą wiadomość, uruchom ponownie OpenBot na komputerze, na którym działa ten agent.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",
@@ -308,6 +325,8 @@ export const messages = {
     "Ten czat stał się za długi dla Claude. OpenBot rozpoczął nową sesję Claude Code z historią czatu. Spróbuj ponownie.",
   "error.provider.claudeApiKeyNoCredit":
     "Klucz API Anthropic nie ma środków API. Plan Claude nie płaci za zapytania z kluczem API. Doładuj środki w Anthropic Console albo zaloguj się do Claude w Ustawieniach i wybierz konto Claude w menu modeli agenta.",
+  "error.provider.claudeServiceBlocked":
+    "Usługa Claude zablokowała to zapytanie. Zwykle to krótki problem po stronie Claude, a nie problem z Twoim kontem. Wyślij wiadomość ponownie za kilka minut.",
   "error.provider.foreignReasoning":
     "Dostawca {provider} nie przyjął wcześniejszego rozumowania z tego czatu, ponieważ otrzymało je inne konto lub inny klucz API. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageTooSmall":
@@ -316,6 +335,8 @@ export const messages = {
     "Model nie przyjął obrazu z tego czatu, ponieważ obraz jest za duży. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.imageCountLimit":
     "Model nie przyjął tego czatu, ponieważ czat zawiera za dużo obrazów. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
+  "error.provider.requestTooLarge":
+    "Ten czat stał się za duży, aby wysłać go do modelu. Często powodują to obrazy w czacie. OpenBot rozpoczął nową sesję {provider} z historią czatu. Spróbuj ponownie.",
   "error.provider.opencodeSessionRejected":
     "OpenCode odrzucił żądanie i nie podał przyczyny. Może się to zdarzyć w długim czacie lub po zmianie modelu. OpenBot rozpoczął nową sesję OpenCode z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model lub niższy wysiłek.",
   "error.provider.opencodeCompactionFailed":
@@ -333,6 +354,8 @@ export const messages = {
     "Gemini nie otworzył strony logowania w przeglądarce. Sprawdź domyślną przeglądarkę, a potem połącz się ponownie.",
   "error.provider.acpSignInFailed": "Logowanie nie zostało ukończone.",
   "error.provider.acpSignInFailedReason": "Logowanie nie zostało ukończone: {reason}",
+  "error.provider.acpSignInNetwork":
+    "Logowanie nie mogło połączyć się z serwerem dostawcy. Sprawdź połączenie sieciowe i ustawienia DNS komputera, na którym działa OpenBot, a następnie spróbuj ponownie.",
   "error.provider.acpSignOutFailed": "Wylogowanie nie zostało ukończone.",
   "error.provider.acpSignOutFailedReason": "Wylogowanie nie zostało ukończone: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -340,6 +363,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "W przeglądarce można otworzyć tylko linki logowania HTTPS.",
   "error.provider.geminiKeyRefused":
     "Gemini odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie połącz ponownie.",
+  "error.provider.geminiKeyRateLimited":
+    "Gemini odrzucił żądanie, ponieważ zapisany klucz API Gemini osiągnął limit zapytań lub swój limit użycia. Klucz jest używany zamiast Twojego planu Google. Zaczekaj kilka minut lub wybierz inny model, a potem spróbuj ponownie. Aby używać planu Google, usuń klucz w Ustawieniach.\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "Zapisany klucz API Gemini nie ma limitu użycia dla tego modelu. Klucz jest używany zamiast Twojego planu Google. Wybierz inny model lub usuń klucz w Ustawieniach, aby używać planu Google.\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini nie może otworzyć pliku ustawień tego konta, więc nie może się zalogować. Usuń to konto i dodaj je ponownie.",
   "error.provider.geminiSettingsUnreadable":
@@ -350,6 +377,8 @@ export const messages = {
     "{provider} odrzucił zapisany klucz API. Zastąp lub usuń klucz w Ustawieniach, a następnie spróbuj ponownie.",
   "error.provider.keyProviderNoBalance":
     "Konto {provider} zapisanego klucza API nie ma środków. Doładuj konto, a następnie spróbuj ponownie.",
+  "error.provider.keyProviderLowCredit":
+    "Konto {provider} zapisanego klucza API nie ma dość środków na odpowiedź tego modelu. Doładuj konto albo wybierz inny model, a następnie spróbuj ponownie.",
   "error.provider.modelServiceRefused":
     "Usługa modelu odrzuciła żądanie. Wybierz inny model albo sprawdź swój dostęp do tego modelu w usłudze.",
   "error.provider.modelServiceRefusedReason":
@@ -429,6 +458,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Plik sesji Pi nie jest dostępny na tym komputerze.",
   "error.provider.piResumeCancelled": "Pi anulował wznowienie sesji. Spróbuj ponownie.",
   "error.provider.piSessionIdentity": "Pi zwrócił inną sesję. Zapisana sesja nie została zastąpiona.",
+  "error.provider.piExtensionFailed":
+    "Pi zatrzymał się, ponieważ nie mógł wczytać rozszerzenia. Usuń lub zaktualizuj to rozszerzenie, a następnie spróbuj ponownie. {detail}",
   "error.provider.piModelInvalid": "Wybierz model Pi, który zawiera nazwę dostawcy.",
   "error.provider.piToolInvalid": "Narzędzie zwróciło nieprawidłowy wynik.",
   "error.provider.piSignIn": "Użyj /login w Pi na komputerze hosta. Zamknij Pi po zakończeniu logowania.",

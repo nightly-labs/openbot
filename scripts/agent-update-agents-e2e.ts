@@ -159,12 +159,27 @@ try {
     assert.equal(first?.ok, true);
     assert.equal(first?.notifications, false, "The result has the agent's new settings.");
     assert.equal("description" in (first ?? {}), false, "The result leaves out the agent's instructions.");
-    assert.equal(unknown?.error, sourceText("error.agent.unknown", { id: "no-such-agent" }));
+    assert.equal(unknown?.error, sourceText("error.backend.agentIdUnknown", { id: "no-such-agent" }));
     assert.equal(busy?.error, sourceText("error.agent.waitBeforeProviderChange"));
     assert.equal(agent(writer.id).notifications, false);
     assert.equal(agent(writer.id).model, writer.model);
     assert.notEqual(agent(reviewer.id).notifications, false, "The busy agent keeps all its settings.");
     assert.equal(agent(reviewer.id).model, NEW_MODEL);
+    return value;
+  });
+
+  await step("An id with one character less names the near agent and changes nothing (#9771)", async () => {
+    const miscopied = writer.id.slice(0, -1);
+    const before = writes.length;
+    const { value } = await call({ agentIds: [miscopied], notifications: true });
+    assert.equal(value.failed, 1);
+    const [result] = Array.isArray(value.results) ? value.results.filter(isDynamicRecord) : [];
+    assert.equal(
+      result?.error,
+      sourceText("error.backend.agentIdNear", { id: miscopied, name: JSON.stringify(writer.name), nearId: writer.id }),
+    );
+    assert.equal(writes.length, before, "The tool does not change the near agent by itself.");
+    assert.equal(agent(writer.id).notifications, false);
     return value;
   });
 

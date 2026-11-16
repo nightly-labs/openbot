@@ -135,6 +135,7 @@ import { Route as V1MarketplaceAgentsAgentIdRouteImport } from './routes/v1/mark
 import { Route as V1MarketplaceAgentsMineRouteImport } from './routes/v1/marketplace/agents/mine'
 import { Route as V1MeBillingIndexRouteImport } from './routes/v1/me/billing/index'
 import { Route as V1MeBillingPortalRouteImport } from './routes/v1/me/billing/portal'
+import { Route as V1MeBillingStorageRouteImport } from './routes/v1/me/billing/storage'
 import { Route as V1MeLicenseIndexRouteImport } from './routes/v1/me/license/index'
 import { Route as V1MeLicenseCheckoutRouteImport } from './routes/v1/me/license/checkout'
 import { Route as V1MeLicensePlanRouteImport } from './routes/v1/me/license/plan'
@@ -189,6 +190,7 @@ import { Route as V2HostingServersServerIdStatusRouteImport } from './routes/v2/
 import { Route as V2HostingServersServerIdWakeRouteImport } from './routes/v2/hosting/servers/$serverId/wake'
 import { Route as V2RemoteHostsHostIdIndexRouteImport } from './routes/v2/remote/hosts/$hostId/index'
 import { Route as V2RemoteHostsHostIdAndroidNotificationRouteImport } from './routes/v2/remote/hosts/$hostId/android-notification'
+import { Route as V2RemoteHostsHostIdAppearanceRouteImport } from './routes/v2/remote/hosts/$hostId/appearance'
 import { Route as V2RemoteHostsHostIdDiscordDisconnectRouteImport } from './routes/v2/remote/hosts/$hostId/discord-disconnect'
 import { Route as V2RemoteHostsHostIdDiscordRouteRouteImport } from './routes/v2/remote/hosts/$hostId/discord-route'
 import { Route as V2RemoteHostsHostIdGithubRouteRouteImport } from './routes/v2/remote/hosts/$hostId/github-route'
@@ -853,6 +855,11 @@ const V1MeBillingPortalRoute = V1MeBillingPortalRouteImport.update({
   path: '/billing/portal',
   getParentRoute: () => V1MeRoute,
 } as any)
+const V1MeBillingStorageRoute = V1MeBillingStorageRouteImport.update({
+  id: '/billing/storage',
+  path: '/billing/storage',
+  getParentRoute: () => V1MeRoute,
+} as any)
 const V1MeLicenseIndexRoute = V1MeLicenseIndexRouteImport.update({
   id: '/license/',
   path: '/license/',
@@ -1154,6 +1161,12 @@ const V2RemoteHostsHostIdAndroidNotificationRoute =
     path: '/v2/remote/hosts/$hostId/android-notification',
     getParentRoute: () => rootRouteImport,
   } as any)
+const V2RemoteHostsHostIdAppearanceRoute =
+  V2RemoteHostsHostIdAppearanceRouteImport.update({
+    id: '/v2/remote/hosts/$hostId/appearance',
+    path: '/v2/remote/hosts/$hostId/appearance',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const V2RemoteHostsHostIdDiscordDisconnectRoute =
   V2RemoteHostsHostIdDiscordDisconnectRouteImport.update({
     id: '/v2/remote/hosts/$hostId/discord-disconnect',
@@ -1442,6 +1455,7 @@ export interface FileRoutesByFullPath {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -1497,6 +1511,7 @@ export interface FileRoutesByFullPath {
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
+  '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -1648,6 +1663,7 @@ export interface FileRoutesByTo {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -1703,6 +1719,7 @@ export interface FileRoutesByTo {
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
+  '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -1859,6 +1876,7 @@ export interface FileRoutesById {
   '/v1/marketplace/agents/$agentId': typeof V1MarketplaceAgentsAgentIdRouteWithChildren
   '/v1/marketplace/agents/mine': typeof V1MarketplaceAgentsMineRoute
   '/v1/me/billing/portal': typeof V1MeBillingPortalRoute
+  '/v1/me/billing/storage': typeof V1MeBillingStorageRoute
   '/v1/me/license/checkout': typeof V1MeLicenseCheckoutRoute
   '/v1/me/license/plan': typeof V1MeLicensePlanRoute
   '/v1/me/license/renewal': typeof V1MeLicenseRenewalRoute
@@ -1914,6 +1932,7 @@ export interface FileRoutesById {
   '/v2/hosting/servers/$serverId/status': typeof V2HostingServersServerIdStatusRoute
   '/v2/hosting/servers/$serverId/wake': typeof V2HostingServersServerIdWakeRoute
   '/v2/remote/hosts/$hostId/android-notification': typeof V2RemoteHostsHostIdAndroidNotificationRoute
+  '/v2/remote/hosts/$hostId/appearance': typeof V2RemoteHostsHostIdAppearanceRoute
   '/v2/remote/hosts/$hostId/discord-disconnect': typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   '/v2/remote/hosts/$hostId/discord-route': typeof V2RemoteHostsHostIdDiscordRouteRoute
   '/v2/remote/hosts/$hostId/github-route': typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -2067,6 +2086,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -2122,6 +2142,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
+    | '/v2/remote/hosts/$hostId/appearance'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -2273,6 +2294,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -2328,6 +2350,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
+    | '/v2/remote/hosts/$hostId/appearance'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -2483,6 +2506,7 @@ export interface FileRouteTypes {
     | '/v1/marketplace/agents/$agentId'
     | '/v1/marketplace/agents/mine'
     | '/v1/me/billing/portal'
+    | '/v1/me/billing/storage'
     | '/v1/me/license/checkout'
     | '/v1/me/license/plan'
     | '/v1/me/license/renewal'
@@ -2538,6 +2562,7 @@ export interface FileRouteTypes {
     | '/v2/hosting/servers/$serverId/status'
     | '/v2/hosting/servers/$serverId/wake'
     | '/v2/remote/hosts/$hostId/android-notification'
+    | '/v2/remote/hosts/$hostId/appearance'
     | '/v2/remote/hosts/$hostId/discord-disconnect'
     | '/v2/remote/hosts/$hostId/discord-route'
     | '/v2/remote/hosts/$hostId/github-route'
@@ -2711,6 +2736,7 @@ export interface RootRouteChildren {
   V2HostingServersServerIdStatusRoute: typeof V2HostingServersServerIdStatusRoute
   V2HostingServersServerIdWakeRoute: typeof V2HostingServersServerIdWakeRoute
   V2RemoteHostsHostIdAndroidNotificationRoute: typeof V2RemoteHostsHostIdAndroidNotificationRoute
+  V2RemoteHostsHostIdAppearanceRoute: typeof V2RemoteHostsHostIdAppearanceRoute
   V2RemoteHostsHostIdDiscordDisconnectRoute: typeof V2RemoteHostsHostIdDiscordDisconnectRoute
   V2RemoteHostsHostIdDiscordRouteRoute: typeof V2RemoteHostsHostIdDiscordRouteRoute
   V2RemoteHostsHostIdGithubRouteRoute: typeof V2RemoteHostsHostIdGithubRouteRoute
@@ -3625,6 +3651,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V1MeBillingPortalRouteImport
       parentRoute: typeof V1MeRoute
     }
+    '/v1/me/billing/storage': {
+      id: '/v1/me/billing/storage'
+      path: '/billing/storage'
+      fullPath: '/v1/me/billing/storage'
+      preLoaderRoute: typeof V1MeBillingStorageRouteImport
+      parentRoute: typeof V1MeRoute
+    }
     '/v1/me/license/': {
       id: '/v1/me/license/'
       path: '/license'
@@ -4003,6 +4036,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof V2RemoteHostsHostIdAndroidNotificationRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/v2/remote/hosts/$hostId/appearance': {
+      id: '/v2/remote/hosts/$hostId/appearance'
+      path: '/v2/remote/hosts/$hostId/appearance'
+      fullPath: '/v2/remote/hosts/$hostId/appearance'
+      preLoaderRoute: typeof V2RemoteHostsHostIdAppearanceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v2/remote/hosts/$hostId/discord-disconnect': {
       id: '/v2/remote/hosts/$hostId/discord-disconnect'
       path: '/v2/remote/hosts/$hostId/discord-disconnect'
@@ -4280,6 +4320,7 @@ interface V1MeRouteChildren {
   V1MeChatColorRoute: typeof V1MeChatColorRoute
   V1MeProfileRoute: typeof V1MeProfileRoute
   V1MeBillingPortalRoute: typeof V1MeBillingPortalRoute
+  V1MeBillingStorageRoute: typeof V1MeBillingStorageRoute
   V1MeLicenseCheckoutRoute: typeof V1MeLicenseCheckoutRoute
   V1MeLicensePlanRoute: typeof V1MeLicensePlanRoute
   V1MeLicenseRenewalRoute: typeof V1MeLicenseRenewalRoute
@@ -4294,6 +4335,7 @@ const V1MeRouteChildren: V1MeRouteChildren = {
   V1MeChatColorRoute: V1MeChatColorRoute,
   V1MeProfileRoute: V1MeProfileRoute,
   V1MeBillingPortalRoute: V1MeBillingPortalRoute,
+  V1MeBillingStorageRoute: V1MeBillingStorageRoute,
   V1MeLicenseCheckoutRoute: V1MeLicenseCheckoutRoute,
   V1MeLicensePlanRoute: V1MeLicensePlanRoute,
   V1MeLicenseRenewalRoute: V1MeLicenseRenewalRoute,
@@ -4566,6 +4608,7 @@ const rootRouteChildren: RootRouteChildren = {
   V2HostingServersServerIdWakeRoute: V2HostingServersServerIdWakeRoute,
   V2RemoteHostsHostIdAndroidNotificationRoute:
     V2RemoteHostsHostIdAndroidNotificationRoute,
+  V2RemoteHostsHostIdAppearanceRoute: V2RemoteHostsHostIdAppearanceRoute,
   V2RemoteHostsHostIdDiscordDisconnectRoute:
     V2RemoteHostsHostIdDiscordDisconnectRoute,
   V2RemoteHostsHostIdDiscordRouteRoute: V2RemoteHostsHostIdDiscordRouteRoute,

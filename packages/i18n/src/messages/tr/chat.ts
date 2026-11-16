@@ -359,8 +359,6 @@ export const messages = {
   "chat.video.pause": "Videoyu duraklat",
   "chat.video.position": "Video konumu",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "Videoyu indir",
-  "chat.video.open": "Videoyu aç",
   "chat.video.mute": "Videonun sesini kapat",
   "chat.video.unmute": "Videonun sesini aç",
   "chat.message.you": "Siz",

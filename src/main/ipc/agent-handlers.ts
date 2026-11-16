@@ -5,6 +5,11 @@ import {
 } from "@openbot/contracts/team-protocol/agent-fast-mode-v1";
 import { AGENT_HIDDEN_CAPABILITY, AGENT_HIDDEN_ROUTES } from "@openbot/contracts/team-protocol/agent-hidden-v1";
 import {
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  AGENT_PENDING_RUNTIME_ROUTES,
+  pendingRuntimeUpdateBody,
+} from "@openbot/contracts/team-protocol/agent-pending-runtime-v1";
+import {
   AGENT_SESSION_SETTINGS_CAPABILITY,
   AGENT_SESSION_SETTINGS_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
@@ -14,6 +19,7 @@ import {
   BROWSER_SECRET_VAULT_ROUTES,
 } from "@openbot/contracts/team-protocol/browser-secret-vault-v1";
 import { CHAT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/chat-colors-v1";
+import { MODEL_STEERING_CAPABILITY, MODEL_STEERING_ROUTES } from "@openbot/contracts/team-protocol/model-steering-v1";
 import {
   MODEL_VISIBILITY_CAPABILITY,
   MODEL_VISIBILITY_ROUTES,
@@ -40,6 +46,7 @@ import {
   decodeAgentFastModels,
   decodeAgentModelListings,
   decodeAgentProfileDraft,
+  decodeAgentSteeringModels,
   decodeChannel,
   decodeChannelPage,
   decodeChannelSummaries,
@@ -68,6 +75,7 @@ import {
   type SidebarLayoutSnapshot,
   withFastServiceTiers,
   withModelListings,
+  withSteeringModels,
   withUsageCredits,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
@@ -509,11 +517,21 @@ export function agentIpcHandlers({
                     })
                     .pipe(Effect.orElseSucceed(() => []))
                 : Effect.succeed([]);
-              // The three requests go to the same host at the same time.
-              const [options, fastModels, listed] = yield* Effect.all([models, fast, listings], {
+              // `model-steering-v1` lists the custom agent models that steer. A host without it, or a
+              // failed read, leaves them unmarked: the composer then shows Send now for them.
+              const steering = remoteServers.supportsCapability(serverId, MODEL_STEERING_CAPABILITY)
+                ? remoteServers
+                    .request(serverId, MODEL_STEERING_ROUTES.list, decodeAgentSteeringModels, {
+                      method: "POST",
+                      body: {},
+                    })
+                    .pipe(Effect.orElseSucceed(() => []))
+                : Effect.succeed([]);
+              // The four requests go to the same host at the same time.
+              const [options, fastModels, listed, steered] = yield* Effect.all([models, fast, listings, steering], {
                 concurrency: "unbounded",
               });
-              return withModelListings(withFastServiceTiers(options, fastModels), listed);
+              return withSteeringModels(withModelListings(withFastServiceTiers(options, fastModels), listed), steered);
             }),
           );
         },
@@ -915,6 +933,30 @@ export function agentIpcHandlers({
             if (!moved) throw new Error(sourceText("error.team.agentNotFound"));
             const agent = remoteServers.agentWithColor(serverId, moved);
             return providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
+              ? { ...agent, providerAccountId }
+              : agent;
+          }
+          // While the agent works, the released agent route refuses a provider change. A change of the
+          // runtime alone goes on `agent-pending-runtime-v1`, which keeps it for the next turn, with the
+          // account in the same change.
+          const runtimeChange = remoteServers.supportsCapability(serverId, AGENT_PENDING_RUNTIME_CAPABILITY)
+            ? pendingRuntimeUpdateBody(input)
+            : null;
+          if (runtimeChange) {
+            const { agentId, providerAccountId } = input;
+            await runCauseEffect(
+              remoteServers.request(serverId, AGENT_PENDING_RUNTIME_ROUTES.update, acceptEmpty, {
+                method: "POST",
+                body: runtimeChange,
+              }),
+            );
+            const changed = (
+              await runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.all, decodeAgentSummaries))
+            ).find((agent) => agent.id === agentId);
+            if (!changed) throw new Error(sourceText("error.team.agentNotFound"));
+            const agent = remoteServers.agentWithColor(serverId, changed);
+            // The released agent list does not carry the account. A queued account is in `pendingRuntime`.
+            return !agent.pendingRuntime && providerAccountId && providerAccountId !== DEFAULT_PROVIDER_ACCOUNT_ID
               ? { ...agent, providerAccountId }
               : agent;
           }

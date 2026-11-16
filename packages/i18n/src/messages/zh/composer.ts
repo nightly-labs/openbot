@@ -153,6 +153,7 @@ export const messages = {
   "composer.picker.section.files": "文件",
   "composer.picker.section.tabs": "浏览器标签页",
   "composer.picker.section.threads": "话题",
+  "composer.picker.section.messages": "消息中",
   "composer.token.tab": "浏览器标签页 {name}",
   "composer.token.thread": "话题 {name}",
   "composer.token.unavailableTab": "已关闭的浏览器标签页 {name}",

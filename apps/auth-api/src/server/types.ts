@@ -27,8 +27,15 @@ export interface WorkerBindings {
   EMAIL_SMTP_USERNAME?: string;
   EMAIL_SMTP_PASSWORD?: string;
   EMAIL_FROM?: string;
+  /**
+   * The team's inbox. Automated emails name it in `Reply-To`, and contact form messages go to it.
+   * Empty uses `EMAIL_FROM`.
+   */
+  EMAIL_REPLY_TO?: string;
   /** The sender of license emails. Empty uses `EMAIL_FROM`. The SMTP account must be allowed to send as it. */
   EMAIL_LICENSE_FROM?: string;
+  /** The address for replies to license emails. Empty uses the license sender. */
+  EMAIL_LICENSE_REPLY_TO?: string;
   /** The email relay Worker. Without it, email leaves from this Worker's own socket. */
   EMAIL_RELAY?: Fetcher;
   /**
@@ -117,6 +124,8 @@ export interface WorkerBindings {
   HOSTED_SERVER_TEMPLATE?: string;
   BOAT_API_KEY?: string;
   BOAT_WEBHOOK_SECRET?: string;
+  /** A Discord webhook for operator messages about the server pool. Without it there are no pool alerts. */
+  HOSTED_POOL_ALERT_WEBHOOK_URL?: string;
   /** An OpenPanel server client and its write-only secret, for account events. Set only in production. */
   OPENPANEL_CLIENT_ID?: string;
   OPENPANEL_CLIENT_SECRET?: string;

@@ -10,6 +10,10 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} が時間内に応答しなかったため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSignInLost":
     "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpRefusedUntilRestart":
+    "{provider} がメッセージを拒否したため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpSettingsTimedOut":
+    "{provider} が時間内に応答しませんでした。しばらくしてからもう一度お試しください。",
   "error.provider.acpPlanUsedUp":
     "{provider} のプランの利用上限に達しました。別のモデルを選ぶか、{provider} のプランをアップグレードしてください。",
   "error.provider.acpMcpNotLoaded":
@@ -212,6 +216,8 @@ export const messages = {
     "エンドポイント「{provider}」には API キーが必要です。サーバー設定 → プロバイダーでキーを追加してから、もう一度お試しください。",
   "error.provider.opencodeKeyExpired":
     "OpenCode の API キーの有効期限が切れました。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
+  "error.provider.opencodeKeyRefused":
+    "OpenCode Go が保存済みの API キーを拒否しました。キーの有効期限が切れている可能性があります。OpenCode Console で新しいキーを作成し、OpenCode の設定に貼り付けてから、もう一度お試しください。",
   "error.provider.opencodeServiceFailure":
     "OpenCode のローカルサービスが失敗したため、このターンを完了できませんでした。もう一度お試しください。エラーが続く場合は、設定で OpenCode を再接続してください。",
   "error.provider.opencodeRateLimited":
@@ -230,6 +236,8 @@ export const messages = {
     "モデルプロバイダー側で障害が発生しました。お使いの接続は原因ではありません。後でもう一度試すか、別のモデルを選んでください。\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "モデルの応答が途中で切れたか、無効でした。メッセージをもう一度送信するか、別のモデルを選んでください。\n{detail}",
+  "error.provider.opencodeReasoningOverlap":
+    "OpenCode はこの推論の強さでこのモデルの推論を読み取れませんでした。推論の強さを下げるか別のモデルを選んでから、メッセージをもう一度送信してください。",
   "error.provider.opencodeNetwork":
     "OpenCode がモデルプロバイダーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続を確認してから、もう一度お試しください。\n{detail}",
   "error.provider.codexStateBusy":
@@ -265,6 +273,8 @@ export const messages = {
     "OPENBOT_ANTIGRAVITY_PATH の Gemini サーバーが見つからないか、実行できません。パスを修正するか変数を削除してから、OpenBot を再起動してください。",
   "error.provider.antigravityVersionUnreadable": "Gemini サーバーのバージョンを読み取れません。",
   "error.provider.antigravitySignIn": "Gemini を使うには Google でサインインしてください。",
+  "error.provider.antigravityModelAtCapacity":
+    "現在、Google にはこの Gemini モデルの空き容量がありません。プランの割り当てが原因ではありません。数分後にもう一度お試しいただくか、別のモデルを選んでください。\n{detail}",
   "error.provider.antigravityRateLimited":
     "レート制限またはプランの割り当てに達したため、Gemini がリクエストを拒否しました。数分待つか別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityQuotaReached":
@@ -275,8 +285,14 @@ export const messages = {
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
+  "error.provider.antigravityLocationUnsupported":
+    "Google は、このエージェントを実行しているコンピューターのネットワーク上の場所からの Gemini の利用を許可していません。別のコンピューターで Gemini を使うか、このエージェントに別のプロバイダーを選んでください。\n{detail}",
   "error.provider.antigravityConnectionLost":
     "Gemini はエージェントとの接続が切れたため停止しました。続けるには、メッセージを送信してください。",
+  "error.provider.grokServiceFailure":
+    "Grok のサービスが混み合っているか、エラーが発生しています。数分後にもう一度お試しいただくか、別のモデルを選んでください。",
+  "error.provider.grokConnectionFailed":
+    "Grok がサービスに接続できません。インターネット接続を確認してから、メッセージをもう一度送信してください。",
   "error.provider.antigravityRemoteWindowsSignIn":
     "Windows ホストでは、Gemini は Google のページをホスト上で開きます。ホストのコンピューターで Gemini を接続してください。",
   "error.provider.cursorArchivePath": "Cursor のアーカイブに予期しないファイルがあります。",
@@ -317,7 +333,9 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes を使うには、Nous Portal でサインインするか、ターミナルで `hermes setup` を実行してください。",
   "error.provider.hermesTurnFailed":
-    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。サーバーの設定 › MCP で確認してから、メッセージをもう一度送信してください。",
+    "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
+  "error.provider.hermesRefused":
+    "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
@@ -325,6 +343,8 @@ export const messages = {
     "このチャットは Claude には長くなりすぎました。OpenBot はチャット履歴を引き継いだ新しい Claude Code セッションを開始しました。もう一度お試しください。",
   "error.provider.claudeApiKeyNoCredit":
     "Anthropic API キーに API クレジットがありません。Claude のプランは API キーでのリクエストには使われません。Anthropic Console でクレジットを追加するか、設定で Claude にサインインして、エージェントのモデルメニューで Claude アカウントを選択してください。",
+  "error.provider.claudeServiceBlocked":
+    "Claude のサービスがこのリクエストをブロックしました。通常は Claude 側の一時的な問題で、アカウントの問題ではありません。数分後にもう一度メッセージを送信してください。",
   "error.provider.foreignReasoning":
     "別のアカウントまたは API キーが受け取ったため、{provider} はこのチャットの以前の推論を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageTooSmall":
@@ -333,6 +353,8 @@ export const messages = {
     "画像が大きすぎるため、モデルはこのチャットの画像を受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.imageCountLimit":
     "画像が多すぎるため、モデルはこのチャットを受け付けませんでした。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
+  "error.provider.requestTooLarge":
+    "このチャットは大きくなりすぎて、モデルに送信できません。多くの場合、チャット内の画像が原因です。OpenBot はチャット履歴を引き継いだ新しい {provider} セッションを開始しました。もう一度お試しください。",
   "error.provider.opencodeSessionRejected":
     "OpenCode がリクエストを拒否しましたが、原因は示されていません。長いチャットやモデルの変更後に起こることがあります。OpenBot はチャット履歴を引き継いだ新しい OpenCode セッションを開始しました。もう一度お試しください。エラーが続く場合は、別のモデルを選ぶか推論レベルを下げてください。",
   "error.provider.opencodeCompactionFailed":
@@ -350,6 +372,8 @@ export const messages = {
     "Gemini はブラウザーでサインインページを開けませんでした。既定のブラウザーを確認してから、もう一度接続してください。",
   "error.provider.acpSignInFailed": "サインインが完了しませんでした。",
   "error.provider.acpSignInFailedReason": "サインインが完了しませんでした: {reason}",
+  "error.provider.acpSignInNetwork":
+    "サインインでプロバイダーのサーバーに接続できませんでした。OpenBot を実行しているコンピューターのネットワーク接続と DNS 設定を確認してから、もう一度お試しください。",
   "error.provider.acpSignOutFailed": "サインアウトが完了しませんでした。",
   "error.provider.acpSignOutFailedReason": "サインアウトが完了しませんでした: {reason}",
   "error.provider.acpSignInMethodMissing":
@@ -357,6 +381,10 @@ export const messages = {
   "error.provider.httpsSignInLinkOnly": "ブラウザーで開けるのは HTTPS のサインインリンクだけです。",
   "error.provider.geminiKeyRefused":
     "Gemini は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度接続してください。",
+  "error.provider.geminiKeyRateLimited":
+    "保存された Gemini API キーがレート制限または割り当てに達したため、Gemini がリクエストを拒否しました。このキーは Google のプランの代わりに使われています。数分待つか別のモデルを選んでから、もう一度お試しください。Google のプランを使うには、設定でキーを削除してください。\n{detail}",
+  "error.provider.geminiKeyQuotaZero":
+    "保存された Gemini API キーには、このモデルの割り当てがありません。このキーは Google のプランの代わりに使われています。別のモデルを選ぶか、Google のプランを使うために設定でキーを削除してください。\n{detail}",
   "error.provider.geminiAccountSettingsUnreadable":
     "Gemini がこのアカウントの設定ファイルを開けないため、サインインできません。このアカウントを削除してから、もう一度追加してください。",
   "error.provider.geminiSettingsUnreadable":
@@ -367,6 +395,8 @@ export const messages = {
     "{provider} は保存された API キーを拒否しました。設定でキーを置き換えるか削除してから、もう一度お試しください。",
   "error.provider.keyProviderNoBalance":
     "保存された API キーの {provider} アカウントに残高がありません。アカウントにクレジットを追加してから、もう一度お試しください。",
+  "error.provider.keyProviderLowCredit":
+    "保存された API キーの {provider} アカウントには、このモデルの応答に必要なクレジットが足りません。アカウントにクレジットを追加するか、別のモデルを選択してから、もう一度お試しください。",
   "error.provider.modelServiceRefused":
     "モデルサービスがリクエストを拒否しました。別のモデルを選択するか、サービスでこのモデルへのアクセス権を確認してください。",
   "error.provider.modelServiceRefusedReason":
@@ -452,6 +482,8 @@ export const messages = {
   "error.provider.piSessionMissing": "Pi のセッションファイルがこのコンピューターにありません。",
   "error.provider.piResumeCancelled": "Pi がセッションの再開をキャンセルしました。もう一度お試しください。",
   "error.provider.piSessionIdentity": "Pi が別のセッションを返しました。保存されたセッションは置き換えられていません。",
+  "error.provider.piExtensionFailed":
+    "拡張機能を読み込めなかったため、Pi が停止しました。この拡張機能を削除または更新してから、もう一度お試しください。{detail}",
   "error.provider.piModelInvalid": "プロバイダーを含む Pi のモデルを選択してください。",
   "error.provider.piToolInvalid": "ツールが無効な結果を返しました。",
   "error.provider.piSignIn":

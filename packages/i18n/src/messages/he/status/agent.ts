@@ -7,6 +7,8 @@ export const messages = {
   "status.agent.instructionsChanged": "עדכן את ההוראות שלו",
   "status.agent.modelSwitchedForLimit": "הגעת למכסת השימוש. עבר אל {model}.",
   "status.agent.modelReturnedAfterLimit": "מכסת השימוש התאפסה. חזר אל {model}.",
+  "status.agent.routineSkippedRunOpen": "דולגה ריצה: הריצה הקודמת עוד לא הסתיימה",
+  "status.agent.routineSkippedUsageLimit": "דולגה ריצה: הגעת למכסת השימוש",
   "status.agent.modelSwitchedForError": "שגיאת ספק. עבר אל {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "ל-{previous} לא נשארו קרדיטים. עבר ל-{model}. כדי להשתמש בו שוב, הוסף קרדיטים ואז בחר בו.",
@@ -28,6 +30,8 @@ export const messages = {
   "status.agent.vaultCardFill":
     "מילוי הכרטיס השמור {card} ב-{site}. אחרי האישור שלך, סוכנים יוכלו למלא את הכרטיס הזה באתר הזה בלי אישור. אפשר להסיר את האתר בהגדרות שרת > כספת.",
   "status.agent.reportProblem": "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך. השם שלך לא מוצג.",
+  "status.agent.reportPhoneProblem":
+    "זה יהפוך לבעיה ציבורית ב-GitHub, עם גרסת האפליקציה והמערכת שלך, ועם הגרסה, המערכת ויומן התמיכה של הטלפון שלך. השם שלך לא מוצג.",
   "status.agent.sendIdea": "זה יהפוך ל-issue ציבורי ב-GitHub. השם שלך לא מוצג.",
   "status.agent.feedbackRecentErrors": "שגיאות אחרונות בצ'אט:",
   "status.agent.feedbackSameAs": "מתווסף ל-issue #{issue}",
@@ -40,6 +44,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "ליצור פקודה חד־פעמית שמתקינה את OpenBot במחשב אחר כשרת {name} ומחברת אותו לחשבון שלך. הסוכן מריץ אותה שם.",
   "status.agent.serverInstallCard": "פקודת התקנה לשרת {name}",
+  "status.agent.browserProfileNamed":
+    "העבר את {agents} לפרופיל הדפדפן {profile}. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileNew":
+    "צור את פרופיל הדפדפן החדש {profile} והעבר אליו את {agents}. אין בו התחברויות. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileShared":
+    "העבר את {agents} לפרופיל הדפדפן המשותף. הם יקבלו את ההתחברויות והעוגיות שלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
+  "status.agent.browserProfileOwn": "תן לכל אחד מ-{agents} פרופיל דפדפן משלו. הכרטיסיות הפתוחות שלהם ייסגרו.",
   "status.agent.feedbackSending": "שולח את המשוב שלך לצוות OpenBot…",
   "status.agent.workflowDelete": "מחיקת תהליך העבודה {title} יחד עם ההרצות והגרסאות שלו. השלבים הפתוחים שלו ייעצרו.",
   "status.agent.vaultCardFillFrames": "שדות הכרטיס נמצאים במסגרות מ-{origins}.",
@@ -98,7 +109,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "הפעלת שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerDisable": "כיבוי שרת MCP {name} עבור כל סוכן בשרת הזה.",
   "status.agent.mcpServerRemove": "הסרת שרת MCP {name} וההתחברות שלו מכל סוכן בשרת הזה.",
-  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהגדרות שרת, MCP.",
+  "status.agent.mcpToolCall": "הפעלת הכלי {tool} של שרת MCP {name}.",
+  "status.agent.mcpSignInRequested": "שרת MCP {name} דורש התחברות. אפשר להתחבר מהחנות, אפליקציות, {name}.",
+  "status.agent.uiBlockClosedByMessage": "נסגר בגלל הודעה חדשה",
   "status.agent.vaultAdded": "נשמר בכספת: {name}",
   "status.agent.vaultUpdated": "שונה בכספת: {name}",
   "status.agent.vaultDeleted": "נמחק מהכספת: {name}",

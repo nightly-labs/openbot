@@ -181,7 +181,7 @@ completed or was cancelled, for a plan, a license or the billing portal. The con
 name and email are not sent to analytics.
 The production desktop app records application, sign-in, onboarding, agent, message, turn, prompt,
 approval, queue, routine, workflow, team, browser, search, Remote Desktop, update, marketplace, memory,
-provider, voice transcription, Voice pane, spoken reply, voice model download, spoken reply setting,
+provider, voice transcription, voice conversation, spoken reply, voice model download, spoken reply setting,
 reaction, Hosted Site, hosted server offer, hosted server plans, plan and member limits, license,
 contact sales, provider usage limit, agent template, phone connection, connector, Computer Use
 permission, help link, channel, server export and import, Usage view, and confirmed
@@ -595,13 +595,53 @@ deletes a server's copy when the account no longer has that server. Sign-out and
 disconnected session delete all copies and the key. Attachments and files are not in the copy.
 
 The mobile app keeps a support log of up to 5,000 events in the phone's system cache: app version,
-system and device model, app state changes, connection steps with server IDs, error text and error
+system and device model, app state changes, the route name of each screen that opens (such as
+`chat/[agentId]`, never an ID), the steps of the notification setup (the setting, the permission,
+whether the phone gave a push token and whether each server registered it, never the token), the
+notification, microphone and camera permissions, a range of free storage (such as `2-10 GB`), low
+memory warnings, the kind of network with the name of the VPN that is on
+(see below), connection steps with server IDs, error text and error
 codes, the types and counts of network candidates (such as "relay/udp", never an address), the
 desktop app version and protocol support of each server, the method, address without query, status
 and time of its requests, including Team API requests to the desktop, and app warnings and errors. It
 does not record message text, files, request bodies or headers, and it masks tokens, keys and email
-addresses. The app never sends the log. **Settings → Support** shows it and lets you save the file or
-clear it.
+addresses. **Settings → Support** shows it and lets you save the file or clear it. The app sends
+lines of the log in one case only: when you select **Send** on a bug report about the phone app
+(see [bug reports](#bug-reports-about-the-phone-app)). It sends no other part of the log, and never
+without that Send.
+
+#### Bug reports about the phone app
+
+When an agent offers a bug report about the phone app, only the phone app can send it. With **Send**,
+the phone adds to the report its system (iOS or Android), the app version with the build number and
+the update ID, the system version and the device model, its network and VPN, and at most 60 lines of
+the support log: the last warnings and errors, and the connection and app state events between them.
+A request that got an answer is not in these lines, and a console line is not: a library can write
+any value there.
+
+The network line is such as `Wi-Fi · VPN: Tailscale` or `Mobile data · no VPN found`. The app reads
+the kind of connection from the system. To find a VPN or a mesh network (Tailscale, ZeroTier and
+others), it reads the addresses of the phone's network interfaces on the phone: it makes a WebRTC
+connection object with no server and no other side, which sends nothing. No system gives the name of
+the VPN app, so the name comes from the address range of the VPN's tunnel, and "probably" marks a
+name that comes from a default range. The line has the name, and at most the first two numbers of a
+private range (`10.8.x.x`); it never has an address. The app reads this at its start, at each change
+of the network and when a report card opens, and it writes each change to the support log.
+
+These lines must not point to you. Tokens, keys and email addresses were masked when each line was
+written. For the report, the phone also masks:
+
+- each server ID, which becomes `server-1`, `server-2`;
+- each network address, which keeps only its kind (`[private-ip]`, `[shared-ip]`, `[public-ip]`,
+  `[ipv6]`);
+- each host name that is not an OpenBot service (`openbot.run`), which becomes `[host]`;
+- each record ID and hash, which becomes `[id]`, and the name of a user folder.
+
+The message of an error is free text, so it can still hold a word that these rules do not know. The
+card shows all of this text before you send it, and Send sends only the text that the card shows. The phone sends it to the server of the agent over
+the Team connection. The server masks secrets and these values again and sends the text with the
+report, as described under [Other network connections](#other-network-connections). It becomes part
+of the public GitHub issue. No report about the phone app is sent without this data.
 
 The mobile app asks an update server for a newer JavaScript bundle each time it starts, and when
 you come back to it, at most one time in 15 minutes. App versions after 1.4.8 ask OpenBot's server
@@ -739,12 +779,13 @@ removes the connection. Deleting an account removes its provider links and SCIM 
 
 ## Email delivery and infrastructure providers
 
-OpenBot sends sign-in, team invitation, and welcome messages through the configured SMTP provider. The
-provider receives the recipient address and the message content. A sign-in message contains the
+OpenBot sends sign-in, team invitation, and welcome messages from `no_reply@openbot.run` through the
+configured SMTP provider. A reply goes to `hello@openbot.run`. The provider receives the recipient address and the message content. A sign-in message contains the
 one-time code and its expiration time. A team invitation can contain the inviter address, team name,
 role, and invite URL. When the first cloud server plan of an account starts, a welcome message goes
 to the account address. It contains the plan name and the server name. License messages go to the
-account address from `licenses@openbot.run` through the same provider. When a license has its first
+account address from `no_reply@openbot.run` through the same provider, and a reply goes to
+`licenses@openbot.run`. When a license has its first
 payment, the message contains the license tier, the number of users, the list price when no discount
 applies, the currency, the billing period, and the date of the next payment. When a renewal payment fails, the message contains
 the license tier, the number of users, the amount due, the currency, the date of the next payment
@@ -795,6 +836,13 @@ the account service sends Stripe your Stripe customer ID, and the subscription I
 change or cancel, to open the Stripe Customer Portal (`billing.stripe.com`). Stripe keeps the
 customer, invoices and payment records under its own policy, also after the subscription ends.
 Billing is off, and Stripe receives nothing, when the account service has no Stripe key.
+
+When a server plan or a license starts or ends, when you cancel or resume its renewal, and when a
+payment for it succeeds, fails, or goes back (a refund or a dispute), the account service sends one
+message to a private Discord channel of the OpenBot team, through a Discord webhook. The message has
+your account email, the plan or the license tier and its number of users, the billing period, the
+currency, and the list amount or the amount of the payment. It has no card data, no Stripe ID and no
+server ID. Discord keeps the message under its own policy.
 
 ## Data stored on the OpenBot computer
 
@@ -944,9 +992,12 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   its site) and the name, expiry and billing address of a card, and delete items, with no approval: the
   chat shows each change, and an item that an agent adds keeps the agent's name. Agents cannot see,
   add, change or delete a Vault API key as an item. When an agent lists its API keys, OpenBot writes
-  each Vault key, readable only by the user, to
-  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<NAME>`, outside every workspace, and
-  gives the agent the path; every agent on the server can read these files in its commands. A changed
+  each Vault key that the agent can use, readable only by the user, to
+  `~/Library/Application Support/OpenBot/agent-api-keys/.vault/<agentId>/<NAME>`, outside every
+  workspace, and gives the agent the path. All agents run as the same system user, so every agent on
+  the server can read these files in its commands, also the files of a key that is for other agents
+  or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
+  not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
   start. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
@@ -1107,20 +1158,20 @@ Network traffic can also occur when:
   pins from `cache.agilebits.com`, checks its SHA-256, and keeps it in
   `~/Library/Application Support/OpenBot/provider-state/1password-cli`. The request carries no user
   data;
-- the user dictates or opens the Voice pane for the first time, or presses Download in **Settings →
+- the user dictates or starts a voice conversation for the first time, or presses Download in **Settings →
   Voice**. OpenBot downloads the speech model that it pins, Parakeet TDT, Parakeet Unified EN,
   Underdog Bark 3.0 Plus, Whisper turbo or Cohere Transcribe, from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes` in
   the application data folder. The request carries no user data. Dictation audio from these models
   stays on the computer, and the chosen model and language are saved in `voice-preference.json` in
   the same folder;
 - the user selects ElevenLabs Scribe v2 Realtime in **Settings → Voice** and dictates or talks in
-  the Voice pane. While the microphone records, or when a Voice pane turn ends, OpenBot streams the
+  a voice conversation. While the microphone records, or when a voice conversation turn ends, OpenBot streams the
   audio and the chosen language to `api.elevenlabs.io` with the user's own API key, and receives the
   text. Nothing else is sent: no conversation, file or agent instruction. ElevenLabs handles the
   audio and the text under its own policy and the user's ElevenLabs plan. The local models send
   nothing;
 - the user selects Groq Whisper large-v3 turbo or Groq Whisper large-v3 in **Settings → Voice** and
-  dictates or talks in the Voice pane. When the recording stops, or when a Voice pane turn ends,
+  dictates or talks in a voice conversation. When the recording stops, or when a voice conversation turn ends,
   OpenBot sends the recorded audio, the chosen model and, when the user set one, the language to
   `api.groq.com` with the user's own API key, and receives the text. Nothing else is sent: no
   conversation, file or agent instruction. Groq handles the audio and the text under its own policy
@@ -1138,7 +1189,7 @@ Network traffic can also occur when:
   the recording in memory, writes it as a WAV file to the app's cache folder only while the request
   runs, and deletes it after. The address and the choices are saved in the phone's keychain, and the
   API key in a separate keychain entry. **Remove voice server** deletes both;
-- the user turns on Read replies aloud, opens the Voice pane for the first time, or presses Download
+- the user turns on Read replies aloud, starts a voice conversation for the first time, or presses Download
   in the Spoken replies section of **Settings → Voice**. OpenBot downloads the Supertonic 3 voice
   model that it pins from `huggingface.co`, checks its size and SHA-256, and keeps it in `runtimes`
   in the application data folder. The request carries no user data. When Supertonic reads a reply
@@ -1149,7 +1200,7 @@ Network traffic can also occur when:
   `api.elevenlabs.io` or `api.x.ai` with the user's own API key, and receives the audio. Listen
   sends a short sample text. Nothing else is sent: no conversation, file or agent instruction. The
   provider handles the text and the audio under its own policy and the user's plan.
-  In the Voice pane, the spoken reply runs on this
+  In a voice conversation, the spoken reply runs on this
   computer, also for an agent on a remote server. Speech recognition uses the model chosen in
   **Settings → Voice**: a local model runs on this computer, and ElevenLabs or Groq gets the audio as
   described above. A message that the user speaks to an agent on this computer keeps its recording,
@@ -1158,7 +1209,7 @@ Network traffic can also occur when:
   text, as for a typed message, and no recording is kept. Recordings show in the Storage tab of
   **Server Settings**, where the user can delete them, and are part of a data export. A recording is
   deleted with the agent's or channel's data;
-- the user turns on Codex live voice in **Settings → Voice** and opens the Voice pane of an agent on
+- the user turns on Codex live voice in **Settings → Voice** and starts a voice conversation with an agent on
   this computer, with any provider. OpenBot starts a separate Codex App Server process for the
   session. The app window sends a WebRTC offer to it, and it opens a realtime voice session with
   OpenAI through the user's own Codex sign-in: the agent's own Codex account for an agent on Codex,
@@ -1229,7 +1280,12 @@ Network traffic can also occur when:
   the agent runs in the desktop app, on a server or on a hosted server, and the agent's provider, CLI
   version, model and reasoning effort. It also sends up to 5 error lines of the chat from the last
   hour: the errors of failed tools other than shell commands, and of OpenBot tools. The card shows the
-  errors. OpenBot removes known secrets from the text and the errors before it shows them. The service opens it as a public
+  errors. OpenBot removes known secrets from the text and the errors before it shows them. A bug
+  report about the phone app also has the phone's system, app version, device, network with the name
+  of its VPN, and support log lines,
+  which the phone adds when the user sends the report there (see
+  [bug reports about the phone app](#bug-reports-about-the-phone-app)); the service refuses such a
+  report without them. The service opens it as a public
   issue, or a comment on the issue that the agent chose, in the
   `nightly-labs/openbot` repository on GitHub, as the OpenBot GitHub App, so the issue does not show
   the account. The service does not store or log the text. It adds a hidden owner mark to the end of
@@ -1241,7 +1297,9 @@ Network traffic can also occur when:
   10 each day, it counts the issues of each account; D1 keeps the account ID, the UTC day and the
   count, and deletes the earlier days of an account when the account sends again, or when the account
   is deleted. When the user is not signed in or the send fails, OpenBot gives a link to the GitHub
-  form with the same text instead, and nothing goes to the account service;
+  form with the same text instead, and nothing goes to the account service. For a report about the
+  phone app, the link is to the form for the phone app, with the phone's system, app version and
+  device when the phone sent them, and never with log lines;
 - the user connects Link in Server settings › Vault. OpenBot asks `login.link.com` for a sign-in
   code and a token, with the label "OpenBot on" and this computer's name, which Link shows in its list
   of connected apps. OpenBot renews and revokes the token there, and reads the account email from
@@ -1374,6 +1432,17 @@ which Sunra account pays. While the Canvas page is open, the computer also asks 
 of that account, with Sunra's `get_balance` tool, which spends no credits. It shows the number only
 in the page rail, and each member of a joined server who can use workflows can see it. Sunra's own
 privacy policy covers what Sunra keeps.
+
+A step with a Higgsfield model uses the Higgsfield sign-in of that computer's Apps in the same way.
+The computer sends the prompt, the model, the size settings and the input pictures to Higgsfield's
+MCP server (`mcp.higgsfield.ai`): it puts each input picture in Higgsfield's upload storage first,
+then asks Higgsfield to make the file, and downloads the result only from Higgsfield's file hosts.
+Higgsfield keeps the file in the history of the signed-in Higgsfield account, and the credits of that
+account pay for it. OpenBot never spends an unlimited-generation allowance of that account. While the
+Canvas page is open, the computer also asks Higgsfield for the credits of that account, with
+Higgsfield's `balance` tool, which spends no credits. It shows the number only in the page rail, and
+each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
+covers what Higgsfield keeps.
 
 Deleting an agent keeps the workflows and their step history without the agent. Deleting a
 workflow deletes its versions, runs, steps, and receipts.
@@ -1554,10 +1623,16 @@ restrict or block a number that it sees as automated.
   holds the number, a masked name, which agent is the WhatsApp Orchestrator, the contacts and groups
   that the owner allowed, and one row per conversation that an agent answers. The messages of that
   conversation are kept as a conversation of that agent, and files people send are kept with the
-  agent's attachments. Names and the last messages of allowed chats are kept in memory until OpenBot
-  quits. Pairing requests are kept in memory for at most an hour. Disconnect logs the device out (when
-  OpenBot is connected), deletes its keys and keeps the conversations, the workspace memories and the
-  allowed senders.
+  agent's attachments. The messages of the allowed chats that OpenBot sees, also those that do not
+  mention the number, are kept in the database for 90 days after they arrive, so that an agent can
+  read and search them. The files of these messages are downloaded when they arrive, up to 100 MB
+  each, to `<userData>/whatsapp/files/`, readable only by the user, and are deleted with their
+  message. The copies of one number use at most 2 GB: when they use more, the copies of the oldest
+  messages are deleted first, and those messages keep only the names of their files. A message that
+  its author deletes for everyone is deleted with its files, and a changed message keeps the new text. Names are kept in memory until OpenBot quits. Pairing requests are kept in memory for at
+  most an hour. Disconnect logs the device out (when OpenBot is connected), deletes its keys, the saved
+  messages and their files, and keeps the conversations, the workspace memories and the allowed
+  senders.
 - **Read from WhatsApp.** WhatsApp gives a linked device every message of the account. OpenBot reads
   only the owner's own "Message yourself" chat, direct messages of the contacts the owner allowed, and
   the groups the owner allowed, where a request starts only from a mention of the number or a reply in

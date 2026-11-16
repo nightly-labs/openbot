@@ -87,11 +87,11 @@ function settingsTitle() {
 function agentsTab() {
   return page
     .getByRole("tablist", { name: t("server.settings.sections"), exact: true })
-    .getByRole("tab", { name: t("server.settings.agents"), exact: true });
+    .getByRole("tab", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 function agentsPanel() {
-  return page.getByRole("tabpanel", { name: t("server.settings.agents"), exact: true });
+  return page.getByRole("tabpanel", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 async function closeWhatsNew(): Promise<void> {
@@ -117,9 +117,11 @@ async function openAgentsTab(): Promise<void> {
   if (await backToList().isVisible()) await backToList().click();
 }
 
-/** The "Agents" part of the `Agents › <setting>` path in the page header. */
+/** The "Agent defaults" part of the `Agent defaults › <setting>` path in the page header. */
 function backToList() {
-  return page.locator(".settings-page-path").getByRole("button", { name: t("server.settings.agents"), exact: true });
+  return page
+    .locator(".settings-page-path")
+    .getByRole("button", { name: t("server.settings.agentDefaultsTitle"), exact: true });
 }
 
 function savedDefaults(): Promise<AgentDefaults> {

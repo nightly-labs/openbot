@@ -293,6 +293,10 @@ export const messages = {
   "routine.calendar.entryMeta": "{when} · {schedule} · {status}",
   "routine.calendar.openAgent": "فتح {name}",
   "routine.calendar.completed": "مكتملة",
+  "routine.calendar.new": "مهمة دورية جديدة",
+  "routine.calendar.newOn": "مهمة دورية جديدة في {day}",
+  "routine.calendar.agent": "الوكيل",
+  "routine.calendar.agentChoice": "الوكيل: {name}",
 
   "routine.settings.loadFailed": "تعذّر تحميل المهام الدورية.",
   "routine.settings.loadRunsFailed": "تعذّر تحميل سجل التشغيل.",

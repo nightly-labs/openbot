@@ -303,6 +303,10 @@ export type TeamApiProviderAccounts = Pick<
   | "signInStatus"
   | "cancelSignIn"
   | "connectKey"
+  | "startCodeSignIn"
+  | "submitCodeSignIn"
+  | "codeSignInStatus"
+  | "cancelCodeSignIn"
   | "rename"
   | "remove"
   | "setAgentAccount"
@@ -676,7 +680,7 @@ export type TeamApiBrowser = Pick<
   | "stopTeach"
   // Behind `browser-page-state`.
   | "stop"
-  // Behind `browser-sign-in`.
+  // Behind `browser-sign-in` and `browser-sign-in-storage-v1`.
   | "importSignIn"
   // The live view, behind `browser-view`. `browser-view-gateway.ts` is what reaches these; a route
   // cannot, because frames outlive the request that asked for them.

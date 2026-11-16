@@ -159,6 +159,7 @@ export const messages = {
   "composer.picker.section.files": "Pliki",
   "composer.picker.section.tabs": "Karty przeglądarki",
   "composer.picker.section.threads": "Wątki",
+  "composer.picker.section.messages": "W wiadomościach",
   "composer.token.tab": "Karta przeglądarki {name}",
   "composer.token.thread": "Wątek {name}",
   "composer.token.unavailableTab": "Zamknięta karta przeglądarki {name}",

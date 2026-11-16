@@ -8,6 +8,7 @@ export const messages = defineMessages("messaging", {
     "OpenBot cannot read the saved tokens on this computer. Disconnect the workspace, then connect it again.",
   "messaging.help.relay_unavailable":
     "OpenBot cannot receive Slack events on this computer. Sign in, give this computer a name in Server settings, and keep OpenBot open.",
+  "messaging.help.not_linked": "This workspace is not linked to this server. Select Reconnect to link it.",
   // The same help for a Discord server connection.
   "messaging.discordHelp.invalid_token":
     "Discord no longer accepts OpenBot in this Discord server. It may have been removed. Connect the Discord server again.",
@@ -15,4 +16,6 @@ export const messages = defineMessages("messaging", {
     "OpenBot cannot read the saved tokens on this computer. Disconnect the Discord server, then connect it again.",
   "messaging.discordHelp.relay_unavailable":
     "OpenBot cannot receive Discord events on this computer. Sign in, give this computer a name in Server settings, and keep OpenBot open.",
+  "messaging.discordHelp.not_linked":
+    "This Discord server is not linked to this OpenBot server. Select Reconnect to link it.",
 });

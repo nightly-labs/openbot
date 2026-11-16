@@ -1,6 +1,6 @@
 import { rankAgentMentions } from "@openbot/contracts/agent-mention-rank";
 import { GlassView } from "expo-glass-effect";
-import { useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import { Button, Spinner, Typography } from "heroui-native";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import AudioLines from "lucide-react-native/icons/audio-lines";
@@ -45,6 +45,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
+import { useCSSVariable } from "uniwind";
 import { BloubAvatar } from "@/features/agents/components/bloub-avatar";
 import { showFailureAlert } from "@/features/analytics/failure-reports";
 import type { ChatBubbleMessage } from "@/features/chat/model/chat-messages";
@@ -73,7 +74,8 @@ import type { VoicePalette } from "../model/voice-palette";
 import { attachmentTypeLabel, shareLocalAttachment } from "./attachment-preview";
 import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
-import { DictationMic, DictationStrip } from "./composer-dictation";
+import type { ComposerContextMeter } from "./composer-context-ring";
+import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
 import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
 import type { ChatAttachments } from "./use-chat-attachments";
@@ -202,6 +204,11 @@ interface ChatComposerProps {
   voiceAvatar?: ReactNode;
   /** The agent's colours for the glow in the call bar. */
   voicePalette?: VoicePalette;
+  /**
+   * How full the chat's context is, for a host that reports it. The ring is a row of the attachment
+   * menu, so the bar keeps its four controls; the plus carries a dot from the warning level on.
+   */
+  contextMeter?: ComposerContextMeter;
 }
 
 const NO_FILES: ChatAttachments["items"] = [];
@@ -313,6 +320,7 @@ export const ChatComposer = memo(function ChatComposer({
   voiceAccent,
   voiceAvatar,
   voicePalette,
+  contextMeter,
 }: ChatComposerProps) {
   const { t, format, sourceText } = useText();
   // A text-only composer has no menu or voice motion of its own; these stay at rest.
@@ -825,12 +833,17 @@ export const ChatComposer = memo(function ChatComposer({
   const busy = preparing;
   const attachmentsBlocked = disabled || preparing;
   const leadingBlocked = attachmentsBlocked;
-  // The card covers this glyph and draws the same corner, so the two trade
-  // places on one progress: the glyph is gone by the time the card is drawn,
-  // and back on the frames the card fades out. Waiting for the card to
-  // unmount left the corner empty for the whole length of its collapse.
+  // The card opens above the bar, so the plus stays in view. It turns into a close mark on the
+  // card's own progress, so a dismissal turns it back frame by frame.
+  // The bar shows no ring, so the plus warns when the context nears its limit. The menu row gives the number.
+  const [warningColor, dangerColor] = useCSSVariable(["--openbot-warning", "--openbot-danger"]);
+  const contextAlert =
+    contextMeter && !contextMeter.compacting && (contextMeter.level === "warning" || contextMeter.level === "danger")
+      ? contextMeter
+      : undefined;
   const plusGlyphStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(menuMotion.get(), [0, 0.2], [1, 0], Extrapolation.CLAMP) * (leadingBlocked ? 0.45 : 1),
+    opacity: leadingBlocked ? 0.45 : 1,
+    transform: [{ rotate: `${45 * menuMotion.get()}deg` }],
   }));
   // Where the plus is drawn, in either shape, from the constants that draw it.
   // Measuring it cannot work: `measureInWindow` reads the layout tree, and the
@@ -850,6 +863,14 @@ export const ChatComposer = memo(function ChatComposer({
       (restingPlus ? (cardWidth - restWidth) / 2 - restControlShift : 0),
     bottom: Math.max(bottomInset, 10) + 4 + plusInset - (restingPlus ? restControlOffset : 0),
     size: plusDrawn,
+    barStart: (END_X === 1 ? insets.left : insets.right) + BAR_INSET + (restingPlus ? (cardWidth - restWidth) / 2 : 0),
+    // The card's height from the same constants that draw it. The reply row is out of flow and
+    // measured, so the press adds its height from the shared value.
+    barTop:
+      composerBottomGap(bottomInset) +
+      (restingPlus
+        ? restHeight
+        : fieldHeight + (stacked ? TOOLBAR_HEIGHT : 0) + (attachmentsOpen ? ATTACHMENT_BLOCK_HEIGHT : 0)),
   };
   const control = composerAction({
     disabled,
@@ -923,6 +944,16 @@ export const ChatComposer = memo(function ChatComposer({
         requestSend();
     }
   }
+
+  // A press and hold on the mic or the waveform opens the voice settings over the chat.
+  const openVoiceSettings = useCallback(() => {
+    // A Stop just before the hold must not open the keyboard behind Settings > Voice.
+    editAfterDictation.current = false;
+    void haptics.selection();
+    inputRef.current?.blur();
+    router.push("/settings/voice");
+  }, []);
+  const voiceSettingsLabel = t("mobile.chat.composer.voiceSettings");
 
   const controlLabel = {
     send: sendLabel ?? t("mobile.chat.composer.send"),
@@ -1484,6 +1515,8 @@ export const ChatComposer = memo(function ChatComposer({
                         label={t(dictating ? "mobile.chat.composer.stopDictation" : "mobile.chat.composer.dictate")}
                         foreground={String(foreground)}
                         onPress={toggleDictation}
+                        onLongPress={openVoiceSettings}
+                        longPressLabel={voiceSettingsLabel}
                       />
                     </Animated.View>
                   ) : null}
@@ -1531,6 +1564,19 @@ export const ChatComposer = memo(function ChatComposer({
                         opacity: disabled || controlReady ? 1 : 0.45,
                       }}
                       onPress={pressControl}
+                      onLongPress={control.mode === "dictate" ? openVoiceSettings : undefined}
+                      delayLongPress={LONG_PRESS_MS}
+                      accessibilityActions={
+                        control.mode === "dictate" && controlReady
+                          ? [{ name: "activate" }, { name: "longpress", label: voiceSettingsLabel }]
+                          : undefined
+                      }
+                      onAccessibilityAction={({ nativeEvent }) => {
+                        if (!controlReady) return;
+                        if (nativeEvent.actionName === "activate") pressControl();
+                        else if (nativeEvent.actionName === "longpress" && control.mode === "dictate")
+                          openVoiceSettings();
+                      }}
                     >
                       {control.spinner ? (
                         <Spinner size="sm" color={accentGlyph} />
@@ -1576,6 +1622,7 @@ export const ChatComposer = memo(function ChatComposer({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("mobile.chat.composer.addAttachment")}
+              accessibilityValue={contextAlert ? { text: contextAlert.label } : undefined}
               accessibilityState={{ disabled: leadingBlocked }}
               disabled={leadingBlocked}
               hitSlop={4}
@@ -1583,12 +1630,29 @@ export const ChatComposer = memo(function ChatComposer({
               onPress={() => {
                 void haptics.selection();
                 setOpenedWith({ expanded: !restingPlus, focused });
-                attachments?.openMenu(attachmentAnchor);
+                attachments?.openMenu({
+                  ...attachmentAnchor,
+                  barTop: attachmentAnchor.barTop + (replyActive ? replyRowHeight.get() : 0),
+                });
               }}
             >
               <Animated.View style={plusGlyphStyle}>
                 <Plus color={String(foreground)} size={24} strokeWidth={1.8} />
               </Animated.View>
+              {contextAlert ? (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    end: 6,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: String(contextAlert.level === "danger" ? dangerColor : warningColor),
+                  }}
+                />
+              ) : null}
             </Pressable>
           </Animated.View>
         ) : null}

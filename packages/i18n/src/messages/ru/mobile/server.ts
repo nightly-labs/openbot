@@ -324,6 +324,13 @@ export const messages = {
   "mobile.server.settings.identityUnsupported":
     "Обновите OpenBot на этом сервере, чтобы менять его название и логотип здесь.",
   "mobile.server.settings.identityOffline": "Подключитесь к серверу, чтобы изменить его название и логотип.",
+  "mobile.server.settings.appearance": "Форма и цвет",
+  "mobile.server.settings.appearanceShape": "Форма",
+  "mobile.server.settings.appearanceShapeOption": "Форма {number}",
+  "mobile.server.settings.appearanceColor": "Цвет сервера",
+  "mobile.server.settings.appearanceAutomatic": "Автоматически",
+  "mobile.server.settings.appearanceReset": "Сбросить",
+  "mobile.server.settings.appearanceSaveFailed": "Не удалось сохранить форму и цвет сервера. Повторите попытку.",
   "mobile.server.route.cropLogo": "Кадрирование логотипа",
   "mobile.server.members.remove": "Удалить участника",
   "mobile.server.members.invitePeople": "Пригласить людей",
@@ -864,6 +871,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на {host}. Отключите рабочее пространство и подключите его снова.",
   "mobile.server.connectors.slack.helpRelay":
     "OpenBot на {host} не может получать события Slack. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
+  "mobile.server.connectors.slack.helpNotLinked":
+    "Это рабочее пространство не связано с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.slack.orchestratorTitle": "Оркестратор Slack",
   "mobile.server.connectors.slack.orchestratorDescription":
     "Этот агент получает все запросы из Slack. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и публикует ответ в ветке.",
@@ -911,6 +920,8 @@ export const messages = {
     "OpenBot не может прочитать сохранённые токены на {host}. Отключите сервер Discord и подключите его снова.",
   "mobile.server.connectors.discord.helpRelay":
     "OpenBot на {host} не может получать события Discord. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
+  "mobile.server.connectors.discord.helpNotLinked":
+    "Этот сервер Discord не связан с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.discord.orchestratorTitle": "Оркестратор Discord",
   "mobile.server.connectors.discord.orchestratorDescription":
     "Этот агент получает все запросы из Discord. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в канале.",
@@ -946,6 +957,8 @@ export const messages = {
     "OpenBot на {host} не может получать сообщения Telegram. На {host} войдите в аккаунт, задайте серверу имя в настройках сервера и не закрывайте OpenBot.",
   "mobile.server.connectors.telegram.helpError":
     "OpenBot не может связаться с этим чатом. Подключите его заново или отключите чат.",
+  "mobile.server.connectors.telegram.helpNotLinked":
+    "Этот чат не связан с {host}. Нажмите «Переподключить», чтобы связать его.",
   "mobile.server.connectors.telegram.retryAt": "Telegram попросил OpenBot подождать. Следующая попытка в {time}.",
   "mobile.server.connectors.telegram.linkTitle": "Привязать чат",
   "mobile.server.connectors.telegram.linkAnother": "Привязать ещё один чат",
@@ -989,6 +1002,8 @@ export const messages = {
     "WhatsApp удалил этот сервер из связанных устройств. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.helpError":
     "OpenBot не может связаться с WhatsApp на этом номере. Переподключите или отключите номер.",
+  "mobile.server.connectors.whatsapp.helpKeysUnreadable":
+    "OpenBot не может прочитать сохранённые ключи этого номера. Привяжите номер заново.",
   "mobile.server.connectors.whatsapp.retryAt": "WhatsApp попросил OpenBot подождать. Следующая попытка в {time}.",
   "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",

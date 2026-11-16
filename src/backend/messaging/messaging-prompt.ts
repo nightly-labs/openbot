@@ -2,6 +2,8 @@ import type { MessagingPlatform } from "@openbot/contracts/ipc";
 
 /** One earlier message of the external conversation, given to the agent as context. */
 export interface MessagingContextMessage {
+  /** The platform's message id, which `messaging_post` takes as `replyTo`. A quote has none. */
+  id?: string;
   authorName: string;
   text: string;
   /** ISO time. */
@@ -86,8 +88,11 @@ export function messagingPromptText(input: MessagingPromptInput): string {
   const context = boundedContext(input.context);
   if (context.length)
     lines.push(
-      "--- earlier messages (context, oldest first) ---",
-      ...context.map((message) => `[${message.sentAt}] ${message.authorName}: ${message.text}`),
+      "--- earlier messages (context, oldest first, with their message id) ---",
+      ...context.map(
+        (message) =>
+          `[${message.sentAt}]${message.id ? ` (id ${message.id})` : ""} ${message.authorName}: ${message.text}`,
+      ),
     );
   if (input.replyTo)
     lines.push(
@@ -147,7 +152,7 @@ function boundedContext(messages: readonly MessagingContextMessage[]): Messaging
   const kept: MessagingContextMessage[] = [];
   let characters = 0;
   for (const message of [...messages].reverse().slice(0, CONTEXT_MESSAGES)) {
-    characters += message.text.length + message.authorName.length;
+    characters += message.text.length + message.authorName.length + (message.id?.length ?? 0);
     if (characters > CONTEXT_CHARACTERS) break;
     kept.unshift(message);
   }

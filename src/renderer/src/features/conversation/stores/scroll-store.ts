@@ -22,7 +22,7 @@ import { currentText } from "@openbot/ui/text";
 import type { VirtualItem } from "@tanstack/virtual-core";
 import { createEffect, createMemo, createSignal, onCleanup, untrack } from "solid-js";
 import { formatMessageTime } from "../../../app-message-projection";
-import { groupAgentMessageMarkers, markOpenAgentMessages, teammateUpdateAnswers } from "../agent-message-timeline";
+import { groupAgentMessageMarkers, markOpenAgentMessages, teammateTurnAnswers } from "../agent-message-timeline";
 import type { ConversationProps, ConversationTarget } from "../conversation-types";
 import { summarizeHostedSiteMessages } from "../hosted-site-timeline";
 import { narrationRows, placeTurnRowsByTime, placeUpdatesAfterSteers } from "../narration-rows";
@@ -157,8 +157,8 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     (deps.props.channel
       ? message.senderAgentId !== undefined && channelWriters().has(message.senderAgentId)
       : Boolean(deps.props.activeTurnId) || !turnSettled());
-  /* The quiet answers of a teammate update show under its marker, so they have no row of their own. */
-  const updateAnswers = createMemo(() => teammateUpdateAnswers(deps.props.messages));
+  /* The quiet answers of a teammate update or request show under its marker, so they have no row of their own. */
+  const updateAnswers = createMemo(() => teammateTurnAnswers(deps.props.messages));
   const foldedAnswerIds = createMemo(
     () => new Set([...updateAnswers().values()].flatMap((answers) => answers.map((answer) => answer.id))),
   );
@@ -316,7 +316,12 @@ export function createScrollStore(deps: ScrollStoreDeps) {
       !deps.props.loadingOlder &&
       !deps.props.olderError,
     (needsOlderPage) => {
-      if (needsOlderPage) deps.props.onLoadOlder?.();
+      if (!needsOlderPage) return;
+      // Rows that just arrived, as when a chat opens, have not measured the boundary again: it still
+      // holds the value of the chat before them. Measure before asking for a page. A signal read in
+      // this callback still gives the value from before the write, so use the measured value.
+      if (untrack(() => timelineMessages().length) > 0 && !updateHistoryBoundary()) return;
+      deps.props.onLoadOlder?.();
     },
   );
 
@@ -348,8 +353,28 @@ export function createScrollStore(deps: ScrollStoreDeps) {
   });
 
   /* One writer for the boundary: the row the virtualizer renders first, read where the reader is. */
-  function updateHistoryBoundary(element = deps.elements.scrollElement()): void {
-    setAtHistoryBoundary(chatHistoryBoundaryReached(element, firstRenderedIndex));
+  function updateHistoryBoundary(element = deps.elements.scrollElement()): boolean {
+    const followsLatest = deps.sticky.getStickToLatest();
+    const reached =
+      chatHistoryBoundaryReached(element, firstRenderedIndex, followsLatest) &&
+      (!followsLatest || currentRowsRendered(element));
+    setAtHistoryBoundary(reached);
+    return reached;
+  }
+
+  /**
+   * Rows that arrive lay out a frame or more after the messages change. Until then the transcript
+   * shows the rows from before, such as the chat that is opening, and its height says nothing about
+   * the new rows. The last row on screen tells which chat the transcript shows. Some rows have no
+   * message mark, such as a question that waits for its answer, so the last mark can be a row above it.
+   */
+  function currentRowsRendered(element: HTMLElement | undefined): boolean {
+    const messages = untrack(timelineMessages);
+    if (!element || messages.length === 0) return true;
+    const marks = element.querySelectorAll("[data-chat-search-message]");
+    const lastId = marks[marks.length - 1]?.getAttribute("data-chat-search-message");
+    if (!lastId) return element.querySelector(".virtual-chat-row") !== null;
+    return messages.findLastIndex((message) => message.id === lastId) !== -1;
   }
 
   function updateScrollFade(element = deps.elements.scrollElement()) {

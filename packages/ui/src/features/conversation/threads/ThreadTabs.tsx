@@ -456,8 +456,9 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       window.addEventListener("pointercancel", onDragEnd);
     };
 
-    /** A mouse wheel scrolls the tabs sideways. A trackpad already scrolls them. */
+    /** A mouse wheel scrolls the tabs sideways. A trackpad already scrolls them. A pinch zooms the page. */
     const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey) return;
       if (element.scrollWidth <= element.clientWidth) return;
       if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
       event.preventDefault();

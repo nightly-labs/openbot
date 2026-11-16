@@ -54,7 +54,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
     layout.setSidebarView(view);
   }
   const usageRows = usePlanLimitRows();
-  /** The Sunra credits of the server that the Canvas page shows. Other pages do not read them. */
+  /** The Sunra and Higgsfield credits of the server that the Canvas page shows. Other pages do not read them. */
   const mediaCredits = createWorkflowMediaCredits(
     () => (windowPage.page() === "workflows" ? usage.state.serverId : null),
     desktopMediaCredits,

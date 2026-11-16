@@ -160,6 +160,7 @@ export const messages = {
   "composer.picker.section.files": "Arquivos",
   "composer.picker.section.tabs": "Abas do navegador",
   "composer.picker.section.threads": "Tópicos",
+  "composer.picker.section.messages": "Nas mensagens",
   "composer.token.tab": "Aba do navegador {name}",
   "composer.token.thread": "Tópico {name}",
   "composer.token.unavailableTab": "Aba do navegador fechada {name}",

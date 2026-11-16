@@ -103,7 +103,7 @@ export type WorkflowFieldValue = string | number | boolean;
  * - image: `media` (a `WorkflowMediaKind`, "image" when absent), `prompt`, `aspect` (one of
  *   `WORKFLOW_MEDIA_ASPECTS`), `model` (an id of `WORKFLOW_MEDIA_MODELS`), `account` (the id of the
  *   account of the model's provider that pays for the file; empty or absent is the provider's own
- *   sign-in, and Sunra ignores it), `resolution` (one of the
+ *   sign-in, and Sunra and Higgsfield ignore it), `resolution` (one of the
  *   model's resolutions, such as "720p" or "2K"), and for a video `duration` (seconds), `firstFrame`
  *   and `lastFrame` (the id of an image node that an
  *   `image` edge connects, whose picture is the first or the last frame) and `voice` (an id of
@@ -122,10 +122,10 @@ export const WORKFLOW_MEDIA_ASPECTS = ["1:1", "4:3", "16:9", "9:16"] as const;
 export type WorkflowMediaAspect = (typeof WORKFLOW_MEDIA_ASPECTS)[number];
 
 /**
- * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra,
- * whose MCP server the user connects in Apps and whose credits pay for the file.
+ * The service that makes the file: the subscription of an agent provider (`codex`, `grok`), or Sunra or
+ * Higgsfield, whose MCP server the user connects in Apps and whose credits pay for the file.
  */
-export type WorkflowMediaProvider = "codex" | "grok" | "sunra";
+export type WorkflowMediaProvider = "codex" | "grok" | "sunra" | "higgsfield";
 
 /** A model that makes the image or the video of an `image` node, with the subscription of its provider. */
 export interface WorkflowMediaModel {
@@ -180,6 +180,35 @@ function sunraModel(
   };
 }
 
+/**
+ * The Higgsfield models, from Higgsfield's `models_explore` (2026-11-16). The resolutions are the
+ * canvas names; the host sends them in lower case, as Higgsfield names them ("2k").
+ */
+const HIGGSFIELD_IMAGE_RESOLUTIONS = ["1K", "2K", "4K"] as const;
+const HIGGSFIELD_VIDEO_RESOLUTIONS = ["720p", "1080p"] as const;
+const HIGGSFIELD_VIDEO_DURATIONS = [5, 10, 15] as const;
+
+function higgsfieldModel(
+  id: string,
+  name: string,
+  maker: string,
+  kind: WorkflowMediaKind,
+  specs: Pick<WorkflowMediaModel, "aspects" | "durations" | "resolutions" | "transparent">,
+): WorkflowMediaModel {
+  return {
+    id: `higgsfield-${id}`,
+    provider: "higgsfield",
+    providerModel: id,
+    name,
+    maker,
+    subscription: "Higgsfield",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    ...specs,
+  };
+}
+
 export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
   {
     id: "gpt-image",
@@ -218,6 +247,33 @@ export const WORKFLOW_MEDIA_MODELS: readonly WorkflowMediaModel[] = [
     aspects: ["16:9", "9:16"],
     durations: [4, 6, 8],
     resolutions: SUNRA_VIDEO_RESOLUTIONS,
+  }),
+  higgsfieldModel("gpt_image_2_6", "GPT Image 2.6", "OpenAI", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+    transparent: true,
+  }),
+  higgsfieldModel("nano_banana_pro", "Nano Banana Pro", "Google", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+  }),
+  higgsfieldModel("seedream_v5_pro", "Seedream 5.0 Pro", "ByteDance", "image", {
+    resolutions: ["2K", "1K"],
+    transparent: true,
+  }),
+  higgsfieldModel("flux_3_image", "FLUX 3", "Black Forest Labs", "image", {
+    resolutions: HIGGSFIELD_IMAGE_RESOLUTIONS,
+  }),
+  higgsfieldModel("seedance_2_0", "Seedance 2.0", "ByteDance", "video", {
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
+  }),
+  higgsfieldModel("kling4_0", "Kling 4.0", "Kuaishou", "video", {
+    aspects: ["1:1", "16:9", "9:16"],
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
+  }),
+  higgsfieldModel("wan2_7", "Wan 2.7", "Alibaba", "video", {
+    durations: HIGGSFIELD_VIDEO_DURATIONS,
+    resolutions: HIGGSFIELD_VIDEO_RESOLUTIONS,
   }),
 ];
 
@@ -937,13 +993,15 @@ export function isWorkflowWebhookSecret(value: unknown): value is WorkflowWebhoo
 /**
  * The media services that the host can use now, beyond the agent providers. `sunra`: an enabled Sunra
  * row in the host's Apps is signed in, so the Sunra models of `WORKFLOW_MEDIA_MODELS` can run.
+ * `higgsfield`: the same for a Higgsfield row and the Higgsfield models.
  */
 export interface WorkflowMediaProviders {
   sunra: boolean;
+  higgsfield: boolean;
 }
 
 export function isWorkflowMediaProviders(value: unknown): value is WorkflowMediaProviders {
-  return isDynamicRecord(value) && isBoolean(value.sunra);
+  return isDynamicRecord(value) && isBoolean(value.sunra) && isBoolean(value.higgsfield);
 }
 
 /**
@@ -956,20 +1014,25 @@ export interface WorkflowMediaCreditBalance {
   quota: number | null;
 }
 
-/** The credits of each media service beyond the agent providers. `sunra`: null when the host cannot read them. */
+/** The credits of each media service beyond the agent providers. Null when the host cannot read them. */
 export interface WorkflowMediaCredits {
   sunra: WorkflowMediaCreditBalance | null;
+  higgsfield: WorkflowMediaCreditBalance | null;
 }
 
 const isCreditCount = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
-function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
+export function isWorkflowMediaCreditBalance(value: unknown): value is WorkflowMediaCreditBalance {
   return (
     isDynamicRecord(value) && isCreditCount(value.available) && (value.quota === null || isCreditCount(value.quota))
   );
 }
 
 export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCredits {
-  return isDynamicRecord(value) && (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra));
+  return (
+    isDynamicRecord(value) &&
+    (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
+    (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+  );
 }

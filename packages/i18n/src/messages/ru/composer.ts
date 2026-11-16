@@ -160,6 +160,7 @@ export const messages = {
   "composer.picker.section.files": "Файлы",
   "composer.picker.section.tabs": "Вкладки браузера",
   "composer.picker.section.threads": "Ветки",
+  "composer.picker.section.messages": "В сообщениях",
   "composer.token.tab": "Вкладка браузера {name}",
   "composer.token.thread": "Ветка {name}",
   "composer.token.unavailableTab": "Закрытая вкладка браузера {name}",

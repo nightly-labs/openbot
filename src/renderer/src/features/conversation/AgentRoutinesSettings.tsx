@@ -68,10 +68,10 @@ import { useText } from "@openbot/ui/text";
 import type { JSX } from "@solidjs/web";
 import { createEffect, createMemo, createSignal, createStore, For, onCleanup, Show, untrack } from "solid-js";
 import { actionToast } from "../../action-toast";
-import { type DesktopAnalyticsScope, desktopAnalytics } from "../../analytics";
+import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
-import { webhookFailureCode } from "../../webhook-failure-code";
 import { HostedUpsellRoutinesNotice, hostedUpsellRoutineCreated } from "../servers/hosted-server-upsell-controller";
+import { trackRoutineAction } from "./routine-analytics";
 import { isEventRoutine, routineListSummary, routineScheduleOf } from "./routine-summary";
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
@@ -1281,21 +1281,4 @@ function validDraft(draft: RoutineDraft): boolean {
 
 function isBlankNewDraft(draft: RoutineDraft): boolean {
   return draft.id === null && draft.triggerKind === "schedule" && !draft.name.trim() && !draft.instruction.trim();
-}
-
-function trackRoutineAction(
-  analytics: DesktopAnalyticsScope,
-  action: "create" | "update" | "delete" | "test",
-  routine: Pick<RoutineDraft, "triggerKind" | "schedule">,
-  startedAt: number,
-  result: "succeeded" | "failed",
-  error?: unknown,
-): void {
-  analytics.track("routine_action", {
-    action,
-    trigger_type: routine.triggerKind === "webhook" ? "webhook" : routine.schedule.kind,
-    duration_ms: Math.max(0, Math.round(performance.now() - startedAt)),
-    result,
-    ...(result === "failed" ? { failure_code: webhookFailureCode(error, `${action}_failed`) } : {}),
-  });
 }

@@ -349,6 +349,8 @@ interface StagedTransfer {
   path: string;
   /** The archive `apply` reads must be the one the preview checked. */
   fingerprint: string;
+  /** The limits the preview checked. A file sent in parts has the local limits, not the one-transfer limits. */
+  limits: ArchiveLimits;
   manifest: TransferManifest;
   avatars: Map<string, AvatarImageInput>;
 }
@@ -1109,6 +1111,7 @@ export class InstanceTransferService {
       temporary,
       path,
       fingerprint: archive.fingerprint,
+      limits,
       manifest: { ...manifest, agents },
       avatars,
     };
@@ -1207,7 +1210,7 @@ export class InstanceTransferService {
       );
     // The file can change after `stage`, so only the same central directory is accepted. Each entry
     // is checked against its size and CRC there when it is read.
-    const archive = yield* readArchiveEffect(staged.path, staged.temporary ? REMOTE_ARCHIVE : ARCHIVE);
+    const archive = yield* readArchiveEffect(staged.path, staged.limits);
     if (archive.fingerprint !== staged.fingerprint)
       return yield* archiveFailure(new Error(sourceText("error.import.exportChanged")));
 

@@ -1,5 +1,43 @@
 [
   {
+    "version": "0.71.0",
+    "date": "2026-11-14",
+    "notices": [
+      "Aggiorna a questa versione anche ogni server a cui ti sei unito. Su un server, Ferma per le esecuzioni delle routine, i file che gli agenti inviano senza testo e le chiavi API nel vecchio percorso funzionano solo se il server ha questa versione."
+    ],
+    "groups": [
+      {
+        "type": "added",
+        "items": [
+          "Allarga due dita su un trackpad o su uno schermo touch per ingrandire la zona sotto il puntatore. I diagrammi, le tele e il visualizzatore di immagini mantengono il proprio zoom.",
+          "Ferma un’esecuzione di una routine dalla Tela delle routine: seleziona Ferma nella barra in alto o nei dettagli della routine. L’esecuzione termina con lo stato Annullata.",
+          "Gli agenti possono inviare un file o un’immagine senza testo a una chat di WhatsApp, Telegram, Slack o Discord.",
+          "Acquista di nuovo un server Starter ospitato. Ha 25 GB di spazio di archiviazione.",
+          "Usa un abbonamento ClinePass con gli agenti Cline. Il menu dei modelli mostra i modelli ClinePass."
+        ]
+      },
+      {
+        "type": "changed",
+        "items": [
+          "Sulla Tela, trascina una nota, un testo libero, una forma o un passaggio dal suo testo. Un clic sul testo posiziona il cursore dove hai cliccato.",
+          "Un messaggio che invii mentre lavora un agente Antigravity entra nell’esecuzione in corso. Serve Antigravity CLI 1.5.0 o una versione successiva.",
+          "Una routine la cui attività dice di fermarsi quando il lavoro è finito ora si mette in pausa da sola. Riattivala dall’elenco delle routine.",
+          "Il Vault ora dice che ogni agente può leggere i file delle chiavi API degli altri agenti, perché tutti gli agenti girano con lo stesso utente di sistema."
+        ]
+      },
+      {
+        "type": "fixed",
+        "items": [
+          "Script, server MCP e impostazioni dei provider che leggono le chiavi API del Vault dai loro file funzionano di nuovo dopo l’aggiornamento a 0.70.0.",
+          "Un agente Claude mantiene il modello nel suo profilo quando Claude Code cambia il modello predefinito.",
+          "Quando Claude interrompe un’esecuzione al limite di spesa mensile, un agente con modelli di riserva continua con il modello successivo.",
+          "Gli agenti ottengono la trascrizione completa di un video con sottotitoli, come un video di YouTube.",
+          "OpenBot usa meno CPU: le schede del browser che non vedi rallentano, e la luce in movimento nella riga di attività di un agente è più leggera."
+        ]
+      }
+    ]
+  },
+  {
     "version": "0.70.0",
     "date": "2026-11-13",
     "notices": [

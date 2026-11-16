@@ -252,7 +252,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .min(1)
         .max(12)
         .describe(
-          "Active step only: one password/whole-code field (+ sign-up confirm field), or each single-digit field in order. Fresh snapshot refs; no username field.",
+          "Active step only: one password/whole-code field (+ sign-up confirm field, or with loginId its code fields), or each single-digit field in order. Fresh refs; no username field.",
         ),
       digits: z
         .number()
@@ -261,7 +261,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
         .max(12)
         .default(6)
         .describe(
-          "For codes, the length from page instructions or the count of single-digit fields, 4–12; do not infer six from the default. Omit it with loginId and one code field: the saved code sets it. For passwords, omit it or use 0.",
+          "For codes, the length from the page or the count of single-digit fields, 4–12; do not assume six. Omit it with loginId and one code field: the saved code sets it. For a password alone, omit it.",
         ),
       submission: z
         .enum(["click", "enter", "on_input"])

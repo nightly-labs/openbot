@@ -357,8 +357,6 @@ export const messages = {
   "chat.video.pause": "Metti in pausa il video",
   "chat.video.position": "Posizione nel video",
   "chat.video.time": "{elapsed} / {duration}",
-  "chat.video.download": "Scarica video",
-  "chat.video.open": "Apri video",
   "chat.video.mute": "Disattiva audio del video",
   "chat.video.unmute": "Riattiva audio del video",
   "chat.message.you": "Tu",

@@ -78,6 +78,8 @@ export const messages = {
   "error.backend.channelWaitBeforeDeleteHistory": "请等此频道中的工作停止后再删除其历史记录。",
   "error.backend.channelCompactUnavailable":
     "此频道现在没有成员可以压缩上下文。成员必须先在频道中回答,且其提供方必须支持压缩。",
+  "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
+  "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
@@ -181,6 +183,8 @@ export const messages = {
   "error.backend.routineRunNoSession": "由于服务商会话不可用，OpenBot 无法中断正在进行中的自动化任务运行。",
   "error.backend.interruptSelf": "助手不能中断自己。",
   "error.backend.interruptOtherWork": "该助手正在处理非你的消息发起的任务，只有用户或该任务的发送者才能停止它。",
+  "error.backend.interruptSharedWork":
+    "该助手的这一轮在处理你的消息，同时也在处理来自用户或其他助手的消息。只有用户可以在该助手的聊天中用“停止助手”停止它。",
   "error.backend.interruptStarting": "该助手仍在启动对话，请等对话开始后再试。",
   "error.backend.interruptNoSession": "由于服务商会话不可用，OpenBot 无法中断该助手。",
   "error.backend.memoryTextRequired": "需要填写记忆内容。",
@@ -215,6 +219,8 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot 无法保存此 MCP 服务器配置。",
   "error.backend.mcpServerNoAnswer": "服务器未在 {seconds} 秒内响应。",
   "error.backend.mcpSignInNotAccepted": "服务器未接受该登录。",
+  "error.backend.mcpSignInAccountRefused":
+    "服务器拒绝了你登录所用的账号。请确认该账号可以使用此服务。要使用其他账号，请先退出登录，再重新登录。",
   "error.backend.mcpSignInClientRefused":
     "完成登录时，登录服务器未接受 OpenBot。请重新登录，OpenBot 会重新向服务器注册。",
   "error.backend.mcpCommandNotFound": "未找到命令：{command}",
@@ -236,12 +242,17 @@ export const messages = {
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
+  "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpToolSchemaRefused":
     "它的工具 {tool} 使用了这个提供方无法读取的输入格式。其他提供方的智能体仍会获得这个服务器。",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请打开 MCP 设置并选择“登录”。",
+    "{provider} 无法使用 MCP 服务器 {name}，因为该服务器要求登录。请在 市场、应用 中打开 {name} 并选择“登录”。",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} 无法启动 MCP 服务器 {name}。请打开 MCP 设置并选择“测试连接”查看原因。",
+    "{provider} 无法启动 MCP 服务器 {name}。请在 市场、应用 中打开 {name} 并选择“测试连接”查看原因。",
+  "error.backend.mcpServerFailedInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，{provider} 无法使用它的工具。{provider} 会自行启动服务器，因此 OpenBot 中的连接测试可能会成功。请开始新的聊天后再试一次。",
+  "error.backend.mcpServerTimedOutInProvider":
+    "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
@@ -301,6 +312,8 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed": "只有服务器所有者或管理员可以选择这个操作。",
   "error.backend.approvalInactive": "该审批已不再有效。",
   "error.backend.approvalOwnerOnly": "只有服务器所有者可以批准该操作。",
+  "error.backend.feedbackNeedsPhone":
+    "只有 OpenBot 手机应用可以发送这份报告，因为它会附上手机的版本和支持日志。请在手机上打开此对话。如果在手机上也看到这条消息，请更新手机应用。",
   "error.backend.takeoverInactive": "该浏览器接管已不再有效。",
   "error.backend.authSubmitting": "身份验证正在提交中。",
   "error.backend.apiKeySaveFailed": "OpenBot 无法保存 API 密钥，请重试。",
@@ -326,6 +339,8 @@ export const messages = {
   "error.backend.browserProxyChanged": "此代理在你打开后已被更改。请重新查看，然后再试一次。",
   "error.backend.browserProxyUnreachable": "代理 {name} 没有响应，因此页面没有打开。",
   "error.backend.browserProxySignInRefused": "代理 {name} 拒绝了登录，因此页面没有打开。",
+  "error.backend.browserSystemProxyFailed":
+    "运行 OpenBot 的计算机设置中的代理没有响应或拒绝了连接，因此页面没有打开。请检查该计算机的代理设置。",
   "error.backend.browserProxyComputerUnreachable": "此配置文件使用的计算机没有响应，因此页面没有打开。",
   "error.backend.browserProxyComputerLocalAddress":
     "此配置文件使用的计算机只打开公共网站。它不打开本地网络上的地址，因此页面没有打开。",
@@ -348,6 +363,8 @@ export const messages = {
   "error.backend.browserInputProtected": "验证期间浏览器输入受保护。",
   "error.backend.mcpServerHttpCredentials": "服务器返回 {status}。请检查 API 密钥或其他凭据。",
   "error.backend.mcpServerHttpUrl": "服务器返回 {status}。请检查地址，链接可能错误、过期或已删除。",
+  "error.backend.mcpServerBearerKey":
+    "此服务器使用 API 密钥，而不是登录。在“请求头”中，将键设为 Authorization，将值设为 Bearer、一个空格和你的 API 密钥。",
   "error.backend.mcpSignInAppUrl": "登录应用需要有效的服务器地址。",
   "error.backend.mcpSignInAppClientId": "请输入登录应用的客户端 ID。",
   "error.backend.mcpSignInAppIssuerChanged":

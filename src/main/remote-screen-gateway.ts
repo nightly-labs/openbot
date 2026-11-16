@@ -80,6 +80,8 @@ interface RemoteScreenGatewayOptions {
   getRuntimeCredentials: () => Effect.Effect<{ username: string; password: string }, RemoteWorkflowError>;
   getDisplays?: (() => RemoteDesktopDisplay[]) | undefined;
   getDisplayScreenOrigin?: ((displayId: string) => { x: number; y: number } | undefined) | undefined;
+  // Read for a Windows host only: true when this computer's session has no screen to capture.
+  sessionDisconnected?: (() => boolean) | undefined;
   getIceServers: () => Effect.Effect<RemoteDesktopIceServer[], RemoteWorkflowError>;
   createRuntime?: RemoteScreenGatewayCreateRuntime;
   audit?: (event: RemoteScreenAuditEvent) => void;
@@ -546,6 +548,12 @@ export class RemoteScreenGateway {
     if (!this.#options.runtimePaths) {
       return yield* new RemoteWorkflowError({
         cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.runtimeMissing")),
+      });
+    }
+    // Sunshine runs in this session. Without this, the stream fails with only a capture error.
+    if (this.#options.platform === "win32" && this.#options.sessionDisconnected?.()) {
+      return yield* new RemoteWorkflowError({
+        cause: new RemoteScreenError(503, "host_unavailable", sourceText("error.remote.windowsSessionDisconnected")),
       });
     }
     if (this.#testSessionId)

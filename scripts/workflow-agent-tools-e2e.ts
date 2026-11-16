@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Effect } from "effect";
 import { z } from "zod";
-import { discoverTools, resolveDeferredTool } from "../src/backend/agent/tool-catalog";
+import { deferredCallArgumentsError, discoverTools, resolveDeferredTool } from "../src/backend/agent/tool-catalog";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
 import type { DynamicToolCallParams } from "../src/backend/protocol";
@@ -203,6 +203,26 @@ try {
       !(search.guidance ?? []).some((text) => text.includes("Manage scheduled work")),
     { ready, guidance: search.guidance },
   );
+  // Users call the Workflows board the Canvas. A canvas search found no workflow tool (#9367).
+  const canvas = discoverTools(params("tool_search", { query: "create a canvas" }), "claude");
+  check(
+    "a canvas search gives all 6 workflow tools with schemas",
+    canvas.tools.filter((tool) => tool.name.includes("workflow") && "inputSchema" in tool).length === 6,
+    canvas.tools.map((tool) => tool.name),
+  );
+  // A canvas can also be on a web page or be the Routines canvas, so those schemas stay.
+  const otherReady = ["click canvas", "connect routine agents canvas"].flatMap((query) =>
+    discoverTools(params("tool_search", { query }), "claude")
+      .tools.filter((tool) => "inputSchema" in tool)
+      .map((tool) => tool.name),
+  );
+  check(
+    "a canvas search keeps the browser and routine schemas that it finds",
+    ["openbot_browser.click", "openbot.connect_routine_agents", "openbot.edit_workflow"].every((name) =>
+      otherReady.includes(name),
+    ),
+    otherReady,
+  );
   const mixed = discoverTools(params("tool_search", { queries: ["workflow", "openbot_browser.snapshot"] }), "codex");
   check(
     "a workflow search keeps the schema of a tool that another query names exactly",
@@ -217,6 +237,21 @@ try {
   );
   const alias = resolveDeferredTool(params("tool_call", { tool: "openbot.list_workflows", arguments: {} }), "codex");
   check("tool_call accepts the qualified name as tool", alias?.tool === "list_workflows", alias);
+  // An ACP agent sent the MCP names that it sees, and no arguments for a tool that has none. Each try
+  // got the same general refusal, and its routine failed until the run ended (#7955).
+  const mcpName = resolveDeferredTool(params("tool_call", { name: "mcp__openbot__list_workflows" }), "acp");
+  check(
+    "tool_call accepts an MCP tool name and no arguments",
+    mcpName?.tool === "list_workflows" && JSON.stringify(mcpName.arguments) === "{}",
+    mcpName,
+  );
+  const bareName = params("tool_call", { name: "list_workflows", arguments: {} });
+  const bareError = resolveDeferredTool(bareName, "acp") ? null : deferredCallArgumentsError(bareName, "acp");
+  check(
+    "tool_call names the catalog tool for a name without its namespace",
+    bareError?.includes("openbot.list_workflows") === true,
+    bareError,
+  );
 
   // 2. One call builds a workflow with refs.
   const built = await call("create", "edit_workflow", {

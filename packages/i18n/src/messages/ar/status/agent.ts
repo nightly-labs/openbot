@@ -7,6 +7,8 @@ export const messages = {
   "status.agent.instructionsChanged": "حدّث تعليماته",
   "status.agent.modelSwitchedForLimit": "تم بلوغ حد الاستخدام. تم التبديل إلى {model}.",
   "status.agent.modelReturnedAfterLimit": "انتهى حد الاستخدام. تمت العودة إلى {model}.",
+  "status.agent.routineSkippedRunOpen": "تشغيل متخطى: لم يكن التشغيل السابق قد انتهى",
+  "status.agent.routineSkippedUsageLimit": "تشغيل متخطى: تم بلوغ حد الاستخدام",
   "status.agent.modelSwitchedForError": "خطأ في المزوّد. تم التبديل إلى {model}.",
   "status.agent.modelSwitchedForSpentBalance":
     "لم يتبق رصيد في {previous}. تم التبديل إلى {model}. لاستخدامه مرة أخرى، أضف رصيدًا ثم اختره.",
@@ -29,6 +31,8 @@ export const messages = {
   "status.agent.vaultCardFill":
     "تعبئة البطاقة المحفوظة {card} في {site}. بعد موافقتك، يمكن للوكلاء تعبئة هذه البطاقة في هذا الموقع دون موافقة. أزل الموقع من إعدادات الخادم > الخزنة.",
   "status.agent.reportProblem": "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك. لا يظهر اسمك.",
+  "status.agent.reportPhoneProblem":
+    "سيصبح هذا مشكلة عامة على GitHub، مع إصدار التطبيق ونظامك، ومع إصدار تطبيق الهاتف ونظام هاتفك وسجل الدعم فيه. لا يظهر اسمك.",
   "status.agent.sendIdea": "يصبح هذا مشكلة عامة على GitHub. لا يظهر اسمك.",
   "status.agent.feedbackRecentErrors": "الأخطاء الأخيرة في المحادثة:",
   "status.agent.feedbackSameAs": "يُضاف إلى المشكلة #{issue}",
@@ -41,6 +45,13 @@ export const messages = {
   "status.agent.serverInstallCommand":
     "إنشاء أمر لمرة واحدة يثبّت OpenBot على كمبيوتر آخر كالخادم {name} ويسجّل دخوله إلى حسابك. يشغّله الوكيل هناك.",
   "status.agent.serverInstallCard": "أمر التثبيت للخادم {name}",
+  "status.agent.browserProfileNamed":
+    "انقل {agents} إلى ملف تعريف المتصفح {profile}. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileNew":
+    "أنشئ ملف تعريف المتصفح الجديد {profile} وانقل {agents} إليه. لا يحتوي على أي تسجيل دخول. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileShared":
+    "انقل {agents} إلى ملف تعريف المتصفح المشترك. يحصلون على تسجيلات الدخول وملفات تعريف الارتباط الخاصة به. تُغلق علاماتهم المفتوحة.",
+  "status.agent.browserProfileOwn": "امنح كل واحد من {agents} ملف تعريف متصفح خاصًا به. تُغلق علاماتهم المفتوحة.",
   "status.agent.feedbackSending": "جارٍ إرسال ملاحظاتك إلى فريق OpenBot…",
   "status.agent.workflowDelete": "احذف سير العمل {title} مع عمليات تشغيله وإصداراته. تتوقف خطواته المفتوحة.",
   "status.agent.vaultCardFillFrames": "حقول البطاقة موجودة في إطارات من {origins}.",
@@ -103,7 +114,9 @@ export const messages = {
   "status.agent.mcpServerEnable": "تشغيل خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerDisable": "إيقاف خادم MCP {name} لكل وكيل على هذا الخادم.",
   "status.agent.mcpServerRemove": "إزالة خادم MCP {name} وتسجيل دخوله من كل وكيل على هذا الخادم.",
-  "status.agent.mcpSignInRequested": "يحتاج خادم MCP {name} إلى تسجيل الدخول. سجّل الدخول من إعدادات الخادم، MCP.",
+  "status.agent.mcpToolCall": "تشغيل الأداة {tool} من خادم MCP {name}.",
+  "status.agent.mcpSignInRequested": "يحتاج خادم MCP {name} إلى تسجيل الدخول. سجّل الدخول من المتجر، التطبيقات، {name}.",
+  "status.agent.uiBlockClosedByMessage": "أُغلق برسالة جديدة",
   "status.agent.vaultAdded": "تم الحفظ في الخزنة: {name}",
   "status.agent.vaultUpdated": "تم التغيير في الخزنة: {name}",
   "status.agent.vaultDeleted": "تم الحذف من الخزنة: {name}",

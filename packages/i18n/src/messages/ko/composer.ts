@@ -155,6 +155,7 @@ export const messages = {
   "composer.picker.section.files": "파일",
   "composer.picker.section.tabs": "브라우저 탭",
   "composer.picker.section.threads": "스레드",
+  "composer.picker.section.messages": "메시지에서",
   "composer.token.tab": "브라우저 탭 {name}",
   "composer.token.thread": "스레드 {name}",
   "composer.token.unavailableTab": "닫힌 브라우저 탭 {name}",

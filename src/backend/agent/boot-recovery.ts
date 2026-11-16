@@ -383,6 +383,7 @@ export class BootRecovery {
               const run = requestId ? this.#mailbox.routineDeliveryOfRequest(agent.id, requestId) : null;
               return run !== null && this.#hooks.quietRunDelivery(run.delivery.id);
             },
+            hasOwnReplyFrom: (deliveryId) => this.#mailbox.hasOwnReplyFrom(deliveryId),
           }).pipe(toBootRecoveryFailed);
           yield* recoveryStep(() => this.#refreshBackfilledConversation(agent.id, publicThreadId));
         }).pipe(

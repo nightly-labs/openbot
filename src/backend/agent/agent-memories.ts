@@ -449,8 +449,12 @@ export class AgentMemories {
           `${sourceText("error.backend.memoryGone")} There is nothing to delete. Call list_memories if you need your current memory IDs.`,
         );
       const selection = this.#memories.getSelection(senderAgentId, current.id);
+      // Only the user deletes a memory that the user set: no text can prove that the user asked for
+      // it. Without a way forward, the agent told the user that it cannot be deleted at all (#8700).
       if (selection?.userControlled)
-        return openBotToolFailure(sourceText("error.backend.memorySelectionUserControlled"));
+        return openBotToolFailure(
+          `${sourceText("error.backend.memorySelectionUserControlled")} You cannot delete it. If the user asked to delete it, tell them in one sentence to delete it in your Memories settings: Settings, Memories, then Delete on this memory. Do not try another memory tool.`,
+        );
       this.#stage(params.turnId, {
         callId: params.callId,
         type: "forget",

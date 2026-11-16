@@ -96,6 +96,18 @@ export const messages = defineMessages("browser", {
   "browser.secret.submitting": "Submitting…",
   "browser.secret.takeOver": "Take over",
   "browser.secret.failed": "The request could not be completed. Check the connection and try again.",
+  "browser.secret.vaultSkip.agentScript":
+    "OpenBot did not use your saved login because the agent ran a script on this page. To use it, ask the agent to reload the page and try again.",
+  "browser.secret.vaultSkip.fieldKind":
+    "OpenBot did not use your saved login because the agent selected the wrong field on the page.",
+  "browser.secret.vaultSkip.loginChoice":
+    "OpenBot did not use a saved login because the agent did not choose one of the saved logins for this site. Tell the agent which account to use.",
+  "browser.secret.vaultSkip.noPassword":
+    "OpenBot did not use your saved login because it has no password for this site.",
+  "browser.secret.vaultSkip.noAuthenticatorKey":
+    "OpenBot did not use your saved login because it has no authenticator key.",
+  "browser.secret.vaultSkip.vaultUnreadable":
+    "OpenBot did not use a saved login because it could not read your password manager.",
   "browser.error.openAddress": "Could not open the address in this tab.",
   "browser.error.channelNoBrowserMember": "No member can open a new tab in this channel.",
   "browser.error.closeTab": "Could not close the browser tab.",

@@ -156,6 +156,7 @@ export const messages = {
   "composer.picker.section.files": "קבצים",
   "composer.picker.section.tabs": "לשוניות דפדפן",
   "composer.picker.section.threads": "שרשורים",
+  "composer.picker.section.messages": "בהודעות",
   "composer.token.tab": "לשונית דפדפן {name}",
   "composer.token.thread": "שרשור {name}",
   "composer.token.unavailableTab": "לשונית דפדפן סגורה {name}",
