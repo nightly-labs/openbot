@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Ci sono troppi indirizzi o cartelle.",
   "error.provider.credentialFileUnreadable": "Il file delle credenziali del provider non è leggibile.",
   "error.provider.credentialFileTooLarge": "Il file delle credenziali del provider è troppo grande.",
+  "error.provider.environmentNameInvalid":
+    "{name} non è un nome di variabile valido. Usa lettere, cifre e _, senza iniziare con una cifra.",
+  "error.provider.environmentNameReserved": "OpenBot imposta {name} per questo provider. Rimuovi questa variabile.",
+  "error.provider.environmentNameDuplicate": "{name} compare più di una volta nell’elenco.",
+  "error.provider.environmentValueTooLong": "Il valore di {name} è troppo lungo.",
+  "error.provider.environmentTooMany": "Un provider può avere al massimo {limit} variabili.",
   "error.provider.archiveSpecialFile": "L'archivio del runtime contiene un link o un file speciale.",
   "error.provider.archiveUnsafePath": "L'archivio del runtime contiene un percorso non sicuro.",
   "error.provider.runtimeSpecialFile": "Il runtime contiene un link o un file speciale.",

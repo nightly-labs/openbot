@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Há endereços ou pastas demais.",
   "error.provider.credentialFileUnreadable": "O arquivo de credenciais do provedor não pode ser lido.",
   "error.provider.credentialFileTooLarge": "O arquivo de credenciais do provedor é muito grande.",
+  "error.provider.environmentNameInvalid":
+    "{name} não é um nome de variável válido. Use letras, dígitos e _, sem começar com um dígito.",
+  "error.provider.environmentNameReserved": "O OpenBot define {name} para este provedor. Remova esta variável.",
+  "error.provider.environmentNameDuplicate": "{name} aparece mais de uma vez na lista.",
+  "error.provider.environmentValueTooLong": "O valor de {name} é longo demais.",
+  "error.provider.environmentTooMany": "Um provedor pode ter no máximo {limit} variáveis.",
   "error.provider.archiveSpecialFile":
     "O arquivo compactado do ambiente de execução contém um link ou arquivo especial.",
   "error.provider.archiveUnsafePath": "O arquivo compactado do ambiente de execução contém um caminho inseguro.",

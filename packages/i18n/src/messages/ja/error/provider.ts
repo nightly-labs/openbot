@@ -46,6 +46,13 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "アドレスまたはフォルダーが多すぎます。",
   "error.provider.credentialFileUnreadable": "プロバイダーの認証情報ファイルを読み取れません。",
   "error.provider.credentialFileTooLarge": "プロバイダーの認証情報ファイルが大きすぎます。",
+  "error.provider.environmentNameInvalid":
+    "{name} は有効な変数名ではありません。英字、数字、_ を使い、数字で始めないでください。",
+  "error.provider.environmentNameReserved":
+    "OpenBot はこのプロバイダーの {name} を設定します。この変数を削除してください。",
+  "error.provider.environmentNameDuplicate": "{name} がリストに複数あります。",
+  "error.provider.environmentValueTooLong": "{name} の値が長すぎます。",
+  "error.provider.environmentTooMany": "プロバイダーの変数は最大 {limit} 個です。",
   "error.provider.archiveSpecialFile": "ランタイムのアーカイブにリンクまたは特殊ファイルが含まれています。",
   "error.provider.archiveUnsafePath": "ランタイムのアーカイブに安全でないパスが含まれています。",
   "error.provider.runtimeSpecialFile": "ランタイムにリンクまたは特殊ファイルが含まれています。",

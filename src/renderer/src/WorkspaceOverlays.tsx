@@ -962,6 +962,7 @@ function ServerSettings() {
           hostPromptCacheTtl={{}}
           claudeUserSetup={{}}
           claudeCompactWindow={{}}
+          providerEnvironment={{}}
           hostModelVisibility={{}}
           hostDefaultProvider={{}}
           agentAccess={{ listAgents: () => appPort().agent.listAgents(server().id) }}

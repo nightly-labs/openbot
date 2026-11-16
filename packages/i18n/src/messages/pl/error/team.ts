@@ -127,6 +127,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "To połączenie nie obsługuje czasu pamięci podręcznej promptów.",
   "error.team.claudeUserSetupUnsupported": "To połączenie nie obsługuje przełącznika konfiguracji Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "To połączenie nie obsługuje rozmiaru kompaktowania Claude.",
+  "error.team.providerEnvironmentUnsupported": "To połączenie nie obsługuje zmiennych dostawcy.",
   "error.team.modelVisibilityUnsupported": "To połączenie nie obsługuje listy modeli.",
   "error.team.providerDefaultUnsupported": "To połączenie nie obsługuje domyślnego dostawcy.",
   "error.team.attachmentNameRequired": "Wymagana jest bezpieczna nazwa załącznika.",

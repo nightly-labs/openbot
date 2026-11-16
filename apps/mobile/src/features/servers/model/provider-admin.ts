@@ -30,6 +30,9 @@ import {
   type PromptCacheTtlSetting,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
+  type ProviderEnvironment,
+  type ProviderEnvironmentProvider,
+  type ProviderEnvironmentUpdate,
   type ProviderModelVisibility,
   type ProviderRuntimeSnapshot,
   type ProviderRuntimeStatus,
@@ -63,6 +66,7 @@ import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protoc
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-default-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-environment-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "@openbot/contracts/team-protocol/provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "@openbot/contracts/team-protocol/provider-usage-reset-v1";
 import {
@@ -107,6 +111,7 @@ import {
   getHostModelVisibility,
   getHostPromptCacheTtl,
   getHostProviderDefault,
+  getHostProviderEnvironment,
   getProviderApiKeyState,
   getProviderRuntimes,
   type HostProviderDefault,
@@ -123,6 +128,7 @@ import {
   setHostModelVisibility,
   setHostPromptCacheTtl,
   setHostProviderDefault,
+  setHostProviderEnvironment,
   setProviderAccountPool,
   setProviderApiKey,
   signInRelayStatus,
@@ -393,7 +399,7 @@ export function relayPage(
  * The Providers admin of one host (`providers-v1` to `providers-v5` and `providers-v8`,
  * `sign-in-relay-v1`, `provider-default-v1`, `custom-provider-harness-v1`, `custom-provider-edit-v1`, `provider-accounts-v1`,
  * the account relays, `acp-registry-v1`, `custom-agents-v1`, `model-visibility-v1`,
- * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1`,
+ * `prompt-cache-ttl-v1`, `claude-compact-window-v1`, `provider-environment-v1`, `provider-sign-out-v1`, `provider-usage-reset-v1`,
  * `provider-account-pool-v1` and `provider-account-keys-v1`), with the newest
  * route set that the host serves. The
  * host checks the role on every route.
@@ -598,6 +604,18 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
           read: (): Promise<ClaudeCompactWindowSetting> => runTeamRequest(getHostClaudeCompactWindow(request)),
           set: (tokens: number | null): Promise<ClaudeCompactWindowSetting> =>
             runTeamRequest(setHostClaudeCompactWindow(request, tokens)),
+        }
+      : null,
+    /**
+     * The environment variables of one provider of the host (`provider-environment-v1`), or null. A
+     * read gives a sensitive variable without its value.
+     */
+    environment: has(PROVIDER_ENVIRONMENT_CAPABILITY)
+      ? {
+          read: (provider: ProviderEnvironmentProvider): Promise<ProviderEnvironment> =>
+            runTeamRequest(getHostProviderEnvironment(request, provider)),
+          set: (update: ProviderEnvironmentUpdate): Promise<ProviderEnvironment> =>
+            runTeamRequest(setHostProviderEnvironment(request, update)),
         }
       : null,
     /** Signs the host's own sign-in of a provider out (`provider-sign-out-v1`), or null. Its agents wait. */

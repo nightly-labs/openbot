@@ -541,6 +541,7 @@ function ServerProvidersStory(props: {
             hostPromptCacheTtl={{}}
             claudeUserSetup={{}}
             claudeCompactWindow={{}}
+            providerEnvironment={{}}
             hostModelVisibility={{}}
             onSwitchToManageProviders={switchToManageProviders}
             providers={providerOptions()}

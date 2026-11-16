@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Il y a trop d’adresses ou de dossiers.",
   "error.provider.credentialFileUnreadable": "Le fichier d’identifiants du fournisseur est illisible.",
   "error.provider.credentialFileTooLarge": "Le fichier d’identifiants du fournisseur est trop volumineux.",
+  "error.provider.environmentNameInvalid":
+    "{name} n’est pas un nom de variable valide. Utilisez des lettres, des chiffres et _, sans commencer par un chiffre.",
+  "error.provider.environmentNameReserved": "OpenBot définit {name} pour ce fournisseur. Retirez cette variable.",
+  "error.provider.environmentNameDuplicate": "{name} figure plus d’une fois dans la liste.",
+  "error.provider.environmentValueTooLong": "La valeur de {name} est trop longue.",
+  "error.provider.environmentTooMany": "Un fournisseur peut avoir au plus {limit} variables.",
   "error.provider.archiveSpecialFile":
     "L’archive de l’environnement d’exécution contient un lien ou un fichier spécial.",
   "error.provider.archiveUnsafePath": "L’archive de l’environnement d’exécution contient un chemin non sûr.",

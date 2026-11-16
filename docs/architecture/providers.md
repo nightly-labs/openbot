@@ -1454,6 +1454,52 @@ the change while an agent uses the provider. New model assignments use the same 
 The switch is local IPC only; released Team API adapters stay unchanged. Remote
 clients receive the host's filtered model list.
 
+### Provider variables
+
+Each provider page in Settings → Providers has an Environment section: variables that each process of
+the provider starts with, such as API keys and base URLs (`provider-environment-v1`,
+`src/main/provider-environment-store.ts`). Claude, Codex and Gemini take them. Names and plain values
+are in `openbot-provider-environment-v1.json`. A sensitive value is in the encrypted provider key file
+under `openbot:provider-env:<provider>:<NAME>`; a read gives `stored: true` and never the value. The
+host refuses an invalid or repeated name, and a name that OpenBot sets for each process
+(`PROVIDER_ENVIRONMENT_RESERVED_NAMES`: `PATH`, `HOME`, `NODE_OPTIONS`, the process marker and the
+account folder variable). `ProviderClientContext.providerEnvironment` gives each spawn the values, after
+OpenBot's own, so they replace a saved key or an inherited value of the same name. A change restarts
+the provider when its turns end (`ProviderRuntime.spawnSettingsChanged`), and an agent's own process,
+such as one of an account after the first, before the agent's next turn.
+
+A proxy such as [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI), which signs in to many
+accounts and shares the requests between them, is one use:
+
+| Provider | Variables | Requests |
+| --- | --- | --- |
+| Claude | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, and an empty `ANTHROPIC_API_KEY` | `POST /v1/messages` |
+| Codex | `OPENAI_BASE_URL` (with `/v1`) and `OPENAI_API_KEY` | `POST /v1/responses` |
+| Gemini | `AGY_LLM_GATEWAY_URL` and `AGY_LLM_GATEWAY_API_KEY` | `/v1beta/models/...`, and the model list from `/v1/models` and `/v1beta/models` |
+
+Each sends the key as `Authorization: Bearer`. The token of Claude Code comes before a claude.ai
+sign-in, and Claude Code then reports itself signed in, also on a server with no Claude login. With
+`ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` in the variables, OpenBot does not give the saved
+Anthropic key, which Claude Code would send as `x-api-key` next to the token. With
+`AGY_LLM_GATEWAY_URL` or `GEMINI_API_KEY`, it does not give the saved Gemini key. Without "Use my
+Claude Code setup", OpenBot copies the `env` of the user's Claude settings into the flag settings,
+which come before the process environment; when the variables name a gateway (`ANTHROPIC_BASE_URL`
+and `ANTHROPIC_AUTH_TOKEN`), the copy leaves out the variables that choose the API and its credential
+(`withoutReplacedGateway` in `claude-client.ts`). With the setup on, the user's settings file loads as
+it is and its values still win.
+
+Codex does not read a base URL from its environment while it has a ChatGPT sign-in, so
+`codexVariableOverrides` turns `OPENAI_BASE_URL` into `-c` overrides of the app-server: a model provider
+`openbot_environment` with `wire_api=responses` and, when the variable is there, `env_key=OPENAI_API_KEY`.
+Checked with Claude Code 2.1.325, Codex 0.167.2 and Antigravity CLI 1.5.9 against a local server that
+logged each request. Grok is not in the list: with a Grok sign-in, Grok CLI 1.0.52 sends the Grok token
+to `GROK_XAI_API_BASE_URL` and ignores `XAI_API_KEY`.
+
+The commands that agents run can read the variables: Claude Code and the Antigravity CLI pass their
+environment on, and Codex leaves out the names with `KEY`, `SECRET` or `TOKEN`. With a proxy, the proxy
+picks the account for each request, so the account of an agent and the account pool no longer choose the
+account that answers.
+
 ### Backup models and failover
 
 An agent keeps an ordered list of backup models (`AgentBackupModels`, at most 8) in `agent_json`.

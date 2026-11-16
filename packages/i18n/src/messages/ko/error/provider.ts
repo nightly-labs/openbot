@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "주소나 폴더가 너무 많아요.",
   "error.provider.credentialFileUnreadable": "제공자 자격 증명 파일을 읽을 수 없어요.",
   "error.provider.credentialFileTooLarge": "제공자 자격 증명 파일이 너무 커요.",
+  "error.provider.environmentNameInvalid":
+    "{name}은(는) 올바른 변수 이름이 아니에요. 영문자, 숫자, _를 쓰고 숫자로 시작하지 마세요.",
+  "error.provider.environmentNameReserved": "OpenBot이 이 공급자의 {name}을(를) 설정해요. 이 변수를 제거하세요.",
+  "error.provider.environmentNameDuplicate": "{name}이(가) 목록에 두 번 이상 있어요.",
+  "error.provider.environmentValueTooLong": "{name}의 값이 너무 길어요.",
+  "error.provider.environmentTooMany": "공급자는 변수를 최대 {limit}개까지 가질 수 있어요.",
   "error.provider.archiveSpecialFile": "런타임 아카이브에 링크 또는 특수 파일이 있어요.",
   "error.provider.archiveUnsafePath": "런타임 아카이브에 안전하지 않은 경로가 있어요.",
   "error.provider.runtimeSpecialFile": "런타임에 링크 또는 특수 파일이 있어요.",

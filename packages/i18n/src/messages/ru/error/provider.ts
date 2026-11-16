@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Слишком много адресов или папок.",
   "error.provider.credentialFileUnreadable": "Файл учётных данных провайдера не читается.",
   "error.provider.credentialFileTooLarge": "Файл учётных данных провайдера слишком большой.",
+  "error.provider.environmentNameInvalid":
+    "{name} — недопустимое имя переменной. Используйте буквы, цифры и _ и не начинайте с цифры.",
+  "error.provider.environmentNameReserved": "OpenBot задаёт {name} для этого провайдера. Удалите эту переменную.",
+  "error.provider.environmentNameDuplicate": "{name} встречается в списке больше одного раза.",
+  "error.provider.environmentValueTooLong": "Значение {name} слишком длинное.",
+  "error.provider.environmentTooMany": "У провайдера может быть не больше {limit} переменных.",
   "error.provider.archiveSpecialFile": "Архив среды выполнения содержит ссылку или специальный файл.",
   "error.provider.archiveUnsafePath": "Архив среды выполнения содержит небезопасный путь.",
   "error.provider.runtimeSpecialFile": "Среда выполнения содержит ссылку или специальный файл.",

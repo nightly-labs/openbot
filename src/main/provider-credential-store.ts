@@ -15,6 +15,9 @@ export class CredentialStoreFailure extends Schema.TaggedError<CredentialStoreFa
 
 const { io: credentialIO, sync: credentialSync } = causeHelpers(CredentialStoreFailure);
 
+/** The name of a key in the envelope that is not a provider's. */
+export type OpenBotSecretName = `openbot:${string}`;
+
 function accountKeyName(provider: AgentProviderId, accountId: string): string {
   return `${provider}:${accountId}`;
 }
@@ -118,6 +121,28 @@ export class ProviderCredentialStore {
       if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
       registerSecretValue(key);
       keys.set(name, key);
+      return true;
+    });
+  }
+
+  /**
+   * A key that is not a provider's, such as the key of the CLI proxy. Its name starts with
+   * `openbot:`, so no provider and no account of a provider can have it, and a build that does not
+   * know it keeps it and never reads it.
+   */
+  secret(name: OpenBotSecretName): string | null {
+    if (!this.#loaded) throw new Error("The provider credential store is not loaded.");
+    return this.#keys.get(name) ?? null;
+  }
+
+  /** Saves a key of `secret`, or removes it when `value` is null. */
+  setSecret(name: OpenBotSecretName, value: string | null): Effect.Effect<void, CredentialStoreFailure> {
+    return this.#edit((keys) => {
+      if (value === null) return keys.delete(name);
+      // As an account key: a save into a file that could not be read would replace every provider key.
+      if (this.#loadError) throw new Error(sourceText("error.provider.credentialFileUnreadable"));
+      registerSecretValue(value);
+      keys.set(name, value);
       return true;
     });
   }

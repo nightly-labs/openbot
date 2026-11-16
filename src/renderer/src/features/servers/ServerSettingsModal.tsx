@@ -66,6 +66,7 @@ import type {
   ProviderClaudeCompactWindowSource,
 } from "../settings/provider-claude-compact-window";
 import type { HostClaudeUserSetupOptions, ProviderClaudeUserSetupSource } from "../settings/provider-claude-user-setup";
+import type { HostProviderEnvironmentOptions, ProviderEnvironmentSource } from "../settings/provider-environment";
 import type { HostDefaultProviderOptions, HostDefaultProviderSource } from "../settings/provider-host-default";
 import type { HostModelVisibilityOptions, ProviderModelVisibilitySource } from "../settings/provider-model-visibility";
 import type { HostPromptCacheTtlOptions, ProviderPromptCacheSource } from "../settings/provider-prompt-cache";
@@ -244,6 +245,11 @@ export interface ServerSettingsModalProps {
    * that this member administers.
    */
   claudeCompactWindow?: HostClaudeCompactWindowOptions | undefined;
+  /**
+   * The provider pages show their Environment section only when a caller supplies this, and only for
+   * the local server or a remote host with `provider-environment-v1` that this member administers.
+   */
+  providerEnvironment?: HostProviderEnvironmentOptions | undefined;
   /**
    * Each provider page shows its Models section only when a caller supplies this, and only for the
    * local server or a remote host with `model-visibility-v1` that this member administers.
@@ -454,6 +460,12 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
   function claudeCompactWindowSource(): ProviderClaudeCompactWindowSource | undefined {
     const options = props.claudeCompactWindow;
     if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "claude-compact-window-v1"))
+      return undefined;
+    return { ...options, serverId: props.server.id };
+  }
+  function providerEnvironmentSource(): ProviderEnvironmentSource | undefined {
+    const options = props.providerEnvironment;
+    if (!options || !actionsAvailable() || !serverCanAdminister(props.server, "provider-environment-v1"))
       return undefined;
     return { ...options, serverId: props.server.id };
   }
@@ -991,6 +1003,7 @@ export function ServerSettingsModal(props: ServerSettingsModalProps) {
                   promptCache={promptCacheSource()}
                   claudeUserSetup={claudeUserSetupSource()}
                   claudeCompactWindow={claudeCompactWindowSource()}
+                  providerEnvironment={providerEnvironmentSource()}
                   modelVisibility={modelVisibilitySource()}
                   hostDefaultProvider={hostDefaultProviderSource()}
                 />

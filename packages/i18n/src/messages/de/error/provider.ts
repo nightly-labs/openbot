@@ -46,6 +46,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Es gibt zu viele Adressen oder Ordner.",
   "error.provider.credentialFileUnreadable": "Die Zugangsdaten-Datei des Anbieters ist nicht lesbar.",
   "error.provider.credentialFileTooLarge": "Die Zugangsdaten-Datei des Anbieters ist zu groß.",
+  "error.provider.environmentNameInvalid":
+    "{name} ist kein gültiger Variablenname. Verwende Buchstaben, Ziffern und _, und beginne nicht mit einer Ziffer.",
+  "error.provider.environmentNameReserved": "OpenBot setzt {name} für diesen Anbieter. Entferne diese Variable.",
+  "error.provider.environmentNameDuplicate": "{name} steht mehr als einmal in der Liste.",
+  "error.provider.environmentValueTooLong": "Der Wert von {name} ist zu lang.",
+  "error.provider.environmentTooMany": "Ein Anbieter kann höchstens {limit} Variablen haben.",
   "error.provider.archiveSpecialFile": "Das Laufzeitarchiv enthält einen Link oder eine spezielle Datei.",
   "error.provider.archiveUnsafePath": "Das Laufzeitarchiv enthält einen unsicheren Pfad.",
   "error.provider.runtimeSpecialFile": "Die Laufzeit enthält einen Link oder eine spezielle Datei.",

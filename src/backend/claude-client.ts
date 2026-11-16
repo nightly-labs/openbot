@@ -678,6 +678,24 @@ const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (pa
  * show: Bedrock, Vertex or a gateway set in `env`, or an `apiKeyHelper`. They go in as flag settings.
  * The file can hold secrets, so no value of it is logged.
  */
+/**
+ * The copied user `env` without the variables that choose the API and its credential, when OpenBot
+ * gives the process a gateway of its own: the CLI proxy sets `ANTHROPIC_BASE_URL` and
+ * `ANTHROPIC_AUTH_TOKEN`. The flag settings come before the process environment, so the copy would
+ * send the requests to the user's own gateway. With the user setup the user settings file loads as it
+ * is, and its values still win.
+ */
+function withoutReplacedGateway(
+  settings: Settings,
+  environment: Readonly<Record<string, string>> | undefined,
+): Settings {
+  if (!environment?.ANTHROPIC_BASE_URL || !environment.ANTHROPIC_AUTH_TOKEN || !settings.env) return settings;
+  const replaced = new Set<string>([...CLAUDE_OTHER_API_VARIABLES, "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"]);
+  const env = Object.fromEntries(Object.entries(settings.env).filter(([name]) => !replaced.has(name)));
+  const { env: _copied, ...rest } = settings;
+  return Object.keys(env).length > 0 ? { ...rest, env } : rest;
+}
+
 function claudeSignInSettings(parsed: DynamicRecord): Settings {
   const stringSetting = (key: string): string | null => {
     const value = parsed[key];
@@ -1400,7 +1418,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
     const userSettingsFile = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
-    const signInSettings: Settings = userSetup ? {} : claudeSignInSettings(userSettingsFile);
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(claudeSignInSettings(userSettingsFile), this.#agentEnvironment?.());
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(

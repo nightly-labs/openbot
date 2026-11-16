@@ -45,6 +45,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Çok fazla adres veya klasör var.",
   "error.provider.credentialFileUnreadable": "Sağlayıcı kimlik bilgisi dosyası okunamıyor.",
   "error.provider.credentialFileTooLarge": "Sağlayıcı kimlik bilgisi dosyası çok büyük.",
+  "error.provider.environmentNameInvalid":
+    "{name} geçerli bir değişken adı değil. Harf, rakam ve _ kullanın ve rakamla başlamayın.",
+  "error.provider.environmentNameReserved": "OpenBot bu sağlayıcı için {name} değerini ayarlar. Bu değişkeni kaldırın.",
+  "error.provider.environmentNameDuplicate": "{name} listede birden fazla kez var.",
+  "error.provider.environmentValueTooLong": "{name} değeri çok uzun.",
+  "error.provider.environmentTooMany": "Bir sağlayıcının en fazla {limit} değişkeni olabilir.",
   "error.provider.archiveSpecialFile": "Çalışma zamanı arşivi bir bağlantı veya özel dosya içeriyor.",
   "error.provider.archiveUnsafePath": "Çalışma zamanı arşivi güvenli olmayan bir yol içeriyor.",
   "error.provider.runtimeSpecialFile": "Çalışma zamanı bir bağlantı veya özel dosya içeriyor.",

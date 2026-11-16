@@ -137,6 +137,7 @@ import { PROVIDER_ACCOUNT_RELAY_V2_CAPABILITY } from "./provider-account-relay-v
 import { PROVIDER_ACCOUNTS_CAPABILITY } from "./provider-accounts-v1";
 import { PROVIDER_DEFAULT_CAPABILITY } from "./provider-default-v1";
 import { PROVIDER_DETECTION_CAPABILITY } from "./provider-detection-v1";
+import { PROVIDER_ENVIRONMENT_CAPABILITY } from "./provider-environment-v1";
 import { PROVIDER_HOST_SIGN_IN_CAPABILITY } from "./provider-host-sign-in-v1";
 import { PROVIDER_SIGN_OUT_CAPABILITY } from "./provider-sign-out-v1";
 import { PROVIDER_USAGE_RESET_CAPABILITY } from "./provider-usage-reset-v1";
@@ -672,6 +673,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -913,7 +915,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
     capability !== MODEL_STEERING_CAPABILITY &&
     capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+    capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+    capability !== PROVIDER_ENVIRONMENT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1031,6 +1034,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MODEL_STEERING_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
+  PROVIDER_ENVIRONMENT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1231,6 +1235,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== BROWSER_VAULT_SKIP_CAPABILITY &&
       capability !== MODEL_STEERING_CAPABILITY &&
       capability !== TEAM_MEMORY_CHANGES_CAPABILITY &&
-      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY,
+      capability !== WORKFLOWS_HIGGSFIELD_CAPABILITY &&
+      capability !== PROVIDER_ENVIRONMENT_CAPABILITY,
   );
 }

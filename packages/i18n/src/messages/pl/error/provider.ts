@@ -44,6 +44,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Jest za dużo adresów lub folderów.",
   "error.provider.credentialFileUnreadable": "Nie można odczytać pliku danych logowania dostawcy.",
   "error.provider.credentialFileTooLarge": "Plik danych logowania dostawcy jest za duży.",
+  "error.provider.environmentNameInvalid":
+    "{name} nie jest poprawną nazwą zmiennej. Użyj liter, cyfr i _ i nie zaczynaj od cyfry.",
+  "error.provider.environmentNameReserved": "OpenBot ustawia {name} dla tego dostawcy. Usuń tę zmienną.",
+  "error.provider.environmentNameDuplicate": "{name} występuje na liście więcej niż raz.",
+  "error.provider.environmentValueTooLong": "Wartość {name} jest za długa.",
+  "error.provider.environmentTooMany": "Dostawca może mieć najwyżej {limit} zmiennych.",
   "error.provider.archiveSpecialFile": "Archiwum środowiska uruchomieniowego zawiera link lub plik specjalny.",
   "error.provider.archiveUnsafePath": "Archiwum środowiska uruchomieniowego zawiera niebezpieczną ścieżkę.",
   "error.provider.runtimeSpecialFile": "Środowisko uruchomieniowe zawiera link lub plik specjalny.",
