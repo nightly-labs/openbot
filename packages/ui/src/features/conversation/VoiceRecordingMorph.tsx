@@ -70,10 +70,10 @@ export function VoiceRecordingMorph(props: {
     () => props.recording,
     (recording) => {
       if (!recording) return;
+      // Enter on the page has no default action, so the key stays free for each mounted bar: the main
+      // chat shows a side thread's recording too, and only the bar that owns the recording sends it.
       const sendOnEnter = (event: KeyboardEvent) => {
-        if (!enterSendsRecording(event)) return;
-        event.preventDefault();
-        props.onSend();
+        if (enterSendsRecording(event)) props.onSend();
       };
       document.addEventListener("keydown", sendOnEnter);
       return () => document.removeEventListener("keydown", sendOnEnter);
