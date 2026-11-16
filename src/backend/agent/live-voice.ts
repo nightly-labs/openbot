@@ -9,9 +9,10 @@ import type {
   VoiceLiveSession,
   VoiceLiveStart,
 } from "@openbot/contracts/ipc";
+import { speechTextFromMarkdown } from "@openbot/contracts/speech-text";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { Deferred, Effect, Fiber, Schema } from "effect";
+import { Deferred, Effect, Fiber, Schema, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
 import {
   type AppServerNotification,
@@ -48,6 +49,13 @@ const CALL_NOT_FOUND = /\bstatus 404\b[\s\S]*\/realtime\/calls\b/;
 const FORBIDDEN = /^(?=[\s\S]*\brealtime\b)[\s\S]*(?:\bstatus 403\b|\b403 Forbidden\b)/;
 /** The one tool of the relay thread. Codex calls it for each request that the voice model hands off. */
 const ASK_TOOL = "ask_agent";
+/**
+ * The namespace of the relay tool. Each GPT model of the Codex catalog runs in code mode only: the relay
+ * model then calls the tool from a script, and it sees the answer only when its script prints it. Often
+ * the script does not, so the relay replies with nothing, and the voice says that the agent did not
+ * answer. A direct-only namespace gives the tool result to the relay model itself (Codex 0.156.0 and later).
+ */
+const ASK_NAMESPACE = "openbot";
 /**
  * Codex gives the voice at most about 4,000 bytes of a relay reply: about the first 2,000 bytes while
  * the relay writes them, and the remainder only when the reply is complete. From a longer reply it
@@ -86,6 +94,22 @@ const RELAY_VOICE_RULE =
   "Keep that language when a short or unclear phrase sounds like a different one. " +
   "If I ask you to speak a different language, use it. " +
   "Do not reply to this message.";
+/**
+ * What the voice says when a spoken request waits behind another turn of the agent, which can take minutes.
+ * It goes straight to the voice: as a tool result, the relay model often replaces it with a failure of its own.
+ */
+const QUEUED_NOTICE =
+  "Your request is in the queue. The agent is still working on an earlier request. " +
+  "You hear the answer when the agent finishes.";
+/** What the voice says about a long answer when OpenBot cannot make a summary of it. */
+const LONG_ANSWER_FALLBACK = "The agent gave a long answer. It is in the chat.";
+/** The prompt that makes the summary of a long answer that the voice says without a request. */
+const summaryPrompt = (answer: string) =>
+  `A voice says your reply aloud. Give the most important facts of the answer below in ${RELAY_SUMMARY_WORDS} ` +
+  "words or fewer, in the language of the answer. Use only facts from the answer, and never add or change one. " +
+  "Write plain sentences without links, lists, formatting or code. " +
+  "End with one sentence that says that the full answer is in the chat. Reply with the summary only.\n\n" +
+  `Answer:\n${answer}`;
 
 const logger = createOpenBotLogger("live-voice");
 
@@ -110,6 +134,8 @@ interface LiveVoiceRelay {
 export interface LiveVoiceReply {
   readonly success: boolean;
   readonly text: string;
+  /** The turn that gave the answer, so that the voice does not say it a second time. */
+  readonly turnId?: string;
 }
 
 /**
@@ -134,6 +160,12 @@ export interface LiveVoiceHooks {
   ): Effect.Effect<string, { readonly cause: unknown }>;
   /** The reply to a delivery, or null while the agent still works on it. */
   reply(agentId: string, deliveryId: string): LiveVoiceReply | null;
+  /** Whether the agent runs a turn now, so that a new message waits in the queue. */
+  busy(agentId: string): boolean;
+  /** The answer of a completed turn in the agent's own chat, or null for a turn of another thread or with no answer. */
+  answer(agentId: string, threadId: string, turnId: string): string | null;
+  /** A short spoken summary of a long answer. */
+  summarize(agentId: string, prompt: string): Effect.Effect<string, { readonly cause: unknown }>;
   /** `memberId` is null for a session of this computer. */
   emit(event: VoiceLiveEvent, memberId: string | null): void;
   redact(text: string): string;
@@ -150,12 +182,20 @@ interface LiveSession {
   readonly onNotification: (notification: AppServerNotification) => void;
   readonly onRequest: (request: AppServerRequest) => void;
   readonly onExit: (error: Error) => void;
+  /** Keeps the order of the answers that the voice says without a request. */
+  readonly speech: Semaphore.Semaphore;
+  /** The turns whose answer went to the voice already. */
+  readonly answeredTurns: Set<string>;
 }
 
-/** A request that the voice gave to the agent, while the agent works on it. */
+/**
+ * A request that the voice gave to the agent, while the agent works on it. With a request id, the
+ * relay waits for the answer. Without one, the relay stopped waiting, and the voice says the answer
+ * when it comes.
+ */
 interface PendingAsk {
   readonly session: LiveSession;
-  readonly requestId: AppServerRequest["id"];
+  readonly requestId: AppServerRequest["id"] | null;
   readonly deliveryId: string;
 }
 
@@ -169,6 +209,10 @@ interface PendingAsk {
  * user's message. The agent's answer goes back to the voice, which speaks it: a short answer as it
  * is, a long one as a summary. So the voice does not depend on the agent's provider or model, and a
  * model change does not end it. The chat shows each request and the full answer as usual.
+ *
+ * When a request waits behind another turn, the voice tells the user at once, so that it does not wait in
+ * silence. The voice also says each other answer of the agent in its chat while the session runs, such
+ * as the answer to a typed message.
  *
  * One session runs at a time for each owner: the user of this computer, or one member of the server.
  */
@@ -211,6 +255,8 @@ export class LiveVoice {
       onNotification: (notification) => this.#notification(session, notification),
       onRequest: (request) => this.#request(session, request),
       onExit: () => this.#end(session, sourceText("error.voice.live.disconnected")),
+      speech: Semaphore.makeUnsafe(1),
+      answeredTurns: new Set(),
     };
     this.#sessions.set(session.id, session);
     relay.client.on("notification", session.onNotification);
@@ -233,18 +279,32 @@ export class LiveVoice {
             approvalPolicy: "never",
             dynamicTools: [
               {
-                name: ASK_TOOL,
-                description: "Pass the user's spoken request to the agent and return its answer.",
-                inputSchema: {
-                  type: "object",
-                  properties: { request: { type: "string", description: "The user's request, verbatim." } },
-                  required: ["request"],
-                  additionalProperties: false,
-                },
+                type: "namespace",
+                name: ASK_NAMESPACE,
+                description: "OpenBot, which runs the agent.",
+                tools: [
+                  {
+                    type: "function",
+                    name: ASK_TOOL,
+                    description: "Pass the user's spoken request to the agent and return its answer.",
+                    inputSchema: {
+                      type: "object",
+                      properties: { request: { type: "string", description: "The user's request, verbatim." } },
+                      required: ["request"],
+                      additionalProperties: false,
+                    },
+                  },
+                ],
               },
             ],
             baseInstructions: RELAY_INSTRUCTIONS,
-            config,
+            config: {
+              ...config,
+              features: {
+                ...config.features,
+                code_mode: { enabled: false, direct_only_tool_namespaces: [ASK_NAMESPACE] },
+              },
+            },
           },
           decodeRecordResponse,
         )
@@ -300,11 +360,20 @@ export class LiveVoice {
 
   /**
    * Reads the events of the agent service. A queue change follows the end of each delivery, after
-   * the turn's messages are saved, so it can carry the answer to a request of the voice.
+   * the turn's messages are saved, so it can carry the answer to a request of the voice. A completed
+   * turn in the agent's own chat also follows the save: the voice says its answer, unless the answer
+   * went to the voice already. A turn that continues, or a quiet routine run, has no answer to say.
    */
   observe(event: AgentEvent): void {
-    if (this.#asks.size === 0) return;
+    if (this.#sessions.size === 0) return;
     if (event.type === "queue-changed" || event.type === "turn-completed") this.#answerSettled();
+    if (event.type !== "turn-completed" || event.status !== "completed" || event.quiet || event.continues) return;
+    for (const session of this.#sessions.values()) {
+      if (session.agentId !== event.agentId || !session.threadId) continue;
+      if (session.answeredTurns.delete(event.turnId)) continue;
+      const answer = this.#hooks.answer(event.agentId, event.threadId, event.turnId);
+      if (answer) this.#speak(session, answer);
+    }
   }
 
   /** Ends every session and waits until each relay process stops. */
@@ -354,6 +423,7 @@ export class LiveVoice {
     if (
       request.method !== "item/tool/call" ||
       getString(params, "threadId") !== session.threadId ||
+      getString(params, "namespace") !== ASK_NAMESPACE ||
       getString(params, "tool") !== ASK_TOOL
     ) {
       session.client.respondError(request.id, { code: -32601, message: "Live voice answers only ask_agent." });
@@ -364,6 +434,8 @@ export class LiveVoice {
       session.client.respond(request.id, toolResult({ success: false, text: "The request is empty." }));
       return;
     }
+    // Read before the send: a message to an idle agent can wait in the queue for a moment too.
+    const waits = this.#hooks.busy(session.agentId);
     Effect.runFork(
       this.#hooks.send(session.agentId, text, session.owner?.sender).pipe(
         Effect.match({
@@ -373,12 +445,20 @@ export class LiveVoice {
               text: failure.cause instanceof Error ? failure.cause.message : String(failure.cause),
             }),
           onSuccess: (deliveryId) => {
-            if (request.signal?.aborted || !this.#sessions.has(session.id)) return;
-            const ask: PendingAsk = { session, requestId: request.id, deliveryId };
+            if (!this.#sessions.has(session.id)) return;
+            // Codex stops waiting when the relay turn ends. The voice says the answer when it comes.
+            const ask: PendingAsk = { session, requestId: request.signal?.aborted ? null : request.id, deliveryId };
             this.#asks.add(ask);
-            // Codex stops waiting when the relay turn ends. The agent still answers in the chat.
-            request.signal?.addEventListener("abort", () => this.#asks.delete(ask), { once: true });
+            request.signal?.addEventListener(
+              "abort",
+              () => {
+                if (!this.#asks.delete(ask)) return;
+                this.#asks.add({ session, requestId: null, deliveryId });
+              },
+              { once: true },
+            );
             this.#answerSettled();
+            if (waits && this.#asks.has(ask)) this.#say(session, Effect.succeed(QUEUED_NOTICE));
           },
         }),
       ),
@@ -390,7 +470,9 @@ export class LiveVoice {
       const reply = this.#hooks.reply(ask.session.agentId, ask.deliveryId);
       if (!reply) continue;
       this.#asks.delete(ask);
-      this.#respond(ask.session, ask.requestId, reply);
+      if (reply.turnId) ask.session.answeredTurns.add(reply.turnId);
+      if (ask.requestId === null) this.#speak(ask.session, reply.text);
+      else this.#respond(ask.session, ask.requestId, reply);
     }
   }
 
@@ -398,6 +480,49 @@ export class LiveVoice {
   #respond(session: LiveSession, requestId: AppServerRequest["id"], reply: LiveVoiceReply): void {
     if (!this.#sessions.has(session.id)) return;
     session.client.respond(requestId, toolResult({ ...reply, text: this.#hooks.redact(reply.text) }));
+  }
+
+  /**
+   * Makes the voice say an answer that no open request waits for: a short answer as plain sentences,
+   * a long one as a summary. The text goes to OpenAI, so it loses the configured secrets first. The
+   * answers go to the voice in the order that they came.
+   */
+  #speak(session: LiveSession, answer: string): void {
+    const redacted = this.#hooks.redact(answer);
+    this.#say(
+      session,
+      Buffer.byteLength(redacted) > RELAY_VERBATIM_BYTES
+        ? this.#hooks.summarize(session.agentId, summaryPrompt(redacted)).pipe(
+            Effect.map((summary) => this.#hooks.redact(summary.trim()) || LONG_ANSWER_FALLBACK),
+            Effect.catch((failure) =>
+              Effect.sync(() => {
+                logger.warn("Could not make a summary of an answer for live voice.", { error: failure.cause });
+                return LONG_ANSWER_FALLBACK;
+              }),
+            ),
+          )
+        : Effect.succeed(speechTextFromMarkdown(redacted)),
+    );
+  }
+
+  /** Gives text to the voice to say, after the texts that came before it. */
+  #say(session: LiveSession, text: Effect.Effect<string>): void {
+    Effect.runFork(
+      text.pipe(
+        Effect.flatMap((speech) => {
+          const threadId = session.threadId;
+          if (!speech || !threadId || !this.#sessions.has(session.id)) return Effect.void;
+          return session.client
+            .request("thread/realtime/appendSpeech", { threadId, text: speech }, decodeRecordResponse)
+            .pipe(
+              Effect.catch((failure) =>
+                Effect.sync(() => logger.warn("Live voice could not say an answer.", { error: failure })),
+              ),
+            );
+        }),
+        session.speech.withPermit,
+      ),
+    );
   }
 
   #startFailure(failure: LiveVoiceFailed): LiveVoiceFailed {
