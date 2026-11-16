@@ -7,7 +7,7 @@
 // - the account check with a short check timeout on a Pi that answers after that timeout;
 // - the model catalog on a Pi that answers after its 5 s pass, then the full read again;
 // - the model catalog on a Pi that never answers: the error must still show.
-// `bun scripts/pi-slow-start-e2e.ts`. Writes .openbot-build/pi-slow-start-e2e/report.json.
+// `bun run test:pi-slow-start`. Writes .openbot-build/pi-slow-start-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";

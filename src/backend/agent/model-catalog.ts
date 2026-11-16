@@ -139,14 +139,16 @@ export class ModelCatalog {
 
   /**
    * Reads the catalogue of every connected CLI. Answers which providers replied with a fresh one,
-   * which providers' 5 s `model/list` timed out, and which providers' `model/list` failed. The caller
-   * must read each one that timed out again with `relist`: only that read records its timeout.
+   * which providers' 5 s `model/list` timed out, with the cause, and which providers' `model/list`
+   * failed. A timeout is not recorded here: the caller reads the list again with `relist`, which keeps
+   * its own failure, or records the cause when no second read follows.
    *
    * A provider that has no client, or whose `model/list` failed or timed out, keeps the models it
    * already had. That is the right catalogue to keep answering with, but it is not proof of what the
    * process now running serves, so its id is absent from the set and no caller may treat it as proof.
    */
   readonly refresh = Effect.fn("ModelCatalog.refresh")(function* (this: ModelCatalog) {
+    const timeouts = new Map<AgentProvider, unknown>();
     const discovered = yield* Effect.forEach(
       BUILT_IN_PROVIDER_DRIVERS,
       ({ id: provider, catalog = {} }) =>
@@ -181,10 +183,10 @@ export class ModelCatalog {
               const timeout = isProviderTimeout(failure.cause);
               // A slow list already had the full request timeout, so a second read gains nothing.
               const timedOut = timeout && !catalog.slowList;
-              // The caller reads a list that timed out again with the full timeout, and that read keeps
-              // its own failure. A slow start that the second read repairs is no error: before, the row
-              // of a working provider showed "Error" with the timeout of the first read (#9945, #3436).
-              if (!timedOut) this.#options.recordProviderError(provider, failure.cause);
+              // A slow start that the second read of the caller repairs is no error: before, the row of a
+              // working provider showed "Error" with the timeout of the first read (#9945, #3436).
+              if (timedOut) timeouts.set(provider, failure.cause);
+              else this.#options.recordProviderError(provider, failure.cause);
               logger.warn("A provider did not list its models.", {
                 provider,
                 durationMs: Math.round(performance.now() - startedAt),
@@ -206,7 +208,7 @@ export class ModelCatalog {
     this.#models = discovered.flatMap((entry) => entry.models);
     return {
       fresh: new Set(discovered.filter((entry) => entry.fresh).map((entry) => entry.provider)),
-      timedOut: new Set(discovered.filter((entry) => entry.timedOut).map((entry) => entry.provider)),
+      timedOut: timeouts,
       failed: new Set(discovered.filter((entry) => entry.failed).map((entry) => entry.provider)),
     };
   });
