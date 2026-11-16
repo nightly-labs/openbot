@@ -331,6 +331,11 @@ export interface AcpFlavor {
    * the command line of the agent's process, which can name the folder of those files.
    */
   ownMcpServerNames?(cwd: string, argv: readonly string[]): readonly string[];
+  /**
+   * The most MCP servers that the agent takes in one session, OpenBot's own servers included. The
+   * agent refuses a session with more, so OpenBot gives it the first of the user's servers that fit.
+   */
+  mcpServerLimit?: number;
   /** Turns OpenBot's servers back on where the agent's own settings for `cwd` turned them off. */
   enableMcpServers?(cwd: string, names: readonly string[]): void;
   /**
@@ -675,6 +680,12 @@ function hermesSessionNotFound(error: RequestError): boolean | null {
 }
 
 /**
+ * Hermes Agent 0.23.1 refuses a session with more than 16 MCP servers with an internal error
+ * and only `invalid_params` in `data.details`, so each message to the agent failed (#10023).
+ */
+const HERMES_MCP_SERVER_LIMIT = 16;
+
+/**
  * Hermes Agent 0.21.5 answers a `session/resume` of a missing session with a new session, and the
  * reply does not give its id: each later prompt to the saved id then ends as "refusal". Its
  * `session/load` of a missing session answers null, which the SDK gives as an empty reply. A load of
@@ -686,6 +697,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
   sessionBusy: hermesSessionBusy,
+  mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
   // each turn failed every turn when the gateway was slow (#9738).
   setsConfigOnlyOnChange: true,
@@ -841,14 +853,15 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, its
   // failed turn is explained, a process that starts to refuse each prompt ends, an unchanged model or
-  // effort is not sent again, and it gets the catalog as MCP tools, as for the Hermes provider
-  // (#9718, #9738, #9312).
+  // effort is not sent again, it gets the catalog as MCP tools, and it gets no more MCP servers than
+  // it takes, as for the Hermes provider (#9718, #9738, #9312, #10023).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
     sessionBusy: hermesSessionBusy,
+    mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,
     resendsAnswer: true,
     turnFailure: hermesTurnFailure,

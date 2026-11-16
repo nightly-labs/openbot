@@ -1947,6 +1947,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               this.#ownMcpServerNames(cwd),
               this.#flavor.mcpServerName,
               this.#flavor.relayStdioMcpServers === true,
+              Math.max(0, (this.#flavor.mcpServerLimit ?? Number.POSITIVE_INFINITY) - mcp.servers.length),
             );
             this.options.reportMcpDrops?.(this.provider, handoff.dropped);
             let given = handoff.servers;
