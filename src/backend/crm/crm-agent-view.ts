@@ -15,7 +15,7 @@ import { isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
 import { databaseRows, requiredNumberColumn, requiredStringColumn } from "../database/database-rows";
-import { readableRow, readableRows } from "../database/readable-rows";
+import { readableRows } from "../database/readable-rows";
 import { CrmError } from "./crm-handle";
 import {
   CRM_CUSTOMER_COLUMNS,
@@ -410,24 +410,23 @@ export class CrmAgentView {
       text[field] = hidden.has(field) ? CRM_HIDDEN : customer[field];
     }
     const payments = (where: string, order: string, limit: number) =>
-      databaseRows(
+      readableRows(
         this.#store.db
           .prepare(`${CRM_PAYMENT_SELECT} WHERE p.customer_id = ? AND ${where} ORDER BY ${order} LIMIT ?`)
           .all(customer.id, limit),
-      ).flatMap((row) => {
-        const record = readableRow(row, decodeCrmPayment, "crm_payments");
-        if (!record) return [];
+        decodeCrmPayment,
+        "crm_payments",
+      ).map((record) => {
         const { customer: _customer, ...payment } = this.#payment(record, hidden);
-        return [payment];
+        return payment;
       });
-    const activity = databaseRows(
+    const activity = readableRows(
       this.#store.db
         .prepare("SELECT * FROM crm_activity WHERE customer_id = ? ORDER BY created_at DESC, activity_id DESC LIMIT ?")
         .all(customer.id, CUSTOMER_ACTIVITY),
-    ).flatMap((row) => {
-      const record = readableRow(row, decodeCrmActivity, "crm_activity");
-      return record ? (this.#activity(record, hidden) ?? []) : [];
-    });
+      decodeCrmActivity,
+      "crm_activity",
+    ).flatMap((record) => this.#activity(record, hidden) ?? []);
     const amounts = !hidden.has("amounts");
     const dates = !hidden.has("dates");
     return compact({

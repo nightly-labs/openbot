@@ -235,11 +235,9 @@ export class WorkflowRunStore {
   /** Runs that can still move: running, waiting for an approval, or stopping. */
   openRuns(): StoredWorkflowRun[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
-          .all(...OPEN_RUN_STATUSES),
-      ),
+      this.#database.connection
+        .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
+        .all(...OPEN_RUN_STATUSES),
       toRun,
       "workflow_runs",
     );
@@ -274,11 +272,9 @@ export class WorkflowRunStore {
   /** Every attempt of the run's steps, oldest first. */
   steps(runId: string): StoredWorkflowStep[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(`${STEP_SELECT} WHERE run_id = ? ORDER BY created_at, attempt, step_id`)
-          .all(runId),
-      ),
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE run_id = ? ORDER BY created_at, attempt, step_id`)
+        .all(runId),
       toStep,
       "workflow_steps",
     );
@@ -292,11 +288,9 @@ export class WorkflowRunStore {
   /** Steps that have not ended, of runs and alone. */
   openSteps(): StoredWorkflowStep[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(`${STEP_SELECT} WHERE status IN (${placeholders(OPEN_STEP_STATUSES)}) ORDER BY created_at, step_id`)
-          .all(...OPEN_STEP_STATUSES),
-      ),
+      this.#database.connection
+        .prepare(`${STEP_SELECT} WHERE status IN (${placeholders(OPEN_STEP_STATUSES)}) ORDER BY created_at, step_id`)
+        .all(...OPEN_STEP_STATUSES),
       toStep,
       "workflow_steps",
     );
@@ -310,15 +304,13 @@ export class WorkflowRunStore {
    */
   latestDone(workflowId: string): Map<string, StoredWorkflowStep> {
     const rows = readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(
-            `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
+      this.#database.connection
+        .prepare(
+          `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
              AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
            ORDER BY created_at, attempt, step_id`,
-          )
-          .all(workflowId),
-      ),
+        )
+        .all(workflowId),
       toStep,
       "workflow_steps",
     );
@@ -502,13 +494,11 @@ export class WorkflowRunStore {
     const soloSteps =
       before === undefined
         ? readableRows(
-            databaseRows(
-              db
-                .prepare(
-                  `${STEP_SELECT} WHERE workflow_id = ? AND run_id IS NULL ORDER BY created_at DESC, step_id DESC LIMIT ?`,
-                )
-                .all(workflowId, limit),
-            ),
+            db
+              .prepare(
+                `${STEP_SELECT} WHERE workflow_id = ? AND run_id IS NULL ORDER BY created_at DESC, step_id DESC LIMIT ?`,
+              )
+              .all(workflowId, limit),
             toStep,
             "workflow_steps",
           )

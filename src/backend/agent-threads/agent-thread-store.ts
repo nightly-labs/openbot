@@ -129,14 +129,12 @@ export class AgentThreadStore {
   /** The open threads of this agent first, then the newest archived ones, up to `INPUT_LIMITS.agentTasks`. */
   list(agentId: string): AgentThreadRecord[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(
-            `${SELECT_THREAD} WHERE agent_id = ?
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ?
            ORDER BY archived_at IS NOT NULL, updated_at DESC, thread_id LIMIT ?`,
-          )
-          .all(agentId, INPUT_LIMITS.agentTasks),
-      ),
+        )
+        .all(agentId, INPUT_LIMITS.agentTasks),
       decodeThread,
       "projection_agent_threads",
     );
@@ -148,13 +146,11 @@ export class AgentThreadStore {
    */
   recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(
-            `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
-          )
-          .all(agentId, after, after, limit),
-      ),
+      this.#database.connection
+        .prepare(
+          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+        )
+        .all(agentId, after, after, limit),
       decodeThread,
       "projection_agent_threads",
     );

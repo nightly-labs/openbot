@@ -14,6 +14,7 @@ import {
   type RoutineSchedule,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
+  WORKFLOW_NODE_KINDS,
   WORKFLOW_RUN_STATUSES,
   WORKFLOW_VERSION_KINDS,
   type WorkflowDetail,
@@ -39,7 +40,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
-import { readableRow, readableRows } from "../database/readable-rows";
+import { readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { nodeTimezone } from "./workflow-graph";
 import { workflowTransaction } from "./workflow-transaction";
@@ -115,17 +116,21 @@ export class WorkflowStore {
     const edges = byWorkflow(
       databaseRows(db.prepare("SELECT * FROM workflow_edges ORDER BY workflow_id, position, edge_id").all()),
     );
-    return rows.map((row) => {
-      const workflowId = requiredStringColumn(row, "workflow_id");
-      return {
-        summary: toSummary(row),
-        graph: toGraph(
-          nodes.get(workflowId) ?? [],
-          edges.get(workflowId) ?? [],
-          requiredStringColumn(row, "strokes_json"),
-        ),
-      };
-    });
+    return readableRows(
+      rows,
+      (row) => {
+        const workflowId = requiredStringColumn(row, "workflow_id");
+        return {
+          summary: toSummary(row),
+          graph: toGraph(
+            nodes.get(workflowId) ?? [],
+            edges.get(workflowId) ?? [],
+            requiredStringColumn(row, "strokes_json"),
+          ),
+        };
+      },
+      "workflow_nodes",
+    );
   }
 
   /** The workflows that have an agent step of the agent. */
@@ -262,14 +267,12 @@ export class WorkflowStore {
 
   versions(workflowId: string): WorkflowVersion[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(
-            `SELECT version_id, graph_revision, kind, created_at FROM workflow_versions WHERE workflow_id = ?
+      this.#database.connection
+        .prepare(
+          `SELECT version_id, graph_revision, kind, created_at FROM workflow_versions WHERE workflow_id = ?
            ORDER BY created_at DESC, version_id DESC`,
-          )
-          .all(workflowId),
-      ),
+        )
+        .all(workflowId),
       toVersion,
       "workflow_versions",
     );
@@ -336,7 +339,7 @@ export class WorkflowStore {
   }
 
   #triggers(workflowId: string): WorkflowTriggerState[] {
-    return databaseRows(
+    return readableRows(
       this.#database.connection
         .prepare(
           `SELECT t.node_id, t.kind, t.next_due_at, h.url FROM workflow_triggers AS t
@@ -344,19 +347,14 @@ export class WorkflowStore {
            WHERE t.workflow_id = ? ORDER BY t.node_id`,
         )
         .all(workflowId),
-    ).flatMap((row) => {
-      const trigger = readableRow(
-        row,
-        (value) => ({
-          nodeId: requiredStringColumn(value, "node_id"),
-          type: checkedColumn(value, "kind", STORED_TRIGGER_KINDS),
-          nextDueAt: optionalStringColumn(value, "next_due_at"),
-          webhookUrl: optionalStringColumn(value, "url"),
-        }),
-        "workflow_triggers",
-      );
-      return trigger ? [trigger] : [];
-    });
+      (row) => ({
+        nodeId: requiredStringColumn(row, "node_id"),
+        type: checkedColumn(row, "kind", STORED_TRIGGER_KINDS),
+        nextDueAt: optionalStringColumn(row, "next_due_at"),
+        webhookUrl: optionalStringColumn(row, "url"),
+      }),
+      "workflow_triggers",
+    );
   }
 
   /**
@@ -571,7 +569,7 @@ function toNode(row: DynamicRecord): WorkflowNode {
   const schedule = optionalStringColumn(row, "schedule_json");
   const node = {
     id: requiredStringColumn(row, "node_id"),
-    kind: requiredStringColumn(row, "kind"),
+    kind: checkedColumn(row, "kind", WORKFLOW_NODE_KINDS),
     at: { x: Number(row.x), y: Number(row.y) },
     ...(width === undefined && height === undefined && font === undefined
       ? {}

@@ -37,7 +37,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
-import { readableRows } from "./database/readable-rows";
+import { readableRow, readableRows } from "./database/readable-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
@@ -212,15 +212,13 @@ export class RoutineStore {
 
   protected listRoutines(ownerId: string): OwnedRoutine[] {
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.routineColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.routineColumns}
            FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasSchedule}
            ORDER BY updated_at DESC, routine_id`,
-          )
-          .all(ownerId),
-      ),
+        )
+        .all(ownerId),
       (row) => this.#routine(row),
       this.tables.routineTable,
     );
@@ -228,7 +226,7 @@ export class RoutineStore {
 
   /** Routines of every trigger kind. */
   listRecords(ownerId: string): OwnedRoutineRecord[] {
-    return databaseRows(
+    return readableRows(
       this.database.connection
         .prepare(
           `SELECT ${this.routineColumns}
@@ -236,7 +234,9 @@ export class RoutineStore {
            ORDER BY updated_at DESC, routine_id`,
         )
         .all(ownerId),
-    ).map((row) => this.#record(row));
+      (row) => this.#record(row),
+      this.tables.routineTable,
+    );
   }
 
   getRecord(ownerId: string, routineId: string): OwnedRoutineRecord | null {
@@ -612,16 +612,14 @@ export class RoutineStore {
   protected listRunRows(ownerId: string, routineId: string, limit = 50, withSkipped = false): OwnedRoutineRun[] {
     const safeLimit = Math.max(1, Math.min(INPUT_LIMITS.routineRunsPage, limit));
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.runColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?${withSkipped ? "" : " AND missed_count IS NULL"}
            ORDER BY created_at DESC, run_id DESC LIMIT ?`,
-          )
-          .all(routineId, ownerId, safeLimit),
-      ),
+        )
+        .all(routineId, ownerId, safeLimit),
       (row) => this.#run(row),
       this.tables.runTable,
     );
@@ -639,16 +637,14 @@ export class RoutineStore {
 
   #queuedRunRows(condition: string): OwnedRoutineRun[] {
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.runColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE status = 'queued' ${condition}
            ORDER BY created_at, run_id`,
-          )
-          .all(),
-      ),
+        )
+        .all(),
       (row) => this.#run(row),
       this.tables.runTable,
     );
@@ -656,17 +652,15 @@ export class RoutineStore {
 
   protected activeRunRows(ownerId: string, routineId: string): OwnedRoutineRun[] {
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.runColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?
              AND status IN ('queued', 'running', 'needs-attention')
            ORDER BY created_at, run_id`,
-          )
-          .all(routineId, ownerId),
-      ),
+        )
+        .all(routineId, ownerId),
       (row) => this.#run(row),
       this.tables.runTable,
     );
@@ -678,16 +672,14 @@ export class RoutineStore {
    */
   protected openRunRows(ownerId: string): OwnedRoutineRun[] {
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.runColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE ${this.tables.ownerColumn} = ? AND status IN ('queued', 'running', 'needs-attention')
            ORDER BY created_at, run_id`,
-          )
-          .all(ownerId),
-      ),
+        )
+        .all(ownerId),
       (row) => this.#run(row),
       this.tables.runTable,
     );
@@ -701,17 +693,15 @@ export class RoutineStore {
   protected failedRunRowsForHandles(ownerId: string, handles: readonly string[]): OwnedRoutineRun[] {
     if (!handles.length) return [];
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.runColumns}
+      this.database.connection
+        .prepare(
+          `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE ${this.tables.ownerColumn} = ? AND status = 'failed'
              AND ${this.tables.handleColumn} IN (${handles.map(() => "?").join(", ")})
            ORDER BY created_at, run_id`,
-          )
-          .all(ownerId, ...handles),
-      ),
+        )
+        .all(ownerId, ...handles),
       (row) => this.#run(row),
       this.tables.runTable,
     );
@@ -745,14 +735,19 @@ export class RoutineStore {
            ORDER BY trigger.next_run_at, trigger.trigger_id`,
         )
         .all(now.toISOString()),
-    )
-      .map((row) => ({
-        routine: this.#routine(row),
-        triggerId: requiredStringColumn(row, "trigger_id"),
-        nextRunAt: requiredStringColumn(row, "next_run_at"),
-        schedule: scheduleColumn(row),
-      }))
-      .filter((due) => !excludedOwnerIds.has(due.routine.ownerId));
+    ).flatMap((row) => {
+      // A routine that this build cannot read is not fired, so its trigger and runs stay unchanged.
+      const routine = readableRow(row, (value) => this.#routine(value), routineTable);
+      if (!routine || excludedOwnerIds.has(routine.ownerId)) return [];
+      return [
+        {
+          routine,
+          triggerId: requiredStringColumn(row, "trigger_id"),
+          nextRunAt: requiredStringColumn(row, "next_run_at"),
+          schedule: scheduleColumn(row),
+        },
+      ];
+    });
   }
 
   nextDueAt(excludedOwnerIds: ReadonlySet<string> = new Set()): string | null {
@@ -760,14 +755,20 @@ export class RoutineStore {
     const row = databaseRows(
       this.database.connection
         .prepare(
-          `SELECT trigger.next_run_at, routine.${ownerColumn}
+          `SELECT trigger.next_run_at, routine.${ownerColumn}, routine.limit_policy, routine.missed_policy
+                  ${this.tables.runInColumn ? ", routine.run_in" : ""}
            FROM ${triggerTable} trigger
            JOIN ${routineTable} routine ON routine.routine_id = trigger.routine_id
            WHERE routine.active = 1
            ORDER BY trigger.next_run_at, trigger.trigger_id`,
         )
         .all(),
-    ).find((candidate) => !excludedOwnerIds.has(requiredStringColumn(candidate, ownerColumn)));
+    ).find(
+      // `dueRoutines` skips an unreadable routine, so its past due time must not wake the timer again and again.
+      (candidate) =>
+        !excludedOwnerIds.has(requiredStringColumn(candidate, ownerColumn)) &&
+        readableRow(candidate, (value) => this.#policies(value), routineTable) !== undefined,
+    );
     return row && isString(row.next_run_at) ? row.next_run_at : null;
   }
 
@@ -1191,13 +1192,11 @@ export class RoutineStore {
 
   #allActive(): OwnedRoutine[] {
     return readableRows(
-      databaseRows(
-        this.database.connection
-          .prepare(
-            `SELECT ${this.routineColumns} FROM ${this.tables.routineTable} WHERE active = 1 AND ${this.#hasSchedule}`,
-          )
-          .all(),
-      ),
+      this.database.connection
+        .prepare(
+          `SELECT ${this.routineColumns} FROM ${this.tables.routineTable} WHERE active = 1 AND ${this.#hasSchedule}`,
+        )
+        .all(),
       (row) => this.#routine(row),
       this.tables.routineTable,
     );
@@ -1233,8 +1232,6 @@ export class RoutineStore {
   }
 
   #fields(row: DynamicRecord): Omit<OwnedRoutine, "trigger"> {
-    const limitPolicy = checkedColumn(row, "limit_policy", ROUTINE_LIMIT_POLICIES);
-    const missedPolicy = checkedColumn(row, "missed_policy", ROUTINE_MISSED_POLICIES);
     return {
       id: requiredStringColumn(row, "routine_id"),
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
@@ -1242,17 +1239,17 @@ export class RoutineStore {
       instruction: requiredStringColumn(row, "instruction"),
       active: requiredNumberColumn(row, "active") === 1,
       timezone: requiredStringColumn(row, "timezone"),
-      limitPolicy,
-      missedPolicy,
-      ...this.#runIn(row),
+      ...this.#policies(row),
       createdAt: requiredStringColumn(row, "created_at"),
       updatedAt: requiredStringColumn(row, "updated_at"),
     };
   }
 
-  #runIn(row: DynamicRecord): { runIn?: RoutineRunPlace } {
-    if (!this.tables.runInColumn) return {};
-    return { runIn: checkedColumn(row, "run_in", ROUTINE_RUN_PLACES) };
+  #policies(row: DynamicRecord): Pick<OwnedRoutine, "limitPolicy" | "missedPolicy" | "runIn"> {
+    const limitPolicy = checkedColumn(row, "limit_policy", ROUTINE_LIMIT_POLICIES);
+    const missedPolicy = checkedColumn(row, "missed_policy", ROUTINE_MISSED_POLICIES);
+    if (!this.tables.runInColumn) return { limitPolicy, missedPolicy };
+    return { limitPolicy, missedPolicy, runIn: checkedColumn(row, "run_in", ROUTINE_RUN_PLACES) };
   }
 
   /** The column exists only on the agent table, so it is written apart from the shared insert. */

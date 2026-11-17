@@ -67,14 +67,12 @@ export class BrowserProxyStore {
 
   list(): BrowserProxyRecord[] {
     return readableRows(
-      databaseRows(
-        this.#database.connection
-          .prepare(
-            `SELECT ${RECORD_COLUMNS} FROM browser_proxies
+      this.#database.connection
+        .prepare(
+          `SELECT ${RECORD_COLUMNS} FROM browser_proxies
            ORDER BY kind, host COLLATE NOCASE, port, created_at, proxy_id`,
-          )
-          .all(),
-      ),
+        )
+        .all(),
       proxyRecord,
       "browser_proxies",
     );

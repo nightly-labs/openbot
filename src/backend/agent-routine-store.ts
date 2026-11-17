@@ -5,6 +5,7 @@ import type {
   RoutineRunStatus,
   UpdateRoutineInput,
 } from "@openbot/contracts/ipc";
+import { databaseRows, requiredStringColumn } from "./database/database-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 import {
   type DueRoutine,
@@ -93,8 +94,12 @@ export class AgentRoutineStore extends RoutineStore {
    */
   pauseForAgentsHiddenBeforeWork(agentIds: readonly string[], now = new Date()): string[] {
     if (this.database.commandResult(HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID) !== undefined) return [];
+    // Ids only, without a decode: a routine that this build cannot read is paused too.
+    const select = this.database.connection.prepare(
+      `SELECT routine_id FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND active = 1`,
+    );
     const routineIds = agentIds.flatMap((agentId) =>
-      this.listRecords(agentId).flatMap((routine) => (routine.active ? [routine.id] : [])),
+      databaseRows(select.all(agentId)).map((row) => requiredStringColumn(row, "routine_id")),
     );
     this.database.dispatch(
       HIDDEN_AGENT_ROUTINE_PAUSE_COMMAND_ID,

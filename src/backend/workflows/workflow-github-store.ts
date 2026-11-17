@@ -419,15 +419,13 @@ export class WorkflowGitHubStore {
   history(workflowId: string): WorkflowGitHubHistory {
     const db = this.#database.connection;
     const deliveries = readableRows(
-      databaseRows(
-        db
-          .prepare(
-            `SELECT node_id, delivery_id, event, repository, number, pull_request, title, received_at, outcome, reason,
+      db
+        .prepare(
+          `SELECT node_id, delivery_id, event, repository, number, pull_request, title, received_at, outcome, reason,
              run_id FROM workflow_github_deliveries WHERE workflow_id = ?
            ORDER BY received_at DESC, delivery_id DESC`,
-          )
-          .all(workflowId),
-      ),
+        )
+        .all(workflowId),
       toDelivery,
       "workflow_github_deliveries",
     );

@@ -371,14 +371,7 @@ export const CRM_CUSTOMER_COLUMNS = `c.*,
 
 export function decodeCrmCustomer(row: DynamicRecord): CrmCustomer {
   const tagIds = jsonArray(row, "tag_ids").filter(isString);
-  const plans = readableRows(
-    jsonArray(row, "plans").map((plan) => {
-      if (!isDynamicRecord(plan)) throw new Error("Invalid SQLite column plans.");
-      return plan;
-    }),
-    decodePlan,
-    "crm_plans",
-  );
+  const plans = readableRows(jsonArray(row, "plans"), decodePlan, "crm_plans");
   return {
     ...decodeCrmCustomerRecord(row),
     tagIds,
@@ -487,7 +480,7 @@ export class CrmStore {
 
   statuses(): CrmStatusRecord[] {
     return readableRows(
-      databaseRows(this.db.prepare("SELECT * FROM crm_statuses ORDER BY position, status_id").all()),
+      this.db.prepare("SELECT * FROM crm_statuses ORDER BY position, status_id").all(),
       decodeStatus,
       "crm_statuses",
     );
@@ -499,18 +492,14 @@ export class CrmStore {
 
   privateFields(): CrmPrivateField[] {
     return readableRows(
-      databaseRows(this.db.prepare("SELECT field FROM crm_private_fields").all()),
+      this.db.prepare("SELECT field FROM crm_private_fields").all(),
       (row) => checkedColumn(row, "field", CRM_PRIVATE_FIELDS),
       "crm_private_fields",
     ).sort((left, right) => CRM_PRIVATE_FIELDS.indexOf(left) - CRM_PRIVATE_FIELDS.indexOf(right));
   }
 
   sources(): CrmSource[] {
-    return readableRows(
-      databaseRows(this.db.prepare("SELECT * FROM crm_sources ORDER BY kind").all()),
-      decodeSource,
-      "crm_sources",
-    );
+    return readableRows(this.db.prepare("SELECT * FROM crm_sources ORDER BY kind").all(), decodeSource, "crm_sources");
   }
 
   source(sourceId: string): CrmSource {
