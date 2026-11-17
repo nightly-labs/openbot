@@ -64,8 +64,7 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.update.notesFailed": "The release notes could not load.",
   "mobile.app.update.notesEmpty": "There are no release notes for this version yet.",
   "mobile.app.update.fullChangelog": "Full changelog",
-  // The rating ask on home. 1 or 2 stars open a public GitHub issue form, 3 stars a prepared post on X,
-  // and 4 or 5 stars the store review page.
+  // The rating ask on home. Every rating can open the store review page or a prepared post on X.
   "mobile.app.rate.title": "Enjoying OpenBot?",
   "mobile.app.rate.body": "A rating helps other teams find OpenBot.",
   "mobile.app.rate.ratingLabel": "Rating",
@@ -76,12 +75,9 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.rate.hint.3": "Fair. Tell us on X what would make it a 5.",
   "mobile.app.rate.hint.4": "Nice! The store is one tap away.",
   "mobile.app.rate.hint.5": "You made our day!",
-  "mobile.app.rate.public": "Opens a public GitHub issue form, where you write what to fix.",
   "mobile.app.rate.xNote": "Opens X with a post to the maker. You can edit it first.",
-  "mobile.app.rate.rate": "Rate OpenBot",
   "mobile.app.rate.appStore": "Rate on the App Store",
   "mobile.app.rate.googlePlay": "Rate on Google Play",
-  "mobile.app.rate.send": "Give feedback",
   "mobile.app.rate.postX": "Post on X",
   "mobile.app.rate.notNow": "Not now",
   "mobile.app.rate.thanks": "Thanks — that helps a lot.",

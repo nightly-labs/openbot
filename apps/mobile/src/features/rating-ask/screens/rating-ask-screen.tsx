@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { scheduleOnRN } from "react-native-worklets";
 
 import { SIGN_IN_CONTROL_HEIGHT, useSignInColors } from "@/features/auth/components/sign-in-colors";
-import { finishRatingAsk, openFeedbackForm, openStoreReview, openXPost } from "@/features/rating-ask/model/rating-ask";
+import { finishRatingAsk, openStoreReview, openXPost } from "@/features/rating-ask/model/rating-ask";
 import { BLOUB_MOVE_MS, BLOUB_RADIUS, useBloubColors } from "@/shared/components/bloub-stage/bloub-look";
 import { useBloubStageRequest } from "@/shared/components/bloub-stage/bloub-stage-context";
 import {
@@ -40,18 +40,6 @@ const HINT = {
   4: "mobile.app.rate.hint.4",
   5: "mobile.app.rate.hint.5",
 } as const;
-/**
- * Where each rating goes. A low rating opens the public GitHub form, where the user writes what to
- * fix. A middle rating opens a prepared post on X, to the maker. A high rating opens the store.
- */
-type Destination = "github" | "x" | "store";
-const DESTINATION = { 1: "github", 2: "github", 3: "x", 4: "store", 5: "store" } as const satisfies Record<
-  Rating,
-  Destination
->;
-/** The line under the hint that says where the main button goes. The store needs none. */
-const DESTINATION_NOTE = { github: "mobile.app.rate.public", x: "mobile.app.rate.xNote" } as const;
-
 // The block drops from the top to a header of this share of the screen. Then the panel slides out
 // from under its edge, as the release notes do under the update header.
 const HEADER_SHARE = 0.38;
@@ -136,9 +124,8 @@ function RatingStar({
 /**
  * The rating ask, over home. The bloub drops from the top to a header, and the panel with the
  * question slides out from under its edge. Its eyes answer each star: tears for 1, a squish, swing
- * and stretch of the block for 5. 1 and 2 stars open the public GitHub form, where the user writes
- * what to fix: a field here could not pass its text on. 3 stars open a prepared post on X, and 4
- * and 5 open the store.
+ * and stretch of the block for 5. The store and a prepared post on X are open to every rating, and
+ * also before one: the stores do not allow an ask that sends only good ratings to them.
  */
 export function RatingAskScreen() {
   const { t } = useText();
@@ -235,16 +222,14 @@ export function RatingAskScreen() {
     setRating(value);
   }
 
-  async function submit() {
-    if (rating === null || opening) return;
+  async function submit(destination: "store" | "x") {
+    if (opening) return;
     setError(null);
     setOpening(true);
     // Each page opens over the app, and the thanks shows when the user comes back.
-    const destination = DESTINATION[rating];
     try {
-      if (destination === "github") await openFeedbackForm(rating);
-      else if (destination === "x") await openXPost();
-      else await openStoreReview();
+      if (destination === "store") await openStoreReview();
+      else await openXPost();
       void haptics.notification("success");
       finishRatingAsk();
       setThanks(destination === "store" ? "rated" : "feedback");
@@ -255,18 +240,8 @@ export function RatingAskScreen() {
     }
   }
 
-  const destination = rating === null ? null : DESTINATION[rating];
-  const canSubmit = rating !== null && !opening && !closing;
-  const primaryLabel =
-    destination === null
-      ? t("mobile.app.rate.rate")
-      : destination === "github"
-        ? t("mobile.app.rate.send")
-        : destination === "x"
-          ? t("mobile.app.rate.postX")
-          : isIOS
-            ? t("mobile.app.rate.appStore")
-            : t("mobile.app.rate.googlePlay");
+  const busy = opening || closing;
+  const storeLabel = isIOS ? t("mobile.app.rate.appStore") : t("mobile.app.rate.googlePlay");
 
   return (
     <View
@@ -329,41 +304,44 @@ export function RatingAskScreen() {
                     {rating ? t(HINT[rating]) : t("mobile.app.rate.hint.none")}
                   </Typography.Paragraph>
                 </Animated.View>
-                {destination === "github" || destination === "x" ? (
-                  <Animated.View
-                    key={destination}
-                    entering={reduced ? undefined : FadeIn.duration(ROW_FADE_MS).easing(SPLASH_EASE_OUT)}
-                  >
-                    <Typography.Paragraph type="body-sm" className="mt-1 text-muted">
-                      {t(DESTINATION_NOTE[destination])}
-                    </Typography.Paragraph>
-                  </Animated.View>
-                ) : null}
                 <View className="min-h-6 flex-1" />
                 <Animated.View entering={rowEntering(4, reduced)} className="gap-1">
                   <Button
                     size="lg"
                     variant="ghost"
                     feedbackVariant="scale"
-                    isDisabled={!canSubmit}
-                    accessibilityLabel={primaryLabel}
-                    style={{
-                      height: SIGN_IN_CONTROL_HEIGHT,
-                      borderRadius: colors.radius,
-                      backgroundColor: bloub.body,
-                      opacity: canSubmit ? 1 : 0.4,
-                    }}
-                    onPress={() => void submit()}
+                    isDisabled={busy}
+                    accessibilityLabel={storeLabel}
+                    style={{ height: SIGN_IN_CONTROL_HEIGHT, borderRadius: colors.radius, backgroundColor: bloub.body }}
+                    onPress={() => void submit("store")}
                   >
                     <Button.Label className="font-sans font-semibold" style={{ color: bloub.eye }}>
-                      {primaryLabel}
+                      {storeLabel}
                     </Button.Label>
                   </Button>
                   <Button
                     size="lg"
                     variant="ghost"
                     feedbackVariant="scale"
-                    isDisabled={opening || closing}
+                    isDisabled={busy}
+                    accessibilityLabel={t("mobile.app.rate.postX")}
+                    accessibilityHint={t("mobile.app.rate.xNote")}
+                    style={{
+                      height: SIGN_IN_CONTROL_HEIGHT,
+                      borderRadius: colors.radius,
+                      backgroundColor: colors.surface,
+                    }}
+                    onPress={() => void submit("x")}
+                  >
+                    <Button.Label className="font-sans font-semibold" style={{ color: colors.text }}>
+                      {t("mobile.app.rate.postX")}
+                    </Button.Label>
+                  </Button>
+                  <Button
+                    size="lg"
+                    variant="ghost"
+                    feedbackVariant="scale"
+                    isDisabled={busy}
                     style={{ height: SIGN_IN_CONTROL_HEIGHT }}
                     onPress={close}
                   >

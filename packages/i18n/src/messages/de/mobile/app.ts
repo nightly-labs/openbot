@@ -72,13 +72,9 @@ export const messages = {
   "mobile.app.rate.hint.3": "Okay. Sag uns auf X, was daraus eine 5 machen würde.",
   "mobile.app.rate.hint.4": "Super! Der Store ist nur einen Tipp entfernt.",
   "mobile.app.rate.hint.5": "Du hast uns den Tag versüßt!",
-  "mobile.app.rate.public":
-    "Öffnet ein öffentliches GitHub-Issue-Formular, in dem du schreibst, was wir beheben sollen.",
   "mobile.app.rate.xNote": "Öffnet X mit einem Post an den Entwickler. Du kannst ihn vorher bearbeiten.",
-  "mobile.app.rate.rate": "OpenBot bewerten",
   "mobile.app.rate.appStore": "Im App Store bewerten",
   "mobile.app.rate.googlePlay": "Bei Google Play bewerten",
-  "mobile.app.rate.send": "Feedback geben",
   "mobile.app.rate.postX": "Auf X posten",
   "mobile.app.rate.notNow": "Nicht jetzt",
   "mobile.app.rate.thanks": "Danke – das hilft sehr.",

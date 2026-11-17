@@ -1,11 +1,10 @@
-import { mobileBugReportFormUrl } from "@openbot/contracts/feedback";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import * as SecureStore from "expo-secure-store";
 import { Linking } from "react-native";
 import { create } from "zustand";
 
+import { openStorePage } from "@/features/app-update/model/app-update";
 import { devShowRatingAsk } from "@/shared/lib/dev-feature-overrides";
-import { isIOS } from "@/shared/lib/platform";
 
 /**
  * When home asks for a rating. The phone counts the days on which home showed, and asks only after
@@ -24,12 +23,6 @@ const COOLDOWN_MS = 60 * DAY_MS;
 const X_POST_TEXT = "Feedback for OpenBot @norbertbodziony: ";
 const X_APP_POST_URL = `twitter://post?message=${encodeURIComponent(X_POST_TEXT)}`;
 const X_WEB_POST_URL = `https://x.com/intent/post?text=${encodeURIComponent(X_POST_TEXT)}`;
-
-// The store pages, with the review form where the store has one.
-const IOS_REVIEW_URL = "itms-apps://apps.apple.com/app/id6807024266?action=write-review";
-const IOS_REVIEW_WEB_URL = "https://apps.apple.com/app/id6807024266?action=write-review";
-const ANDROID_REVIEW_URL = "market://details?id=run.openbot.mobile";
-const ANDROID_REVIEW_WEB_URL = "https://play.google.com/store/apps/details?id=run.openbot.mobile";
 
 interface RatingAskRecord {
   /** The newest local days on which home showed, as `YYYY-MM-DD`. Only the count matters. */
@@ -121,20 +114,9 @@ export function finishRatingAsk(): void {
   void save({ done: true });
 }
 
-/** Opens the review page of the store. The web page is the fallback when the store app does not open. */
-export async function openStoreReview(): Promise<void> {
-  const [url, webUrl] = isIOS ? [IOS_REVIEW_URL, IOS_REVIEW_WEB_URL] : [ANDROID_REVIEW_URL, ANDROID_REVIEW_WEB_URL];
-  await Linking.openURL(url).catch(() => Linking.openURL(webUrl));
-}
-
-/**
- * Opens the public mobile bug report form, where the user writes the feedback and submits it. The
- * link holds only the title: the page loads from GitHub before the user submits, so this phone's
- * facts and log stay out of it. The form asks the user for them.
- */
-export async function openFeedbackForm(stars: number): Promise<void> {
-  // The title is in English for the maintainers, as the other issue forms are.
-  await Linking.openURL(mobileBugReportFormUrl({ title: `Feedback from the rating ask (${stars} of 5 stars)` }));
+/** Opens the review form of the App Store, or the app page on Google Play. */
+export function openStoreReview(): Promise<void> {
+  return openStorePage({ review: true });
 }
 
 /** Opens a prepared post on X: in the X app when it is installed, else on the web. */
