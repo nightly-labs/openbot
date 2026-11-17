@@ -52,6 +52,10 @@ export const messages = {
     "👋 *OpenBot подключён*\n\nПишите сюда, чтобы обратиться к своим агентам. WhatsApp Orchestrator отвечает сам или передаёт работу нужному агенту.\n\nОтправьте *stop*, чтобы остановить запрос.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot подключён*\n\nЛюди, которым вы разрешите в OpenBot, теперь могут писать на этот номер. Новый человек получит код: одобрите его в OpenBot в разделе «Запросы».\n\nОтправьте *stop*, чтобы остановить запрос.",
+  "status.messaging.whatsappOtherOpenBot":
+    "К этому номеру WhatsApp привязан ещё один OpenBot, поэтому вы можете получать два ответа. Чтобы это исправить, откройте «Связанные устройства» в WhatsApp на телефоне и выйдите из OpenBot, которым вы не пользуетесь.",
+  "status.messaging.whatsappPaused":
+    "OpenBot перестал отвечать здесь на 10 минут: за короткое время пришло слишком много сообщений. Если к этому номеру привязан ещё один OpenBot, откройте «Связанные устройства» в WhatsApp на телефоне и выйдите из OpenBot, которым вы не пользуетесь.",
   "status.messaging.whatsappOrchestratorName": "Оркестратор WhatsApp",
   "status.messaging.whatsappOrchestratorTitle": "Отвечает в WhatsApp и обращается к команде",
 } as const satisfies PartialTranslation<typeof source>;

@@ -60,6 +60,7 @@ import {
   type MessagingThreads,
 } from "./messaging-threads";
 import {
+  CANCEL_TEXT,
   type ConnectionIdentity,
   DiscordApiError,
   type HistoryFilter,
@@ -186,7 +187,6 @@ const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "remove
 const APPROVAL_TEXT_LIMIT = 2_500;
 /** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
 const PROGRESS_TEXT_LIMIT = 1_000;
-const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
 const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
