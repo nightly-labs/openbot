@@ -3232,11 +3232,9 @@ export class BrowserCdpEngine {
         return yield* browserFailure(new Error("Stale browser reference. Take a fresh snapshot before acting."));
       }
       const record = this.#targets.get(target.ref);
-      if (!record)
-        return yield* browserFailure(new Error("Element reference is no longer available. Take a fresh snapshot."));
-      const sessionId = record.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
-      // The node id of a frame in another process can name another node in the page's own session.
-      if (record.targetId && sessionId === undefined)
+      const sessionId = record?.targetId ? this.#targetSessions.get(record.targetId)?.sessionId : undefined;
+      // A frame in another process that went away: its node id can name another node in the page's session.
+      if (!record || (record.targetId && sessionId === undefined))
         return yield* browserFailure(new Error("Element reference is no longer available. Take a fresh snapshot."));
       if (deadline !== undefined) {
         yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -3381,7 +3379,9 @@ export class BrowserCdpEngine {
         );
         yield* Effect.gen({ self: this }, function* () {
           for (const objectId of objectIds) {
-            const candidate = yield* describedMatch(send, objectId, capture, target.text);
+            const candidate = yield* describedMatch(send, objectId, capture, target.text).pipe(
+              skipGoneFrame(capture.sessionId, undefined),
+            );
             if (!candidate) continue;
             const key = `${capture.targetId ?? "main"}:${candidate.backendNodeId}`;
             if (seen.has(key)) continue;
