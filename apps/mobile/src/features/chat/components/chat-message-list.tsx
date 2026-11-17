@@ -1178,12 +1178,12 @@ function FocusHighlight({ rowId, color, shown }: { rowId: string; color: string;
 const RowContext = createContext<RowContextValue | null>(null);
 
 const MESSAGE_TIME = { hour: "numeric", minute: "2-digit" } as const;
-const NO_TIME_REVEAL = { transform: [{ translateX: 0 }] };
 
 /**
- * The time of a message, beside the chat past the end of its row, at the middle height of the
- * message, so each time is level with its own bubble. It shows when a swipe moves the rows away
- * from Back, and fades in as it comes. A screen reader reads the time in the actions sheet.
+ * The time of a message, at the middle height of the message, so each time is level with its own
+ * bubble. It comes in from past the end of the chat with the swipe, fading in, and stops at the end
+ * of the screen once it is in; the bubbles can move on past that. A screen reader reads the time in
+ * the actions sheet.
  */
 function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
   const { format } = useText();
@@ -1191,17 +1191,22 @@ function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedV
     const at = messageTime(createdAt);
     return Number.isNaN(at) ? null : format.date(new Date(at), MESSAGE_TIME);
   }, [createdAt, format]);
-  const style = useAnimatedStyle(() => ({
-    opacity: interpolate(reveal.get(), [MESSAGE_TIME_WIDTH * 0.25, MESSAGE_TIME_WIDTH], [0, 1], Extrapolation.CLAMP),
-  }));
+  const style = useAnimatedStyle(() => {
+    const distance = reveal.get();
+    return {
+      opacity: interpolate(distance, [MESSAGE_TIME_WIDTH * 0.25, MESSAGE_TIME_WIDTH], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateX: Math.max(0, MESSAGE_TIME_WIDTH - distance) * END_X }],
+    };
+  });
   if (!label) return null;
   return (
     <Animated.View
       pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      className="absolute top-0 bottom-0 items-center justify-center"
-      style={[{ end: -MESSAGE_TIME_WIDTH, width: MESSAGE_TIME_WIDTH }, style]}
+      className="absolute top-0 bottom-0 items-end justify-center"
+      // The time ends 12 pt before the edge of the screen, inside the side padding of the list.
+      style={[{ end: -(LIST_PADDING - 12), width: MESSAGE_TIME_WIDTH }, style]}
     >
       <Typography.Paragraph type="body-xs" numberOfLines={1} className="text-muted">
         {label}
@@ -1211,19 +1216,19 @@ function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedV
 }
 
 /**
- * A message and its time. The time is placed against the message only, not against the day label,
- * the steps row or the divider of the same row.
+ * A message bubble and its time. Only the bubble moves with the swipe that shows the times: the day
+ * label, the steps row, markers and dividers of the chat stay in place.
  */
 function MessageWithTime({
   createdAt,
   reveal,
   children,
-}: PropsWithChildren<{ createdAt: string | undefined; reveal: SharedValue<number> | null }>) {
-  if (!createdAt || !reveal) return children;
+}: PropsWithChildren<{ createdAt: string | undefined; reveal: SharedValue<number> }>) {
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: -reveal.get() * END_X }] }));
   return (
     <View>
-      {children}
-      <MessageTime createdAt={createdAt} reveal={reveal} />
+      <Animated.View style={moved}>{children}</Animated.View>
+      {createdAt ? <MessageTime createdAt={createdAt} reveal={reveal} /> : null}
     </View>
   );
 }
@@ -1235,19 +1240,34 @@ function MessageWithTime({
 function ChatRow({ item }: { item: VisibleMessage }) {
   const row = useContext(RowContext);
   const timeReveal = useContext(ChatTimeRevealContext);
-  // The swipe that shows the message times moves each row away from Back.
-  const revealStyle = useAnimatedStyle(() =>
-    timeReveal ? { transform: [{ translateX: -timeReveal.get() * END_X }] } : NO_TIME_REVEAL,
-  );
   if (!row) return null;
   const message = row.rowsById.get(item.id) ?? item;
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
   const day = row.dayLabels.get(message.id);
+  const messageRow =
+    message.kind === "thinking" ? null : (
+      <MessageRow
+        message={message}
+        isFirstUser={message.id === row.firstUserId}
+        source={
+          message.kind === "message" && message.replyToMessageId
+            ? row.messagesById.get(message.replyToMessageId)
+            : undefined
+        }
+        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+        upload={row.upload?.messageId === message.id ? row.upload : undefined}
+        outbox={row.outboxStatuses?.get(message.id)}
+        selecting={message.id === row.selectingMessageId}
+        arriving={row.arrivals.has(message.id)}
+        revealed={row.revealedIds.has(message.id)}
+        shared={row.shared}
+      />
+    );
   return (
     <Animated.View
-      style={[ROW_STYLE, response ? row.responseStyle : undefined, revealStyle]}
+      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
@@ -1269,25 +1289,12 @@ function ChatRow({ item }: { item: VisibleMessage }) {
           onPress={openTurn ? () => openTurn(turn.turnId) : undefined}
         />
       ) : null}
-      {message.kind === "thinking" ? null : (
-        <MessageWithTime createdAt={message.kind === "message" ? message.createdAt : undefined} reveal={timeReveal}>
-          <MessageRow
-            message={message}
-            isFirstUser={message.id === row.firstUserId}
-            source={
-              message.kind === "message" && message.replyToMessageId
-                ? row.messagesById.get(message.replyToMessageId)
-                : undefined
-            }
-            questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-            upload={row.upload?.messageId === message.id ? row.upload : undefined}
-            outbox={row.outboxStatuses?.get(message.id)}
-            selecting={message.id === row.selectingMessageId}
-            arriving={row.arrivals.has(message.id)}
-            revealed={row.revealedIds.has(message.id)}
-            shared={row.shared}
-          />
+      {message.kind === "message" && timeReveal ? (
+        <MessageWithTime createdAt={message.createdAt} reveal={timeReveal}>
+          {messageRow}
         </MessageWithTime>
+      ) : (
+        messageRow
       )}
       {row.branchDivider?.rowId === message.id ? (
         <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />

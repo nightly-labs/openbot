@@ -32,11 +32,19 @@ const PRESS_IN = {
 };
 const RELEASE = { duration: 300, dampingRatio: 0.7, reduceMotion: ReduceMotion.System };
 const SETTLE = { duration: 400, dampingRatio: 1, reduceMotion: ReduceMotion.System };
+/** The bubbles go back after the times with a small overshoot, as in Messages on iOS. */
+const TIMES_SETTLE = { duration: 450, dampingRatio: 0.78, reduceMotion: ReduceMotion.System };
+/**
+ * Past the place where the times stop, the bubbles move on at this part of the finger's distance.
+ * The reply swipe resists more: its icon stays at the bubble's side.
+ */
+const TIMES_OVERSCROLL = 0.4;
+const REPLY_OVERSCROLL = 0.15;
 
-/** The distance of a swipe as it moves a view: in full up to `limit`, then at a small part of it. */
-function resisted(distance: number, limit: number): number {
+/** The distance of a swipe as it moves a view: in full up to `limit`, then at `part` of it. */
+function resisted(distance: number, limit: number, part: number): number {
   "worklet";
-  return Math.max(0, Math.min(distance, limit) + Math.max(0, distance - limit) * 0.15);
+  return Math.max(0, Math.min(distance, limit) + Math.max(0, distance - limit) * part);
 }
 
 /**
@@ -101,7 +109,7 @@ export function ChatMessageGesture({
       .failOffsetY([-12, 12])
       .onStart(() => scheduleOnRN(setIconShown, true))
       .onUpdate((event) => {
-        offset.set(resisted(event.translationX * END_X, 64));
+        offset.set(resisted(event.translationX * END_X, 64, REPLY_OVERSCROLL));
       })
       .onEnd((event) => {
         const distance = event.translationX * END_X;
@@ -117,10 +125,10 @@ export function ChatMessageGesture({
       .failOffsetX(8 * END_X)
       .failOffsetY([-12, 12])
       .onUpdate((event) => {
-        timeReveal?.set(resisted(-event.translationX * END_X, MESSAGE_TIME_WIDTH));
+        timeReveal?.set(resisted(-event.translationX * END_X, MESSAGE_TIME_WIDTH, TIMES_OVERSCROLL));
       })
       .onFinalize(() => {
-        timeReveal?.set(withSpring(0, SETTLE));
+        timeReveal?.set(withSpring(0, TIMES_SETTLE));
       });
     if (listSwipe) {
       swipe.blocksExternalGesture(listSwipe);

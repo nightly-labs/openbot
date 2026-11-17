@@ -11,12 +11,13 @@ export type ChatSwipeGesture = ReturnType<typeof Gesture.Pan>;
  */
 export const ChatSwipeGestureContext = createContext<ChatSwipeGesture | null>(null);
 
-/** The width of the message times beside the chat, in points. The swipe moves the chat this far. */
+/** The width of the message times beside the chat, in points: the times are fully in at this distance. */
 export const MESSAGE_TIME_WIDTH = 72;
 
 /**
- * How far the rows of the chat move away from Back to show the message times, in points: from 0 to
- * about `MESSAGE_TIME_WIDTH`. A swipe on a message bubble sets it; each row reads it.
+ * How far the message bubbles move away from Back to show the message times, in points. The times
+ * are fully in at `MESSAGE_TIME_WIDTH` and stop there; the bubbles can move on past it. A swipe on a
+ * message bubble sets it; each message reads it.
  */
 export const ChatTimeRevealContext = createContext<SharedValue<number> | null>(null);
 
