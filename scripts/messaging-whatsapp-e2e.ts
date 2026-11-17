@@ -784,6 +784,17 @@ try {
       await failTurn("turn-provider-text", "Claude Code failed: /home/ana/.claude/settings.json is not valid.");
       await until(() => generalPosts() > before, "the general text");
       assert.ok(!texts().some((text) => text.includes("/home/ana")), "The provider's own text reached WhatsApp.");
+      // Another OpenBot on the same number posts such a reason with ids that this one does not know.
+      const otherReason = message({ chat: OWNER_JID, fromMe: true, text: signIn });
+      phone.current().receive([otherReason]);
+      const later = message({ chat: OWNER_JID, fromMe: true, text: "after the other OpenBot's reason" });
+      phone.current().receive([later]);
+      await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the message after the other reason");
+      assert.equal(
+        received(agents, OWNER_JID, otherReason.key.id ?? ""),
+        false,
+        "Another OpenBot's reason was a request.",
+      );
       // The steps below expect the owner to have as many waiting requests as the limit permits.
       for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
         const again = message({ chat: OWNER_JID, fromMe: true, text: `request again ${index}` });

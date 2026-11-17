@@ -1,4 +1,4 @@
-import { AGENT_PROVIDERS, type AgentProviderRef, agentProviderName } from "@openbot/contracts/agent-providers";
+import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
@@ -13,7 +13,7 @@ import {
   MESSAGING_LIMITS,
 } from "@openbot/contracts/ipc";
 import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
-import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
+import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
@@ -27,7 +27,14 @@ import { type MessagingContextMessage, messagingPromptText, REPLY_CHARACTERS } f
 import type { MessagingOperationFailed } from "./messaging-service";
 import { type MessagingLink, type MessagingPingInput, MessagingStore } from "./messaging-store";
 import { boundedHistory, parseMessagingOutboundTool, parseMessagingTool } from "./messaging-tools";
-import type { ContextEntry, HistoryFilter, InboundFile, MessageTarget, MessagingPlace } from "./messaging-types";
+import {
+  type ContextEntry,
+  chatFailureReason,
+  type HistoryFilter,
+  type InboundFile,
+  type MessageTarget,
+  type MessagingPlace,
+} from "./messaging-types";
 
 /** A file the agent attached to its answer, ready to upload. */
 export interface MessagingAnswerFile {
@@ -1199,21 +1206,6 @@ export function isAnswer(message: ConversationMessage): boolean {
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
     Boolean(message.text.trim())
   );
-}
-
-/**
- * The chat text for the stored failure of a turn, or null for the general text. The platform is
- * outside this computer, and a provider's own text can hold paths or keys, so only an error from the
- * catalog goes there: one with no placeholder, such as a spent usage limit, or an expired sign-in that
- * names a provider (#11303).
- */
-function chatFailureReason(error: string | null | undefined): string | null {
-  if (!error) return null;
-  if (isFixedSourceText(error)) return matchingSourceKeys(error).some((key) => key.startsWith("error.")) ? error : null;
-  const signInExpired = AGENT_PROVIDERS.some(
-    (provider) => error === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }),
-  );
-  return signInExpired ? error : null;
 }
 
 export class MessagingThreadFailed extends Schema.TaggedError<MessagingThreadFailed>()("MessagingThreadFailed", {
