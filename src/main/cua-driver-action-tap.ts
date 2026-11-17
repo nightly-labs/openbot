@@ -163,7 +163,7 @@ const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
  * The protocol is one JSON object per line. A tool call is
  * `{"method":"call","name":"click","args":{…}}`; the target sits in the arguments either directly
  * as `pid` and `window_id` or inside a `target` object, and the point sits beside it as `x` and
- * `y`. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
+ * `y`. A `run_steps` call holds such calls as its steps. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
  * reports nothing rather than a guess.
  */
 function readRequest(line: string, at: number, screenshotWidth: (windowId: number) => number | null): ObservedRequest {
@@ -178,12 +178,67 @@ function readRequest(line: string, at: number, screenshotWidth: (windowId: numbe
   const tool = parsed.name;
   if (typeof tool !== "string") return NOTHING;
   const args: DynamicRecord = isDynamicRecord(parsed.args) ? parsed.args : {};
+  if (tool === RUN_STEPS_TOOL) return { tool, list: false, ...readSteps(args, at, screenshotWidth) };
   return {
     tool,
     list: false,
     action: readTarget(tool, args, at),
     pointer: readPointer(tool, args, at, screenshotWidth),
   };
+}
+
+/** The driver's batch tool. Its own instructions tell agents to act through it, even for one step. */
+const RUN_STEPS_TOOL = "run_steps";
+/** The fields of a step that are not the arguments of its tool, as the driver reads a step. */
+const STEP_KEYS = new Set(["tool", "args", "wait_for", "expect", "timeout_ms"]);
+/** The fields that name a window, which later steps inherit from the batch or an earlier step. */
+const WINDOW_KEYS = ["pid", "window_id", "app", "window"] as const;
+
+/**
+ * What a `run_steps` call says, read step by step as if each step were its own call.
+ *
+ * The driver runs each step inside the daemon, so the call's arguments are the only place the tap
+ * sees these clicks and moves. Without this, a batch drew no cursor at all (#10986). A step without
+ * a window gets the window of the batch, or of the last step that named one, as in the driver.
+ */
+function readSteps(
+  args: DynamicRecord,
+  at: number,
+  screenshotWidth: (windowId: number) => number | null,
+): Pick<ObservedRequest, "action" | "pointer"> {
+  let context = windowOf(args);
+  let action: ObservedAction | null = null;
+  let pointer: ObservedPointer | "unplaced" | null = null;
+  for (const raw of Array.isArray(args.steps) ? args.steps : []) {
+    const step = readStep(raw);
+    if (!step) continue;
+    const named = windowOf(step.args);
+    if (named) context = named;
+    const stepArgs = named || !context ? step.args : { ...context, ...step.args };
+    action = readTarget(step.tool, stepArgs, at) ?? action;
+    pointer = readPointer(step.tool, stepArgs, at, screenshotWidth) ?? pointer;
+  }
+  return { action, pointer };
+}
+
+/** One step's tool and arguments, from `{tool, args}`, `{<tool>: args}` or `{tool, ...args}`. */
+function readStep(raw: unknown): { tool: string; args: DynamicRecord } | null {
+  if (!isDynamicRecord(raw)) return null;
+  if (typeof raw.tool === "string") {
+    if (isDynamicRecord(raw.args)) return { tool: raw.tool, args: raw.args };
+    return { tool: raw.tool, args: Object.fromEntries(Object.entries(raw).filter(([key]) => !STEP_KEYS.has(key))) };
+  }
+  const named = Object.keys(raw).filter((key) => !STEP_KEYS.has(key));
+  const tool = named[0];
+  if (named.length !== 1 || tool === undefined) return null;
+  const args = raw[tool];
+  return isDynamicRecord(args) ? { tool, args } : null;
+}
+
+/** The window fields of some arguments, or `null` when they name no window. */
+function windowOf(args: DynamicRecord): DynamicRecord | null {
+  const fields = WINDOW_KEYS.filter((key) => args[key] !== undefined && args[key] !== null);
+  return fields.length > 0 ? Object.fromEntries(fields.map((key) => [key, args[key]])) : null;
 }
 
 function readTarget(tool: string, args: DynamicRecord, at: number): ObservedAction | null {
@@ -227,6 +282,8 @@ function pointerWindow(tool: string, args: DynamicRecord): number | null | undef
   const target: DynamicRecord = isDynamicRecord(args.target) ? args.target : {};
   if (args.scope === "desktop" || args.coordinate_frame === "desktop" || target.kind === "desktop") return null;
   const windowId = numberIn(args.window_id) ?? numberIn(target.window_id);
+  // A `run_steps` step can name its window by app or title, which only the driver resolves.
+  if (windowId === null && (typeof args.app === "string" || typeof args.window === "string")) return undefined;
   if (windowId === null && numberIn(args.pid) === null && numberIn(target.pid) === null) return null;
   if (windowId === null || args.from_zoom === true) return undefined;
   return windowId;

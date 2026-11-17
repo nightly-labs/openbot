@@ -79,6 +79,10 @@ window's top-left corner plus the point times the window width divided by that s
 as the driver computes it. A click that OpenBot cannot place (no `window_id`, a point in a `zoom`
 image, or no screenshot width yet) removes the cursor. A window that is not in `list_windows` gets
 no cursor.
+The driver tells agents to act through `run_steps`, which runs its steps inside the daemon, so the
+tap reads the steps of that call in order, each as its own call. A step without a window gets the
+window of the batch or of the last step that named one, as in the driver. A step that names its
+window only by `app` or `window` title removes the cursor, because only the driver resolves it.
 
 ### Agent display on a server
 
