@@ -796,9 +796,10 @@ export class ProviderRuntime implements ProviderPort {
       isSignedOut: (provider) => this.signInRequired(provider),
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
-      // Apart from the read: the restart reads the catalogue again itself.
+      // Apart from the read: the restart reads the catalogue again itself. An agent's own process, such
+      // as one of an account after the first, read the same settings at its start, so it starts again too.
       startSettingsChanged: (provider) =>
-        this.restartProviderWhenIdle(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
+        this.spawnSettingsChanged(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
     });
   }
 

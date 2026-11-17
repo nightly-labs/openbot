@@ -804,7 +804,8 @@ interface ProviderModelCatalog {
   /**
    * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
    * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
-   * not keep the list it had at its start (#8495).
+   * not keep the list it had at its start (#8495). For a CLI whose list never changes while it runs,
+   * such as Codex, the reread compares the settings of `source` and restarts the CLI when they change.
    */
   readonly relistWhileRunning?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
