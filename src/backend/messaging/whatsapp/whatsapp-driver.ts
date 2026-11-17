@@ -25,6 +25,7 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type MessagingPlaces,
   type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
@@ -362,10 +363,10 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   /** The owner's own chat and the allowed chats. OpenBot posts nowhere else. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       const identity = whatsAppIdentity(this.#handle);
-      if (!identity) return [];
+      if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
       const places: MessagingPlace[] = [];
       if (rules.ownNumber)
@@ -382,7 +383,7 @@ class WhatsAppAdapter implements MessagingAdapter {
           kind: "chat",
         });
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
-      return places;
+      return { places };
     });
   }
 

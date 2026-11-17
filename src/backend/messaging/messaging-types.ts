@@ -32,6 +32,12 @@ export interface MessagingPlace {
   kind: "channel" | "private" | "thread" | "chat";
 }
 
+/** The answer of `places`. `note` tells the agent what the list leaves out, such as places past a limit. */
+export interface MessagingPlaces {
+  places: MessagingPlace[];
+  note?: string;
+}
+
 export interface InboundFile {
   id: string;
   name: string;
@@ -230,7 +236,7 @@ export interface MessagingAdapter {
   authorName(userId: string): Effect.Effect<string, MessagingAdapterError>;
   placeName(platformChannelId: string): Effect.Effect<string, MessagingAdapterError>;
   /** The places of this connection that OpenBot can post in now. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError>;
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError>;
   /**
    * The id of a place that an agent named, as `places` lists it, for a platform where one place has
    * more than one written form (a WhatsApp phone number). The id as it is when no listed place matches.
