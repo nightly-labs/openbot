@@ -6,6 +6,11 @@
   max-width: 100%;
 }
 
+/* In a chat with agent faces, the open question starts after the face column, as the agents' bubbles do. */
+.question-prompt-with-author {
+  padding-inline-start: calc(var(--message-author-column) + var(--openbot-space-2));
+}
+
 .question-prompt-bubble[data-entrance] {
   animation: question-prompt-in var(--page-slide-dur) var(--page-slide-ease) both;
 }
