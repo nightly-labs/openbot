@@ -12,7 +12,7 @@ import type {
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
   BROWSER_CARD_FIELDS,
@@ -92,6 +92,7 @@ import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./bro
 import { guardedPress } from "./browser-press-guard";
 import { createFramePacer } from "./browser-screencast-pacing";
 import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
+import { CLICK_READ_TIMEOUT_MS, readClickTarget } from "./browser-user-click";
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
@@ -2793,6 +2794,26 @@ export class BrowserCdpEngine {
         return value === null ? null : stringValue(value);
       }),
     );
+  });
+
+  /**
+   * The role and the name of the control that a person pressed, or null. `readClickTarget` says what
+   * the point is. A page that does not answer in this time gives no click step.
+   */
+  readonly clickTargetAt = Effect.fn("BrowserCdp.clickTargetAt")(function* (
+    this: BrowserCdpEngine,
+    x: number,
+    y: number,
+    inPage: boolean,
+  ) {
+    const read = this.#leaseEffect((send) =>
+      readClickTarget(send, (frameId) => this.#targetSessions.get(frameId)?.sessionId, x, y, inPage),
+    );
+    const target = yield* read.pipe(
+      Effect.timeoutOption(CLICK_READ_TIMEOUT_MS),
+      Effect.catch(() => Effect.succeed(Option.none())),
+    );
+    return Option.getOrNull(target);
   });
 
   /**

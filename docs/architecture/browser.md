@@ -257,8 +257,11 @@ while a person holds the tab (takeover or Take control), so no step is the agent
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
 a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
 path part that looks like a code, such as a reset token, with `:id`) or a press on a control
-(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
-with a 1 second limit). A press outside a control, on a password field, or on a field whose
+(`before-mouse-event` mouseDown; `browser-user-click.ts` reads the role and the name in the CDP
+automation world, with a 1 second limit). The read goes into open shadow roots and into frames, also
+frames of another process. A press in such a frame gives no `input-event` and its point is in the
+frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A press
+outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
 never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
 `openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
