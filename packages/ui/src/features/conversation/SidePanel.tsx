@@ -149,6 +149,8 @@ export interface SidePanelFileTab {
   key: string;
   name: string;
   folder: boolean;
+  /** The file did not open. While the tab has the focus, its X closes it also when it is not selected. */
+  unavailable?: boolean | undefined;
 }
 
 /** The file tabs of the side panel. They come after the thread tabs. */
@@ -530,6 +532,7 @@ export function SidePanelHeader(props: SidePanelHeaderProps) {
                   class="side-panel-tab side-panel-file-tab no-drag"
                   data-file-key={file().key}
                   data-selected={selected() ? "true" : undefined}
+                  data-unavailable={file().unavailable ? "true" : undefined}
                 >
                   <Button
                     variant="ghost"
