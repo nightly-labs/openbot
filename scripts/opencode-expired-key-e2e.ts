@@ -174,6 +174,12 @@ try {
   await runCauseEffect(sixth.stop());
   storedKey = null;
   process.env.FAKE_AUTH_KEY = "expired-v2";
+  // The Go key in OpenCode's own `auth.json` keeps the Go text, which names OpenBot's settings (#10166).
+  await mkdir(openCodeData, { recursive: true });
+  await writeFile(
+    join(openCodeData, "auth.json"),
+    JSON.stringify({ "opencode-go": { type: "api", key: "expired-v2" } }),
+  );
   const seventh = open(cli);
   const { error: notSaved } = await runTurn(seventh, await startThread(seventh, { cwd: workspace }));
   assert.equal(
@@ -187,7 +193,6 @@ try {
   // 8. OpenCode 2.3.0 sends each 403 of a provider as `-32000`, also a firewall's block of a VPN
   // address. With a key for that provider in OpenCode's own database, the provider refused the
   // request: the error must not say that a sign-in is missing.
-  await mkdir(openCodeData, { recursive: true });
   const database = new DatabaseSync(join(openCodeData, "opencode.db"));
   database.exec(
     "CREATE TABLE credential (id TEXT PRIMARY KEY, integration_id TEXT, label TEXT NOT NULL, value TEXT NOT NULL, active INTEGER)",

@@ -100,7 +100,8 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  *
  * OpenCode 2.3.0 also answers this way for each HTTP 403 of the provider, such as a firewall that
  * blocks a VPN address. With a key in OpenCode's own store, the provider refused the request; the
- * key is not missing (#10166).
+ * key is not missing (#10166). OpenCode Go keeps its text: an expired Go key is the usual cause, and
+ * that text gives the fix in OpenBot's settings.
  */
 function openCodeAuthRequired(
   error: unknown,
@@ -120,7 +121,7 @@ function openCodeAuthRequired(
   if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
   if (!provider) return sourceText("error.provider.opencodeAuthRequiredUnknown");
-  return providerKeyStored(provider)
+  return provider.toLowerCase() !== "opencode-go" && providerKeyStored(provider)
     ? sourceText("error.provider.opencodeProviderRefused", { provider })
     : sourceText("error.provider.opencodeAuthRequired", { provider });
 }

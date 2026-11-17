@@ -90,6 +90,7 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
 });
 
 const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
+const AuthFileEntry = Schema.Struct({ type: Schema.String });
 
 /**
  * Whether OpenCode has its own key for a model provider: an active `credential` row in OpenCode 2's
@@ -110,7 +111,12 @@ export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(funct
       catch: (cause) => new OpenCodeUsageFailed({ cause }),
     }).pipe(Effect.orElseSucceed(() => "")));
   const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
-  if (Option.isSome(entries) && Object.hasOwn(entries.value, provider)) return true;
+  if (
+    Option.isSome(entries) &&
+    Object.hasOwn(entries.value, provider) &&
+    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
+  )
+    return true;
   const databaseFile = env.OPENCODE_DB || "opencode.db";
   if (inlineAuth || databaseFile === ":memory:") return false;
   return yield* Effect.try({
