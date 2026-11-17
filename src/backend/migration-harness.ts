@@ -20,26 +20,29 @@ import { migrateOpenBotDatabase } from "./openbot-database-schema";
 /** The applied time of every harness migration, so that two runs make the same rows. */
 export const HARNESS_APPLIED_AT = "2026-11-01T09:00:00.000Z";
 
-const ReleasedSchema = Schema.Struct({
-  migrations: Schema.Array(Schema.Number),
-  objects: Schema.Array(Schema.String),
-});
+// Each list is a change of the same list in the entry before: `[start, end]` stands for its items
+// `start` to `end - 1` (`scripts/released-schema-fixtures.ts`).
+const Changes = <Item extends Schema.Constraint>(item: Item) =>
+  Schema.Array(Schema.Union([item, Schema.Tuple([Schema.Number, Schema.Number])]));
+const ReleasedSchema = Schema.Struct({ migrations: Changes(Schema.Number), objects: Changes(Schema.String) });
 
 const ReleasedSchemas = Schema.Struct({
   releases: Schema.Array(
-    Schema.Struct({
-      tags: Schema.Array(Schema.String),
-      newInstall: ReleasedSchema,
-      upgraded: Schema.optional(ReleasedSchema),
-    }),
+    Schema.Struct({ tag: Schema.String, newInstall: ReleasedSchema, upgraded: Schema.optional(ReleasedSchema) }),
   ),
   statements: Schema.Record(Schema.String, Schema.String),
 });
 
+function applyChanges<Item extends number | string>(
+  base: readonly Item[],
+  changes: readonly (Item | readonly [number, number])[],
+): Item[] {
+  return changes.flatMap((change) => (typeof change === "object" ? base.slice(change[0], change[1]) : [change]));
+}
+
 export interface ReleasedDatabaseCase {
   /** For example "v0.3.0 new install (schema 10)". */
   readonly name: string;
-  readonly tags: readonly string[];
   /** The `schema_migrations` versions that the release wrote. */
   readonly migrations: readonly number[];
   /** The statements that make the schema, in the order that SQLite stores them. */
@@ -47,8 +50,8 @@ export interface ReleasedDatabaseCase {
 }
 
 /**
- * Two databases for each group of releases that made the same ones: the database of a new install, and
- * the database of an install that upgraded through every release from v0.1.12.
+ * Two databases for each release that changed them: the database of a new install, and the database of
+ * an install that upgraded through every release from v0.1.12.
  */
 export function releasedDatabaseCases(): readonly ReleasedDatabaseCase[] {
   const file = Schema.decodeUnknownSync(ReleasedSchemas)(
@@ -59,14 +62,25 @@ export function releasedDatabaseCases(): readonly ReleasedDatabaseCase[] {
     if (sql === undefined) throw new Error(`releases.json has no statement ${hash}.`);
     return sql;
   };
+  const empty = { migrations: [], objects: [] };
+  let previous: Record<"newInstall" | "upgraded", { migrations: number[]; objects: string[] }> = {
+    newInstall: empty,
+    upgraded: empty,
+  };
   return file.releases.flatMap((release) => {
+    const read = (kind: "newInstall" | "upgraded", changes: typeof release.newInstall) => ({
+      migrations: applyChanges(previous[kind].migrations, changes.migrations),
+      objects: applyChanges(previous[kind].objects, changes.objects),
+    });
+    const newInstall = read("newInstall", release.newInstall);
+    const upgraded = release.upgraded ? read("upgraded", release.upgraded) : null;
+    previous = { newInstall, upgraded: upgraded ?? newInstall };
     const kinds = [
-      ["new install", release.newInstall],
-      ...(release.upgraded ? [["upgraded through every release", release.upgraded] as const] : []),
+      ["new install", newInstall],
+      ...(upgraded ? [["upgraded through every release", upgraded] as const] : []),
     ] as const;
     return kinds.map(([kind, schema]) => ({
-      name: `${release.tags[0]} ${kind} (schema ${schema.migrations.at(-1)})`,
-      tags: release.tags,
+      name: `${release.tag} ${kind} (schema ${schema.migrations.at(-1)})`,
       migrations: schema.migrations,
       statements: schema.objects.map(statement),
     }));
@@ -404,7 +418,7 @@ function foreignKeyOrder(db: DatabaseSync, tables: readonly string[]): readonly 
 }
 
 /** The tables that hold user data: not `schema_migrations`, not a full-text index or its shadow tables. */
-export function userTables(db: DatabaseSync): readonly string[] {
+function userTables(db: DatabaseSync): readonly string[] {
   return query(
     db,
     `SELECT list.name FROM pragma_table_list AS list
@@ -868,7 +882,7 @@ export function readAppliedVersions(database: DatabaseSync): readonly number[] {
 // to create that table itself to reach the migration path, so its declaration is
 // the fixture's rather than the product's. Its contents are asserted instead,
 // which is the part `createLatestDatabase` writes without running anything.
-export function readTableNames(database: DatabaseSync): readonly string[] {
+function readTableNames(database: DatabaseSync): readonly string[] {
   return query(
     database,
     `SELECT name FROM sqlite_master

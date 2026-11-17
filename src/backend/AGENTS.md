@@ -45,9 +45,9 @@ table, and the test checks that each row is kept or changed as the migration say
 a new install's, and that a second start changes nothing.
 
 - The released schemas come from the release tags, not from this build:
-  `released-schemas/releases.json`. After each release that changes the schema, run
-  `bun scripts/released-schema-fixtures.ts`; `--check` writes nothing and fails when the file is old.
-  Do not edit the file by hand.
+  `released-schemas/releases.json`. A release that does not change the schema does not change the
+  file. After a release that does, the `Check` job of CI fails (`--check`) until you run
+  `bun scripts/released-schema-fixtures.ts`. Do not edit the file by hand.
 - A migration that changes, moves or deletes rows adds a function for its version to `ROW_CHANGES` in
   `migration-harness.ts`. The function makes the same change on the rows that the test read before the
   upgrade. A row that only a new value can trigger (an active session, a repeated event) goes in
@@ -70,9 +70,10 @@ user's computer, and it must finish with the disk that is free.
 - A migration that changes a large table, or rewrites or deletes many of its rows, runs
   `bun scripts/migration-large-db-e2e.ts --from=<last shipped version>` and puts the time, peak disk
   and peak memory of its step in the PR. The default is 1.5 GB; `--full` makes 17 GB, which is for CI or
-  a server only. `Release upgrade history` runs the 1.5 GB size each week. The parity test fails for a new migration that alters, rebuilds or indexes a large
-  table until its version is in `MEASURED_LARGE_TABLE_CHANGES`. Data-only rewrites leave no trace in
-  the schema history, so review covers them.
+  a server only. `Release upgrade history` runs the 1.5 GB size each week. The parity test fails for a
+  new migration that alters, rebuilds or indexes a large table until its version is in
+  `MEASURED_LARGE_TABLE_CHANGES`. Data-only rewrites leave no trace in the schema history, so review
+  covers them.
 
 The account service has a second, unrelated database — Cloudflare D1 — and its rule is the opposite
 shape: those migrations are reversible but race a deploy. `apps/auth-api/AGENTS.md` owns it — nothing in this

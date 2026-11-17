@@ -28,6 +28,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import {
   buildDatabaseAtVersion,
+  HARNESS_APPLIED_AT,
   latestAppliedVersion,
   openHarnessDatabase,
   query,
@@ -39,7 +40,6 @@ import { migrateOpenBotDatabase } from "../src/backend/openbot-database-schema";
 const OUT = resolve(import.meta.dirname, "../.openbot-build/migration-large-db");
 const BIG_TABLES = ["orchestration_events", "provider_history_staging", "projection_thread_messages"] as const;
 const GIB = 1024 ** 3;
-const APPLIED_AT = "2026-11-01T09:00:00.000Z";
 
 function flag(name: string): string | undefined {
   return process.argv.find((argument) => argument.startsWith(`--${name}=`))?.slice(name.length + 3);
@@ -54,7 +54,8 @@ interface StartResult {
   startRssBytes: number;
   changedRows: number;
   version: number;
-  objects: SchemaObject[];
+  /** What the start did to each big table. */
+  bigTables: Record<string, string[]>;
 }
 
 interface SchemaObject {
@@ -77,13 +78,34 @@ function schemaObjects(db: DatabaseSync): SchemaObject[] {
   );
 }
 
+/** What a migration did to each big table, from the schema before and after it. */
+function bigTableWork(before: readonly SchemaObject[], after: readonly SchemaObject[]): Record<string, string[]> {
+  const work: Record<string, string[]> = {};
+  const find = (objects: readonly SchemaObject[], name: string) => objects.find((object) => object.name === name);
+  for (const table of BIG_TABLES) {
+    const notes: string[] = [];
+    const old = find(before, table);
+    const now = find(after, table);
+    if (old && !now) notes.push("dropped");
+    if (old && now && old.sql !== now.sql) notes.push(old.rootpage === now.rootpage ? "altered" : "rebuilt");
+    for (const object of after) {
+      if (object.type === "index" && object.table === table && !find(before, object.name)) {
+        notes.push(`new index ${object.name}`);
+      }
+    }
+    if (notes.length > 0) work[table] = notes;
+  }
+  return work;
+}
+
 const childDatabase = flag("start");
 if (childDatabase) {
   const through = Number(flag("through"));
   const startRssBytes = process.memoryUsage().rss;
   const db = openHarnessDatabase(childDatabase);
+  const before = schemaObjects(db);
   const started = performance.now();
-  migrateOpenBotDatabase(db, { appliedAt: APPLIED_AT, throughVersion: through, closedCleanly: true });
+  migrateOpenBotDatabase(db, { appliedAt: HARNESS_APPLIED_AT, throughVersion: through, closedCleanly: true });
   const seconds = (performance.now() - started) / 1000;
   const changes = query(db, "SELECT total_changes() AS n")[0]?.n;
   const result: StartResult = {
@@ -93,7 +115,7 @@ if (childDatabase) {
     startRssBytes,
     changedRows: isNumber(changes) ? changes : 0,
     version: latestAppliedVersion(db),
-    objects: schemaObjects(db),
+    bigTables: bigTableWork(before, schemaObjects(db)),
   };
   db.close();
   process.stdout.write(JSON.stringify(result));
@@ -389,20 +411,16 @@ function runChild<T>(args: readonly string[], database: string, parse: (value: u
 }
 
 function parseStart(value: unknown): StartResult {
-  if (!isDynamicRecord(value) || !Array.isArray(value.objects)) throw new Error("A start printed no result.");
+  if (!isDynamicRecord(value) || !isDynamicRecord(value.bigTables)) throw new Error("A start printed no result.");
   return {
     seconds: Number(value.seconds),
     maxRssBytes: Number(value.maxRssBytes),
     startRssBytes: Number(value.startRssBytes),
     changedRows: Number(value.changedRows),
     version: Number(value.version),
-    objects: value.objects.filter(isDynamicRecord).map((object) => ({
-      type: String(object.type),
-      name: String(object.name),
-      table: String(object.table),
-      rootpage: Number(object.rootpage),
-      sql: String(object.sql),
-    })),
+    bigTables: Object.fromEntries(
+      Object.entries(value.bigTables).map(([table, notes]) => [table, Array.isArray(notes) ? notes.map(String) : []]),
+    ),
   };
 }
 
@@ -412,26 +430,6 @@ function parseChecks(value: unknown): { foreignKeyCheckSeconds: number; quickChe
     foreignKeyCheckSeconds: Number(value.foreignKeyCheckSeconds),
     quickCheckSeconds: Number(value.quickCheckSeconds),
   };
-}
-
-/** What a migration did to each big table, from the schema before and after it. */
-function bigTableWork(before: readonly SchemaObject[], after: readonly SchemaObject[]): Record<string, string[]> {
-  const work: Record<string, string[]> = {};
-  const find = (objects: readonly SchemaObject[], name: string) => objects.find((object) => object.name === name);
-  for (const table of BIG_TABLES) {
-    const notes: string[] = [];
-    const old = find(before, table);
-    const now = find(after, table);
-    if (old && !now) notes.push("dropped");
-    if (old && now && old.sql !== now.sql) notes.push(old.rootpage === now.rootpage ? "altered" : "rebuilt");
-    for (const object of after) {
-      if (object.type === "index" && object.table === table && !find(before, object.name)) {
-        notes.push(`new index ${object.name}`);
-      }
-    }
-    if (notes.length > 0) work[table] = notes;
-  }
-  return work;
 }
 
 const base = join(OUT, "base.db");
@@ -449,55 +447,34 @@ copy(base, stepped);
 const checks = await runChild([`--checks=${stepped}`], stepped, parseChecks);
 const fixedSeconds = checks.result.foreignKeyCheckSeconds + checks.result.quickCheckSeconds;
 
-interface Step {
-  version: number;
-  seconds: number;
-  /** `seconds` less the whole-file foreign-key read and quick check that each start runs once. */
-  migrationSeconds: number;
-  peakExtraDiskBytes: number;
-  peakWalBytes: number;
-  maxRssBytes: number;
-  extraRssBytes: number;
-  changedRows: number;
-  fileBytesAfter: number;
-  bigTables: Record<string, string[]>;
-  heavy: boolean;
-}
-
-const steps: Step[] = [];
-const startObjects = (() => {
-  const db = openHarnessDatabase(stepped);
-  const objects = schemaObjects(db);
-  db.close();
-  return objects;
-})();
-let objectsBefore = startObjects;
+const gb = (bytes: number) => Math.round((bytes / GIB) * 1000) / 1000;
+const mb = (bytes: number) => Math.round(bytes / 1024 ** 2);
+const steps: object[] = [];
 let current = fromVersion;
 for (;;) {
   const measured = await runChild([`--start=${stepped}`, `--through=${current + 1}`], stepped, parseStart);
-  if (measured.result.version === current) break;
-  current = measured.result.version;
-  const bigTables = bigTableWork(objectsBefore, measured.result.objects);
-  objectsBefore = measured.result.objects;
-  const fileSize = generated.fileBytes;
+  const { result } = measured;
+  if (result.version === current) break;
+  current = result.version;
   // A rebuild, a full rewrite or a VACUUM writes a big part of the file again: to the WAL, or to a
   // temporary copy.
   const heavy =
-    Object.keys(bigTables).length > 0 ||
-    measured.peakExtraDiskBytes > fileSize * 0.1 ||
-    measured.peakWalBytes > fileSize * 0.1;
+    Object.keys(result.bigTables).length > 0 ||
+    measured.peakExtraDiskBytes > generated.fileBytes * 0.1 ||
+    measured.peakWalBytes > generated.fileBytes * 0.1;
   steps.push({
     version: current,
-    seconds: measured.result.seconds,
-    migrationSeconds: Math.max(0, measured.result.seconds - fixedSeconds),
-    peakExtraDiskBytes: measured.peakExtraDiskBytes,
-    peakWalBytes: measured.peakWalBytes,
-    maxRssBytes: measured.result.maxRssBytes,
-    extraRssBytes: measured.result.maxRssBytes - measured.result.startRssBytes,
-    changedRows: measured.result.changedRows,
-    fileBytesAfter: measured.fileBytesAfter,
-    bigTables,
     heavy,
+    bigTables: result.bigTables,
+    seconds: result.seconds,
+    // Less the whole-file foreign-key read and quick check that each start runs once.
+    migrationSeconds: Math.max(0, result.seconds - fixedSeconds),
+    peakExtraDiskGb: gb(measured.peakExtraDiskBytes),
+    peakWalGb: gb(measured.peakWalBytes),
+    maxRssMb: mb(result.maxRssBytes),
+    extraRssMb: mb(result.maxRssBytes - result.startRssBytes),
+    changedRows: result.changedRows,
+    fileGbAfter: gb(measured.fileBytesAfter),
   });
   process.stderr.write(
     `v${current}: ${measured.result.seconds.toFixed(1)} s, disk +${(measured.peakExtraDiskBytes / GIB).toFixed(2)} GB, ` +
@@ -532,7 +509,6 @@ for (const [table, rows] of Object.entries(expectedRows)) {
   if (rowsAfter[table] !== rows) failures.push(`${table}: expected ${rows} rows, found ${rowsAfter[table]}`);
 }
 
-const gb = (bytes: number) => Math.round((bytes / GIB) * 1000) / 1000;
 const report = {
   createdAt: new Date().toISOString(),
   platform: `${process.platform}-${process.arch}`,
@@ -555,28 +531,12 @@ const report = {
     seconds: full.result.seconds,
     peakExtraDiskGb: gb(full.peakExtraDiskBytes),
     peakWalGb: gb(full.peakWalBytes),
-    maxRssMb: Math.round(full.result.maxRssBytes / 1024 ** 2),
+    maxRssMb: mb(full.result.maxRssBytes),
     fileGbAfter: gb(full.fileBytesAfter),
     rowsAfter,
     largestObjectsGbAfter: Object.fromEntries(Object.entries(tablesAfter).map(([name, bytes]) => [name, gb(bytes)])),
   },
-  heavyMigrations: steps
-    .filter((step) => step.heavy)
-    .map((step) => ({
-      version: step.version,
-      migrationSeconds: Math.round(step.migrationSeconds * 10) / 10,
-      peakExtraDiskGb: gb(step.peakExtraDiskBytes),
-      peakWalGb: gb(step.peakWalBytes),
-      bigTables: step.bigTables,
-    })),
-  steps: steps.map((step) => ({
-    ...step,
-    peakExtraDiskGb: gb(step.peakExtraDiskBytes),
-    peakWalGb: gb(step.peakWalBytes),
-    maxRssMb: Math.round(step.maxRssBytes / 1024 ** 2),
-    extraRssMb: Math.round(step.extraRssBytes / 1024 ** 2),
-    fileGbAfter: gb(step.fileBytesAfter),
-  })),
+  steps,
   notes: [
     "peakExtraDisk is the drop in free space of the volume while the migration runs. Other programs that write to the same volume add noise.",
     "Each step is one start: its seconds include one foreign-key read and one quick check of the whole file (perStartChecks). migrationSeconds leaves them out.",

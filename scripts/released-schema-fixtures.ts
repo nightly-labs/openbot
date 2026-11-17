@@ -5,16 +5,17 @@
 // `.openbot-build/released-schema-fixtures/<tag>`, links the tag's own `@openbot/*` packages, and runs
 // the tag's own `migrateOpenBotDatabase` in a child process two times: on an empty database (a new
 // install), and on the database that the previous tag upgraded (an install that upgraded through every
-// release from the first one). Each run reads `sqlite_master` and `schema_migrations`. Tags that made
-// the same databases share one entry. Each SQL statement is stored once and the entries refer to it by
-// hash, so the file stays small.
+// release from the first one). Each run reads `sqlite_master` and `schema_migrations`.
 //
-// The migration harness (`src/backend/migration-harness.ts`) builds each entry, seeds rows, and
-// upgrades it to the latest version. Run this script after each release that changes the schema:
+// The file stays small: an entry is written only for a tag whose databases differ from the tag before,
+// each SQL statement is stored once and referred to by its hash, and each list is stored as a change of
+// the same list in the entry before (`src/backend/migration-harness.ts` reads it back). So a release
+// that does not change the schema does not change the file. Run this script after a release that does:
 //
 //   bun scripts/released-schema-fixtures.ts [--check]
 //
-// `--check` writes nothing and exits non-zero when the file is not up to date.
+// `--check` writes nothing and exits non-zero when the file is not up to date. The `Check` job of CI
+// runs it.
 // The tags before v0.1.12 have no database. The tags before v0.3.0 have no migration registry; their
 // schemas are also in `src/backend/released-schemas/v*.sql`, which the pre-registry test reads.
 import { execFileSync } from "node:child_process";
@@ -146,11 +147,30 @@ interface ReleasedSchema {
   objects: string[];
 }
 
-interface Release {
-  tags: string[];
-  newInstall: ReleasedSchema;
-  /** Left out when it is the same as `newInstall`. */
-  upgraded?: ReleasedSchema;
+type Item = number | string;
+
+/**
+ * Writes `list` as a change of `base`: an item is kept as it is, and `[start, end]` stands for the
+ * items `start` to `end - 1` of `base`. The decoder is `releasedDatabaseCases` in the harness.
+ */
+function encode(base: readonly Item[], list: readonly Item[]): (Item | [number, number])[] {
+  const encoded: (Item | [number, number])[] = [];
+  for (let index = 0; index < list.length; ) {
+    let longest = { start: 0, length: 0 };
+    base.forEach((_, start) => {
+      let length = 0;
+      while (start + length < base.length && base[start + length] === list[index + length]) length += 1;
+      if (length > longest.length) longest = { start, length };
+    });
+    if (longest.length >= 2) {
+      encoded.push([longest.start, longest.start + longest.length]);
+      index += longest.length;
+    } else {
+      encoded.push(...list.slice(index, index + 1));
+      index += 1;
+    }
+  }
+  return encoded;
 }
 
 const statements: Record<string, string> = {};
@@ -163,7 +183,9 @@ function releasedSchema(dump: Dump): ReleasedSchema {
   return { migrations: dump.migrations, objects };
 }
 
-const releases: Release[] = [];
+const releases: object[] = [];
+const empty: ReleasedSchema = { migrations: [], objects: [] };
+let previous = { newInstall: empty, upgraded: empty };
 const upgradedDatabase = join(WORK, "upgraded.db");
 await rm(WORK, { recursive: true, force: true });
 for (const tag of releaseTags()) {
@@ -174,14 +196,16 @@ for (const tag of releaseTags()) {
   if (releases.length === 0) await copyFile(newDatabase, upgradedDatabase);
   const upgraded = releasedSchema(dumpDatabase(schemaModule, upgradedDatabase));
   await rm(join(WORK, tag), { recursive: true, force: true });
+  const current = { newInstall, upgraded };
+  if (JSON.stringify(current) === JSON.stringify(previous)) continue;
+  const change = (kind: keyof typeof current) => ({
+    migrations: encode(previous[kind].migrations, current[kind].migrations),
+    objects: encode(previous[kind].objects, current[kind].objects),
+  });
   const sameAsNew = JSON.stringify(upgraded) === JSON.stringify(newInstall);
-  const release: Release = { tags: [tag], newInstall, ...(sameAsNew ? {} : { upgraded }) };
-  const previous = releases.at(-1);
-  if (previous && JSON.stringify({ ...previous, tags: [] }) === JSON.stringify({ ...release, tags: [] })) {
-    previous.tags.push(tag);
-  } else {
-    releases.push(release);
-  }
+  // `upgraded` is left out when it is the same as `newInstall`.
+  releases.push({ tag, newInstall: change("newInstall"), ...(sameAsNew ? {} : { upgraded: change("upgraded") }) });
+  previous = current;
   process.stderr.write(
     `${tag}: schema ${newInstall.migrations.at(-1)}, ${newInstall.objects.length} objects` +
       `${sameAsNew ? "" : `; upgraded: ${upgraded.objects.length} objects`}\n`,

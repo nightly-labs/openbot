@@ -156,6 +156,14 @@ jobs:
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
 
+          # Fails after a release that changed the database schema until `releases.json` has it. The
+          # script runs the migrations of each release tag; `git archive` needs only the tag commits.
+          - name: Check released database schemas
+            if: env.CODE == 'true'
+            run: |
+              git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+              bun scripts/released-schema-fixtures.ts --check
+
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
     # needs a display. Ubuntu runners have none, so it runs under xvfb, where
