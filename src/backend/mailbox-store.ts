@@ -1736,6 +1736,7 @@ export class MailboxStore {
                 }
               : undefined,
           createdAt: storedDelivery.steeredAt ?? message.createdAt,
+          ...(storedDelivery.steeredAt === undefined ? {} : { steered: true as const }),
           status: delivery.status === "failed" ? "failed" : "completed",
           itemType:
             message.sender.kind === "agent"
