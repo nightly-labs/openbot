@@ -151,7 +151,7 @@ describe("workspace HTML preview pages", () => {
       expect((await pages.response(new Request(`${address}/style.css`))).status).toBe(404);
     });
 
-    it("gives no files and no base to a page without a folder, or to a page with its own base", async () => {
+    it("gives no files and no base to a page without a folder, or to a page with its own base address", async () => {
       const pages = new FilePreviewPages();
       const folder = await reviewFolder();
       const plain = pages.add("text/html", html, pages.generation) ?? "";
@@ -162,6 +162,9 @@ describe("workspace HTML preview pages", () => {
       const text = await (await pages.response(new Request(based))).text();
       expect(text).not.toContain(`<base href="${based}/">`);
       expect(text).toContain('<base href="https://example.com/">');
+      const target = new TextEncoder().encode('<head><base target="_blank"></head><img src="a.png">');
+      const targeted = pages.add("text/html", target, pages.generation, folder) ?? "";
+      expect(await (await pages.response(new Request(targeted))).text()).toContain(`<base href="${targeted}/">`);
     });
   });
 });

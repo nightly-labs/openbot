@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
-import { extname, isAbsolute, join, relative, sep } from "node:path";
+import { realpath } from "node:fs/promises";
+import { extname, join, relative, sep } from "node:path";
 import { CHAT_VISUAL_PAGE_LIMIT, isChatVisualMimeType } from "@openbot/contracts/chat-visual";
-import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { isFilePreviewPageUrl } from "@openbot/contracts/ipc";
+import { runCauseEffect } from "../backend/effect-boundary";
+import { isPathInside } from "../backend/path-containment";
 import { attachmentDocumentHeaders, chatVisualResponse } from "./chat-visual-protocol";
+import { fileResponse } from "./file-response";
 
 const FILE_PREVIEW_PAGE_CAPACITY = 8;
 
@@ -75,11 +77,15 @@ export class FilePreviewPages {
   }
 
   get(url: URL): Uint8Array | undefined {
+    return this.#page(url)?.bytes;
+  }
+
+  #page(url: URL): FilePreviewPage | undefined {
     // The frame theme is in the fragment; a query must never become a file lookup.
     if (url.username || url.password || url.search) return undefined;
     const address = `${url.protocol}//${url.host}${url.pathname}`;
     if (!isFilePreviewPageUrl(address)) return undefined;
-    return this.#pages.get(address)?.bytes;
+    return this.#pages.get(address);
   }
 
   release(address: string): void {
@@ -88,16 +94,15 @@ export class FilePreviewPages {
 
   async response(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    const page = request.method === "GET" ? this.get(url) : undefined;
+    const page = request.method === "GET" ? this.#page(url) : undefined;
     if (page) {
-      const html = new TextDecoder().decode(page);
       // Relative addresses resolve under the page's own address, where its folder is served. A
-      // page that sets its own base keeps it.
+      // page that sets its own base address keeps it.
       const base =
-        this.#pages.get(`${url.protocol}//${url.host}${url.pathname}`)?.folder && !/<base\b/iu.test(html)
+        page.folder && !/<base\b[^>]*\bhref\s*=/iu.test(new TextDecoder().decode(page.bytes))
           ? `<base href="${url.protocol}//${url.host}${url.pathname}/">`
           : undefined;
-      return chatVisualResponse(page, base ? { head: base } : {});
+      return chatVisualResponse(page.bytes, base ? { head: base } : {});
     }
     const asset = request.method === "GET" ? await this.#asset(url) : undefined;
     return asset ?? new Response("Not found", { status: 404 });
@@ -118,18 +123,17 @@ export class FilePreviewPages {
     try {
       const file = await realpath(join(folder, ...path.split("/")));
       const inside = relative(folder, file);
-      if (!inside || isAbsolute(inside) || inside.startsWith("..")) return undefined;
-      const type = pageAssetType(inside.split(sep).join("/"));
-      const info = await stat(file);
-      if (!type || !info.isFile() || info.size > ATTACHMENT_LIMITS.fileBytes) return undefined;
-      return new Response(new Uint8Array(await readFile(file)), {
-        headers: {
+      const type = inside && isPathInside(folder, file) ? pageAssetType(inside.split(sep).join("/")) : undefined;
+      if (!type) return undefined;
+      // The stream reads from one open file, which must be a regular file, and keeps no copy in memory.
+      return await runCauseEffect(
+        fileResponse(file, {
           "Content-Type": type,
           "Cache-Control": "no-store",
           "X-Content-Type-Options": "nosniff",
           ...attachmentDocumentHeaders(type),
-        },
-      });
+        }),
+      );
     } catch {
       return undefined;
     }
