@@ -218,8 +218,9 @@ export class WhatsAppConnect implements WhatsAppPolicy {
   /**
    * The form of a contact's number that WhatsApp has, so that posts reach the contact. With `typed`,
    * it fails when WhatsApp answers that no form has an account. The number as it was typed when the
-   * number is not connected, when WhatsApp does not answer in time, or, without `typed`, when the number
-   * has only one form or no form has an account.
+   * number is not connected, when WhatsApp does not answer in time, when WhatsApp names an account in
+   * a form that OpenBot does not know, or, without `typed`, when the number has only one form or no
+   * form has an account.
    */
   #registeredNumber(
     connectionId: string,
@@ -233,7 +234,8 @@ export class WhatsAppConnect implements WhatsAppPolicy {
       Effect.map((jids) => {
         if (!jids) return number;
         const form = forms.find((candidate) => jids.includes(userJid(candidate)));
-        return form ?? (typed ? null : number);
+        // Only an answer with no account refuses the number: an account in another form still exists.
+        return form ?? (typed && jids.length === 0 ? null : number);
       }),
       Effect.timeoutOrElse({ duration: REGISTERED_NUMBER_TIMEOUT_MS, orElse: () => Effect.succeed(number) }),
       Effect.catch(() => Effect.succeed(number)),
