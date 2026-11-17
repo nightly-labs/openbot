@@ -446,8 +446,10 @@ export class LocalServers {
   });
 
   /**
-   * The desktop app's create opens the new server. A create from another device leaves the app as it is,
-   * and answers after the registration, so the device finds the server in the account's list.
+   * No create opens the new server. The desktop app opens it after the create resolves: a step that fails
+   * before then must leave the user on the open server, where the dialog shows the error (#11203). A
+   * create from another device answers after the registration, so the device finds the server in the
+   * account's list.
    */
   readonly create = Effect.fn("LocalServers.create")(function* (
     this: LocalServers,
@@ -471,7 +473,7 @@ export class LocalServers {
       publicKey: null,
     };
     yield* this.#registry.add(entry, LOCAL_SERVER_LIMIT).pipe(toLocalServerFailure);
-    return yield* this.#start(entry, from === "desktop", from === "device").pipe(
+    return yield* this.#start(entry, from === "device").pipe(
       Effect.tapError(() =>
         // A server that never started holds nothing of the user's yet.
         this.#forget(entry).pipe(
@@ -488,7 +490,7 @@ export class LocalServers {
     const entry = yield* this.#entry(serverId);
     yield* this.#stopChild(entry);
     this.#exits.delete(entry.id);
-    yield* this.#start(entry, false);
+    yield* this.#start(entry);
   });
 
   /**
@@ -748,7 +750,6 @@ export class LocalServers {
   readonly #start = Effect.fn("LocalServers.start")(function* (
     this: LocalServers,
     entry: StoredLocalServer,
-    select: boolean,
     awaitRegistration = false,
   ): Effect.fn.Return<ServerSummary, LocalServerFailure> {
     if (this.#stopped) return yield* startFailure();
@@ -823,7 +824,8 @@ export class LocalServers {
         publicKey: pinned.publicKey,
         username: LOCAL_SERVER_OWNER_USERNAME,
         password: secret,
-        select,
+        // The caller opens the server when it wants to, after the start succeeded (#11203).
+        select: false,
       };
       const summary = yield* this.#options.remoteServers.attachLocalServer(attach).pipe(toLocalServerFailure);
       this.#options.log.info(`A server on this computer started (pid ${child.pid ?? "unknown"}).`);
@@ -832,7 +834,7 @@ export class LocalServers {
       const register = this.#accountSteps.withPermit(this.#publishUnlocked(entry, running));
       if (awaitRegistration) yield* register;
       else this.#background(register);
-      this.#background(this.#renewSession(entry, running, { ...attach, select: false }));
+      this.#background(this.#renewSession(entry, running, attach));
       return summary;
     }).pipe(Effect.tapError(() => this.#stopChild(entry, running)));
   });
@@ -915,7 +917,7 @@ export class LocalServers {
       if (this.#running.has(entry.id)) return Effect.succeed(null);
       const done = Deferred.makeUnsafe<ServerSummary, LocalServerFailure>();
       this.#starts.set(entry.id, done);
-      return this.#start(entry, false).pipe(
+      return this.#start(entry).pipe(
         Effect.onExit((exit) =>
           Effect.sync(() => {
             if (this.#starts.get(entry.id) === done) this.#starts.delete(entry.id);
