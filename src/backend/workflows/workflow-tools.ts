@@ -349,6 +349,7 @@ function mergeFields(fields: WorkflowNode["fields"], patch: WorkflowOp["fields"]
 /**
  * A trigger's fields after an op that gives `repositories`. The host takes `repository` as the first
  * repository and drops a list that does not start with it, so the op sets both, as the canvas does.
+ * A null list clears both.
  */
 function withRepositoryList(
   kind: WorkflowNodeKind,
@@ -357,7 +358,7 @@ function withRepositoryList(
   op: number,
 ): WorkflowNode["fields"] {
   const value = patch?.repositories;
-  if (kind !== "trigger" || typeof value !== "string") return fields;
+  if (kind !== "trigger" || value === undefined) return fields;
   const repositories = workflowListField(value);
   const wrong = repositories.find((name) => !isGitHubRepositoryName(name));
   if (wrong !== undefined) refuse(`Op ${op}: "${wrong}" is not a repository name (owner/name).`);
