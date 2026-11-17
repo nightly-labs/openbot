@@ -1,8 +1,7 @@
 import { create } from "zustand";
 
-/** How the editor shows the steps of an outline: as a flow with the two paths side by side, or as lists. */
+/** How the workflow page, the editor and a run show the steps: as a flow from left to right, or as a list. */
 export type EditorView = "flow" | "list";
-export const EDITOR_VIEWS = ["flow", "list"] as const satisfies readonly EditorView[];
 
 /**
  * The view that the person chose last. It stays while the app runs and is not saved: a bundle that an

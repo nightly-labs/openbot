@@ -25,19 +25,24 @@ import { type FlowItem, type FlowPath, workflowFlowTree } from "@/features/workf
 import type { GraphPlace } from "@/features/workflows/model/workflow-graph-edit";
 import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
+import type { MenuAction } from "@/shared/components/menu-view";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
 
 /** The corner of a step card: the grouped radius of the app. */
 const GROUPED_RADIUS = 16;
 
-/** What a tap on a step does: open its menu (the workflow page) or open its page (the editor). */
-type StepPress =
+/**
+ * What a tap on a step does: open its menu (the workflow page), open its page (the editor of a workflow
+ * that is not an outline, and a run), or open its page with the menu on a long press (the outline editor).
+ */
+export type StepPress =
   | { kind: "menu"; menu: WorkflowStepMenu }
-  | { kind: "open"; open: (node: WorkflowNode) => void; canOpen: (node: WorkflowNode) => boolean };
+  | { kind: "open"; open: (node: WorkflowNode) => void; canOpen: (node: WorkflowNode) => boolean }
+  | { kind: "edit"; actions: MenuAction[]; onAction: (id: string) => void; open: () => void; hint: string };
 
 /** One step of the flow. A step with a problem has a red edge and shows the problem. */
-function FlowViewStep({
+export function FlowStepCard({
   node,
   agents,
   press,
@@ -74,9 +79,9 @@ function FlowViewStep({
   const [pressed, setPressed] = useState(false);
   const label = stepLabel(node, agents, t);
   const text = stepText(node, t);
-  const actions = press?.kind === "menu" ? press.menu.actions(node) : [];
+  const actions = press?.kind === "menu" ? press.menu.actions(node) : press?.kind === "edit" ? press.actions : [];
   const hasMenu = actions.length > 0;
-  const opens = press?.kind === "open" && press.canOpen(node);
+  const opens = (press?.kind === "open" && press.canOpen(node)) || press?.kind === "edit";
   return (
     <View
       style={{ width: FLOW_CARD_WIDTH, opacity: quiet ? 0.6 : 1 }}
@@ -124,6 +129,27 @@ function FlowViewStep({
           size={size}
           onAction={(id) => press.menu.onAction(node, id)}
           onPressedChange={setPressed}
+        />
+      ) : null}
+      {press?.kind === "edit" && hasMenu ? (
+        <WorkflowStepMenuLayer
+          actions={actions}
+          label={`${label}, ${problem ?? text}`}
+          hint={press.hint}
+          size={size}
+          onAction={press.onAction}
+          onPress={press.open}
+          onPressedChange={setPressed}
+        />
+      ) : null}
+      {press?.kind === "edit" && !hasMenu ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${label}, ${problem ?? text}`}
+          style={StyleSheet.absoluteFill}
+          onPressIn={() => setPressed(true)}
+          onPressOut={() => setPressed(false)}
+          onPress={press.open}
         />
       ) : null}
       {press?.kind === "open" && opens ? (
@@ -272,7 +298,7 @@ export function WorkflowFlowView({
     if (item.type === "step") {
       const node = byId.get(item.id);
       return node ? (
-        <FlowViewStep
+        <FlowStepCard
           node={node}
           agents={agents}
           press={press}
@@ -299,7 +325,7 @@ export function WorkflowFlowView({
                   className="px-1.5 py-1 text-center text-grouped-secondary"
                   style={[typeScale.small, { maxWidth: FLOW_CARD_WIDTH * 0.7 }]}
                 >
-                  {t(item.joined ? "mobile.workflow.path.joined" : "mobile.workflow.path.ends")}
+                  {t(path.goesOn ? "mobile.workflow.path.joined" : "mobile.workflow.path.ends")}
                 </Typography.Paragraph>
               ) : null}
             </>

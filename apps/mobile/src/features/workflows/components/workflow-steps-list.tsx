@@ -72,7 +72,7 @@ export function FlowRowNote({
       <Typography.Paragraph className="shrink text-grouped-secondary" style={typeScale.caption}>
         {row.type === "jump"
           ? t(row.loop ? "mobile.workflow.flow.loop" : "mobile.workflow.flow.jump", { step: labelOf(row.to) })
-          : t(row.joined ? "mobile.workflow.path.joined" : "mobile.workflow.path.ends")}
+          : t(row.goesOn ? "mobile.workflow.path.joined" : "mobile.workflow.path.ends")}
       </Typography.Paragraph>
     </View>
   );

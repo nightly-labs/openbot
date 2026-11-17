@@ -36,6 +36,8 @@ export interface FlowPath {
   /** The branch of a condition, or null for a step that sends its result to more than one step. */
   branch: WorkflowBranch | null;
   items: FlowItem[];
+  /** The path goes on to a step after the split, its join or a join further out; else the run ends. */
+  goesOn: boolean;
 }
 
 export interface FlowTree {
@@ -74,27 +76,34 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     (node.kind === "prompt" || node.kind === "asset") && (into.get(node.id) ?? []).length === 0;
 
   const placed = new Set<string>();
+  /** Whether the last walk stopped at a join: its path goes on after the split. */
+  let endedAtStop = false;
 
-  /** The steps that the given steps reach, with the fewest edges to each. */
-  const reach = (start: string) => {
+  /**
+   * The steps that a step reaches, with the fewest edges to each. It does not go past a step of `stop`,
+   * the join of an outer split: the paths of an inner split must join before the outer paths do.
+   */
+  const reach = (start: string, stop: ReadonlySet<string>) => {
     const distance = new Map([[start, 0]]);
     let layer = [start];
     while (layer.length > 0) {
       const next: string[] = [];
-      for (const id of layer)
+      for (const id of layer) {
+        if (stop.has(id)) continue;
         for (const edge of out.get(id) ?? [])
           if (!distance.has(edge.to) && !placed.has(edge.to)) {
             distance.set(edge.to, (distance.get(id) ?? 0) + 1);
             next.push(edge.to);
           }
+      }
       layer = next;
     }
     return distance;
   };
 
   /** The nearest step that every path reaches: the paths join there. */
-  const joinOf = (targets: readonly string[]): string | undefined => {
-    const maps = targets.map(reach);
+  const joinOf = (targets: readonly string[], stop: ReadonlySet<string>): string | undefined => {
+    const maps = targets.map((target) => reach(target, stop));
     let best: string | undefined;
     let bestDistance = Number.POSITIVE_INFINITY;
     for (const [id] of maps[0] ?? []) {
@@ -176,14 +185,19 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       }
       // Paths join only when there are two or more: one connected path of a condition goes on alone,
       // and its other answer ends the run.
-      const join = rest.length > 1 ? joinOf(rest.map((edge) => edge.to)) : undefined;
+      const join =
+        rest.length > 1
+          ? joinOf(
+              rest.map((edge) => edge.to),
+              stop,
+            )
+          : undefined;
       const inner = new Set(stop);
       if (join) inner.add(join);
-      const paths: FlowPath[] = rest.map((edge) => ({
-        key: edge.branch ?? edge.to,
-        branch: edge.branch ?? null,
-        items: walk(edge.to, inner, edge),
-      }));
+      const paths: FlowPath[] = rest.map((edge) => {
+        const items = walk(edge.to, inner, edge);
+        return { key: edge.branch ?? edge.to, branch: edge.branch ?? null, items, goesOn: endedAtStop };
+      });
       // A condition shows both of its paths: one that goes nowhere ends the run, and a step can go there.
       if (isCondition)
         for (const branch of ["yes", "no"] as const)
@@ -192,12 +206,15 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
               key: branch,
               branch,
               items: [{ type: "add", place: { kind: "after", nodeId: from, branch } }],
+              goesOn: false,
             });
       paths.sort((left, right) => (left.branch === "no" ? 1 : 0) - (right.branch === "no" ? 1 : 0));
       items.push({ type: "split", from, paths, joined: Boolean(join) });
       previous = from;
       current = join;
     }
+    // Read by the split that walked this path, right after this call returns.
+    endedAtStop = current !== undefined && stop.has(current);
     return items;
   };
 
@@ -219,7 +236,8 @@ export type FlowRow =
   | { type: "step"; id: string; depth: number }
   | { type: "path"; key: string; branch: WorkflowBranch | null; index: number; depth: number }
   | { type: "jump"; key: string; to: string; loop: boolean; depth: number }
-  | { type: "end"; key: string; joined: boolean; depth: number }
+  /** `goesOn`: the path goes to the steps after the split; else the run ends there. */
+  | { type: "end"; key: string; goesOn: boolean; depth: number }
   | { type: "loose"; depth: number };
 
 /** The tree as rows: each path under its label, one level deeper; the steps that no trigger reaches last. */
@@ -241,7 +259,7 @@ export function flowRows(tree: FlowTree): FlowRow[] {
           const key = `${path}/${item.from}-${child.key}`;
           rows.push({ type: "path", key, branch: child.branch, index, depth: depth + 1 });
           if (child.items.every((inner) => inner.type === "add"))
-            rows.push({ type: "end", key: `${key}/end`, joined: item.joined, depth: depth + 1 });
+            rows.push({ type: "end", key: `${key}/end`, goesOn: child.goesOn, depth: depth + 1 });
           else walk(child.items, depth + 1, key);
         });
     }

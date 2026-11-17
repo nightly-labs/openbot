@@ -1,22 +1,17 @@
 import type { WorkflowNode } from "@openbot/contracts/ipc";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { Typography } from "heroui-native";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { Fragment, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
-import { useCSSVariable } from "uniwind";
+import { Fragment } from "react";
 import {
   FLOW_CARD_WIDTH,
   FlowAddButton,
   FlowCanvas,
   FlowLanes,
 } from "@/features/workflows/components/workflow-flow-canvas";
-import { WorkflowKindTile } from "@/features/workflows/components/workflow-kind-tile";
-import { WorkflowStepMenuLayer } from "@/features/workflows/components/workflow-step-menu-layer";
+import { FlowStepCard } from "@/features/workflows/components/workflow-flow-view";
 import { openAddStep, openStep, useWorkflowStepMenu } from "@/features/workflows/model/use-workflow-step-menu";
 import type { WorkflowDraft } from "@/features/workflows/model/workflow-draft";
 import type { FlowList, WorkflowOutline } from "@/features/workflows/model/workflow-outline";
-import { stepLabel, stepText, triggerType } from "@/features/workflows/model/workflow-steps";
 import type { MobileAgent } from "@/features/workspace/model/workspace-types";
 import { useText } from "@/shared/lib/text";
 import { typeScale } from "@/shared/lib/type-scale";
@@ -27,8 +22,8 @@ function AddHere({ list, index }: { list: FlowList; index: number }) {
 }
 
 /**
- * A step of the flow: a tap opens its page, a long press opens the same menu as the list. A step with a
- * problem has a red edge and shows the problem. The trigger has no menu: a tap opens its page.
+ * A step of the outline flow: a tap opens its page, a long press opens the same menu as the list. The
+ * card is the card of every flow; the trigger has no menu.
  */
 function FlowStep({
   node,
@@ -42,68 +37,20 @@ function FlowStep({
   problem: string | undefined;
 }) {
   const { t } = useText();
-  const [danger, control, grouped] = useCSSVariable([
-    "--openbot-danger-text",
-    "--openbot-bg-control",
-    "--openbot-bg-grouped",
-  ]);
-  const [size, setSize] = useState<{ width: number; height: number }>();
-  const [pressed, setPressed] = useState(false);
   const { structural, actions, onAction } = useWorkflowStepMenu(node, draft);
-  const label = stepLabel(node, agents, t);
   return (
-    <View
-      style={{ width: FLOW_CARD_WIDTH }}
-      onLayout={(event) => setSize({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
-    >
-      <View
-        className="flex-row items-center gap-3 rounded-grouped px-3 py-2.5"
-        style={{
-          backgroundColor: String(pressed ? control : grouped),
-          ...(problem ? { borderWidth: 1.5, borderColor: String(danger) } : null),
-        }}
-      >
-        <WorkflowKindTile
-          kind={node.kind}
-          trigger={node.kind === "trigger" ? triggerType(node) : undefined}
-          size={30}
-        />
-        <View className="min-w-0 flex-1">
-          <Typography.Paragraph className="text-grouped-secondary" numberOfLines={1} style={typeScale.small}>
-            {label}
-          </Typography.Paragraph>
-          <Typography.Paragraph numberOfLines={4} style={typeScale.caption}>
-            {stepText(node, t)}
-          </Typography.Paragraph>
-          {problem ? (
-            <Typography.Paragraph className="font-medium text-danger-text" numberOfLines={3} style={typeScale.small}>
-              {problem}
-            </Typography.Paragraph>
-          ) : null}
-        </View>
-        {problem ? <TriangleAlert color={String(danger)} size={16} strokeWidth={2} /> : null}
-      </View>
-      {structural ? (
-        <WorkflowStepMenuLayer
-          actions={actions}
-          label={`${label}, ${problem ?? stepText(node, t)}`}
-          hint={t("mobile.workflow.editor.flowStepHint")}
-          size={size}
-          onAction={onAction}
-          onPress={() => openStep(node)}
-          onPressedChange={setPressed}
-        />
-      ) : (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${label}, ${problem ?? stepText(node, t)}`}
-          style={StyleSheet.absoluteFill}
-          onPressIn={() => setPressed(true)}
-          onPressOut={() => setPressed(false)}
-          onPress={() => openStep(node)}
-        />
-      )}
-    </View>
+    <FlowStepCard
+      node={node}
+      agents={agents}
+      problem={problem}
+      press={{
+        kind: "edit",
+        actions: structural ? actions : [],
+        onAction,
+        open: () => openStep(node),
+        hint: t("mobile.workflow.editor.flowStepHint"),
+      }}
+    />
   );
 }
 
