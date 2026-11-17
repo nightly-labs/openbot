@@ -151,6 +151,11 @@ const QUIET_END_MS = 30_000;
 const QUIET_END_MAX_MS = 2 * 60_000;
 /** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
 const QUIET_REPEAT_POLL_MS = 1_000;
+/**
+ * The quiet turns that OpenBot keeps for the turns that answer their background work (#10847). Claude
+ * starts such a turn when the work ends, usually within minutes, and a chat has few quiet turns.
+ */
+const QUIET_TURNS_KEPT = 200;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /** The time added to a reset that a provider's text names, which rounds down to the minute. */
@@ -451,6 +456,8 @@ export class TurnLifecycle {
       unprompted: boolean;
       /** The background subagents whose reports this turn reads, with the turn that started each. */
       reports: Map<string, string>;
+      /** The turns whose background work this turn of the provider's own answers (`continues`). */
+      continues: readonly string[];
     }
   >();
   /**
@@ -490,6 +497,11 @@ export class TurnLifecycle {
   readonly #sessionFailures = new Map<string, number>();
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
+  /**
+   * The newest turns that ended quiet, oldest first (`QUIET_TURNS_KEPT`). A turn that the provider
+   * starts itself to answer their background work can end quiet too (#10847).
+   */
+  readonly #quietTurns = new Set<string>();
   /**
    * Running turns whose agent owns a main task of a channel routine's request and called the no-update
    * tool. The channel shows their answers as steps. The entry stays until the completion has marked
@@ -655,6 +667,7 @@ export class TurnLifecycle {
     this.#capacityNotices.clear();
     this.#limitedTurns.clear();
     this.#unreadReports.clear();
+    this.#quietTurns.clear();
     this.#failoverTurns.clear();
     this.#failoverRetries.clear();
     this.#runningTurns.clear();
@@ -1164,6 +1177,8 @@ export class TurnLifecycle {
           lastEventAt: Date.now(),
           unprompted,
           reports: new Map(),
+          continues:
+            unprompted && isRecord(params) && Array.isArray(params.continues) ? params.continues.filter(isString) : [],
         });
         this.#traces.begin(turnId, new Date().toISOString());
         const publicThreadId = this.#conversation.publicThreadId(agentId, threadId);
@@ -1718,7 +1733,8 @@ export class TurnLifecycle {
    * answers; `unanswered` when a teammate's request still waits for its `send_message` reply; `shown`
    * when a person waits for the answer, as in a Test run; null when no routine run, teammate update,
    * teammate request or teammate's answer to a quiet routine run (`#continuesQuietRun`) started the
-   * turn. The completion decides again, because a message can join the turn after the call and the
+   * turn, and it does not answer only background work of quiet turns (`#continuesQuietTurns`). The
+   * completion decides again, because a message can join the turn after the call and the
    * reply can come after it. `channelRun` is a turn that owns a main task of a channel routine's
    * request: the channel then posts no message for the turn (#7166).
    */
@@ -1735,6 +1751,13 @@ export class TurnLifecycle {
       return "quiet";
     }
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    // A turn that the provider started itself to answer the background work of quiet turns (#10847).
+    if (this.#continuesQuietTurns(this.#runningTurns.get(turnId)?.continues, deliveries)) {
+      this.#noUpdateTurns.add(turnId);
+      if (this.#reportedFailures.has(turnId)) return "shown";
+      this.#armQuietEnd(agentId, turnId);
+      return "quiet";
+    }
     if (
       !deliveries.some(
         ({ delivery }) =>
@@ -1760,12 +1783,28 @@ export class TurnLifecycle {
 
   /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
   #quietAfterNoUpdate(agentId: string, threadId: string, turnId: string): boolean {
+    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
     return (
       this.#runningTurns.has(turnId) &&
       !this.#reportedFailures.has(turnId) &&
       (this.#quietChannelTurns.has(turnId) ||
         (this.#noUpdateTurns.has(turnId) &&
-          this.#quietRoutineTurn(agentId, threadId, this.#mailbox.findDeliveriesByTurn(agentId, turnId), true)))
+          (this.#continuesQuietTurns(this.#runningTurns.get(turnId)?.continues, deliveries) ||
+            this.#quietRoutineTurn(agentId, threadId, deliveries, true))))
+    );
+  }
+
+  /**
+   * Whether a turn with no delivery answers only the background work of turns that ended quiet, such as a
+   * Claude turn after a background command of a teammate update ended. Nobody waited for those turns, so
+   * nobody waits for this one. A turn that also answers work of a person's request is not quiet (#10847).
+   */
+  #continuesQuietTurns(continues: readonly string[] | undefined, deliveries: readonly DeliveryContext[]): boolean {
+    return (
+      deliveries.length === 0 &&
+      continues !== undefined &&
+      continues.length > 0 &&
+      continues.every((turnId) => this.#quietTurns.has(turnId))
     );
   }
 
@@ -2259,16 +2298,27 @@ export class TurnLifecycle {
       // waits for the answer. The owner
       // of a channel routine's request that called the no-update tool is quiet too. A failed run is
       // never quiet.
+      const settles = outcome === "completed" && reportedFailure === undefined;
+      const quietTurn =
+        settles &&
+        (this.#continuesQuietTurns(running?.continues, deliveries) ||
+          this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled, resultSent));
       const quiet =
-        outcome === "completed" &&
-        reportedFailure === undefined &&
-        (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled, resultSent)
+        settles &&
+        (quietTurn
           ? settleQuietRoutineTurn(
               snapshot,
               turnId,
               noUpdateCalled || answeredRequestTurn(deliveries, snapshot, turnId),
             )
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
+      if (quiet && quietTurn) {
+        this.#quietTurns.add(turnId);
+        for (const oldest of this.#quietTurns) {
+          if (this.#quietTurns.size <= QUIET_TURNS_KEPT) break;
+          this.#quietTurns.delete(oldest);
+        }
+      }
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
       if (!quiet) this.#quietChannelTurns.delete(turnId);
       const latestAssistant = latestTurnAnswer(snapshot.messages, turnId);

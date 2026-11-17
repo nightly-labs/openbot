@@ -101,6 +101,14 @@ request and a reply from a later turn do not count. The import also reads the st
 messages of the turn, because the provider history does not hold them. A reply to a message of the
 agent can hold the result that the user asked for, so it is never quiet.
 
+A quiet turn can start background work, such as a background command or subagent. When it ends while
+no turn runs, Claude starts a turn of its own to answer it, and no delivery started that turn. The
+Claude client keeps the turn that started each background task (`task_started`), and the turn that
+answers it names those turns (`continues` on `turn/started`). When each of them ended quiet, the
+turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
+quiet answers (#10847). Work of a person's request, or of an unknown turn, keeps the answer in the
+chat. The lifecycle keeps the newest quiet turns in memory only, so after a restart such a turn shows.
+
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the
 desktop, the web client and the phone show no notification for it and play no completion sound

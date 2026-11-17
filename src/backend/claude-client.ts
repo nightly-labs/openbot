@@ -533,6 +533,13 @@ interface ThreadRuntime {
    * result. Until that turn begins, closing the query loses the result (#10743).
    */
   awaitsResultTurn: boolean;
+  /** The turn that started each background subagent or command that still works, by CLI task id. */
+  taskTurns: Map<string, string>;
+  /**
+   * The turns that started the background work that ended while no turn ran, null for work of no known
+   * turn. The turn that the CLI then starts to answer the results continues them (#10847).
+   */
+  endedTaskTurns: (string | null)[];
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
@@ -626,6 +633,8 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
+  /** `task_started`, `task_updated` and `task_notification`: the CLI's id of the background task. */
+  task_id?: unknown;
   /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
   command_uuid?: unknown;
   state?: unknown;
@@ -1649,6 +1658,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       subagents: newSubagentState(),
       backgroundTasks: 0,
       awaitsResultTurn: false,
+      taskTurns: new Map(),
+      endedTaskTurns: [],
       lastOutputAt: Date.now(),
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
@@ -1801,6 +1812,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       messageIds: new Set<string>(),
       promptStarted: false,
     };
+    // A turn that answers background work that ended continues the turns that started it. Work of an
+    // unknown turn continues none, so the lifecycle does not take the turn as quiet.
+    const continues =
+      unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
+    runtime.endedTaskTurns = [];
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
     runtime.awaitsResultTurn = false;
@@ -1808,11 +1824,13 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#threads.holdForTurn(runtime);
     this.emit("notification", {
       method: "turn/started",
-      // `unprompted` tells the lifecycle that no delivery started this turn.
+      // `unprompted` tells the lifecycle that no delivery started this turn, and `continues` names the
+      // turns whose background work it answers.
       params: {
         threadId: runtime.id,
         turn: { id: turnId, status: "inProgress" },
         ...(unprompted ? { unprompted } : {}),
+        ...(continues.length > 0 ? { continues } : {}),
       },
     });
     return turn;
@@ -2045,6 +2063,16 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         }
       }
       return;
+    }
+    // A task starts in the turn that called its tool. Its end with no turn running makes the CLI start a
+    // turn of its own, which then continues that turn (#10847). A task that ends in a turn is that turn's.
+    if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
+      if (message.subtype === "task_started" && runtime.activeTurn)
+        runtime.taskTurns.set(message.task_id, runtime.activeTurn.id);
+      else if (message.subtype === "task_notification") {
+        if (!runtime.activeTurn) runtime.endedTaskTurns.push(runtime.taskTurns.get(message.task_id) ?? null);
+        runtime.taskTurns.delete(message.task_id);
+      }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {
       this.#emitSubagents(runtime, foldClaudeTaskMessage(runtime.subagents, message, new Date().toISOString()));
