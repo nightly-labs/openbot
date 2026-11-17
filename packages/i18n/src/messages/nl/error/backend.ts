@@ -299,6 +299,8 @@ export const messages = {
     "OpenBot kon de lokale inlogverbinding voor deze server niet starten. Start OpenBot opnieuw en probeer het nog eens.",
   "error.backend.mcpOAuthSignInNeeded":
     "De inlog bij deze MCP-server is verlopen. De gebruiker moet opnieuw inloggen in OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot kon de aanmelding bij deze MCP-server nu niet vernieuwen. De aanmelding blijft bewaard en de volgende aanvraag probeert het opnieuw. Blijft deze fout, dan kan de gebruiker zich in OpenBot afmelden bij de server en opnieuw aanmelden.",
   "error.backend.mcpServerUnreachable": "OpenBot kan de server niet bereiken. Controleer de URL en je netwerk.",
   "error.backend.mcpLocalServerOff":
     "Er reageert geen server op {address} op deze computer. Start de server, of zet hem aan in de app die hem draait, en probeer het opnieuw.",

@@ -3,7 +3,7 @@ import type { ConversationMessage, ConversationSnapshot } from "@openbot/contrac
 import { isAgentProvider, mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import type { ConversationQueries } from "./conversation-queries";
-import { activityTurnId } from "./conversation-writer";
+import { activityTurnId, keptUnsavedImage } from "./conversation-writer";
 import { type DatabaseCore, deleteThreadAttachments } from "./database-core";
 import { databaseRows, decodeThreadAgentRow, objectValue, requiredEventRow } from "./database-rows";
 import { withoutDeletedMessages } from "./deleted-thread-messages";
@@ -435,6 +435,7 @@ function mergeReplayedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
     ...(imageGeneration ? { imageGeneration } : {}),
+    ...keptUnsavedImage(existing, imported, imageGeneration),
   };
 }
 

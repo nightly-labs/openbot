@@ -11,6 +11,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.acpSignInLost": "{provider} lost its sign-in, so OpenBot ended its process. Send your message again.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} refused a message, so OpenBot ended its process. Send your message again.",
+  "error.provider.acpServerLost": "{provider} lost its connection. Send your message again.",
+  "error.provider.acpServerLostEnded": "{provider} lost its connection, so OpenBot ended its process.",
   "error.provider.acpSettingsTimedOut": "{provider} did not answer in time. Try again in a moment.",
   "error.provider.acpPlanUsedUp":
     "{provider} says that your plan is used up. Choose another model, or upgrade your {provider} plan.",
@@ -183,6 +185,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codeLoginRefused": "The provider did not accept the code. Start the sign-in again.",
   "error.provider.codeLoginUnsupported":
     "This server cannot sign in with a pasted code. Sign in on the server computer, in its browser.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude could not save its sign-in on the Mac. Restart the Mac that runs OpenBot, then connect Claude again.",
   "error.provider.cliBusyRetry": "The {provider} CLI is working on a turn. Wait for it to finish, then try again.",
   "error.provider.cliSigningIn": "The {provider} CLI is signing in. Finish or cancel sign-in, then update.",
   "error.provider.cliBusyUpdate": "The {provider} CLI is working on a turn. Wait for it to finish, then update.",
@@ -202,6 +206,8 @@ export const messages = defineMessages("error.provider", {
     'OpenCode has no sign-in for the model provider "{provider}". Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode has no sign-in for the provider of this model. Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.",
+  "error.provider.opencodeProviderRefused":
+    'The model provider "{provider}" refused the request. OpenCode has a key for this provider, so the cause can be your network: some providers block VPNs, proxies or some countries. Turn off the VPN or use a different network, then try again. If the error continues, the key can be incorrect: run `opencode auth login` in a terminal and enter the key again.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode refused this free model. Some free models are not available in every country. Choose a different model with the Free label, or paste an OpenCode Go key in the OpenCode settings and choose an OpenCode Go model.",
   "error.provider.customEndpointKeyRefused":
@@ -274,10 +280,14 @@ export const messages = defineMessages("error.provider", {
     "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google did not accept the Gemini sign-in for this request. Send your message again. If the error continues, reconnect Gemini in Settings.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini refused this request and did not give the cause. An item in the chat history can cause this, such as an image that the agent opened. OpenBot started a new Gemini session with the chat history. Try again. If the error continues, choose another model.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -323,6 +333,8 @@ export const messages = defineMessages("error.provider", {
     "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Marketplace, Apps, then send your message again.",
   "error.provider.hermesRefused":
     "Hermes refused this message before it started. Send it again. If Hermes refuses each message, restart OpenBot on the computer that runs this agent.",
+  "error.provider.hermesConnectionLost":
+    "Hermes lost its connection during this message, so it does not know if the work finished. Check what the agent did before you send the message again.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot could not use this model: the model did not accept its thinking setting. Select a different model for this agent, then send your message again.",
   "error.provider.usageLimitReached": "The account reached its usage limit.",

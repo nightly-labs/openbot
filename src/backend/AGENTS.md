@@ -41,21 +41,14 @@ directory touches `apps/auth-api/migrations/`.
 
 ## Transactions
 
-- Run every SQLite transaction through `withTransaction` (synchronous work) or
-  `withTransactionAsync` (work that awaits) in `database/sqlite-transaction.ts`. Do not run
-  `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, `SAVEPOINT` or `RELEASE` by hand in `src/backend` or
-  `src/main`. The Biome rule `no-raw-sqlite-transaction` rejects them.
-- The outer call opens `BEGIN IMMEDIATE`. A nested call runs in a savepoint, so it joins the
-  caller's transaction. An error rolls back only its own level and is thrown again. The connection
-  is never left in a transaction that the helper opened, and a `ROLLBACK` after SQLite already
-  rolled back (for example on a full disk) does not hide the first error.
-- Do not commit or roll back inside the work. To keep a part of the work after a failure, catch the
-  error outside a nested `withTransaction` call: its savepoint is already rolled back (see
-  `CrmStore.#decide`).
-- `withTransactionAsync` never nests. Another caller can use the connection while the work awaits,
-  so use it only on a connection that has one user at a time, such as the Claude history index.
-- A migration has no backup to fall back to. A schema change and its `schema_migrations` marker
-  stay in one `withTransaction` call.
+- Run each SQLite transaction through `withTransaction` (synchronous work) or `withTransactionAsync`
+  (work that awaits) in `database/sqlite-transaction.ts`. The Biome rule `no-raw-sqlite-transaction`
+  rejects hand-written `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, `SAVEPOINT` and `RELEASE`.
+- A nested `withTransaction` runs in a savepoint. Its error rolls back only its level and is thrown
+  again. To keep the caller's writes, catch the error outside the nested call (see `CrmStore.#decide`).
+- `withTransactionAsync` never nests. Use it only on a connection with one user at a time, such as the
+  Claude history index.
+- A migration has no backup. Keep a schema change and its `schema_migrations` marker in one call.
 
 ## Size
 

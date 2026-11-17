@@ -302,6 +302,8 @@ export const messages = {
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":
     "この MCP サーバーへのサインインは終了しました。ユーザーは OpenBot でもう一度サインインする必要があります。",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot は今この MCP サーバーのサインインを更新できませんでした。サインインは保持され、次のリクエストで再試行します。このエラーが続く場合、ユーザーは OpenBot でこのサーバーからサインアウトし、もう一度サインインできます。",
   "error.backend.mcpServerUnreachable":
     "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
   "error.backend.mcpLocalServerOff":

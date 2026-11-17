@@ -433,6 +433,14 @@ export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
 export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
 
 /**
+ * The item type of the message that continues a channel request after the sub-tasks that it waited
+ * for ended. It repeats the person's request for the member, but the person did not send it again
+ * (#8812). No chat, history page, search, queue or preview shows it, and it does not go to a Team API
+ * client.
+ */
+export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";
+
+/**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the
  * subagents and a quiet routine answer are not an answer.
  */

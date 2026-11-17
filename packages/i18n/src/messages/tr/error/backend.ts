@@ -286,6 +286,8 @@ export const messages = {
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":
     "Bu MCP sunucusundaki oturum sona erdi. Kullanıcının OpenBot'ta yeniden oturum açması gerekiyor.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot bu MCP sunucusundaki oturumu şu anda yenileyemedi. Oturum korunuyor ve sonraki istek yeniden deneyecek. Bu hata sürerse kullanıcı OpenBot'ta sunucudan çıkış yapıp yeniden giriş yapabilir.",
   "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
   "error.backend.mcpLocalServerOff":
     "Bu bilgisayarda {address} adresinde yanıt veren bir sunucu yok. Sunucuyu başlatın veya onu çalıştıran uygulamada açın, ardından tekrar deneyin.",

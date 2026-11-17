@@ -108,6 +108,7 @@ import {
   uiBlockPromptResult,
   userMessagePromptResult,
   validPromptQuestions,
+  vaultLateAnswerText,
   vaultPromptResult,
   vaultRequestFormSpec,
 } from "./prompts";
@@ -236,6 +237,8 @@ const TAKEOVER_TAB_OF_OTHER_CHAT =
   "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
+const NO_LOGIN_FOR_SITE =
+  "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
 const VAULT_LOGIN_ADD_FIELDS =
   "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
 const VAULT_PASSWORD_EXTERNAL_REFUSED =
@@ -417,6 +420,10 @@ function enteredVaultItem(
   }
 }
 
+/** The secure input failed and the tab went to the user, so the password typed in the card was not kept. */
+const TYPED_PASSWORD_NOT_SAVED =
+  "The password was not saved in the Vault: the secure input did not complete. Tell the user in one short sentence that the password was not saved.";
+
 interface PendingBrowserTakeover {
   client: AgentClient;
   /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
@@ -431,6 +438,10 @@ interface PendingBrowserTakeover {
   personCompleted?: true;
   /** A member selected Done on another device, not in the window of this computer. */
   memberCompleted?: true;
+  /** The person selected Cancel on the card, so the agent must not ask again (#10452). */
+  personCancelled?: true;
+  /** The user asked to save the typed password, but the secure input failed, so nothing was saved (#10462). */
+  vaultNotSaved?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -861,7 +872,12 @@ export class AttentionRegistry {
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
-      const lateAnswer = pending.detached ? lateAnswerText(pending.questions, input.answers) : "";
+      // The form of a Vault request holds secrets, so its late answer names the saved item only.
+      const lateAnswer = !pending.detached
+        ? ""
+        : pending.uiBlock?.vault
+          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
+          : lateAnswerText(pending.questions, input.answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -1047,7 +1063,7 @@ export class AttentionRegistry {
         if (input.decision === "complete") {
           pending.personCompleted = true;
           if (fromMember) pending.memberCompleted = true;
-        }
+        } else pending.personCancelled = true;
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -1066,6 +1082,7 @@ export class AttentionRegistry {
     });
     if (input.decision === "cancel") {
       secret.cancel();
+      pending.personCancelled = true;
       this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
       return;
     }
@@ -1098,6 +1115,8 @@ export class AttentionRegistry {
     // The user finishes in the tab, so a later completion is theirs, and the card's vault reason ends.
     delete pending.vaultLoginId;
     delete pending.request.vaultSkip;
+    if (input.decision === "submit" && input.saveToVault && secret.request.method === "password")
+      pending.vaultNotSaved = true;
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
@@ -1880,7 +1899,10 @@ export class AttentionRegistry {
         }
       : logins === null
         ? { connected: false, logins: [], next: "No password vault is connected. Use submit_secret without loginId." }
-        : { connected: true, logins };
+        : logins.length === 0
+          ? // A login matches only pages of its own site, and a sign-in can be on another site (#10502).
+            { connected: true, logins, next: NO_LOGIN_FOR_SITE }
+          : { connected: true, logins };
     const result: DynamicToolResult = {
       success: true,
       contentItems: [{ type: "inputText", text: JSON.stringify(answer) }],
@@ -1939,17 +1961,7 @@ export class AttentionRegistry {
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
-    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    const detachAfterMs = deadlines.length > 0 ? Math.min(...deadlines) : undefined;
-    const target =
-      detachAfterMs === undefined || questions.some((question) => question.isSecret)
-        ? null
-        : this.#lateAnswerTarget(agentId, publicThreadId);
-    if (target)
-      pending.detach = {
-        target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), detachAfterMs),
-      };
+    if (!questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -2025,7 +2037,7 @@ export class AttentionRegistry {
       timer.unref?.();
       autoAnswerTimer = { state: auto, timer };
     }
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "ui-block",
@@ -2038,7 +2050,10 @@ export class AttentionRegistry {
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
-    });
+    };
+    // The late answer of a Vault request names the saved item only, never a value of the form (#10577).
+    if (block.vault) this.#scheduleDetach(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -2313,6 +2328,21 @@ export class AttentionRegistry {
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * Starts the timer of `#detachPrompt` when the provider stops the call at a fixed time
+   * (`AppServerRequest.detachAfterMs` or `answerBeforeMs`, the smaller) and a chat can get the answer.
+   */
+  #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    if (deadlines.length === 0) return;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    if (target)
+      pending.detach = {
+        target,
+        timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)),
+      };
   }
 
   /**
@@ -2630,7 +2660,15 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing));
+    pending.resolve(
+      browserTakeoverResult(
+        decision,
+        vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined),
+        pending.vaultSkipped,
+        signInMissing,
+        pending.personCancelled === true,
+      ),
+    );
   }
 
   #persistQuestionPrompt(

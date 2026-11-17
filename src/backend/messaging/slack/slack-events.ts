@@ -17,6 +17,7 @@ export const SLACK_ACTION_IDS = {
  * - A reply in a thread without a mention counts only in a thread that an agent already answers
  *   (`requiresLink`). In a thread that an agent's post pinged people in, it counts only from them. A reply with a mention also arrives as
  *   `app_mention`, which takes it, so the order of the two events does not decide where it goes.
+ *   A reply without a mention that starts with another person's mention is for that person, and is ignored.
  * - Messages of bots, of OpenBot itself, edits, deletions and joins are ignored.
  */
 export function slackInboundMessage(payload: unknown, workspaceId: string, botUserId: string): InboundMessage | null {
@@ -62,6 +63,10 @@ export function slackInboundMessage(payload: unknown, workspaceId: string, botUs
   }
   if (!threadTs || threadTs === ts) return null;
   if (isString(event.text) && event.text.includes(`<@${botUserId}>`)) return null;
+  // A reply that starts with another person's mention talks to that person, not to OpenBot: it gets no
+  // reaction, no "Working" post and no turn. A group, @here or a channel link addresses the room.
+  const leading = isString(event.text) ? /^\s*<@([A-Z0-9]+)(?:\|[^>]*)?>/.exec(event.text) : null;
+  if (leading && leading[1] !== botUserId) return null;
   return {
     ...base,
     threadKey: threadTs,

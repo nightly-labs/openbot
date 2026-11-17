@@ -12,7 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { withoutQueuePositions } from "../database/conversation-writer";
+import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-writer";
 import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
@@ -50,16 +50,13 @@ const logger = createOpenBotLogger("conversation-runtime");
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
 /**
- * Runs `work` inside a SQLite transaction (`withTransaction`), opening one only when the caller is
- * not already inside another. Nesting is load-bearing: `deleteRoutine` drives a routine mutation
- * whose `beforeMutate` hook appends a run transition in the same transaction, and an approval
- * response can append a hosted-site event inside an outer one. A nested call runs in a savepoint,
- * so its failure rolls back only its own rows, and its `onRollback` runs at once.
+ * Runs `work` in `withTransaction`. Nesting is load-bearing: `deleteRoutine` drives a routine
+ * mutation whose `beforeMutate` hook appends a run transition in the same transaction, and an
+ * approval response can append a hosted-site event inside an outer one.
  *
- * `onCommit` exists because a nested caller must not publish in-memory state the owner can still
- * discard: effects that make rows visible to the rest of the app are queued on the owner and run
- * once, after `COMMIT`. `onRollback` is queued the same way, so an owner that fails *after* a
- * nested call succeeded still undoes that call's in-memory slice.
+ * A nested call queues `onCommit` and `onRollback` on the owner, so in-memory state shows only
+ * committed rows. When a level fails, its savepoint is rolled back, so the effects queued inside it
+ * are removed: its rollbacks run at once, newest first, and its commits never run.
  */
 export function withDatabaseTransaction<T>(
   database: OpenBotDatabase,
@@ -67,69 +64,53 @@ export function withDatabaseTransaction<T>(
   onRollback?: () => void,
   onCommit?: () => void,
 ): T {
-  // `isTransaction`, not the map, decides who owns one: a transaction started anywhere else has no
-  // scope in the map, and this call must still join it.
   const connection = database.connection;
-  if (connection.isTransaction) {
-    const owner = openTransactions.get(database);
-    let result: T;
-    try {
-      result = withTransaction(connection, work);
-    } catch (error) {
-      // Our own work failed and its savepoint is rolled back, so undo our in-memory slice now
-      // rather than queueing it: a queued restorer would run a second time.
-      onRollback?.();
-      throw error;
-    }
-    if (owner) {
-      if (onRollback) owner.rollback.push(onRollback);
-      if (onCommit) owner.commit.push(onCommit);
-    } else {
-      // An ambient transaction this helper did not open has no queue to defer onto, so the
-      // effects run as they always did.
-      onCommit?.();
-    }
-    return result;
-  }
-  const scope: TransactionScope = { rollback: [], commit: [] };
-  let opened = false;
+  // `isTransaction`, not the map, decides who owns one: a transaction opened elsewhere has no
+  // scope in the map, and this call must still join it.
+  const nested = connection.isTransaction;
+  const owner = nested ? openTransactions.get(database) : undefined;
+  const scope: TransactionScope = owner ?? { rollback: [], commit: [] };
+  const rollbackMark = scope.rollback.length;
+  const commitMark = scope.commit.length;
+  let ran = false;
   let result: T;
   try {
     result = withTransaction(connection, () => {
-      opened = true;
-      openTransactions.set(database, scope);
+      ran = true;
+      if (!nested) openTransactions.set(database, scope);
       return work();
     });
   } catch (error) {
-    openTransactions.delete(database);
-    // A failed `BEGIN IMMEDIATE` ran no work, so there is nothing to restore.
-    if (!opened) throw error;
-    // Innermost first, so each restorer sees the state the one after it has already put back.
-    for (const restore of [...scope.rollback].reverse()) restore();
+    if (!nested) openTransactions.delete(database);
+    // A failed `BEGIN` or `SAVEPOINT` ran no work.
+    if (!ran) throw error;
+    scope.commit.splice(commitMark);
+    for (const restore of scope.rollback.splice(rollbackMark).reverse()) restore();
     onRollback?.();
     throw error;
   }
-  // Past COMMIT the rows are durable, so the effects run outside the block above: a listener that
-  // throws while a conversation is published must not reach the restorers, which would put the
-  // in-memory projection back to a state SQLite no longer holds. Only `work` and `COMMIT` roll back.
-  //
-  // The scope is cleared first because publishing can re-enter this function, which must then open
-  // its own transaction instead of joining one that is already committed.
+  if (owner) {
+    if (onRollback) owner.rollback.push(onRollback);
+    if (onCommit) owner.commit.push(onCommit);
+    return result;
+  }
+  // A transaction opened elsewhere has no queue, so the effect runs now.
+  if (nested) {
+    onCommit?.();
+    return result;
+  }
+  // Past COMMIT the rows are durable, so a throwing effect must not reach the restorers. The scope
+  // is cleared first: an effect can re-enter this function and must open its own transaction.
   openTransactions.delete(database);
-  // Every effect runs, so a throw from one does not skip the rest. The rows are already durable,
-  // and an effect that keeps memory in step with them is the only thing left to put it back.
+  // Every effect runs, so a throw from one does not skip the rest.
   const failures: unknown[] = [];
-  const runEffect = (effect: (() => void) | undefined): void => {
+  for (const effect of [...scope.commit, onCommit]) {
     try {
       effect?.();
     } catch (error) {
       failures.push(error);
     }
-  };
-  for (const effect of scope.commit) runEffect(effect);
-  runEffect(onCommit);
-  // One failure keeps its own message, because a single failing listener already names the cause.
-  // Several report together, so no cause is lost.
+  }
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) throw new AggregateError(failures, sourceText("error.agent.commitEffectsFailed"));
   return result;
@@ -703,7 +684,11 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
+    const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
+    // A turn end is stored also when an earlier write already saved this chat, such as the failure
+    // note to an agent that asked: only the turn-end write closes the stored turn (#10698).
+    const turnEnd = isTurnEndEvent(eventType);
+    if (unchanged && !turnEnd) {
       this.#retainPublishedSnapshot(snapshot);
       return;
     }
@@ -730,7 +715,8 @@ export class ConversationRuntime {
         !cached ||
         changedMessages.length > 0 ||
         removedMessageIds.length > 0 ||
-        cached.activeTurnId !== snapshot.activeTurnId
+        cached.activeTurnId !== snapshot.activeTurnId ||
+        turnEnd
       ) {
         snapshot.revision = this.#store.database.persistConversationChanges({
           agentId: snapshot.agentId,

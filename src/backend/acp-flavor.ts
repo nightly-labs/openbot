@@ -25,6 +25,14 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
+interface AcpRetryUpdate {
+  /** The number of the retry: 1 for the first request after the failed one. */
+  readonly attempt: number;
+  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
+  readonly unreachable: boolean;
+}
+
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
   readonly name: string;
@@ -83,7 +91,8 @@ export interface AcpFlavor {
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
-   * API key for the provider of that model.
+   * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
+   * agent's own store has a key for a provider.
    */
   turnFailure?(
     error: unknown,
@@ -93,6 +102,7 @@ export interface AcpFlavor {
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
     savedKey: boolean,
+    providerKeyStored: (provider: string) => boolean,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -143,6 +153,18 @@ export interface AcpFlavor {
    * prompt is not ended again.
    */
   refusesUntilRestart?(error: unknown): boolean;
+  /**
+   * Whether a failed request says that the agent lost the connection to its own server, after which
+   * its process can fail each request until it ends. OpenBot then ends the process as for
+   * `refusesUntilRestart`, also when the session open or a settings change of a turn fails.
+   */
+  lostServerUntilRestart?(error: unknown): boolean;
+  /**
+   * Whether a failed prompt says that the agent lost its own server, which can come a moment before
+   * its process exits. The turn then waits for that exit, as for a closed connection, so it ends as
+   * at a process exit: the recovery continues an answer that the exit cut (#10310).
+   */
+  serverLost?(error: unknown): boolean;
   /**
    * Whether the agent refused to open a session again because a prompt still runs in it, such as a
    * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
@@ -285,6 +307,11 @@ export interface AcpFlavor {
    * session update does, and the chat shows the retry.
    */
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  /**
+   * A session update that says that the agent sends a failed model request again, else null. The agent
+   * does not say how many times it tries. The chat shows the retry until the agent's next output.
+   */
+  retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   /**
    * Whether a session update reports a retry of a model request that timed out: a retry that the agent
    * schedules, or the end of a retried attempt. The agent waits for a model as long as OpenBot's stall
@@ -599,7 +626,24 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
 function hermesTurnFailure(error: unknown, detail: string): string {
   if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
     return sourceText("error.provider.hermesTurnFailed");
+  if (hermesGatewayLost(error)) return sourceText("error.provider.hermesConnectionLost");
   return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
+}
+
+/**
+ * Hermes Agent fails a request with an internal error and "Gateway disconnected…" in `data.details`
+ * when its gateway restarts. Hermes Agent 0.22.0 and before keep the closed connection, so each later
+ * request of that process failed the same way, also after the gateway started again, until OpenBot
+ * started again (#10624).
+ */
+function hermesGatewayLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    /^Gateway disconnected\b/u.test(error.data.details)
+  );
 }
 
 /**
@@ -696,6 +740,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
+  lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
@@ -852,14 +897,15 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, its
-  // failed turn is explained, a process that starts to refuse each prompt ends, an unchanged model or
-  // effort is not sent again, it gets the catalog as MCP tools, and it gets no more MCP servers than
-  // it takes, as for the Hermes provider (#9718, #9738, #9312, #10023).
+  // failed turn is explained, a process that starts to refuse each prompt or lost its gateway ends, an
+  // unchanged model or effort is not sent again, it gets the catalog as MCP tools, and it gets no more
+  // MCP servers than it takes, as for the Hermes provider (#9718, #9738, #9312, #10023, #10624).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
+    lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,

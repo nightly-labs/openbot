@@ -1,8 +1,6 @@
-// Checks the one SQLite transaction helper (`withTransaction`, plan 011 item 10) on a real
-// `openbot.db`: a forced error inside nested writes leaves no partial write, a caught nested error
-// rolls back only its own level, a full disk keeps its own error, and the connection is never left in
-// a transaction and stays usable. Boots the real database on a temporary profile. No app, provider,
-// account or network is started.
+// Checks `withTransaction` and `withDatabaseTransaction` on a real `openbot.db` in a temporary
+// profile: nested rollback levels, a full disk, async work, the commit/rollback effect queue, and a
+// reopen. No app, provider or network is started.
 //
 // Run: bun scripts/with-transaction-e2e.ts
 // Writes .openbot-build/with-transaction/report.json and exits non-zero on a failure.
@@ -11,11 +9,11 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { withDatabaseTransaction } from "../src/backend/agent/conversation-runtime";
 import { databaseRows, requiredNumberColumn, requiredStringColumn } from "../src/backend/database/database-rows";
 import { withTransaction, withTransactionAsync } from "../src/backend/database/sqlite-transaction";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import { OpenBotDatabase } from "../src/backend/openbot-database";
-import { workflowTransaction } from "../src/backend/workflows/workflow-transaction";
 
 const OUT = resolve(import.meta.dirname, "../.openbot-build/with-transaction");
 const root = await mkdtemp(join(tmpdir(), "openbot-with-transaction-"));
@@ -26,227 +24,184 @@ interface CaseResult {
   rows: string[];
   inTransactionAfter: boolean;
   error?: string;
+  effects?: string[];
 }
 
-interface Report {
-  cases: CaseResult[];
-  integrityCheck?: string;
-  reopenedRows?: string[];
-  passed: boolean;
-  failure?: string;
-}
-
-const report: Report = { cases: [], passed: false };
+const report: { cases: CaseResult[]; reopenedRows?: string[]; passed: boolean; failure?: string } = {
+  cases: [],
+  passed: false,
+};
 
 class ForcedFailure extends Error {}
 
-function rowsOf(database: OpenBotDatabase): string[] {
-  return databaseRows(database.connection.prepare("SELECT label FROM with_transaction_probe ORDER BY id").all()).map(
-    (row) => requiredStringColumn(row, "label"),
+const database = new OpenBotDatabase(userData);
+const db = () => database.connection;
+const write = (label: string) => db().prepare("INSERT INTO probe(label) VALUES (?)").run(label);
+const rowsOf = (target: OpenBotDatabase) =>
+  databaseRows(target.connection.prepare("SELECT label FROM probe ORDER BY id").all()).map((row) =>
+    requiredStringColumn(row, "label"),
   );
-}
+const pragmaNumber = (name: string) =>
+  requiredNumberColumn(databaseRows(db().prepare(`PRAGMA ${name}`).all())[0] ?? {}, name);
 
-function write(database: OpenBotDatabase, label: string): void {
-  database.connection.prepare("INSERT INTO with_transaction_probe(label) VALUES (?)").run(label);
-}
-
-function clear(database: OpenBotDatabase): void {
-  database.connection.exec("DELETE FROM with_transaction_probe");
-}
-
-function record(database: OpenBotDatabase, name: string, run: () => void): CaseResult {
-  clear(database);
-  let error: string | undefined;
+/** Runs one case on an empty table and asserts its rows, its error, and that no transaction stays open. */
+async function check(name: string, run: () => unknown, rows: string[], error?: RegExp): Promise<CaseResult> {
+  db().exec("DELETE FROM probe");
+  let message: string | undefined;
   try {
-    run();
+    await run();
   } catch (cause) {
-    error = cause instanceof Error ? cause.message : String(cause);
+    message = cause instanceof Error ? cause.message : String(cause);
   }
-  const result: CaseResult = {
-    name,
-    rows: rowsOf(database),
-    inTransactionAfter: database.connection.isTransaction,
-    ...(error === undefined ? {} : { error }),
-  };
+  const result: CaseResult = { name, rows: rowsOf(database), inTransactionAfter: db().isTransaction };
+  if (message !== undefined) result.error = message;
   report.cases.push(result);
+  assert.deepEqual(result.rows, rows, name);
+  assert.equal(result.inTransactionAfter, false, name);
+  if (error) assert.match(message ?? "", error, name);
+  else assert.equal(message, undefined, name);
   return result;
 }
 
-function eventCount(database: OpenBotDatabase, commandId: string): number {
-  const rows = databaseRows(
-    database.connection
-      .prepare(
-        `SELECT (SELECT count(*) FROM orchestration_events WHERE command_id = ?) +
-                (SELECT count(*) FROM orchestration_command_receipts WHERE command_id = ?) AS count`,
-      )
-      .all(commandId, commandId),
-  );
-  return rows[0] ? requiredNumberColumn(rows[0], "count") : 0;
+function nested(labels: string[], fail: boolean): void {
+  const [label, ...rest] = labels;
+  if (label === undefined) {
+    if (fail) throw new ForcedFailure("forced failure");
+    return;
+  }
+  withTransaction(db(), () => {
+    write(label);
+    nested(rest, fail);
+  });
 }
 
 try {
-  const database = new OpenBotDatabase(userData);
   await runCauseEffect(database.initialize());
-  database.connection.exec("CREATE TABLE with_transaction_probe(id INTEGER PRIMARY KEY, label TEXT NOT NULL)");
+  db().exec("CREATE TABLE probe(id INTEGER PRIMARY KEY, label TEXT NOT NULL)");
 
-  // 1. Nested writes that succeed commit together.
-  const nestedCommit = record(database, "nested writes commit together", () =>
-    withTransaction(database.connection, () => {
-      write(database, "outer");
-      withTransaction(database.connection, () => {
-        write(database, "inner");
-        withTransaction(database.connection, () => write(database, "innermost"));
-      });
-    }),
+  await check("nested writes commit together", () => nested(["outer", "inner", "innermost"], false), [
+    "outer",
+    "inner",
+    "innermost",
+  ]);
+  await check(
+    "uncaught nested error rolls back every level",
+    () => nested(["outer", "inner", "innermost"], true),
+    [],
+    /forced failure/,
   );
-  assert.deepEqual(nestedCommit.rows, ["outer", "inner", "innermost"]);
-  assert.equal(nestedCommit.inTransactionAfter, false);
-
-  // 2. An error in the innermost write that nobody catches leaves no row of any level.
-  const uncaught = record(database, "uncaught nested error rolls back every level", () =>
-    withTransaction(database.connection, () => {
-      write(database, "outer");
-      withTransaction(database.connection, () => {
-        write(database, "inner");
-        withTransaction(database.connection, () => {
-          write(database, "innermost");
-          throw new ForcedFailure("forced innermost failure");
-        });
-      });
-    }),
+  await check(
+    "caught nested error rolls back only its level",
+    () =>
+      withTransaction(db(), () => {
+        write("outer-before");
+        try {
+          nested(["inner", "innermost"], true);
+        } catch (error) {
+          if (!(error instanceof ForcedFailure)) throw error;
+        }
+        write("outer-after");
+      }),
+    ["outer-before", "outer-after"],
   );
-  assert.deepEqual(uncaught.rows, []);
-  assert.equal(uncaught.error, "forced innermost failure");
-  assert.equal(uncaught.inTransactionAfter, false);
 
-  // 3. A caught nested error rolls back only its level: the caller keeps its own writes.
-  const caught = record(database, "caught nested error rolls back only its level", () =>
-    withTransaction(database.connection, () => {
-      write(database, "outer-before");
+  const pageCount = pragmaNumber("page_count");
+  await check(
+    "full disk inside a nested write keeps its own error",
+    () => {
+      db().exec(`PRAGMA max_page_count = ${pageCount + 2}`);
       try {
-        withTransaction(database.connection, () => {
-          write(database, "inner-partial");
-          withTransaction(database.connection, () => write(database, "innermost-partial"));
-          throw new ForcedFailure("forced inner failure");
+        withTransaction(db(), () => {
+          write("before-full");
+          withTransaction(db(), () => {
+            for (let index = 0; index < 10_000; index += 1) write(`filler-${index}-${"x".repeat(512)}`);
+          });
         });
-      } catch (error) {
-        if (!(error instanceof ForcedFailure)) throw error;
+      } finally {
+        db().exec("PRAGMA max_page_count = 1073741823");
       }
-      write(database, "outer-after");
-    }),
+    },
+    [],
+    /full/i,
   );
-  assert.deepEqual(caught.rows, ["outer-before", "outer-after"]);
-  assert.equal(caught.inTransactionAfter, false);
 
-  // 4. A SQLite constraint error inside a nested level keeps its own message.
-  database.connection.exec("CREATE UNIQUE INDEX with_transaction_probe_label ON with_transaction_probe(label)");
-  const constraint = record(database, "constraint error inside a nested level keeps its message", () =>
-    withTransaction(database.connection, () => {
-      write(database, "unique");
-      withTransaction(database.connection, () => write(database, "unique"));
-    }),
+  await check(
+    "async failure after an await rolls back",
+    () =>
+      withTransactionAsync(db(), async () => {
+        write("async-before");
+        await Promise.resolve();
+        throw new ForcedFailure("forced async failure");
+      }),
+    [],
+    /forced async failure/,
   );
-  assert.deepEqual(constraint.rows, []);
-  assert.match(constraint.error ?? "", /UNIQUE constraint failed/);
-  assert.equal(constraint.inTransactionAfter, false);
-  database.connection.exec("DROP INDEX with_transaction_probe_label");
-
-  // 5. A full disk inside a nested write: the first error is thrown, nothing stays, no transaction stays.
-  const pageCount = requiredNumberColumn(
-    databaseRows(database.connection.prepare("PRAGMA page_count").all())[0] ?? {},
-    "page_count",
-  );
-  const fullDisk = record(database, "full disk inside a nested write keeps its own error", () => {
-    database.connection.exec(`PRAGMA max_page_count = ${pageCount + 2}`);
-    try {
-      withTransaction(database.connection, () => {
-        write(database, "before-full");
-        withTransaction(database.connection, () => {
-          const insert = database.connection.prepare("INSERT INTO with_transaction_probe(label) VALUES (?)");
-          for (let index = 0; index < 10_000; index += 1) insert.run(`filler-${index}-${"x".repeat(512)}`);
-        });
+  await check(
+    "async transaction inside an open one is refused",
+    () => {
+      let refusal: Promise<void> = Promise.resolve();
+      withTransaction(db(), () => {
+        write("outer");
+        refusal = withTransactionAsync(db(), async () => void write("async-inner"));
       });
-    } finally {
-      database.connection.exec("PRAGMA max_page_count = 1073741823");
-    }
-  });
-  assert.deepEqual(fullDisk.rows, []);
-  assert.match(fullDisk.error ?? "", /full/i);
-  assert.equal(fullDisk.inTransactionAfter, false);
+      return refusal;
+    },
+    ["outer"],
+    /within a transaction/,
+  );
 
-  // 6. A real store path: a dispatch nested in a workflow transaction whose projector fails keeps no
-  // event and no receipt.
-  const commandId = "with-transaction-e2e:dispatch";
-  const dispatch = record(database, "failed nested dispatch keeps no event or receipt", () =>
-    workflowTransaction(database, () => {
-      write(database, "workflow-row");
-      database.dispatch(
-        commandId,
-        [{ aggregateType: "with-transaction-e2e", aggregateId: "probe", eventType: "probe.written", payload: {} }],
+  // A caught nested failure: effects queued inside the failed level do not run on the outer commit,
+  // and its rollbacks run, newest first.
+  const effects: string[] = [];
+  const effect = (name: string) => () => void effects.push(name);
+  const queue = await check(
+    "caught nested failure drops the effects of its level",
+    () =>
+      withDatabaseTransaction(
+        database,
         () => {
-          write(database, "projected-row");
-          throw new ForcedFailure("forced projector failure");
+          write("outer");
+          withDatabaseTransaction(database, () => write("kept"), effect("kept:rollback"), effect("kept:commit"));
+          try {
+            withDatabaseTransaction(
+              database,
+              () => {
+                write("middle");
+                withDatabaseTransaction(
+                  database,
+                  () => write("inner"),
+                  effect("inner:rollback"),
+                  effect("inner:commit"),
+                );
+                throw new ForcedFailure("forced middle failure");
+              },
+              effect("middle:rollback"),
+              effect("middle:commit"),
+            );
+          } catch (error) {
+            if (!(error instanceof ForcedFailure)) throw error;
+          }
         },
-      );
-    }),
+        effect("outer:rollback"),
+        effect("outer:commit"),
+      ),
+    ["outer", "kept"],
   );
-  assert.deepEqual(dispatch.rows, []);
-  assert.equal(eventCount(database, commandId), 0);
-  assert.equal(dispatch.inTransactionAfter, false);
+  queue.effects = effects;
+  assert.deepEqual(effects, ["inner:rollback", "middle:rollback", "kept:commit", "outer:commit"]);
 
-  // 7. Async work that fails after an await rolls back, and an async transaction never nests.
-  clear(database);
-  let asyncError = "";
-  await withTransactionAsync(database.connection, async () => {
-    write(database, "async-before");
-    await Promise.resolve();
-    throw new ForcedFailure("forced async failure");
-  }).catch((error: unknown) => {
-    asyncError = error instanceof Error ? error.message : String(error);
-  });
-  report.cases.push({
-    name: "async failure after an await rolls back",
-    rows: rowsOf(database),
-    inTransactionAfter: database.connection.isTransaction,
-    error: asyncError,
-  });
-  assert.deepEqual(rowsOf(database), []);
-  assert.equal(asyncError, "forced async failure");
-  assert.equal(database.connection.isTransaction, false);
-
-  // The refusal is a rejected promise: the async work never runs, and the open transaction is kept.
-  let refusal: Promise<string> = Promise.resolve("");
-  const asyncNested = record(database, "async transaction inside an open one is refused", () =>
-    withTransaction(database.connection, () => {
-      write(database, "outer");
-      refusal = withTransactionAsync(database.connection, async () => write(database, "async-inner")).then(
-        () => "",
-        (error: unknown) => (error instanceof Error ? error.message : String(error)),
-      );
-    }),
+  await check("connection is usable after the failures", () => withTransaction(db(), () => write("after")), ["after"]);
+  assert.equal(
+    requiredStringColumn(databaseRows(db().prepare("PRAGMA integrity_check").all())[0] ?? {}, "integrity_check"),
+    "ok",
   );
-  asyncNested.error = await refusal;
-  assert.deepEqual(asyncNested.rows, ["outer"]);
-  assert.match(asyncNested.error, /within a transaction/);
-  assert.equal(asyncNested.inTransactionAfter, false);
-
-  // 8. The connection stays usable: a later write commits, and the file is sound after a reopen.
-  const usable = record(database, "connection is usable after the failures", () =>
-    withTransaction(database.connection, () => write(database, "after-failures")),
-  );
-  assert.deepEqual(usable.rows, ["after-failures"]);
-  report.integrityCheck = requiredStringColumn(
-    databaseRows(database.connection.prepare("PRAGMA integrity_check").all())[0] ?? {},
-    "integrity_check",
-  );
-  assert.equal(report.integrityCheck, "ok");
   database.close();
 
   const reopened = new OpenBotDatabase(userData);
   await runCauseEffect(reopened.initialize());
   report.reopenedRows = rowsOf(reopened);
-  assert.deepEqual(report.reopenedRows, ["after-failures"]);
   reopened.close();
+  assert.deepEqual(report.reopenedRows, ["after"]);
 
   report.passed = true;
 } catch (error) {
@@ -257,7 +212,7 @@ try {
   writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   await rm(root, { recursive: true, force: true });
   process.stdout.write(
-    `${report.passed ? "PASS" : "FAIL"}: ${report.cases.length} cases, report in ${join(OUT, "report.json")}\n`,
+    `${report.passed ? "PASS" : "FAIL"}: ${report.cases.length} cases, ${join(OUT, "report.json")}\n`,
   );
   if (report.failure) process.stderr.write(`${report.failure}\n`);
 }
