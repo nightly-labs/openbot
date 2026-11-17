@@ -2894,10 +2894,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           // an empty model step, which Antigravity's harness reports as an empty-output error (#4505).
           if (!((turn.receivedOutput || turn.answerOptional) && sdkHarness.emptyOutputFailure?.test(detail))) {
             turn.accountLink = sdkHarness.accountLink?.(detail, this.options.argv, thread.id) ?? null;
+            // The flavor's own rules name a cause that the generic ones miss, such as "code 429" (#11099).
+            const rawCause = classifyFailure(detail);
             turn.failureCause =
               turn.accountLink || sdkHarness.accountVerification?.test(detail)
                 ? "authentication"
-                : classifyFailure(detail);
+                : rawCause === "unknown"
+                  ? (sdkHarness.failureCause?.(detail) ?? rawCause)
+                  : rawCause;
             turn.providerError =
               this.#mcpLoadFailureMessage(thread, detail) ??
               this.options.savedKeyLimitMessage?.(detail) ??

@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
 import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS } from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
@@ -145,6 +146,17 @@ const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
+/**
+ * The cause of each Gemini request failure that another model can pass, as the message says. A model
+ * at capacity is an outage of that model, as in the provider's retry status (`CAPACITY_CAUSE`).
+ */
+const GEMINI_FAILURE_CAUSES: Partial<Record<(typeof GEMINI_REQUEST_FAILURES)[number][0], CauseCode>> = {
+  "error.provider.antigravityModelAtCapacity": "provider_unavailable",
+  "error.provider.antigravityQuotaReached": "usage_limit",
+  "error.provider.antigravityRateLimited": "rate_limit",
+  "error.provider.antigravityServiceFailure": "provider_unavailable",
+};
+
 /** The message of a Gemini turn that the server failed but reported as answer text. */
 function geminiTurnFailure(answer: string): string {
   const text = answer.replace(GEMINI_WARNING_ANSWER, "");
@@ -157,6 +169,20 @@ function geminiTurnFailure(answer: string): string {
   if (GEMINI_CONNECTION_LOST_ANSWER.test(text)) return sourceText("error.provider.antigravityConnectionLost");
   const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
   return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
+}
+
+/**
+ * The cause of a Gemini turn that the server failed but reported as answer text, from the same rules
+ * as its message, or `null`. A rate limit that names no Google status, such as "code 429", showed
+ * the rate-limit message but did not move the agent to its backup model (#11099).
+ */
+function geminiTurnFailureCause(answer: string): CauseCode | null {
+  const text = answer.replace(GEMINI_WARNING_ANSWER, "");
+  // These texts get their own message in `geminiTurnFailure`, not a request failure's.
+  if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text)) return null;
+  if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text) || GEMINI_CONNECTION_LOST_ANSWER.test(text)) return null;
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
+  return key ? (GEMINI_FAILURE_CAUSES[key] ?? null) : null;
 }
 
 /** The prefix that the ACP SDK puts before the server's text of a failed request. */
@@ -463,6 +489,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     answerIsFailure: GEMINI_FAILURE_ANSWER,
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
     turnFailure: geminiTurnFailure,
+    failureCause: geminiTurnFailureCause,
     accountLink: antigravityAccountLink,
     accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
     // Antigravity reports an exhausted quota as answer text and ends the turn as a success. Google
