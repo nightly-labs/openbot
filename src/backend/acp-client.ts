@@ -1980,7 +1980,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               given = relayed.servers;
               closeRelays = relayed.close;
             }
-            const mcpServers = [...given, ...mcp.servers];
+            let mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;
             if (enableMcpServers) {
               const names = mcp.servers.map((server) => server.name);
@@ -1996,6 +1996,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 ),
               );
             }
+            const sentAt = Date.now();
             if (resume && requestedThreadId) {
               const restored = this.#restoreSessionEffect(
                 connection,
@@ -2017,6 +2018,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
+            }
+            const connectLimit = this.#flavor.mcpConnectLimitMs;
+            if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
+              // The agent continued without OpenBot's tools and would not connect to the same token again (#10749).
+              this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
+              mcpServers = [...given, ...mcp.renew()];
+              const retriedAt = Date.now();
+              const retry = this.#restoreSessionEffect(
+                connection,
+                { sessionId: id, cwd, ...directories, mcpServers, ...meta },
+                "resume",
+              );
+              const retried = yield* Effect.result(sessionTransport ? retry : this.#whileProcessWrites(retry));
+              // The session works as before without the tools; a later session of the directory tries again.
+              if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
+                this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
             // The turn would run with no OpenBot tools, and the model would make up their errors (#3058).
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())

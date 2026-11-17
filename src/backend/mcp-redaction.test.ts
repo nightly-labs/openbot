@@ -103,7 +103,14 @@ describe("mcpSecretValues", () => {
   it("gives Pi each value but only the credentials as secrets", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-pi-mcp-test-"));
     try {
-      const local = { servers: [], setThreadId: () => {}, reached: () => false, close: () => {} };
+      const local = {
+        servers: [],
+        setThreadId: () => {},
+        reached: () => false,
+        dropped: () => false,
+        renew: () => [],
+        close: () => {},
+      };
       const extension = await Effect.runPromise(
         createPiMcpExtension(
           {
