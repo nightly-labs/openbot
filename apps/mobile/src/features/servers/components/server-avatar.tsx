@@ -50,7 +50,7 @@ function serverInitials(name: string): string {
 /**
  * A squircle with the server logo; with no logo, the felt plush: the shape and colour that an owner
  * or admin chose (`host-appearance-v1`), or else the squircle in the automatic colour of the server
- * ID. This computer shows a monitor icon, and a plush that cannot be drawn shows initials. A dot
+ * ID. This computer shows a monitor icon until a plush is chosen for it, and a plush that cannot be drawn shows initials. A dot
  * shows the connection state. `logoUri` replaces the saved logo with a draft; `null` shows no logo.
  * `showStatus={false}` leaves out the dot and the dimming, for a place that shows the logo only.
  */
@@ -96,7 +96,8 @@ export function ServerAvatar({
         : offline;
   const muted = showStatus && !online;
   const showsLogo = Boolean(logo && !logoFailed);
-  const showsPlush = !showsLogo && server.kind !== "local";
+  // This computer keeps its monitor icon unless an owner or admin chose a plush for it.
+  const showsPlush = !showsLogo && (server.kind !== "local" || Boolean(server.appearance));
   const plush = useServerPlush(
     server.id,
     server.appearance,
