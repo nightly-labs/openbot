@@ -1,5 +1,11 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
-import type { AgentEvent, AgentRuntimeSnapshot, AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AttachmentSummary,
+  type ConversationMessage,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
@@ -431,7 +437,10 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.resync();
+        // A joined server sends a snapshot after a reconnect, when channel events can be lost. This
+        // computer's events lose none after the start read below, and it sends a snapshot at each
+        // token count change of a working agent: a full channel read each time stalls typing (#11103).
+        if (activeServerId() !== LOCAL_SERVER_ID) void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -565,7 +574,10 @@ export function AgentEventBridge() {
     void agentsPort()
       .agent.getRuntimeSnapshot()
       .then((snapshot) => {
-        if (snapshot) flush(() => handleAgentEvent({ type: "runtime-snapshot", snapshot }));
+        if (!snapshot) return;
+        // The dropped events can include channel changes.
+        if (activeServerId() === LOCAL_SERVER_ID) void channels.resync();
+        flush(() => handleAgentEvent({ type: "runtime-snapshot", snapshot }));
       })
       .catch(() => undefined);
     return () => {
