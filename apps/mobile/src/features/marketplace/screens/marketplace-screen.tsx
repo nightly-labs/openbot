@@ -80,7 +80,8 @@ export function MarketplaceScreen() {
   };
   const listMode = isMarketplaceFiltered(filter) || catalog.search.length > 0;
 
-  // The agents and skills did not load. The bundled apps still show under it, with a way to retry.
+  // The agents, the skills or the custom MCP servers did not load. The bundled apps still show under it,
+  // with a way to retry.
   const loadFailed =
     server && catalog.failed ? (
       <View className="items-center gap-3 px-6 py-4">
