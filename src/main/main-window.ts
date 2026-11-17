@@ -515,8 +515,9 @@ export function createMainWindowController({
     onRendererLoadStarted();
     return window.loadURL(appRendererUrl(process.env.ELECTRON_RENDERER_URL).toString()).catch((error: unknown) => {
       // Another load of the page, such as View > Reload while the start loads, replaced this one. The
-      // window still loads OpenBot, so the start waits for that load instead of failing (#11326).
-      if (!isReplacedLoad(error) || window.isDestroyed()) throw error;
+      // window still loads OpenBot, so the start waits for that load instead of failing (#11326). A stop
+      // also gives ERR_ABORTED, but then nothing loads, and no event would end the wait.
+      if (!isReplacedLoad(error) || window.isDestroyed() || !window.webContents.isLoading()) throw error;
       return replacementLoad(window.webContents, error);
     });
   }
