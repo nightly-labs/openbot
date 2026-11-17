@@ -9,8 +9,9 @@
 // as an invalid stream event (#10591).
 // Cases: `other-host`, the `provider` entry that every other endpoint keeps, which must get the 422
 // (the control); `mistral`, which must finish the turn and keep the key, the header, the saved output
-// cap and the saved efforts, use Mistral's own adapter, and show the text of the last answer. The `mistral` layer also holds a second endpoint and an OpenCode Go key,
-// and OpenCode must list the models of both endpoints. The `mistral` endpoint is in both blocks:
+// cap and the saved efforts, use Mistral's own adapter, and show the text of the last answer. A keyless
+// endpoint on Mistral's API keeps the OpenAI-compatible adapter, which reads no `MISTRAL_API_KEY`. The
+// `mistral` layer also holds a second endpoint and an OpenCode Go key, and OpenCode must list the models of both endpoints. The `mistral` endpoint is in both blocks:
 // OpenCode 2 uses its `providers` entry, and OpenCode 1 ignores `providers` and keeps `provider`.
 // `bun scripts/opencode-mistral-reasoning-e2e.ts [<opencode binary>]`. Without an argument it uses
 // `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-mistral-reasoning-e2e/report.json.
@@ -286,6 +287,12 @@ try {
   assert.ok(layer.provider?.[ENDPOINT], "mistral: the endpoint must keep its `provider` entry for OpenCode 1");
   assert.ok(layer.provider?.[OTHER_ENDPOINT], "mistral: the other endpoint must keep its `provider` entry");
   assert.equal(layer.providers[ENDPOINT].package, "aisdk:@ai-sdk/mistral", "mistral: package");
+  const keyless = openCodeConfigEnv({}, () => [{ ...endpoint("https://api.mistral.ai/v1"), apiKey: null }], null);
+  assert.equal(
+    JSON.parse(keyless.OPENCODE_CONFIG_CONTENT ?? "{}").providers?.[ENDPOINT]?.package,
+    "aisdk:@ai-sdk/openai-compatible",
+    "keyless mistral: package",
+  );
   before = requests.length;
   const turn = await runTurn(mistral.content, "mistral");
   const sent = requests.slice(before);
@@ -302,11 +309,17 @@ try {
     models,
   });
   assert.equal(turn.code, 0, `mistral: OpenCode exit ${turn.code}: ${turn.stderr}`);
+  const events = turn.stdout
+    .split("\n")
+    .filter((line) => line.trim() !== "")
+    .map((line): unknown => JSON.parse(line));
+  const errors = events.filter((event) => getString(event, "type") === "error");
+  assert.deepEqual(errors, [], "mistral: OpenCode reported an error");
+  const texts = events.filter((event) => getString(event, "type") === "text");
   assert.ok(
-    !turn.stdout.includes('"type":"error"'),
-    `mistral: OpenCode reported an error: ${turn.stdout.slice(-2000)}`,
+    texts.some((event) => isRecord(event) && getString(event.part, "text") === REPLY),
+    "mistral: the text of the last answer did not show",
   );
-  assert.ok(turn.stdout.includes(REPLY), "mistral: the text of the last answer did not show");
   assert.ok(
     sent.some((request) => request.toolResult && request.status === 200),
     "mistral: the request after the tool call was not answered",
