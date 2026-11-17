@@ -873,6 +873,10 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
  */
 export const KIRO_ACP_FLAVOR: AcpFlavor = {
   authRequiredSignsOut: true,
+  // Kiro CLI stops each request to an HTTP MCP server after 120 s and ignores progress, so a question card
+  // answers the call before the limit and the late answer goes to the chat. The custom agent `kiro-cli` has
+  // the same limit (#11049).
+  mcpToolCallLimitMs: 120_000,
   // `_kiro.dev/metadata` carries `contextUsagePercentage`; the model list says "... with 1M context window".
   contextPercentNotice: { method: "kiro.dev/metadata", window: kiroContextWindow },
   // Kiro CLI 2.37.1 sends the roster of its subagents (`agentName`, `initialQuery`, `status.type` of

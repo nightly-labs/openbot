@@ -45,6 +45,7 @@ interface Report {
   oneFolder?: { first: Span; second: Span; overlapMs: number };
   signedOut?: { account: unknown };
   skillByPath?: { reply: string };
+  mcpInOneFolder?: { threads: string[]; callers: string[]; replies: string[] };
   context?: { updates: number; window: number | null; lastTokens: number | null };
   subagents?: { seen: number; final: Pick<ConversationSubagent, "agentType" | "status" | "title" | "steps">[] };
   approvals: { method: string; subagent: boolean; shape: string }[];
@@ -92,14 +93,18 @@ try {
   const client = driver.createClient(cli, 60_000, NO_PROVIDER_CREDENTIALS);
   clients.push(client);
   client.on("request", (request) => {
+    // A call of the OpenBot tool has its own handler below.
+    if (request.method === "item/tool/call") return;
     // Only the subagent tool may run. Anything else that asks is declined.
     const text = JSON.stringify(request.params ?? {});
     const subagent = /subagent|agent crew/iu.test(text);
     // Reading the skill is the one other action that the skill case needs: a read of its SKILL.md.
     const readsSkill = /secret-word/iu.test(text) && /read/iu.test(text);
+    // The check of the MCP tool of OpenBot calls `whoami`, which changes nothing.
+    const callsWhoami = /whoami/iu.test(text);
     report.approvals.push({ method: request.method, subagent, shape: text.slice(0, 300) });
     if (request.method.endsWith("/requestApproval"))
-      client.respond(request.id, { decision: subagent || readsSkill ? "accept" : "decline" });
+      client.respond(request.id, { decision: subagent || readsSkill || callsWhoami ? "accept" : "decline" });
     else client.respondError(request.id, { code: -32601, message: `The test does not answer ${request.method}.` });
   });
   client.start();
@@ -119,6 +124,56 @@ try {
     }),
   );
   const [folderA = root, folderB = root, shared = root] = folders;
+
+  // Two sessions in one folder, each with the MCP server that OpenBot gives its own sessions (`LocalMcpBridge`, one token
+  // for each session). A call to the tool must reach the session that made it: Kiro could keep one server for a folder,
+  // as OpenCode does, and then the second session would replace the token of the first (#9805).
+  const bridgeFolder = join(root, "bridge-folder");
+  await mkdir(bridgeFolder);
+  const whoami = {
+    type: "namespace",
+    name: "openbot",
+    tools: [
+      {
+        type: "function",
+        name: "whoami",
+        description: "Returns the id of the chat that calls it. Call it once, with no arguments.",
+        inputSchema: { type: "object", properties: {} },
+      },
+    ],
+  };
+  const callers: string[] = [];
+  client.on("request", (request) => {
+    if (request.method !== "item/tool/call" || !isRecord(request.params)) return;
+    const caller = getString(request.params, "threadId") ?? "";
+    callers.push(caller);
+    client.respond(request.id, { success: true, contentItems: [{ type: "inputText", text: `thread-id:${caller}` }] });
+  });
+  const open = async () => {
+    const response = await runCauseEffect(
+      client.request("thread/start", { cwd: bridgeFolder, model, dynamicTools: [whoami] }, (value) => value),
+    );
+    const id = getString(getRecord(response, "thread"), "id");
+    assert.ok(id, "thread/start answers no thread id.");
+    return id;
+  };
+  const [bridgeA, bridgeB] = [await open(), await open()];
+  const ask =
+    "Call the whoami tool of the openbot MCP server once, then answer with exactly the text that it returned.";
+  const [answerA, answerB] = await Promise.all([
+    runTurn(client, bridgeA, { model, text: ask, timeoutMs: 120_000 }),
+    runTurn(client, bridgeB, { model, text: ask, timeoutMs: 120_000 }),
+  ]);
+  report.mcpInOneFolder = {
+    threads: [bridgeA, bridgeB],
+    callers,
+    replies: [answerA.reply.trim().slice(-100), answerB.reply.trim().slice(-100)],
+  };
+  assert.equal(answerA.error, null, "The turn with the MCP tool of the first session fails.");
+  assert.equal(answerB.error, null, "The turn with the MCP tool of the second session fails.");
+  assert.deepEqual([...callers].sort(), [bridgeA, bridgeB].sort(), "A call of the tool reached the wrong chat.");
+  assert.ok(answerA.reply.includes(`thread-id:${bridgeA}`), "The first session did not get its own id.");
+  assert.ok(answerB.reply.includes(`thread-id:${bridgeB}`), "The second session did not get its own id.");
 
   // The context fill of a turn: `_kiro.dev/metadata` gives a percentage, and the model list the size.
   const fills: { tokens: number; window: number }[] = [];

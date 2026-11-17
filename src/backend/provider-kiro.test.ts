@@ -4,9 +4,10 @@ import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { agentProviderDescriptor, isLocalOnlyProvider } from "@openbot/contracts/agent-providers";
+import { agentTaskLimit } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { kiroContextWindow } from "./acp-flavor";
+import { customAgentFlavor, KIRO_ACP_FLAVOR, kiroContextWindow } from "./acp-flavor";
 import { resolveKiroCli } from "./cli";
 import { kiroDataDirectory, kiroHomeDirectory, kiroStatePaths } from "./process-confinement";
 import { BUILT_IN_PROVIDER_DRIVERS, kiroArgv, requireProviderDriver } from "./provider-drivers";
@@ -56,6 +57,25 @@ describe("Kiro state folders", () => {
       expect(state.protected).toContain(join(kiroHome, name));
     // Every protected path is inside a writable folder, as the sandbox needs.
     for (const path of state.protected) expect(state.writable.some((folder) => path.startsWith(folder))).toBe(true);
+  });
+});
+
+describe("KIRO_ACP_FLAVOR", () => {
+  it("has the 120 s MCP call limit of Kiro CLI, as the custom agent kiro-cli has", () => {
+    expect(KIRO_ACP_FLAVOR.mcpToolCallLimitMs).toBe(120_000);
+    expect(customAgentFlavor("kiro-cli").mcpToolCallLimitMs).toBe(KIRO_ACP_FLAVOR.mcpToolCallLimitMs);
+  });
+});
+
+describe("parallel turns of a Kiro agent", () => {
+  it("gives a Kiro agent the task limit of any other agent, so its chat and its threads run together", () => {
+    expect(agentTaskLimit({ provider: "kiro" }, 4)).toBe(4);
+    expect(agentTaskLimit({ provider: "kiro", taskLimit: 3 }, 4)).toBe(3);
+    expect(agentTaskLimit({ provider: "kiro" }, 8)).toBe(8);
+  });
+
+  it("keeps one turn at a time for the generic custom ACP agent", () => {
+    expect(agentTaskLimit({ provider: "acp", taskLimit: 3 }, 4)).toBe(1);
   });
 });
 

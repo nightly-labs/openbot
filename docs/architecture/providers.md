@@ -1482,9 +1482,18 @@ a finished turn in `meteringUsage`. `KIRO_ACP_FLAVOR.contextPercentNotice` turns
 session that this client does not hold, such as a subagent's, is left out. Credits are not shown: OpenBot
 reads tokens and US dollars, and a credit is neither.
 
-**Parallel turns.** `concurrentTurns` is `true`. With Kiro CLI 2.37.1, two `session/new` and two
-`session/prompt` calls in one process ended 0.06 s apart (8.06 s and 8.12 s). Whether two sessions in
-one folder work with the MCP servers of OpenBot was not checked.
+**Parallel turns.** `concurrentTurns` is `true`, so an agent on Kiro runs its own chat, its side threads and its
+channel turns at the same time, up to its task limit. Three checks back it:
+
+- `bun run test:kiro-parallel` runs the real agent service and scheduler over a fake `kiro-cli`. The chat and two
+  side threads of a Kiro agent run 3 turns at once in one process, each in a session of its own, and none waits with
+  the hold `one-turn`. A control agent on the generic `acp` provider runs the same messages one at a time, and a side
+  thread waits with `one-turn`.
+- `bun run test:kiro-live`, on a signed-in Kiro CLI 2.37.1: two sessions in two folders, and two in one folder,
+  overlap about 1.5 to 2 s.
+- The same run opens two sessions in one folder, each with the MCP server of OpenBot (`LocalMcpBridge`, one token for
+  each session), and has each one call a tool. Each call reached the chat that made it, so Kiro does not keep one MCP
+  server for a folder (`mcpServersPerDirectory` is not set, as it is for OpenCode).
 
 **Skills and instructions.** Kiro reads skills from `.kiro/skills` (workspace) and `~/.kiro/skills`
 only. A test with a skill in each of `.kiro/skills`, `.agents/skills` and `.claude/skills` showed only the
