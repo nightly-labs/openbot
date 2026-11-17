@@ -63,6 +63,8 @@ export const messages = {
   "mobile.app.update.group.removed": "הוסר",
   "mobile.app.update.group.deprecated": "הוצא משימוש",
   "mobile.app.update.group.security": "אבטחה",
+  "mobile.app.update.requiredTitle": "נדרש עדכון",
+  "mobile.app.update.requiredBody": "OpenBot {version} כבר לא נתמך. יש לעדכן לגרסה {minimum} ומעלה כדי להמשיך.",
   "mobile.app.update.notesFailed": "לא ניתן לטעון את הערות הגרסה.",
   "mobile.app.update.notesEmpty": "עדיין אין הערות גרסה לגרסה הזו.",
   "mobile.app.update.fullChangelog": "יומן השינויים המלא",

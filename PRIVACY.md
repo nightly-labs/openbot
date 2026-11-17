@@ -2277,6 +2277,15 @@ account data, chats, files, commands, or credentials. GitHub receives the host I
 of the connection. Connected administrators receive the installed version, release version,
 check status, and installation method.
 
+### Minimum app version
+
+A packaged desktop app and a server ask the account service for the lowest OpenBot version that it
+still supports, 15 seconds after start and then every 6 hours. The request names only the surface
+(`desktop` or `host`). It has no account, session, version, chat, file or command; the account
+service gets the IP address as part of the connection and stores nothing. The app compares its own
+version with the answer on the computer. The phone app sends no new request: the answer of the
+feature flag request that it already makes now also has the lowest supported store version.
+
 
 ## Pi, Muse, and ACP registry setup
 

@@ -490,6 +490,7 @@
     "check:ui": "bun scripts/ui-foundation-check.ts",
     "check:assets": "bun scripts/check-image-assets.ts",
     "check:doc-links": "bun scripts/check-doc-links.ts",
+    "check:app-minimum-version": "bun scripts/check-app-minimum-version.ts",
     "check:agent-context": "bun scripts/agent-context-budget.ts",
     "check:migrations": "bun scripts/check-frozen-migrations.ts",
     "verify:preload": "bun scripts/verify-preload-bundle.ts",

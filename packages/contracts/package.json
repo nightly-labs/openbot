@@ -55,6 +55,7 @@
     "./ipc-skills": "./src/ipc-skills.ts",
     "./mobile-connect": "./src/mobile-connect.ts",
     "./mobile-features": "./src/mobile-features.ts",
+    "./app-minimum-version": "./src/app-minimum-version.ts",
     "./marketplace-links": "./src/marketplace-links.ts",
     "./plugin-links": "./src/plugin-links.ts",
     "./release-version": "./src/release-version.ts",

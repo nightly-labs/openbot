@@ -165,6 +165,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
 
+          - name: Check minimum app versions
+            if: env.CODE == 'true'
+            run: bun run check:app-minimum-version
+
           # Fails after a release that changed the database schema until `releases.json` has it. It
           # takes about 50 s, so it runs only when the database code changes: a new migration must be
           # tested from every released schema. `git archive` needs only the tag commits.

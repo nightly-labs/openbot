@@ -400,6 +400,7 @@ import {
 import { remoteSyncProfileFile } from "./remote-sync-profile-file";
 import { sendToRenderer } from "./renderer-ipc";
 import { RequestedUpdate, RequestedUpdateRefusal } from "./requested-update";
+import { RequiredUpdate } from "./required-update";
 import { ResourceMonitor } from "./resource-monitor";
 import { StatementTimings } from "./resource-summary";
 import { RoutineFeedServer } from "./routine-feed-server";
@@ -565,6 +566,8 @@ const TEARDOWN_ORDER = {
   // First, so a process that the teardown ends does not count as a crash.
   resourceMonitor: 9,
   startupTiming: 9.5,
+  // Before the updater and the requested update that it drives.
+  requiredUpdate: 9.8,
   updater: 10,
   idleRestart: 11,
   hostUpdateCoordinator: 12,
@@ -737,6 +740,8 @@ export interface ApplicationServices {
   requestedUpdate: RequestedUpdate;
   /** The restart that the user of this computer asked for, when no work runs. */
   idleRestart: IdleRestart;
+  /** Null in a development run and in a local server child. */
+  requiredUpdate: RequiredUpdate | null;
   setupFile: string;
   /** The analytics answer of this computer, kept the same as the account's latest answer. */
   analyticsPreferences: AnalyticsPreferenceService;
@@ -4610,6 +4615,22 @@ export async function createApplicationServices({
     log: (message) => logger.info(message),
   });
   teardown.push(TEARDOWN_ORDER.idleRestart, "the restart when idle", () => idleRestart.dispose());
+  const requiredUpdate =
+    app.isPackaged && !localServerChild
+      ? new RequiredUpdate({
+          surface: hostedServer || serverModeEnvironment ? "host" : "desktop",
+          currentVersion,
+          resolveApiUrl: (path) => centralAuth.resolveApiUrl(path),
+          updater,
+          setRequired: (required) => remoteUpdate.setRequired(required),
+          log: (message) => logger.info(message),
+        })
+      : null;
+  if (requiredUpdate) {
+    teardown.push(TEARDOWN_ORDER.requiredUpdate, "the minimum version check", () =>
+      Effect.runPromise(requiredUpdate.dispose()),
+    );
+  }
   if (hostedServer) {
     const hostedServerStartRetry = new HostedServerStartRetry({
       hostPhase: () => host.getStatus().phase,
@@ -4824,6 +4845,7 @@ export async function createApplicationServices({
     hostUpdateCoordinator,
     requestedUpdate: remoteUpdate,
     idleRestart,
+    requiredUpdate,
     describeRestartReadiness,
     sidebarLayout,
     host,
