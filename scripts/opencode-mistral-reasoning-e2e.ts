@@ -4,10 +4,12 @@
 // Builds the OpenCode config layer with `openCodeConfigEnv`, then runs the real OpenCode CLI with that
 // layer against a fake strict server on loopback (only the base URL changes). The fake server answers
 // the first request with a `bash` tool call, and refuses a request whose assistant message carries
-// `reasoning_content`, as Mistral does.
+// `reasoning_content`, as Mistral does. It streams the last answer as Mistral does with reasoning on:
+// `delta.content` is a list of `thinking` and `text` parts, which the OpenAI-compatible adapter refuses
+// as an invalid stream event (#10591).
 // Cases: `other-host`, the `provider` entry that every other endpoint keeps, which must get the 422
 // (the control); `mistral`, which must finish the turn and keep the key, the header, the saved output
-// cap and the saved efforts. The `mistral` layer also holds a second endpoint and an OpenCode Go key,
+// cap and the saved efforts, use Mistral's own adapter, and show the text of the last answer. The `mistral` layer also holds a second endpoint and an OpenCode Go key,
 // and OpenCode must list the models of both endpoints. The `mistral` endpoint is in both blocks:
 // OpenCode 2 uses its `providers` entry, and OpenCode 1 ignores `providers` and keeps `provider`.
 // `bun scripts/opencode-mistral-reasoning-e2e.ts [<opencode binary>]`. Without an argument it uses
@@ -39,6 +41,7 @@ const MAX_OUTPUT = 12_345;
 const EFFORT = "high";
 const OTHER_ENDPOINT = "lab";
 const OTHER_MODEL = "lab-model";
+const REPLY = "e2e reply";
 const root = await mkdtemp(join(tmpdir(), "openbot-opencode-mistral-"));
 
 interface CapturedRequest {
@@ -109,7 +112,15 @@ function answer(request: IncomingMessage, response: ServerResponse, text: string
     return;
   }
   sse(response, model, [
-    { index: 0, delta: { role: "assistant", content: "done" }, finish_reason: null },
+    {
+      index: 0,
+      delta: {
+        role: "assistant",
+        content: [{ type: "thinking", thinking: [{ type: "text", text: "The bash ran." }] }],
+      },
+      finish_reason: null,
+    },
+    { index: 0, delta: { content: [{ type: "text", text: REPLY }] }, finish_reason: null },
     { index: 0, delta: {}, finish_reason: "stop" },
   ]);
 }
@@ -274,6 +285,7 @@ try {
   const layer = JSON.parse(mistral.content);
   assert.ok(layer.provider?.[ENDPOINT], "mistral: the endpoint must keep its `provider` entry for OpenCode 1");
   assert.ok(layer.provider?.[OTHER_ENDPOINT], "mistral: the other endpoint must keep its `provider` entry");
+  assert.equal(layer.providers[ENDPOINT].package, "aisdk:@ai-sdk/mistral", "mistral: package");
   before = requests.length;
   const turn = await runTurn(mistral.content, "mistral");
   const sent = requests.slice(before);
@@ -290,6 +302,11 @@ try {
     models,
   });
   assert.equal(turn.code, 0, `mistral: OpenCode exit ${turn.code}: ${turn.stderr}`);
+  assert.ok(
+    !turn.stdout.includes('"type":"error"'),
+    `mistral: OpenCode reported an error: ${turn.stdout.slice(-2000)}`,
+  );
+  assert.ok(turn.stdout.includes(REPLY), "mistral: the text of the last answer did not show");
   assert.ok(
     sent.some((request) => request.toolResult && request.status === 200),
     "mistral: the request after the tool call was not answered",
