@@ -928,7 +928,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           Effect.suspend(() =>
             answered || thread.turn !== turn
               ? Effect.void
-              : thread.rpc.request({ type: "get_state" }).pipe(
+              : thread.rpc.request({ type: "get_state" }, this.options.requestTimeoutMs).pipe(
                   Effect.flatMap((state) =>
                     answered || state.isStreaming === true || state.isCompacting === true
                       ? Effect.void
