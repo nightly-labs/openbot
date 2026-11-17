@@ -142,7 +142,7 @@ const runBitwardenCli: BitwardenCliRunner = (executable, args, extra, signal) =>
       },
     );
     const stop = () => Effect.runFork(stopWindowsProcessTree(child).pipe(Effect.ignore));
-    const timer = wrapper ? setTimeout(stop, CLI_TIMEOUT_MS) : undefined;
+    const timer = wrapper ? setTimeout(stop, CLI_TIMEOUT_MS).unref() : undefined;
     if (!wrapper) return;
     if (signal.aborted) stop();
     else signal.addEventListener("abort", stop, { once: true });
