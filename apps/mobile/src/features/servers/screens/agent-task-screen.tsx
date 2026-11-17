@@ -1,6 +1,6 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
+import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -22,23 +22,24 @@ import {
   QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
-import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
-import { dictationVoice } from "@/features/chat/components/composer-voice";
 import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import {
+  useComposerDictation,
+  useComposerDictationWithSettings,
+} from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
-import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
-import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { branchDividerRowId } from "@/features/chat/model/branch-points";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
@@ -50,13 +51,19 @@ import {
   withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
-import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import {
+  answerlessTurnSummaries,
+  finishedTurnSummaries,
+  type TurnStepsSummary,
+} from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
+import { useAgentMentionSkills } from "@/features/chat/model/use-agent-mention-skills";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -65,6 +72,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -308,12 +316,18 @@ function AgentTaskChat({
   // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
-  const turnSummaries = useMemo(() => {
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
+  const allTurnSummaries = useMemo(() => {
     lastTurnSummaries.current = conversation.data
       ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
       : undefined;
     return lastTurnSummaries.current;
   }, [conversation.data, activeTurnId, turnLines]);
+  // With the thinking display off, only a turn with no answer keeps its steps row. A separate memo
+  // keeps the map while a streamed word leaves the summaries the same.
+  const answerlessSummaries = useMemo(() => answerlessTurnSummaries(allTurnSummaries), [allTurnSummaries]);
+  const turnSummaries = showThinking ? allTurnSummaries : answerlessSummaries;
+  const rowShown = useChatRowShown(turnSummaries);
   const openTurn = useCallback(
     (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
     [agentId, serverId, taskId],
@@ -422,7 +436,7 @@ function AgentTaskChat({
     insets.top + 84,
     keyboardOffset,
     ready && rowsShown,
-    rowsShown && messages.some((row) => row.kind !== "thinking" || turnSummaries?.has(row.id)),
+    rowsShown && messages.some(rowShown),
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
     // As a chat that opens at a message from search: the list does not take the latest message first.
@@ -454,13 +468,20 @@ function AgentTaskChat({
     [removeMessage, queryClient, queryScope, serverId, taskId],
   );
   const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
-  const voice = useVoiceMode({
+  // As in the agent's chat: the mic beside the main control dictates into the draft, and only Send
+  // makes it a message. Losing the server or a screen on top stops listening and keeps the words.
+  const dictation = useComposerDictation({
     enabled: isFocused && canSend,
     focused: isFocused,
-    sendable: canSend,
-    onSend: (text) => void send(text),
+    draft,
+    onDraft: setDraft,
   });
-  const voiceOpen = voice.stage !== "closed";
+  const dictating = dictation.active;
+  const composerDictation = useComposerDictationWithSettings(dictation);
+  // The skills and apps that the composer offers after `@`, and in Use skill or app on a host that
+  // takes files in threads, as in the agent's chat.
+  const mentionSkills = useAgentMentionSkills(agentId, serverId, canSend);
+  const [skillPickerVersion, setSkillPickerVersion] = useState(0);
   // As in the agent's chat: a pull past the latest message opens the agent's info sheet on top of
   // this thread, unless Settings turns the pull off.
   const pullOn = useChatPullPreference((state) => state.enabled);
@@ -470,14 +491,16 @@ function AgentTaskChat({
   );
   const endPull = useChatEndPull({
     motion,
-    enabled: pullOn && !attachments.menuOpen && !voiceOpen,
+    enabled: pullOn && !attachments.menuOpen && !dictating,
     onOpen: openInfo,
   });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
-  const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
+  // Dictation and the attachment card keep the composer until they close: replacing it would end them.
+  const keepsComposer = dictating || attachments.menuOpen;
+  const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
   // A private answer to a form question is typed there too, never in a second field beside the composer.
-  const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
+  const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark),
@@ -537,11 +560,7 @@ function AgentTaskChat({
         );
         attachments.clear();
         // The thread shows in the menu before its list event arrives.
-        queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
-          stored && !stored.tasks.some((entry) => entry.id === started.id)
-            ? { ...stored, tasks: [started, ...stored.tasks] }
-            : stored,
-        );
+        addStartedTask(queryClient, queryScope, serverId, started);
         router.setParams<"/task/[taskId]">({ taskId: started.id });
       } catch (error) {
         void haptics.notification("error");
@@ -662,7 +681,6 @@ function AgentTaskChat({
           liquidGlassAvailable={liquidGlassAvailable}
           topInset={insets.top}
           onBack={leaveTask}
-          accessibilityHidden={voiceOpen}
         />
         <ChatMessageList
           pullGesture={endPull.gesture}
@@ -670,7 +688,6 @@ function AgentTaskChat({
           agents={serverAgents}
           rowsShown={rowsShown}
           target={target}
-          accessibilityHidden={voiceOpen}
           motion={motion}
           sending={sending}
           awaitingTurn={awaitingTurn}
@@ -731,22 +748,8 @@ function AgentTaskChat({
           topInset={insets.top}
           onRetryHistory={() => void conversation.refetch()}
         />
-        {voiceOpen ? (
-          <VoiceOverlay
-            voice={voice}
-            hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
-            reply={null}
-            muted={muted}
-            topInset={insets.top}
-            controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
-            reducedTransparency={reducedTransparency}
-          />
-        ) : null}
         <Animated.View
-          style={[
-            { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
-            motion.composerStyle,
-          ]}
+          style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
@@ -832,6 +835,8 @@ function AgentTaskChat({
               onCancelReply={() => {}}
               mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
               mentionReferences={mentionReferences}
+              mentionSkills={mentionSkills}
+              skillPickerVersion={skillPickerVersion}
               action={action}
               actionForeground={actionForeground}
               agentName={target.name}
@@ -862,7 +867,7 @@ function AgentTaskChat({
               onStop={task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined}
               stopping={task ? threadActions.acting(task) : false}
               keyboardProgress={motion.keyboardProgress}
-              voice={dictationVoice(voice, t)}
+              dictation={composerDictation}
               voiceAccent={accent}
               contextMeter={contextMeter}
             />
@@ -882,6 +887,7 @@ function AgentTaskChat({
           keyboardOffset={keyboardOffset}
           liquidGlassAvailable={liquidGlassAvailable}
           onClose={attachments.closeMenu}
+          onUseSkill={mentionSkills.length ? () => setSkillPickerVersion((version) => version + 1) : undefined}
           progress={menuProgress}
         />
       ) : null}

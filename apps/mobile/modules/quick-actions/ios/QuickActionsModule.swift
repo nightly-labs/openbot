@@ -7,7 +7,9 @@ private let quickActionEvent = "onQuickAction"
 private let symbols = [
   "agent": "bubble.left",
   "routines": "calendar",
-  "search": "magnifyingglass"
+  "search": "magnifyingglass",
+  "share": "square.and.arrow.up",
+  "support": "heart"
 ]
 
 struct QuickActionItem: Record {

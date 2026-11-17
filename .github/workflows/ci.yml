@@ -10,11 +10,12 @@ on:
 permissions:
   contents: read
 
-# A new PR push cancels the old run. On main, each commit gets its own complete run: merges come
-# faster than one run takes, and a shared group cancelled almost every main run and its deploy.
+# A new PR push cancels the old run. On main, a run always completes, and only the newest commit
+# waits for it: GitHub cancels an older waiting run. Merges come faster than one run takes, so each
+# run tests all the commits merged since the last run, and runner use does not grow with each merge.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GIT_CONFIG_COUNT: 1

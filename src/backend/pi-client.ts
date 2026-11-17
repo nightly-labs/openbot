@@ -39,6 +39,7 @@ import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiRpc } from "./pi-rpc";
+import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type AppServerNotification,
@@ -125,6 +126,24 @@ const PI_CATALOG_KEY_VARIABLES: Record<KeyOnlyProviderId, string | null> = {
   deepseek: "DEEPSEEK_API_KEY",
   openrouter: "OPENROUTER_API_KEY",
 };
+
+const PI_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+
+/**
+ * The thinking levels of a model that `get_available_models` lists, by Pi's own rule
+ * (`getSupportedThinkingLevels` in `@earendil-works/pi-ai`, the same from Pi 1.1.0 to 1.5.2). The
+ * list read them with `set_model` for each model, but Pi can replace its model list during that
+ * loop: a model that OpenRouter removed then failed `set_model`, and the provider showed Error (#11097).
+ */
+function piThinkingLevels(model: unknown): string[] {
+  if (!isRecord(model) || model.reasoning !== true) return [];
+  const map = getRecord(model, "thinkingLevelMap");
+  return PI_THINKING_LEVELS.filter((level) => {
+    const mapped = map?.[level];
+    if (mapped === null) return false;
+    return level === "xhigh" || level === "max" ? mapped !== undefined : true;
+  });
+}
 
 const PiSessionUsage = Schema.Struct({
   tokens: Schema.Struct({
@@ -538,15 +557,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
             if (!provider || !id || (keyProvider && provider !== keyProvider.id)) continue;
             // OpenRouter's `:batch` models work only through its batch API: a chat turn fails with 404.
             if (provider === "openrouter" && id.endsWith(":batch")) continue;
-            const reasoning = isRecord(model) && model.reasoning === true;
-            let levels: string[] = [];
-            if (reasoning) {
-              yield* connection.request({ type: "set_model", provider, modelId: id }, timeoutMs);
-              const advertised = yield* connection.request({ type: "get_available_thinking_levels" }, timeoutMs);
-              levels = getArray(advertised, "levels")
-                .filter(isString)
-                .map((level) => (level === "off" ? "none" : level));
-            }
+            const levels = piThinkingLevels(model).map((level) => (level === "off" ? "none" : level));
             const thinkingLevel = getString(state, "thinkingLevel");
             const preferred = thinkingLevel === "off" ? "none" : thinkingLevel;
             const defaultLevel = preferred && levels.includes(preferred) ? preferred : levels[0];
@@ -740,6 +751,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           ? ["--no-tools", ...(withExtensions ? [] : ["--no-extensions"]), "--no-mcp"]
           : ["--extension", extension.path]),
       );
+      if (!this.options.profileGeneration && process.platform === "win32")
+        args.push(...(yield* piWindowsShellArguments(cwd, this.#environment())));
       const instructions = getString(params, "developerInstructions");
       if (instructions) {
         // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`

@@ -197,9 +197,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Yanıtı iptal et",
   "mobile.chat.composer.messageAgent": "{name} ajanına mesaj gönder",
   "mobile.chat.composer.pasteFailed": "Yapıştırılan metin eklenemedi",
-  "mobile.chat.composer.cancelDictation": "Dikteyi iptal et",
   "mobile.chat.voice.listening": "Dinleniyor…",
-  "mobile.chat.voice.continue": "Dikteye devam et",
   "mobile.chat.liveVoice.start": "Sesli konuşma başlat",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Başlatılıyor",
@@ -368,7 +366,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Bilgisayarınızda oturum açın",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Bu site sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın.",
-  "mobile.chat.browserSecret.takeoverReload": "Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot parolayı veya kodu girmeyi tamamlayamadı. Eksik olanı sayfaya girin. Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
   "mobile.chat.browserSecret.takeoverFailed": "İstek tamamlanamadı.",
   "mobile.chat.browserSecret.done": "Bitirdim",
   "mobile.chat.browserSecret.submitOnce": "{origin} adresine bir kez gönderin. Bu değer sohbete eklenmez.",
@@ -535,6 +534,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Ajanı durdur ve kuyruktaki sonraki mesajı şimdi gönder",
   "mobile.chat.queue.deleteNext": "Kuyruktaki sonraki mesajı sil",
   "mobile.chat.queue.moveFirst": "En başa taşı",
+  "mobile.chat.queue.runInNewThread": "Yeni mesaj dizisinde çalıştır",
+  "mobile.chat.queue.runNextInNewThread": "Sıradaki mesajı yeni mesaj dizisinde çalıştır",
   "mobile.chat.queue.deleteTitle": "Kuyruktaki mesaj silinsin mi?",
   "mobile.chat.queue.deleteMessage": "Ajan bunu hiçbir zaman alamaz.",
   "mobile.chat.queue.keep": "Koru",

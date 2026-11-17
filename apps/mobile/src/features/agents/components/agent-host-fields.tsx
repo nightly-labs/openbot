@@ -19,11 +19,11 @@ import type { MobileTextKey } from "@openbot/i18n/mobile";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Typography } from "heroui-native";
 import { useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, View } from "react-native";
 import { useUniwind } from "uniwind";
 import { useAgentSteers } from "@/features/agents/model/use-agent-steers";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
-import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
+import { SettingsGroupRow, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
 import {
   type MobileAgent,
@@ -149,6 +149,15 @@ function SaveError({ error }: { error: string | null }) {
   ) : null;
 }
 
+/** A save error under a row of a group. */
+function RowSaveError({ error }: { error: string | null }) {
+  return error ? (
+    <View className="px-4 pb-3">
+      <SaveError error={error} />
+    </View>
+  ) : null;
+}
+
 /** Agent info > Permissions: Computer Use and local scripts, which act on the host computer. */
 export function AgentHostPermissionFields(props: AgentHostFieldsProps) {
   const { t } = useText();
@@ -198,37 +207,34 @@ export function AgentBusyMessageField(props: AgentHostFieldsProps) {
   // host or models that did not load), the note does not show.
   const steerUnsupported = mode === "steer" && steering.known && !steering.steers;
   return (
-    <>
-      <SettingsSection
-        footer={
+    <SettingsGroupRow>
+      <SettingsRow
+        description={
           steerUnsupported && agent.provider
             ? t("mobile.agent.busyMessage.steerUnsupported", { provider: agentProviderName(agent.provider) })
             : t("mobile.agent.busyMessage.footer")
         }
+        trailing={
+          <SettingsPicker<BusyMessageChoice>
+            value={choice}
+            options={[
+              { value: "default", label: t(HOST_DEFAULT_LABEL[current.defaultBusyMessageMode]) },
+              { value: "queue", label: t(BUSY_MESSAGE_LABEL.queue) },
+              { value: "steer", label: t(BUSY_MESSAGE_LABEL.steer) },
+            ]}
+            enabled={enabled}
+            dark={theme === "dark"}
+            label={t("mobile.agent.busyMessage.label")}
+            onChange={(next) => {
+              if (next !== choice) void save(current, { busyMessageMode: next === "default" ? null : next });
+            }}
+          />
+        }
       >
-        <SettingsRow
-          trailing={
-            <SettingsPicker<BusyMessageChoice>
-              value={choice}
-              options={[
-                { value: "default", label: t(HOST_DEFAULT_LABEL[current.defaultBusyMessageMode]) },
-                { value: "queue", label: t(BUSY_MESSAGE_LABEL.queue) },
-                { value: "steer", label: t(BUSY_MESSAGE_LABEL.steer) },
-              ]}
-              enabled={enabled}
-              dark={theme === "dark"}
-              label={t("mobile.agent.busyMessage.label")}
-              onChange={(next) => {
-                if (next !== choice) void save(current, { busyMessageMode: next === "default" ? null : next });
-              }}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+        <Typography.Paragraph>{t("mobile.agent.busyMessage.label")}</Typography.Paragraph>
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -253,39 +259,36 @@ export function AgentTaskLimitField(props: AgentHostFieldsProps) {
   const oneTurnAtATime = agent.provider !== undefined && !agentProviderDescriptor(agent.provider).concurrentTurns;
   const choice: TaskLimitChoice = oneTurnAtATime ? 1 : (current.taskLimit ?? "default");
   return (
-    <>
-      <SettingsSection
-        footer={
+    <SettingsGroupRow>
+      <SettingsRow
+        description={
           oneTurnAtATime && agent.provider
             ? t("mobile.agent.taskLimit.oneTurn", { provider: agentProviderName(agent.provider) })
             : t("mobile.agent.taskLimit.footer")
         }
+        trailing={
+          <SettingsPicker<TaskLimitChoice>
+            value={choice}
+            options={TASK_LIMIT_CHOICES.map((value) => ({
+              value,
+              label:
+                value === "default"
+                  ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
+                  : format.number(value),
+            }))}
+            enabled={enabled && !oneTurnAtATime}
+            dark={theme === "dark"}
+            label={t("mobile.agent.taskLimit.footer")}
+            onChange={(next) => {
+              if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
+            }}
+          />
+        }
       >
-        <SettingsRow
-          trailing={
-            <SettingsPicker<TaskLimitChoice>
-              value={choice}
-              options={TASK_LIMIT_CHOICES.map((value) => ({
-                value,
-                label:
-                  value === "default"
-                    ? t("mobile.agent.taskLimit.default", { count: AGENT_TASK_LIMIT_DEFAULT })
-                    : format.number(value),
-              }))}
-              enabled={enabled && !oneTurnAtATime}
-              dark={theme === "dark"}
-              label={t("mobile.agent.taskLimit.footer")}
-              onChange={(next) => {
-                if (next !== choice) void save(current, { taskLimit: next === "default" ? null : next });
-              }}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+        <Typography.Paragraph>{t("mobile.agent.taskLimit.label")}</Typography.Paragraph>
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -306,20 +309,18 @@ export function AgentNewChatAllowedField(props: AgentHostFieldsProps) {
   );
   if (!current) return null;
   return (
-    <>
-      <SettingsSection footer={t("mobile.agent.agentNewChat.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.allowNewChat}
-            disabled={!enabled}
-            label={t("mobile.agent.agentNewChat.title")}
-            dark={theme === "dark"}
-            onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
-          />
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+    <SettingsGroupRow>
+      <SettingsRow description={t("mobile.agent.agentNewChat.footer")}>
+        <SettingsSwitch
+          value={current.allowNewChat}
+          disabled={!enabled}
+          label={t("mobile.agent.agentNewChat.title")}
+          dark={theme === "dark"}
+          onValueChange={(allowNewChat) => void save(current, { allowNewChat })}
+        />
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 
@@ -336,20 +337,18 @@ export function AgentPlanCardField(props: AgentHostFieldsProps) {
   );
   if (!current) return null;
   return (
-    <>
-      <SettingsSection footer={t("mobile.agent.planCard.footer")}>
-        <SettingsRow>
-          <SettingsSwitch
-            value={current.quickAcknowledgement}
-            disabled={!enabled}
-            label={t("mobile.agent.planCard.label")}
-            dark={theme === "dark"}
-            onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
-          />
-        </SettingsRow>
-      </SettingsSection>
-      <SaveError error={error} />
-    </>
+    <SettingsGroupRow>
+      <SettingsRow description={t("mobile.agent.planCard.footer")}>
+        <SettingsSwitch
+          value={current.quickAcknowledgement}
+          disabled={!enabled}
+          label={t("mobile.agent.planCard.label")}
+          dark={theme === "dark"}
+          onValueChange={(quickAcknowledgement) => void save(current, { quickAcknowledgement })}
+        />
+      </SettingsRow>
+      <RowSaveError error={error} />
+    </SettingsGroupRow>
   );
 }
 

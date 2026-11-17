@@ -329,10 +329,10 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "개인 번호",
   "connector.whatsapp.ownNumberDescription":
-    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. OpenBot 전용 번호라면 끄세요.",
+    "“나에게 메시지 보내기” 채팅과 허용한 사람들만 메시지를 보낼 수 있어요. 다른 사람에게는 답장하지 않아요. 끄면 OpenBot이 모르는 사람에게 코드를 답장해요.",
   "connector.whatsapp.workingMessage": "“작업 중이에요…” 메시지",
   "connector.whatsapp.workingMessageDescription":
-    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 답변만 보내려면 끄세요.",
+    "에이전트가 작업하는 동안 OpenBot이 보내고, 이후 답변으로 바꿔요. 이전 요청을 기다리는 요청에는 대기 메시지도 보내요. 답변만 보내려면 끄세요.",
   "connector.whatsapp.statusReactions": "상태 반응",
   "connector.whatsapp.statusReactionsDescription":
     "메시지가 도착하면 OpenBot이 👀로, 답변이 준비되면 ✅로 반응해요. 반응을 보내지 않으려면 끄세요.",
@@ -351,9 +351,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "번호를 선택한 다음 휴대폰의 WhatsApp에서 이 서버를 연결하세요.",
   "connector.whatsapp.kindLabel": "번호",
   "connector.whatsapp.kindPersonal": "내 개인 번호",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요.",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot은 “나에게 메시지 보내기” 채팅과 허용한 사람들에게만 답해요. 다른 사람에게는 답장하지 않아요.",
   "connector.whatsapp.kindDedicated": "OpenBot 전용 번호",
-  "connector.whatsapp.kindDedicatedDescription": "모르는 사람은 나에게 알려 줄 코드를 받아요. 여기에서 승인하세요.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot이 이 번호로 모르는 사람마다 나에게 알려 줄 코드를 답장해요. 여기에서 승인하세요.",
   "connector.whatsapp.methodLabel": "연결 방법",
   "connector.whatsapp.methodQr": "QR 코드",
   "connector.whatsapp.methodCode": "페어링 코드",

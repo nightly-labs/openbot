@@ -85,6 +85,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
   "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",
   "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
   "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
@@ -389,8 +390,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Sla deze beslissing op als nieuwe notitie in mijn kluis.",
   "marketplace.plugin.obsidian.prompt.log":
     "Voeg een samenvatting van het werk van vandaag toe aan mijn notitie Work log.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    "Open in Obsidian Settings > Local REST API. Kopieer de API-sleutel en zet “Enable non-encrypted (HTTP) server” aan.",
+  "marketplace.plugin.obsidian.hint.apiKey": "Open in Obsidian Settings > Local REST API en kopieer de API-sleutel.",
   "marketplace.plugin.resend.tagline": "Transactionele e-mail",
   "marketplace.plugin.resend.description":
     "Met Resend kunnen agents transactionele e-mail versturen en de bezorging controleren via één API. Een API-sleutel uit het Resend-dashboard gaat als één omgevingsvariabele naar de lokale server.",

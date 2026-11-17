@@ -323,6 +323,11 @@ export interface ConversationMessage {
   /** Set on a `video_generation` message. Absent on a message from an older host. */
   videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
+  /**
+   * Set on a message that joined a turn that was already running, a steer. The shared order puts it
+   * after the rows that the turn wrote before it (`conversation-order.ts`). The Team API drops it.
+   */
+  steered?: true | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
   reactions?: ConversationReaction[] | undefined;
@@ -384,6 +389,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         value.attachments.every(isAttachmentSummary))) &&
     (value.voiceRecording === undefined || isAttachmentSummary(value.voiceRecording)) &&
     (value.delivery === undefined || isConversationDelivery(value.delivery)) &&
+    (value.steered === undefined || value.steered === true) &&
     (value.exchange === undefined || isAgentExchangeSummary(value.exchange)) &&
     (value.reaction === undefined || value.reaction === null || isMessageReaction(value.reaction)) &&
     (value.reactions === undefined ||

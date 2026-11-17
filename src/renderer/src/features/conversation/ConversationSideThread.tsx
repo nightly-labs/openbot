@@ -7,10 +7,11 @@ import { AgentThreadView } from "@openbot/ui/features/conversation/threads/Agent
 import type { AgentThreadBranchSource } from "@openbot/ui/features/conversation/threads/BranchDivider";
 import { TaskAnswerCard } from "@openbot/ui/features/tasks/TaskPanel";
 import { useText } from "@openbot/ui/text";
-import { createEffect, createProjection, Show } from "solid-js";
+import { createEffect, createMemo, createProjection, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { threadAwaitingReplies } from "../../awaiting-replies";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
@@ -64,6 +65,7 @@ export function ConversationSideThread(props: { threadId: string }) {
   });
   const thread = (): SideThread | undefined => view.threads?.side.thread(props.threadId);
   const item = () => view.threads?.side.tabs.find((tab) => tab.id === props.threadId);
+  const awaiting = createMemo(() => threadAwaitingReplies(thread()?.task, view.agents, view.agentWaits));
   /** Reconciled by id, so a stream chunk redraws only the message that changed. */
   const messages = createProjection<AgentMessage[]>(
     () => {
@@ -252,6 +254,7 @@ export function ConversationSideThread(props: { threadId: string }) {
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(draftKey(), null)}
             queue={threadQueue.view(current().thread.task, draftKey())}
+            awaiting={awaiting()}
             selectionActions={selectionActions(current().thread)}
           />
         )}

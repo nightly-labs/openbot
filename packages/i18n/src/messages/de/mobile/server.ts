@@ -426,7 +426,6 @@ export const messages = {
   "mobile.server.route.providers": "Anbieter",
   "mobile.server.route.provider": "Anbieter",
   "mobile.server.route.providerModels": "Modelle",
-  "mobile.server.route.mcp": "MCP-Server",
   "mobile.server.route.mcpServer": "MCP-Server",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (du)",
@@ -936,10 +935,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Neu verknüpfen",
   "mobile.server.connectors.whatsapp.ownNumber": "Private Nummer",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Schalte das für eine Nummer nur für OpenBot aus.",
+    "Nur dein Chat „Nachricht an dich selbst“ und die Personen, die du zulässt, können schreiben. Andere bekommen keine Antwort. Wenn es aus ist, antwortet OpenBot unbekannten Personen mit einem Code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Nachricht „Wird bearbeitet…“",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Schalte sie aus, um nur die Antwort zu senden.",
+    "OpenBot sendet sie, während der Agent arbeitet, und ersetzt sie dann durch die Antwort. Eine Anfrage, die auf eine frühere wartet, bekommt auch eine Wartemeldung. Schalte sie aus, um nur die Antwort zu senden.",
   "mobile.server.connectors.whatsapp.statusReactions": "Status-Reaktionen",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reagiert mit 👀, wenn eine Nachricht ankommt, und mit ✅, wenn die Antwort fertig ist. Schalte sie aus, um keine Reaktionen zu senden.",
@@ -959,10 +958,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Nummer",
   "mobile.server.connectors.whatsapp.kindPersonal": "Meine private Nummer",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot antwortet nur dir in „Nachricht an dich selbst“ und den Personen, die du zulässt.",
+    "OpenBot antwortet nur dir in „Nachricht an dich selbst“ und den Personen, die du zulässt. Andere Personen bekommen keine Antwort.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Eine Nummer nur für OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Unbekannte Personen bekommen einen Code, den sie dir geben. Du genehmigst sie hier.",
+    "OpenBot antwortet von dieser Nummer jeder unbekannten Person mit einem Code, den sie dir gibt. Du genehmigst sie hier.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Telefonnummer",
   "mobile.server.connectors.whatsapp.phoneDescription": "Mit Ländervorwahl, z. B. +49 151 23456789.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Gib die Telefonnummer mit Ländervorwahl ein.",
@@ -1128,6 +1127,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installiert",
   "mobile.server.providers.status.notInstalled": "Nicht installiert",
   "mobile.server.providers.status.checking": "Wird geprüft",
+  "mobile.server.providers.addAccountWithCode": "Konto mit Code hinzufügen",
+  "mobile.server.providers.accountSignInWithCode": "Mit Code anmelden",
   "mobile.server.providers.accountsKeyHint":
     "Jeder Agent nutzt ein Konto. Wähle es in den Einstellungen des Agenten. Ein neues Konto braucht einen API-Schlüssel dieses Kontos.",
   "mobile.server.providers.accountChangeKey": "Schlüssel ändern",
@@ -1232,24 +1233,12 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "Standard für neue Agenten",
   "mobile.server.providers.startsWith": "Neue Agenten starten mit {name}.",
   "mobile.server.providers.connectFirst": "Verbinde zuerst {name}.",
-  "mobile.server.settings.mcp": "MCP-Server",
-  "mobile.server.settings.mcpCount": { one: "{count} Server", other: "{count} Server" },
   "mobile.server.mcp.unsupported": "Aktualisiere OpenBot auf diesem Server, um seine MCP-Server hier zu verwalten.",
   "mobile.server.mcp.unavailable":
     "Verbinde dich als Inhaber oder Admin mit diesem Server, um seine MCP-Server zu verwalten.",
   "mobile.server.mcp.accessUnsupported":
     "Aktualisiere OpenBot auf diesem Server, um festzulegen, wer seine MCP-Server erhält.",
-  "mobile.server.mcp.description":
-    "MCP-Server geben den Agenten dieses Servers mehr Werkzeuge. Claude- und Codex-Agenten erhalten nur die Server in dieser Liste.",
   "mobile.server.mcp.loading": "MCP-Server werden geladen…",
-  "mobile.server.mcp.loadFailed": "Die MCP-Server konnten nicht geladen werden.",
-  "mobile.server.mcp.empty": "Noch keine MCP-Server.",
-  "mobile.server.mcp.retry": "Erneut versuchen",
-  "mobile.server.mcp.add": "MCP-Server hinzufügen",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "An",
-  "mobile.server.mcp.disabled": "Aus",
-  "mobile.server.mcp.signedIn": "Angemeldet",
   "mobile.server.mcp.gone": "Dieser MCP-Server ist nicht mehr auf diesem Server.",
   "mobile.server.mcp.addTitle": "MCP-Server hinzufügen",
   "mobile.server.mcp.addConfirm": "Hinzufügen",

@@ -17,6 +17,15 @@ import { MessageColorPicture, ThemePicture } from "@/features/settings/component
 import { type Appearance, saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { saveChatBackground, useChatBackground } from "@/features/settings/model/chat-background";
 import {
+  type ChatDetailPreference,
+  saveMemoryChangesDisplayPreference,
+  saveSubagentsDisplayPreference,
+  saveThinkingDisplayPreference,
+  useMemoryChangesDisplayPreference,
+  useSubagentsDisplayPreference,
+  useThinkingDisplayPreference,
+} from "@/features/settings/model/chat-details";
+import {
   type MessageColorMode,
   type MessageColorValue,
   saveMessageColor,
@@ -162,6 +171,7 @@ export function AppearanceSettingsScreen() {
       </SettingsSection>
       <ChatBackgroundSection dark={theme === "dark"} />
       <RoutineCollapseSection dark={theme === "dark"} />
+      <ChatDetailsSection dark={theme === "dark"} />
       <FullVisualSection dark={theme === "dark"} />
     </SettingsContent>
   );
@@ -268,6 +278,53 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
           }}
         />
       </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** The details of a reply that a chat shows: the agent's thinking, its subagents and its saved memories. */
+function ChatDetailsSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const [error, setError] = useState<string | null>(null);
+  const details = [
+    {
+      label: t("mobile.settings.appearance.showThinking"),
+      state: useThinkingDisplayPreference(),
+      save: saveThinkingDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showSubagents"),
+      state: useSubagentsDisplayPreference(),
+      save: saveSubagentsDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showMemoryChanges"),
+      state: useMemoryChangesDisplayPreference(),
+      save: saveMemoryChangesDisplayPreference,
+    },
+  ] satisfies { label: string; state: ChatDetailPreference; save: (enabled: boolean) => Promise<void> }[];
+  return (
+    <SettingsSection
+      title={t("mobile.settings.appearance.replyDetails")}
+      footer={error ?? t("mobile.settings.appearance.replyDetailsFooter")}
+    >
+      {details.map(({ label, state, save }) => (
+        <SettingsRow key={label}>
+          <SettingsSwitch
+            value={state.enabled}
+            disabled={!state.ready || state.saving}
+            label={label}
+            dark={dark}
+            onValueChange={(enabled) => {
+              setError(null);
+              void save(enabled).catch(() => {
+                setError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
+        </SettingsRow>
+      ))}
     </SettingsSection>
   );
 }

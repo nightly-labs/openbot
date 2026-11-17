@@ -5,7 +5,8 @@
 // when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
 // Checks:
 //   1. A turn that wrote text before the error continues on the backup model, and a thread turn
-//      moves to it too (#8406). These run after check 5.
+//      moves to it too (#8406). So does a WhatsApp conversation turn, and the conversation gets the
+//      backup's answer (#11015). These run after check 5.
 //   2. An agent with no backup models fails with its error, as before.
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
 //      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
@@ -18,7 +19,8 @@
 // whose uuid the saved session holds runs with a new uuid (#9270).
 // When a usage limit refuses the turn that Claude starts by itself for a background subagent's report,
 // the request that started the subagent continues on the backup with that report. A report that a
-// completed turn read does not make its request run again (#9493).
+// completed turn read does not make its request run again (#9493). When the plan refuses only the
+// subagent's requests and Claude's own turn then ends with no answer, the request continues on the backup too (#11141).
 // `bun run test:backup-model-failover`. Writes .openbot-build/backup-model-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -132,7 +134,9 @@ const turn = (message) => {
   // The turn starts a background subagent and ends. When the subagent ends, Claude starts a turn by
   // itself to read its report, and the plan refuses that turn at once (#9493). With "usage-report-read",
   // that turn reads the report and completes, and the plan refuses a later turn that Claude starts.
-  if ((input.includes("usage-background") || input.includes("usage-report-read")) && model === ${JSON.stringify(PRIMARY)}) {
+  // With "usage-subagent", the plan refuses the subagent's request, and Claude's own turn ends with no answer
+  // and no refusal of its own (#11141).
+  if ((input.includes("usage-background") || input.includes("usage-report-read") || input.includes("usage-subagent")) && model === ${JSON.stringify(PRIMARY)}) {
     const callId = "toolu_" + randomUUID().replaceAll("-", "");
     write({ type: "assistant", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
       content: [{ type: "tool_use", id: callId, name: "Agent", input: { description: "Background research", prompt: "Research.", run_in_background: true } }],
@@ -141,6 +145,19 @@ const turn = (message) => {
     result({ is_error: false, result: "A helper works in the background." });
     setTimeout(() => {
       const limit = "You've hit your limit. Try again later.";
+      if (input.includes("usage-subagent")) {
+        process.stdout.write(JSON.stringify({ type: "assistant", error: "rate_limit", message: { id: "msg_" + randomUUID(), type: "message", role: "assistant", model,
+          content: [{ type: "text", text: "You've hit your 5-hour limit · resets 7:50pm" }], stop_reason: null, usage: { input_tokens: 1, output_tokens: 1 } },
+          parent_tool_use_id: callId, session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
+          status: "failed", summary: "You've hit your 5-hour limit · resets 7:50pm", session_id: sessionId, uuid: randomUUID() }) + "\\n");
+        fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
+        assistant("");
+        write({ type: "rate_limit_event", rate_limit_info: { status: "rejected", rateLimitType: "five_hour", resetsAt: Math.floor(Date.now() / 1000) + 3600 },
+          session_id: sessionId, uuid: randomUUID() });
+        result({ is_error: false, result: "" });
+        return;
+      }
       process.stdout.write(JSON.stringify({ type: "system", subtype: "task_notification", task_id: "task-" + callId, tool_use_id: callId,
         status: "completed", summary: "Found three sources.", session_id: sessionId, uuid: randomUUID() }) + "\\n");
       fs.appendFileSync(${JSON.stringify(turnLog)}, JSON.stringify({ model, failed: true, input: "background report", pid: process.pid }) + "\\n");
@@ -840,6 +857,55 @@ try {
     return { taskId: task.id, ran };
   });
 
+  await check("a WhatsApp conversation turn moves to the backup model", async () => {
+    const replier = await withBackup("Replier");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const ends: { status: string; answer: string | null }[] = [];
+    const stopListening = service.messaging.onActivity((activity) => {
+      if (activity.type === "finished" && activity.link.platformChannelId === "failover@g.us")
+        ends.push({ status: activity.status, answer: activity.answer });
+    });
+    try {
+      const connection = service.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+      service.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+      const received = await runCauseEffect(
+        service.messaging.receive({
+          connectionId: connection.connectionId,
+          agentId: replier.id,
+          platformChannelId: "failover@g.us",
+          threadKey: "failover",
+          isDirect: false,
+          title: "Group",
+          text: "work",
+          sourcePaths: [],
+          origin: { authorId: "48200000000", authorName: "Client", platformMessageId: "failover-message" },
+          idempotencyKey: "whatsapp:failover",
+        }),
+      );
+      assert.equal(received.status, "queued");
+      const linkId = received.status === "queued" ? received.link.linkId : "";
+      await waitFor("the conversation's request to end", () => ends.length > 0);
+      await waitFor(
+        "the conversation's requests to settle",
+        () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+      );
+    } finally {
+      stopListening();
+    }
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The message ran on the own model, then on the backup.");
+    assert.deepEqual(ends, [{ status: "completed", answer: "Done." }], "The conversation gets the backup's answer.");
+    assert.equal(agentOf(replier.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(replier.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran, ends };
+  });
+
   await check("a thread turn that wrote text continues on the backup model", async () => {
     const threader = await withBackup("Weaver");
     failing([PRIMARY]);
@@ -1356,6 +1422,49 @@ try {
         .map((turn) => turn.model),
       [PRIMARY, PRIMARY, BACKUP],
       "The request ran, Claude's own turn was refused, and the backup continued.",
+    );
+    assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
+    const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);
+    assert.equal(notes.length, 1, "The chat says that the agent switched.");
+    assert.deepEqual(errorsFor(agent.id, since), [], "No error shows.");
+    return {
+      models: turns()
+        .slice(before)
+        .map((turn) => turn.model),
+      notes,
+    };
+  });
+
+  await check("a usage limit that refuses only a background subagent continues on the backup", async () => {
+    await restart();
+    const agent = await create("Lead");
+    await waitFor("the first turn to end", () =>
+      service.listQueue(agent.id).deliveries.every((delivery) => delivery.status === "completed"),
+    );
+    await runCauseEffect(
+      service.updateAgent({
+        agentId: agent.id,
+        backupModels: { automatic: true, order: [{ provider: "claude", model: BACKUP }] },
+      }),
+    );
+    const since = events.length;
+    const before = turns().length;
+    const outcome = await send(agent.id, "usage-subagent: research in the background, then report.");
+    assert.equal(outcome.status, "completed", "The request that starts the subagent completes.");
+    const continued = await waitFor("the request to continue on the backup", () =>
+      turns()
+        .slice(before)
+        .find((turn) => turn.model === BACKUP),
+    );
+    assert.ok(continued.input.includes("Continue the unfinished task"), "The backup gets a continuation request.");
+    assert.ok(
+      continued.input.includes('Background subagent \\"Background research\\" failed'),
+      "The backup gets the subagent's failure.",
+    );
+    assert.ok(continued.input.includes("usage-subagent"), "The backup gets the original request.");
+    await waitFor(
+      "the continuation to end",
+      () => mailbox.getDelivery(outcome.deliveryId)?.delivery.status === "completed",
     );
     assert.equal(agentOf(agent.id).model, BACKUP, "The agent is on its backup model.");
     const notes = await markers(agent.id, MODEL_SWITCH_ITEM_TYPES["usage-limit"]);

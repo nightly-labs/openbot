@@ -10,6 +10,8 @@ export type AgentProvider = AgentProviderId;
 /** Where a diagnostic came from. See `AgentClient.on("diagnostic")`. */
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
+  /** Set when the text is a record of the agent process's stderr, not a report that OpenBot wrote. */
+  readonly stderr?: boolean;
 }
 
 export interface AgentClient {
@@ -20,6 +22,11 @@ export interface AgentClient {
    * handoff.
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
+  /**
+   * True when the provider compacts its own context, although OpenBot cannot ask it to. The context
+   * meter shows that the provider manages compaction, as for `native`.
+   */
+  readonly compactsItself?: boolean;
   /**
    * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
    * become a step: the provider names no phase, and the client classifies the text only at the next
@@ -65,6 +72,11 @@ export interface AgentClient {
   readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
+  /**
+   * True when the process must be replaced before the next turn, and nothing that uses it is lost:
+   * it still runs a stopped turn that OpenBot ended. `threadIds` are the threads loaded on it.
+   */
+  readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
   /**

@@ -768,6 +768,13 @@ export function createRendererForwarders({
     for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.attachmentImports.importProgress, progress);
   }
 
+  // Settings can open in any window; each one keeps the progress of its own server.
+  function forwardInstanceTransferUploadProgress(
+    progress: import("@openbot/contracts/ipc").InstanceTransferUploadProgress,
+  ): void {
+    for (const target of appWindows()) sendToRenderer(target, IPC_ENDPOINTS.instanceTransfer.uploadProgress, progress);
+  }
+
   return {
     closeChatNotifications,
     forwardAgentEvent,
@@ -796,5 +803,6 @@ export function createRendererForwarders({
     forwardDirectTyping,
     forwardAttachmentDownload,
     forwardAttachmentImportProgress,
+    forwardInstanceTransferUploadProgress,
   };
 }

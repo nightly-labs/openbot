@@ -72,7 +72,7 @@ import { desktopAnalytics } from "../../analytics";
 import { writeClipboardText } from "../../clipboard";
 import { HostedUpsellRoutinesNotice, hostedUpsellRoutineCreated } from "../servers/hosted-server-upsell-controller";
 import { trackRoutineAction } from "./routine-analytics";
-import { isEventRoutine, routineListSummary, routineScheduleOf } from "./routine-summary";
+import { isEventRoutine, routineListSummary, routinePausedByRunLabel, routineScheduleOf } from "./routine-summary";
 import type { RoutineEditorRecord, RoutinesPort } from "./routines-port";
 
 export interface RoutineSelectionRequest {
@@ -887,6 +887,9 @@ export function AgentRoutinesSettings(props: AgentRoutinesSettingsProps) {
                                     ? t("routine.settings.completed", { schedule: routineListSummary(routine(), text) })
                                     : routineListSummary(routine(), text)}
                                 </small>
+                                <Show when={routinePausedByRunLabel(routine(), text)}>
+                                  {(reason) => <small>{reason()}</small>}
+                                </Show>
                               </span>
                             </Button>
                             {/* A done one-time routine needs a new time to run again, so only the editor resumes it. */}

@@ -17,6 +17,8 @@
 // leaves out no server of OpenBot's, also when an OpenBot server name is the start of its name.
 // From #9568: the CLI 1.5.9 names the refused tool in its answer, and no longer answers with the
 // short text after which OpenBot reads the log. The server is left out the same way.
+// From #11063: the CLI refuses the tool again from the second prompt after the resume. Each later
+// turn leaves the server out again, and answers.
 // From #7482: Google refuses a tool schema (an array with no `items`, an empty `enum` value) and names the
 // tool only by its place in the request. OpenBot finds the tool in the schemas that the CLI saved, leaves
 // out its server, and the turn answers.
@@ -328,6 +330,26 @@ try {
     answerPrompts.map((entry) => entry.refused),
     ["mcp_resend_get-contact", null],
     "The prompt runs once more, and then without the refused tool.",
+  );
+
+  // 8b. The CLI refuses the tool again from the second prompt after the resume (#11063). Each later
+  // turn leaves the server out again, and answers.
+  for (const name of ["refusedToolAgain", "refusedToolThird"]) {
+    const again = await runTurn(refusedClient, answerThread, {
+      text: "CLI_1_5_9 SERVERS_RETURN Reply with OK only.",
+      timeoutMs: 30_000,
+    });
+    report.turns[name] = again;
+    assert.equal(again.error, null, "A later turn with the refused tool again has no error.");
+    assert.equal(again.reply, "OK", "A later turn answers without the server.");
+  }
+  const againPrompts = (await readJsonl<RefusedEntry>(refusedLog)).filter(
+    (entry) => entry.method === "session/prompt" && entry.sessionId === answerThread,
+  );
+  assert.deepEqual(
+    againPrompts.map((entry) => entry.refused),
+    ["mcp_resend_get-contact", null, "mcp_resend_get-contact", null, "mcp_resend_get-contact", null],
+    "Each turn runs once more, and then without the refused tool.",
   );
 
   // 9. Google refuses a tool schema and names the tool only by its place in the request (#7482).

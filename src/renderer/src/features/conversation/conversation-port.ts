@@ -5,6 +5,8 @@ import type { DeleteSharedTableInput, OpenBotDesktopApi, SharedTable } from "@op
  * shared tables, and the browser seams a view takes when no runtime is injected.
  */
 export interface ConversationPort {
+  /** A chat window opens the page of a browser takeover in the main window. */
+  dynamicIsland: Pick<OpenBotDesktopApi["dynamicIsland"], "openBrowserTakeover">;
   agent: Pick<
     OpenBotDesktopApi["agent"],
     | "addPreviewPage"

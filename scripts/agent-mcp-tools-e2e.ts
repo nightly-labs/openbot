@@ -142,7 +142,7 @@ interface ToolAnswer {
   error?: string;
   toolCount?: number;
   tools?: string[];
-  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean }>;
+  servers?: Array<{ name: string; headerNames?: string[]; builtIn?: boolean; forYou?: boolean }>;
   enabled?: boolean;
   removed?: boolean;
   setupSteps?: string[];
@@ -201,6 +201,7 @@ try {
     const response = await runCauseEffect(
       handleMcpServerTool(using, {
         tool,
+        agentId: "agent-a",
         arguments: args,
         approve: (reason) =>
           Effect.sync(() => {
@@ -355,6 +356,23 @@ try {
   const listed = await call("list shows no secret", "list_mcp_servers", {});
   const crmListed = listed.result.servers?.find((entry) => entry.name === "crm");
   assert.deepEqual(crmListed?.headerNames, ["Authorization"]);
+  assert.equal(crmListed?.forYou, true, "A server with no selected agents goes to every agent.");
+
+  // The user selected other agents for crm (#10992): the list tells the agent that it does not get crm.
+  const crmId = row("crm")?.id;
+  const limited = mcpServersFromGateway(gateway, undefined, undefined, (mcpServerId, agentId) =>
+    mcpServerId === crmId ? agentId === "agent-b" : true,
+  );
+  const limitedListed = await call(
+    "list shows the servers the agent does not get",
+    "list_mcp_servers",
+    {},
+    true,
+    limited,
+  );
+  const forYou = Object.fromEntries((limitedListed.result.servers ?? []).map((entry) => [entry.name, entry.forYou]));
+  assert.equal(forYou.crm, false);
+  assert.equal(forYou.docs, true);
 
   const off = await call("turn a server off", "set_mcp_server_enabled", { name: "docs", enabled: false });
   assert.equal(off.success, true);

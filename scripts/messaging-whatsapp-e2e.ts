@@ -16,6 +16,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { Boom } from "@hapi/boom";
 import type { MessagingConnection, WhatsAppLinkState } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import {
   newStoreKey,
   WhatsAppAuthStore,
@@ -750,6 +751,57 @@ try {
       // The request waits again, as the steps below expect.
       await runCauseEffect(mailbox.restoreQueued(request.delivery.id));
       return { posts: working() - before };
+    });
+
+    await step("failed turn: the chat gets the catalog reason, never the provider's own text (#11303)", async () => {
+      const link = agents.messaging.store.linkByKey(connectionId(agents), OWNER_JID, "dm");
+      assert.ok(link, "No conversation for the owner's chat.");
+      // Posts and edits: the end of a request edits its status post.
+      const texts = () =>
+        phone.sent.flatMap((sent) =>
+          sent.jid === OWNER_JID && "text" in sent.content && typeof sent.content.text === "string"
+            ? [sent.content.text]
+            : [],
+        );
+      // No provider runs here, so the step ends each turn as the turn lifecycle does: the failure is
+      // stored on the request before the turn's end.
+      const failTurn = async (turnId: string, error: string) => {
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the owner's chat.");
+        await runCauseEffect(mailbox.markStarting(request.delivery.id));
+        const scope = Effect.runSync(Scope.make());
+        const turn = { agentId: link.agentId, threadId: link.threadId, turnId };
+        agents.messaging.event({ type: "turn-started", ...turn }, scope);
+        await runCauseEffect(mailbox.markTerminal(request.delivery.id, "failed", error));
+        agents.messaging.event({ type: "turn-completed", ...turn, status: "failed" }, scope);
+      };
+      const signIn = sourceText("error.provider.signInExpired", { provider: "Claude" });
+      await failTurn("turn-sign-in-expired", signIn);
+      await until(() => texts().includes(signIn), "the sign-in reason");
+      const general = sourceText("status.messaging.failed");
+      const generalPosts = () => texts().filter((text) => text === general).length;
+      const before = generalPosts();
+      await failTurn("turn-provider-text", "Claude Code failed: /home/ana/.claude/settings.json is not valid.");
+      await until(() => generalPosts() > before, "the general text");
+      assert.ok(!texts().some((text) => text.includes("/home/ana")), "The provider's own text reached WhatsApp.");
+      // Another OpenBot on the same number posts such a reason with ids that this one does not know.
+      const otherReason = message({ chat: OWNER_JID, fromMe: true, text: signIn });
+      phone.current().receive([otherReason]);
+      const later = message({ chat: OWNER_JID, fromMe: true, text: "after the other OpenBot's reason" });
+      phone.current().receive([later]);
+      await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the message after the other reason");
+      assert.equal(
+        received(agents, OWNER_JID, otherReason.key.id ?? ""),
+        false,
+        "Another OpenBot's reason was a request.",
+      );
+      // The steps below expect the owner to have as many waiting requests as the limit permits.
+      for (let index = 1; mailbox.unresolvedMessagingDeliveries(link.linkId).length < 2; index += 1) {
+        const again = message({ chat: OWNER_JID, fromMe: true, text: `request again ${index}` });
+        phone.current().receive([again]);
+        await until(() => received(agents, OWNER_JID, again.key.id ?? ""), `request again ${index}`);
+      }
+      return { reason: signIn, general };
     });
 
     await step(

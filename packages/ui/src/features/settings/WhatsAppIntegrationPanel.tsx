@@ -53,6 +53,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import {
   type IntegrationPageSlots,
@@ -218,7 +219,9 @@ export function whatsappIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: "connector.whatsapp.statusAttention", attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: "connector.whatsapp.statusConnected", attention };
+  return (
+    pausedChannelState(connections) ?? { status: "connected", label: "connector.whatsapp.statusConnected", attention }
+  );
 }
 
 /** Where the link dialog starts: at the number link, or at the orchestrator of the linked numbers. */

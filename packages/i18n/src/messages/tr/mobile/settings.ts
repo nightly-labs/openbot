@@ -130,6 +130,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Rutin etkinliğini daralt",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Bir sohbetteki ardışık rutin olayları daraltılmış tek bir satır olarak görünür. Göstermek için satıra dokunun.",
+  "mobile.settings.appearance.replyDetails": "Yanıt ayrıntıları",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Sohbetlerde satırını gizlemek için bir ayrıntıyı kapatın. Ajan düşünmeye, alt ajan başlatmaya ve anı kaydetmeye devam eder.",
+  "mobile.settings.appearance.showThinking": "Ajanın düşünmesini göster",
+  "mobile.settings.appearance.showSubagents": "Alt ajanları göster",
+  "mobile.settings.appearance.showMemoryChanges": "Kaydedilen anıları göster",
   "mobile.settings.appearance.fullVisuals": "Görsel önizlemeleri tam göster",
   "mobile.settings.appearance.fullVisualsFooter":
     "Bir ajanın görseli sohbette tam yüksekliğiyle görünür. Bu kapalıyken uzun bir görsel kesilir; tamamını görmek için ona dokunun.",
@@ -245,8 +251,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
   "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
+  "mobile.settings.conversations.swipeOff": "Kapalı",
   "mobile.settings.conversations.swipeFooter":
-    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Bir mesajda kaydırmak yine ona yanıt verir.",
+    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Aynı kaydırma bir mesajda mesajların saatlerini gösterir.",
   "mobile.settings.conversations.pullInfo": "Bilgi için yukarı çek",
   "mobile.settings.conversations.pullInfoFooter":
     "Bir sohbet, kanal veya mesaj dizisinde son mesajın ötesine yukarı çekip bırakarak bilgisini açın.",
@@ -510,6 +517,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "İşlem durdurulamadı.",
   "mobile.settings.agents.processes.stopTitle": "Bu program durdurulsun mu?",
   "mobile.settings.agents.processes.stopLabel": "{pid} işlemini durdur",
+  "mobile.settings.quickActions.title": "Uygulama simgesi menüsü",
+  "mobile.settings.quickActions.footer":
+    "Bu eylemleri görmek için OpenBot simgesine dokunup basılı tut. En fazla {count} tanesini açabilirsin.",
+  "mobile.settings.quickActions.latestChat": "Son sohbet",
+  "mobile.settings.quickActions.secondChat": "Sondan ikinci sohbet",
   "mobile.settings.shortcuts.title": "Kestirmeler",
   "mobile.settings.shortcuts.agent": "Ajan",
   "mobile.settings.shortcuts.none": "Yok",

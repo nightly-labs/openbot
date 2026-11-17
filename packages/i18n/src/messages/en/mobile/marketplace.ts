@@ -94,6 +94,7 @@ export const messages = defineMessages("mobile.marketplace", {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "Help me use this skill.",
   "mobile.marketplace.app.add": "Add app",
+  "mobile.marketplace.app.addCustom": "Add custom",
   "mobile.marketplace.app.connect": "Connect",
   "mobile.marketplace.app.connectTitle": "Connect {name}",
   "mobile.marketplace.app.keyIntro": "Paste the key from your account. The server tests it before it saves the app.",

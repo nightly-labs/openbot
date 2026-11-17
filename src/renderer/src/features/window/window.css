@@ -203,7 +203,7 @@
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-compact
     .conversation-panel
     > .conversation-header {
-    margin-inline-start: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
+    --conversation-header-shift: max(0px, calc(var(--top-row-tabs-start) - var(--left-panel-width)));
   }
 
   /* The chat header has the centre line of the buttons of the frame, as each page header has. */
@@ -216,14 +216,18 @@
   }
 
   /* The frame animates the width of the sidebar column. The start of the chat header moves in the
-   * same time, so the tabs do not jump when the sidebar closes or opens. */
+   * same time, so the tabs do not jump when the sidebar closes or opens. A moved header also ends at
+   * the end of the chat: a full-width header (`panel-layout.css`) would go under the side panel. */
   .app-window
     > .window-rail:not([hidden])
     ~ .app-frame-edge[data-window-page-kind="agents"]
     .conversation-panel
     > .conversation-header {
-    transition: margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay))
-      cubic-bezier(0.32, 0.72, 0, 1);
+    max-width: calc(100% - var(--conversation-header-shift, 0px));
+    margin-inline-start: var(--conversation-header-shift, 0px);
+    transition:
+      margin-inline-start var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1),
+      max-width var(--panel-resize-duration, var(--openbot-duration-overlay)) cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   /* The sidebar button of the top row closes the agent list. The sidebar column has no width; only
@@ -262,7 +266,7 @@
     ~ .app-frame-edge[data-window-page-kind="agents"].app-frame-sidebar-closed
     .conversation-panel
     > .conversation-header {
-    margin-inline-start: var(--top-row-tabs-start);
+    --conversation-header-shift: var(--top-row-tabs-start);
   }
 
   /* One card holds the sidebar, the chat and the side panel, below the top row. The frame draws the
