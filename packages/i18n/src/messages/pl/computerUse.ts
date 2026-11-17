@@ -20,6 +20,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot widzi aplikacje na tym komputerze i może ich używać. Ten system nie wymaga dodatkowych uprawnień.",
   "computerUse.openSettingsFailed.title": "Nie udało się otworzyć Ustawień systemowych",
+  "computerUse.restartRequired.title": "Uruchom ponownie OpenBot, aby dokończyć sterowanie komputerem",
+  "computerUse.restartRequired.action": "Uruchom ponownie OpenBot",
   "computerUse.compact.title": "Włącz Sterowanie komputerem",
   "computerUse.compact.description": "Pozwól OpenBot widzieć aplikacje na tym komputerze i ich używać.",
   "computerUse.granted": "Przyznano",

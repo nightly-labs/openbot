@@ -20,6 +20,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot יכול לראות אפליקציות במחשב הזה ולפעול בהן. המערכת הזו אינה דורשת הרשאה נוספת.",
   "computerUse.openSettingsFailed.title": "לא ניתן היה לפתוח את System Settings",
+  "computerUse.restartRequired.title": "יש להפעיל מחדש את OpenBot כדי לסיים את הגדרת השליטה במחשב",
+  "computerUse.restartRequired.action": "הפעלה מחדש של OpenBot",
   "computerUse.compact.title": "הפעלת שליטה במחשב",
   "computerUse.compact.description": "מאפשר ל-OpenBot לראות אפליקציות במחשב הזה ולפעול בהן.",
   "computerUse.granted": "ניתנה",

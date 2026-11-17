@@ -20,6 +20,8 @@ export const messages = defineMessages("computerUse", {
   "computerUse.ready.description":
     "OpenBot can see and interact with apps on this computer. This system asks for no extra permission.",
   "computerUse.openSettingsFailed.title": "Couldn’t open System Settings",
+  "computerUse.restartRequired.title": "Restart OpenBot to finish Computer Use",
+  "computerUse.restartRequired.action": "Restart OpenBot",
   "computerUse.compact.title": "Enable Computer Use",
   "computerUse.compact.description": "Let OpenBot see and interact with apps on this computer.",
   "computerUse.granted": "Granted",

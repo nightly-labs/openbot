@@ -20,6 +20,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot kan apps op deze computer zien en bedienen. Dit systeem vraagt geen extra machtiging.",
   "computerUse.openSettingsFailed.title": "Kan Systeeminstellingen niet openen",
+  "computerUse.restartRequired.title": "Start OpenBot opnieuw om Computerbesturing af te ronden",
+  "computerUse.restartRequired.action": "OpenBot opnieuw starten",
   "computerUse.compact.title": "Computerbesturing inschakelen",
   "computerUse.compact.description": "Laat OpenBot apps op deze computer zien en bedienen.",
   "computerUse.granted": "Verleend",

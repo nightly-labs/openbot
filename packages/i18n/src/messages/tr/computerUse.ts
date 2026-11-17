@@ -20,6 +20,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot bu bilgisayardaki uygulamaları görebilir ve onlarla etkileşime girebilir. Bu sistem fazladan izin istemez.",
   "computerUse.openSettingsFailed.title": "Sistem Ayarları açılamadı",
+  "computerUse.restartRequired.title": "Bilgisayar Kullanımını tamamlamak için OpenBot'u yeniden başlatın",
+  "computerUse.restartRequired.action": "OpenBot'u yeniden başlat",
   "computerUse.compact.title": "Bilgisayar Kullanımını etkinleştir",
   "computerUse.compact.description":
     "OpenBot'un bu bilgisayardaki uygulamaları görmesine ve etkileşime girmesine izin verin.",

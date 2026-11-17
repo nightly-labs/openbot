@@ -21,6 +21,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot はこのコンピューターのアプリを見て操作できます。このシステムでは追加の権限は必要ありません。",
   "computerUse.openSettingsFailed.title": "システム設定を開けませんでした",
+  "computerUse.restartRequired.title": "Computer Use を完了するには OpenBot を再起動してください",
+  "computerUse.restartRequired.action": "OpenBot を再起動",
   "computerUse.compact.title": "Computer Use を有効にする",
   "computerUse.compact.description": "OpenBot がこのコンピューターのアプリを見て操作できるようにします。",
   "computerUse.granted": "許可済み",

@@ -9,6 +9,8 @@ export const messages = {
   "status.computerUse.driverStopped": "Il driver del Controllo del computer si è fermato.",
   "status.computerUse.unsupported": "Il Controllo del computer è disponibile su macOS, Windows e Linux.",
   "status.computerUse.driverMissing": "Questa versione di OpenBot non include il driver del Controllo del computer.",
+  "status.computerUse.restartRequired":
+    "macOS impedisce ancora a OpenBot di fare clic e digitare, anche se entrambi i permessi sono attivi. Riavvia OpenBot. Se succede di nuovo, fai clic su Gestisci accanto ad Accessibilità, rimuovi OpenBot dall'elenco, aggiungilo di nuovo e riavvia OpenBot.",
   "status.computerUse.progressActing": "Uso di un'app su questo computer…",
   "status.computerUse.progressDeciding": "Scelta del prossimo passo nell'app…",
 } as const satisfies PartialTranslation<typeof source>;

@@ -21,6 +21,8 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot peut voir les apps de cet ordinateur et interagir avec elles. Ce système ne demande aucune autorisation supplémentaire.",
   "computerUse.openSettingsFailed.title": "Impossible d’ouvrir Réglages Système",
+  "computerUse.restartRequired.title": "Redémarrez OpenBot pour terminer Computer Use",
+  "computerUse.restartRequired.action": "Redémarrer OpenBot",
   "computerUse.compact.title": "Activer Computer Use",
   "computerUse.compact.description":
     "Permettez à OpenBot de voir les apps de cet ordinateur et d’interagir avec elles.",

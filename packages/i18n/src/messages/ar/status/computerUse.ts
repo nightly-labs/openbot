@@ -8,6 +8,8 @@ export const messages = {
   "status.computerUse.driverStopped": "توقف مشغّل التحكم في الحاسوب.",
   "status.computerUse.unsupported": "التحكم في الحاسوب متاح على macOS وWindows وLinux.",
   "status.computerUse.driverMissing": "لا يتضمن هذا الإصدار من OpenBot مشغّل التحكم في الحاسوب.",
+  "status.computerUse.restartRequired":
+    "لا يزال macOS يمنع OpenBot من النقر والكتابة، رغم تفعيل الإذنين. أعد تشغيل OpenBot. إذا تكرر ذلك، فانقر على «إدارة» بجانب «إمكانية الوصول»، وأزل OpenBot من القائمة، وأضفه مرة أخرى، ثم أعد تشغيل OpenBot.",
   "status.computerUse.progressActing": "جارٍ استخدام تطبيق على هذا الحاسوب…",
   "status.computerUse.progressDeciding": "جارٍ تحديد الخطوة التالية في التطبيق…",
 } as const satisfies PartialTranslation<typeof source>;

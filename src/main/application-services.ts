@@ -887,7 +887,7 @@ async function accountServiceFetch(input: string | URL | Request, init?: Request
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
-  if (state.status === "permissions-required") return "setup-required";
+  if (state.status === "permissions-required" || state.status === "restart-required") return "setup-required";
   return "unavailable";
 }
 

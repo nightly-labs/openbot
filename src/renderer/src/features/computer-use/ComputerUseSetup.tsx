@@ -66,6 +66,8 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
   const [state, setState] = createSignal<ComputerUseState | null>(null);
   const [loading, setLoading] = createSignal(false);
   const [busyPermission, setBusyPermission] = createSignal<MacPermissionId | null>(null);
+  const [restarting, setRestarting] = createSignal(false);
+  const [restartError, setRestartError] = createSignal<string | null>(null);
   const [error, setError] = createSignal<string | null>(null);
   let disposed = false;
 
@@ -100,6 +102,21 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     }
   }
 
+  /** Restarts OpenBot when no work runs, as Settings > Updates does. A busy agent shows its toast. */
+  async function restart(): Promise<void> {
+    if (restarting()) return;
+    setRestarting(true);
+    setRestartError(null);
+    try {
+      await computerUsePort().update.restartWhenIdle("relaunch");
+    } catch (cause) {
+      if (!disposed) {
+        setRestartError(errorMessage(cause, t("update.idleRestart.requestFailed")));
+        setRestarting(false);
+      }
+    }
+  }
+
   // A grant is given in System Settings, outside this window, and the driver reports only what it
   // sees when it is asked. Coming back to OpenBot is the moment the answer may have changed, so the
   // panel asks again rather than keeping a row that is granted already.
@@ -116,7 +133,10 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
 
   const showPermissions = () => {
     const status = state()?.status;
-    return (status === "permissions-required" || status === "ready") && permissions().length > 0;
+    return (
+      (status === "permissions-required" || status === "restart-required" || status === "ready") &&
+      permissions().length > 0
+    );
   };
 
   /** Every status that leaves Computer Use not working, which the one alert below reports. */
@@ -187,6 +207,31 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
             <Button type="button" variant="outline" size="sm" loading={loading()} onClick={() => void loadState()}>
               <RefreshCw aria-hidden="true" />
               {t("common.tryAgain")}
+            </Button>
+          </AlertActions>
+        </Alert>
+      </Show>
+
+      {/*
+       * macOS reports both grants, but refuses the Accessibility calls themselves (#10658). Only a
+       * restart of OpenBot clears that, so the rows stay below for a grant to manage, and the
+       * restart is the one action.
+       */}
+      <Show when={state()?.status === "restart-required"}>
+        <Alert tone="warning" class="computer-use-alert" role="status">
+          <AlertIcon>
+            <TriangleAlert />
+          </AlertIcon>
+          <AlertContent>
+            <AlertTitle>{t("computerUse.restartRequired.title")}</AlertTitle>
+            <AlertDescription>
+              {restartError() ?? errorMessage(state()?.message, t("computerUse.restartRequired.title"))}
+            </AlertDescription>
+          </AlertContent>
+          <AlertActions>
+            <Button type="button" variant="outline" size="sm" loading={restarting()} onClick={() => void restart()}>
+              <RefreshCw aria-hidden="true" />
+              {t("computerUse.restartRequired.action")}
             </Button>
           </AlertActions>
         </Alert>

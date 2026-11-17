@@ -8,6 +8,8 @@ export const messages = {
   "status.computerUse.driverStopped": "Драйвер управления компьютером остановлен.",
   "status.computerUse.unsupported": "Управление компьютером доступно в macOS, Windows и Linux.",
   "status.computerUse.driverMissing": "В этой сборке OpenBot нет драйвера управления компьютером.",
+  "status.computerUse.restartRequired":
+    "macOS по-прежнему не даёт OpenBot нажимать и вводить текст, хотя оба разрешения включены. Перезапустите OpenBot. Если это повторится, нажмите «Настроить» рядом с «Универсальный доступ», удалите OpenBot из списка, добавьте его снова и перезапустите OpenBot.",
   "status.computerUse.progressActing": "Работаю с приложением на этом компьютере…",
   "status.computerUse.progressDeciding": "Выбираю следующий шаг в приложении…",
 } as const satisfies PartialTranslation<typeof source>;
