@@ -60,6 +60,13 @@ const SPOKEN_AUDIO_SECONDS = 3 * 60;
  * stays after it is dropped, and a new play decodes it again.
  */
 const DECODED_RECORDING_LIMIT = 4;
+/**
+ * How much synthesized audio of a reading can wait to play, in seconds at normal speed. A part is
+ * synthesized as soon as the part before it is ready, so a computer that synthesizes faster than it
+ * plays gets further ahead with each part, and the voice does not stop between parts. The limit keeps
+ * the work and the memory small when the user stops the reading.
+ */
+const SYNTHESIS_AHEAD_SECONDS = 30;
 
 /** An agent on one server. Agent ids repeat across servers. */
 export type SpeechAgent = Pick<SpeechSource, "serverId" | "agentId">;
@@ -271,9 +278,9 @@ export function seekSpeech(seconds: number): void {
 }
 
 /**
- * Sets the text that is read after the reading of now, or none. Its first part is synthesized while
- * the reading of now plays its last part, so that it plays without a wait. The host synthesizes one
- * part at a time, so it does not start earlier: the reading of now would wait for it.
+ * Sets the text that is read after the reading of now, or none. Its first part is synthesized after
+ * the reading of now asked for its last part, so that it plays without a wait. The host synthesizes
+ * one part at a time, so it does not start earlier: the reading of now would wait for it.
  */
 export function setUpcomingReading(next: UpcomingReading | undefined): void {
   upcoming = next;
@@ -318,7 +325,8 @@ export interface ReadAloudResult {
 }
 
 /**
- * Reads a text aloud in parts, and synthesizes each part while the part before it plays. A new
+ * Reads a text aloud in parts. Each part is synthesized when the part before it is ready, up to
+ * `SYNTHESIS_AHEAD_SECONDS` of audio ahead of the part that plays. A new
  * reading, or `stopSpeech`, ends this one; the answer then comes at once. A failed part ends the
  * reading with its error. `prepared` is the upcoming reading of this text, whose first part can be
  * synthesized already.
@@ -361,36 +369,64 @@ export async function readAloud(
     const askedAt = performance.now();
     return voice.speak({ text: part, language }).then((audio) => ({ audio, synthesisMs: performance.now() - askedAt }));
   };
+  // The parts in reading order. The host synthesizes one text at a time, so a part is asked for when
+  // the part before it is ready, while less than the limit of audio waits to play.
+  const queue: Promise<SpokenPart & { text: string; seconds: number }>[] = [];
+  /** Seconds of synthesized audio that did not start to play. */
+  let ahead = 0;
+  /** A part is asked for and not ready, or a part failed: the next part waits. */
+  let asking = false;
+  let lastPart = first;
+  let lastSynthesisMs: number | undefined;
+  const enqueue = (part: string, spoken: Promise<SpokenPart>) => {
+    asking = true;
+    const ready = spoken.then((answer) => {
+      const seconds = answer.audio.pcm.byteLength / 2 / answer.audio.sampleRate;
+      ahead += seconds;
+      asking = false;
+      lastSynthesisMs = answer.synthesisMs;
+      askNext();
+      return { ...answer, text: part, seconds };
+    });
+    // A reading that stops before this part plays never reads its answer.
+    ready.catch(() => undefined);
+    queue.push(ready);
+  };
+  const askNext = () => {
+    if (own.stopped || own.lastPartAsked || asking || ahead >= SYNTHESIS_AHEAD_SECONDS) return;
+    // The next part must be ready before the audio that waits to play ends, so its length fits the
+    // speed of this computer.
+    const budget = lastSynthesisMs === undefined ? undefined : partBudget(lastPart, ahead, lastSynthesisMs, replyRate);
+    const following = parts.next(budget);
+    if (following === undefined) {
+      own.lastPartAsked = true;
+      prepareUpcoming();
+      return;
+    }
+    lastPart = following;
+    enqueue(following, ask(following));
+  };
   // A prepared part that failed is asked for again, as it was before the reading started.
-  let next: Promise<SpokenPart> | undefined = preparedFirst
-    ? preparedFirst.then((audio) => ({ audio, synthesisMs: undefined })).catch(() => ask(first))
-    : ask(first);
-  let part = first;
+  enqueue(
+    first,
+    preparedFirst
+      ? preparedFirst.then((audio) => ({ audio, synthesisMs: undefined })).catch(() => ask(first))
+      : ask(first),
+  );
   try {
-    while (next) {
-      const { audio, synthesisMs } = await next;
+    for (let next = queue.shift(); next; next = queue.shift()) {
+      const { audio, text: current, seconds } = await next;
       if (own.stopped) return result;
-      const seconds = audio.pcm.byteLength / 2 / audio.sampleRate;
-      const current = part;
+      ahead -= seconds;
+      askNext();
       setState((draft) => {
         if (!draft.reading) return;
         draft.reading.part = current;
       });
-      // The next part must be ready before this part ends, so its length fits the speed of this computer.
-      const budget = synthesisMs === undefined ? undefined : partBudget(current, seconds, synthesisMs, replyRate);
-      const following = parts.next(budget);
-      next = following === undefined ? undefined : ask(following);
-      // A reading that stops before this part plays never reads its answer.
-      next?.catch(() => undefined);
-      if (!next) {
-        own.lastPartAsked = true;
-        prepareUpcoming();
-      }
       result.firstAudioMs ??= Math.round(performance.now() - calledAt);
       result.seconds += seconds;
       await play(own, audio);
       if (own.stopped) return result;
-      if (following !== undefined) part = following;
     }
     const messageId = source?.messageId;
     if (messageId) keepSpokenAudio(messageId, own.played);
