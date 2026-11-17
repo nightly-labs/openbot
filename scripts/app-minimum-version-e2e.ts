@@ -8,7 +8,7 @@
 //    agent turn runs.
 // Writes .openbot-build/app-minimum-version-e2e/report.json.
 import assert from "node:assert/strict";
-import { type ChildProcess, spawn } from "node:child_process";
+import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
@@ -95,34 +95,24 @@ const freePort = () =>
     });
   });
 
-/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
-function waitForSite(child: ChildProcess, address: string): Promise<void> {
-  return new Promise((done, fail) => {
-    let output = "";
-    const read = (chunk: Buffer) => {
-      output += chunk.toString();
-      if (output.includes(address)) done();
-    };
-    child.stdout?.on("data", read);
-    child.stderr?.on("data", read);
-    child.once("exit", () => fail(new Error("The site's development server stopped before it listened.")));
-  });
-}
-
 const port = await freePort();
+const origin = `http://127.0.0.1:${port}`;
 const site = spawn(
   process.execPath,
   [resolve(ROOT, "scripts/run-development.ts"), "api", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
   { cwd: ROOT, stdio: ["ignore", "pipe", "pipe"] },
 );
 let siteOutput = "";
-site.stdout?.on("data", (chunk: Buffer) => {
-  siteOutput += chunk.toString();
+/** Resolves once Vite prints the address it listens on, or rejects when the server exits first. */
+const siteReady = new Promise<void>((done, fail) => {
+  const read = (chunk: Buffer) => {
+    siteOutput += chunk.toString();
+    if (siteOutput.includes(origin)) done();
+  };
+  site.stdout?.on("data", read);
+  site.stderr?.on("data", read);
+  site.once("exit", () => fail(new Error("The site's development server stopped before it listened.")));
 });
-site.stderr?.on("data", (chunk: Buffer) => {
-  siteOutput += chunk.toString();
-});
-const origin = `http://127.0.0.1:${port}`;
 
 /** A fake updater with the parts of `UpdateService` that the two classes use. */
 class FakeUpdater extends EventEmitter {
@@ -214,7 +204,7 @@ const answer =
 const MINIMUM = "0.58.0";
 
 try {
-  await waitForSite(site, origin);
+  await siteReady;
 
   const routes: { surface: string; minimumVersion: string | null }[] = [];
   for (const surface of APP_SURFACES) {
