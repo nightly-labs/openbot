@@ -27,7 +27,17 @@ import { providerCall } from "./provider-client-effects";
 // Pi starts in that workspace, so the extension trusts the folder of the first decision of the
 // process. Pi gives that folder as its real path. A later decision, for a session in another
 // folder, stays Pi's. The decision is not saved in Pi's `trust.json`.
+//
+// Pi's own `tool_search` tells the model to use it for all MCP tools, but it loads only the tools of
+// the deferred servers, never OpenBot's. A model that searched there for history_search found only
+// computer use tools and said that the OpenBot tools were missing (#10799). Each of its results now
+// names OpenBot's search, as OpenBot's results name Pi's (`DEFERRED_MCP_NOTE`). `details` stays, so
+// Pi still records the loaded tools for resume.
 const EXTENSION = String.raw`export default function (pi) {
+  pi.on("tool_result", (event) => {
+    if (event.toolName !== "tool_search" || event.isError) return undefined;
+    return { content: [...event.content, { type: "text", text: ${JSON.stringify(piToolSearchNote())} }] };
+  });
   const slot = Symbol.for("openbot.pi.mcpServers");
   globalThis[slot] ??= JSON.parse(process.env.OPENBOT_PI_MCP_SERVERS || "[]");
   delete process.env.OPENBOT_PI_MCP_SERVERS;
@@ -62,6 +72,21 @@ const EXTENSION = String.raw`export default function (pi) {
  */
 const PI_SEARCH_ONLY_OPENBOT_TOOLS = ["request_api_key", "suggest_marketplace_app", "show_setting"] as const;
 
+// Pi keeps the tool names in the session that OpenBot resumes, so a name must not change when
+// OpenBot restarts: the model calls the old names, and Pi does not find them (#3343). The name
+// comes from the server's own name, not its position, which changes when a server is added or
+// removed. Pi replaces a tool name longer than 64 characters with a hash, and the model then cannot
+// find tools such as tool_search by name. Eight hex characters keep the names short.
+function serverName(kind: "external" | "local", name: string): string {
+  return `openbot_${createHash("sha256").update(`${kind}:${name}`).digest("hex").slice(0, 8)}`;
+}
+
+/** Added to each result of Pi's own `tool_search`. Pi names a tool `mcp__<server>__<tool>`. */
+function piToolSearchNote(): string {
+  const openbot = `mcp__${serverName("local", OPENBOT_DYNAMIC_TOOLS.name)}`;
+  return `This search loads only the tools of the servers in <mcp_servers>. It never finds OpenBot or browser tools: find them with ${openbot}__tool_search, and run them with ${openbot}__tool_call.`;
+}
+
 export interface PiMcpExtension {
   path: string;
   environment: Record<string, string>;
@@ -92,13 +117,6 @@ export const createPiMcpExtension = Effect.fn("PiMcp.createExtension")(function*
   const environment: Record<string, string> = {};
   const secrets: string[] = [];
   let count = 0;
-  // Pi keeps the tool names in the session that OpenBot resumes, so a name must not change when
-  // OpenBot restarts: the model calls the old names, and Pi does not find them (#3343). The name
-  // comes from the server's own name, not its position, which changes when a server is added or
-  // removed. Pi replaces a tool name longer than 64 characters with a hash, and the model then cannot
-  // find tools such as tool_search by name. Eight hex characters keep the names short.
-  const serverName = (kind: "external" | "local", name: string) =>
-    `openbot_${createHash("sha256").update(`${kind}:${name}`).digest("hex").slice(0, 8)}`;
   const values = (pairs: Record<string, string>) =>
     Object.fromEntries(
       Object.entries(pairs).map(([key, value]) => {
