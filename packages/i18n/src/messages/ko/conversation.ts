@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "파일",
   "conversation.threads.new": "새 스레드",
   "conversation.threads.all": "모든 스레드",
+  "conversation.threads.allUnread": "모든 스레드, 새 답장 있음",
   "conversation.threads.open": "열려 있는 스레드",
   "conversation.threads.current": "스레드: {title}",
   "conversation.threads.actions": "스레드 작업",

@@ -11,9 +11,11 @@ import {
   forgetPendingThreadDeletes,
   type PendingThreadDelete,
   readPendingThreadDeletes,
+  readThreadsSeenThrough,
   readThreadTabs,
   type ThreadTabsByServer,
   takePendingThreadDelete,
+  writeThreadsSeenThrough,
   writeThreadTabs,
 } from "./thread-tabs-storage";
 
@@ -447,6 +449,7 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
   /** Removes the tabs of a deleted agent. */
   function forgetAgent(agentId: string): void {
     forgetPendingThreadDeletes(serverId(), agentId);
+    writeThreadsSeenThrough(serverId(), agentId, null);
     setDraft(agentId, false);
     writeTabs(agentId, null);
   }
@@ -481,25 +484,31 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
     },
   );
 
-  // A thread that the agent starts in this session gets a tab, but does not open.
+  // A thread that the agent starts, or that the user starts on another device, gets a tab here, but does
+  // not open. A thread that starts in this session always does, also in a second window. The device keeps
+  // the creation time of the newest thread that it has seen, so a thread that started while this device
+  // was off also gets a tab, and a tab that the user closed does not come back after a restart.
   createEffect(
     () => {
       const agentId = activeAgentId();
       if (!agentId) return null;
-      const added = (tasks.snapshot(agentId)?.tasks ?? [])
-        .filter(
-          (entry) =>
-            entry.origin === "agent" &&
-            entry.state !== "closed" &&
-            entry.createdAt >= sessionStart &&
-            !seen.has(entry.id),
-        )
-        .map((entry) => entry.id);
-      return added.length === 0 ? null : [agentId, ...added].join("\n");
+      const snapshot = tasks.snapshot(agentId);
+      if (!snapshot) return null;
+      const stored = readThreadsSeenThrough(serverId(), agentId);
+      let newest = stored ?? sessionStart;
+      const added: string[] = [];
+      for (const entry of snapshot.tasks) {
+        if (entry.createdAt > newest) newest = entry.createdAt;
+        const unseen = entry.createdAt >= sessionStart || (stored !== undefined && entry.createdAt > stored);
+        if (unseen && entry.state !== "closed" && !seen.has(entry.id)) added.push(entry.id);
+      }
+      return added.length === 0 && newest === stored ? null : [agentId, newest, ...added].join("\n");
     },
     (key) => {
       if (!key) return;
-      const [agentId = "", ...added] = key.split("\n");
+      const [agentId = "", newest = "", ...added] = key.split("\n");
+      writeThreadsSeenThrough(serverId(), agentId, newest);
+      if (added.length === 0) return;
       for (const id of added) seen.add(id);
       untrack(() => {
         const ids = openIds(agentId);
