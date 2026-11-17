@@ -4497,7 +4497,7 @@ export class ProviderRuntime implements ProviderPort {
    * same failure can name neither the server nor its URL, such as the `rmcp` worker's `Unexpected
    * content type: … when send initialized notification` (#7895), so `#configuredMcpServerIn` finds
    * no server in it. Codex names a server by its key (`codexMcpServerKey`): the name in the form it
-   * accepts, or that name with `openbot_` in front when the user's own Codex file has the key. Each
+   * accepts with `openbot_` in front, or without it when that key is reserved or the user's. Each
    * server of that file goes to Codex turned off (`codexDisabledServers`), so it does not start and
    * a failure under either key is the failure of OpenBot's server. A key that matches no row, and a
    * built-in server, go to the log only, as from stderr.
@@ -4506,10 +4506,11 @@ export class ProviderRuntime implements ProviderPort {
     const key = getString(params, "name");
     if (getString(params, "status") !== "failed" || !key) return;
     const message = shortenDiagnostic(this.#redactMcp(getString(params, "error") ?? ""));
-    const config = this.#credentials.mcpServers().find((row) => {
-      const name = providerMcpServerName(row.name);
-      return key === name || key === `openbot_${name}`;
-    });
+    // A row's `openbot_` key comes first: a row named `openbot_x` travels as `openbot_openbot_x`.
+    const rows = this.#credentials.mcpServers();
+    const config =
+      rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
+      rows.find((row) => key === providerMcpServerName(row.name));
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
     stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
