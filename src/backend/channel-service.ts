@@ -1593,14 +1593,18 @@ export class ChannelService {
             .filter((agent) => channel.members.some((member) => member.agentId === agent.id));
           // The prompt names each agent by a short key, not by its long id: a model that miscopied one
           // character of an id named no member, and the request stopped (#10158). An answer that gives
-          // a full id still counts.
-          const memberKeys = new Map(
-            [...new Set([...channel.members.map((member) => member.agentId), lead.id])].map(
-              (agentId, index) => [agentId, `m${index + 1}`] as const,
-            ),
-          );
+          // a full id still counts. A key is never the id of a member, so it names one agent only.
+          const memberIds = new Set([...channel.members.map((member) => member.agentId), lead.id]);
+          const memberKeys = new Map<string, string>();
+          const agentOfKey = new Map<string, string>();
+          let keyNumber = 0;
+          for (const agentId of memberIds) {
+            keyNumber++;
+            while (memberIds.has(`m${keyNumber}`)) keyNumber++;
+            memberKeys.set(agentId, `m${keyNumber}`);
+            agentOfKey.set(`m${keyNumber}`, agentId);
+          }
           const keyOf = (agentId: string) => memberKeys.get(agentId) ?? agentId;
-          const agentOfKey = new Map<string, string>([...memberKeys].map(([agentId, key]) => [key, agentId] as const));
           const agentOf = (id: string) => agentOfKey.get(id) ?? id;
           const recent = channelResult(
             yield* Effect.result(
@@ -1815,7 +1819,7 @@ export class ChannelService {
           ];
           // A member the model named that cannot take work is left out. With none left, the lead takes
           // the request, as it takes an unreadable answer: the person gets an answer, not a stopped
-          // request (#10158). Only a lead that cannot take work gives the reason.
+          // request (#10158). When the lead cannot take work either, the first one gives the reason.
           const chosen = picked.filter((agentId) => eligible.includes(agentId));
           if (!chosen.length && eligible.includes(lead.id)) {
             logger.warn("A routing answer named no member who can take work, so the lead takes the request.", {
