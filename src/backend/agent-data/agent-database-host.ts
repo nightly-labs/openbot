@@ -338,6 +338,38 @@ function redactFailure(failure: AgentDatabaseFailure, databasePath: string): Age
   return { ...failure, message: failure.message.replaceAll(databasePath, basename(databasePath)) };
 }
 
+/**
+ * Runs `PRAGMA quick_check(20)` on `openbot.db` and returns one row for each line that it reports.
+ * The connection is its own and has no authorizer: the statement is fixed and the main process gives
+ * the path. It is read-only, so its close never checkpoints or removes the write-ahead log.
+ */
+function checkIntegrity(databasePath: string): Effect.Effect<AgentDatabaseRows, HostFailure> {
+  return Effect.try({
+    try: () => {
+      // The same busy timeout as the main connection of `openbot.db`.
+      const database = new DatabaseSync(databasePath, { readOnly: true, timeout: 5_000 });
+      try {
+        const rows = database
+          .prepare("PRAGMA quick_check(20)")
+          .all()
+          .map((row): AgentDatabaseValue[] => [String(row.quick_check)]);
+        return { columns: ["quick_check"], rows, truncated: false, changes: 0, lastInsertRowid: null };
+      } finally {
+        database.close();
+      }
+    },
+    catch: (error) => {
+      const code =
+        typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
+      const failure = redactFailure(
+        { kind: "sqlite", message: error instanceof Error ? error.message : String(error) },
+        databasePath,
+      );
+      return new HostFailure(failure.kind, failure.message, code);
+    },
+  });
+}
+
 function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): Effect.Effect<A, HostFailure> {
   return Effect.try({
     try: operation,
@@ -407,6 +439,7 @@ class AgentDatabaseHost extends Context.Service<
           yield* Effect.sync(() => closePath(request.databasePath));
           return { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null };
         }
+        if (request.kind === "integrity-check") return yield* checkIntegrity(request.databasePath);
         // These Effects are synchronous. Do not yield asynchronous work while authorizer state is set.
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {
