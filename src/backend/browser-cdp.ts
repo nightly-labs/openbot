@@ -112,11 +112,13 @@ const DROP_FRAME_WAIT_MS = 1_500;
 const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
 /**
  * Chromium can drop key events, with no error, that reach a new page before its first frame. That
- * frame comes in less than 100 ms, so only a page younger than this waits for a frame before a key.
- * An older page does not wait: a tab that draws one frame each second would make each key slow.
+ * frame comes in less than 100 ms after the response, so only a page that got its response less
+ * than this time ago waits for a frame before a key. The age counts from the response, because
+ * redirects and a slow server come before it. An older page does not wait: a tab that draws one
+ * frame each second would make each key slow.
  */
 const NEW_PAGE_MS = 1_500;
-const NEW_PAGE_FRAME_SCRIPT = `performance.now() < ${NEW_PAGE_MS} && ${DROP_FRAME_SCRIPT}`;
+const NEW_PAGE_FRAME_SCRIPT = `performance.now() - (performance.getEntriesByType("navigation")[0]?.responseStart ?? 0) < ${NEW_PAGE_MS} && ${DROP_FRAME_SCRIPT}`;
 
 /**
  * Lets the page render one frame, as `DROP_FRAME_WAIT_MS` says. The wait only helps the page: the
