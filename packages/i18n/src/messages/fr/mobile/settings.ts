@@ -255,8 +255,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Balayer à droite dans un chat",
   "mobile.settings.conversations.swipeThreads": "Fils",
   "mobile.settings.conversations.swipeBrowser": "Navigateur",
+  "mobile.settings.conversations.swipeOff": "Désactivé",
   "mobile.settings.conversations.swipeFooter":
-    "Un balayage opposé à Retour dans le chat d’un agent ouvre ceci. Un balayage sur un message y répond toujours.",
+    "Un balayage opposé à Retour dans le chat d’un agent ouvre ceci. Le même balayage sur un message affiche l’heure des messages.",
   "mobile.settings.conversations.pullInfo": "Tirer vers le haut pour les infos",
   "mobile.settings.conversations.pullInfoFooter":
     "Dans un chat, un canal ou un fil, tirez vers le haut après le dernier message, puis relâchez pour ouvrir ses infos.",

@@ -1,18 +1,20 @@
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type { AgentMessage } from "@openbot/ui/data";
 import { formatMessageTime } from "../../app-message-projection";
 
 /**
  * The narration of a `thinking` row as rows of their own, in order. A row is still a step of the
- * turn: with `itemType: "commentary"` the timeline gives it no stored-message actions.
+ * turn: with `itemType: "commentary"` the timeline gives it no stored-message actions. A filler note,
+ * or one that repeats an earlier note of the turn, stays only in the steps (`showsNarration`).
  */
 export function narrationRows(thinking: AgentMessage, provider: AgentProviderRef | undefined): AgentMessage[] {
   const items = thinking.items ?? [];
   const rows: AgentMessage[] = [];
+  const shown = new Set<string>();
   for (const [index, body] of items.entries()) {
     const id = thinking.itemIds?.[index];
-    if (!id || !body.trim() || !isNarrationItemId(id, provider)) continue;
+    if (!id || !isNarrationItemId(id, provider) || !showsNarration(body, shown)) continue;
     const createdAt = thinking.itemCreatedAt?.[index];
     rows.push({
       id,

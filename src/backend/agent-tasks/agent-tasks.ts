@@ -155,9 +155,10 @@ export class AgentTasks implements TaskLanes {
   }
 
   snapshot(agentId: string): AgentTasksSnapshot {
+    const awaited = this.#mailbox.awaitedThreadRequests();
     return {
       agentId,
-      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task)),
+      tasks: this.#store.list(agentId).map((task) => this.#publicTask(task, awaited)),
       limit: this.limit(agentId),
     };
   }
@@ -684,7 +685,7 @@ export class AgentTasks implements TaskLanes {
     return this.#store.taskForThread(threadId);
   }
 
-  #publicTask(task: AgentThreadRecord): AgentTask {
+  #publicTask(task: AgentThreadRecord, awaited = this.#mailbox.awaitedThreadRequests()): AgentTask {
     const snapshot = this.#conversation.loadedExecutionSnapshot(task.threadId);
     const activeTurnId = task.closedAt === null ? (snapshot?.activeTurnId ?? null) : null;
     const queuedMessages =
@@ -713,6 +714,10 @@ export class AgentTasks implements TaskLanes {
       error: task.outcome === "failed" ? task.error : null,
       queuedMessages,
       queue: task.closedAt === null ? this.#mailbox.taskQueue(task.agentId, task.taskId) : [],
+      // An answer to an archived thread goes to the agent's own chat, so only an open thread waits.
+      awaitedReplies: awaited.flatMap(({ taskId, messageId, recipientAgentId, status }) =>
+        taskId === task.taskId && task.closedAt === null ? [{ messageId, recipientAgentId, status }] : [],
+      ),
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       closedAt: task.closedAt,

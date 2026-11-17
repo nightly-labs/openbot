@@ -1,5 +1,5 @@
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
   ConversationMessage,
@@ -331,8 +331,11 @@ export class MessagingThreads {
    * second time. Past the cap, the oldest goes.
    */
   readonly #finishedTurns = new Set<string>();
-  /** The id of the last progress line that each running turn reported, by turn id. */
-  readonly #progress = new Map<string, string>();
+  /**
+   * The id of the last progress line that each running turn read, and the texts that it reported
+   * (`showsNarration`), by turn id.
+   */
+  readonly #progress = new Map<string, { id: string; texts: Set<string> }>();
   /**
    * The provider session that read the guidance and the saved facts of each conversation, by link
    * id. Kept in memory only: after a restart, the first prompt of each conversation repeats them.
@@ -984,7 +987,8 @@ export class MessagingThreads {
 
   /**
    * Reports the newest completed progress line of the running turn once. Only narration counts: the
-   * agent's thinking never goes to the conversation.
+   * agent's thinking never goes to the conversation. A filler line, or one that repeats a line the
+   * turn already reported, is not posted.
    */
   #reportProgress(snapshot: ConversationSnapshot): void {
     const turnId = snapshot.activeTurnId;
@@ -1006,8 +1010,11 @@ export class MessagingThreads {
       )
         update = message;
     }
-    if (!update || this.#progress.get(turnId) === update.id) return;
-    this.#progress.set(turnId, update.id);
+    if (!update) return;
+    const progress = this.#progress.get(turnId) ?? { id: "", texts: new Set<string>() };
+    if (progress.id === update.id) return;
+    this.#progress.set(turnId, { ...progress, id: update.id });
+    if (!showsNarration(update.text, progress.texts)) return;
     this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
   }
 

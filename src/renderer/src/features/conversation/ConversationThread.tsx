@@ -12,6 +12,7 @@ import { createEffect, createMemo, createProjection, createSignal, Show, untrack
 import { actionToast } from "../../action-toast";
 import { useShowAgentSteps } from "../../agent-steps-preference";
 import { toAgentMessages } from "../../app-message-projection";
+import { threadAwaitingReplies } from "../../awaiting-replies";
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { usePlatform } from "../../platform";
@@ -123,6 +124,7 @@ export function ConversationThread() {
       if (taskId && messageId && read) read(messageId);
     },
   );
+  const awaiting = createMemo(() => threadAwaitingReplies(props.threads?.open, props.agents, props.agentWaits));
   const view = () => {
     const agent = props.agent;
     const threads = props.threads;
@@ -355,6 +357,7 @@ export function ConversationThread() {
             replyTo={replyTo()}
             onCancelReply={() => threadComposer.setReply(threadComposer.openDraftKey(), null)}
             queue={threadQueue.view(current().threads.open, threadComposer.openDraftKey())}
+            awaiting={awaiting()}
             selectionActions={selectionActions(current().threads)}
           />
         </>

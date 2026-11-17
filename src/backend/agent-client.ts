@@ -10,6 +10,8 @@ export type AgentProvider = AgentProviderId;
 /** Where a diagnostic came from. See `AgentClient.on("diagnostic")`. */
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
+  /** Set when the text is a record of the agent process's stderr, not a report that OpenBot wrote. */
+  readonly stderr?: boolean;
 }
 
 export interface AgentClient {
@@ -20,6 +22,11 @@ export interface AgentClient {
    * handoff.
    */
   readonly contextCompaction?: "events" | "request" | "native" | "handoff" | "unsupported";
+  /**
+   * True when the provider compacts its own context, although OpenBot cannot ask it to. The context
+   * meter shows that the provider manages compaction, as for `native`.
+   */
+  readonly compactsItself?: boolean;
   /**
    * True when a streaming answer item (`final_answer`, or `agentMessage` with no phase yet) can still
    * become a step: the provider names no phase, and the client classifies the text only at the next

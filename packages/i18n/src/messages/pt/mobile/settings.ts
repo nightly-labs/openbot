@@ -255,8 +255,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Deslizar para a direita no chat",
   "mobile.settings.conversations.swipeThreads": "Tópicos",
   "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeOff": "Desativado",
   "mobile.settings.conversations.swipeFooter":
-    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. Deslizar em uma mensagem ainda responde a ela.",
+    "Deslizar no sentido oposto a Voltar no chat de um agente abre isto. O mesmo gesto em uma mensagem mostra o horário das mensagens.",
   "mobile.settings.conversations.pullInfo": "Puxar para cima para ver info",
   "mobile.settings.conversations.pullInfoFooter":
     "Em um chat, canal ou tópico, puxe para cima além da última mensagem e solte para abrir as informações.",

@@ -1,6 +1,6 @@
 import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import { isNarrationItemId } from "@openbot/contracts/conversation-narration";
+import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import { sortConversationMessages } from "@openbot/contracts/conversation-order";
 import { itemTypeCountsAsUnread } from "@openbot/contracts/conversation-read";
 import type {
@@ -248,10 +248,30 @@ export interface ProgressUpdates {
 
 /**
  * Narration that the agent finished writing. A narration that still streams waits, so its bubble
- * enters with all of its text and does not grow, as on desktop.
+ * enters with all of its text and does not grow, as on desktop. A filler note, or one that repeats an
+ * earlier note of the turn, stays only in the steps; `shown` holds the notes that the turn showed.
  */
-function shownProgressUpdate(message: ConversationMessage, provider: AgentProviderRef | undefined): boolean {
-  return message.status !== "streaming" && Boolean(message.text.trim()) && isNarrationItemId(message.id, provider);
+function shownProgressUpdate(
+  message: ConversationMessage,
+  provider: AgentProviderRef | undefined,
+  shown: Set<string>,
+): boolean {
+  return (
+    message.status !== "streaming" && isNarrationItemId(message.id, provider) && showsNarration(message.text, shown)
+  );
+}
+
+/** The notes that each turn showed as progress updates, for `shownProgressUpdate`. */
+function turnShownNotes(): (turnKey: string) => Set<string> {
+  const byTurn = new Map<string, Set<string>>();
+  return (turnKey) => {
+    let shown = byTurn.get(turnKey);
+    if (!shown) {
+      shown = new Set();
+      byTurn.set(turnKey, shown);
+    }
+    return shown;
+  };
 }
 
 /**
@@ -495,6 +515,7 @@ export function projectChatMessages(
   const sorted = sortedConversationMessages(messages);
   const latestRuns = latestRoutineRunMessages(sorted);
   const answered = progressUpdates ? answerTimes(sorted) : undefined;
+  const shownNotes = turnShownNotes();
   // As on desktop, only the agent's own output counts: not an exchange with a teammate or a routine marker.
   const replacedIds = replacedConversationPlans(
     sorted.map((message) => ({
@@ -584,7 +605,8 @@ export function projectChatMessages(
       // The steps keep a progress update too, as the desktop steps do.
       const update =
         progressUpdates && answered
-          ? shownProgressUpdate(message, progressUpdates.provider(undefined)) && beforeAnswer(message, answered)
+          ? beforeAnswer(message, answered) &&
+            shownProgressUpdate(message, progressUpdates.provider(undefined), shownNotes(key))
           : false;
       thinking.steps.push({
         id: message.id,
@@ -1027,6 +1049,7 @@ export function projectChannelMessages(
 ): ChatMessage[] {
   const latestRuns = latestRoutineRunMessages(messages.map((entry) => entry.message));
   const answered = progressUpdates ? answerTimes(messages.map((entry) => entry.message)) : undefined;
+  const shownNotes = turnShownNotes();
   const replacedIds = replacedConversationPlans(
     messages.map((entry) => ({
       id: entry.id,
@@ -1040,8 +1063,12 @@ export function projectChannelMessages(
     entry.author.kind === "agent" &&
     !entry.superseded &&
     entry.message.itemType === "commentary" &&
-    shownProgressUpdate(entry.message, progressUpdates?.provider(entry.author.id)) &&
-    (!answered || beforeAnswer(entry.message, answered));
+    (!answered || beforeAnswer(entry.message, answered)) &&
+    shownProgressUpdate(
+      entry.message,
+      progressUpdates?.provider(entry.author.id),
+      shownNotes(entry.message.turnId ?? entry.message.id),
+    );
   return messages
     .filter(
       (entry) =>
