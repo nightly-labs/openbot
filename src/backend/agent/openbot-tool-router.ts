@@ -3729,8 +3729,18 @@ export class OpenBotToolRouter {
               ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
             )
             .map(({ delivery }) => delivery.messageId);
+      // Without replyToMessageId, a message that needs no answer, such as the recipient's answer or
+      // notice, selects its side thread only while that thread waits for this agent. Otherwise the
+      // message is a new request: it goes to the recipient's own chat, where it can start a task
+      // (#10273). To continue the recipient's thread, the agent replies to the recipient's message.
+      const threadRequestIds = replyTo
+        ? answeredRequestIds
+        : answeredRequestIds.filter(
+            (requestId) =>
+              this.#mailbox.expectsReply(requestId) || this.#mailbox.sideThreadWaitsFor(senderAgentId, requestId),
+          );
       const answerTaskIds = new Set(
-        answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
+        threadRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;
