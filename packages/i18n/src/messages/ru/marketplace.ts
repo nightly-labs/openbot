@@ -418,8 +418,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "Что сказано в моих заметках о решениях по этому проекту?",
   "marketplace.plugin.obsidian.prompt.save": "Сохраните это решение как новую заметку в моём хранилище.",
   "marketplace.plugin.obsidian.prompt.log": "Добавьте сводку сегодняшней работы в мою заметку «Журнал работы».",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'В Obsidian откройте Settings > Local REST API. Скопируйте API-ключ и включите "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "В Obsidian откройте Settings > Local REST API и скопируйте API-ключ.",
   "marketplace.plugin.resend.tagline": "Транзакционная почта",
   "marketplace.plugin.resend.description":
     "Resend позволяет агентам отправлять транзакционные письма и проверять доставку через один API. Ключ API из панели Resend передаётся локальному серверу в одной переменной окружения.",

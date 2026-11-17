@@ -365,8 +365,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "이 프로젝트의 결정 사항에 대해 내 노트에는 뭐라고 적혀 있어?",
   "marketplace.plugin.obsidian.prompt.save": "이 결정을 내 보관함에 새 노트로 저장해 줘.",
   "marketplace.plugin.obsidian.prompt.log": "오늘 한 작업 요약을 내 작업 로그 노트에 추가해 줘.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian에서 Settings > Local REST API를 여세요. API 키를 복사하고 "Enable non-encrypted (HTTP) server"를 켜세요.',
+  "marketplace.plugin.obsidian.hint.apiKey": "Obsidian에서 Settings > Local REST API를 열고 API 키를 복사하세요.",
   "marketplace.plugin.resend.tagline": "트랜잭션 이메일",
   "marketplace.plugin.resend.description":
     "Resend를 사용하면 에이전트가 API 하나로 트랜잭션 이메일을 보내고 전송 상태를 확인할 수 있어요. Resend 대시보드의 API 키는 환경 변수 하나로 로컬 서버에 전달돼요.",

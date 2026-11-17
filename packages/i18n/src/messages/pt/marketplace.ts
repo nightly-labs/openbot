@@ -389,8 +389,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "O que minhas notas dizem sobre as decisões deste projeto?",
   "marketplace.plugin.obsidian.prompt.save": "Salve esta decisão como uma nova nota no meu cofre.",
   "marketplace.plugin.obsidian.prompt.log": "Adicione um resumo do trabalho de hoje à minha nota Registro de trabalho.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'No Obsidian, abra Settings > Local REST API. Copie a chave de API e ative "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "No Obsidian, abra Settings > Local REST API e copie a chave de API.",
   "marketplace.plugin.resend.tagline": "E-mail transacional",
   "marketplace.plugin.resend.description":
     "O Resend permite que agentes enviem e-mails transacionais e verifiquem a entrega por uma única API. Uma chave de API do painel do Resend é passada ao servidor local como uma variável de ambiente.",

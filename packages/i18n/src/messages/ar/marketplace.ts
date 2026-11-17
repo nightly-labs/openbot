@@ -399,8 +399,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "ماذا تقول ملاحظاتي عن القرارات في هذا المشروع؟",
   "marketplace.plugin.obsidian.prompt.save": "احفظ هذا القرار كملاحظة جديدة في خزنتي.",
   "marketplace.plugin.obsidian.prompt.log": "أضف ملخصًا لعمل اليوم إلى ملاحظة Work log.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    "في Obsidian، افتح Settings > Local REST API. انسخ مفتاح API وفعّل «Enable non-encrypted (HTTP) server».",
+  "marketplace.plugin.obsidian.hint.apiKey": "في Obsidian، افتح Settings > Local REST API وانسخ مفتاح API.",
   "marketplace.plugin.resend.tagline": "البريد الإلكتروني للمعاملات",
   "marketplace.plugin.resend.description":
     "يتيح Resend للوكلاء إرسال رسائل البريد الإلكتروني للمعاملات والتحقق من التسليم عبر واجهة API واحدة. يُمرَّر مفتاح API من لوحة تحكم Resend إلى الخادم المحلي كمتغير بيئة واحد.",

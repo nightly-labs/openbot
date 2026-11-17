@@ -384,8 +384,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "מה ההערות שלי אומרות על ההחלטות בפרויקט הזה?",
   "marketplace.plugin.obsidian.prompt.save": "שמור את ההחלטה הזו כהערה חדשה בכספת שלי.",
   "marketplace.plugin.obsidian.prompt.log": "הוסף סיכום של עבודת היום להערה Work log שלי.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'ב-Obsidian, יש לפתוח Settings > Local REST API. יש להעתיק את מפתח ה-API ולהפעיל את "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "ב-Obsidian, יש לפתוח Settings > Local REST API ולהעתיק את מפתח ה-API.",
   "marketplace.plugin.resend.tagline": "אימייל טרנזקציוני",
   "marketplace.plugin.resend.description":
     "Resend מאפשר לסוכנים לשלוח אימייל טרנזקציוני ולבדוק מסירה דרך API אחד. מפתח API מלוח הבקרה של Resend מועבר לשרת המקומי כמשתנה סביבה אחד.",

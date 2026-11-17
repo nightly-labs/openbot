@@ -359,8 +359,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "我的笔记里关于这个项目的决定是怎么写的？",
   "marketplace.plugin.obsidian.prompt.save": "把这个决定作为新笔记保存到我的仓库。",
   "marketplace.plugin.obsidian.prompt.log": "把今天工作的总结添加到我的“工作日志”笔记中。",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    '在 Obsidian 中打开 Settings > Local REST API。复制 API 密钥并开启 "Enable non-encrypted (HTTP) server"。',
+  "marketplace.plugin.obsidian.hint.apiKey": "在 Obsidian 中打开 Settings > Local REST API，然后复制 API 密钥。",
   "marketplace.plugin.resend.tagline": "事务性邮件",
   "marketplace.plugin.resend.description":
     "Resend 让助手通过一个 API 发送事务性邮件并检查投递情况。把 Resend 控制台中的 API 密钥作为一个环境变量传给本地服务器即可。",
