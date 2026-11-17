@@ -1433,7 +1433,7 @@ export class TurnLifecycle {
             threadId,
             last.totalTokens,
             usage.modelContextWindow,
-            source.contextCompaction === "native",
+            source.contextCompaction === "native" || source.compactsItself === true,
             compactsOnRequest(source.contextCompaction) ? 0.8 : null,
             usage.estimated === true,
             isAgentContextCategories(usage.categories) ? usage.categories : undefined,

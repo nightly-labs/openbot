@@ -391,6 +391,11 @@ export interface AcpFlavor {
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
   /**
+   * The agent compacts its own context, and OpenBot cannot ask it to. The context meter then says that
+   * the provider manages compaction. The ACP client sees each compaction when the context shrinks.
+   */
+  compactsItself?: true;
+  /**
    * The agent opens a saved session again with all of its prompts. A session that an idle release
    * closed keeps the instructions that it got, so its next prompt does not send them again.
    */
@@ -474,6 +479,9 @@ export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   // chat showed only "Add a payment method to continue", and no backup model took the turn (#9808).
   planUsedUpChunk: PAYMENT_METHOD_WALL,
   failureCause: (error) => (PAYMENT_METHOD_WALL_TEXT.test(errorText(error)) ? "usage_limit" : null),
+  // GitHub Copilot CLI 1.0.112 compacts its session by itself. The context meter said "This agent
+  // does not compact its context." (#10643).
+  compactsItself: true,
 };
 
 /**

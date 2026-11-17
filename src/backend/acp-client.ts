@@ -666,6 +666,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
   get contextCompaction(): "handoff" | "unsupported" {
     return this.#flavor.contextCompaction ?? "unsupported";
   }
+  get compactsItself(): boolean {
+    return this.#flavor.compactsItself === true;
+  }
   /**
    * An agent whose prompt stays open for background work (Antigravity) is left out: its answer can
    * wait minutes for the end of the prompt, and a channel would show it only then.
