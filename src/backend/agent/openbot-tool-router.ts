@@ -3720,13 +3720,19 @@ export class OpenBotToolRouter {
       // answer goes to the recipient's own chat, so it is not lost. A message without replyToMessageId,
       // such as a question back, goes to the thread of the requests from its recipient that this turn
       // works on, when they all came from that one thread (#5093). Otherwise it goes to the own chat,
-      // and the automatic result does not follow, so the thread would wait without an answer.
+      // and the automatic result does not follow, so the thread would wait without an answer. Only a
+      // request that waits for an answer counts: a new message after the recipient's answer is a new
+      // request, so it goes to the recipient's own chat, where it can start a task (#10273). To continue
+      // the recipient's thread, the agent replies to that answer.
       // `answerTaskId` routes a message to one recipient only.
       const answeredRequestIds = replyTo
         ? [replyTo]
         : turnDeliveries
             .filter(
-              ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
+              ({ delivery }) =>
+                delivery.sender.kind === "agent" &&
+                delivery.sender.agentId === recipientValues[0] &&
+                delivery.expectsReply !== false,
             )
             .map(({ delivery }) => delivery.messageId);
       const answerTaskIds = new Set(
