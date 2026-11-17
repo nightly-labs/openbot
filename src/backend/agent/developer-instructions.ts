@@ -181,6 +181,11 @@ export interface DeveloperInstructionOptions {
   /** The agent gets an http MCP server, which can need a sign-in that the provider cannot do. */
   httpMcpServers?: boolean;
   /**
+   * The agent gets an MCP server other than Computer Use, such as a connected Marketplace app. Without
+   * a rule, the agent asked the user to sign in to the same service in the browser (#11171).
+   */
+  mcpApps?: boolean;
+  /**
    * The user's MCP servers whose tools the provider can defer. A code-mode-only Codex model gets them
    * in `exec`, and no request names them, so the instructions do (#4468). OpenCode 2.2.7 puts them
    * in `execute`, behind its own `search(...)` (#7097). Antigravity 1.5 leaves some out (#7427).
@@ -604,6 +609,11 @@ export function developerInstructions(
         ? ' It is not in your tool list: tool_search with the query "<service> app" finds it, and tool_call runs it.'
         : ""
     } For GitHub issues, pull requests, and comments, use GitHub MCP tools when you have them, so that the OpenBot app is the author; otherwise use gh as the signed-in user.`,
+    ...(options.mcpApps
+      ? [
+          "When one of your MCP servers is for the service of a task, use its tools first, before the browser, a sign-in, or openbot.suggest_marketplace_app, unless the user asks for the browser. When its tools fail with a sign-in, key, or connection error, describe and call openbot.test_mcp_server with the server name and follow its result; do not ask the user to sign in to that service in the browser instead.",
+        ]
+      : []),
     ...(options.deferredMcpServers?.length
       ? [
           // OpenCode 2.2.7 lists only some tools of a large server in execute. A model that searched

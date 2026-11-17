@@ -1519,6 +1519,7 @@ export class ThreadLifecycle {
       homeSkills,
       workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      mcpApps: mcpServers.some((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID),
       deferredMcpServers:
         client.provider === "codex"
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
