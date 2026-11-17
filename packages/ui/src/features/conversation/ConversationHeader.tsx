@@ -132,6 +132,9 @@ function fitHeaderPicker(header: HTMLElement) {
   const measure = () => {
     // A part can mount after the header, such as the picker. Observing a part again has no effect.
     for (const part of parts()) observer.observe(part);
+    // When the last thread tab closes, only the thread row changes its width: the group fills the header.
+    const row = header.querySelector(":scope > .conversation-heading-group > .agent-threads-header");
+    if (row) observer.observe(row);
     // A thread row that is not in its tab mode shows the picker as its icon (header-controls.css).
     if (header.querySelector('.agent-threads-tabs, .agent-threads-header:not([data-mode="tabs"])')) return;
     // A chat with no agent, such as a channel, has no picker, so no step stays from an agent's chat.
