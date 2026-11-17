@@ -10,11 +10,10 @@
 
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { join } from "node:path";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Option, Schema } from "effect";
-import { openCodeDataDirectory } from "./process-confinement";
+import { openCodeDatabasePath, readOpenCodeDatabase } from "./opencode-usage";
 
 const logger = createOpenBotLogger("opencode-agent-defaults");
 
@@ -52,9 +51,6 @@ const OPENCODE_WEB_SEARCH_DEFAULT = { provider: "random" } as const;
 
 /** The key under which OpenCode 2 saves that answer in its `kv` table. */
 const WEB_SEARCH_ANSWER_KEY = "websearch:provider";
-
-/** OpenCode keeps its database in WAL mode; a read waits this long for a writer, not more. */
-const OPENCODE_DB_BUSY_TIMEOUT_MS = 100;
 
 /** The global config files that OpenCode reads, in its own order. */
 const GLOBAL_CONFIG_FILES = ["config.json", "opencode.json", "opencode.jsonc"] as const;
@@ -238,19 +234,13 @@ function readTextOrNull(file: string): string | null {
  * read it. A database or a `kv` table that does not exist yet holds none.
  */
 function hasWebSearchAnswer(env: NodeJS.ProcessEnv, home: string): boolean | null {
-  const databaseFile = env.OPENCODE_DB || "opencode.db";
-  if (databaseFile === ":memory:") return false;
-  const path = resolve(openCodeDataDirectory(env, home), databaseFile);
-  if (!existsSync(path)) return false;
+  const path = openCodeDatabasePath(env, home);
+  if (!path || !existsSync(path)) return false;
   try {
-    const database = new DatabaseSync(path, { readOnly: true });
-    try {
-      database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
+    return readOpenCodeDatabase(path, (database) => {
       if (!database.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'kv'").get()) return false;
       return database.prepare("SELECT 1 FROM kv WHERE key = ?").get(WEB_SEARCH_ANSWER_KEY) !== undefined;
-    } finally {
-      database.close();
-    }
+    });
   } catch (cause) {
     logger.warn("OpenBot could not read OpenCode's web search answer.", toLogValue(cause));
     return null;
