@@ -104,6 +104,8 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
   #allowed: boolean;
   #autoInstall: boolean;
   readonly #clientInUse: (() => boolean) | null;
+  /** This version is below the lowest one that the account service supports. */
+  #required = false;
   /** The version whose restart was cancelled, or whose automatic restart failed. The next version schedules again. */
   #declinedVersion: string | null = null;
   #schedule: Schedule | null = null;
@@ -225,11 +227,37 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     if (this.#schedule && !this.#restarting()) {
       // Each switch removes only the restart it allowed: remote access a member's, auto-install its own.
       const automatic = this.#schedule.memberId === null;
-      if (automatic ? !this.#installsAutomatically() : !this.#allowed) this.#clear();
+      if (automatic ? !this.#installsByItself() : !this.#allowed) this.#clear();
     }
     yield* this.#advance(this.#updater.getStatus());
     return preference;
   }).bind(this);
+
+  /**
+   * The account service says that this version is below the lowest supported one (`RequiredUpdate`).
+   * The host then installs the next release by itself, as the automatic install does: it checks,
+   * downloads, and restarts when no agent turn or other work runs. It never stops work mid-turn. A
+   * failed or cancelled install of a version is not tried again by itself, so it cannot loop.
+   */
+  setRequired(required: boolean): void {
+    if (this.#required === required) return;
+    this.#required = required;
+    Effect.runFork(Effect.forkIn(this.#applyRequired(), this.#workScope, { startImmediately: true }));
+  }
+
+  readonly #applyRequired = Effect.fn("RequestedUpdate.applyRequired")(function* (this: RequestedUpdate) {
+    const status = this.#updater.getStatus();
+    if (!this.#required) {
+      if (this.#schedule?.memberId === null && !this.#installsByItself() && !this.#restarting()) this.#clear();
+      return;
+    }
+    if (status.managedByHost || status.phase === "unsupported") return;
+    // A periodic check may not have run yet, or found nothing before the release; this one also gets
+    // a release that is still in its staged rollout.
+    if (status.phase === "idle" || status.phase === "up-to-date" || status.errorCode === "check_failed")
+      yield* Effect.forkIn(this.#updater.checkForUpdates(), this.#workScope, { startImmediately: true });
+    else yield* this.#advance(status);
+  });
 
   /**
    * Removes the schedule. A download under way continues; it is the same one auto-download runs. A
@@ -277,12 +305,15 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
     }
   });
 
-  /** Downloads a new version and schedules the restart when the host user or an admin turned it on. */
+  /**
+   * Downloads a new version and schedules the restart when the host user or an admin turned it on, or
+   * when the update is required.
+   */
   readonly #installAutomatically = Effect.fn("RequestedUpdate.installAutomatically")(function* (
     this: RequestedUpdate,
     status: UpdateStatus,
   ) {
-    if (!this.#installsAutomatically() || status.managedByHost || !status.availableVersion) return;
+    if (!this.#installsByItself() || status.managedByHost || !status.availableVersion) return;
     if (status.availableVersion === this.#declinedVersion) return;
     if (status.phase === "available")
       yield* Effect.forkIn(this.#updater.downloadUpdate(), this.#workScope, { startImmediately: true });
@@ -355,6 +386,11 @@ export class RequestedUpdate extends EventEmitter<{ preference: [UpdatePreferenc
 
   #installsAutomatically(): boolean {
     return this.#autoInstall || this.#clientInUse !== null;
+  }
+
+  /** The automatic install, or a required update. Only the first is a setting that admins see. */
+  #installsByItself(): boolean {
+    return this.#installsAutomatically() || this.#required;
   }
 
   #restarting(): boolean {

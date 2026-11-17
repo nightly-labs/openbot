@@ -822,6 +822,38 @@ all servers get a new release in about 6 hours, and a pause does not stop them.
 - `gh release upload --clobber` deletes each manifest and then uploads it again. A check in that
   short time gets no manifest. Settings > Updates can then show a check error until the next check.
 
+## Minimum app version
+
+OpenBot supports the releases of the last 2 months (60 days) on each surface: the desktop app, the
+server, and the phone apps (at least 60 days). The web client has no minimum: the Worker serves it,
+so it is always current.
+
+The account service derives the minimum from the release dates in `CHANGELOG.md` and
+`apps/mobile/CHANGELOG.md`, which the Worker bundles (`apps/auth-api/src/server/app-minimum-version.ts`).
+The minimum of a surface is the highest version that it had on or before the day 60 days ago. For
+the phones, only store versions count (not over-the-air versions), with the date of each store. When
+no release is that old, there is no minimum. The value moves forward each day without a deploy or a
+D1 row, and each release deploys the Worker with its new changelog. To change the window, change
+`SUPPORT_WINDOW_DAYS` and deploy the Worker.
+
+- `GET /v1/app/minimum-version?surface=desktop|host|ios|android` answers `{ minimumVersion }`
+  (`null` for no minimum or an unknown surface). `GET /v1/mobile/features` has the same field for
+  the phone platform.
+- A packaged desktop app or server asks 15 seconds after start and every 6 hours
+  (`src/main/required-update.ts`). Below the minimum, the desktop app shows **Update required** in
+  place of the workspace. The update downloads by itself and installs at the next safe point
+  (`RequestedUpdate`, a restart that waits for idle: agent turns, routines, browser control and
+  transfers), or at once with the button. A server does the same without the screen. A tenant whose
+  Host Manager manages updates, a development build and a local server child do not ask.
+- The phone app shows **Update required** with the store link while its store version is below the
+  minimum of its signed-in account server.
+- Only a confirmed answer blocks. An offline app, a failed request or an answer that the app cannot
+  read keeps the last state, and the app never blocks without an answer.
+- A release must be published before its changelog date is 60 days old. A release that is still
+  paused (0%) at that time is the minimum, but an automatic check cannot get it. Release it or
+  publish a newer one first. An install that cannot update itself (a Linux package, Nix) shows the
+  download page.
+
 ## Release health after publishing
 
 Before a staged rollout goes to 100%, run the release health check. It compares how the new release

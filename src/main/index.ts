@@ -1757,6 +1757,7 @@ if (!hasSingleInstanceLock) {
       });
       built.requestedUpdate.on("preference", forwardUpdatePreference);
       updater.start();
+      built.requiredUpdate?.start();
       // Each tenant quits only itself. The host verifies process exit independently.
       built.hostUpdateCoordinator.setStopHandler(async () => {
         await prepareForUpdateInstall(SHUTDOWN_DEADLINE_MS);

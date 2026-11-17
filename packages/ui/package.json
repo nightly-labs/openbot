@@ -414,6 +414,7 @@
     "./features/team/TeamPersonAvatar": "./src/features/team/TeamPersonAvatar.tsx",
     "./features/updates/HelpMenu": "./src/features/updates/HelpMenu.tsx",
     "./features/updates/restart-reasons": "./src/features/updates/restart-reasons.ts",
+    "./features/updates/UpdateRequiredScreen": "./src/features/updates/UpdateRequiredScreen.tsx",
     "./features/updates/update-status": "./src/features/updates/update-status.ts",
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",

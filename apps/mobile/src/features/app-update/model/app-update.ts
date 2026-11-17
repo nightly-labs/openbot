@@ -182,6 +182,11 @@ export async function installAppUpdate(update: AppUpdate, reloadColor: string): 
     });
     return;
   }
+  await openStorePage();
+}
+
+/** Opens the store page of the app, or its web page when the store app does not open. */
+export async function openStorePage(): Promise<void> {
   const [url, webUrl] = isIOS ? [IOS_STORE_URL, IOS_STORE_WEB_URL] : [ANDROID_STORE_URL, ANDROID_STORE_WEB_URL];
   await Linking.openURL(url).catch(() => Linking.openURL(webUrl));
 }
