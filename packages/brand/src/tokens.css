@@ -511,6 +511,10 @@
   --openbot-provider-current: var(--openbot-text-primary);
 }
 
+[data-provider="kiro"] {
+  --openbot-provider-current: var(--openbot-text-primary);
+}
+
 [data-provider="acp"] {
   --openbot-provider-current: var(--openbot-text-primary);
 }

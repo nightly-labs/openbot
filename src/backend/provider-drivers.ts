@@ -24,6 +24,7 @@ import {
   DEVIN_ACP_FLAVOR,
   HERMES_ACP_FLAVOR,
   KIMI_ACP_FLAVOR,
+  KIRO_ACP_FLAVOR,
   MISTRAL_ACP_FLAVOR,
 } from "./acp-flavor";
 import {
@@ -60,6 +61,7 @@ import {
   resolveGrokCli,
   resolveHermesCli,
   resolveKimiCli,
+  resolveKiroCli,
   resolveMistralCli,
   resolveMuseCli,
   resolveOpencodeCli,
@@ -106,6 +108,7 @@ import {
   hermesHome,
   hermesStatePaths,
   kimiStatePaths,
+  kiroStatePaths,
   mistralHomeDirectory,
   mistralStatePaths,
   museStatePaths,
@@ -472,6 +475,17 @@ function confineClineTarget(target: SpawnTarget, confinement: ProcessConfinement
   const state = clineStatePaths();
   for (const folder of state.writable) mkdirSync(folder, { recursive: true, mode: 0o700 });
   return confineSpawnTarget(target, confinement, state);
+}
+
+/**
+ * `kiro-cli acp` serves the Agent Client Protocol on stdio. Kiro CLI 3 starts the V3 engine by default,
+ * which has other methods and no `--agent`, `--model` or `--effort` flags. OpenBot reads the V2 server
+ * (`_kiro.dev/*`, `session/set_model`), so it names the engine from Kiro CLI 2.36, the first release
+ * with `--agent-engine`. Kiro CLI 2.37.1 starts V2 by default, and a release before 2.36 refuses the flag.
+ */
+export function kiroArgv(version: string): readonly string[] {
+  const [major = 0, minor = 0] = version.split(".").map((part) => Number.parseInt(part, 10));
+  return major > 2 || (major === 2 && minor >= 36) ? ["acp", "--agent-engine=v2"] : ["acp"];
 }
 
 /** `hermes acp` serves the Agent Client Protocol on stdio. */
@@ -1799,6 +1813,48 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         servesModel: context.servesModel,
       }),
     authState: (account) => ({ kind: "hermes", email: account?.email ?? null }),
+    validateAccount: () => undefined,
+  },
+  {
+    id: "kiro",
+    // The user signs in with `kiro-cli login` (a browser page, or a code with `--use-device-flow`);
+    // OpenBot reads the account again afterwards. A sign-in that OpenBot starts needs the output of that
+    // command, which was not checked against a real sign-in.
+    signIn: { kind: "external" },
+    // `kiro-cli logout` ends the CLI's own sign-in.
+    signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
+    resolveCli: () => resolveKiroCli(),
+    createClient: (cli, timeout, context, confinement) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kiro",
+        flavor: KIRO_ACP_FLAVOR,
+        argv: kiroArgv(cli.version),
+        env: {},
+        ...(confinement
+          ? {
+              confine: (target) => confineWithState(target, confinement, kiroStatePaths, context.agentEnvironment?.()),
+            }
+          : {}),
+        extraEnv: () => ({ ...context.agentEnvironment?.() }),
+        signInMessage: sourceText("error.provider.kiroSignIn"),
+        servesModel: context.servesModel,
+        mcpServers: context.mcpServers,
+        reportMcpDrops: context.reportMcpDrops,
+        mcpToolRuntimes: context.mcpToolRuntimes,
+        mcpEndpoint: context.mcpEndpoint,
+        history: context.history?.("kiro"),
+      }),
+    createProfileClient: (cli, timeout, context) =>
+      new AcpAgentClient(cli, timeout, {
+        provider: "kiro",
+        flavor: KIRO_ACP_FLAVOR,
+        argv: kiroArgv(cli.version),
+        profileGeneration: true,
+        env: {},
+        signInMessage: sourceText("error.provider.kiroSignIn"),
+        servesModel: context.servesModel,
+      }),
+    authState: (account) => ({ kind: "kiro", email: account?.email ?? null }),
     validateAccount: () => undefined,
   },
   {

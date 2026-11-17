@@ -851,6 +851,14 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
 };
 
 /**
+ * Kiro CLI 2.37 and later, started while the user is signed out, answers every request after
+ * `initialize` with ACP's `authRequired` error (https://kiro.dev/docs/cli/acp/). A saved sign-in that
+ * stops working, such as an expired Identity Center session, gives the same error to a new session,
+ * and the client must then report the sign-out.
+ */
+export const KIRO_ACP_FLAVOR: AcpFlavor = { authRequiredSignsOut: true };
+
+/**
  * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have
  * with "Invalid params", the message `Session not found: <id>` and `{ session_id: <id> }`. Only that
  * session counts: a wrong config value is also "Invalid params".

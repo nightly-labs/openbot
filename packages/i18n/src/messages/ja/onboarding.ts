@@ -47,6 +47,7 @@ export const messages = {
   "onboarding.provider.devinAccount": "Devin アカウントで使える多数のモデル",
   "onboarding.provider.copilotAccount": "Copilot プランで使える多数のモデル",
   "onboarding.provider.mistralAccount": "Mistral アカウントで使える Mistral のモデル",
+  "onboarding.provider.kiroAccount": "Kiro プランで Claude などのモデルを利用",
   "onboarding.provider.hermesNous": "Nous Portal プランまたはお使いの Hermes の設定",
   "onboarding.provider.inceptionKey": "Inception API キーで Mercury モデル",
   "onboarding.provider.deepseekKey": "DeepSeek API キーで使う DeepSeek モデル",

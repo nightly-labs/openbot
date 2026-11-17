@@ -344,6 +344,50 @@ export function kimiStatePaths(env: NodeJS.ProcessEnv = process.env, home = home
   };
 }
 
+/** The settings, sessions and logs folder of Kiro CLI. */
+export function kiroHomeDirectory(home = homedir()): string {
+  return join(home, ".kiro");
+}
+
+/**
+ * The folder where Kiro CLI keeps its sign-in and history (`data.sqlite3`) and the runtime that it
+ * downloads. It is the data folder of the user on each system. Only the macOS folder was checked.
+ */
+export function kiroDataDirectory(
+  env: NodeJS.ProcessEnv = process.env,
+  home = homedir(),
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform === "darwin") return join(home, "Library", "Application Support", "kiro-cli");
+  if (platform === "win32") return join(env.LOCALAPPDATA?.trim() || join(home, "AppData", "Local"), "kiro-cli");
+  return join(env.XDG_DATA_HOME?.trim() || join(home, ".local", "share"), "kiro-cli");
+}
+
+/**
+ * Kiro CLI writes its sessions, session index, logs and caches in `~/.kiro`, and its sign-in, history
+ * and downloaded runtime in its data folder. The settings and MCP servers, the agents, the steering
+ * files, the skills, the powers, the extensions and the environment file are in `~/.kiro` too, and
+ * every other Kiro process loads them, so they stay read-only. Whether the CLI also writes the AWS
+ * folders of an IAM Identity Center sign-in was not checked, so those folders stay closed.
+ */
+export function kiroStatePaths(env: NodeJS.ProcessEnv = process.env, home = homedir()): ProviderStatePaths {
+  const kiroHome = kiroHomeDirectory(home);
+  return {
+    writable: [kiroHome, kiroDataDirectory(env, home)],
+    protected: [
+      "settings",
+      "agents",
+      "steering",
+      "skills",
+      "powers",
+      "extensions",
+      "hooks",
+      "argv.json",
+      "kiro.env",
+    ].map((name) => join(kiroHome, name)),
+  };
+}
+
 /** The home folder of Mistral Vibe: `$VIBE_HOME`, or `~/.vibe`. */
 export function mistralHomeDirectory(env: NodeJS.ProcessEnv = process.env, home = homedir()): string {
   return env.VIBE_HOME?.trim() || join(home, ".vibe");

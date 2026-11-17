@@ -65,6 +65,9 @@ export function providerAuthKind(agent: AgentSummary, facts: ProviderAuthFacts):
       // Each Mistral Vibe sign-in saves an API key, and the host cannot tell a Le Chat plan key from a
       // pay-as-you-go key.
       return "unknown";
+    case "kiro":
+      // Kiro runs only on a Kiro plan: a Builder ID, a social sign-in or IAM Identity Center.
+      return facts.account("kiro") ? "subscription" : "unknown";
     case "cline":
       return model.startsWith("cline-free/") ? "free" : "unknown";
     case "hermes":

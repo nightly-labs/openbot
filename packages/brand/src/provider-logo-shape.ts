@@ -48,6 +48,11 @@ const DEEPSEEK_PATH =
 const OPENROUTER_PATH =
   "M16.778 1.844v1.919q-.569-.026-1.138-.032-.708-.008-1.415.037c-1.93.126-4.023.728-6.149 2.237-2.911 2.066-2.731 1.95-4.14 2.75-.396.223-1.342.574-2.185.798-.841.225-1.753.333-1.751.333v4.229s.768.108 1.61.333c.842.224 1.789.575 2.185.799 1.41.798 1.228.683 4.14 2.75 2.126 1.509 4.22 2.11 6.148 2.236.88.058 1.716.041 2.555.005v1.918l7.222-4.168-7.222-4.17v2.176c-.86.038-1.611.065-2.278.021-1.364-.09-2.417-.357-3.979-1.465-2.244-1.593-2.866-2.027-3.68-2.508.889-.518 1.449-.906 3.822-2.59 1.56-1.109 2.614-1.377 3.978-1.466.667-.044 1.418-.017 2.278.02v2.176L24 6.014Z";
 
+// The Kiro mark of AWS in one colour, on a 24 by 24 grid, from LobeHub Icons (MIT):
+// https://github.com/lobehub/lobe-icons
+const KIRO_PATH =
+  "M4.594 6.677C6.67-2.226 18.746-2.211 21.16 6.632c.353 1.297 1.725 7.582-1.673 13.747-1.545 2.797-5.841 5.49-6.99 1.883C8.6 25.477 3.315 24.1 5.789 18.609l-.318.143c-3.57 1.305-3.863-1.208-3.173-2.513.45-.84.727-1.335.937-1.897.353-.975.458-1.568.593-2.498.27-1.837.277-3.607.765-5.167zm8.37.01a.92.92 0 00-.81.428c-.217.323-.33.825-.33 1.462 0 .705.15 1.89 1.14 1.89h.008c.757 0 1.214-.705 1.214-1.89 0-.622-.127-1.125-.367-1.455a1.014 1.014 0 00-.855-.435zm4.08 0a.92.92 0 00-.81.428c-.217.323-.33.825-.33 1.462 0 .705.15 1.89 1.14 1.89h.008c.757 0 1.215-.705 1.215-1.89 0-.622-.128-1.125-.368-1.455a1.014 1.014 0 00-.855-.435z";
+
 // The Hermes Agent mark of Nous Research in one colour, on a 24 by 24 grid, from LobeHub Icons (MIT):
 // https://github.com/lobehub/lobe-icons
 const HERMES_PATHS = [
@@ -96,6 +101,7 @@ export type ProviderLogoVariant =
   | "devin"
   | "copilot"
   | "mistral"
+  | "kiro"
   | "acp"
   | "pi"
   | "muse"
@@ -149,6 +155,8 @@ export function providerLogoShape(provider: ProviderLogoVariant): ProviderLogoSh
       return { viewBox: GRID_24, paths: [{ d: COPILOT_PATH }] };
     case "mistral":
       return { viewBox: GRID_24, paths: [{ d: MISTRAL_PATH }] };
+    case "kiro":
+      return { viewBox: GRID_24, paths: [{ d: KIRO_PATH, evenOdd: true }] };
     case "deepseek":
       return { viewBox: GRID_24, paths: [{ d: DEEPSEEK_PATH, evenOdd: true }] };
     case "openrouter":

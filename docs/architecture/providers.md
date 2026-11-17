@@ -1432,6 +1432,52 @@ the model gets all tools: about 230 KB of schemas with 142 catalog tools. `bun r
 (`HERMES_REPO`, `HERMES_PYTHON`) gives the tools of the real bridge to the tool search of a Hermes
 checkout and writes `.openbot-build/hermes-catalog-tools-e2e/report.json`.
 
+### Kiro
+
+The Kiro provider (id `kiro`) starts the user's own Kiro CLI with `kiro-cli acp`. OpenBot has no
+managed runtime for it: AWS updates the CLI itself, and the CLI keeps the sign-in in its own folders.
+`resolveKiroCli` looks for `kiro-cli` on `PATH` and in `~/.local/bin`, and reads the version from
+`kiro-cli X.Y.Z` in `kiro-cli --version`. `OPENBOT_KIRO_PATH` selects an executable. A missing CLI is
+`not-installed`, and the row opens the `kiro-install` guide.
+
+**Engine.** Kiro CLI 3 starts the V3 engine by default. V3 has other methods (`session/set_config_option`
+for the model, no `_kiro.dev/*` notifications) and refuses `--agent`, `--model` and `--effort`.
+OpenBot reads the V2 server, so `kiroArgv` starts `kiro-cli acp --agent-engine=v2` from 2.36, the first
+release with the flag, and `kiro-cli acp` before it. Kiro CLI 2.37.1 gives the same `initialize` and
+`session/new` result with and without the flag. A V3 adapter is separate work.
+
+**Sign in.** `initialize` of 2.37.1 lists no auth method. The user runs `kiro-cli login` (a browser page,
+or a code with `--use-device-flow`) in a terminal, then Connect reads the account again
+(`signIn: external`). Disconnect runs `kiro-cli logout`. A signed-out CLI answers each request after
+`initialize` with ACP's `-32000` (documented by Kiro for 2.37 and later, not run signed out), and
+`KIRO_ACP_FLAVOR.authRequiredSignsOut` reports the sign-out. A sign-in that OpenBot starts, and a code
+sign-in for a joined server, need the output of `kiro-cli login`, which was not read from a real sign-in.
+
+**Models and agents.** `session/new` returns `models` (Claude and GPT ids) and `modes` (the user's Kiro
+agents). OpenBot lists the models; the modes are not used yet.
+
+**Parallel turns.** `concurrentTurns` is `true`. With Kiro CLI 2.37.1, two `session/new` and two
+`session/prompt` calls in one process ended 0.06 s apart (8.06 s and 8.12 s). Whether two sessions in
+one folder work with the MCP servers of OpenBot was not checked.
+
+**Skills and instructions.** Kiro reads skills from `.kiro/skills` (workspace) and `~/.kiro/skills`
+only. A test with a skill in each of `.kiro/skills`, `.agents/skills` and `.claude/skills` showed only
+the first in `_kiro.dev/commands/available`. So `skillFolders` is `[".kiro/skills"]`, and `homeSkills` is
+`instructions`: the developer instructions name the skills of `~/.agents/skills`. Kiro reads
+`AGENTS.md` as steering. The skills that OpenBot installs go to `.agents/skills` and `.claude/skills`
+(`MANAGED_SKILL_FOLDERS`), which Kiro does not read, so a Kiro agent does not get them. Writing
+`.kiro/skills` too is separate work, because the installer, the instance transfer and the skill list
+write and skip those two folders.
+
+**Confinement.** `kiroStatePaths` lets a confined process write `~/.kiro` and the data folder of the
+CLI (`data.sqlite3`, the runtime it downloads), and protects `settings`, `agents`, `steering`, `skills`,
+`powers`, `extensions`, `hooks`, `argv.json` and `kiro.env` in `~/.kiro`. Only the macOS data folder
+(`~/Library/Application Support/kiro-cli`) was checked. The AWS folders of an IAM Identity Center
+sign-in stay closed: whether the CLI writes them was not checked.
+
+**Not done.** `_kiro.dev/subagent/list_update` (subagent cards), `_kiro.dev/metadata` (context and credits
+usage), plan usage (`reportsUsage` is `false`), the Windows and Linux data folders, and the V3 engine.
+
 ### Custom agents
 
 The provider `acp` runs ACP programs that the user saves. The model id names the agent:

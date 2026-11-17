@@ -251,6 +251,7 @@ const SPAWN_ENVIRONMENT_PROVIDERS: readonly AgentProvider[] = [
   "copilot",
   "mistral",
   "hermes",
+  "kiro",
   "acp",
 ];
 
@@ -3795,7 +3796,9 @@ export class ProviderRuntime implements ProviderPort {
                 ? sourceText("error.provider.openrouterSignIn")
                 : provider === "hermes"
                   ? sourceText("error.provider.hermesSignIn")
-                  : agentProviderDescriptor(provider).signInMessage)
+                  : provider === "kiro"
+                    ? sourceText("error.provider.kiroSignIn")
+                    : agentProviderDescriptor(provider).signInMessage)
     );
   }
 
