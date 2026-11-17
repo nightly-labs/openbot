@@ -4764,10 +4764,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     agentId: string,
   ) {
     const busy = () => new ContextResetBusyError(sourceText("error.agent.waitBeforeDeleteHistory"));
-    // `mainContextBusy` also reads the running turn of the chat's own thread.
-    const mainChatBusy = (agent: AgentSummary) =>
-      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), [], false) ||
-      this.#threads.mainContextBusy(agent);
+    // `mainContextBusy` reads the running turn of the chat's own thread. A conversation that is not
+    // in the messaging lane, as on a provider that runs one turn at a time, still holds the chat.
+    const mainChatBusy = (agent: AgentSummary) => {
+      const working = this.#conversation.workingSnapshot(agentId);
+      return (
+        Boolean(
+          working?.activeTurnId && !(working.threadId && this.messaging.inMessagingLane(agentId, working.threadId)),
+        ) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), [], false) ||
+        this.#threads.mainContextBusy(agent)
+      );
+    };
     const target = yield* lifecycleStep("delete agent history", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
       if (mainChatBusy(agent)) throw busy();
