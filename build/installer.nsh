@@ -261,7 +261,8 @@
 ; that does not exist or that holds this user's earlier installation. Until then, add an OpenBot
 ; subfolder. The app makes %USERPROFILE%\OpenBot only at its first start, so that folder can also not
 ; exist yet: use the default folder for it and for a folder that holds it. The page shows nothing;
-; Abort skips it.
+; Abort skips it. In a visible update, the install mode page has set the folder from the registry
+; again, so this page uses the folder that `customInit` uses for a silent update.
 !macro customPageAfterChangeDir
   !include FileFunc.nsh
 
@@ -270,6 +271,15 @@
   Function openBotSafeInstallDirectory
     Push $0
     Push $1
+    ${if} ${isUpdated}
+      !insertmacro openBotHoldsUserData $INSTDIR $0
+      ${if} $0 == "1"
+        StrCpy $INSTDIR "$LocalAppData\Programs\${APP_FILENAME}"
+      ${endIf}
+      Pop $1
+      Pop $0
+      Abort
+    ${endIf}
     ReadRegStr $1 HKCU "${INSTALL_REGISTRY_KEY}" InstallLocation
     StrCpy $0 $INSTDIR 1 -1
     ${if} $0 == "\"

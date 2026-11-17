@@ -16,6 +16,7 @@
 //      default folder, keeps the other files there, and points the login item at the new copy.
 //   6. A visible update, as the app starts it, shows only the progress page and closes by itself.
 //      It runs without --force-run, so that it does not start the app on the runner.
+//   7. Case 4 as a visible update: it installs in the same folder as the silent update.
 // Usage: bun scripts/windows-home-install-update-e2e.ts <earlier installer> <new installer>
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -90,6 +91,7 @@ const cases: {
   newInstallerMovesTheInstallation?: CaseResult;
   newInstallerRemovesTheCopyAbove?: CaseResult;
   visibleUpdate?: CaseResult;
+  visibleUpdateMovesTheInstallation?: CaseResult;
 } = {};
 const report: {
   earlierInstaller: string;
@@ -282,11 +284,11 @@ async function earlierUninstallerDeletesWorkspaces(): Promise<void> {
   check(result.missingWorkspaceFiles.length === workspaceFiles.length, "The earlier uninstaller kept the workspaces.");
 }
 
-async function newInstallerMovesTheInstallation(): Promise<void> {
+async function newInstallerMovesTheInstallation(visible = false): Promise<void> {
   await installEarlierInHomeFolder();
   const longPathFile = await makeWorkspaces({ longPath: true });
   setLoginItem(join(homeFolder, "OpenBot.exe"));
-  const exitCode = await runInstaller(newInstaller, "--updated /S");
+  const exitCode = await runInstaller(newInstaller, visible ? "--updated" : "--updated /S");
   const result = {
     exitCode,
     registration: registration(),
@@ -295,7 +297,7 @@ async function newInstallerMovesTheInstallation(): Promise<void> {
     appFilesInHomeFolder: presentAppFiles(homeFolder),
     missingWorkspaceFiles: await workspacesIntact(longPathFile),
   };
-  cases.newInstallerMovesTheInstallation = result;
+  cases[visible ? "visibleUpdateMovesTheInstallation" : "newInstallerMovesTheInstallation"] = result;
   check(exitCode === 0, `The new installer exited with ${exitCode}.`);
   check(result.missingWorkspaceFiles.length === 0, `Workspace files are missing: ${result.missingWorkspaceFiles}`);
   check(result.appFilesInDefaultFolder.includes("OpenBot.exe"), "The new installer did not use the default folder.");
@@ -364,9 +366,10 @@ try {
     normalUpdate,
     earlierUninstallerStops,
     earlierUninstallerDeletesWorkspaces,
-    newInstallerMovesTheInstallation,
+    () => newInstallerMovesTheInstallation(),
     newInstallerRemovesTheCopyAbove,
     visibleUpdate,
+    () => newInstallerMovesTheInstallation(true),
   ]) {
     await step();
   }
