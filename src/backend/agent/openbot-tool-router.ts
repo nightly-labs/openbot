@@ -3468,13 +3468,19 @@ const RECIPIENT_QUEUES_NOTE =
 
 /** Says that this message corrects the request already running, so no second result is expected. */
 function amendmentNote(steer: AgentMessageSteer, existing: string | undefined): string {
-  const head =
-    steer === "steered"
-      ? "This message amended the request already running at the recipient."
-      : "This message amended your request; it waits for the recipient's next turn.";
+  if (steer === "steered") {
+    return [
+      "This message amended the request already running at the recipient.",
+      "The result of your earlier request still comes back; this amendment gets no answer of its own.",
+      existing,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+  // The steer did not land, so the store restored the request meaning: this message now asks for its
+  // own answer. Saying that it gets none would be false.
   return [
-    head,
-    "The result of your earlier request still comes back; this amendment gets no answer of its own.",
+    "This message amends your request. It did not join the running turn, so it waits as a request and its own result comes back.",
     existing,
   ]
     .filter(Boolean)

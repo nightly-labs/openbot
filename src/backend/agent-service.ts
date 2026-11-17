@@ -6552,6 +6552,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
     if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) {
       // No loaded chat or no turn to join, an app restart included: the amendment is a request again.
+      // The store restores only a queued delivery that still carries the amendment marker, so a
+      // message that already started or that was never an amendment is untouched.
       this.#mailbox.restoreAmendedRequest(deliveryId);
       return Effect.succeed(null);
     }
