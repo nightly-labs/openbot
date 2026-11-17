@@ -17,10 +17,11 @@ import {
   type WorkflowMediaPriceRequest,
   type WorkflowMediaSpecs,
   workflowCatalogMediaModel,
+  workflowCatalogProvider,
   workflowFixedCatalogModel,
   workflowMediaSpecs,
 } from "@openbot/contracts/ipc";
-import { Effect, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Semaphore } from "effect";
 import { type HiggsfieldPlan, higgsfieldFixedPlan } from "./higgsfield-catalog";
 import { readHiggsfieldCatalog, readHiggsfieldPrice } from "./higgsfield-media";
 import type { McpMediaFailed, McpMediaSignIn } from "./mcp-media";
@@ -135,15 +136,13 @@ const serviceModels = (provider: WorkflowCatalogProvider, listed: Listed<unknown
   return listed.entries ? [...listed.entries.values()].map((entry) => entry.model) : fixedModels(provider);
 };
 
-/** The service of a catalog id: its ids start with "sunra-" or "higgsfield-". */
-const catalogProvider = (id: string): WorkflowCatalogProvider | null =>
-  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
-
 export class WorkflowMediaCatalogCache {
   readonly #options: WorkflowMediaCatalogCacheOptions;
   readonly #sunra: ReturnType<typeof serviceList<SunraPlan>>;
   readonly #higgsfield: ReturnType<typeof serviceList<HiggsfieldPlan>>;
   readonly #prices = new Map<string, { at: number; credits: number | null }>();
+  /** The quotes that run now, by price key. */
+  readonly #quotes = new Map<string, Deferred.Deferred<number | null>>();
 
   constructor(options: WorkflowMediaCatalogCacheOptions) {
     this.#options = options;
@@ -155,15 +154,30 @@ export class WorkflowMediaCatalogCache {
     return this.#options.now?.() ?? Date.now();
   }
 
+  #keepPrice(key: string, credits: number | null): void {
+    if (this.#prices.size >= PRICE_ENTRIES) {
+      const oldest = this.#prices.keys().next();
+      if (!oldest.done) this.#prices.delete(oldest.value);
+    }
+    this.#prices.set(key, { at: this.#now(), credits });
+  }
+
+  #list(provider: WorkflowCatalogProvider): Effect.Effect<Listed<unknown> | null> {
+    return provider === "sunra" ? this.#sunra.list() : this.#higgsfield.list();
+  }
+
   /**
-   * The models of each signed-in service. A service that did not answer gives its fixed models. It
-   * never fails.
+   * The models of each signed-in service, or with `only`, of that service. A service that did not
+   * answer gives its fixed models. It never fails.
    */
-  readonly catalog = Effect.fn("WorkflowMediaCatalogCache.catalog")(function* (this: WorkflowMediaCatalogCache) {
-    const [sunra, higgsfield] = yield* Effect.all([this.#sunra.list(), this.#higgsfield.list()], {
-      concurrency: "unbounded",
-    });
-    if (!sunra && !higgsfield) this.#prices.clear();
+  readonly catalog = Effect.fn("WorkflowMediaCatalogCache.catalog")(function* (
+    this: WorkflowMediaCatalogCache,
+    only?: WorkflowCatalogProvider,
+  ) {
+    const read = (provider: WorkflowCatalogProvider) =>
+      only === undefined || only === provider ? this.#list(provider) : Effect.succeed(null);
+    const [sunra, higgsfield] = yield* Effect.all([read("sunra"), read("higgsfield")], { concurrency: "unbounded" });
+    if (only === undefined && !sunra && !higgsfield) this.#prices.clear();
     // The wire and IPC answers take at most WORKFLOW_MEDIA_CATALOG_MAX models.
     const models = [...serviceModels("sunra", sunra), ...serviceModels("higgsfield", higgsfield)];
     return { models: models.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) } satisfies WorkflowMediaCatalog;
@@ -200,9 +214,9 @@ export class WorkflowMediaCatalogCache {
   ) {
     const none = { credits: null } satisfies WorkflowMediaPrice;
     // Only the list of the model's service: a slow service does not hold the price of the other one.
-    const provider = catalogProvider(request.model);
+    const provider = workflowCatalogProvider(request.model);
     if (!provider) return none;
-    const listed = yield* (provider === "sunra" ? this.#sunra : this.#higgsfield).list();
+    const listed = yield* this.#list(provider);
     const model = serviceModels(provider, listed)
       .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
       .find((entry) => entry.id === request.model && entry.kinds.includes(request.kind));
@@ -241,22 +255,29 @@ export class WorkflowMediaCatalogCache {
             ...ask,
             plan: yield* this.higgsfieldPlan(model.id, providerModel, request.kind),
           });
+    // Nodes with the same choices wait for one quote.
+    const pending = this.#quotes.get(key);
+    if (pending) return { credits: yield* Deferred.await(pending) } satisfies WorkflowMediaPrice;
+    const shared = Deferred.makeUnsafe<number | null>();
+    this.#quotes.set(key, shared);
     const credits = yield* quote.pipe(
+      // A service that gives no price, such as Sunra for a Team, is kept as no price.
+      Effect.tap((value) => Effect.sync(() => this.#keepPrice(key, value))),
+      // A failed quote is not kept, so the next change of a choice asks again.
       Effect.catch((failure) =>
         Effect.sync(() => {
           this.#options.warn("Could not read the media price.", { service: provider, error: failure.message });
           return null;
         }),
       ),
+      // The nodes that wait get the quote, or no price when this call stopped first.
+      Effect.onExit((exit) =>
+        Effect.sync(() => {
+          this.#quotes.delete(key);
+          Deferred.doneUnsafe(shared, Effect.succeed(Exit.isSuccess(exit) ? exit.value : null));
+        }),
+      ),
     );
-    // A failed quote is not kept, so the next change of a choice asks again.
-    if (credits !== null) {
-      if (this.#prices.size >= PRICE_ENTRIES) {
-        const oldest = this.#prices.keys().next();
-        if (!oldest.done) this.#prices.delete(oldest.value);
-      }
-      this.#prices.set(key, { at: this.#now(), credits });
-    }
     return { credits } satisfies WorkflowMediaPrice;
   }).bind(this);
 }

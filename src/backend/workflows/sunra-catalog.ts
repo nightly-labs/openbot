@@ -6,14 +6,9 @@
  * cannot run from the canvas, so it is not shown.
  */
 
-import {
-  WORKFLOW_MEDIA_ASPECTS,
-  type WorkflowMediaAspect,
-  type WorkflowMediaCatalogModel,
-  type WorkflowMediaKind,
-} from "@openbot/contracts/ipc";
+import type { WorkflowMediaCatalogModel, WorkflowMediaKind } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
-import { shownDurations } from "./higgsfield-catalog";
+import { canvasAspects, numbers, shownDurations, strings, text } from "./higgsfield-catalog";
 
 /** How the host sends the pictures and the background of a step to one Sunra model. */
 export interface SunraPlan {
@@ -60,19 +55,7 @@ const MAKERS: readonly (readonly [string, string])[] = [
 /** The references that Sunra takes from a model whose `max_ref_images` is not set. */
 const UNSET_REFERENCES = 4;
 
-const text = (value: unknown) => (typeof value === "string" ? value : "");
-const strings = (value: unknown): string[] =>
-  Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
-const numbers = (value: unknown): number[] =>
-  Array.isArray(value)
-    ? value.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0)
-    : [];
 const count = (value: unknown) => (typeof value === "number" && Number.isInteger(value) && value > 0 ? value : 0);
-
-function canvasAspects(value: unknown): WorkflowMediaAspect[] {
-  const listed = new Set(strings(value));
-  return WORKFLOW_MEDIA_ASPECTS.filter((aspect) => listed.has(aspect));
-}
 
 function maker(id: string): string {
   return MAKERS.find(([prefix]) => id.startsWith(prefix))?.[1] ?? "Sunra";

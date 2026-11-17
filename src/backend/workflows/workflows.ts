@@ -45,6 +45,7 @@ import {
   type StartWorkflowRunInput,
   WORKFLOW_GITHUB_EVENTS,
   WORKFLOW_PICTURE_TYPES,
+  type WorkflowCatalogProvider,
   type WorkflowDetail,
   type WorkflowGitHubHistory,
   type WorkflowGitHubLastEventInput,
@@ -71,6 +72,7 @@ import {
   type WorkflowVersion,
   type WorkflowVersionInput,
   workflowCatalogMediaModel,
+  workflowCatalogProvider,
   workflowMediaKind,
   workflowMediaModel,
   workflowMediaSpecs,
@@ -292,8 +294,8 @@ export interface WorkflowsDependencies {
   mediaProviders?: () => WorkflowMediaProviders;
   /** The credits of the media services that this host can spend now; with `only`, of that one. Absent: none. */
   mediaCredits?: (only?: keyof WorkflowMediaCredits) => Effect.Effect<WorkflowMediaCredits>;
-  /** The live models of the signed-in media services. Absent: none. */
-  mediaCatalog?: () => Effect.Effect<WorkflowMediaCatalog>;
+  /** The live models of the signed-in media services; with `only`, of that one. Absent: none. */
+  mediaCatalog?: (only?: WorkflowCatalogProvider) => Effect.Effect<WorkflowMediaCatalog>;
   /** What one file of a media service model costs with the choices of a step. Absent: no quote. */
   mediaPrice?: (request: WorkflowMediaPriceRequest) => Effect.Effect<WorkflowMediaPrice>;
   notify(notice: WorkflowNotice): void;
@@ -675,13 +677,14 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           // A step with no description, no text and no picture would make media from nothing.
           const empty = !fieldText(node, "prompt").trim() && !step.input.trim() && images.length === 0;
           const make = Effect.gen(function* () {
-            // A Sunra or Higgsfield model comes from the live list of the service, which can have
-            // choices that the fixed list does not have.
-            const fixed = workflowMediaModel(node.fields);
-            const live =
-              fixed && fixed.provider !== "sunra" && fixed.provider !== "higgsfield"
-                ? []
-                : (yield* mediaCatalog()).models.flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
+            // A Sunra or Higgsfield model comes from the live list of its service, which can have
+            // choices that the fixed list does not have. Only that list is read, and not for a step
+            // that fails as empty: a slow service does not hold a step of the other one.
+            const service =
+              !empty && typeof node.fields.model === "string" ? workflowCatalogProvider(node.fields.model) : null;
+            const live = service
+              ? (yield* mediaCatalog(service)).models.flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+              : [];
             const model = workflowMediaModel(node.fields, live);
             const specs = workflowMediaSpecs(node.fields, kind, model);
             const result = empty
@@ -2003,8 +2006,8 @@ class Workflows extends Context.Service<Workflows, WorkflowsShape>()("openbot/ba
           dependencies.mediaProviders?.() ?? { sunra: false, higgsfield: false };
         const mediaCredits = (only?: keyof WorkflowMediaCredits): Effect.Effect<WorkflowMediaCredits> =>
           dependencies.mediaCredits?.(only) ?? Effect.succeed({ sunra: null, higgsfield: null });
-        const mediaCatalog = (): Effect.Effect<WorkflowMediaCatalog> =>
-          dependencies.mediaCatalog?.() ?? Effect.succeed({ models: [] });
+        const mediaCatalog = (only?: WorkflowCatalogProvider): Effect.Effect<WorkflowMediaCatalog> =>
+          dependencies.mediaCatalog?.(only) ?? Effect.succeed({ models: [] });
         const mediaPrice = (request: WorkflowMediaPriceRequest): Effect.Effect<WorkflowMediaPrice> =>
           dependencies.mediaPrice?.(request) ?? Effect.succeed({ credits: null });
 

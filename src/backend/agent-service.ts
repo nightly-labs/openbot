@@ -3089,10 +3089,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mcp.serviceSignIn(provider === "sunra" ? SUNRA_MCP_HOST : HIGGSFIELD_MCP_HOST);
   }
 
-  /** The live models of the signed-in media services. It never fails; a service that fails gives its fixed models. */
-  readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (this: AgentService) {
+  /**
+   * The live models of the signed-in media services; with `only`, of that one. It never fails; a
+   * service that fails gives its fixed models.
+   */
+  readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (
+    this: AgentService,
+    only?: WorkflowCatalogProvider,
+  ) {
     if (this.#stopping) return { models: [] } satisfies WorkflowMediaCatalog;
-    return yield* this.#mediaCatalog.catalog();
+    return yield* this.#mediaCatalog.catalog(only);
   }).bind(this);
 
   /** What one file of a media service model costs with the choices of a step, or null with no quote. */

@@ -1137,6 +1137,10 @@ export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCr
 export type WorkflowCatalogProvider = "sunra" | "higgsfield";
 export const WORKFLOW_CATALOG_PROVIDERS: readonly WorkflowCatalogProvider[] = ["sunra", "higgsfield"];
 export const WORKFLOW_MEDIA_CATALOG_MAX = 1000;
+
+/** The service of a catalog model id: its ids start with "sunra-" or "higgsfield-". */
+export const workflowCatalogProvider = (id: string): WorkflowCatalogProvider | null =>
+  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
 const WORKFLOW_MEDIA_NAME_MAX = 160;
 const WORKFLOW_MEDIA_MAKER_MAX = 120;
 const WORKFLOW_MEDIA_RESOLUTION_MAX = 16;

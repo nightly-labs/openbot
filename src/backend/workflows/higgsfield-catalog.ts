@@ -71,11 +71,11 @@ const KNOWN_LIMITS: Readonly<Record<string, Partial<Pick<HiggsfieldPlan, "refere
   kling4_0: { references: 10, total: 10 },
 };
 
-const text = (value: unknown) => (typeof value === "string" ? value : "");
+export const text = (value: unknown) => (typeof value === "string" ? value : "");
 const records = (value: unknown): DynamicRecord[] => (Array.isArray(value) ? value.filter(isDynamicRecord) : []);
-const strings = (value: unknown): string[] =>
+export const strings = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
-const numbers = (value: unknown): number[] =>
+export const numbers = (value: unknown): number[] =>
   Array.isArray(value)
     ? value.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0)
     : [];
@@ -99,7 +99,7 @@ function textLimit(value: string | undefined): number | null {
 }
 
 /** The canvas aspect ratios of a model, in the order of the canvas. */
-function canvasAspects(value: unknown): WorkflowMediaAspect[] {
+export function canvasAspects(value: unknown): WorkflowMediaAspect[] {
   const listed = new Set(strings(value));
   return WORKFLOW_MEDIA_ASPECTS.filter((aspect) => listed.has(aspect));
 }

@@ -2682,7 +2682,7 @@ export async function createApplicationServices({
         ),
       mediaProviders: () => service.workflowMediaProviders(),
       mediaCredits: (only) => service.workflowMediaCredits(only),
-      mediaCatalog: () => service.workflowMediaCatalog(),
+      mediaCatalog: (only) => service.workflowMediaCatalog(only),
       mediaPrice: (request) => service.workflowMediaPrice(request),
       // A kept picture is new in the Library, so the next scan must not answer from before it. A failure
       // after the file is stored also clears the scan.
