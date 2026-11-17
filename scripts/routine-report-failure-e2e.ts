@@ -12,7 +12,8 @@
 // a flow skips the agents after a failed owner or linked step, that a result destination gets the
 // answer of a reported failure but not of a provider failure, that a failed run does not pause its
 // own routine in either call order (#9856), and that a routine that its own run paused says which run
-// until the next change of the routine, also after a restart (#10048).
+// until the next change of the routine, also after a restart (#10048), and that the routine prompt
+// says that a request to a teammate is not a failure (#10928).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -666,6 +667,13 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === healthRun.delivery.turnId,
   )?.text;
   pass("The Test-run prompt names the tool", healthPrompt?.includes("call the routine_report_failure tool") === true);
+  // A run that waited for teammates reported a failure before their replies came (#10928).
+  pass(
+    "The routine prompt says that a teammate request is not a failure",
+    healthPrompt?.includes("A request to a teammate is not a failure") === true &&
+      healthPrompt.includes("Do not call the routine_report_failure tool only because a reply has not come yet."),
+    healthPrompt,
+  );
   pass(
     "The routine prompt does not forbid listing routines",
     healthPrompt?.includes("Do not create, update, delete, or test routines during this run.") === true &&
