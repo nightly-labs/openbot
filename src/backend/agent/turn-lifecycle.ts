@@ -268,6 +268,8 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
+  /** Whether the agent's pool has another account that is ready for its model. */
+  poolHasOtherAccount(agentId: string): boolean;
   /**
    * Whether a ready backup, or the ready model the agent left for a limit, continues work that a usage
    * limit stopped after it started. An agent set to ask uses its order too: the turn already started,
@@ -1637,6 +1639,19 @@ export class TurnLifecycle {
           this.#holdCompactionFailure(errorTurnId, context, false, source);
           return;
         }
+        // A spent quota passes over the pooled account at once, so the pool moves the agent to its next
+        // account. The pool read only the usage readings, and Google's reading of a spent Antigravity
+        // account can still show room, so each turn went to the spent account again (#11255). With no
+        // other account, nothing is recorded: one error must not hold a single account until its reset.
+        if (
+          notification.method === "error" &&
+          agentId &&
+          errorTurnId !== null &&
+          this.#runningTurns.has(errorTurnId) &&
+          context.causeCode === "usage_limit" &&
+          this.#hooks.poolHasOtherAccount(agentId)
+        )
+          this.#markFailed(agentId, context.model, { message, context });
         // A provider error moves an agent set to switch without asking to its next backup model. The
         // error waits for the end of the turn: a turn that did nothing yet runs again there instead.
         // A turn with no answer waits also with no backup: teammate results can run again (#7225).

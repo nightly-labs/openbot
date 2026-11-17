@@ -1925,6 +1925,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
+        poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
         quietRoutineDelivery: (deliveryId) => this.#routines.quietRunForDelivery(deliveryId),
@@ -4309,7 +4310,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * pool that no agent uses yet, each account in the pool counts.
    */
   #poolPick(provider: AgentProvider, model: string | null, current: string | null): string | null {
-    const members = this.#providers.poolMembers(provider, model ?? "").filter(
+    return pickPoolAccount(this.#readyPoolMembers(provider, model), current, Date.now() / 1000);
+  }
+
+  /** The pool's accounts that are ready for the model and not at a limit or after a provider error. */
+  #readyPoolMembers(provider: AgentProvider, model: string | null) {
+    return this.#providers.poolMembers(provider, model ?? "").filter(
       (member) =>
         model === null ||
         this.#usageLimitReady({
@@ -4318,7 +4324,19 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           ...(member.accountId === DEFAULT_PROVIDER_ACCOUNT_ID ? {} : { providerAccountId: member.accountId }),
         }),
     );
-    return pickPoolAccount(members, current, Date.now() / 1000);
+  }
+
+  /**
+   * Whether the agent's pool has another account that is ready for its model. A spent quota moves also
+   * an agent that an agent pinned to its account. With no other account, the agent stays where it is.
+   */
+  #poolHasOtherAccount(agentId: string): boolean {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent) return false;
+    const choice = agentModelChoice(agent);
+    if (!this.#pooled(choice)) return false;
+    const current = choice.providerAccountId ?? DEFAULT_PROVIDER_ACCOUNT_ID;
+    return this.#readyPoolMembers(choice.provider, choice.model).some((member) => member.accountId !== current);
   }
 
   /** Shows the pool's pick for the model of the provider's first agent in the provider's row. */
