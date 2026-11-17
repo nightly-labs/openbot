@@ -856,9 +856,9 @@ const MessageRow = memo(function MessageRow({
   );
   const rendered =
     message.kind === "routine" ? (
-      <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+      <RoutineMarkerRow key={message.id} message={message} />
     ) : message.kind === "routine-run-group" ? (
-      <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
+      <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "app-suggestion" ? (
