@@ -413,16 +413,9 @@ export class MobileChannelStore {
         !item.message.questionPrompt.resolution,
     );
     const prompt = message?.message.questionPrompt;
-    // A question with no row in the page shows from the host's request, and the host refuses an
-    // answer when it no longer waits (#10178). A row that has its answer is closed.
-    const saved = page?.messages.some(
-      (item) =>
-        item.author.kind === "agent" &&
-        item.author.id === agentId &&
-        item.message.questionPrompt?.requestId === input.requestId,
-    );
-    if (!page || page.channel.archived || (saved && !prompt))
-      throw new Error(sourceText("error.remote.formUnavailable"));
+    // A question with no open row in the page shows from the host's request, and the host refuses an
+    // answer when it no longer waits (#10178). The screen shows no card for a row that has its answer.
+    if (!page || page.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
     await this.request(
       "POST",
       TEAM_API_ROUTES.respond.prompt,

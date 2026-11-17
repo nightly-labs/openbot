@@ -60,16 +60,22 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
   // A question of a member's thread here that the page has no row for, as the question of a turn that
   // the provider started with no task: that turn copies no rows to the channel. Its card comes from
   // the host's request, so "Waiting for you" leads to a question that the person can answer (#10178).
+  // A saved row is matched by its turn too: a custom agent counts its request ids again after a restart.
+  // The card waits for the page, which the answer needs.
   const threadWaits = useThreadWaits(serverId);
   const liveQuestions = useMemo(() => {
-    if (!online || archived || !threadIds) return [];
+    if (!online || archived || !threadIds || !page) return [];
+    const key = (agentId: string, turnId: string | undefined, requestId: string | number) =>
+      `${agentId}\n${turnId ?? ""}\n${String(requestId)}`;
     const saved = new Set(
-      (page?.messages ?? []).flatMap((entry) =>
-        entry.message.questionPrompt ? [`${entry.author.id}\n${String(entry.message.questionPrompt.requestId)}`] : [],
+      page.messages.flatMap((entry) =>
+        entry.message.questionPrompt
+          ? [key(entry.author.id, entry.message.turnId, entry.message.questionPrompt.requestId)]
+          : [],
       ),
     );
     return threadWaits.flatMap(({ reason, questions, agentId, requestId, threadId, turnId }) =>
-      reason === "question" && questions && threadIds.has(threadId) && !saved.has(`${agentId}\n${String(requestId)}`)
+      reason === "question" && questions && threadIds.has(threadId) && !saved.has(key(agentId, turnId, requestId))
         ? [
             {
               agentId,
@@ -83,7 +89,7 @@ function ChannelChat({ channelId, serverId }: { channelId: string; serverId: str
           ]
         : [],
     );
-  }, [online, archived, threadIds, page?.messages, threadWaits]);
+  }, [online, archived, threadIds, page, threadWaits]);
   const shownMessages = useMemo(
     () => (liveQuestions.length > 0 ? [...messages, ...liveQuestions.map((question) => question.message)] : messages),
     [messages, liveQuestions],

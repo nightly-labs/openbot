@@ -292,7 +292,7 @@ export function waitingChannelPrompt(
 }
 
 /**
- * The newest question that a member's thread in this channel waits on, read from the host's request.
+ * The last question in the host's list that a member's thread in this channel waits on.
  * The view shows it when the page has no row for it: a turn that the provider started with no task
  * copies no rows to the channel, and the channel showed "Needs you" with no question (#10178). An
  * older host does not name the threads, so the view shows the saved rows only.
