@@ -97,6 +97,11 @@ import {
 import { guardedListDecoder, optionalHistoryExtent, requiredString } from "@openbot/contracts/ipc-decoding";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
+import {
+  AGENT_ACTIVE_QUEUES_ROUTES,
+  type AgentActiveQueues,
+  isAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
   AGENT_FAST_MODE_CAPABILITY,
@@ -425,6 +430,8 @@ export interface WebWorkspaceRuntime {
   /** Sends which agent this member is writing to, or `null`. It does nothing while the host is offline. */
   setTyping(agentId: string | null, typing: boolean): void;
   queue(agentId: string): Promise<QueueSnapshot>;
+  /** The open work of the queues of these agents, on a host with `agent-active-queues-v1`. */
+  activeQueues(agentIds: string[]): Promise<AgentActiveQueues>;
   editQueue(input: EditQueuedMessageInput): Promise<QueueSnapshot>;
   cancelQueued(input: CancelQueuedMessageInput): Promise<void>;
   steerQueued(input: SteerQueuedMessageInput): Promise<void>;
@@ -1592,6 +1599,7 @@ export function createWebWorkspaceRuntime(
     stop: (id, turnId) =>
       Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
+    activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeActiveQueues, { agentIds }),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
     cancelQueued: (input) =>
@@ -2129,4 +2137,9 @@ function decodeWebConversationPage(value: unknown): ConversationPage {
       ...optionalHistoryExtent(value.pageInfo),
     },
   };
+}
+
+function decodeActiveQueues(value: unknown): AgentActiveQueues {
+  if (!isAgentActiveQueues(value)) throw new Error("Invalid agent queues.");
+  return value;
 }

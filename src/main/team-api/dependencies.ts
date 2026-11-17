@@ -171,6 +171,7 @@ type TeamApiAgentMethods = Pick<
   | "listWorkspaceDirectory"
   | "sendMessage"
   | "listQueue"
+  | "listActiveQueues"
   | "acknowledgeFailedTurn"
   | "setMessageReaction"
   | "deleteConversationMessage"

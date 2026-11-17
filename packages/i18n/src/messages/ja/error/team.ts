@@ -73,6 +73,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "この接続ではチャットの色を使用できません。",
   "error.team.routineRunPlaceUnsupported": "この接続ではルーティンの実行場所を変更できません。",
   "error.team.routinePauseReasonsUnsupported": "この接続ではルーティンが一時停止された理由を表示できません。",
+  "error.team.activeQueuesUnsupported": "この接続では、すべてのエージェントのキューを表示できません。",
   "error.team.routinesOnceUnsupported": "この接続では 1 回のみ実行するルーティンを保存できません。",
   "error.team.routineRunCommandUnsupported": "この接続ではルーティンの実行コマンドを取得できません。",
   "error.team.threadQueueUnsupported": "この接続ではサイドスレッドのキューを表示できません。",

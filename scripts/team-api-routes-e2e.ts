@@ -10,6 +10,7 @@
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
 // which run paused each paused routine (`routine-pause-reasons-v1`) over the same records,
+// the open work of the queues of all agents in one read (`agent-active-queues-v1`),
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // the whole copy of a pending approval (`pending-approval-v1`),
@@ -97,6 +98,10 @@ import {
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
+import {
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import {
   AGENT_BACKUP_MODELS_CAPABILITY,
   AGENT_BACKUP_MODELS_ROUTES,
@@ -768,6 +773,36 @@ const transferAgent = agent("agent-transfer", "Tess", "claude", "claude-sonnet-4
 mkdirSync(transferAgent.workspacePath, { recursive: true });
 writeFileSync(join(transferAgent.workspacePath, "random.bin"), randomBytes(INSTANCE_TRANSFER_CHUNK_BYTES + 4096));
 
+/** `agent-active-queues-v1`: the text of each open delivery, and how many each agent has. */
+let activeQueueText = "open work";
+let activeQueueDeliveries = 1;
+
+/** The open work of a queue, with an attachment whose preview URL is an address on the host. */
+function activeQueue(agentId: string): QueueSnapshot {
+  const [delivery] = queueSnapshot(agentId).deliveries;
+  if (!delivery) throw new Error("The queue fixture has no delivery.");
+  return {
+    agentId,
+    ...(agentId === "agent-oc" ? { welcome: true as const } : {}),
+    deliveries: Array.from({ length: agentId === "agent-ada" ? activeQueueDeliveries : 1 }, (_, index) => ({
+      ...delivery,
+      id: `delivery-${agentId}-${index}`,
+      text: activeQueueText,
+      attachments: [
+        {
+          id: "attachment-1",
+          name: "notes.txt",
+          size: 4,
+          kind: "file" as const,
+          mimeType: "text/plain",
+          previewKind: "text" as const,
+          previewUrl: "http://127.0.0.1:1/preview/attachment-1",
+        },
+      ],
+    })),
+  };
+}
+
 function queueSnapshot(agentId: string): QueueSnapshot {
   return {
     agentId,
@@ -1156,6 +1191,10 @@ const fakeAgents: TeamApiAgents = {
   listQueue: (agentId) => {
     record("listQueue", agentId);
     return queueSnapshot(agentId);
+  },
+  listActiveQueues: (agentIds) => {
+    record("listActiveQueues", agentIds);
+    return agentIds.map(activeQueue);
   },
   acknowledgeFailedTurn: (agentId, turnId) => record("acknowledgeFailedTurn", agentId, turnId),
   cancelQueuedMessage: (agentId, deliveryId) => Effect.sync(() => record("cancelQueuedMessage", agentId, deliveryId)),
@@ -10919,6 +10958,85 @@ try {
         isDeepStrictEqual(resumed.body, { routines: [] }) &&
         saves().length === savesBefore,
       [summary(viewer), summary(missing), summary(hiddenAgent), summary(resumed)],
+    );
+  }
+
+  // ---- The open work of all queues (agent-active-queues-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, AGENT_ACTIVE_QUEUES_CAPABILITY];
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises agent-active-queues-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(AGENT_ACTIVE_QUEUES_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {} });
+    const unknownKey = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "the list route without the capability gets 400 activeQueuesUnsupported, and a body with another key gets 400",
+      errorIs(unsupported, 400, sourceText("error.team.activeQueuesUnsupported")) && unknownKey.status === 400,
+      [summary(unsupported), summary(unknownKey)],
+    );
+    const all = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    const visibleIds = list(field(all.body, "queues")).map((queue) => field(queue, "agentId"));
+    const firstAttachment = field(list(field(list(field(all.body, "queues"))[0], "deliveries"))[0], "attachments");
+    check(
+      "a member reads the open work of every agent that the member can see in one read, with no preview URL, and the welcome flag",
+      all.status === 200 &&
+        visibleIds.length > 0 &&
+        visibleIds.includes("agent-ada") &&
+        isDeepStrictEqual(field(all.body, "omitted"), []) &&
+        list(firstAttachment).every((attachment) => field(attachment, "previewUrl") === null) &&
+        list(field(all.body, "queues")).some(
+          (queue) => field(queue, "agentId") === "agent-oc" && field(queue, "welcome") === true,
+        ),
+      summary(all),
+    );
+    const named = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-none"] },
+      capabilities,
+    });
+    const oldClient = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, {
+      token: bobToken,
+      json: { agentIds: ["agent-ada", "agent-pi"] },
+      capabilities,
+      protocol: 6,
+    });
+    accessLevels = { revision: 37, everyone: { "agent-ada": "none" }, roles: [] };
+    const noAccess = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    accessLevels = { revision: 38, everyone: {}, roles: [] };
+    const ids = (reply: Reply) => list(field(reply.body, "queues")).map((queue) => field(queue, "agentId"));
+    check(
+      "named agents limit the read; an unknown agent, an agent hidden from the client and an agent without access are left out with no error",
+      isDeepStrictEqual(ids(named), ["agent-ada"]) &&
+        isDeepStrictEqual(ids(oldClient), ["agent-ada"]) &&
+        noAccess.status === 200 &&
+        !ids(noAccess).includes("agent-ada") &&
+        ids(noAccess).length === visibleIds.length - 1,
+      [summary(named), summary(oldClient), summary(noAccess)],
+    );
+    // Agent Ada has more open work than one frame carries: the answer names Ada in `omitted`, and the
+    // client reads Ada on the released route.
+    activeQueueText = "x".repeat(90_000);
+    activeQueueDeliveries = 20;
+    const large = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueText = "open work";
+    activeQueueDeliveries = 1;
+    check(
+      "an agent whose open work does not fit in one WebRTC frame is named in omitted, and the other agents stay in the answer",
+      large.status === 200 &&
+        isDeepStrictEqual(field(large.body, "omitted"), ["agent-ada"]) &&
+        !ids(large).includes("agent-ada") &&
+        ids(large).length === visibleIds.length - 1 &&
+        Buffer.byteLength(large.text) <= WEBRTC_FRAME_BODY_BUDGET,
+      { status: large.status, bytes: large.text.length, omitted: field(large.body, "omitted"), queues: ids(large) },
     );
   }
 

@@ -73,6 +73,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "ألوان الدردشة غير مدعومة في هذا الاتصال.",
   "error.team.routineRunPlaceUnsupported": "لا يمكن لهذا الاتصال تغيير مكان تشغيل المهمة الدورية.",
   "error.team.routinePauseReasonsUnsupported": "لا يمكن لهذا الاتصال عرض سبب إيقاف المهمة الدورية مؤقتًا.",
+  "error.team.activeQueuesUnsupported": "لا يمكن لهذا الاتصال عرض قوائم انتظار جميع الوكلاء.",
   "error.team.routinesOnceUnsupported": "لا يمكن لهذا الاتصال حفظ المهام الدورية التي تعمل مرة واحدة.",
   "error.team.routineRunCommandUnsupported": "لا يمكن لهذا الاتصال إعطاء أمر تشغيل المهمة الدورية.",
   "error.team.threadQueueUnsupported": "لا يمكن لهذا الاتصال عرض قائمة انتظار محادثة جانبية.",

@@ -256,6 +256,7 @@ import {
   decodeComputerUseState,
 } from "./computer-use-decoding";
 import {
+  decodeActiveQueues,
   decodeAgentTask,
   decodeAgentTaskReadState,
   decodeAgentTaskReadStates,
@@ -676,6 +677,7 @@ const agentGroup = bridgeGroup(IPC_ENDPOINTS.agent, {
   deleteConversationMessage: decodeVoid,
   withdrawFeedback: decodeWithdrawFeedbackResult,
   listQueue: decodeQueue,
+  listActiveQueues: decodeActiveQueues,
   listWaits: decodeWaits,
   listPinnedMessages: decodePinnedMessages,
   setMessagePinned: decodePinnedMessages,

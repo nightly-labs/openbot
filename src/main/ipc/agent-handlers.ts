@@ -83,6 +83,12 @@ import {
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
+  AGENT_ACTIVE_QUEUES_CAPABILITY,
+  AGENT_ACTIVE_QUEUES_ROUTES,
+  type AgentActiveQueues,
+  isAgentActiveQueues,
+} from "@openbot/contracts/team-protocol/agent-active-queues-v1";
+import {
   AGENT_QUEUE_TASK_CAPABILITY,
   AGENT_QUEUE_TASK_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
@@ -214,6 +220,7 @@ import type { SkillMarketplaceService } from "../skill-marketplace-service";
 import {
   parseAcknowledgeFailedTurn,
   parseAgentId,
+  parseAgentIdList,
   parseAgentTask,
   parseApprovalResponse,
   parseBranchAgentTask,
@@ -1248,6 +1255,22 @@ export function agentIpcHandlers({
         remote: (agentId, serverId) =>
           runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agent.queue(agentId), decodeQueueSnapshot)),
       }),
+      // An older host has no list route: the answer is null, and the renderer reads each queue.
+      listActiveQueues: scopedHandler(parseAgentIdList, {
+        local: (agentIds) => {
+          const known = new Set(service.listAgents().map((agent) => agent.id));
+          return { queues: service.listActiveQueues(agentIds.filter((id) => known.has(id))), omitted: [] };
+        },
+        remote: (agentIds, serverId) => {
+          if (!remoteServers.supportsCapability(serverId, AGENT_ACTIVE_QUEUES_CAPABILITY)) return null;
+          return runCauseEffect(
+            remoteServers.request(serverId, AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, {
+              method: "POST",
+              body: { agentIds },
+            }),
+          );
+        },
+      }),
       // A joined server has open waits through `agent-waits-v1`. An older host has no route for them, so
       // the composer shows none there and keeps working.
       listWaits: scopedHandler(parseAgentId, {
@@ -1687,4 +1710,9 @@ export function agentIpcHandlers({
       }),
     },
   };
+}
+
+function decodeAgentActiveQueues(value: unknown): AgentActiveQueues {
+  if (!isAgentActiveQueues(value)) throw new Error("Invalid remote agent queues.");
+  return value;
 }

@@ -75,6 +75,7 @@ export const messages = {
   "error.team.chatColorsUnsupported": "Esta conexión no admite colores de chat.",
   "error.team.routineRunPlaceUnsupported": "Esta conexión no puede cambiar dónde se ejecuta una rutina.",
   "error.team.routinePauseReasonsUnsupported": "Esta conexión no puede mostrar por qué una rutina está en pausa.",
+  "error.team.activeQueuesUnsupported": "Esta conexión no puede mostrar las colas de todos los agentes.",
   "error.team.routinesOnceUnsupported": "Esta conexión no puede guardar rutinas que se ejecutan una vez.",
   "error.team.routineRunCommandUnsupported": "Esta conexión no puede dar el comando de ejecución de una rutina.",
   "error.team.threadQueueUnsupported": "Esta conexión no puede mostrar la cola de un hilo lateral.",

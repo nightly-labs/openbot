@@ -11,6 +11,7 @@ import type {
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
 import type { ServerAuditLog } from "./ipc-server-audit";
+import type { AgentActiveQueues } from "./team-protocol/agent-active-queues-v1";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
 // registrar bind its handlers as an object keyed by endpoint, so a channel with no handler, and a
@@ -1871,6 +1872,9 @@ export const IPC_ENDPOINTS = {
     // A joined server takes it through `feedback-withdraw-v1`, for its owner only.
     withdrawFeedback: scopedRequest<WithdrawFeedbackInput, WithdrawFeedbackResult>()("agent:withdraw-feedback"),
     listQueue: scopedRequest<string, QueueSnapshot>()("agent:list-queue"),
+    // The open work of the queues of many agents, for the agent rows. A joined server takes it through
+    // `agent-active-queues-v1`; null when the host does not have it, and the caller reads each queue.
+    listActiveQueues: scopedRequest<string[], AgentActiveQueues | null>()("agent:list-active-queues"),
     listWaits: scopedRequest<string, AgentWaitsSnapshot>()("agent:list-waits"),
     cancelWait: scopedRequest<CancelAgentWaitInput, void>()("agent:cancel-wait"),
     // The pins of all chats of an agent. A joined server takes both through `message-pins-v1`.

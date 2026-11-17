@@ -680,6 +680,18 @@ joined desktop get the window without other client code. A released phone keeps 
 until it updates. `scripts/queue-window-e2e.ts` checks the frame size with and without the
 capability.
 
+### Open queues of all agents
+
+`agent-active-queues-v1` adds `POST /v1/agent-active-queues/list`. A client reads the open work of
+each visible agent (queued, starting and running deliveries, the failed deliveries of a failed turn,
+and the welcome mark) in one request, not one `GET /v1/agents/:id/queue` for each agent. On a server
+with many agents, those reads filled the data channel after connect and delayed the chat. The
+answer has no finished history; agents that do not fit in one WebRTC frame are in `omitted`, and the
+client reads them on the released route. The web client and a joined desktop use the route on
+connect, resync, agent changes and `queue-invalidated`, and read the full queue of an agent when the
+user opens its chat. A host without the capability gets the released per-agent reads.
+`scripts/team-api-routes-e2e.ts` checks the route.
+
 ### Browser control and page state
 
 The frozen `browser-changed` event and `GET /v1/browser/tabs` drop unknown tab keys in released
