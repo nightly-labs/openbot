@@ -288,7 +288,8 @@ function newLoginAsEdit(
   input: VaultSaveInput,
   allows: (login: StoredLogin) => boolean,
 ): VaultSaveInput {
-  if (input.kind !== "login" || input.id !== null) return input;
+  // A new login with no password still fails as before: it does not take the saved password.
+  if (input.kind !== "login" || input.id !== null || input.password === null) return input;
   const host = loginHost(input.website);
   const saved =
     host === undefined
