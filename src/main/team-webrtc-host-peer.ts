@@ -986,7 +986,11 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({ cause: new Error("The event frame is not client control data.") });
     // Do not send `event-reset` here. The client can acknowledge an old event after the stream
     // already reset it, and a second reset would move it back before the newer events it has.
-    for (const sequence of this.#events.keys()) if (sequence <= frame.throughSequence) this.#events.delete(sequence);
+    // The buffer keeps the sequences in increasing order, so the scan stops at the first newer event.
+    for (const sequence of this.#events.keys()) {
+      if (sequence > frame.throughSequence) break;
+      this.#events.delete(sequence);
+    }
   });
 
   readonly #sendEvents = Effect.fn("TeamHostPeer.sendEvents")(function* (

@@ -1742,6 +1742,12 @@ export class TeamApiServer {
       return resolved;
     };
 
+    // A completed turn sends the runtime snapshot to some clients. It is read once for all of them.
+    let runtimeSnapshot = () => {
+      const snapshot = this.#options.agents.getRuntimeSnapshot();
+      runtimeSnapshot = () => snapshot;
+      return snapshot;
+    };
     for (const [client, connection] of this.#eventClients) {
       if (memberId !== undefined && connection.memberId !== memberId) continue;
       const event = this.#eventFor(connection, broadcast);
@@ -1922,7 +1928,7 @@ export class TeamApiServer {
         encodeEvent(
           {
             type: "runtime-snapshot",
-            snapshot: this.#options.agents.getRuntimeSnapshot(),
+            snapshot: runtimeSnapshot(),
           },
           encodingOptions,
         ) ?? undefined;
