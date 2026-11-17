@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { type DynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Fiber, Option, Result, Schema } from "effect";
+import { Effect, Fiber, Result, Schema } from "effect";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
 import { TurnContext } from "./agent/turn-context";
@@ -93,8 +93,8 @@ const LINUX_SANDBOX_FAILURE =
 const CODEX_APP_SANDBOX_ENV = "CODEX_WINDOWS_REGISTERED_CORE";
 /** The page of `thread/backgroundTerminals/list`. Only the count matters to OpenBot. */
 const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data: Schema.Array(Schema.Unknown) }));
-/** The thread and turn of a key of `#liveTurns`. */
-const decodeTurnKey = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Tuple([Schema.String, Schema.String])));
+/** The `collabAgentToolCall` tools whose receivers are subagents of the calling thread. */
+const SUBAGENT_OWNER_TOOLS: ReadonlySet<unknown> = new Set(["spawnAgent", "resumeAgent", "sendInput"]);
 /**
  * How long Codex may take to end a stopped turn before OpenBot ends it, as for ACP and Claude. Codex
  * answers `turn/interrupt` only when the turn ends, and a command that hangs keeps it from ending
@@ -832,30 +832,43 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     if ((method !== "item/started" && method !== "item/completed") || !isRecord(params.item)) return;
     const item = params.item;
     const children =
-      item.type === "collabAgentToolCall" && item.tool === "spawnAgent" && Array.isArray(item.receiverThreadIds)
+      item.type === "collabAgentToolCall" &&
+      SUBAGENT_OWNER_TOOLS.has(item.tool) &&
+      Array.isArray(item.receiverThreadIds)
         ? item.receiverThreadIds.filter(isString)
         : item.type === "subAgentActivity" && isString(item.agentThreadId)
           ? [item.agentThreadId]
           : [];
     for (const child of children) {
-      if (child === threadId || this.#subagentParents.get(child) === threadId) continue;
+      if (this.#subagentParents.get(child) === threadId || this.#isSubagentOf(threadId, child)) continue;
       this.#subagentParents.set(child, threadId);
       // A subagent that the stopped turn started just before its end.
       if (this.#stoppedParents.has(threadId)) this.#stopSubagent(child);
     }
   }
 
-  /** Stops the subagents of a stopped thread, and their own subagents. */
+  /** Whether `threadId` is the thread `ancestor` or one of its subagents. Keeps the links free of loops. */
+  #isSubagentOf(threadId: string, ancestor: string): boolean {
+    for (
+      let current: string | undefined = threadId;
+      current !== undefined;
+      current = this.#subagentParents.get(current)
+    )
+      if (current === ancestor) return true;
+    return false;
+  }
+
+  /** Stops the subagents of a stopped thread, and their own subagents. A second Stop sends their Stops again. */
   #stopSubagentsOf(threadId: string): void {
-    if (this.#stoppedParents.has(threadId)) return;
     this.#stoppedParents.add(threadId);
     for (const [child, parent] of this.#subagentParents) if (parent === threadId) this.#stopSubagent(child);
   }
 
   #stopSubagent(threadId: string): void {
+    const prefix = `${JSON.stringify([threadId]).slice(0, -1)},`;
     for (const key of this.#liveTurns) {
-      const turn = decodeTurnKey(key);
-      if (Option.isSome(turn) && turn.value[0] === threadId) this.#stopSubagentTurn(threadId, turn.value[1]);
+      const turnId = key.startsWith(prefix) ? JSON.parse(key)[1] : undefined;
+      if (isString(turnId)) this.#stopSubagentTurn(threadId, turnId);
     }
     this.#stopSubagentsOf(threadId);
   }
