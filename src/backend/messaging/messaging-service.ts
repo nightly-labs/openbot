@@ -2672,7 +2672,7 @@ function finalPost(
       reaction: reacts ? "stopped" : null,
     };
   // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
-  // the catalog text of a start that failed, such as a provider that is not downloaded, or the general one.
+  // the catalog text of a start or a turn that failed, such as an expired sign-in, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
