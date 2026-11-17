@@ -35,7 +35,8 @@ export function routineListSummary(routine: RoutineEditorRecord, text: RoutineTe
 
 /**
  * "Paused by its 8:00 AM run" when a scheduled run of the routine paused it (#10048), else undefined.
- * The time is in the routine's zone, as its schedule is. A run on another day also gives the date.
+ * The time is in the routine's zone, as its schedule is, and the label names that zone when it is not
+ * the viewer's zone, as the next-run label does. A run on another day also gives the date.
  */
 export function routinePausedByRunLabel(
   routine: Pick<RoutineFields, "active" | "timezone" | "pausedByRun">,
@@ -54,10 +55,25 @@ export function routinePausedByRunLabel(
       ? { hour: "numeric", minute: "2-digit", timeZone }
       : { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone },
   );
-  return text.t("routine.settings.pausedByRun", { time });
+  return [text.t("routine.settings.pausedByRun", { time }), routineTimeZoneLabel(routine, text)]
+    .filter(Boolean)
+    .join(" · ");
 }
 
-function knownTimeZone(timeZone: string): string | undefined {
+export function localTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
+
+/** "Warsaw time", only when the routine does not run in the viewer's zone. */
+export function routineTimeZoneLabel(routine: Pick<RoutineFields, "timezone">, text: RoutineText): string | undefined {
+  const timeZone = knownTimeZone(routine.timezone);
+  if (!timeZone || timeZone === localTimeZone()) return undefined;
+  const city = timeZone.split("/").at(-1)?.replaceAll("_", " ");
+  return text.t("routine.card.timeZone", { city: city ?? timeZone });
+}
+
+export function knownTimeZone(timeZone: string | undefined): string | undefined {
+  if (!timeZone) return undefined;
   try {
     new Intl.DateTimeFormat(undefined, { timeZone });
     return timeZone;

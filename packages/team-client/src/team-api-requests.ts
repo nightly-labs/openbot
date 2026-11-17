@@ -59,6 +59,7 @@ import {
   isRoutine,
   isRoutineFlowCanvas,
   isRoutineFlowLink,
+  isRoutinePausedByRun,
   isRoutineRun,
   type LocalBrowserSecretResponse,
   type MarkAgentTaskReadInput,
@@ -999,8 +1000,9 @@ export function withRoutinePauseReasons<R extends { id: string; active: boolean 
   if (reasons.length === 0) return [...routines];
   const reasonOf = new Map(reasons.map((reason) => [reason.routineId, reason.scheduledFor]));
   return routines.map((routine) => {
-    const scheduledFor = routine.active ? undefined : reasonOf.get(routine.id);
-    return scheduledFor ? { ...routine, pausedByRun: { scheduledFor } } : routine;
+    const pausedByRun = routine.active ? undefined : { scheduledFor: reasonOf.get(routine.id) };
+    // The preload refuses the whole list for one time that does not parse, so a bad one is dropped here.
+    return isRoutinePausedByRun(pausedByRun) ? { ...routine, pausedByRun } : routine;
   });
 }
 
