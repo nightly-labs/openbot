@@ -31,7 +31,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
-import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   AcpConfiguration,
   type AcpModel,
@@ -515,6 +515,8 @@ interface HistoryReplay {
   draining: boolean;
   done: Promise<void>;
   resolveDone: () => void;
+  /** Resolves when the read has ended and the session no longer counts as a replay. */
+  ended: Promise<void>;
   pending: number;
   error: unknown;
 }
@@ -927,9 +929,20 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (stored && durableReplay) yield* readStored(request);
       return;
     }
+    // A replay takes all updates and tool calls of its session. A turn that runs or opens in the
+    // session owns them, so this read gives only the saved history (#11201). A turn can open on a
+    // released session, which this client does not hold.
+    if (this.#openingTurns.has(request.threadId) || this.#threads.get(request.threadId)?.activeTurn) {
+      if (stored && durableReplay) yield* readStored(request);
+      return;
+    }
     let resolveDone!: () => void;
     const done = new Promise<void>((resolve) => {
       resolveDone = resolve;
+    });
+    let resolveEnded!: () => void;
+    const ended = new Promise<void>((resolve) => {
+      resolveEnded = resolve;
     });
     const controller = new AbortController();
     const replay: HistoryReplay = {
@@ -952,6 +965,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       draining: false,
       done,
       resolveDone,
+      ended,
       pending: 0,
       error: null,
     };
@@ -1002,6 +1016,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       controller.abort();
       if (!replay.sourceDone) this.#abortHistoryReplay(replay);
       this.#historyReplays.delete(request.threadId);
+      resolveEnded();
       const thread = this.#threads.get(request.threadId);
       if (thread && !thread.activeTurn) yield* this.#threads.markIdle(thread);
     }
@@ -2628,6 +2643,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     params: unknown,
   ): Effect.fn.Return<{ turn: { id: string; status: string }; turnId?: string }, ProviderClientOperationError> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
+    // A history read of the session takes its updates and refuses its tools until it ends, so the
+    // prompt waits for it. A read that starts later sees this opening turn and leaves the session (#11201).
+    // A read that does not end in the stall limit does not hold the prompt longer.
+    for (;;) {
+      const reading = this.#historyReplays.get(threadId);
+      if (!reading) break;
+      const ended = yield* Effect.promise(() => reading.ended).pipe(
+        Effect.timeoutOption(this.options.turnStallMs ?? ACP_TURN_STALL_MS),
+      );
+      if (Option.isNone(ended)) break;
+    }
     let thread = yield* providerSync(() => this.#requireThread(threadId));
     // A background replay that runs can start a turn of the agent. The prompt waits for it before it
     // opens the session again, because that replaces the thread that the replay writes to.
