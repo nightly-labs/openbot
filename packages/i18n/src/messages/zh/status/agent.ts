@@ -2,6 +2,10 @@ import type { PartialTranslation } from "../../../message";
 import type { messages as source } from "../../en/status/agent";
 
 export const messages = {
+  "status.agent.mcpSignInPage": "{name} 要求你在 `{address}` 上登录。[登录]({url})，然后选择“继续”。",
+  "status.agent.mcpSignInPageDoneDetail": "助手会重新尝试该请求。",
+  "status.agent.mcpSignInPageDecline": "不登录",
+  "status.agent.mcpSignInPageDeclineDetail": "该请求将停止。",
   "status.agent.claudeWriteOutside": "写入 {path}，位置在助手工作区、共享文件夹和临时文件夹之外。",
   "status.agent.contextCleared": "上下文已清空，将从这里开始新对话。",
   "status.agent.instructionsChanged": "更新了它的指令",
@@ -57,6 +61,7 @@ export const messages = {
   "status.agent.workflowDelete": "删除工作流 {title} 及其运行记录和版本。其未完成的步骤会停止。",
   "status.agent.deleteAgents": "删除 {agents} 及其聊天和文件。此操作无法撤销。",
   "status.agent.vaultCardFillFrames": "银行卡字段位于来自 {origins} 的框架中。",
+  "status.agent.linkCardFill": "在 {site} 上填入一次性 Link 卡 {card}。你已在 Link 中批准向 {merchant} 支付该笔款项。",
   "status.agent.screenCaptureProgress": "正在请求截屏…",
   "status.agent.screenCaptureReviewing": "正在查看截屏…",
   "status.agent.browserOpening": "正在打开网页…",
@@ -141,4 +146,5 @@ export const messages = {
   "status.agent.compactionContinues": "助手压缩上下文时连接中断。助手将继续工作。",
   "status.agent.providerExitContinues": "助手在完成回答前停止了。助手将继续工作。",
   "status.agent.branchTitle": "分支聊天",
+  "status.agent.importedChatTitle": "已导入的对话",
 } as const satisfies PartialTranslation<typeof source>;

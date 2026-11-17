@@ -387,6 +387,7 @@ export const messages = {
   "error.provider.customAgentCheckFailed": "该助手未以 ACP 助手的方式响应。",
   "error.provider.customAgentRemoveBusy": "请等待当前对话与队列结束，再移除该自定义助手。",
   "error.provider.customAgentNone": "尚未保存任何自定义助手。",
+  "error.provider.customAgentsUnavailable": "该服务器无法更改自定义助手，请更新该服务器上的 OpenBot。",
   "error.provider.customAgentMissing": "该自定义助手当前未保存。请改用其他模型。",
   "error.provider.customAgentSignIn": "请用该助手自带的命令登录后重试。",
   "error.provider.customAgentsReadOnly":

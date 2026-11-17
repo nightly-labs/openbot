@@ -86,6 +86,22 @@ export const messages = {
   "marketplace.agent.updateAvailable": "有可用更新",
   "marketplace.agent.update": "更新",
   "marketplace.agent.openChat": "打开对话",
+  "marketplace.agentUpdate.title": "更新 {name}？",
+  "marketplace.agentUpdate.body": {
+    one: "{count} 个技能有本地更改。除非选择“替换”，否则将保持原样。",
+    other: "{count} 个技能有本地更改。除非选择“替换”，否则将保持原样。",
+  },
+  "marketplace.agentUpdate.listLabel": "有本地更改的技能",
+  "marketplace.agentUpdate.keep": "保留你的更改",
+  "marketplace.agentUpdate.lost": "你的更改将会丢失",
+  "marketplace.agentUpdate.choiceLabel": "保留或替换 {name}",
+  "marketplace.agentUpdate.keepOption": "保留",
+  "marketplace.agentUpdate.replace": "替换",
+  "marketplace.agentUpdate.others": {
+    one: "另有 {count} 个技能也将更新。",
+    other: "另有 {count} 个技能也将更新。",
+  },
+  "marketplace.agentUpdate.confirm": "更新助手",
 
   // Apps.
   "marketplace.app.connect": "连接",
