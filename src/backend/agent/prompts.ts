@@ -8,6 +8,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   COMPUTER_USE_MCP_SERVER_NAME,
+  isReservedMcpServerName,
   MCP_ELICITATION_DECISION_QUESTION_ID,
   vaultExpiryText,
 } from "@openbot/contracts/ipc";
@@ -204,8 +205,19 @@ function mcpSignInPageQuestion(params: unknown, serverName: string | null): Agen
   };
 }
 
+/**
+ * The server that asks, with the name the user gave it. Codex names an OpenBot server by its key,
+ * which has `openbot_` in front (`codexMcpServerKey`). OpenBot's own browser server keeps its name.
+ */
+function elicitationServerName(params: unknown): string | null {
+  const name = getString(params, "serverName")?.trim() || null;
+  return name?.startsWith("openbot_") && name.length > "openbot_".length && !isReservedMcpServerName(name)
+    ? name.slice("openbot_".length)
+    : name;
+}
+
 export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {
-  const serverName = getString(params, "serverName");
+  const serverName = elicitationServerName(params);
   const mode = getString(params, "mode") ?? "form";
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
@@ -231,7 +243,7 @@ const CODEX_APPS_MCP_SERVER_NAME = "codex_apps";
  * `_meta._codex_apps.connector_auth_failure.connector_name`.
  */
 export function declinedMcpElicitationText(params: unknown): string {
-  const serverName = getString(params, "serverName")?.trim() || null;
+  const serverName = elicitationServerName(params);
   const signIn = getString(params, "mode") === "url";
   if (serverName === CODEX_APPS_MCP_SERVER_NAME) {
     const authFailure = getRecord(getRecord(getRecord(params, "_meta"), "_codex_apps"), "connector_auth_failure");
