@@ -306,6 +306,8 @@ export const messages = {
     "OpenBot n’a pas pu démarrer sa connexion locale de connexion pour ce serveur. Redémarrez OpenBot, puis réessayez.",
   "error.backend.mcpOAuthSignInNeeded":
     "La connexion à ce serveur MCP a pris fin. L’utilisateur doit se reconnecter dans OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot n’a pas pu renouveler la connexion à ce serveur MCP pour le moment. La connexion est conservée, et la prochaine requête réessaiera. Si cette erreur persiste, l’utilisateur peut se déconnecter du serveur dans OpenBot, puis se reconnecter.",
   "error.backend.mcpServerUnreachable": "OpenBot n’a pas pu joindre le serveur. Vérifiez l’URL et votre réseau.",
   "error.backend.mcpLocalServerOff":
     "Aucun serveur ne répond à {address} sur cet ordinateur. Démarrez le serveur ou activez-le dans l’app qui l’exécute, puis réessayez.",
