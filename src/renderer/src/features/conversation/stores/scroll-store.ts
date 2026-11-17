@@ -38,7 +38,6 @@ import {
 import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
 import { conversationOwnerId } from "./composer-store";
-import { PENDING_SEND_ID_PREFIX } from "./pending-send-store";
 
 /** How long a message sent while a question card is open waits for the host to close the card. */
 const PROMPT_SEND_HOLD_MS = 2000;
@@ -210,57 +209,63 @@ export function createScrollStore(deps: ScrollStoreDeps) {
    * A message that the user sends while a question card is open shows when the question's row has
    * its outcome, under that row. The card is drawn under all rows, so until the host closed it, the
    * message showed above the question; and the host closes the card a moment before the row says
-   * "cancelled", so the message then stood where the card was. A card that stays open, such as an
-   * MCP sign-in, lets the message show after `PROMPT_SEND_HOLD_MS`. Each time is when this view first
-   * had the row, so an older message that loads late is not held, and the host's clock does not count.
+   * "cancelled", so the message then stood where the card was. Only a question of the running turn
+   * closes for a message (`releaseForUserMessage`), so a card that stays, such as a detached question,
+   * holds nothing; one that stays all the same, such as an MCP sign-in, lets the message show after
+   * `PROMPT_SEND_HOLD_MS`. Each time is when this view first had the row while a question waited, so a
+   * message from before the question is not held, and the host's clock does not count.
    */
   const userRowSeenAt = new Map<string, number>();
   let waitingQuestion:
-    | { key: string; turnId: string; requestId: string; at: number; closedAt: number | undefined }
+    | { key: string; owner: string; turnId: string; requestId: string; at: number; closedAt: number | undefined }
     | undefined;
   const [promptHoldClock, setPromptHoldClock] = createSignal(0);
   const promptHold = createMemo(() => {
     promptHoldClock();
+    const held = new Set<string>();
+    let revealAt: number | undefined;
     const now = Date.now();
-    const rows = [...shownMessages(), ...deps.pendingMessages()].filter((message) => message.author === "you");
-    const ids = new Set(rows.map((message) => message.id));
-    for (const id of userRowSeenAt.keys()) if (!ids.has(id)) userRowSeenAt.delete(id);
-    for (const id of ids) if (!userRowSeenAt.has(id)) userRowSeenAt.set(id, now);
+    const owner = `${deps.props.server?.id ?? "local"}:${conversationOwnerId(deps.props) ?? ""}`;
     const prompt = deps.props.channel ? undefined : deps.props.prompt;
-    if (prompt) {
-      const key = JSON.stringify([conversationOwnerId(deps.props), prompt.turnId, String(prompt.requestId)]);
+    const closesForMessage = prompt !== undefined && !prompt.detached && prompt.turnId === deps.props.activeTurnId;
+    if (waitingQuestion?.owner !== owner) waitingQuestion = undefined;
+    if (prompt && closesForMessage) {
+      const key = JSON.stringify([prompt.turnId, String(prompt.requestId)]);
       if (waitingQuestion?.key !== key)
         waitingQuestion = {
           key,
+          owner,
           turnId: prompt.turnId,
           requestId: String(prompt.requestId),
           at: now,
           closedAt: undefined,
         };
-    } else if (waitingQuestion) waitingQuestion.closedAt ??= now;
-    const held = new Set<string>();
-    let revealAt: number | undefined;
+    } else if (prompt) waitingQuestion = undefined;
+    else if (waitingQuestion) waitingQuestion.closedAt ??= now;
     const waiting = waitingQuestion;
-    if (!waiting) return { held, revealAt };
+    if (!waiting) {
+      userRowSeenAt.clear();
+      return { held, revealAt };
+    }
+    // The chat has the question's row only once it has its outcome.
     const question = deps.props.messages.find(
       (message) => message.turnId === waiting.turnId && String(message.questionPrompt?.requestId) === waiting.requestId,
     );
-    // The chat can have the question's row only once it has its outcome.
     const rowDone = Boolean(question?.questionPrompt?.resolution);
     const closedLongAgo = waiting.closedAt !== undefined && now - waiting.closedAt >= PROMPT_SEND_HOLD_MS;
     if (!prompt && (rowDone || closedLongAgo)) {
       waitingQuestion = undefined;
+      userRowSeenAt.clear();
       return { held, revealAt };
     }
+    const rows = [...shownMessages(), ...deps.pendingMessages()].filter((message) => message.author === "you");
     for (const message of rows) {
-      const afterQuestion =
-        message.id.startsWith(PENDING_SEND_ID_PREFIX) ||
-        (question?.createdAt !== undefined &&
-          message.createdAt !== undefined &&
-          message.createdAt > question.createdAt);
+      if (!userRowSeenAt.has(message.id)) userRowSeenAt.set(message.id, now);
       const seenAt = userRowSeenAt.get(message.id) ?? now;
       const until = seenAt + PROMPT_SEND_HOLD_MS;
-      if (!afterQuestion || seenAt <= waiting.at || until <= now) continue;
+      const beforeQuestion =
+        question?.createdAt !== undefined && message.createdAt !== undefined && message.createdAt <= question.createdAt;
+      if (beforeQuestion || seenAt <= waiting.at || until <= now) continue;
       held.add(message.id);
       revealAt = Math.min(revealAt ?? until, until);
     }

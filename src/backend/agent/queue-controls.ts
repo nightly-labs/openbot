@@ -367,7 +367,7 @@ export class QueueControls {
         this.#conversation.isExecutionThread(snapshot.threadId) &&
         !snapshot.messages.some((message) => message.id === input.deliveryId)
       ) {
-        snapshot.messages.push(promptMessage(context, { ...context.delivery, turnId }));
+        snapshot.messages.push({ ...promptMessage(context, { ...context.delivery, turnId }), steered: true });
         this.#mailboxSync.syncDeliveryMessage(snapshot, input.deliveryId);
       }
       this.#mailboxSync.syncMailboxMessages(snapshot);

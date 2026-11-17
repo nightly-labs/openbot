@@ -6823,14 +6823,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         );
     // A turn that waits on a question in this chat reads no message until that question is answered,
     // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
-    // The question closes after the steer: the closed question tells the agent to end its turn when
-    // the message is not in its input, so a steer that came later ran as a turn of its own below.
     const waitingTurnId = snapshot.activeTurnId;
     const releaseQuestions = Effect.sync(() => {
       if (targetThreadId && waitingTurnId && waitingTurnId !== this.#stoppedTurn(agent.id, task?.taskId ?? null))
         this.#attention.releaseForUserMessage(agent.id, targetThreadId, waitingTurnId);
     });
-    yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true, false, releaseQuestions);
+    // Claude's steer puts the message in the CLI's input at once, so the question closes after it.
+    // When the question closed first, the agent read "end your turn when the message is not in your
+    // input" before the message came, and the message ran as a turn of its own below. An ACP steer
+    // by prompt refuses while a question waits, and an ACP steer extension can wait for the tool call
+    // to end, so for the other providers the question closes first, as before.
+    const steerFirst = providerForAgent(agent) === "claude";
+    if (!steerFirst) yield* releaseQuestions;
+    yield* this.#steerWhenBusy(
+      agent,
+      task,
+      snapshot,
+      delivery.delivery.id,
+      true,
+      false,
+      steerFirst ? releaseQuestions : Effect.void,
+    );
     if (!task) {
       this.#emit({ type: "agents-changed", agents: this.listAgents() });
       this.#conversation.emitConversation(snapshot);
