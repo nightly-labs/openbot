@@ -54,6 +54,8 @@ export type MessagingActivity =
       followUp: boolean;
       answer: string | null;
       files: MessagingAnswerFile[];
+      /** The catalog text of a start that failed, such as a provider that is not downloaded. */
+      reason?: string | null;
     }
   | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
   /** A new progress line that the agent wrote between its steps, with the Natural style. */
@@ -996,9 +998,12 @@ export class MessagingThreads {
     this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
   }
 
-  /** A messaging delivery that failed before its turn started ends like a failed turn. */
-  deliveryFailed(deliveryId: string): void {
-    this.deliverySettled(deliveryId, "failed");
+  /**
+   * A messaging delivery that failed before its turn started ends like a failed turn. `reason` is a
+   * catalog text that says why, or null for the general text.
+   */
+  deliveryFailed(deliveryId: string, reason: string | null): void {
+    this.deliverySettled(deliveryId, "failed", reason);
   }
 
   /**
@@ -1007,7 +1012,11 @@ export class MessagingThreads {
    * this, the conversation keeps the "working" status and its Stop button, and gets no answer. A
    * turn that the recovery found complete posts its answer, without its files.
    */
-  deliverySettled(deliveryId: string, status: "completed" | "failed" | "interrupted"): void {
+  deliverySettled(
+    deliveryId: string,
+    status: "completed" | "failed" | "interrupted",
+    reason: string | null = null,
+  ): void {
     this.#prepared.delete(deliveryId);
     this.#stopsBeforeStart.delete(deliveryId);
     const origin = this.#mailbox.messagingOrigin(deliveryId);
@@ -1033,6 +1042,7 @@ export class MessagingThreads {
       followUp: delivery?.sender.kind === "agent",
       answer,
       files: [],
+      reason,
     });
   }
 

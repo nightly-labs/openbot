@@ -61,6 +61,18 @@ export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved"
 
 const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
+/** The fixed texts of a start that found its provider not downloaded (`cli.ts`). They hold no detail. */
+const PROVIDER_MISSING_TEXTS: ReadonlySet<string> = new Set([
+  sourceText("error.provider.codexMissing"),
+  sourceText("error.provider.claudeMissing"),
+  sourceText("error.provider.grokMissing"),
+  sourceText("error.provider.opencodeMissing"),
+  sourceText("error.provider.antigravityMissing"),
+  sourceText("error.provider.cursorMissing"),
+  sourceText("error.provider.clineMissing"),
+  sourceText("error.provider.kimiMissing"),
+  sourceText("error.provider.hermesMissing"),
+]);
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
 /**
@@ -1343,11 +1355,12 @@ export class DrainScheduler {
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           // The agent that asked gets the failure as its answer; the drain of the sender below starts it.
           yield* this.#answerFailedRequest(delivery.id, delivery.recipientAgentId);
+          const startReason = this.#startReason(recipient, error);
           if (this.#channels)
             yield* this.#channels
-              .deliveryFailed(delivery.id, this.#channelStartReason(recipient, error))
+              .deliveryFailed(delivery.id, startReason ?? CHANNEL_START_FAILED)
               .pipe(toDeliveryStartFailed);
-          this.#messaging?.deliveryFailed(delivery.id);
+          this.#messaging?.deliveryFailed(delivery.id, startReason);
           // The provider refused the session or the turn, so no turn line records the failure.
           logger.warn("A message did not start.", {
             agentId: delivery.recipientAgentId,
@@ -1535,16 +1548,21 @@ export class DrainScheduler {
   }
 
   /**
-   * What a stopped channel task says when its provider did not start it. A sign-in is the start
-   * failure that the reader can fix, so the task names it instead of the general reason (#6684): the
-   * provider's own sign-in text when the start failed with it, such as a request for an API key, and an
-   * expired sign-in otherwise, also when the provider refused the account before its check marked it.
-   * Only catalog text goes to the channel: every reader of it sees it, in the reader's language.
-   * Another Codex app that holds the thread is the same: Resume fails until the reader closes it there.
+   * What a stopped channel task or an external conversation says when the provider did not start
+   * it, or null for the general reason. A sign-in is the start failure that the reader can fix, so it
+   * is named instead of the general reason (#6684): the provider's own sign-in text when the start
+   * failed with it, such as a request for an API key, and an expired sign-in otherwise, also when the
+   * provider refused the account before its check marked it. A provider that is not downloaded is
+   * named too (#10597). Only catalog text goes out: every reader of it sees it, in the reader's
+   * language. Another Codex app that holds the thread is the same: a new try fails until the reader
+   * closes it there.
    */
-  #channelStartReason(recipient: AgentSummary | undefined, error: unknown): string {
+  #startReason(recipient: AgentSummary | undefined, error: unknown): string | null {
     if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
-    if (!recipient || !(error instanceof Error)) return CHANNEL_START_FAILED;
+    if (!(error instanceof Error)) return null;
+    // The provider status keeps the text of the missing download, and the start fails with it.
+    if (PROVIDER_MISSING_TEXTS.has(error.message)) return error.message;
+    if (!recipient) return null;
     const provider = providerForAgent(recipient);
     const signInText =
       error instanceof ProviderSignInError ||
@@ -1556,7 +1574,7 @@ export class DrainScheduler {
     // The agent runs on this provider, which it can only choose while signed in, so its sign-in expired.
     if (signInText || classifyUserError(error) === "auth")
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
-    return CHANNEL_START_FAILED;
+    return null;
   }
 
   /**
