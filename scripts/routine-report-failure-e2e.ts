@@ -10,7 +10,8 @@
 // teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
 // a flow skips the agents after a failed owner or linked step, that a result destination gets the
 // answer of a reported failure but not of a provider failure, and that a failed run does not pause its
-// own routine in either call order (#9856), nor does a run with nothing to report (#10492).
+// own routine in either call order (#9856), nor does a run with nothing to report, while a run that
+// pauses its routine again and reports it stops the routine (#10492).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -958,11 +959,23 @@ try {
   const pausedThenQuiet = await selfPausing("Paused then quiet", (id) => [pauseRoutine(id), noUpdate]);
   const quietResumedResult = toolResults(pausedThenQuiet.turnId, "routine_no_update")[0]?.result;
   pass(
-    "A run that pauses its own routine and then ends with nothing to report turns the routine on again (#10492)",
+    "A run that pauses its own routine and then has nothing to report turns the routine on again, and does not end quiet (#10492)",
     pausedThenQuiet.active === true &&
       pausedThenQuiet.ran.run.status === "succeeded" &&
-      quietResumedResult?.contentItems.some((item) => item.text.includes("this routine is on again")) === true,
+      quietResumedResult?.success === false &&
+      quietResumedResult.contentItems.some((item) => item.text.includes("this routine is on again")),
     { active: pausedThenQuiet.active, run: pausedThenQuiet.ran.run.status, quietResumedResult },
+  );
+  const stopsWithReport = await selfPausing("Stops with a report", (id) => [
+    pauseRoutine(id),
+    noUpdate,
+    pauseRoutine(id),
+  ]);
+  const secondPause = toolResults(stopsWithReport.turnId, "update_routine")[1]?.result;
+  pass(
+    "A run that pauses its own routine again after the refused quiet end stops the routine (#10492)",
+    stopsWithReport.active === false && stopsWithReport.ran.run.status === "succeeded" && secondPause?.success === true,
+    { active: stopsWithReport.active, run: stopsWithReport.ran.run.status, secondPause },
   );
   const quietThenPaused = await selfPausing("Quiet then paused", (id) => [noUpdate, pauseRoutine(id)]);
   const refusedQuietPause = toolResults(quietThenPaused.turnId, "update_routine")[0]?.result;
@@ -976,7 +989,9 @@ try {
   );
   pass(
     "The run prompt says that nothing to report is not a stop condition (#10492)",
-    stopPrompt?.includes("Nothing to report is not a stop condition either: keep this routine on.") === true,
+    stopPrompt?.includes(
+      "Nothing to report is not a stop condition either: keep this routine on. A run that pauses this routine must say so in a short report",
+    ) === true,
     stopPrompt,
   );
   for (const name of ["Paused then failed", "Failed then paused", "Paused then quiet", "Quiet then paused"]) {

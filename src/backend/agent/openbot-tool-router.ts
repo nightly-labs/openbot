@@ -2317,6 +2317,18 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "In a channel routine run, only the owner of the request can end the run with nothing to report. Give your result as usual.",
         );
+      // Nothing to report is not a stop condition: a run that paused its own routine turns it on again
+      // (#10492), as a failed run does. A run that does stop its routine says so, so it does not end quiet.
+      const runTurn = this.#routineRunTurns.get(params.turnId);
+      if (runTurn !== undefined && runTurn.paused.length > 0) {
+        const results = runTurn.paused.map((pause) => this.#routines.resumeAfterRunPause(pause, params));
+        this.#noteRoutineRunTurn(params.turnId, { ended: runTurn.ended, paused: [] });
+        return openBotToolFailure(
+          results.includes("failed")
+            ? "You paused this routine, and OpenBot could not turn it on again. Give a short report that says that the routine is paused, and that the user can turn it on again."
+            : `Nothing to report is not a stop condition${results.includes("resumed") ? ", so this routine is on again" : ""}. When the task says to stop this routine now, pause it again and give a short report that says that it stopped and why. Otherwise call this tool again.`,
+        );
+      }
       // A person who started a Test run waits for its answer, as in an agent's own routine.
       const outcome =
         channelRun?.part === "owner" && !channelRun.quiet
@@ -2331,18 +2343,12 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
-      // Nothing to report is not a stop condition either: a run that paused its own routine turns it on
-      // again (#10492), as a failed run does.
-      const resumed = this.#endRoutineRunTurn(params, "quiet").includes("resumed")
-        ? "Nothing to report is not a stop condition, so this routine is on again. "
-        : "";
+      // A later pause of its own routine in this run is refused (#10492).
+      this.#endRoutineRunTurn(params, "quiet");
       return openBotToolResult(
         outcome === "quiet"
-          ? {
-              status: "quiet",
-              note: `${resumed}This turn ends without a message or a notification. End your turn now.`,
-            }
-          : { status: "shown", note: `${resumed}Someone waits for this answer. Report the result as usual.` },
+          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
+          : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
       );
     }
 
@@ -2390,7 +2396,7 @@ export class OpenBotToolRouter {
       return openBotToolFailure(
         runTurn.ended === "failed"
           ? "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual."
-          : "This run has nothing to report. Nothing to report is not a stop condition, so this routine stays on. End your turn now.",
+          : "This run ended with nothing to report. Nothing to report is not a stop condition, so this routine stays on. This is not a failure: do not report one. End your turn now.",
       );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
       this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
