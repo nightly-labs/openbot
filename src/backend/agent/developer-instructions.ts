@@ -32,20 +32,20 @@ const ROUTINE_SIGN_IN_RULE =
 const ROUTINE_NO_TAKEOVER_RULE = "In a routine run, report a required sign-in instead of a takeover.";
 
 /**
- * On Windows, the driver ends each foreground click or key by putting the window that was in front
- * before it back in front, and a menu closes when its app loses the front. So a submenu that a click
- * opened was gone in the next screenshot, and the agent clicked it again and again (#10791).
- * `invoke_menu` opens each level and invokes the item in one call, before the window goes back.
- */
-/**
  * The driver refuses a background click or key that the app cannot take, such as a click in WeChat
  * while its accessibility provider is busy, and tells the agent to try foreground. Its own skill
  * allows foreground only after the user allows visible control, so the agent told the user that
  * the app was unavailable (#10254). Turning on Computer Use is that permission.
  */
 const BACKGROUND_REFUSAL_RULE =
-  " When a click, a key or typing answers background_unavailable, read the window again. When the action did not happen, do only that action again with delivery_mode foreground: the user allowed this when they turned on Computer Use for you. Do not tell the user that an app is unavailable before you try this.";
+  " After background_unavailable, read the window again. If the action did not happen, do only that action again with delivery_mode foreground: turning on Computer Use allows this. Do not say that an app is unavailable before this.";
 
+/**
+ * On Windows, the driver ends each foreground click or key by putting the window that was in front
+ * before it back in front, and a menu closes when its app loses the front. So a submenu that a click
+ * opened was gone in the next screenshot, and the agent clicked it again and again (#10791).
+ * `invoke_menu` opens each level and invokes the item in one call, before the window goes back.
+ */
 const WINDOWS_MENU_RULE =
   ' On Windows, a foreground click or key puts the window that was in front before it back in front, and that closes a menu that the action opened. To choose an item in an app\'s menu, call invoke_menu with the full path from the top-level menu, such as ["File", "Export"]. When a menu that you opened is gone in the next read, do not click it again: use invoke_menu. When invoke_menu cannot find the path, tell the user in one plain sentence that you cannot keep that menu open, and ask them to choose the item.';
 
