@@ -217,9 +217,9 @@ send new user data (`PRIVACY.md` if outbound data changes).
 | # | Item | State |
 |---|---|---|
 | 7 | Shared migration test harness (migrate to version N, fixtures per released schema) | IN PROGRESS (with 12) |
-| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | IN PROGRESS |
-| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | IN PROGRESS |
-| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | IN PROGRESS |
+| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | IN REVIEW (#10806; no `name` column: the check stops a renumber) |
+| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | IN REVIEW (#10805; list reads skip the row; wire decoders unchanged) |
+| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | IN REVIEW (#10801) |
 | 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | TODO |
 | 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | IN PROGRESS (with 7) |
 
