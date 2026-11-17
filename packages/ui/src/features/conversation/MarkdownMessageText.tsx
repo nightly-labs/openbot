@@ -895,46 +895,51 @@ function MarkdownImage(props: {
 }) {
   const { t } = useText();
   const [failedUrl, setFailedUrl] = createSignal<string>();
-  const image = () => (
-    <img
-      class="message-markdown-image"
-      src={props.url}
-      alt={props.alt}
-      title={props.title}
-      loading="lazy"
-      decoding="async"
-      referrerpolicy="no-referrer"
-      onError={() => setFailedUrl(props.url)}
-    />
-  );
+  const loadingUrl = () => (failedUrl() === props.url ? undefined : props.url);
   return (
     <Show
-      when={failedUrl() !== props.url}
+      when={loadingUrl()}
+      keyed
       fallback={
         <span class="message-markdown-image-unavailable">
-          {props.alt.trim()
-            ? t("chat.image.unavailableNamed", { name: props.alt.trim() })
-            : t("chat.image.unavailable")}
+          {t("chat.image.unavailableNamed", { name: markdownImageName(props.alt, props.url) })}
         </span>
       }
     >
-      <Show when={props.onOpenImage} fallback={image()}>
-        {(onOpenImage) => (
-          <Button
-            variant="ghost"
-            type="button"
-            class="message-markdown-image-button"
-            aria-label={t("chat.image.preview", { name: markdownImageName(props.alt, props.url) })}
-            data-cuelume-tap="open"
-            onClick={(event) => {
-              const picture = event.currentTarget.querySelector("img");
-              if (picture) onOpenImage()(picture);
-            }}
-          >
-            {image()}
-          </Button>
-        )}
-      </Show>
+      {(url) => {
+        // Each URL gets its own element, so a late error of an earlier URL cannot mark this one.
+        const image = () => (
+          <img
+            class="message-markdown-image"
+            src={url}
+            alt={props.alt}
+            title={props.title}
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+            onError={() => setFailedUrl(url)}
+          />
+        );
+        return (
+          <Show when={props.onOpenImage} fallback={image()}>
+            {(onOpenImage) => (
+              <Button
+                variant="ghost"
+                type="button"
+                class="message-markdown-image-button"
+                aria-label={t("chat.image.preview", { name: markdownImageName(props.alt, url) })}
+                data-cuelume-tap="open"
+                onClick={(event) => {
+                  const picture = event.currentTarget.querySelector("img");
+                  if (picture) onOpenImage()(picture);
+                }}
+              >
+                {image()}
+              </Button>
+            )}
+          </Show>
+        );
+      }}
     </Show>
   );
 }

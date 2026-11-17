@@ -164,7 +164,9 @@
   max-height: 240px;
 }
 
+/* The label takes the place of a block picture, so it stays on its own line. */
 .message-markdown-image-unavailable {
+  display: block;
   color: var(--openbot-text-secondary);
   font-size: var(--openbot-text-sm);
 }
