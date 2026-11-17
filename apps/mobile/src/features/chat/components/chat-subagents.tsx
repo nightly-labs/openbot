@@ -87,7 +87,7 @@ export function useSubagentClock(running: boolean): number {
   return now;
 }
 
-function Spinner({ color, size }: { color: string; size: number }) {
+export function Spinner({ color, size }: { color: string; size: number }) {
   const turn = useSharedValue(0);
   useEffect(() => {
     turn.set(
@@ -242,7 +242,6 @@ export function ChatSubagents({
       icon={icon}
       label={title}
       meta={`${progress} · ${elapsed}`}
-      metaColor={failed > 0 && running === 0 ? colors.danger : undefined}
       accessibilityLabel={`${title}, ${progress}, ${elapsed}`}
       onPress={onOpen ? () => onOpen(message.id) : undefined}
     />

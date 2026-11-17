@@ -51,7 +51,6 @@ export function ChatActivityLine({
   label,
   name,
   meta,
-  metaColor,
   accessibilityLabel,
   accessibilityHint,
   accessibilityState,
@@ -59,13 +58,12 @@ export function ChatActivityLine({
   onPress,
 }: {
   icon: ReactNode;
-  label: string;
-  /** A name after the label, such as the routine name, in a stronger color. */
+  /** Absent when the name alone says what the line is, such as a group of runs of one routine. */
+  label?: string;
+  /** A name after the label, such as the routine name, in a stronger color. It can wrap to a second line. */
   name?: string;
   /** Counts or a duration after the label, in a weaker color. */
   meta?: string;
-  /** The color of the meta when it carries a state, such as a failure. */
-  metaColor?: string;
   accessibilityLabel: string;
   accessibilityHint?: string;
   accessibilityState?: AccessibilityState;
@@ -80,18 +78,20 @@ export function ChatActivityLine({
   const content = (
     <>
       {icon}
-      <Typography.Paragraph
-        type="body-xs"
-        numberOfLines={1}
-        className="shrink"
-        style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}
-      >
-        {label}
-      </Typography.Paragraph>
-      {name ? (
+      {label ? (
         <Typography.Paragraph
           type="body-xs"
           numberOfLines={1}
+          className="shrink"
+          style={{ color: colors.muted, fontVariant: ["tabular-nums"] }}
+        >
+          {label}
+        </Typography.Paragraph>
+      ) : null}
+      {name ? (
+        <Typography.Paragraph
+          type="body-xs"
+          numberOfLines={2}
           className="shrink font-medium"
           style={{ color: colors.name }}
         >
@@ -102,7 +102,8 @@ export function ChatActivityLine({
         <Typography.Paragraph
           type="body-xs"
           numberOfLines={1}
-          style={{ color: metaColor ?? colors.dim, fontVariant: ["tabular-nums"] }}
+          className="shrink"
+          style={{ color: colors.dim, fontVariant: ["tabular-nums"] }}
         >
           {`· ${meta}`}
         </Typography.Paragraph>

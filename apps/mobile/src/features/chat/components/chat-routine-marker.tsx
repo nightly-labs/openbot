@@ -26,6 +26,7 @@ import type { RoutineMarker, RoutineMarkerEvent, RoutineRunGroup } from "@/featu
 import { useReducedMotion } from "@/shared/lib/motion";
 import { useText } from "@/shared/lib/text";
 import { ACTIVITY_ICON_SIZE, type ActivityColors, ChatActivityLine, useActivityColors } from "./chat-activity-line";
+import { Spinner } from "./chat-subagents";
 
 const ROUTINE_MARKER_ICONS: Record<RoutineMarkerEvent, LucideIcon> = {
   created: CalendarPlus,
@@ -84,13 +85,19 @@ function markerColor(event: RoutineMarkerEvent, colors: ActivityColors) {
   return colors.muted;
 }
 
+/** The marker icon. A running routine turns, as running subagents do. */
+function MarkerIcon({ event, colors }: { event: RoutineMarkerEvent; colors: ActivityColors }) {
+  if (event === "running") return <Spinner color={colors.running} size={ACTIVITY_ICON_SIZE} />;
+  const Icon = ROUTINE_MARKER_ICONS[event];
+  return <Icon size={ACTIVITY_ICON_SIZE} color={markerColor(event, colors)} />;
+}
+
 export function RoutineMarkerRow({ message }: { message: RoutineMarker }) {
   const { t } = useText();
   const colors = useActivityColors();
-  const Icon = ROUTINE_MARKER_ICONS[message.event];
   return (
     <ChatActivityLine
-      icon={<Icon size={ACTIVITY_ICON_SIZE} color={markerColor(message.event, colors)} />}
+      icon={<MarkerIcon event={message.event} colors={colors} />}
       label={t(message.label)}
       name={message.routineName}
       accessibilityLabel={`${t(message.label)}, ${message.routineName}`}
@@ -165,14 +172,13 @@ export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
     return height < 0 ? {} : { height: height * openness.get() };
   });
   const lead = group.runs.find((run) => run.event === "failed") ?? group.runs.at(-1);
-  const Icon = lead ? ROUTINE_MARKER_ICONS[lead.event] : CalendarClock;
   const title = group.routineName ?? t("mobile.chat.routine.group.title");
   const count = group.runs.length;
   return (
     <View>
       <ChatActivityLine
-        icon={<Icon size={ACTIVITY_ICON_SIZE} color={markerColor(lead?.event ?? "updated", colors)} />}
-        label={title}
+        icon={<MarkerIcon event={lead?.event ?? "updated"} colors={colors} />}
+        name={title}
         accessibilityState={{ expanded: open }}
         accessibilityLabel={[
           title,
@@ -224,7 +230,8 @@ export function RoutineRunGroupRow({ group }: { group: RoutineRunGroup }) {
       >
         {mounted ? (
           <View
-            className={floating ? "absolute inset-x-0 top-0" : undefined}
+            // The runs sit under the group text, so the group reads as one block.
+            className={floating ? "absolute inset-x-0 top-0 ps-5" : "ps-5"}
             onLayout={(event) => {
               const { height } = event.nativeEvent.layout;
               contentHeight.set(height);
