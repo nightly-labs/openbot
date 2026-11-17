@@ -2450,17 +2450,23 @@ export class MailboxStore {
    *
    * A request steered into a turn for other work gets a note too when that turn ends as interrupted
    * before a reply to it: the person stopped it, or the provider process exited.
+   *
+   * `recovered` is a delivery that the restart recovery settled: the process that ran its turn is gone,
+   * so an interrupted request gets a note too. Otherwise the agent that asked waits for a result that
+   * no turn sends (#11561).
    */
   answerFailedRequest = Effect.fn("MailboxStore.answerFailedRequest")(function* (
     this: MailboxStore,
     deliveryId: string,
     taskOpen: (taskId: string) => boolean,
     agentExists: (agentId: string) => boolean,
+    recovered = false,
   ): Effect.fn.Return<string | null, StoredStateFailure> {
     const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
     const request = delivery && this.#state.messages.find((message) => message.id === delivery.messageId);
+    const steered = delivery?.status === "interrupted" && this.steeredIntoOtherWork(deliveryId);
     const outcome =
-      delivery?.status === "failed" || (delivery?.status === "interrupted" && this.steeredIntoOtherWork(deliveryId))
+      delivery?.status === "failed" || (delivery?.status === "interrupted" && (steered || recovered))
         ? delivery.status
         : null;
     if (!delivery || !outcome || request?.sender.kind !== "agent" || request.channelId) return null;
@@ -2486,11 +2492,15 @@ export class MailboxStore {
         "Status: blocked",
         outcome === "failed"
           ? `Result: OpenBot note, not written by this teammate: the request failed before the teammate answered. ${(delivery.error ?? "The provider gave no reason.").slice(0, FAILED_REQUEST_REASON_LIMIT)}`
-          : "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended before the teammate answered.",
+          : steered
+            ? "Result: OpenBot note, not written by this teammate: the request went into a running turn of the teammate, and that turn ended before the teammate answered."
+            : "Result: OpenBot note, not written by this teammate: the teammate's turn stopped when OpenBot or its provider restarted, before the teammate answered. Part of the work can be done.",
         "Evidence: none",
         outcome === "failed"
           ? "Unblock: The user must fix the cause, then ask for the request again."
-          : "Unblock: Send the request again if you still need the result.",
+          : steered
+            ? "Unblock: Send the request again if you still need the result."
+            : "Unblock: Check what the teammate already did, then send the request again if you still need the result.",
       ].join("\n"),
       replyToMessageId: request.id,
       ...(taskId ? { taskId } : {}),
