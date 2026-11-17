@@ -4894,13 +4894,16 @@ export class BrowserHost {
     let press: { x: number; y: number; inPage: boolean } | null = null;
     contents.on("before-mouse-event", (_event, input) => {
       if (input.type !== "mouseDown" || !records()) return;
+      // The place of the press, before the press can navigate the page.
+      const place = stepPlace(tab.engine.scrubText(contents.getURL()));
+      if (!place) return;
       const zoom = contents.getZoomFactor() || 1;
       const viewed = tab.engine.viewPress();
       const current = viewed ? { ...viewed, inPage: true } : { x: input.x / zoom, y: input.y / zoom, inPage: false };
       press = current;
       setImmediate(() => {
         if (press === current) press = null;
-        this.#recordClick(tab, current);
+        this.#recordClick(tab, place, current);
       });
     });
     contents.on("input-event", (_event, input) => {
@@ -4909,11 +4912,12 @@ export class BrowserHost {
   }
 
   /** Records the control under a press, in CSS pixels, as `#bindUserBrowsing` reads it. */
-  #recordClick(tab: BrowserHostTab, press: { x: number; y: number; inPage: boolean }): void {
-    const contents = tab.contents;
-    if (tab.closing || contents.isDestroyed()) return;
-    const place = stepPlace(tab.engine.scrubText(contents.getURL()));
-    if (!place) return;
+  #recordClick(
+    tab: BrowserHostTab,
+    place: { host: string; path: string },
+    press: { x: number; y: number; inPage: boolean },
+  ): void {
+    if (tab.closing || tab.contents.isDestroyed()) return;
     const record = Effect.map(tab.engine.clickTargetAt(press.x, press.y, press.inPage), (target) => {
       // The tab can change hands while the page answers.
       if (target)
