@@ -15,6 +15,7 @@ import type { OpenBotDatabase } from "../openbot-database";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import type { RoutineScheduler } from "./routine-scheduler";
+import { isServerWorkReceipt } from "./server-work-receipt";
 
 export interface MailboxSyncHooks {
   emit(event: AgentEvent): void;
@@ -27,7 +28,7 @@ export interface MailboxSyncOptions {
   database: OpenBotDatabase;
   mailbox: MailboxStore;
   conversation: ConversationRuntime;
-  routines: RoutineScheduler;
+  routines: Pick<RoutineScheduler, "reconcileDelivery" | "stateChanged">;
   scope: () => Scope.Scope;
   hooks: MailboxSyncHooks;
 }
@@ -45,7 +46,7 @@ export class MailboxSync {
   readonly #database: OpenBotDatabase;
   readonly #mailbox: MailboxStore;
   readonly #conversation: ConversationRuntime;
-  readonly #routines: RoutineScheduler;
+  readonly #routines: Pick<RoutineScheduler, "reconcileDelivery" | "stateChanged">;
   readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
 
@@ -61,7 +62,7 @@ export class MailboxSync {
   syncDeliveryMessage(snapshot: ConversationSnapshot, deliveryId: string): void {
     const context = this.#mailbox.getDelivery(deliveryId);
     const message = snapshot.messages.find((candidate) => candidate.id === deliveryId);
-    if (!context || !message) return;
+    if (!context || !message || isServerWorkReceipt(message)) return;
     // A plan continuation keeps the request in its first turn, so that turn's plan and answer stay
     // between the request and the continuation's answer. So does work that a backup model continues:
     // with the request in the continuation's turn, its answer showed above the text of the stopped
@@ -86,10 +87,14 @@ export class MailboxSync {
 
   syncMailboxMessages(snapshot: ConversationSnapshot, mailboxMessages?: readonly ConversationMessage[]): void {
     if (this.#conversation.isExecutionThread(snapshot.threadId)) return;
+    // Receipts are a view of mailbox metadata, never durable conversation rows. Remove stale
+    // copies first so hiding one or clearing this main chat cannot bring it back from cache.
+    snapshot.messages = snapshot.messages.filter((message) => !isServerWorkReceipt(message));
     const fromCreatedAt = snapshot.messages[0]?.createdAt;
-    const mailboxCopies =
+    const ordinaryCopies =
       mailboxMessages ??
       this.#mailbox.conversationMessages(snapshot.agentId, fromCreatedAt === undefined ? {} : { fromCreatedAt });
+    const mailboxCopies = [...ordinaryCopies, ...this.workReceipts(snapshot.agentId, snapshot.threadId)];
     // A teammate's or a routine's message stays in the mailbox after a person deletes it from this
     // chat, so the record of the delete keeps it out.
     const deleted = snapshot.threadId
@@ -122,6 +127,19 @@ export class MailboxSync {
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Visible main-chat notices, derived only for this thread and filtered by its delete records. */
+  workReceipts(agentId: string, threadId: string | null, limit = 100): ConversationMessage[] {
+    if (!threadId || limit < 1) return [];
+    const deleted = this.#database.deletedConversationMessageIds(threadId);
+    return this.#mailbox.workReceipts(agentId, threadId, limit).filter((message) => !deleted.has(message.id));
+  }
+
+  /** An around-message read can name a receipt that intentionally has no SQL message row. */
+  workReceipt(agentId: string, threadId: string | null, messageId: string): ConversationMessage | null {
+    if (!threadId || this.#database.deletedConversationMessageIds(threadId).has(messageId)) return null;
+    return this.#mailbox.workReceipt(agentId, threadId, messageId);
   }
 
   /**
@@ -157,6 +175,8 @@ export class MailboxSync {
       persisted,
       this.#mailbox.conversationMessages(agent.id, oldest === undefined ? {} : { fromCreatedAt: oldest }),
     );
+    const live = this.#conversation.snapshot(agent.id);
+    if (live) this.syncMailboxMessages(live);
     if (conversationContentSignature(persisted) === previousSignature) return;
     // The signature also changes with key order, which the stored rows keep. Write only the
     // messages that store differently, so a read with no real change writes nothing (#2224).
@@ -176,14 +196,6 @@ export class MailboxSync {
           messageCount: changedMessages.length,
         },
       });
-    }
-    const live = this.#conversation.snapshot(agent.id);
-    if (live) {
-      const liveOldest = live.messages[0]?.createdAt;
-      this.syncMailboxMessages(
-        live,
-        this.#mailbox.conversationMessages(agent.id, liveOldest === undefined ? {} : { fromCreatedAt: liveOldest }),
-      );
     }
   }
 

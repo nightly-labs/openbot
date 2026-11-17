@@ -132,6 +132,9 @@ export const messages = defineMessages("settings", {
   "settings.busyMessage.title": "Steer agents while they work",
   "settings.busyMessage.description":
     "New messages join the agent’s current work, not the queue. Agents that cannot do this keep new messages in the queue.",
+  "settings.customMessageRouting.title": "Messages while working",
+  "settings.customMessageRouting.description":
+    "Queue waits. Steer joins the current work. Thread uses Jev to choose an existing or new chat. Set EXPERIENTIAL_API_KEY in OpenBot Vault or the server environment. Thread sends the incoming message and permitted work titles to Experiential Labs. Queue and Steer need no key.",
   // The Agents tab: the defaults of the agents on this computer.
   "settings.agentDefaults.title": "Defaults",
   "settings.agentDefaults.description": "Agents follow these defaults, unless you change them for an agent.",

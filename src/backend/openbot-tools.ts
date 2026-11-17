@@ -43,6 +43,8 @@ import {
 } from "./agent/profile-tools";
 import { ROUTINE_NO_UPDATE_TOOL, ROUTINE_REPORT_FAILURE_TOOL } from "./agent/routine-quiet-runs";
 import { captureScreenToolShape } from "./agent/screen-capture";
+import { dispatchQueuedWorkToolSchema, listQueuedWorkToolSchema } from "./agent/server-work-backlog";
+import { dispatchWorkToolSchema, findWorkToolSchema } from "./agent/server-work-dispatch";
 import {
   assignAgentSectionToolSchema,
   createSectionToolSchema,
@@ -854,6 +856,30 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
         .optional(),
       pinned: z.boolean().describe("False to unpin. Default true.").optional(),
     },
+  },
+  {
+    name: "list_queued_work",
+    description:
+      "Read your own pending main-chat requests and whether their metadata permits a side-chat split. Read the whole request in your own history before deciding. Eligibility is not proof of independence: approvals, clarifications and related follow-ups need their original job context.",
+    shape: listQueuedWorkToolSchema.shape,
+  },
+  {
+    name: "dispatch_queued_work",
+    description:
+      "Move one selected independent, self-contained request from your main queue to a parallel side chat. Keeps its original delivery, sender, files and reply route; never replays the message. Use list_queued_work first. Do not split an approval, clarification, related follow-up, routine or external conversation away from its job context. Existing clients show the new task normally.",
+    shape: dispatchQueuedWorkToolSchema.shape,
+  },
+  {
+    name: "dispatch_work",
+    description:
+      "Start independent work in a teammate's side chat with Thread mode. Use a stable workKey to find or create related work, or taskId to continue it. A requestId identifies one request for safe retries. End your turn after dispatch; replies return to the chat that asked. Side chats share workspace files. Reopen archived work only when intended.",
+    shape: dispatchWorkToolSchema.shape,
+  },
+  {
+    name: "find_work",
+    description:
+      "Find permitted teammate work by stable workKey, taskId, or title query. Returns work IDs and status, not transcripts. Use taskId with dispatch_work for a follow-up. Work in a shared sidebar section can be found by its members; other requests stay scoped to their sender.",
+    shape: findWorkToolSchema.shape,
   },
   {
     name: "send_message",

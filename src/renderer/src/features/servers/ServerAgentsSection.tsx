@@ -4,7 +4,9 @@ import {
   type AgentDefaultsAgentValues,
   type AgentDefaultsOverview,
   agentDefaultChoiceValues,
+  type CustomMessageRoutingSettings,
   type OpenBotDesktopApi,
+  type SetCustomMessageRoutingInput,
   type UpdateAgentDefaultsInput,
 } from "@openbot/contracts/ipc";
 import { Alert, AlertContent, AlertDescription, ItemGroup, SettingsSection } from "@openbot/ui";
@@ -48,6 +50,8 @@ interface AgentsState {
   profiles: readonly RoleAgent[];
   loadFailed: boolean;
   setting: AgentDefaultSetting | null;
+  customMessageRouting: CustomMessageRoutingSettings | null;
+  customMessageRoutingSaving: boolean;
 }
 
 export interface ServerAgentsSection {
@@ -98,6 +102,8 @@ export function createServerAgentsSection(
     profiles: [],
     loadFailed: false,
     setting: null,
+    customMessageRouting: null,
+    customMessageRoutingSaving: false,
   });
   /** Bumped for each read, so an answer for an earlier server or read is dropped. */
   let generation = 0;
@@ -119,13 +125,17 @@ export function createServerAgentsSection(
     const options = props.agentDefaults;
     if (!options) return;
     const current = ++generation;
-    Promise.all([calls().getAgentDefaultsOverview(serverId), options.listAgents()]).then(
-      ([overview, profiles]) => {
+    // Thread configuration is local host IPC; released remote/mobile settings stay unchanged.
+    const custom =
+      local() && !options.calls ? window.openbot.getCustomMessageRouting().catch(() => null) : Promise.resolve(null);
+    Promise.all([calls().getAgentDefaultsOverview(serverId), options.listAgents(), custom]).then(
+      ([overview, profiles, routing]) => {
         if (current !== generation || writes > 0) return;
         setState((draft) => {
           draft.overview = overview;
           draft.profiles = [...profiles];
           draft.loadFailed = false;
+          draft.customMessageRouting = routing?.available ? routing : null;
         });
       },
       () => {
@@ -238,6 +248,35 @@ export function createServerAgentsSection(
     );
   }
 
+  function changeCustomMessageRouting(input: SetCustomMessageRoutingInput): void {
+    if (!local() || !state.customMessageRouting?.available || state.customMessageRoutingSaving) return;
+    const serverId = props.server.id;
+    const current = ++generation;
+    setState((draft) => {
+      draft.customMessageRoutingSaving = true;
+    });
+    window.openbot
+      .setCustomMessageRouting(input)
+      .then(
+        (routing) => {
+          if (serverId !== props.server.id) return;
+          setState((draft) => {
+            draft.customMessageRouting = routing.available ? routing : null;
+          });
+        },
+        (error: unknown) => {
+          showSaveFailure(error);
+        },
+      )
+      .finally(() => {
+        if (serverId !== props.server.id) return;
+        setState((draft) => {
+          draft.customMessageRoutingSaving = false;
+        });
+        if (current !== generation && shown()) load(serverId);
+      });
+  }
+
   /** Where the agents run, for the text of the local script limit. */
   const scope = () => (local() ? "computer" : "server");
 
@@ -300,6 +339,15 @@ export function createServerAgentsSection(
             loadFailed={state.loadFailed}
             defaults={overview().defaults}
             steer={overview().busyMessageMode === "steer"}
+            customMessageRouting={
+              state.customMessageRouting
+                ? {
+                    settings: state.customMessageRouting,
+                    saving: state.customMessageRoutingSaving,
+                    onChange: changeCustomMessageRouting,
+                  }
+                : undefined
+            }
             setting={state.setting}
             menuMount={host.menuMount()}
             onOpen={(setting) =>
@@ -328,7 +376,14 @@ export function createServerAgentsSection(
     crumb() {
       const setting = state.setting;
       if (!setting) return null;
-      return { title: t(agentDefaultSettingTitle(setting)), back: showList };
+      return {
+        title: t(
+          setting === "busyMessageMode" && state.customMessageRouting?.available
+            ? "settings.customMessageRouting.title"
+            : agentDefaultSettingTitle(setting),
+        ),
+        back: showList,
+      };
     },
     resetForServer() {
       generation++;
@@ -338,6 +393,8 @@ export function createServerAgentsSection(
         draft.profiles = [];
         draft.loadFailed = false;
         draft.setting = null;
+        draft.customMessageRouting = null;
+        draft.customMessageRoutingSaving = false;
       });
     },
   };

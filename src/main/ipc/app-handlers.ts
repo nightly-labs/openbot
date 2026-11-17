@@ -11,12 +11,15 @@ import {
   type AppSetupState,
   type AppVariant,
   type ChatWindowTarget,
+  type CustomMessageRoutingSettings,
   type ExternalDestination,
   type ExternalLinkBrowser,
   externalLinkAppName,
   GROK_BOT_EXPORT_URL,
+  type SetCustomMessageRoutingInput,
 } from "@openbot/contracts/ipc";
 import type { AppTranslate } from "@openbot/i18n";
+import { sourceText } from "@openbot/i18n/source";
 import { analyticsOnByDefault } from "@openbot/telemetry";
 import { app, type BrowserWindow, dialog, type OpenDialogOptions, type WebContents } from "electron";
 import { version as developmentVersion } from "../../../package.json";
@@ -39,6 +42,7 @@ import { aboveAppsScreenSupport } from "../linux-wayland-output";
 import type { LogoColorService } from "../logo-color-service";
 import { MAC_PERMISSION_URLS } from "../mac-permission-urls";
 import { exportDiagnostics, exportOpenBotData } from "../maintenance-service";
+import type { PreferenceFileFailure } from "../preference-file";
 import { isTailscaleConnected } from "../private-network-detection";
 import type { RemoteNetworkRoutePreferenceStore } from "../remote-network-route-preference-store";
 import type { RemoteSessionCache } from "../remote-session-cache";
@@ -61,6 +65,7 @@ import {
   parseRendererTimingReport,
   parseSetup,
 } from "./app-inputs";
+import { parseCustomMessageRoutingInput } from "./custom-message-routing-inputs";
 import { stringPayload } from "./validation";
 
 const OPENBOT_SITE = "https://openbot.run";
@@ -133,6 +138,10 @@ export interface AppIpcDependencies {
   analyticsPreferences: AnalyticsPreferenceService;
   approvalAutomation: ApprovalAutomation;
   busyMessageMode: BusyMessageModePreferenceStore;
+  customMessageRouting?: {
+    get(): CustomMessageRoutingSettings;
+    set(input: SetCustomMessageRoutingInput): Effect.Effect<CustomMessageRoutingSettings, PreferenceFileFailure>;
+  } | null;
   agentDefaults: AgentDefaultsPreferenceStore;
   agentMemoryLimit: AgentMemoryLimitSetting;
   remoteSessionReuse: RemoteSessionReusePreferenceStore;
@@ -173,6 +182,7 @@ export function appIpcHandlers({
   analyticsPreferences,
   approvalAutomation,
   busyMessageMode,
+  customMessageRouting,
   agentDefaults,
   agentMemoryLimit,
   remoteSessionReuse,
@@ -251,6 +261,18 @@ export function appIpcHandlers({
       }),
       getApprovalAutomation: handler(() => approvalAutomation.current()),
       getBusyMessageModePreference: handler(() => busyMessageMode.get()),
+      getCustomMessageRouting: handler(
+        (): CustomMessageRoutingSettings =>
+          customMessageRouting?.get() ?? { available: false, defaultMode: "queue", agents: {} },
+      ),
+      setCustomMessageRouting: payloadHandler(parseCustomMessageRoutingInput, (input) => {
+        if (!customMessageRouting) throw new Error(sourceText("error.app.customMessageRoutingUnavailable"));
+        return runCauseEffect(
+          customMessageRouting
+            .set(input)
+            .pipe(Effect.tap(() => Effect.sync(() => service.agentDefaultsChanged(agentDefaults.get())))),
+        );
+      }),
       getAgentDefaults: handler(() => agentDefaults.get()),
       getAgentMemoryLimitPreference: handler(() => agentMemoryLimit.get()),
       getRemoteSessionReusePreference: handler(() => remoteSessionReuse.get()),

@@ -151,4 +151,5 @@ export const messages = defineMessages("status.agent", {
   "status.agent.providerExitContinues": "The agent stopped before it finished its answer. The agent continues.",
   "status.agent.branchTitle": "Branched chat",
   "status.agent.importedChatTitle": "Imported chat",
+  "status.agent.workRequestRouted": "Request sent to work chat: {title}.",
 });

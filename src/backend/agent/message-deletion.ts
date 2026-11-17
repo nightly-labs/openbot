@@ -6,6 +6,7 @@ import type { MailboxStore } from "../mailbox-store";
 import { type MessageDeleteAccess, MessageDeleteRefused } from "../message-delete";
 import { type StoredStateFailure, storedSync } from "../stored-state-effects";
 import type { ConversationRuntime } from "./conversation-runtime";
+import { isServerWorkReceipt } from "./server-work-receipt";
 
 export interface MessageDeletionOptions {
   store: AgentStore;
@@ -60,9 +61,15 @@ export class MessageDeletion {
     const { agentId, threadId, taskId, snapshot, message } = target;
     if (!access.deleteAny && !sentBy(message, access.memberId))
       return yield* new MessageDeleteRefused({ reason: "forbidden" });
-    if (this.#busy(snapshot, message)) return yield* new MessageDeleteRefused({ reason: "busy" });
-    const mailbox = yield* this.#mailbox.deleteShownMessage(agentId, message.id);
-    if (mailbox === "busy") return yield* new MessageDeleteRefused({ reason: "busy" });
+    // A main-chat receipt shares the side request's delivery id. Its delete removes only this
+    // thread's acknowledgement; it must not inspect or delete the runnable side request.
+    if (taskId === null && isServerWorkReceipt(message)) {
+      yield* this.#mailbox.hideWorkReceipt(agentId, threadId, message.id);
+    } else {
+      if (this.#busy(snapshot, message)) return yield* new MessageDeleteRefused({ reason: "busy" });
+      const mailbox = yield* this.#mailbox.deleteShownMessage(agentId, message.id);
+      if (mailbox === "busy") return yield* new MessageDeleteRefused({ reason: "busy" });
+    }
     yield* storedSync(() => {
       // A turn can start while the mailbox step waits, so the write keeps the current active turn.
       // The read also loads the chat again when main evicted it, so the delete is published.
@@ -105,7 +112,8 @@ export class MessageDeletion {
     if (!threadId) return null;
     const message =
       snapshot.messages.find((candidate) => candidate.id === input.messageId) ??
-      this.#store.database.readConversationMessages(agent.id, threadId, [input.messageId])[0];
+      this.#store.database.readConversationMessages(agent.id, threadId, [input.messageId])[0] ??
+      (taskId === null ? this.#mailbox.workReceipt(agent.id, threadId, input.messageId) : null);
     return message ? { agentId: agent.id, threadId, taskId, snapshot, message } : null;
   }
 

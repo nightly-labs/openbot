@@ -4,6 +4,7 @@ import { isDeepStrictEqual } from "node:util";
 import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
+import { isServerWorkReceipt } from "../agent/server-work-receipt";
 import type { AgentRoster } from "./agent-roster";
 import { recordUsageMessage } from "./agent-usage";
 import { type DatabaseCore, deleteReceiptsOf, deleteThreadAttachments } from "./database-core";
@@ -82,7 +83,9 @@ export class ConversationWriter {
     // A message that a person deleted stays deleted, also when a held snapshot still has it.
     const snapshot = {
       ...written,
-      messages: withoutDeletedMessages(this.#core.connection, threadId, written.messages),
+      messages: withoutDeletedMessages(this.#core.connection, threadId, written.messages).filter(
+        (message) => !isServerWorkReceipt(message),
+      ),
     };
     const recovery = conversationRecoveryState(this.#core.connection, threadId, snapshot.activeTurnId);
     const result = this.#core.dispatch(
@@ -263,6 +266,7 @@ export class ConversationWriter {
     }
     const message = snapshot.messages[ordinal];
     if (!message) throw new Error(`Streamed message is missing from the snapshot: ${messageId}`);
+    if (isServerWorkReceipt(message)) return this.#threadRevision(threadId);
     return this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -332,6 +336,7 @@ export class ConversationWriter {
     detail?: unknown;
     commandId?: string;
   }): number {
+    if (isServerWorkReceipt(input.message)) return this.#threadRevision(input.threadId);
     if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
       return this.#threadRevision(input.threadId);
     }
@@ -429,7 +434,9 @@ export class ConversationWriter {
    */
   changedConversationMessages(threadId: string, written: readonly ConversationMessage[]): ConversationMessage[] {
     // A message that a person deleted is never a change: the writer skips it.
-    const messages = withoutDeletedMessages(this.#core.connection, threadId, written);
+    const messages = withoutDeletedMessages(this.#core.connection, threadId, written).filter(
+      (message) => !isServerWorkReceipt(message),
+    );
     if (messages.length === 0) return [];
     const stored = new Map(
       databaseRows(
@@ -481,7 +488,9 @@ export class ConversationWriter {
     const removedMessageIds = [...new Set([...(input.removedMessageIds ?? []), ...deletedMessageIds])];
     const deleted = deletedThreadMessageIds(this.#core.connection, input.threadId);
     for (const messageId of deletedMessageIds) deleted.add(messageId);
-    const changedMessages = input.changedMessages.filter((message) => !deleted.has(message.id));
+    const changedMessages = input.changedMessages.filter(
+      (message) => !deleted.has(message.id) && !isServerWorkReceipt(message),
+    );
     const result = this.#core.dispatch(
       input.commandId ?? `conversation:${input.eventType}:${randomUUID()}`,
       [
@@ -726,6 +735,7 @@ export class ConversationWriter {
     commandId?: string;
   }): number {
     const eventType = input.eventType ?? "provider-history.message-imported";
+    if (isServerWorkReceipt(input.message)) return this.#threadRevision(input.threadId);
     // A provider keeps its own history, so an import can meet a message that a person deleted here.
     if (isDeletedThreadMessage(this.#core.connection, input.threadId, input.message.id)) {
       return this.#threadRevision(input.threadId);

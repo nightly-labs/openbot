@@ -10,6 +10,7 @@ import type {
   ResetAgentSessionSettingInput,
   SetAgentSessionSettingInput,
 } from "./ipc-agent-session-settings";
+import type { CustomMessageRoutingSettings, SetCustomMessageRoutingInput } from "./ipc-custom-message-routing";
 import type { ServerAuditLog } from "./ipc-server-audit";
 // The one channel list. Each endpoint holds its wire value, the group it belongs to, and whether it
 // is a request the renderer invokes or an event the main process sends. That is what lets a
@@ -783,6 +784,11 @@ export const IPC_ENDPOINTS = {
     // window instead of the window only reading the value at start.
     approvalAutomation: event<ApprovalAutomationPreference>()("app:approval-automation"),
     getBusyMessageModePreference: request<undefined, BusyMessageModePreference>()("app:get-busy-message-mode"),
+    // Local host routing settings. These channels have no Team API route or remote capability.
+    getCustomMessageRouting: request<undefined, CustomMessageRoutingSettings>()("app:get-custom-message-routing"),
+    setCustomMessageRouting: request<SetCustomMessageRoutingInput, CustomMessageRoutingSettings>()(
+      "app:set-custom-message-routing",
+    ),
     getAgentDefaults: request<undefined, AgentDefaults>()("app:get-agent-defaults"),
     getAgentMemoryLimitPreference: request<undefined, AgentMemoryLimitPreference>()("app:get-agent-memory-limit"),
     // Server settings set the limit of this computer (`hostAdmin.setAgentMemoryLimit`), here or from a

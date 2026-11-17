@@ -36,6 +36,7 @@ import { QueueEditRejectedError } from "@openbot/contracts/team-protocol/queue-e
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Effect, Result } from "effect";
+import { type PreparedServerWorkReceipt, SERVER_WORK_RECEIPT_ITEM_TYPE } from "./agent/server-work-receipt";
 import {
   AttachmentFiles,
   type ExportedAttachmentFile,
@@ -93,6 +94,8 @@ interface StoredMessage {
    * and the public chat do not show it, like channel work. A task message has one recipient.
    */
   taskId?: string;
+  /** Host-only metadata. The main-chat receipt is projected, never stored as a chat row. */
+  routingReceipt?: { mainThreadId: string; text: string };
   /**
    * The side thread an agent sent this message from. An answer to it runs in that thread, and the
    * sender's own chat does not show it. The recipient's chat gets it, so the sender link opens that thread.
@@ -207,6 +210,12 @@ interface StoredReaction {
 }
 
 interface EnqueueInput {
+  /** A visible main-chat acknowledgment for an implicitly routed user message, committed atomically. */
+  mainReceipt?: () => PreparedServerWorkReceipt;
+  /** Internal host admission check, after file copies and immediately before the synchronous commit. */
+  beforeCommit?: () => void;
+  /** A host request retry across provider turns. The primary key retains its source turn. */
+  idempotencyAlias?: string;
   channelId?: string;
   messaging?: MessagingOrigin;
   messagingReturn?: MessagingOrigin;
@@ -320,6 +329,12 @@ export class MailboxStore {
   readonly #deliveryGate = new MailboxDeliveryGate();
   readonly #stagedGeneratedAttachments = new Map<string, StoredGeneratedAttachment>();
   #state: StoredState = structuredClone(EMPTY_STATE);
+  #receiptMessages: StoredMessage[] | null = null;
+  #receiptDeliveries: StoredDelivery[] | null = null;
+  readonly #receiptIndex = new Map<
+    string,
+    { messageId: string; mainThreadId: string; agentId: string; notice: ConversationMessage }
+  >();
   /**
    * The app start loads the store before the window opens, and the agent service initializes the same
    * store again. A second load reads every message and delivery again, which stops the main process
@@ -615,8 +630,10 @@ export class MailboxStore {
     input: EnqueueInput,
   ): Effect.fn.Return<QueuedMessageReceipt, StoredStateFailure> {
     try {
-      if (input.idempotencyKey) {
-        const existingMessageId = this.#state.idempotency[input.idempotencyKey];
+      if (input.idempotencyKey || input.idempotencyAlias) {
+        const existingMessageId =
+          (input.idempotencyAlias ? this.#state.idempotency[input.idempotencyAlias] : undefined) ??
+          (input.idempotencyKey ? this.#state.idempotency[input.idempotencyKey] : undefined);
         if (existingMessageId) return this.#receipt(existingMessageId);
       }
 
@@ -624,6 +641,8 @@ export class MailboxStore {
       const validateRecipients = this.prepareDelivery(recipients);
       if (recipients.length === 0) throw new Error(sourceText("error.backend.recipientRequired"));
       if (input.taskId !== undefined && recipients.length !== 1) throw new Error("A task message has one recipient.");
+      if (input.mainReceipt && (input.sender.kind !== "user" || !input.taskId || recipients.length !== 1))
+        throw new Error("A main routing receipt requires one user request in a task.");
       if (recipients.length > INPUT_LIMITS.messageRecipients) {
         throw new Error(sourceText("error.backend.recipientLimit", { limit: INPUT_LIMITS.messageRecipients }));
       }
@@ -633,6 +652,13 @@ export class MailboxStore {
       if (input.idempotencyKey !== undefined && input.idempotencyKey.length > INPUT_LIMITS.identifier) {
         throw new Error("The idempotency key is too long.");
       }
+      if (
+        input.idempotencyAlias !== undefined &&
+        (!input.idempotencyAlias.startsWith("server-work-receipt:") ||
+          input.idempotencyAlias.length > INPUT_LIMITS.identifier ||
+          !input.idempotencyKey)
+      )
+        throw new Error("Invalid server work receipt alias.");
 
       const text = input.text.trim();
       if (text.length > INPUT_LIMITS.messageText) throw new Error(sourceText("error.agent.messageTooLong"));
@@ -689,8 +715,11 @@ export class MailboxStore {
               Effect.tapError(() => removeTransfers),
             )
         : undefined;
+      let mainReceipt: PreparedServerWorkReceipt | undefined;
       try {
         validateRecipients();
+        input.beforeCommit?.();
+        mainReceipt = input.mainReceipt?.();
       } catch (error) {
         yield* removeTransfers;
         throw error;
@@ -702,6 +731,7 @@ export class MailboxStore {
         ...(messaging ? { messaging } : {}),
         ...(input.messagingReturn ? { messagingReturn: input.messagingReturn } : {}),
         ...(input.taskId ? { taskId: input.taskId } : {}),
+        ...(mainReceipt ? { routingReceipt: { mainThreadId: mainReceipt.threadId, text: mainReceipt.text } } : {}),
         ...(input.senderTaskId ? { senderTaskId: input.senderTaskId } : {}),
         id: messageId,
         sender: storedSender(input.sender),
@@ -732,14 +762,44 @@ export class MailboxStore {
       this.#state.messages.push(message);
       recordRestartActivity();
       this.#state.deliveries.push(...deliveries);
-      if (input.idempotencyKey) this.#state.idempotency[input.idempotencyKey] = messageId;
+      if (input.idempotencyKey) {
+        this.#state.idempotency[input.idempotencyKey] = messageId;
+      }
+      if (input.idempotencyAlias) this.#state.idempotency[input.idempotencyAlias] = messageId;
       const usedDrafts = voiceDraft ? [...drafts, voiceDraft] : drafts;
       this.#state.drafts = this.#state.drafts.filter((draft) => !usedDrafts.includes(draft));
       this.#changes.messageIds.add(messageId);
       for (const delivery of deliveries) this.#changes.deliveryIds.add(delivery.id);
       for (const draft of usedDrafts) this.#changes.draftIds.add(draft.id);
+      let mainReceiptPublication: { message: ConversationMessage; revision: number } | undefined;
       try {
-        this.#persist();
+        if (mainReceipt) {
+          const delivery = deliveries[0];
+          if (!delivery) throw new Error("A routing receipt requires a delivery.");
+          const notice: ConversationMessage = {
+            id: delivery.id,
+            author: "agent",
+            senderAgentId: delivery.recipientAgentId,
+            source: "system",
+            itemType: SERVER_WORK_RECEIPT_ITEM_TYPE,
+            text: mainReceipt.text,
+            createdAt,
+            status: "completed",
+          };
+          const prepared = mainReceipt;
+          const revision = this.#database.persistMailboxChangesWith(this.#state, this.#changes, "mailbox.updated", () =>
+            this.#database.persistConversationChanges({
+              agentId: delivery.recipientAgentId,
+              threadId: prepared.threadId,
+              activeTurnId: prepared.activeTurnId,
+              changedMessages: [],
+              eventType: "server-work.receipt",
+              detail: { deliveryId: delivery.id, taskId: input.taskId },
+            }),
+          );
+          this.#clearChanges();
+          mainReceiptPublication = { message: notice, revision };
+        } else this.#persist();
       } catch (error) {
         const deliveryIds = new Set(deliveries.map((delivery) => delivery.id));
         this.#state.messages = this.#state.messages.filter((candidate) => candidate.id !== messageId);
@@ -747,6 +807,8 @@ export class MailboxStore {
         if (input.idempotencyKey && this.#state.idempotency[input.idempotencyKey] === messageId) {
           delete this.#state.idempotency[input.idempotencyKey];
         }
+        if (input.idempotencyAlias && this.#state.idempotency[input.idempotencyAlias] === messageId)
+          delete this.#state.idempotency[input.idempotencyAlias];
         for (const draft of usedDrafts) {
           if (!this.#state.drafts.some((candidate) => candidate.id === draft.id)) {
             this.#state.drafts.push(draft);
@@ -754,6 +816,19 @@ export class MailboxStore {
         }
         yield* removeTransfers;
         throw error;
+      }
+      if (mainReceipt && mainReceiptPublication) {
+        const delivery = deliveries[0];
+        if (
+          delivery &&
+          this.#receiptMessages === this.#state.messages &&
+          this.#receiptDeliveries === this.#state.deliveries
+        )
+          this.#indexWorkReceipt(message, delivery);
+        const prepared = mainReceipt;
+        const notice = mainReceiptPublication;
+        // Publication cannot make a committed request look unsent. SQLite remains authoritative.
+        yield* Effect.try(() => prepared.publish(notice.message, notice.revision)).pipe(Effect.ignore);
       }
       // The message is saved: failing now would hide a delivery that runs from its caller. A draft
       // folder left behind holds copies only, and a restart clears it with the other drafts.
@@ -960,6 +1035,100 @@ export class MailboxStore {
     return delivery ? this.#taskIdOf(delivery) : null;
   }
 
+  /** Main-chat send confirmations, derived from task mailbox records only. */
+  workReceipts(agentId: string, mainThreadId: string, limit = 100): ConversationMessage[] {
+    if (limit <= 0) return [];
+    if (this.#receiptMessages !== this.#state.messages || this.#receiptDeliveries !== this.#state.deliveries) {
+      // A restart or a deletion replaces the arrays. Ordinary status updates and new messages do not.
+      const marked = new Map(
+        this.#state.messages.filter((message) => message.routingReceipt).map((message) => [message.id, message]),
+      );
+      this.#receiptIndex.clear();
+      for (const delivery of this.#state.deliveries) {
+        const message = marked.get(delivery.messageId);
+        if (message) this.#indexWorkReceipt(message, delivery);
+      }
+      this.#receiptMessages = this.#state.messages;
+      this.#receiptDeliveries = this.#state.deliveries;
+    }
+    return [...this.#receiptIndex.values()]
+      .filter((item) => item.agentId === agentId && item.mainThreadId === mainThreadId)
+      .map((item) => ({ ...item.notice }))
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt) || left.id.localeCompare(right.id))
+      .slice(-limit);
+  }
+
+  #indexWorkReceipt(message: StoredMessage, delivery: StoredDelivery): void {
+    if (!message.taskId || !message.routingReceipt) return;
+    this.#receiptIndex.set(delivery.id, {
+      messageId: message.id,
+      mainThreadId: message.routingReceipt.mainThreadId,
+      agentId: delivery.recipientAgentId,
+      notice: {
+        id: delivery.id,
+        author: "agent",
+        senderAgentId: delivery.recipientAgentId,
+        source: "system",
+        itemType: SERVER_WORK_RECEIPT_ITEM_TYPE,
+        text: message.routingReceipt.text,
+        createdAt: delivery.createdAt,
+        status: "completed",
+      },
+    });
+  }
+
+  workReceipt(agentId: string, mainThreadId: string, deliveryId: string): ConversationMessage | null {
+    return (
+      this.workReceipts(agentId, mainThreadId, Number.MAX_SAFE_INTEGER).find((message) => message.id === deliveryId) ??
+      null
+    );
+  }
+
+  /** Hiding a main receipt never deletes its task delivery or files. */
+  hideWorkReceipt(agentId: string, mainThreadId: string, deliveryId: string): Effect.Effect<void, StoredStateFailure> {
+    return this.#hideWorkReceipts(agentId, mainThreadId, deliveryId);
+  }
+
+  clearWorkReceipts(agentId: string, mainThreadId: string): Effect.Effect<void, StoredStateFailure> {
+    return this.#hideWorkReceipts(agentId, mainThreadId);
+  }
+
+  readonly #hideWorkReceipts = Effect.fn("MailboxStore.hideWorkReceipts")(function* (
+    this: MailboxStore,
+    agentId: string,
+    mainThreadId: string,
+    deliveryId?: string,
+  ) {
+    yield* storedSync(() => {
+      const ids = new Set(
+        this.#state.deliveries
+          .filter(
+            (delivery) =>
+              delivery.recipientAgentId === agentId && (deliveryId === undefined || delivery.id === deliveryId),
+          )
+          .map((delivery) => delivery.messageId),
+      );
+      const changed = this.#state.messages.filter(
+        (message) => ids.has(message.id) && message.routingReceipt?.mainThreadId === mainThreadId,
+      );
+      const previous = changed.map((message) => message.routingReceipt);
+      for (const message of changed) {
+        delete message.routingReceipt;
+        this.#changes.messageIds.add(message.id);
+      }
+      try {
+        if (changed.length > 0) this.#persist("server-work.receipt-hidden");
+        const hidden = new Set(changed.map((message) => message.id));
+        for (const [id, item] of this.#receiptIndex) if (hidden.has(item.messageId)) this.#receiptIndex.delete(id);
+      } catch (error) {
+        changed.forEach((message, index) => {
+          message.routingReceipt = previous[index];
+        });
+        throw error;
+      }
+    });
+  }, Effect.uninterruptible).bind(this);
+
   /** Whether the delivery carries a new agent's setup message (`agent-welcome-v1`). */
   isWelcomeDelivery(deliveryId: string): boolean {
     return this.#messageOfDelivery(deliveryId)?.welcome === true;
@@ -1124,6 +1293,11 @@ export class MailboxStore {
     return this.#queuedFor(agentId)
       .filter((delivery) => !waitsForPlanContinuation(delivery) && this.#laneOf(delivery, messages) === taskId)
       .map((delivery) => delivery.id);
+  }
+
+  /** Includes finished deliveries: a failed new-send rollback must never discard existing work. */
+  taskHasMessages(taskId: string): boolean {
+    return this.#state.messages.some((message) => message.taskId === taskId);
   }
 
   /** Whether a message of this task is queued, starting or running. */
@@ -1406,15 +1580,38 @@ export class MailboxStore {
     });
   }
 
-  /**
-   * Moves a queued message of the person into a task, so it runs beside the agent's own chat. Only a
-   * message with one recipient and no channel or external origin can move.
-   */
+  /** Eligible for an agent-selected split of its own independent backlog. No content is inferred. */
+  canMoveToWork(agentId: string, deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((item) => item.id === deliveryId && item.recipientAgentId === agentId);
+    if (
+      delivery?.status !== "queued" ||
+      delivery.editId ||
+      this.#queueUpdates.has(deliveryId) ||
+      delivery.resumeAfterUsageLimit ||
+      delivery.planContinuation
+    )
+      return false;
+    const message = this.#state.messages.find((item) => item.id === delivery.messageId);
+    return Boolean(
+      message &&
+        (message.sender.kind === "user" || message.sender.kind === "agent") &&
+        !message.replyToMessageId &&
+        !message.channelId &&
+        !message.messaging &&
+        !message.taskId &&
+        !message.welcome &&
+        !message.agentSetup &&
+        this.#state.deliveries.filter((item) => item.messageId === message.id).length === 1,
+    );
+  }
+
+  /** Moves one queued request to a task. Agent requests need the internal backlog opt-in. */
   moveToTask = Effect.fn("MailboxStore.moveToTask")(function* (
     this: MailboxStore,
     agentId: string,
     deliveryId: string,
     taskId: string,
+    options: { allowAgentRequests?: boolean } = {},
   ): Effect.fn.Return<void, StoredStateFailure> {
     try {
       const delivery = this.#state.deliveries.find(
@@ -1425,7 +1622,8 @@ export class MailboxStore {
       const message = this.#requireMessage(delivery.messageId);
       const recipients = this.#state.deliveries.filter((candidate) => candidate.messageId === message.id);
       if (
-        message.sender.kind !== "user" ||
+        (message.sender.kind !== "user" &&
+          !(options.allowAgentRequests && message.sender.kind === "agent" && !message.replyToMessageId)) ||
         message.channelId ||
         message.messaging ||
         message.taskId ||
@@ -1760,12 +1958,13 @@ export class MailboxStore {
   }, Effect.uninterruptible).bind(this);
 
   /**
-   * The turn that sent each message, by message id, read once for a whole lookup: agent keys are
-   * kept for good, so a scan of every key for each message grows with the square of the history.
+   * The turn that sent each message, by message id, read once for a whole lookup. Stable work
+   * receipt aliases do not name source turns, so only the original key supplies the turn.
    */
   #sourceTurnIds(): Map<string, string | undefined> {
     const turnIds = new Map<string, string | undefined>();
     for (const [key, messageId] of Object.entries(this.#state.idempotency)) {
+      if (key.startsWith("server-work-receipt:")) continue;
       if (turnIds.has(messageId)) continue;
       const parts = key.split(":");
       turnIds.set(messageId, parts.length >= 3 ? parts.at(-2) : undefined);
@@ -3932,6 +4131,10 @@ function isStoredMessage(value: unknown): value is StoredMessage {
     (value.messaging === undefined || isMessagingOrigin(value.messaging)) &&
     (value.messagingReturn === undefined || isMessagingOrigin(value.messagingReturn)) &&
     (value.taskId === undefined || isString(value.taskId)) &&
+    (value.routingReceipt === undefined ||
+      (isRecord(value.routingReceipt) &&
+        isString(value.routingReceipt.mainThreadId) &&
+        isString(value.routingReceipt.text))) &&
     (value.senderTaskId === undefined || isString(value.senderTaskId)) &&
     isString(value.id) &&
     isRecord(value.sender) &&

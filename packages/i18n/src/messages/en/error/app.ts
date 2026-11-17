@@ -11,4 +11,7 @@ export const messages = defineMessages("error.app", {
   "error.app.remoteIdentityUnavailable": "The remote host identity is unavailable.",
   "error.app.iceServersMissing": "Remote Signal has not supplied ICE servers yet.",
   "error.app.finishLocalTest": "Finish the local test before switching displays.",
+  "error.app.customMessageRoutingUnavailable": "Message routing is not available on this host.",
+  "error.app.jevRoutingUnavailable":
+    "Jev thread routing is unavailable. The message stays in the main queue. Check EXPERIENTIAL_API_KEY and the service.",
 });

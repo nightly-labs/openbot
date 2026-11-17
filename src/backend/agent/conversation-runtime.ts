@@ -575,6 +575,12 @@ export class ConversationRuntime {
     return this.isTaskThread(threadId) || this.channelForThread(threadId) !== null;
   }
 
+  /** Only a newly created replacement for a discarded, unstarted task may reuse its id. */
+  registerRecreatedUnstartedTaskThread(agentId: string, threadId: string): void {
+    this.#forgottenExecutionThreads.delete(threadId);
+    this.registerTaskThread(agentId, threadId);
+  }
+
   registerTaskThread(agentId: string, threadId: string): void {
     if (this.#forgottenExecutionThreads.has(threadId) || this.#store.ownsThread(threadId)) return;
     this.#taskThreads.add(threadId);
@@ -809,6 +815,17 @@ export class ConversationRuntime {
       signature = conversationContentSignature(snapshot);
     this.#conversationSignatures.set(snapshot.threadId ?? snapshot.agentId, signature);
     this.#emit({ type: "conversation", snapshot: structuredClone(snapshot) });
+  }
+
+  /** Publishes a committed host notice without treating an unflushed provider stream as durable. */
+  publishCommittedMessage(snapshot: ConversationSnapshot, message: ConversationMessage, revision: number): void {
+    const cached = this.#cachedSnapshot(snapshot);
+    const wasCommitted = cached !== undefined && this.#cacheIsCommitted(cached);
+    if (!snapshot.messages.some((current) => current.id === message.id)) snapshot.messages.push(message);
+    snapshot.messages = sortConversationMessages(snapshot.messages);
+    snapshot.revision = Math.max(snapshot.revision, revision);
+    this.publishConversation(snapshot);
+    if (wasCommitted) this.#retainPublishedSnapshot(snapshot);
   }
 
   rememberConversationSignature(snapshot: ConversationSnapshot): void {

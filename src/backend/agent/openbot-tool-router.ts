@@ -215,6 +215,10 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
+import { dispatchQueuedWorkToolSchema, listQueuedWorkToolSchema, ServerWorkBacklog } from "./server-work-backlog";
+import { dispatchWorkToolSchema, findWorkToolSchema, ServerWorkDispatch } from "./server-work-dispatch";
+import { serverWorkSharingScope } from "./server-work-identity";
+import type { AgentServerWorkPolicy } from "./server-work-policy";
 import { searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
@@ -496,6 +500,9 @@ export interface OpenBotToolRouterHooks {
 }
 
 export interface OpenBotToolRouterOptions {
+  serverWorkRouting?: import("./server-work-routing").ServerWorkRouting | null;
+  serverWorkBacklog?: ServerWorkBacklog;
+  serverWorkPolicy?: (agentId: string) => AgentServerWorkPolicy | null;
   capturedSteps?: (session: ProviderSession) => Effect.Effect<Map<string, string> | null, ToolOperationFailed>;
   store: AgentStore;
   mailbox: MailboxStore;
@@ -569,6 +576,9 @@ export interface OpenBotToolRouterOptions {
  * It never imports the agent service facade.
  */
 export class OpenBotToolRouter {
+  readonly #serverWorkPolicy: (agentId: string) => AgentServerWorkPolicy | null;
+  readonly #serverWork: ServerWorkDispatch;
+  readonly #serverWorkBacklog: ServerWorkBacklog;
   readonly #history: HistoryTools;
   readonly #store: AgentStore;
   readonly #mailbox: MailboxStore;
@@ -643,6 +653,33 @@ export class OpenBotToolRouter {
     this.#mailbox = options.mailbox;
     this.#mailboxSync = options.mailboxSync;
     this.#conversation = options.conversation;
+    this.#serverWorkPolicy = options.serverWorkPolicy ?? (() => null);
+    this.#serverWork = new ServerWorkDispatch({
+      tasks: options.tasks,
+      mailbox: options.mailbox,
+      policy: this.#serverWorkPolicy,
+      routing: options.serverWorkRouting,
+      visibleAgents: () => options.hooks.listAgents(),
+      sharingScope: (sender, target) => {
+        return serverWorkSharingScope(options.sidebarLayout?.getSnapshot(), sender, target);
+      },
+      queued: (agentId) => {
+        options.mailboxSync.emitQueue(agentId);
+        options.drain.scheduleDrain(agentId);
+      },
+    });
+    this.#serverWorkBacklog =
+      options.serverWorkBacklog ??
+      new ServerWorkBacklog({
+        tasks: options.tasks,
+        mailbox: options.mailbox,
+        policy: this.#serverWorkPolicy,
+        sharingScope: (sender, target) => serverWorkSharingScope(options.sidebarLayout?.getSnapshot(), sender, target),
+        queued: (agentId) => {
+          options.mailboxSync.emitQueue(agentId);
+          options.drain.scheduleDrain(agentId);
+        },
+      });
     this.#attention = options.attention;
     this.#codexSubagentParent = options.codexSubagentParent ?? (() => undefined);
     this.#browser = options.browser;
@@ -1076,6 +1113,10 @@ export class OpenBotToolRouter {
               tool === "list_library_folders" ||
               tool === "organize_library" ||
               tool === "send_message" ||
+              tool === "dispatch_work" ||
+              tool === "find_work" ||
+              tool === "list_queued_work" ||
+              tool === "dispatch_queued_work" ||
               tool === "messaging_post" ||
               tool === "web_search" ||
               tool === "create_server_install_command";
@@ -2070,8 +2111,15 @@ export class OpenBotToolRouter {
       return yield* this.#messaging.tool(link, params.turnId, params.callId, params.tool, params.arguments);
     }
     const channelId = this.#channels.store.channelForThread(executionThreadId);
-    if (channelId && (params.tool.startsWith("channel_") || params.tool === "send_message")) {
-      if (params.tool === "send_message") throw new Error("Use channel_assign or channel_transfer for channel work.");
+    if (
+      channelId &&
+      (params.tool.startsWith("channel_") ||
+        params.tool === "send_message" ||
+        params.tool === "dispatch_work" ||
+        params.tool === "find_work")
+    ) {
+      if (params.tool === "send_message" || params.tool === "dispatch_work" || params.tool === "find_work")
+        throw new Error("Use channel_assign or channel_transfer for channel work.");
       return openBotToolResult(
         yield* this.#channels.tool(
           channelId,
@@ -2541,6 +2589,52 @@ export class OpenBotToolRouter {
 
     const taskResult = yield* this.#tasks.handleTool(params, caller);
     if (taskResult) return taskResult;
+
+    if (params.tool === "list_queued_work" || params.tool === "dispatch_queued_work") {
+      const mainThreadId = this.#store.list().find((agent) => agent.id === senderAgentId)?.threadId;
+      if (callerThreadId !== mainThreadId && callerTaskId === null)
+        return openBotToolFailure(
+          "Queued work is available only from the agent's own chats, not an external conversation.",
+        );
+      if (!this.#serverWorkPolicy(senderAgentId))
+        return openBotToolFailure(sourceText("error.backend.taskRemoteUnsupported"));
+      if (params.tool === "list_queued_work") {
+        listQueuedWorkToolSchema.parse(params.arguments ?? {});
+        return openBotToolResult({ work: this.#serverWorkBacklog.list(senderAgentId) });
+      }
+      const args = dispatchQueuedWorkToolSchema.parse(params.arguments);
+      return openBotToolResult(
+        yield* this.#serverWorkBacklog.dispatch(senderAgentId, args.deliveryId, args.title, args.taskId),
+      );
+    }
+
+    if (params.tool === "find_work") {
+      const args = findWorkToolSchema.parse(params.arguments);
+      if (!this.#serverWorkPolicy(args.recipientAgentId))
+        return openBotToolFailure(sourceText("error.backend.taskRemoteUnsupported"));
+      return openBotToolResult({ work: this.#serverWork.find({ callerAgentId: senderAgentId, ...args }) });
+    }
+    if (params.tool === "dispatch_work") {
+      const args = dispatchWorkToolSchema.parse(params.arguments);
+      return yield* this.#sendMessage(
+        {
+          ...params,
+          tool: "send_message",
+          arguments: {
+            recipientAgentIds: [args.recipientAgentId],
+            text: args.text,
+            expectsReply: true,
+            ...(args.title ? { workTitle: args.title } : {}),
+            ...(args.workKey ? { workKey: args.workKey } : {}),
+            ...(args.taskId ? { workTaskId: args.taskId } : {}),
+            ...(args.requestId ? { workRequestId: args.requestId } : {}),
+            ...(args.reopen === undefined ? {} : { reopenWork: args.reopen }),
+            forceWork: true,
+          },
+        },
+        senderAgentId,
+      );
+    }
 
     const tableResult = yield* handleDataTool(params.tool, params.arguments, senderAgentId, this.#tables);
     if (tableResult) return tableResult;
@@ -3643,6 +3737,7 @@ export class OpenBotToolRouter {
       if (!Array.isArray(recipientValues) || !recipientValues.every((item) => isString(item))) {
         throw new Error("recipientAgentIds must be an array of agent ids.");
       }
+      if (recipientValues.length < 1 || recipientValues.length > 32) throw new Error("Address 1 to 32 recipients.");
       if (recipientValues.length !== new Set(recipientValues).size) {
         throw new Error("Duplicate recipients are not allowed.");
       }
@@ -3737,6 +3832,69 @@ export class OpenBotToolRouter {
       // The same rule for a request from a Slack thread or another external conversation (#5517).
       const messaging = this.#mailbox.answerReturn(answeredRequestIds, recipientValues);
       const text = params.arguments.text;
+      const explicitWork =
+        params.arguments.forceWork === true ||
+        params.arguments.workKey !== undefined ||
+        params.arguments.workTaskId !== undefined;
+      if (explicitWork && recipientValues.length !== 1) throw new Error("Address one recipient for keyed work.");
+      if (explicitWork && replyTo)
+        throw new Error("A reply keeps its original route. Use a separate dispatch_work call for new work.");
+      const customWork =
+        explicitWork ||
+        (recipientValues.length === 1 &&
+          !replyTo &&
+          !answerTaskId &&
+          !messaging &&
+          expectsReply !== false &&
+          recipientValues.every((recipient) => this.#serverWorkPolicy(recipient)?.dispatchMode === "new-thread"));
+      if (customWork) {
+        const workArguments = params.arguments;
+        const workResults = yield* Effect.forEach(
+          recipientValues,
+          (recipientAgentId) => {
+            const workKey = workArguments.workKey;
+            const workTaskId = workArguments.workTaskId;
+            const workTitle = workArguments.workTitle;
+            const workRequestId = workArguments.workRequestId;
+            if (workKey !== undefined && (typeof workKey !== "string" || !workKey.trim() || workKey.length > 256))
+              throw new Error("workKey must have 1 to 256 characters.");
+            if (workTaskId !== undefined && typeof workTaskId !== "string")
+              throw new Error("workTaskId must be an id.");
+            const request = {
+              senderAgentId,
+              recipientAgentId,
+              text,
+              sourcePaths: paths,
+              requestId: typeof workRequestId === "string" ? workRequestId : toolCallIdempotencyKey(params),
+              sourceTurnId: params.turnId,
+              sourceIdempotencyKey: toolCallIdempotencyKey(params),
+              ...(typeof workKey === "string" ? { workKey: workKey.trim() } : {}),
+              ...(typeof workTaskId === "string" ? { taskId: workTaskId } : {}),
+              ...(typeof workTitle === "string" ? { title: workTitle } : {}),
+              ...(senderTaskId ? { senderTaskId } : {}),
+              ...(messagingReturn ? { messagingReturn } : {}),
+              ...(workArguments.reopenWork === true ? { reopen: true } : {}),
+            };
+            return explicitWork ? this.#serverWork.dispatch(request) : this.#serverWork.dispatchAutomatic(request);
+          },
+          { concurrency: 1 },
+        );
+        const snapshot = this.#conversation.ensureSnapshot(senderAgentId, params.threadId);
+        this.#mailboxSync.syncMailboxMessages(snapshot);
+        this.#conversation.emitConversation(snapshot);
+        return openBotToolResult({
+          messageId: workResults[0]?.receipt.messageId,
+          deliveries: workResults.flatMap((result) =>
+            result.receipt.deliveries.map((delivery) => ({ ...delivery, outcome: "queued" })),
+          ),
+          work: workResults.flatMap((result) =>
+            result.work ? [{ ...result.work, messageId: result.receipt.messageId }] : [],
+          ),
+          next: workResults.every((result) => result.work)
+            ? "Work runs in the recipient side chats within server capacity. Keep these work IDs for follow-ups. End your turn; replies return here. Do not hold a provider turn while waiting."
+            : "The request remains in the recipient main chat to keep its context, or because automatic routing was unavailable. It waits for that chat's turn. End your turn; replies return here.",
+        });
+      }
       const receipt = yield* this.#mailbox
         .enqueue({
           sender: { kind: "agent", agentId: senderAgentId },

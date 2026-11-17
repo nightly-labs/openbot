@@ -23,6 +23,7 @@ import { z } from "zod";
 import type { ConversationRuntime } from "../agent/conversation-runtime";
 import type { TaskLanes } from "../agent/drain-scheduler";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
+import type { AgentServerWorkPolicy } from "../agent/server-work-policy";
 import {
   type AgentThreadOrigin,
   type AgentThreadRecord,
@@ -55,6 +56,7 @@ export const startTaskToolSchema = z.strictObject({
 });
 
 export interface AgentTasksHooks {
+  serverWorkPolicy?(agentId: string): AgentServerWorkPolicy | null;
   emit(event: AgentEvent): void;
   /** The agent, for its provider and its task limit. */
   agent(agentId: string): AgentSummary | undefined;
@@ -117,7 +119,30 @@ export class AgentTasks implements TaskLanes {
   /** One branch is made at a time, so a retry that arrives during the first call finds its branch. */
   readonly #branches = Semaphore.makeUnsafe(1);
   /** One `start_task` call runs at a time, so parallel calls in one turn cannot pass the task limits. */
-  readonly #starts = Semaphore.makeUnsafe(1);
+  readonly #starts = new Map<string, Semaphore.Semaphore>();
+  readonly #discardedUnstartedThreads = new Set<string>();
+
+  /** Serializes admission of this agent, including the first mailbox commit. Other agents stay free. */
+  withWorkAdmission<A, E, R>(agentId: string, effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R> {
+    let admission = this.#starts.get(agentId);
+    if (!admission) {
+      admission = Semaphore.makeUnsafe(1);
+      this.#starts.set(agentId, admission);
+    }
+    return admission.withPermit(effect);
+  }
+
+  /** A follow-up to busy work adds no unfinished task; idle work must pass admission again. */
+  assertWorkAdmission(agentId: string, taskId: string): void {
+    const task = this.#store.task(taskId);
+    if (task && !this.#finished(task)) return;
+    const limit = this.#hooks.serverWorkPolicy?.(agentId)?.maxUnfinishedTasks ?? AGENT_STARTED_UNFINISHED_TASKS;
+    const unfinished = this.#store
+      .openTaskIds(agentId)
+      .flatMap((id) => this.#store.task(id) ?? [])
+      .filter((candidate) => candidate.routineId === null && !this.#finished(candidate));
+    if (unfinished.length >= limit) throw new Error(sourceText("error.backend.taskUnfinishedLimit", { count: limit }));
+  }
 
   constructor(options: AgentTasksOptions) {
     this.#store = options.store;
@@ -137,7 +162,71 @@ export class AgentTasks implements TaskLanes {
 
   limit(agentId: string): number {
     const agent = this.#hooks.agent(agentId);
+    const policy = this.#hooks.serverWorkPolicy?.(agentId);
+    if (agent && policy && agentProviderDescriptor(agent.provider).concurrentTurns) return policy.maxConcurrentTasks;
     return agent ? agentTaskLimit(agent, this.#hooks.defaultTaskLimit()) : 1;
+  }
+
+  /** Internal work discovery. No conversation text crosses this boundary. */
+  listWork(agentId: string): AgentThreadRecord[] {
+    return this.#store.recent(agentId, null, 500);
+  }
+
+  /**
+   * Creates a stable side thread without running a turn in the agent's main chat. The caller holds
+   * withWorkAdmission through enqueue, as start_task does. Failed enqueues can discard the new empty
+   * thread. A retry can recreate that unstarted thread without reviving an old running session.
+   */
+  createWork(agentId: string, title: string, threadId: string): Effect.Effect<AgentThreadRecord> {
+    return Effect.gen({ self: this }, function* () {
+      const existing = this.#store.task(threadId);
+      if (existing) {
+        if (existing.agentId !== agentId) throw new Error(sourceText("error.backend.threadNotFound"));
+        return existing;
+      }
+      const open = this.#store.openTaskIds(agentId).flatMap((id) => this.#store.task(id) ?? []);
+      const unfinishedLimit =
+        this.#hooks.serverWorkPolicy?.(agentId)?.maxUnfinishedTasks ?? AGENT_STARTED_UNFINISHED_TASKS;
+      const unfinished = open.filter((task) => task.routineId === null && !this.#finished(task));
+      if (unfinished.length >= unfinishedLimit)
+        throw new Error(sourceText("error.backend.taskUnfinishedLimit", { count: unfinishedLimit }));
+      const archived: AgentThreadRecord[] = [];
+      // Keep the frozen 50-thread client bound. Only finished managed work is archived for room.
+      if (open.length >= INPUT_LIMITS.agentTasks) {
+        const finished = open
+          .filter((task) => task.threadId.startsWith("openbot-work-") && this.#finished(task))
+          .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt));
+        const oldest = finished[0];
+        if (oldest) {
+          this.#closeQuietly(oldest);
+          archived.push(oldest);
+        }
+      }
+      this.#requireRoom(agentId);
+      const workTitle = taskTitle(title);
+      if (!workTitle) throw new Error(sourceText("error.backend.threadTitleRequired"));
+      const task = this.#store.create({ agentId, threadId, origin: "agent", title: workTitle, titleSource: "agent" });
+      let returned = false;
+      return yield* Effect.gen({ self: this }, function* () {
+        if (this.#discardedUnstartedThreads.delete(task.threadId))
+          this.#conversation.registerRecreatedUnstartedTaskThread(agentId, task.threadId);
+        else this.#conversation.registerTaskThread(agentId, task.threadId);
+        this.changed(agentId);
+        if (archived.length > 0) yield* this.#hooks.archived(agentId, archived);
+        returned = true;
+        return task;
+      }).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (!returned && !this.#mailbox.taskBusy(agentId, task.taskId)) {
+              // Keep previous archives and any later generation or populated task intact.
+              this.discard(task);
+              this.changed(agentId);
+            }
+          }),
+        ),
+      );
+    });
   }
 
   /** Whether the agent's provider runs one turn at a time, across its own chat and its tasks. */
@@ -302,8 +391,10 @@ export class AgentTasks implements TaskLanes {
         files.set(attachment.id, copy);
       }
       return yield* branchStep("storage", () =>
-        this.#mailbox.persistGeneratedAttachmentsWith(staged, "attachment.branch-copied", () =>
-          this.#store.branch({
+        this.#mailbox.persistGeneratedAttachmentsWith(staged, "attachment.branch-copied", () => {
+          // File copies can yield while another request fills the last place.
+          this.#requireRoom(input.agentId);
+          return this.#store.branch({
             agentId: input.agentId,
             requestId: input.requestId,
             threadId,
@@ -311,8 +402,8 @@ export class AgentTasks implements TaskLanes {
             sourceThreadId: source.threadId,
             sourceMessageId: input.messageId,
             messages: copyBranchMessages(messages, files),
-          }),
-        ),
+          });
+        }),
       );
     }).pipe(
       Effect.mapError((failure) =>
@@ -358,8 +449,19 @@ export class AgentTasks implements TaskLanes {
 
   /** Removes a new task that took no message, because the move into it was refused. */
   discard(task: AgentThreadRecord): void {
-    this.#conversation.forgetExecutionThread(task.threadId);
+    const current = this.#store.task(task.taskId);
+    if (
+      !current ||
+      current.agentId !== task.agentId ||
+      current.createdAt !== task.createdAt ||
+      this.#mailbox.taskHasMessages(task.taskId) ||
+      this.#store.hasMessages(task.threadId) ||
+      this.#hooks.turnActive(task.agentId, task.threadId)
+    )
+      return;
     this.#store.delete(task.taskId);
+    this.#conversation.forgetExecutionThread(task.threadId);
+    this.#discardedUnstartedThreads.add(task.threadId);
   }
 
   /** A rename by a person: trimmed, and kept when later messages arrive. */
@@ -526,8 +628,9 @@ export class AgentTasks implements TaskLanes {
     if (params.tool !== START_TASK_TOOL) return null;
     const parsed = startTaskToolSchema.safeParse(params.arguments);
     if (!parsed.success) return openBotToolFailure(sourceText("error.backend.taskToolInvalid"));
-    if (caller.inExecutionThread) return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
-    return yield* this.#starts.withPermit(this.#start(params, caller, parsed.data));
+    if (caller.inExecutionThread && !this.#hooks.serverWorkPolicy?.(caller.agentId))
+      return openBotToolFailure(sourceText("error.backend.taskOwnChatOnly"));
+    return yield* this.withWorkAdmission(caller.agentId, this.#start(params, caller, parsed.data));
   });
 
   /**
@@ -551,10 +654,10 @@ export class AgentTasks implements TaskLanes {
     const finished = open.filter((task) => this.#finished(task));
     // A routine thread is the routine's own: its runs do not count as tasks that the agent started.
     const unfinishedTasks = open.filter((task) => task.routineId === null && !finished.includes(task)).length;
-    if (unfinishedTasks >= AGENT_STARTED_UNFINISHED_TASKS)
-      return openBotToolFailure(
-        sourceText("error.backend.taskUnfinishedLimit", { count: AGENT_STARTED_UNFINISHED_TASKS }),
-      );
+    const unfinishedLimit =
+      this.#hooks.serverWorkPolicy?.(caller.agentId)?.maxUnfinishedTasks ?? AGENT_STARTED_UNFINISHED_TASKS;
+    if (unfinishedTasks >= unfinishedLimit)
+      return openBotToolFailure(sourceText("error.backend.taskUnfinishedLimit", { count: unfinishedLimit }));
     // The newest finished tasks that the agent started stay open, when the task list has a place for them
     // and for the new task. The person's own tasks, branches and routine threads stay open.
     const finishedByAgent = finished

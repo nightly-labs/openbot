@@ -52,6 +52,7 @@ export * from "./ipc-conversation-trace";
 export * from "./ipc-conversations";
 export * from "./ipc-crm";
 export * from "./ipc-custom-agents";
+export * from "./ipc-custom-message-routing";
 export * from "./ipc-custom-providers";
 export * from "./ipc-desktop-apis";
 export * from "./ipc-dynamic-island";

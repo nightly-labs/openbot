@@ -265,8 +265,16 @@ export class OpenBotDatabase {
     anchor: ConversationPageAnchor = { type: "latest" },
     requestedLimit = 50,
     options: ConversationMarkerExclusions = {},
+    latestMaximumMessages = 100,
   ): ConversationPage {
-    return this.#conversations.readConversationPage(agentId, threadId, anchor, requestedLimit, options);
+    return this.#conversations.readConversationPage(
+      agentId,
+      threadId,
+      anchor,
+      requestedLimit,
+      options,
+      latestMaximumMessages,
+    );
   }
 
   supportedConversationCursor(

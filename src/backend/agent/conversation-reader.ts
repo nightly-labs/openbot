@@ -88,8 +88,31 @@ export class ConversationReader {
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
       this.#mailboxSync.reconcilePersistedMailboxMessages(agent);
-      const page = this.#store.database.readConversationPage(agentId, agent.threadId, anchor, limit, options);
+      if (!Number.isInteger(limit) || limit < 1) throw new Error("The conversation page limit is invalid.");
+      const budget = Math.min(limit, 100);
+      const aroundReceipt =
+        anchor.type === "around" ? this.#mailboxSync.workReceipt(agentId, agent.threadId, anchor.messageId) : null;
+      const receipts = aroundReceipt
+        ? [aroundReceipt]
+        : anchor.type === "latest"
+          ? this.#mailboxSync.workReceipts(agentId, agent.threadId, Math.min(budget, 99))
+          : [];
+      // Reserve the slots before SQL chooses whole turn groups. Never trim real rows after
+      // reading them: their existing older cursor must still point before the rows we return.
+      const page = this.#store.database.readConversationPage(
+        agentId,
+        agent.threadId,
+        aroundReceipt ? { type: "latest" } : anchor,
+        Math.max(1, budget - receipts.length),
+        options,
+        100 - receipts.length,
+      );
       this.#mailboxSync.refreshQueuePositions(page.messages);
+      // Keep the SQL order of real rows, including a turn split across pages.
+      for (const receipt of receipts) {
+        const index = page.messages.findLastIndex((message) => message.createdAt <= receipt.createdAt);
+        page.messages.splice(index + 1, 0, receipt);
+      }
       return {
         ...page,
         readState: this.#reads.readStateForThread(memberId, agent.threadId, options),
@@ -171,6 +194,9 @@ export class ConversationReader {
   ) {
     const agent = yield* this.#store.existing(agentId).pipe(toConversationReadFailed);
     return yield* readerStep(() => {
+      // A routing notice has no durable unread position. Keep the reader's actual cursor.
+      if (fromMessageId && this.#mailboxSync.workReceipt(agentId, agent.threadId, fromMessageId))
+        return this.#reads.readStateForThread(memberId, agent.threadId, options);
       const state = this.#reads.markUnreadForThread(memberId, agent.threadId, fromMessageId, options);
       this.#hooks.emit(
         {
