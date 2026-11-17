@@ -69,7 +69,7 @@ const MCP_APPROVAL =
 export const MCP_SERVER_TOOL_DEFINITIONS = [
   {
     name: "list_mcp_servers",
-    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in, and forYou: whether you get its tools. Values are never shown. ${MCP_SCOPE} Read-only.`,
+    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in, and forYou: whether you get its tools while it is on. Values are never shown. ${MCP_SCOPE} Read-only.`,
     shape: {},
   },
   {
