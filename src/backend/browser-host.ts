@@ -276,6 +276,9 @@ const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left"
  */
 const MAX_ACTIVE_DOWNLOADS = 4;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+/** The diagnostic for a download over `MAX_DOWNLOAD_BYTES`, so the agent can tell the user what to do. */
+const DOWNLOAD_TOO_LARGE =
+  "Download stopped: the file is larger than 2 GiB, the download limit of this browser. No file was saved. The user can download it in their own web browser.";
 
 export interface BrowserViewOptions {
   /** Hears the page's mouse cursor when it changes. Not called while a secret is on the page. */
@@ -3844,12 +3847,27 @@ export class BrowserHost {
     );
     target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     target.on("will-download", (event, item, contents) => {
-      if ([...this.#tabs.values()].some((tab) => tab.secret && tab.contents === contents)) {
+      const tab = [...this.#tabs.values()].find((candidate) => candidate.contents === contents);
+      if (tab?.secret) {
         event.preventDefault();
         return;
       }
-      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS || item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+      // A stopped download saves no file, so the tab's diagnostics tell the agent why.
+      const stopped = (message: string) => {
+        if (!tab) return;
+        tab.diagnostics.add({ kind: "network", level: "error", message, ...diagnosticUrlField(item.getURL()) });
+        this.#emitChanged();
+      };
+      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS) {
         event.preventDefault();
+        stopped(
+          `Download refused: ${MAX_ACTIVE_DOWNLOADS} downloads are already in progress. No file was saved. Try again when one is done.`,
+        );
+        return;
+      }
+      if (item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+        event.preventDefault();
+        stopped(DOWNLOAD_TOO_LARGE);
         return;
       }
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
@@ -3866,6 +3884,7 @@ export class BrowserHost {
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
         item.cancel();
+        stopped(DOWNLOAD_TOO_LARGE);
       });
       item.once("done", () => {
         this.#activeDownloads -= 1;
