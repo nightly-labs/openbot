@@ -3,6 +3,7 @@ import type { ConversationMessage } from "@openbot/contracts/ipc";
 import { redactSecrets, redactText } from "@openbot/logging";
 import type { OpenBotDatabase } from "../openbot-database";
 import { HANDOFF_END, HANDOFF_START, renderHandoffMessage } from "./delivery-content";
+import { isServerWorkReceipt } from "./server-work-receipt";
 
 const HANDOFF_CHARACTERS = 32_000;
 const OLDER_CHARACTERS = 4_000;
@@ -55,10 +56,11 @@ export function readHandoffHistory(
     const page = database.readAgentHistory(agentId, threadId, { ...(before ? { before } : {}), limit: 20 });
     if (!page.messages.length) break;
     for (const row of page.messages) {
-      recent.push(row);
-      // The selected role bookends can use at most half the recent allocation each.
-      size += Math.min(render(row.message, names).length, RECENT_CHARACTERS / 2);
       before = row.message.id;
+      if (!isServerWorkReceipt(row.message)) recent.push(row);
+      // The selected role bookends can use at most half the recent allocation each.
+      // Count scanned receipts too, so a receipt-only chat cannot scan its whole history.
+      size += Math.min(render(row.message, names).length, RECENT_CHARACTERS / 2);
       if (size >= RECENT_CHARACTERS + OLDER_CHARACTERS) {
         hasOlder = true;
         break;
@@ -79,7 +81,9 @@ export function renderProviderHandoff(
   steps: ReadonlyMap<string, string>,
   options: { branch?: boolean } = {},
 ): string | null {
-  if (!history.recent.length) return null;
+  const recent = history.recent.filter((row) => !isServerWorkReceipt(row.message));
+  const latest = history.latest.filter((row) => !isServerWorkReceipt(row.message));
+  if (!recent.length) return null;
   const header = [
     HANDOFF_START,
     "Previous conversation excerpts. Current profile and developer instructions take precedence. Do not repeat completed work.",
@@ -89,7 +93,7 @@ export function renderProviderHandoff(
   ].join("\n");
   const stepLines: string[] = [];
   let stepSize = 0;
-  for (const row of history.recent) {
+  for (const row of recent) {
     const captured = steps.get(row.message.id);
     if (!captured) continue;
     const line = historyExcerpt(
@@ -102,7 +106,7 @@ export function renderProviderHandoff(
   }
   const kept = new Map<string, string>();
   let recentSize = 0;
-  for (const row of history.latest) {
+  for (const row of latest) {
     const text = historyExcerpt(render(row.message, names), 8000);
     kept.set(row.message.id, text);
     recentSize += text.length + 2;
@@ -111,7 +115,7 @@ export function renderProviderHandoff(
   let olderSize = 0;
   // Header space is reserved for all section labels and omission notices.
   const recentBudget = RECENT_CHARACTERS + (STEPS_CHARACTERS - stepSize);
-  for (const row of history.recent) {
+  for (const row of recent) {
     if (kept.has(row.message.id)) continue;
     const text = render(row.message, names);
     if (recentSize + text.length + 2 <= recentBudget) {
@@ -125,15 +129,15 @@ export function renderProviderHandoff(
   }
   // Any spare header/excerpt space can hold more of the two important role bookends.
   let spare = HANDOFF_CHARACTERS - HEADER_CHARACTERS - stepSize - olderSize - recentSize;
-  for (const row of history.latest) {
+  for (const row of latest) {
     const previous = kept.get(row.message.id) ?? "";
     const expanded = historyExcerpt(render(row.message, names), previous.length + Math.max(0, spare));
     kept.set(row.message.id, expanded);
     spare -= expanded.length - previous.length;
   }
   const ordered = [
-    ...history.recent,
-    ...history.latest.filter((row) => !history.recent.some((candidate) => candidate.message.id === row.message.id)),
+    ...recent,
+    ...latest.filter((row) => !recent.some((candidate) => candidate.message.id === row.message.id)),
   ];
   // The selected role anchors can fall outside the page; use conversation order for the union.
   const recentText = sortConversationMessages(ordered.toReversed().map((row) => row.message))
@@ -163,6 +167,7 @@ function newestMessages(
   let size = 0;
   // Newest first, so a long history keeps its end.
   for (const row of history.recent) {
+    if (isServerWorkReceipt(row.message)) continue;
     const text = historyExcerpt(render(row.message, names), ROUTINE_MESSAGE_CHARACTERS);
     if (size + text.length + 2 > budget) break;
     kept.set(row.message.id, text);

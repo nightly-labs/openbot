@@ -620,6 +620,15 @@ memory value of a server (2, 8 or 16), else no limit on a desktop computer. Low 
 reads and sets both host values on `host-turn-limits-v1` (owner or admin), and a save drains the
 queues again, so a higher limit starts waiting turns at once.
 
+Optional [Thread message routing](../message-routing.md) uses the same task scheduler and official
+limits. `ServerWorkRouting` classifies incoming text against permitted open work metadata without
+holding admission during the provider call. `ServerWorkDispatch` and `ServerWorkBacklog` keep
+creation and enqueue or move under the per-agent admission lock. Explicit replies retain their
+source task. `MailboxStore` projects inert main-chat receipts from metadata on the real task request;
+raw conversation rows and replayable events never contain the receipt. Queue and Steer fields and
+released Team API adapters keep their meanings. Thread configuration is separate local host IPC;
+existing remote and mobile task clients need no new protocol.
+
 The chat header shows a tab for the main thread and one for each open side thread, a "+" button and a
 menu of all threads with an "Archived" group (`packages/ui/src/features/conversation/threads/`). The
 user starts a side thread with "+" (a draft tab that becomes a thread with its first message) or moves

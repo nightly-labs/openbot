@@ -5,6 +5,7 @@ import type {
   AgentProviderRef,
   AgentSessionSettings,
   CreateAgentInput,
+  CustomMessageRoutingSettings,
   HiddenAgentsSnapshot,
   McpSignInApp,
   McpSignInAppState,
@@ -270,6 +271,7 @@ export interface MockOpenBotOptions
     MockHostUpdateOptions,
     MockRoutineResultsOptions {
   appInfo?: AppInfo;
+  customMessageRouting?: CustomMessageRoutingSettings;
   analyticsPreference?: AnalyticsPreference;
   /** The first value of the first-run analytics box. Clear, as in a region that asks for consent. */
   analyticsDefault?: boolean;
@@ -522,6 +524,13 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
   let analyticsPreference = clone<AnalyticsPreference>(options.analyticsPreference ?? { enabled: true });
   let approvalAutomation = clone<ApprovalAutomationPreference>(DEFAULT_APPROVAL_AUTOMATION_PREFERENCE);
   let busyMessageMode: BusyMessageModePreference = { mode: DEFAULT_BUSY_MESSAGE_MODE };
+  let customMessageRouting: CustomMessageRoutingSettings = clone(
+    options.customMessageRouting ?? {
+      available: false,
+      defaultMode: DEFAULT_BUSY_MESSAGE_MODE,
+      agents: {},
+    },
+  );
   let agentDefaults: AgentDefaults = { ...DEFAULT_AGENT_DEFAULTS };
   const hostTurnLimits = createMockHostTurnLimits();
   let agentMemoryLimit: AgentMemoryLimitPreference = { limit: DEFAULT_AGENT_MEMORY_LIMIT };
@@ -1354,6 +1363,21 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       return () => approvalAutomationListeners.delete(listener);
     },
     getBusyMessageModePreference: async () => clone(busyMessageMode),
+    getCustomMessageRouting: async () => clone(customMessageRouting),
+    setCustomMessageRouting: async ({ mode, agentIds }) => {
+      if (!customMessageRouting.available) throw new Error(sourceText("error.app.customMessageRoutingUnavailable"));
+      if (agentIds) {
+        if (agentIds.some((id) => !agents.some((agent) => agent.id === id))) throw new Error("Unknown local agent.");
+        customMessageRouting = {
+          ...customMessageRouting,
+          agents: { ...customMessageRouting.agents, ...Object.fromEntries(agentIds.map((id) => [id, mode])) },
+        };
+      } else {
+        if (mode === null) throw new Error("A host message mode is required.");
+        customMessageRouting = { ...customMessageRouting, defaultMode: mode };
+      }
+      return clone(customMessageRouting);
+    },
     getAppBehaviorPreference: async () => clone(appBehavior),
     setAppBehaviorPreference: async (change) => {
       appBehavior = { ...appBehavior, ...change };

@@ -1,4 +1,5 @@
 import { isManagedRuntimeProvider, type ManagedProviderId } from "@openbot/contracts/agent-providers";
+import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import { ANALYTICS_GENERATIONS, openPanelTransport, ReportQueue } from "@openbot/telemetry";
 import { fileReportStorage } from "@openbot/telemetry/node";
 import { makeWASocket } from "@openbot/whatsapp/baileys";
@@ -106,6 +107,7 @@ import type {
 } from "@openbot/contracts/ipc";
 import {
   agentBrowserProfile,
+  agentTaskLimit,
   type ChannelCommand,
   DEFAULT_APP_LANGUAGE,
   DEFAULT_DYNAMIC_ISLAND_PREFERENCE,
@@ -142,6 +144,7 @@ import {
   webContents,
 } from "electron";
 import { pasteCodeLoginSupported } from "../backend/agent/cli-code-login";
+import { JevWorkRouter } from "../backend/agent/jev-work-router";
 import { toMcpGatewayFailed } from "../backend/agent/mcp-gateway";
 import { ProviderAccountStore } from "../backend/agent/provider-account-store";
 import { AgentMemoryStore } from "../backend/agent-memory-store";
@@ -246,8 +249,16 @@ import {
 } from "./cua-driver-runtime";
 import { type CustomAgentChanges, createCustomAgentChanges } from "./custom-agent-changes";
 import { CUSTOM_AGENTS_FILE, CustomAgentStore } from "./custom-agent-store";
+import {
+  CUSTOM_MESSAGE_ROUTING_FILE,
+  CustomMessageRoutingPreferenceStore,
+} from "./custom-message-routing-preference-store";
 import { type CustomProviderChanges, createCustomProviderChanges } from "./custom-provider-changes";
 import { CustomProviderStore } from "./custom-provider-store";
+import {
+  CUSTOM_THREAD_ROUTING_STATUS_FILE,
+  CustomThreadRoutingStatusStore,
+} from "./custom-thread-routing-status-store";
 import { MCP_OAUTH_REDIRECT_URL } from "./deep-link-router";
 import { desktopShowsAgentEvent } from "./desktop-notifications";
 import { shouldAutoStartHost } from "./development-profile";
@@ -630,6 +641,8 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  // After the service stops accepting routing decisions, flush its bounded diagnostic writer.
+  customThreadRoutingStatus: 110.25,
   // After the agent service, which stops the provider processes and with them each `cua-driver mcp`
   // proxy. A turn that starts while the service stops still finds the daemon (#6494).
   cuaDriver: 110.5,
@@ -758,6 +771,7 @@ export interface ApplicationServices {
   interfaceSize: InterfaceSizeService;
   notificationPreference: NotificationPreferenceStore;
   busyMessageMode: BusyMessageModePreferenceStore;
+  customMessageRouting: CustomMessageRoutingPreferenceStore;
   agentDefaults: AgentDefaultsPreferenceStore;
   agentMemoryLimit: AgentMemoryLimitSetting;
   memoryReview: MemoryReviewPreferenceStore;
@@ -1568,6 +1582,11 @@ export async function createApplicationServices({
   const busyMessageMode = new BusyMessageModePreferenceStore(
     join(app.getPath("userData"), BUSY_MESSAGE_MODE_PREFERENCE_FILE),
   );
+  const customMessageRouting = new CustomMessageRoutingPreferenceStore({
+    path: join(app.getPath("userData"), CUSTOM_MESSAGE_ROUTING_FILE),
+    legacyDefault: () => busyMessageMode.get().mode,
+    agents: () => store.list(),
+  });
   const agentMemoryLimit = new AgentMemoryLimitPreferenceStore(
     join(app.getPath("userData"), AGENT_MEMORY_LIMIT_PREFERENCE_FILE),
   );
@@ -1640,6 +1659,7 @@ export async function createApplicationServices({
       interfaceSize.load(),
       notificationPreference.load(),
       busyMessageMode.load(),
+      customMessageRouting.load(),
       agentMemoryLimit.load(),
       agentNotificationLevels.load(),
       sidebarPins.load(),
@@ -2270,6 +2290,20 @@ export async function createApplicationServices({
   });
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
+  const customThreadRoutingStatus = new CustomThreadRoutingStatusStore(
+    join(app.getPath("userData"), CUSTOM_THREAD_ROUTING_STATUS_FILE),
+  );
+  teardown.push(TEARDOWN_ORDER.customThreadRoutingStatus, "thread routing diagnostics", () =>
+    Effect.runPromise(customThreadRoutingStatus.dispose()),
+  );
+  await Effect.runPromise(customThreadRoutingStatus.start());
+  const jevWorkRouter = new JevWorkRouter({
+    apiKey: (agentId) =>
+      vault.items.apiKeys(agentId).find((key) => key.name === "EXPERIENTIAL_API_KEY")?.value ??
+      process.env.EXPERIENTIAL_API_KEY ??
+      null,
+    observe: (event) => customThreadRoutingStatus.record(event),
+  });
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2345,6 +2379,24 @@ export async function createApplicationServices({
         }),
     hostMemory,
     hostTurnLimits,
+    messageRouting: {
+      mode: (agentId) => customMessageRouting.mode(agentId),
+      decide: (input) => jevWorkRouter.decide(input),
+      legacyAgentChanged: (agentId) => customMessageRouting.followLegacyAgent(agentId),
+    },
+    serverWorkPolicy: {
+      policy: (agentId) => {
+        if (customMessageRouting.mode(agentId) !== "thread") return null;
+        const agent = store.list().find((candidate) => candidate.id === agentId);
+        return agent
+          ? {
+              maxConcurrentTasks: agentTaskLimit(agent, hostTurnLimits.agentTaskLimit()),
+              maxUnfinishedTasks: INPUT_LIMITS.agentTasks,
+              dispatchMode: "new-thread",
+            }
+          : null;
+      },
+    },
     hostedStorageGb: () => hostedStorageGb,
     agentCursorDrawn: drawsComputerUseHighlight,
     // An agent display of its own is X11, where the driver records video.
@@ -3165,7 +3217,12 @@ export async function createApplicationServices({
   );
   const agentAdminSettings = createAgentAdminSettings({ agents: service, approvalAutomation });
   const agentHostSettings = createAgentHostSettings({ agents: service, busyMessageMode, agentDefaults });
-  const agentDefaultsSettings = createAgentDefaultsSettings({ agents: service, agentDefaults, busyMessageMode });
+  const agentDefaultsSettings = createAgentDefaultsSettings({
+    agents: service,
+    agentDefaults,
+    busyMessageMode,
+    legacyDefaultChanged: () => customMessageRouting.followLegacyDefault(),
+  });
   const agentFolders = createAgentFolders({ service, userDataPath: app.getPath("userData") });
   const agentInstructions = createAgentInstructionsFiles(service);
   const browserProfiles = createBrowserProfileService({
@@ -3346,7 +3403,10 @@ export async function createApplicationServices({
     serverPreferences: {
       timezone: { get: () => serverTimezone.get().timezone, set: (timezone) => serverTimezone.set(timezone) },
       personality: { get: () => serverPersonality.get(), set: (personality) => serverPersonality.set(personality) },
-      busyMessageMode: { get: () => busyMessageMode.get(), set: (mode) => busyMessageMode.set(mode) },
+      busyMessageMode: {
+        get: () => busyMessageMode.get(),
+        set: (mode) => busyMessageMode.set(mode).pipe(Effect.tap(() => customMessageRouting.followLegacyDefault())),
+      },
       agentDefaults: {
         get: () => agentDefaults.get(),
         set: (defaults) => {
@@ -4752,6 +4812,7 @@ export async function createApplicationServices({
     interfaceSize,
     notificationPreference,
     busyMessageMode,
+    customMessageRouting,
     agentDefaults,
     agentMemoryLimit: agentMemoryLimitSetting,
     memoryReview,

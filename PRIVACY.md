@@ -132,6 +132,27 @@ Channel history keeps its existing membership and task checks. Messaging history
 current link. The full conversation stays in local SQLite storage. No history text is sent to the
 account service or analytics by these tools.
 
+## Optional Thread routing
+
+When the host owner selects Thread message routing, OpenBot sends eligible incoming text and the
+titles of permitted open work chats to Experiential Labs, using its Jev model at
+`https://api.experientiallabs.ai/v1/systemone`. An own-agent user request can also include a bounded
+main-chat subject. OpenBot masks known secrets first. It sends no attachment bodies, task IDs,
+agent IDs or work transcripts. The provider receives temporary choice labels and returns a routing
+choice. This is an additional provider request; Queue and Steer make no Jev request.
+
+The key comes from OpenBot Vault, within the recipient agent's access, or `EXPERIENTIAL_API_KEY` in
+the host environment. It is sent only as the gateway credential. No key is stored in the routing
+preference or diagnostic file. The local diagnostic file retains at most 200 entries with agent ID,
+outcome, reason code, timing, candidate count, optional HTTP status and timestamp. It contains no
+message, title, response body, credential or task ID, and is not sent to analytics or the account
+service. See [Message routing](docs/message-routing.md).
+
+The optional backlog tools read full requests from the calling agent's own main queue. Selected
+requests move to work chats without a copied request or changed sender. Main-chat routing notices
+are views of local mailbox metadata; they contain the work title, not the original request text.
+Deleting a notice does not delete its work chat.
+
 ## Local scripts
 
 Local scripts is off by default for each agent. When enabled, scripts that run as the same OS user

@@ -1,4 +1,9 @@
-import { type AgentFolderList, type BrowserProfileSummary, nextBrowserProfileHue } from "@openbot/contracts/ipc";
+import {
+  type AgentFolderList,
+  type BrowserProfileSummary,
+  type CustomMessageMode,
+  nextBrowserProfileHue,
+} from "@openbot/contracts/ipc";
 import type { AgentFolderCalls } from "@openbot/ui/features/conversation/AgentFolders";
 import AgentSettingsPanel from "@openbot/ui/features/conversation/AgentSettingsPanel";
 import { createStore } from "solid-js";
@@ -111,6 +116,30 @@ export const WorkspaceOnlyFolders: Story = {
 export const AskFirst: Story = { args: { agent: { ...STORY_AGENT, access: "full" }, autoApprove: false } };
 /** The agent steers messages sent while it works, whatever the app default says. */
 export const SteersWhileWorking: Story = { args: { agent: { ...STORY_AGENT, busyMessageMode: "steer" } } };
+/** The custom preference takes priority over the old Queue field. Open Advanced to change it. */
+export const CustomThread: Story = {
+  args: { agent: { ...STORY_AGENT, busyMessageMode: "queue" } },
+  render: (args) => {
+    const [routing, setRouting] = createStore<{ mode: CustomMessageMode | null }>({ mode: null });
+    return (
+      <main class="agent-memories-story-stage">
+        <AgentSettingsPanel
+          {...args}
+          customMessageRouting={{
+            mode: routing.mode,
+            defaultMode: "thread",
+            saving: false,
+            onChange: async (mode) => {
+              setRouting((draft) => {
+                draft.mode = mode;
+              });
+            },
+          }}
+        />
+      </main>
+    );
+  },
+};
 /** Steer, from the app default, on a provider that cannot steer: the note says the messages queue. */
 export const SteerUnsupportedProvider: Story = {
   args: {

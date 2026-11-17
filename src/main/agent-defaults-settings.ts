@@ -16,11 +16,13 @@ import { causeHelpers } from "../backend/effect-boundary";
 import { AgentNotFoundError } from "./agent-admin-settings";
 import type { AgentDefaultsPreferenceStore } from "./agent-defaults-preference-store";
 import type { BusyMessageModePreferenceStore } from "./busy-message-mode-preference-store";
+import type { PreferenceFileFailure } from "./preference-file";
 
 export interface AgentDefaultsSettingsDependencies {
   agents: Pick<AgentService, "listAgents" | "updateAgent" | "agentDefaultsChanged">;
   agentDefaults: AgentDefaultsPreferenceStore;
   busyMessageMode: BusyMessageModePreferenceStore;
+  legacyDefaultChanged?: () => Effect.Effect<void, PreferenceFileFailure>;
 }
 
 export interface AgentDefaultsSettingsService {
@@ -51,6 +53,7 @@ export function createAgentDefaultsSettings({
   agents,
   agentDefaults,
   busyMessageMode,
+  legacyDefaultChanged,
 }: AgentDefaultsSettingsDependencies): AgentDefaultsSettingsService {
   // Each update reads, merges and writes the defaults. Two updates that overlap, such as one from a
   // phone and one from a desktop, must not merge from the same old value, or the second loses the first.
@@ -73,12 +76,19 @@ export function createAgentDefaultsSettings({
     const next = { ...previous, ...changes };
     // The spread keeps the key order of `previous`, so the two texts differ only when a value changed.
     const defaultsChanged = JSON.stringify(next) !== JSON.stringify(previous);
-    if (!modeChanged && !defaultsChanged) return read();
+    if (!modeChanged && !defaultsChanged) {
+      if (mode !== undefined && legacyDefaultChanged) {
+        yield* rewrap(legacyDefaultChanged());
+        agents.agentDefaultsChanged(previous);
+      }
+      return read();
+    }
     // The agents that follow a changed default get it at once, as after a change in the local window.
     // The `agents-changed` event also tells the open Settings of each device to read the defaults again,
     // also after a failed second write, when the first write is already saved.
     yield* Effect.gen(function* () {
       if (modeChanged && mode !== undefined) yield* rewrap(busyMessageMode.set({ mode }));
+      if (mode !== undefined && legacyDefaultChanged) yield* rewrap(legacyDefaultChanged());
       if (defaultsChanged) yield* rewrap(agentDefaults.set(next));
     }).pipe(Effect.ensuring(Effect.sync(() => agents.agentDefaultsChanged(previous))));
     return read();

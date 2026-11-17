@@ -31,6 +31,7 @@ import {
   type BusyMessageMode,
   type ClientAgentModelOption,
   type CustomAgentSummary,
+  type CustomMessageMode,
   type CustomProviderSummary,
   DEFAULT_AGENT_ACCESS,
   DEFAULT_AGENT_DEFAULTS,
@@ -143,6 +144,13 @@ export type AgentRuntimeSettingsPatch =
   | (AgentRuntimeSettings & Pick<UpdateAgentInput, "providerAccountId">)
   | Pick<AgentRuntimeSettings, "reasoningEffort">;
 
+export interface AgentCustomMessageRoutingOptions {
+  mode: CustomMessageMode | null;
+  defaultMode: CustomMessageMode;
+  saving: boolean;
+  onChange(mode: CustomMessageMode | null): Promise<void>;
+}
+
 export interface AgentSettingsPanelProps {
   agent: AgentProfile;
   runtimeSettings: AgentRuntimeSettings;
@@ -173,6 +181,8 @@ export interface AgentSettingsPanelProps {
   notificationLevel?: AgentNotificationLevelOptions | undefined;
   /** The busy-message setting can be changed locally or through the host's administrator route. */
   busyMessageModeEditable?: boolean;
+  /** The local host's routing setting. Omitted by web and joined-server controls. */
+  customMessageRouting?: AgentCustomMessageRoutingOptions;
   /** Whether the busy-message default belongs to a joined server's host, not to this app. */
   busyMessageDefaultIsHost?: boolean;
   /** Backup models are local-only too: the Team API does not carry them. */
@@ -982,10 +992,15 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
     t(choice === "default" ? defaultBusyMessageLabels()[defaultBusyMessageMode()] : BUSY_MESSAGE_LABEL[choice]);
   const steerUnsupported = () => {
     const provider = knownProvider();
+    const custom = props.customMessageRouting;
+    const mode = custom
+      ? (custom.mode ?? custom.defaultMode)
+      : draft.busyMessage === "default"
+        ? defaultBusyMessageMode()
+        : draft.busyMessage;
     return (
       provider !== undefined &&
-      (draft.busyMessage === "default" ? defaultBusyMessageMode() : draft.busyMessage) === "steer" &&
-      // A custom agent steers when its model reports it (#4977).
+      mode === "steer" &&
       !agentSteersTurns({ provider, model: draft.runtime.model }, props.modelOptions)
     );
   };
@@ -1592,29 +1607,36 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
             <Show when={page() === "advanced"}>
               <SettingsLinkGroup inset class="agent-settings-runtime-rows">
                 <Show when={props.busyMessageModeEditable}>
-                  <Select<BusyMessageChoice>
-                    class="agent-settings-runtime-select"
-                    options={[...BUSY_MESSAGE_CHOICES]}
-                    value={draft.busyMessage}
-                    onChange={(next) => {
-                      if (!next || next === draft.busyMessage) return;
-                      void saveBusyMessage(next);
-                    }}
-                    itemComponent={(item) => (
-                      <SelectItem item={item.item}>{busyMessageLabel(item.item.rawValue)}</SelectItem>
-                    )}
+                  <Show
+                    when={props.customMessageRouting}
+                    fallback={
+                      <Select<BusyMessageChoice>
+                        class="agent-settings-runtime-select"
+                        options={[...BUSY_MESSAGE_CHOICES]}
+                        value={draft.busyMessage}
+                        onChange={(next) => {
+                          if (!next || next === draft.busyMessage) return;
+                          void saveBusyMessage(next);
+                        }}
+                        itemComponent={(item) => (
+                          <SelectItem item={item.item}>{busyMessageLabel(item.item.rawValue)}</SelectItem>
+                        )}
+                      >
+                        <SelectTrigger
+                          class="agent-settings-runtime-row"
+                          aria-label={t("agentSettings.runtime.busyMessageLabel")}
+                        >
+                          <span class="agent-settings-runtime-label">{t("agentSettings.runtime.busyMessage")}</span>
+                          <SelectValue<BusyMessageChoice>>
+                            {(state) => busyMessageLabel(state.selectedOption() ?? "default")}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent />
+                      </Select>
+                    }
                   >
-                    <SelectTrigger
-                      class="agent-settings-runtime-row"
-                      aria-label={t("agentSettings.runtime.busyMessageLabel")}
-                    >
-                      <span class="agent-settings-runtime-label">{t("agentSettings.runtime.busyMessage")}</span>
-                      <SelectValue<BusyMessageChoice>>
-                        {(state) => busyMessageLabel(state.selectedOption() ?? "default")}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent />
-                  </Select>
+                    {(options) => <CustomBusyMessageSelect options={options()} />}
+                  </Show>
                 </Show>
                 <Show when={props.browserProfiles}>
                   {(options) => (
@@ -1814,6 +1836,39 @@ function sameRuntimeSettings(current: AgentRuntimeSettings, settings: AgentRunti
 
 const BUSY_MESSAGE_CHOICES = ["default", "queue", "steer"] as const;
 type BusyMessageChoice = (typeof BUSY_MESSAGE_CHOICES)[number];
+
+type CustomBusyMessageChoice = "default" | CustomMessageMode;
+const CUSTOM_BUSY_MESSAGE_CHOICES: CustomBusyMessageChoice[] = ["default", "queue", "steer", "thread"];
+
+/** Controlled host preference: choosing Thread or Default never writes a released agent field. */
+function CustomBusyMessageSelect(props: { options: AgentCustomMessageRoutingOptions }) {
+  const { t } = useText();
+  const modeLabel = (mode: CustomMessageMode) =>
+    t(mode === "thread" ? "agentSettings.busyMessage.thread" : BUSY_MESSAGE_LABEL[mode]);
+  const label = (choice: CustomBusyMessageChoice) =>
+    choice === "default"
+      ? t("settings.agentDefaults.followDefault", { value: modeLabel(props.options.defaultMode) })
+      : modeLabel(choice);
+  const current = (): CustomBusyMessageChoice => props.options.mode ?? "default";
+  return (
+    <Select<CustomBusyMessageChoice>
+      class="agent-settings-runtime-select"
+      options={CUSTOM_BUSY_MESSAGE_CHOICES}
+      value={current()}
+      disabled={props.options.saving}
+      onChange={(choice) => {
+        if (choice && choice !== current()) void props.options.onChange(choice === "default" ? null : choice);
+      }}
+      itemComponent={(item) => <SelectItem item={item.item}>{label(item.item.rawValue)}</SelectItem>}
+    >
+      <SelectTrigger class="agent-settings-runtime-row" aria-label={t("agentSettings.runtime.busyMessageLabel")}>
+        <span class="agent-settings-runtime-label">{t("agentSettings.runtime.busyMessage")}</span>
+        <SelectValue<CustomBusyMessageChoice>>{(state) => label(state.selectedOption() ?? "default")}</SelectValue>
+      </SelectTrigger>
+      <SelectContent />
+    </Select>
+  );
+}
 
 const BUSY_MESSAGE_LABEL = {
   queue: "agentSettings.busyMessage.queue",

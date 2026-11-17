@@ -41,6 +41,7 @@ import { useConversationViewScope } from "./conversation-scope";
 import { agentSkillsMode } from "./installed-skills-source";
 import { desktopChatEventRoutinesApi } from "./routine-webhooks-api";
 import type { RoutineResultsCalls } from "./routines-port";
+import { createAgentMessageRoutingStore } from "./stores/agent-message-routing-store";
 import { type CodexLivePort, createCodexLiveConversation } from "./stores/codex-live-conversation-store";
 import type { VoiceConversationKind } from "./stores/voice-session-store";
 
@@ -266,6 +267,19 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
   // own agents, for an owner or admin, when it serves `agent-publish-v1`.
   // A remote agent's host resolves its settings, so the account defaults of this computer do not apply.
   const localAgentDefaults = () => (props.server?.kind === "local" ? props.agentDefaults : undefined);
+  // Thread settings use local host IPC. Joined clients keep their released Queue/Steer editors;
+  // the host still routes their messages when they support task screens. See docs/message-routing.md.
+  const agentMessageRouting = createAgentMessageRoutingStore({
+    desktop: () => !props.runtime,
+    target: () =>
+      settingsOpen() && props.server?.kind === "local" && !props.runtime && props.agent
+        ? { serverId: props.server.id, agentId: props.agent.id }
+        : null,
+    onError: (error) =>
+      actionToast.error(errorMessage(error, t("agent.error.settingsFailed")), {
+        report: { operation: "settings", source: "action", cause_code: "unknown" },
+      }),
+  });
   const localFolderCalls = agentFolderCalls();
   // An agent's folders are on the computer that runs it. A joined server serves them through
   // `agent-folders-v1` for an owner or admin, and the folder browser lists the folders of the host.
@@ -799,7 +813,11 @@ export function ConversationPanels(panelProps: { onOpenUsage?: ((trigger: HTMLBu
                 props.server?.kind === "local" ||
                 (serverCanAdminister(props.server, "agent-host-settings-v1") && agent().allowAutomation !== undefined)
               }
-              busyMessageModeEditable={props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true}
+              busyMessageModeEditable={
+                (props.server?.kind === "local" || props.remoteBusyMessageModeLoaded === true) &&
+                agentMessageRouting.ready()
+              }
+              customMessageRouting={agentMessageRouting.current()}
               busyMessageDefaultIsHost={props.server?.kind === "remote"}
               newChatEditable={props.server?.kind === "local" || props.remoteNewChatLoaded === true}
               quickAcknowledgementEditable={props.server?.kind === "local" || props.remotePlanCardLoaded === true}

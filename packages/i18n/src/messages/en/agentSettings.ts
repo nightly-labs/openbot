@@ -165,6 +165,7 @@ export const messages = defineMessages("agentSettings", {
   "agentSettings.busyMessage.hostDefaultSteer": "Host default (Steer)",
   "agentSettings.busyMessage.queue": "Queue",
   "agentSettings.busyMessage.steer": "Steer",
+  "agentSettings.busyMessage.thread": "Thread",
   "agentSettings.busyMessage.steerUnsupported":
     "{provider} cannot steer a running turn. Messages sent while it works wait in the queue.",
 

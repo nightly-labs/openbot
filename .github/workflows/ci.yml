@@ -318,6 +318,61 @@ jobs:
             .openbot-build/crm-team-api-e2e/
           if-no-files-found: ignore
 
+  thread-routing-e2e:
+    # Temporary profiles and loopback HTTP only. The provider boundary uses a fake local CLI;
+    # this lane has no Jev key and makes no paid provider request.
+    name: Thread routing E2E
+    needs: detect
+    if: needs.detect.outputs.desktop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Bun
+        uses: ./.github/actions/setup-bun
+        with:
+          install: ignore-scripts
+
+      - name: Check scoped route planning
+        run: bun scripts/server-work-routing-e2e.ts
+
+      - name: Check dispatch and retry identity
+        run: bun scripts/server-work-dispatch-e2e.ts
+
+      - name: Check selected backlog moves
+        run: bun scripts/server-work-backlog-e2e.ts
+
+      - name: Check configured task capacity
+        run: bun scripts/server-work-capacity-e2e.ts
+
+      - name: Check the Jev boundary with loopback HTTP
+        run: bun scripts/jev-work-router-e2e.ts
+
+      - name: Check service routing with a fake provider
+        run: bun scripts/server-work-service-e2e.ts
+
+      - name: Check released client receipt decoding
+        run: bun scripts/server-work-client-receipt-e2e.ts
+
+      - name: Check receipt storage and rollback safety
+        run: bun scripts/server-work-receipt-e2e.ts
+
+      - name: Check local settings races
+        run: bun scripts/agent-message-routing-ui-e2e.ts
+
+      - name: Upload routing reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: thread-routing-e2e
+          path: |
+            .openbot-build/server-work-*/report.json
+            .openbot-build/jev-work-router-e2e/report.json
+            .openbot-build/agent-message-routing-ui-e2e/report.json
+          if-no-files-found: ignore
+
   reverse-actions-e2e:
     # Runs the released Team API adapters and the reverse actions (revoke and reconnect, mute and
     # unmute, pause and resume, hide and restore) against the real host services on a temporary

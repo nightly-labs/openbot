@@ -36,6 +36,7 @@ import { For, Show } from "solid-js";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { AutomationLimitRow } from "./AutomationLimitRow";
+import { type CustomMessageRoutingOptions, CustomMessageRoutingSetting } from "./CustomMessageRoutingSetting";
 import { PlanStartRow } from "./PlanStartRow";
 
 const CHOICES: AgentDefaultChoice[] = ["default", "on", "off"];
@@ -127,6 +128,8 @@ export interface SettingsAgentsTabProps {
   defaults: AgentDefaults;
   /** The app default of "Steer agents while they work". */
   steer: boolean;
+  /** Supplied only by the local custom host. It does not change released agent default fields. */
+  customMessageRouting?: CustomMessageRoutingOptions;
   /** The open setting, or null for the list of settings. */
   setting: AgentDefaultSetting | null;
   /** Where the agents run, for the text of the local script limit. Missing: this computer. */
@@ -152,6 +155,7 @@ export interface SettingsAgentsTabProps {
  */
 export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
   const { t } = useText();
+  const customRouting = () => (props.customMessageRouting?.settings.available ? props.customMessageRouting : undefined);
   const defaultOn = (setting: AgentDefaultSetting) =>
     setting === "busyMessageMode" ? props.steer : props.defaults[setting];
   const isOn = (agent: AgentDefaultsAgent, setting: AgentDefaultSetting) => {
@@ -159,6 +163,17 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
     return choice === "default" ? defaultOn(setting) : choice === "on";
   };
   const valueLabel = (setting: AgentDefaultSetting, on: boolean) => {
+    const custom = customRouting();
+    if (setting === "busyMessageMode" && custom) {
+      const mode = custom.settings.defaultMode;
+      return t(
+        mode === "thread"
+          ? "agentSettings.busyMessage.thread"
+          : mode === "steer"
+            ? "agentSettings.busyMessage.steer"
+            : "agentSettings.busyMessage.queue",
+      );
+    }
     if (setting === "busyMessageMode")
       return t(on ? "agentSettings.busyMessage.steer" : "agentSettings.busyMessage.queue");
     return t(on ? "settings.agentDefaults.on" : "settings.agentDefaults.off");
@@ -180,6 +195,10 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
     </Show>
   );
 
+  const titleKey = (setting: AgentDefaultSetting) =>
+    setting === "busyMessageMode" && customRouting()
+      ? "settings.customMessageRouting.title"
+      : agentDefaultSettingTitle(setting);
   const list = () => (
     <SettingsSection title={t("settings.agentDefaults.title")} description={t("settings.agentDefaults.description")}>
       <ItemGroup class="settings-modal-card">
@@ -187,29 +206,31 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
           {(setting) => {
             const on = () => props.agents.filter((agent) => isOn(agent, setting.key));
             return (
-              <Item data-settings-row={setting.title} class="settings-modal-row integrations-hub-row">
+              <Item data-settings-row={titleKey(setting.key)} class="settings-modal-row integrations-hub-row">
                 <Button
                   type="button"
                   variant="ghost"
                   class="integrations-hub-hitarea"
-                  aria-label={t("settings.agentDefaults.open", { name: t(setting.title) })}
+                  aria-label={t("settings.agentDefaults.open", { name: t(titleKey(setting.key)) })}
                   onClick={() => props.onOpen(setting.key)}
                 />
                 <ItemContent>
-                  <ItemTitle>{t(setting.title)}</ItemTitle>
+                  <ItemTitle>{t(titleKey(setting.key))}</ItemTitle>
                   <ItemDescription>
                     {t("settings.agentDefaults.value", { value: valueLabel(setting.key, defaultOn(setting.key)) })}
                   </ItemDescription>
                 </ItemContent>
                 <ItemActions class="integrations-hub-actions">
-                  <AgentFaces agents={on()} />
-                  <Show when={props.agents.length > 0}>
-                    <Text variant="label-sm" tone="muted" class="server-roles-member-count">
-                      {t("settings.agentDefaults.count", {
-                        on: String(on().length),
-                        total: String(props.agents.length),
-                      })}
-                    </Text>
+                  <Show when={setting.key !== "busyMessageMode" || !customRouting()}>
+                    <AgentFaces agents={on()} />
+                    <Show when={props.agents.length > 0}>
+                      <Text variant="label-sm" tone="muted" class="server-roles-member-count">
+                        {t("settings.agentDefaults.count", {
+                          on: String(on().length),
+                          total: String(props.agents.length),
+                        })}
+                      </Text>
+                    </Show>
                   </Show>
                   <ChevronRight class="integrations-hub-chevron" aria-hidden="true" />
                 </ItemActions>
@@ -234,7 +255,7 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
     </SettingsSection>
   );
 
-  const settingPage = (setting: AgentDefaultSetting) => {
+  const standardSettingPage = (setting: AgentDefaultSetting) => {
     const title = () => t(agentDefaultSettingTitle(setting));
     const description = () =>
       t(AGENT_DEFAULT_SETTINGS.find((item) => item.key === setting)?.description ?? "settings.tab.agents.description");
@@ -373,6 +394,14 @@ export function SettingsAgentsTab(props: SettingsAgentsTabProps) {
       </>
     );
   };
+
+  const settingPage = (setting: AgentDefaultSetting) => (
+    <Show when={setting === "busyMessageMode" ? customRouting() : undefined} fallback={standardSettingPage(setting)}>
+      {(options) => (
+        <CustomMessageRoutingSetting options={options()} agents={props.agents} menuMount={props.menuMount} />
+      )}
+    </Show>
+  );
 
   return (
     <>

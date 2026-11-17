@@ -88,6 +88,7 @@ import {
   teammateRequest,
   textAnswersOnly,
 } from "./routine-quiet-runs";
+import { isServerWorkThread } from "./server-work-identity";
 import { type SkillLoad, skillLoads, skillLoadTokens } from "./skill-loads";
 import {
   foldCodexChildItem,
@@ -2316,7 +2317,11 @@ export class TurnLifecycle {
         }
         // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
         // that wants no answer, so only a teammate that asked for a result gets one.
-        if (!continuation && !this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed") {
+        if (
+          !continuation &&
+          (!this.#conversation.isExecutionThread(snapshot.threadId) || isServerWorkThread(snapshot.threadId)) &&
+          terminal === "completed"
+        ) {
           // A turn with no answer text can still have run tools and made files. The note says so, or
           // the agent that asked sends the same work again (#8214).
           const noResult = latestAssistant
@@ -2325,7 +2330,15 @@ export class TurnLifecycle {
                 redactText(this.#hooks.redactMcp(text)),
               );
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
+            yield* this.#relayAgentResult(
+              agentId,
+              turnId,
+              snapshot,
+              delivery,
+              deliveries,
+              latestAssistant?.text,
+              noResult,
+            );
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
         // ends a request steered into the turn too, so its sender gets a note and does not wait.
@@ -2728,6 +2741,7 @@ export class TurnLifecycle {
     this: TurnLifecycle,
     agentId: string,
     turnId: string,
+    sourceSnapshot: ConversationSnapshot,
     delivery: DeliveryContext,
     turnDeliveries: readonly DeliveryContext[],
     text: string | undefined,
@@ -2771,6 +2785,10 @@ export class TurnLifecycle {
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;
+    const senderTaskId =
+      sourceSnapshot.threadId && isServerWorkThread(sourceSnapshot.threadId)
+        ? this.#hooks.taskForThread(sourceSnapshot.threadId)
+        : null;
     const receipt = yield* this.#mailbox
       .enqueue({
         sender: { kind: "agent", agentId },
@@ -2780,13 +2798,14 @@ export class TurnLifecycle {
         text: text ?? noResult,
         replyToMessageId: messageId,
         ...(taskId ? { taskId } : {}),
+        ...(senderTaskId ? { senderTaskId } : {}),
         // The requested result, not a new request. The chain-origin guard above already stops a
         // second relay; this is what tells the recipient it owes no acknowledgement for one.
         expectsReply: false,
         idempotencyKey: `${AUTO_RESULT_KEY_PREFIX}${turnId}:${messageId}`,
       })
       .pipe(toTurnOperationFailed);
-    const senderSnapshot = this.#conversation.snapshotToUpdate(agentId);
+    const senderSnapshot = senderTaskId ? sourceSnapshot : this.#conversation.snapshotToUpdate(agentId);
     if (senderSnapshot) {
       this.#mailboxSync.syncMailboxMessages(senderSnapshot);
       this.#conversation.emitConversation(senderSnapshot);

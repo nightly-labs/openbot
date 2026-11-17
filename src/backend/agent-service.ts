@@ -58,6 +58,7 @@ import type {
   CreateChannelMemoryInput,
   CreateChannelRoutineInput,
   CreateRoutineInput,
+  CustomMessageMode,
   CustomProviderHarness,
   CustomProviderRestart,
   DeleteAgentMemoryInput,
@@ -260,6 +261,15 @@ import { type RoutineMutationOptions, RoutineScheduler, toRoutineOperationFailed
 import { localTimezone } from "./agent/routine-tools";
 import { buildRuntimeSnapshot } from "./agent/runtime-snapshot";
 import type { ScreenCaptureHost } from "./agent/screen-capture";
+import { ServerWorkBacklog } from "./agent/server-work-backlog";
+import { serverWorkSharingScope } from "./agent/server-work-identity";
+import type { AgentServerWorkPolicy } from "./agent/server-work-policy";
+import { isServerWorkReceipt, serverWorkReceiptText } from "./agent/server-work-receipt";
+import {
+  type ServerWorkRouteDecisionInput,
+  type ServerWorkRoutePlan,
+  ServerWorkRouting,
+} from "./agent/server-work-routing";
 import { SessionSettings } from "./agent/session-settings";
 import { SIDE_QUESTION_CHAT_MESSAGES, sideQuestionPrompt } from "./agent/side-question";
 import type { AgentSidebar } from "./agent/sidebar-tools";
@@ -565,6 +575,16 @@ export interface AgentServiceOptions {
    * own. Without it, both keep their defaults. Call `turnLimitsChanged` after a change.
    */
   hostTurnLimits?: { turnLimit(): number | "unlimited" | null; agentTaskLimit(): number };
+  /** Thread admission policy. No released client or agent field is changed. */
+  serverWorkPolicy?: {
+    policy(agentId: string): AgentServerWorkPolicy | null;
+  };
+  /** An additive host-only action; released busy-message fields still have two values. */
+  messageRouting?: {
+    mode(agentId: string): CustomMessageMode;
+    decide(input: ServerWorkRouteDecisionInput): Effect.Effect<unknown, ToolOperationFailed>;
+    legacyAgentChanged?(agentId: string): Effect.Effect<void, { readonly cause: unknown }>;
+  };
   /**
    * The plan storage in GB of a hosted server, or null elsewhere and until the account server answers.
    * The agent instructions name the limit.
@@ -633,6 +653,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   readonly #memoryReview: MemoryReview;
   readonly #waits: AgentWaits;
   readonly #tasks: AgentTasks;
+  readonly #serverWorkBacklog: ServerWorkBacklog;
+  readonly #serverWorkRouting: ServerWorkRouting | null;
+  readonly #messageRouting: AgentServiceOptions["messageRouting"];
   readonly #history: AgentHistoryTransfer;
   readonly #messageDeletion: MessageDeletion;
   readonly #feedbackWithdrawal: FeedbackWithdrawal;
@@ -794,6 +817,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emit: (event) => this.#emit(event),
         agent: (agentId) => store.list().find((agent) => agent.id === agentId),
         defaultTaskLimit: () => this.#defaultTaskLimit(),
+        serverWorkPolicy: (agentId) => options.serverWorkPolicy?.policy(agentId) ?? null,
         // Read late: the drain is built further down this constructor.
         hold: (agentId, taskId) => this.#drain.taskHold(agentId, taskId),
         queued: (agentId) => {
@@ -816,6 +840,34 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }).bind(this),
       },
     });
+    this.#serverWorkBacklog = new ServerWorkBacklog({
+      tasks: this.#tasks,
+      mailbox,
+      policy: (agentId) => options.serverWorkPolicy?.policy(agentId) ?? null,
+      sharingScope: (sender, target) => serverWorkSharingScope(this.#sidebarLayout?.getSnapshot(), sender, target),
+      queued: (agentId) => {
+        this.#mailboxSync.emitQueue(agentId);
+        this.#drain.scheduleDrain(agentId);
+      },
+    });
+    const messageRouting = options.messageRouting;
+    this.#messageRouting = messageRouting;
+    this.#serverWorkRouting = messageRouting
+      ? new ServerWorkRouting({
+          tasks: this.#tasks,
+          sharingScope: (sender, target) => serverWorkSharingScope(this.#sidebarLayout?.getSnapshot(), sender, target),
+          decide: (input) => messageRouting.decide(input),
+          mainTitle: (agentId) => {
+            const turnId = this.#conversation.snapshotToUpdate(agentId)?.activeTurnId;
+            const request = turnId
+              ? this.#mailbox
+                  .findDeliveriesByTurn(agentId, turnId)
+                  .find((context) => this.#mailbox.taskIdForDelivery(context.delivery.id) === null)
+              : null;
+            return request?.delivery.text || this.#store.list().find((agent) => agent.id === agentId)?.preview || "";
+          },
+        })
+      : null;
     this.#messageDeletion = new MessageDeletion({
       store,
       mailbox,
@@ -1283,7 +1335,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
       sendLateAnswer: (agentId, target, text, sender) =>
         Effect.runFork(
-          this.sendMessage({ agentId, text, ...target }, sender).pipe(
+          this.sendMessage({ agentId, text, ...target }, sender, undefined, { allowAutomaticThread: false }).pipe(
             Effect.catch((failure) => Effect.sync(() => this.#emitError("late_answer_failed", failure.cause, agentId))),
             Effect.forkIn(this.#scope, { startImmediately: true }),
           ),
@@ -1992,6 +2044,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       },
     });
     this.#tools = new OpenBotToolRouter({
+      serverWorkBacklog: this.#serverWorkBacklog,
+      serverWorkRouting: this.#serverWorkRouting,
+      serverWorkPolicy: (agentId) => options.serverWorkPolicy?.policy(agentId) ?? null,
       capturedSteps: (session) => this.#threads.capturedWorkSteps(session).pipe(toToolOperationFailed),
       store,
       mailbox,
@@ -3649,6 +3704,13 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       .runExclusive(() =>
         this.#applyAgentUpdate(this.#withAccountModel(input), initiatingAgentId, null, queueWhileBusy),
       )
+      .pipe(
+        Effect.tap(() =>
+          input.busyMessageMode !== undefined
+            ? (this.#messageRouting?.legacyAgentChanged?.(input.agentId) ?? Effect.void)
+            : Effect.void,
+        ),
+      )
       .pipe(Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "updateAgent", cause: failure.cause })));
   }
 
@@ -4689,7 +4751,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     // The mailbox copies go first, as for one message: a failure after them leaves the chat as it
     // was, and a second request completes the work.
     const mailbox = yield* this.#mailbox
-      .deleteShownMessages(agentId, target.messageIds)
+      .deleteShownMessages(
+        agentId,
+        target.messageIds.filter((id) => this.#mailbox.taskIdForDelivery(id) === null),
+      )
       .pipe(
         Effect.catchTag("StoredStateFailure", ({ cause }) =>
           Effect.fail(new AgentLifecycleFailed({ operation: "delete agent history", cause })),
@@ -4709,6 +4774,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         return { result: undefined, snapshot };
       }),
     );
+    yield* this.#mailbox
+      .clearWorkReceipts(agentId, target.threadId)
+      .pipe(Effect.mapError(({ cause }) => new AgentLifecycleFailed({ operation: "delete agent history", cause })));
     // The chat list row loses the text of the last message too.
     yield* this.#store
       .clearPreview(agentId)
@@ -6694,8 +6762,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     input: SendMessageInput,
     sender?: ConversationMessageSender,
     timezone?: string,
+    ingress?: { allowAutomaticThread?: boolean },
   ): Effect.fn.Return<QueuedMessageReceipt, AgentLifecycleFailed> {
-    if (!input.clientMessageId) return yield* this.#sendUserMessage(input, sender, timezone);
+    if (!input.clientMessageId)
+      return yield* this.#sendUserMessage(input, sender, timezone, undefined, false, false, ingress);
     const idempotencyKey = `user-send:${createHash("sha256")
       .update(JSON.stringify([sender?.id ?? null, input.agentId, input.clientMessageId]))
       .digest("hex")}`;
@@ -6707,7 +6777,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     if (pending) return yield* Deferred.await(pending);
     const send = Deferred.makeUnsafe<QueuedMessageReceipt, AgentLifecycleFailed>();
     this.#pendingUserSends.set(idempotencyKey, send);
-    return yield* this.#sendUserMessage(input, sender, timezone, idempotencyKey).pipe(
+    return yield* this.#sendUserMessage(input, sender, timezone, idempotencyKey, false, false, ingress).pipe(
       Effect.onExit((exit) => Deferred.done(send, exit)),
       Effect.ensuring(Effect.sync(() => this.#pendingUserSends.delete(idempotencyKey))),
     );
@@ -6721,6 +6791,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     idempotencyKey?: string,
     welcome = false,
     agentSetup = false,
+    ingress?: { allowAutomaticThread?: boolean },
   ) {
     const validateRecipient = yield* lifecycleStep("prepare message delivery", () =>
       this.#mailbox.prepareDelivery([input.agentId]),
@@ -6746,28 +6817,145 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       );
     yield* lifecycleStep("validate message recipient", validateRecipient);
     // A message to a task runs in the task's own thread and lane, beside the agent's own chat.
-    const taskId = input.taskId;
-    const task = taskId
+    let taskId = input.taskId;
+    if (!taskId && input.replyToMessageId && agent.threadId) {
+      const replied = this.#mailbox.workReceipt(agent.id, agent.threadId, input.replyToMessageId);
+      if (replied && isServerWorkReceipt(replied))
+        taskId = this.#mailbox.taskIdForDelivery(input.replyToMessageId) ?? undefined;
+    }
+    let task = taskId
       ? yield* lifecycleStep("find message task", () => this.#tasks.requireOpen(agent.id, taskId))
       : null;
-    const receipt = yield* this.#mailbox
-      .enqueue({
-        sender: { kind: "user" },
-        ...(sender ? { senderMember: sender } : {}),
-        ...(task ? { taskId: task.taskId } : {}),
-        recipientAgentIds: [agent.id],
-        text: input.text,
-        draftIds: input.attachmentDraftIds ?? [],
-        ...(input.voiceRecordingDraftId ? { voiceRecordingDraftId: input.voiceRecordingDraftId } : {}),
-        // A reply names a message of the thread that takes it: the agent's own chat, or the task's thread.
-        replyToMessageId: input.replyToMessageId ?? null,
-        ...(idempotencyKey ? { idempotencyKey } : {}),
-        ...(welcome ? { welcome } : {}),
-        ...(agentSetup ? { agentSetup } : {}),
-      })
-      .pipe(
-        Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause })),
-      );
+    const router = this.#serverWorkRouting;
+    const automatic =
+      !task &&
+      !input.replyToMessageId &&
+      !welcome &&
+      !agentSetup &&
+      ingress?.allowAutomaticThread !== false &&
+      this.#messageRouting?.mode(agent.id) === "thread" &&
+      router !== null;
+    const enqueue = () => {
+      const selected = task;
+      return this.#mailbox
+        .enqueue({
+          sender: { kind: "user" },
+          ...(sender ? { senderMember: sender } : {}),
+          ...(task ? { taskId: task.taskId } : {}),
+          recipientAgentIds: [agent.id],
+          text: input.text,
+          draftIds: input.attachmentDraftIds ?? [],
+          ...(input.voiceRecordingDraftId ? { voiceRecordingDraftId: input.voiceRecordingDraftId } : {}),
+          // A reply names a message of the thread that takes it: the agent's own chat, or the task's thread.
+          replyToMessageId: input.replyToMessageId ?? null,
+          ...(idempotencyKey ? { idempotencyKey } : {}),
+          ...(welcome ? { welcome } : {}),
+          ...(agentSetup ? { agentSetup } : {}),
+          ...(automatic && selected
+            ? {
+                mainReceipt: () => {
+                  const threadId = this.#store.ensureThreadIdNow(agent.id);
+                  const main = this.#conversation.ensureSnapshot(agent.id, threadId);
+                  return {
+                    threadId,
+                    activeTurnId: main.activeTurnId,
+                    text: serverWorkReceiptText(selected.title),
+                    publish: (notice: ConversationMessage, revision: number) =>
+                      this.#conversation.publishCommittedMessage(main, notice, revision),
+                  };
+                },
+              }
+            : {}),
+          ...(automatic && selected
+            ? {
+                beforeCommit: () => {
+                  router?.assertAllowed({ agentId: agent.id, senderAgentId: agent.id }, selected.taskId);
+                  const current = this.#tasks.requireOpen(agent.id, selected.taskId);
+                  if (current.createdAt !== selected.createdAt || this.#messageRouting?.mode(agent.id) !== "thread")
+                    throw new Error(sourceText("error.backend.threadMoveRefused"));
+                },
+              }
+            : {}),
+        })
+        .pipe(
+          Effect.mapError(
+            (failure) => new AgentLifecycleFailed({ operation: "enqueue message", cause: failure.cause }),
+          ),
+        );
+    };
+    // Network classification is outside admission so one slow decision cannot hold other requests.
+    const plannedRoute: ServerWorkRoutePlan | null =
+      automatic && router
+        ? yield* router
+            .plan({
+              agentId: agent.id,
+              senderAgentId: agent.id,
+              text: input.text,
+              requestId: idempotencyKey ?? randomUUID(),
+            })
+            .pipe(
+              Effect.catch(() => {
+                this.#emitError(
+                  "message_thread_routing_failed",
+                  new Error(sourceText("error.app.jevRoutingUnavailable")),
+                  agent.id,
+                );
+                return Effect.succeed({ kind: "main" as const });
+              }),
+            )
+        : null;
+    const receipt = yield* automatic && router
+      ? this.#tasks
+          .withWorkAdmission(
+            agent.id,
+            Effect.gen({ self: this }, function* () {
+              const plan =
+                this.#messageRouting?.mode(agent.id) === "thread" &&
+                plannedRoute &&
+                router.isPlanCurrent({ agentId: agent.id, senderAgentId: agent.id }, plannedRoute)
+                  ? plannedRoute
+                  : null;
+              let created: AgentThreadRecord | null = null;
+              if (plan?.kind === "existing" && plan.taskId) {
+                this.#tasks.assertWorkAdmission(agent.id, plan.taskId);
+                task = this.#tasks.requireOpen(agent.id, plan.taskId);
+              } else if (plan?.kind === "new" && plan.taskId) {
+                const existed = this.#tasks.has(agent.id, plan.taskId);
+                task = yield* this.#tasks
+                  .createWork(agent.id, plan.title ?? input.text, plan.taskId)
+                  .pipe(
+                    Effect.catchDefect((cause) =>
+                      Effect.fail(new AgentLifecycleFailed({ operation: "create message thread", cause })),
+                    ),
+                  );
+                created = existed ? null : task;
+              }
+              let committed = false;
+              const result = yield* enqueue().pipe(
+                Effect.tap(() =>
+                  Effect.sync(() => {
+                    committed = true;
+                  }),
+                ),
+                Effect.ensuring(
+                  Effect.sync(() => {
+                    if (!committed && created && !this.#mailbox.taskBusy(agent.id, created.taskId)) {
+                      this.#tasks.discard(created);
+                      this.#tasks.changed(agent.id);
+                    }
+                  }),
+                ),
+              );
+              if (task) this.#tasks.changed(agent.id);
+              return result;
+            }),
+          )
+          .pipe(
+            Effect.mapError(
+              (failure) => new AgentLifecycleFailed({ operation: "route message thread", cause: failure.cause }),
+            ),
+          )
+      : enqueue();
     const [queued] = receipt.deliveries;
     const delivery = queued ? this.#mailbox.getDelivery(queued.id) : null;
     if (!delivery)
@@ -6807,7 +6995,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             Effect.sync(() => this.#emitError("message_preview_failed", failure.cause, agent.id)),
           ),
         );
-    yield* this.#steerWhenBusy(agent, task, snapshot, delivery.delivery.id, true, false);
+    yield* this.#steerWhenBusy(
+      agent,
+      task,
+      snapshot,
+      delivery.delivery.id,
+      true,
+      false,
+      ingress?.allowAutomaticThread === false && this.#messageRouting?.mode(agent.id) === "thread"
+        ? (agent.busyMessageMode ?? this.#busyMessageMode())
+        : undefined,
+    );
     // A turn that waits on a question in this chat reads no message until that question is answered,
     // so the person who wrote instead would wait for it. A stopped turn clears its own questions.
     const waitingTurnId = snapshot.activeTurnId;
@@ -6873,12 +7071,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     deliveryId: string,
     explain: boolean,
     wait: boolean,
+    legacyMode?: BusyMessageMode,
   ): Effect.fn.Return<AgentMessageSteer> {
     const steerTurnId = this.#turnToSteer(agent.id, task?.taskId ?? null, snapshot);
     if (!steerTurnId) return null;
     // These reasons come first, so the sender is not told to select Steer when Steer would not help.
     // Only a message sent to steer gets a reason on its row.
-    const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
+    const steers =
+      (legacyMode ?? this.#messageRouting?.mode(agent.id) ?? agent.busyMessageMode ?? this.#busyMessageMode()) ===
+      "steer";
     // A custom agent steers only when its process reported `_session/steering` (`steersTurns`).
     const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
     if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
@@ -6986,12 +7187,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           (failure) => new AgentLifecycleFailed({ operation: "load reaction agent", cause: failure.cause }),
         ),
       );
+    // A main receipt shares an ID with a task request. A reaction here must not change that task.
+    if (agent.threadId && this.#mailbox.workReceipt(agent.id, agent.threadId, input.messageId)) {
+      return yield* new AgentLifecycleFailed({
+        operation: "set message reaction",
+        cause: new Error(sourceText("error.agent.messageUnavailable")),
+      });
+    }
     const snapshot = this.#conversation.ensureSnapshot(agent.id, agent.threadId);
     if (!snapshot.messages.some((message) => message.id === input.messageId)) {
       const [message] = this.#store.database.readConversationMessages(agent.id, agent.threadId, [input.messageId]);
       if (message) snapshot.messages.push(message);
     }
-    const message = snapshot.messages.find((candidate) => candidate.id === input.messageId);
+    const message = snapshot.messages.find(
+      (candidate) => candidate.id === input.messageId && !isServerWorkReceipt(candidate),
+    );
     if (!message) {
       return yield* new AgentLifecycleFailed({
         operation: "set message reaction",
