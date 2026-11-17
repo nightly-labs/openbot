@@ -49,8 +49,9 @@ Stripe customer keeps as proof of the check. Without it, the check works and has
 `bun scripts/stripe-vat-migrate.ts` moves the subscriptions that used Stripe Tax to the Tax Rate; it is
 a dry run unless you give `--apply`.
 The Worker variable `BILLING_COUNTRY_REQUIRED=true` refuses a Checkout of an account with no billing
-country (409 `billing_country_required`). Unset, such an account gets a Stripe Tax Checkout, so that an
-older desktop app can still buy.
+country (409 `billing_country_required`). `wrangler.jsonc` sets it, so production and local development
+refuse. With `false`, such an account gets a Stripe Tax Checkout, so that a desktop app older than 0.72.0
+can still buy. Set `BILLING_COUNTRY_REQUIRED=false` in the shell to try that path locally.
 
 For a local Worker, forward the webhooks and set the secret that `stripe listen` prints in your
 shell as `STRIPE_WEBHOOK_SECRET`:

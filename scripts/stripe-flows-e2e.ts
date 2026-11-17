@@ -3707,12 +3707,12 @@ const scenarios: Record<Scenario, (account: Account) => Promise<void>> = {
       { status: polishCompany.status, saved: await details(), vat: vatView(polishPage) },
     );
 
-    // A customer from before the billing details step that never paid has no address. The Worker reads
-    // BILLING_COUNTRY_REQUIRED from the same shell as this script.
+    // A customer from before the billing details step that never paid has no address. The local Worker
+    // reads BILLING_COUNTRY_REQUIRED from the same shell as this script, else "true" from wrangler.jsonc.
     await stripe("POST", `/v1/customers/${account.customer}`, idSchema, { address: "" });
     const noCountry = await account.checkout(serverId);
     const cleared = await details();
-    if (process.env.BILLING_COUNTRY_REQUIRED?.trim() === "true") {
+    if (process.env.BILLING_COUNTRY_REQUIRED?.trim() !== "false") {
       record(
         "vat",
         "with no billing country a Checkout page is refused: 409 billing_country_required",
