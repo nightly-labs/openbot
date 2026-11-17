@@ -50,6 +50,7 @@ import {
   decodeInstanceTransferPreview,
   decodeInstanceTransferResult,
   decodeInstanceTransferSummary,
+  decodeInstanceTransferUploadProgress,
   decodeLibraryFoldersSnapshot,
   decodeMachineAlertSettings,
   decodeMcpAccessSnapshot,
@@ -1362,6 +1363,7 @@ const openbotApi: OpenBotDesktopApi = {
     apply: decodeInstanceTransferResult,
     discard: decodeVoid,
     copy: decodeInstanceTransferResult,
+    uploadProgress: decodeInstanceTransferUploadProgress,
   }),
   marketplaceAgents: bridgeGroup(IPC_ENDPOINTS.marketplaceAgents, {
     list: decodeMarketplaceAgentPage,

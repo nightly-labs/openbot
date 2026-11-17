@@ -3982,6 +3982,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         return clone({ agents: copied, skipped: [], signIn: ["claude"], warnings: [] });
       },
+      // The preview has no joined server to send a file to.
+      onUploadProgress: () => () => undefined,
     },
     remoteDesktop: mockTeam.remoteDesktop,
   };

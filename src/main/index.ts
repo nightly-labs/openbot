@@ -585,6 +585,7 @@ const {
   forwardDirectTyping,
   forwardAttachmentDownload,
   forwardAttachmentImportProgress,
+  forwardInstanceTransferUploadProgress,
 } = createRendererForwarders({
   getMainWindow: () => windowHolder.current,
   // A function: the window controller is made after the forwarders, and no event comes before it.
@@ -1044,6 +1045,7 @@ function registerIpcHandlers({
       remoteServers,
       getMainWindow: getDialogParent,
       translate: language.translate,
+      reportUploadProgress: forwardInstanceTransferUploadProgress,
     }),
     ...updateIpcHandlers({ updater, updatePreferenceFile, requestedUpdate, idleRestart }),
     ...notificationIpcHandlers({

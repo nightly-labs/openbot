@@ -4,6 +4,7 @@ import type {
   InstanceTransferPreview,
   InstanceTransferResult,
   InstanceTransferSummary,
+  InstanceTransferUploadProgress,
 } from "@openbot/contracts/ipc";
 import type { AppFormat, AppTranslate } from "@openbot/i18n";
 import {
@@ -21,6 +22,7 @@ import {
   ItemGroup,
   Lock,
   Monitor,
+  Progress,
   Settings,
   SlidingTabs,
   Sparkles,
@@ -38,6 +40,9 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 export type InstanceTransferScreen = "home" | "export" | "import";
 export type InstanceExportPhase = "options" | "exporting" | "saved";
 export type InstanceImportPhase = "idle" | "reading" | "review" | "importing" | "done";
+
+/** The bytes of a file that the client has sent to a joined server. */
+export type TransferUploadState = Pick<InstanceTransferUploadProgress, "sent" | "total">;
 
 export interface InstanceExportOptions {
   agentIds: string[];
@@ -73,6 +78,8 @@ export interface InstanceTransferViewProps {
   preview: InstanceTransferPreview | null;
   result: InstanceTransferResult | null;
   importError: string | null;
+  /** While `reading`: the bytes sent to a joined server. Null before the first part, and on this computer. */
+  importProgress?: TransferUploadState | null | undefined;
   onChoose: () => void;
   /** `includeServerPreferences`: only where `fullCopyAvailable`; the file's preferences replace this server's. */
   onImport: (keys: string[], includeSettings: boolean, includeServerPreferences: boolean) => void;
@@ -433,6 +440,7 @@ function ExportSaved(props: {
 
 function ImportScreen(props: InstanceTransferViewProps) {
   const { t } = useText();
+  const uploading = () => (props.importPhase === "reading" ? props.importProgress : null);
   return (
     <>
       <Show when={props.importPhase === "idle" || (props.importPhase === "reading" && !props.preview)}>
@@ -445,13 +453,14 @@ function ImportScreen(props: InstanceTransferViewProps) {
           <Button
             type="button"
             loading={props.importPhase === "reading"}
-            loadingLabel={t("settings.transfer.import.reading")}
+            loadingLabel={t(uploadLabel(uploading(), "settings.transfer.import.reading"))}
             onClick={() => props.onChoose()}
           >
             <Upload class="files-button-icon" aria-hidden="true" />
             {t("settings.transfer.import.choose")}
           </Button>
         </div>
+        <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
       </Show>
       {/* Keyed, so a newly chosen file starts with every agent selected again. */}
       <Show when={props.importPhase !== "idle" && props.importPhase !== "done" && props.preview} keyed>
@@ -768,6 +777,37 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
       <ChevronLeft aria-hidden="true" />
       {t("settings.transfer.back")}
     </Button>
+  );
+}
+
+/** The label of a busy button while a file goes to a joined server, or `fallback` before the first part. */
+export function uploadLabel<Fallback extends string>(
+  progress: TransferUploadState | null | undefined,
+  fallback: Fallback,
+) {
+  if (!progress) return fallback;
+  return progress.sent < progress.total ? "settings.transfer.upload.sending" : "settings.transfer.upload.serverReading";
+}
+
+/** How much of the file a joined server has. After the last byte, the server reads the file. */
+export function TransferUploadProgress(props: { progress: TransferUploadState }) {
+  const { t, format } = useText();
+  const percent = () =>
+    props.progress.total > 0 ? Math.min(100, Math.floor((props.progress.sent / props.progress.total) * 100)) : 0;
+  return (
+    <div class="instance-transfer-upload">
+      <Progress
+        class="instance-transfer-upload-bar"
+        value={percent()}
+        aria-label={t("settings.transfer.upload.label")}
+      />
+      <p class="instance-transfer-upload-status">
+        {t("settings.transfer.upload.sent", {
+          sent: format.fileSizeAmount(props.progress.sent, props.progress.total),
+          total: format.fileSize(props.progress.total),
+        })}
+      </p>
+    </div>
   );
 }
 

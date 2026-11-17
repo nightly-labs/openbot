@@ -18,7 +18,14 @@ import { createEffect, createMemo, createSignal, createUniqueId, For, Show, untr
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
 import { ServerLogo } from "../servers/ServerLogo";
-import { NotMoved, TransferAlert, TransferNotes } from "./InstanceTransferView";
+import {
+  NotMoved,
+  TransferAlert,
+  TransferNotes,
+  TransferUploadProgress,
+  type TransferUploadState,
+  uploadLabel,
+} from "./InstanceTransferView";
 
 export type CopyAgentsAgent = Pick<InstanceTransferAgent, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
 
@@ -44,6 +51,8 @@ export interface CopyAgentsDialogProps {
   /** The agents of a side could not be read. */
   loadError: string | null;
   phase: CopyAgentsPhase;
+  /** While `copying`: the bytes sent to a joined destination. Null before the first part, and for this computer. */
+  progress?: TransferUploadState | null | undefined;
   result: InstanceTransferResult | null;
   error: string | null;
   onCopy: (agentIds: string[]) => void;
@@ -81,6 +90,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   });
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
   const busy = () => props.phase === "copying";
+  const uploading = () => (busy() ? props.progress : null);
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
   const to = () => props.servers.find((server) => server.id === props.toId) ?? null;
@@ -235,6 +245,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
               <Show when={props.error}>
                 {(message) => <TransferAlert title={t("settings.transfer.copy.failed")} description={message()} />}
               </Show>
+              <Show when={uploading()}>{(progress) => <TransferUploadProgress progress={progress()} />}</Show>
               <Show when={doneResult()} fallback={<NotMoved text="settings.transfer.copy.notCopied" />}>
                 {(result) => <CopyResult result={result()} server={to()?.name ?? ""} />}
               </Show>
@@ -251,7 +262,7 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                       type="button"
                       disabled={!to() || selected().length === 0}
                       loading={busy()}
-                      loadingLabel={t("settings.transfer.copy.copying")}
+                      loadingLabel={t(uploadLabel(uploading(), "settings.transfer.copy.copying"))}
                       onClick={() => props.onCopy(selected().map((agent) => agent.id))}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}

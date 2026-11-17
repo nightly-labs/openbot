@@ -49,6 +49,7 @@ export function ServerTransferPanel(props: ServerTransferOptions & { serverId: s
         onShowExport={store.showExport}
         onExportAgain={() => store.exportAgain()}
         importPhase={store.state.importPhase}
+        importProgress={store.state.importProgress}
         preview={store.state.preview}
         result={store.state.result}
         importError={store.state.importError}
@@ -91,6 +92,7 @@ function ServerCopy(props: { serverId: string; options: ServerCopyOptions; onClo
       toAgents={store.state.toAgents}
       loadError={store.loadError()}
       phase={store.state.phase}
+      progress={store.state.progress}
       result={store.state.result}
       error={store.state.error}
       onCopy={(agentIds) => store.copy(agentIds)}

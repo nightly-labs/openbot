@@ -398,6 +398,7 @@ import type {
   InstanceTransferPreview,
   InstanceTransferResult,
   InstanceTransferSummary,
+  InstanceTransferUploadProgress,
 } from "./ipc-instance-transfer";
 import type { LibraryFolderAction, LibraryFoldersSnapshot } from "./ipc-library-folders";
 import type { LinkAccountStatus } from "./ipc-link-account";
@@ -2393,6 +2394,8 @@ export const IPC_ENDPOINTS = {
     apply: scopedRequest<ApplyInstanceTransferInput, InstanceTransferResult, "required">()("instance-transfer:apply"),
     discard: scopedRequest<string, void, "required">()("instance-transfer:discard"),
     copy: scopedRequest<CopyInstanceAgentsInput, InstanceTransferResult, "required">()("instance-transfer:copy"),
+    // The bytes of a file that `choose` or `copy` sends to a joined server, while it sends them.
+    uploadProgress: event<InstanceTransferUploadProgress>()("instance-transfer:upload-progress"),
   },
   // The plugin deep link, its own group because its registrar holds the pending link rather than a
   // service. `takePendingListing` is what a window that finished loading after the link arrived

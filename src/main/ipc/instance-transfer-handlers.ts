@@ -18,6 +18,7 @@ import {
   type InstanceExportResult,
   type InstanceTransferPreview,
   type InstanceTransferResult,
+  type InstanceTransferUploadProgress,
   LOCAL_SERVER_ID,
   parseApplyInstanceTransferInput,
   parseCopyInstanceAgentsInput,
@@ -63,6 +64,8 @@ export interface InstanceTransferIpcDependencies {
   >;
   getMainWindow: () => BrowserWindow | null;
   translate: AppTranslate;
+  /** The bytes of a file in parts that this computer has sent to a joined server. */
+  reportUploadProgress: (progress: InstanceTransferUploadProgress) => void;
 }
 
 export function instanceTransferIpcHandlers({
@@ -70,6 +73,7 @@ export function instanceTransferIpcHandlers({
   remoteServers,
   getMainWindow,
   translate,
+  reportUploadProgress,
 }: InstanceTransferIpcDependencies): Pick<IpcGroupHandlers, "instanceTransfer"> {
   const filters = [{ name: translate("dialog.filter.transfer"), extensions: ["zip"] }];
   /** The file this computer saved last, for "Show the file". */
@@ -154,7 +158,12 @@ export function instanceTransferIpcHandlers({
 
   /** Sends the file at `path` to the host. The size check comes before the read. */
   const stageRemoteFile = async (serverId: string, path: string): Promise<InstanceTransferPreview> => {
-    if (inParts(serverId)) return runCauseEffect(uploadTransferInParts(remoteServers, serverId, path));
+    if (inParts(serverId))
+      return runCauseEffect(
+        uploadTransferInParts(remoteServers, serverId, path, (sent, total) =>
+          reportUploadProgress({ serverId, sent, total }),
+        ),
+      );
     const info = await stat(path);
     if (!info.isFile() || info.size === 0) throw new Error(sourceText("error.import.chooseZip"));
     if (info.size > INSTANCE_TRANSFER_REMOTE_BYTES) throw new Error(sourceText("error.import.transferRemoteTooLarge"));
