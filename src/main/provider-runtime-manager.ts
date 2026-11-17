@@ -1023,8 +1023,9 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * against the record its install wrote. A directory with neither is an older pin this build has no
    * hashes for; `#previousVersion` still lends it out until an update replaces it.
    *
-   * `rejected`: the pinned version or a newer one is in the store but failed its check, for example
-   * after a file in it changed. It does not run, and the log keeps the reason.
+   * `rejected`: the pinned version, or a newer one with its install record, is in the store but
+   * failed its check, for example after a file in it changed. It does not run, and the log keeps
+   * the reason.
    */
 
   #newestInstalledEffect(
@@ -1050,8 +1051,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
           Effect.catch((error) => Effect.succeed(error)),
         );
         if (failure) {
-          // An older pin has no hashes in this build, so only the pinned version or a newer one counts.
-          if (!olderVersion(version, pinned.version)) {
+          // Only a copy that this build can check counts: the pinned version, or a newer one with the
+          // record of its install. An older pin, or the pin of a newer build, has no hashes here.
+          const checkable =
+            version === pinned.version ||
+            (!olderVersion(version, pinned.version) && (yield* pathExists(join(installRoot, INSTALL_RECORD))));
+          if (checkable) {
             rejected = true;
             logger.warn("Provider runtime check failed.", {
               runtime: pinned.runtime,
