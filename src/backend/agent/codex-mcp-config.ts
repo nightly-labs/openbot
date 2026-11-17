@@ -1,7 +1,7 @@
 import { COMPUTER_USE_MCP_SERVER_NAME, isReservedMcpServerName } from "@openbot/contracts/ipc";
 import type { DynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
-import { Effect, Semaphore } from "effect";
+import { Effect, Result, Semaphore } from "effect";
 import type { AgentClient } from "../agent-client";
 import {
   CODEX_PLACEHOLDER_COMMAND,
@@ -28,9 +28,8 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
 ) {
   const register = Object.keys(servers({})).length > 0;
   const response = yield* client.request("config/read", { includeLayers: true }, decodeRecordResponse);
-  if (!register) return response;
   const own = codexOwnTransports(getRecord(getRecord(response, "config"), "mcp_servers"));
-  const entries = Object.entries(servers(own));
+  const entries = register ? Object.entries(servers(own)) : [];
 
   const userLayer = getArray(response, "layers")
     .filter(isRecord)
@@ -41,6 +40,7 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
   const version = getString(userLayer, "version");
   const filePath = getString(getRecord(userLayer, "name"), "file");
   if (!version || !filePath) {
+    if (!register) return response;
     return yield* new ProviderClientOperationError({
       cause: new Error(sourceText("error.provider.mcpConfig")),
     });
@@ -81,15 +81,18 @@ export const readCodexMcpConfig = Effect.fn("Agent.readCodexMcpConfig")(function
 
   // Save only a disabled placeholder. URLs, arguments, and credentials stay in the thread.
   // Other Codex clients must not start servers that OpenBot owns.
-  yield* client.request(
-    "config/batchWrite",
-    {
-      edits: [...edits.values()],
-      filePath,
-      expectedVersion: version,
-    },
-    decodeRecordResponse,
+  const written = yield* Effect.result(
+    client.request(
+      "config/batchWrite",
+      { edits: [...edits.values()], filePath, expectedVersion: version },
+      decodeRecordResponse,
+    ),
   );
+  // An agent with no server of its own needs no write: a move that failed waits for the next start.
+  if (Result.isFailure(written)) {
+    if (!register) return response;
+    return yield* written.failure;
+  }
   // Read again so the thread and its fingerprint use the saved configuration.
   return yield* client.request("config/read", { includeLayers: true }, decodeRecordResponse);
 }, registrationLock.withPermit);

@@ -207,13 +207,13 @@ function mcpSignInPageQuestion(params: unknown, serverName: string | null): Agen
 
 /**
  * The server that asks, with the name the user gave it. Codex names an OpenBot server by its key,
- * which has `openbot_` in front (`codexMcpServerKey`). OpenBot's own browser server keeps its name.
+ * which has `openbot_` in front (`codexMcpServerKey`). OpenBot's own browser server keeps its name,
+ * and so does a user's server that would then pass as Codex's own `codex_apps`.
  */
 function elicitationServerName(params: unknown): string | null {
   const name = getString(params, "serverName")?.trim() || null;
-  return name?.startsWith("openbot_") && name.length > "openbot_".length && !isReservedMcpServerName(name)
-    ? name.slice("openbot_".length)
-    : name;
+  const shown = name?.startsWith("openbot_") ? name.slice("openbot_".length) : name;
+  return shown && name && !isReservedMcpServerName(name) && shown !== CODEX_APPS_MCP_SERVER_NAME ? shown : name;
 }
 
 export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {

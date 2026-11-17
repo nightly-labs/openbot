@@ -4506,10 +4506,11 @@ export class ProviderRuntime implements ProviderPort {
     const key = getString(params, "name");
     if (getString(params, "status") !== "failed" || !key) return;
     const message = shortenDiagnostic(this.#redactMcp(getString(params, "error") ?? ""));
-    const config = this.#credentials.mcpServers().find((row) => {
-      const name = providerMcpServerName(row.name);
-      return key === name || key === `openbot_${name}`;
-    });
+    // A row's `openbot_` key comes first: a row named `openbot_x` travels as `openbot_openbot_x`.
+    const rows = this.#credentials.mcpServers();
+    const config =
+      rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
+      rows.find((row) => key === providerMcpServerName(row.name));
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
     stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });
