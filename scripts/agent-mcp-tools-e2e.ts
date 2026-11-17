@@ -296,6 +296,7 @@ try {
   });
   assert.equal(guarded.result.status, "needs_key");
   assert.equal(guarded.signInCards.length, 0);
+  assert.ok(row("billing"), "a server that wants its key on every path is saved for the user to add it");
 
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
