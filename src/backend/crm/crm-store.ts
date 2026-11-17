@@ -54,6 +54,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { CrmError } from "./crm-handle";
 
@@ -370,10 +371,14 @@ export const CRM_CUSTOMER_COLUMNS = `c.*,
 
 export function decodeCrmCustomer(row: DynamicRecord): CrmCustomer {
   const tagIds = jsonArray(row, "tag_ids").filter(isString);
-  const plans = jsonArray(row, "plans").map((plan) => {
-    if (!isDynamicRecord(plan)) throw new Error("Invalid SQLite column plans.");
-    return decodePlan(plan);
-  });
+  const plans = readableRows(
+    jsonArray(row, "plans").map((plan) => {
+      if (!isDynamicRecord(plan)) throw new Error("Invalid SQLite column plans.");
+      return plan;
+    }),
+    decodePlan,
+    "crm_plans",
+  );
   return {
     ...decodeCrmCustomerRecord(row),
     tagIds,
@@ -481,8 +486,10 @@ export class CrmStore {
   }
 
   statuses(): CrmStatusRecord[] {
-    return databaseRows(this.db.prepare("SELECT * FROM crm_statuses ORDER BY position, status_id").all()).map(
+    return readableRows(
+      databaseRows(this.db.prepare("SELECT * FROM crm_statuses ORDER BY position, status_id").all()),
       decodeStatus,
+      "crm_statuses",
     );
   }
 
@@ -491,13 +498,19 @@ export class CrmStore {
   }
 
   privateFields(): CrmPrivateField[] {
-    return databaseRows(this.db.prepare("SELECT field FROM crm_private_fields").all())
-      .map((row) => checkedColumn(row, "field", CRM_PRIVATE_FIELDS))
-      .sort((left, right) => CRM_PRIVATE_FIELDS.indexOf(left) - CRM_PRIVATE_FIELDS.indexOf(right));
+    return readableRows(
+      databaseRows(this.db.prepare("SELECT field FROM crm_private_fields").all()),
+      (row) => checkedColumn(row, "field", CRM_PRIVATE_FIELDS),
+      "crm_private_fields",
+    ).sort((left, right) => CRM_PRIVATE_FIELDS.indexOf(left) - CRM_PRIVATE_FIELDS.indexOf(right));
   }
 
   sources(): CrmSource[] {
-    return databaseRows(this.db.prepare("SELECT * FROM crm_sources ORDER BY kind").all()).map(decodeSource);
+    return readableRows(
+      databaseRows(this.db.prepare("SELECT * FROM crm_sources ORDER BY kind").all()),
+      decodeSource,
+      "crm_sources",
+    );
   }
 
   source(sourceId: string): CrmSource {
@@ -583,8 +596,14 @@ export class CrmStore {
         )
         .all(this.today(), input.after ?? 0, CRM_LIMITS.page + 1),
     );
-    const customers = rows.slice(0, CRM_LIMITS.page).map(decodeCrmCustomer);
-    return { customers, next: rows.length > CRM_LIMITS.page ? (customers.at(-1)?.number ?? null) : null };
+    const page = rows.slice(0, CRM_LIMITS.page);
+    const customers = readableRows(page, decodeCrmCustomer, "crm_customers");
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
+    return {
+      customers,
+      next: rows.length > CRM_LIMITS.page && last ? requiredNumberColumn(last, "number") : null,
+    };
   }
 
   payments(input: CrmPaymentPageInput): CrmPaymentPage {
@@ -605,14 +624,18 @@ export class CrmStore {
       this.db
         .prepare(`${CRM_PAYMENT_SELECT} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`)
         .all(...values, CRM_LIMITS.page + 1),
-    ).map(decodeCrmPayment);
-    const payments = rows.slice(0, CRM_LIMITS.page);
-    const last = payments.at(-1);
+    );
+    const page = rows.slice(0, CRM_LIMITS.page);
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
     return {
-      payments: payments.map(publicPayment),
+      payments: readableRows(page, decodeCrmPayment, "crm_payments").map(publicPayment),
       next:
         rows.length > CRM_LIMITS.page && last
-          ? encodeCrmCursor([open ? last.dueOn : (last.paidAt ?? ""), last.number])
+          ? encodeCrmCursor([
+              open ? requiredStringColumn(last, "due_on") : (optionalStringColumn(last, "paid_at") ?? ""),
+              requiredNumberColumn(last, "number"),
+            ])
           : null,
     };
   }
@@ -633,12 +656,16 @@ export class CrmStore {
            ORDER BY created_at DESC, activity_id DESC LIMIT ?`,
         )
         .all(...values, ACTIVITY_PAGE_SIZE + 1),
-    ).map(decodeCrmActivity);
-    const activity = rows.slice(0, ACTIVITY_PAGE_SIZE);
-    const last = activity.at(-1);
+    );
+    const page = rows.slice(0, ACTIVITY_PAGE_SIZE);
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
     return {
-      activity,
-      next: rows.length > ACTIVITY_PAGE_SIZE && last ? encodeCrmCursor([last.createdAt, last.id]) : null,
+      activity: readableRows(page, decodeCrmActivity, "crm_activity"),
+      next:
+        rows.length > ACTIVITY_PAGE_SIZE && last
+          ? encodeCrmCursor([requiredStringColumn(last, "created_at"), requiredStringColumn(last, "activity_id")])
+          : null,
     };
   }
 

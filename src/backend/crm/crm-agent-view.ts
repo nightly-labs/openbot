@@ -14,7 +14,8 @@ import {
 import { isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import type { Effect } from "effect";
-import { databaseRows } from "../database/database-rows";
+import { databaseRows, requiredNumberColumn, requiredStringColumn } from "../database/database-rows";
+import { readableRow, readableRows } from "../database/readable-rows";
 import { CrmError } from "./crm-handle";
 import {
   CRM_CUSTOMER_COLUMNS,
@@ -386,13 +387,16 @@ export class CrmAgentView {
            ${where.length > 0 ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY c.number LIMIT ${param(limit + 1)}`,
         )
         .all(...values),
-    ).map(decodeCrmCustomer);
-    const customers = rows.slice(0, limit);
-    const last = customers.at(-1);
+    );
+    const page = rows.slice(0, limit);
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
     // An empty list stays, so the agent reads that nothing matched.
     return {
-      customers: customers.map((customer) => this.#summary(customer, hidden)),
-      ...(rows.length > limit && last ? { next: String(last.number) } : {}),
+      customers: readableRows(page, decodeCrmCustomer, "crm_customers").map((customer) =>
+        this.#summary(customer, hidden),
+      ),
+      ...(rows.length > limit && last ? { next: String(requiredNumberColumn(last, "number")) } : {}),
       ...compact({ hiddenFields: hiddenList(hidden) }),
     };
   }
@@ -410,15 +414,20 @@ export class CrmAgentView {
         this.#store.db
           .prepare(`${CRM_PAYMENT_SELECT} WHERE p.customer_id = ? AND ${where} ORDER BY ${order} LIMIT ?`)
           .all(customer.id, limit),
-      ).map((row) => {
-        const { customer: _customer, ...payment } = this.#payment(decodeCrmPayment(row), hidden);
-        return payment;
+      ).flatMap((row) => {
+        const record = readableRow(row, decodeCrmPayment, "crm_payments");
+        if (!record) return [];
+        const { customer: _customer, ...payment } = this.#payment(record, hidden);
+        return [payment];
       });
     const activity = databaseRows(
       this.#store.db
         .prepare("SELECT * FROM crm_activity WHERE customer_id = ? ORDER BY created_at DESC, activity_id DESC LIMIT ?")
         .all(customer.id, CUSTOMER_ACTIVITY),
-    ).flatMap((row) => this.#activity(decodeCrmActivity(row), hidden) ?? []);
+    ).flatMap((row) => {
+      const record = readableRow(row, decodeCrmActivity, "crm_activity");
+      return record ? (this.#activity(record, hidden) ?? []) : [];
+    });
     const amounts = !hidden.has("amounts");
     const dates = !hidden.has("dates");
     return compact({
@@ -486,13 +495,21 @@ export class CrmAgentView {
       this.#store.db
         .prepare(`${CRM_PAYMENT_SELECT} WHERE ${where.join(" AND ")} ORDER BY ${order} LIMIT ?`)
         .all(...values, limit + 1),
-    ).map(decodeCrmPayment);
-    const payments = rows.slice(0, limit);
-    const last = payments.at(-1);
+    );
+    const page = rows.slice(0, limit);
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
     // An empty list stays, so the agent reads that nothing matched.
     return {
-      payments: payments.map((payment) => this.#payment(payment, hidden)),
-      ...(rows.length > limit && last ? { next: encodeCrmCursor([dates ? last.dueOn : "", last.number]) } : {}),
+      payments: readableRows(page, decodeCrmPayment, "crm_payments").map((payment) => this.#payment(payment, hidden)),
+      ...(rows.length > limit && last
+        ? {
+            next: encodeCrmCursor([
+              dates ? requiredStringColumn(last, "due_on") : "",
+              requiredNumberColumn(last, "number"),
+            ]),
+          }
+        : {}),
       ...compact({ hiddenFields: hiddenList(hidden) }),
     };
   }

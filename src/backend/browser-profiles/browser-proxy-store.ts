@@ -8,6 +8,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 
 /** A saved proxy address without its password. */
@@ -65,14 +66,18 @@ export class BrowserProxyStore {
   }
 
   list(): BrowserProxyRecord[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(
-          `SELECT ${RECORD_COLUMNS} FROM browser_proxies
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(
+            `SELECT ${RECORD_COLUMNS} FROM browser_proxies
            ORDER BY kind, host COLLATE NOCASE, port, created_at, proxy_id`,
-        )
-        .all(),
-    ).map(proxyRecord);
+          )
+          .all(),
+      ),
+      proxyRecord,
+      "browser_proxies",
+    );
   }
 
   get(id: string): BrowserProxyRecord | undefined {

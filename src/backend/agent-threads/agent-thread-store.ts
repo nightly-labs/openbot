@@ -6,16 +6,18 @@ import {
   type AttachmentSummary,
   type ConversationMessage,
 } from "@openbot/contracts/ipc";
-import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { ORDER_KEY_DESC } from "../database/conversation-queries";
 import { deleteAggregateHistory, deleteThreadAttachments } from "../database/database-core";
 import {
+  checkedColumn,
   databaseRow,
   databaseRows,
   decodeConversationMessageJson,
   optionalStringColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRows } from "../database/readable-rows";
 import { refreshThreadOrder } from "../database/thread-message-order";
 import type { OpenBotDatabase } from "../openbot-database";
 
@@ -126,14 +128,18 @@ export class AgentThreadStore {
 
   /** The open threads of this agent first, then the newest archived ones, up to `INPUT_LIMITS.agentTasks`. */
   list(agentId: string): AgentThreadRecord[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(
-          `${SELECT_THREAD} WHERE agent_id = ?
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(
+            `${SELECT_THREAD} WHERE agent_id = ?
            ORDER BY archived_at IS NOT NULL, updated_at DESC, thread_id LIMIT ?`,
-        )
-        .all(agentId, INPUT_LIMITS.agentTasks),
-    ).map(decodeThread);
+          )
+          .all(agentId, INPUT_LIMITS.agentTasks),
+      ),
+      decodeThread,
+      "projection_agent_threads",
+    );
   }
 
   /**
@@ -141,13 +147,17 @@ export class AgentThreadStore {
    * or a reopen) at or after `after`. The latest activity first.
    */
   recent(agentId: string, after: string | null, limit: number): AgentThreadRecord[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(
-          `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
-        )
-        .all(agentId, after, after, limit),
-    ).map(decodeThread);
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(
+            `${SELECT_THREAD} WHERE agent_id = ? AND (? IS NULL OR updated_at >= ?) ORDER BY updated_at DESC, thread_id LIMIT ?`,
+          )
+          .all(agentId, after, after, limit),
+      ),
+      decodeThread,
+      "projection_agent_threads",
+    );
   }
 
   /** The agent id and thread id of every side thread, for boot recovery. */
@@ -586,17 +596,14 @@ function deleteThreadRows(db: Connection, threads: readonly AgentThreadRecord[])
 }
 
 function decodeThread(row: DynamicRecord): AgentThreadRecord {
-  const origin = requiredStringColumn(row, "origin");
-  const titleSource = requiredStringColumn(row, "title_source");
-  const outcome = optionalStringColumn(row, "outcome");
+  const origin = checkedColumn(row, "origin", AGENT_THREAD_ORIGINS);
+  const titleSource = checkedColumn(row, "title_source", AGENT_THREAD_TITLE_SOURCES);
+  const outcome = row.outcome === null ? null : checkedColumn(row, "outcome", AGENT_TASK_OUTCOMES);
   const sourceThreadId = optionalStringColumn(row, "branch_source_thread_id");
   const sourceMessageId = optionalStringColumn(row, "branch_source_message_id");
   const throughMessageId = optionalStringColumn(row, "branch_through_message_id");
   const branchColumns = [sourceThreadId, sourceMessageId, throughMessageId].filter((value) => value !== null).length;
   if (branchColumns !== 0 && branchColumns !== 3) throw new Error("Incomplete branch link.");
-  if (!isOneOf(AGENT_THREAD_ORIGINS, origin)) throw new Error(`Unknown thread origin: ${origin}`);
-  if (!isOneOf(AGENT_THREAD_TITLE_SOURCES, titleSource)) throw new Error(`Unknown title source: ${titleSource}`);
-  if (outcome !== null && !isOneOf(AGENT_TASK_OUTCOMES, outcome)) throw new Error(`Unknown thread outcome: ${outcome}`);
   return {
     taskId: requiredStringColumn(row, "task_id"),
     agentId: requiredStringColumn(row, "agent_id"),

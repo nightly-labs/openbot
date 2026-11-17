@@ -28,6 +28,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { workflowTransaction } from "./workflow-transaction";
 
@@ -417,15 +418,19 @@ export class WorkflowGitHubStore {
   /** The newest events of the workflow's GitHub triggers, newest first, and the items of their open and listed runs. */
   history(workflowId: string): WorkflowGitHubHistory {
     const db = this.#database.connection;
-    const deliveries = databaseRows(
-      db
-        .prepare(
-          `SELECT node_id, delivery_id, event, repository, number, pull_request, title, received_at, outcome, reason,
+    const deliveries = readableRows(
+      databaseRows(
+        db
+          .prepare(
+            `SELECT node_id, delivery_id, event, repository, number, pull_request, title, received_at, outcome, reason,
              run_id FROM workflow_github_deliveries WHERE workflow_id = ?
            ORDER BY received_at DESC, delivery_id DESC`,
-        )
-        .all(workflowId),
-    ).map(toDelivery);
+          )
+          .all(workflowId),
+      ),
+      toDelivery,
+      "workflow_github_deliveries",
+    );
     const runs = databaseRows(
       db
         .prepare(

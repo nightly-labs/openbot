@@ -31,6 +31,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { webhookReceiptCutoff } from "../webhook-route-store";
 import { workflowTransaction } from "./workflow-transaction";
@@ -233,11 +234,15 @@ export class WorkflowRunStore {
 
   /** Runs that can still move: running, waiting for an approval, or stopping. */
   openRuns(): StoredWorkflowRun[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
-        .all(...OPEN_RUN_STATUSES),
-    ).map(toRun);
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(`${RUN_SELECT} WHERE status IN (${placeholders(OPEN_RUN_STATUSES)}) ORDER BY started_at, run_id`)
+          .all(...OPEN_RUN_STATUSES),
+      ),
+      toRun,
+      "workflow_runs",
+    );
   }
 
   /** Changes an open run's status. Answers whether it changed. */
@@ -268,11 +273,15 @@ export class WorkflowRunStore {
 
   /** Every attempt of the run's steps, oldest first. */
   steps(runId: string): StoredWorkflowStep[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(`${STEP_SELECT} WHERE run_id = ? ORDER BY created_at, attempt, step_id`)
-        .all(runId),
-    ).map(toStep);
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(`${STEP_SELECT} WHERE run_id = ? ORDER BY created_at, attempt, step_id`)
+          .all(runId),
+      ),
+      toStep,
+      "workflow_steps",
+    );
   }
 
   step(stepId: string): StoredWorkflowStep | null {
@@ -282,11 +291,15 @@ export class WorkflowRunStore {
 
   /** Steps that have not ended, of runs and alone. */
   openSteps(): StoredWorkflowStep[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(`${STEP_SELECT} WHERE status IN (${placeholders(OPEN_STEP_STATUSES)}) ORDER BY created_at, step_id`)
-        .all(...OPEN_STEP_STATUSES),
-    ).map(toStep);
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(`${STEP_SELECT} WHERE status IN (${placeholders(OPEN_STEP_STATUSES)}) ORDER BY created_at, step_id`)
+          .all(...OPEN_STEP_STATUSES),
+      ),
+      toStep,
+      "workflow_steps",
+    );
   }
 
   /**
@@ -296,15 +309,19 @@ export class WorkflowRunStore {
    * the graph that it was given in.
    */
   latestDone(workflowId: string): Map<string, StoredWorkflowStep> {
-    const rows = databaseRows(
-      this.#database.connection
-        .prepare(
-          `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
+    const rows = readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(
+            `${STEP_SELECT} WHERE workflow_id = ? AND status = 'done'
              AND (run_id IS NULL OR request_id <> run_id || ':' || node_id || ':reused')
            ORDER BY created_at, attempt, step_id`,
-        )
-        .all(workflowId),
-    ).map(toStep);
+          )
+          .all(workflowId),
+      ),
+      toStep,
+      "workflow_steps",
+    );
     return new Map(rows.map((step) => [step.nodeId, step]));
   }
 
@@ -477,23 +494,32 @@ export class WorkflowRunStore {
                ORDER BY started_at DESC, run_id DESC LIMIT ?`,
             )
             .all(workflowId, cursor.startedAt, cursor.startedAt, cursor.runId, limit + 1),
-    ).map(toRun);
-    const runs = rows.slice(0, limit);
-    const last = runs.at(-1);
+    );
+    const page = rows.slice(0, limit);
+    const runs = readableRows(page, toRun, "workflow_runs");
+    // The cursor comes from the last row read, so a row left out does not end the list early.
+    const last = page.at(-1);
     const soloSteps =
       before === undefined
-        ? databaseRows(
-            db
-              .prepare(
-                `${STEP_SELECT} WHERE workflow_id = ? AND run_id IS NULL ORDER BY created_at DESC, step_id DESC LIMIT ?`,
-              )
-              .all(workflowId, limit),
-          ).map(toStep)
+        ? readableRows(
+            databaseRows(
+              db
+                .prepare(
+                  `${STEP_SELECT} WHERE workflow_id = ? AND run_id IS NULL ORDER BY created_at DESC, step_id DESC LIMIT ?`,
+                )
+                .all(workflowId, limit),
+            ),
+            toStep,
+            "workflow_steps",
+          )
         : [];
     return {
       runs: runs.map((run) => ({ run: publicRun(run), steps: this.steps(run.id).map(publicStep) })),
       soloSteps: soloSteps.map(publicStep),
-      nextBefore: rows.length > limit && last ? `${last.startedAt}|${last.id}` : null,
+      nextBefore:
+        rows.length > limit && last
+          ? `${requiredStringColumn(last, "started_at")}|${requiredStringColumn(last, "run_id")}`
+          : null,
     };
   }
 

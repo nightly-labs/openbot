@@ -19,7 +19,7 @@ import {
   ROUTINE_RUN_SOURCES,
 } from "@openbot/contracts/ipc";
 import type { EventFilter, EventJsonValue, EventRoutineOwner } from "@openbot/contracts/ipc-events";
-import { type DynamicRecord, isDynamicRecord, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { type DynamicRecord, isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import {
   nextRoutineOccurrence,
@@ -31,11 +31,13 @@ import {
   validateStoredRoutineSchedule,
 } from "@openbot/team-client/routine-schedule";
 import {
+  checkedColumn,
   databaseRows,
   optionalStringColumn,
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { readableRows } from "./database/readable-rows";
 import type { OpenBotDatabase } from "./openbot-database";
 import { hasWebhookReceipt, insertWebhookReceipt, revokeRoutineWebhooks } from "./webhook-route-store";
 import { parseEventFilters, validateWebhookTrigger, webhookMismatch, webhookRunInstruction } from "./webhook-trigger";
@@ -209,15 +211,19 @@ export class RoutineStore {
   }
 
   protected listRoutines(ownerId: string): OwnedRoutine[] {
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.routineColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.routineColumns}
            FROM ${this.tables.routineTable} WHERE ${this.tables.ownerColumn} = ? AND ${this.#hasSchedule}
            ORDER BY updated_at DESC, routine_id`,
-        )
-        .all(ownerId),
-    ).map((row) => this.#routine(row));
+          )
+          .all(ownerId),
+      ),
+      (row) => this.#routine(row),
+      this.tables.routineTable,
+    );
   }
 
   /** Routines of every trigger kind. */
@@ -605,16 +611,20 @@ export class RoutineStore {
   /** Skipped-run records only fill the local history, so other readers do not get them by default. */
   protected listRunRows(ownerId: string, routineId: string, limit = 50, withSkipped = false): OwnedRoutineRun[] {
     const safeLimit = Math.max(1, Math.min(INPUT_LIMITS.routineRunsPage, limit));
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.runColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?${withSkipped ? "" : " AND missed_count IS NULL"}
            ORDER BY created_at DESC, run_id DESC LIMIT ?`,
-        )
-        .all(routineId, ownerId, safeLimit),
-    ).map((row) => this.#run(row));
+          )
+          .all(routineId, ownerId, safeLimit),
+      ),
+      (row) => this.#run(row),
+      this.tables.runTable,
+    );
   }
 
   /** Runs that were created but never got a handle - the crash window between the two writes. */
@@ -628,30 +638,38 @@ export class RoutineStore {
   }
 
   #queuedRunRows(condition: string): OwnedRoutineRun[] {
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.runColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE status = 'queued' ${condition}
            ORDER BY created_at, run_id`,
-        )
-        .all(),
-    ).map((row) => this.#run(row));
+          )
+          .all(),
+      ),
+      (row) => this.#run(row),
+      this.tables.runTable,
+    );
   }
 
   protected activeRunRows(ownerId: string, routineId: string): OwnedRoutineRun[] {
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.runColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE routine_id = ? AND ${this.tables.ownerColumn} = ?
              AND status IN ('queued', 'running', 'needs-attention')
            ORDER BY created_at, run_id`,
-        )
-        .all(routineId, ownerId),
-    ).map((row) => this.#run(row));
+          )
+          .all(routineId, ownerId),
+      ),
+      (row) => this.#run(row),
+      this.tables.runTable,
+    );
   }
 
   /**
@@ -659,16 +677,20 @@ export class RoutineStore {
    * not by routine: one channel change can settle runs of several routines at once.
    */
   protected openRunRows(ownerId: string): OwnedRoutineRun[] {
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.runColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE ${this.tables.ownerColumn} = ? AND status IN ('queued', 'running', 'needs-attention')
            ORDER BY created_at, run_id`,
-        )
-        .all(ownerId),
-    ).map((row) => this.#run(row));
+          )
+          .all(ownerId),
+      ),
+      (row) => this.#run(row),
+      this.tables.runTable,
+    );
   }
 
   /**
@@ -678,17 +700,21 @@ export class RoutineStore {
    */
   protected failedRunRowsForHandles(ownerId: string, handles: readonly string[]): OwnedRoutineRun[] {
     if (!handles.length) return [];
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.runColumns}
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.runColumns}
            FROM ${this.tables.runTable}
            WHERE ${this.tables.ownerColumn} = ? AND status = 'failed'
              AND ${this.tables.handleColumn} IN (${handles.map(() => "?").join(", ")})
            ORDER BY created_at, run_id`,
-        )
-        .all(ownerId, ...handles),
-    ).map((row) => this.#run(row));
+          )
+          .all(ownerId, ...handles),
+      ),
+      (row) => this.#run(row),
+      this.tables.runTable,
+    );
   }
 
   /** The owners that still have an unfinished run, so a boot reconcile can visit only those. */
@@ -1164,13 +1190,17 @@ export class RoutineStore {
   }
 
   #allActive(): OwnedRoutine[] {
-    return databaseRows(
-      this.database.connection
-        .prepare(
-          `SELECT ${this.routineColumns} FROM ${this.tables.routineTable} WHERE active = 1 AND ${this.#hasSchedule}`,
-        )
-        .all(),
-    ).map((row) => this.#routine(row));
+    return readableRows(
+      databaseRows(
+        this.database.connection
+          .prepare(
+            `SELECT ${this.routineColumns} FROM ${this.tables.routineTable} WHERE active = 1 AND ${this.#hasSchedule}`,
+          )
+          .all(),
+      ),
+      (row) => this.#routine(row),
+      this.tables.routineTable,
+    );
   }
 
   #routine(row: DynamicRecord): OwnedRoutine {
@@ -1203,11 +1233,8 @@ export class RoutineStore {
   }
 
   #fields(row: DynamicRecord): Omit<OwnedRoutine, "trigger"> {
-    const limitPolicy = requiredStringColumn(row, "limit_policy");
-    if (!isOneOf(ROUTINE_LIMIT_POLICIES, limitPolicy)) throw new Error("The stored routine limit policy is invalid.");
-    const missedPolicy = requiredStringColumn(row, "missed_policy");
-    if (!isOneOf(ROUTINE_MISSED_POLICIES, missedPolicy))
-      throw new Error("The stored routine missed-run policy is invalid.");
+    const limitPolicy = checkedColumn(row, "limit_policy", ROUTINE_LIMIT_POLICIES);
+    const missedPolicy = checkedColumn(row, "missed_policy", ROUTINE_MISSED_POLICIES);
     return {
       id: requiredStringColumn(row, "routine_id"),
       ownerId: requiredStringColumn(row, this.tables.ownerColumn),
@@ -1225,9 +1252,7 @@ export class RoutineStore {
 
   #runIn(row: DynamicRecord): { runIn?: RoutineRunPlace } {
     if (!this.tables.runInColumn) return {};
-    const runIn = requiredStringColumn(row, "run_in");
-    if (!isOneOf(ROUTINE_RUN_PLACES, runIn)) throw new Error("The stored routine run place is invalid.");
-    return { runIn };
+    return { runIn: checkedColumn(row, "run_in", ROUTINE_RUN_PLACES) };
   }
 
   /** The column exists only on the agent table, so it is written apart from the shared insert. */
@@ -1268,14 +1293,9 @@ export class RoutineStore {
   }
 
   #run(row: DynamicRecord): OwnedRoutineRun {
-    const status = requiredStringColumn(row, "status");
-    if (!isRoutineRunStatus(status)) throw new Error("The stored routine run status is invalid.");
-    const kind = requiredStringColumn(row, "run_kind");
-    if (kind !== "scheduled" && kind !== "manual") throw new Error("The stored routine run kind is invalid.");
-    const source = optionalStringColumn(row, "run_source");
-    if (source !== null && !isOneOf(ROUTINE_RUN_SOURCES, source)) {
-      throw new Error("The stored routine run source is invalid.");
-    }
+    const status = checkedColumn(row, "status", ROUTINE_RUN_STATUSES);
+    const kind = checkedColumn(row, "run_kind", ROUTINE_RUN_KINDS);
+    const source = row.run_source === null ? null : checkedColumn(row, "run_source", ROUTINE_RUN_SOURCES);
     const missedCount = row.missed_count;
     return {
       id: requiredStringColumn(row, "run_id"),
@@ -1472,14 +1492,14 @@ function runStartColumns(start: RoutineRunStart): Pick<RoutineRunFields, "kind" 
   return start === "scheduled" ? { kind: "scheduled" } : { kind: "manual", source: start };
 }
 
-function isRoutineRunStatus(value: string): value is RoutineRunStatus {
-  return (
-    value === "queued" ||
-    value === "running" ||
-    value === "needs-attention" ||
-    value === "succeeded" ||
-    value === "failed" ||
-    value === "interrupted" ||
-    value === "cancelled"
-  );
-}
+const ROUTINE_RUN_STATUSES = [
+  "queued",
+  "running",
+  "needs-attention",
+  "succeeded",
+  "failed",
+  "interrupted",
+  "cancelled",
+] as const satisfies readonly RoutineRunStatus[];
+
+const ROUTINE_RUN_KINDS = ["scheduled", "manual"] as const;

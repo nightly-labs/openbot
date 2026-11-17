@@ -39,6 +39,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { readableRow, readableRows } from "../database/readable-rows";
 import type { OpenBotDatabase } from "../openbot-database";
 import { nodeTimezone } from "./workflow-graph";
 import { workflowTransaction } from "./workflow-transaction";
@@ -260,14 +261,18 @@ export class WorkflowStore {
   }
 
   versions(workflowId: string): WorkflowVersion[] {
-    return databaseRows(
-      this.#database.connection
-        .prepare(
-          `SELECT version_id, graph_revision, kind, created_at FROM workflow_versions WHERE workflow_id = ?
+    return readableRows(
+      databaseRows(
+        this.#database.connection
+          .prepare(
+            `SELECT version_id, graph_revision, kind, created_at FROM workflow_versions WHERE workflow_id = ?
            ORDER BY created_at DESC, version_id DESC`,
-        )
-        .all(workflowId),
-    ).map(toVersion);
+          )
+          .all(workflowId),
+      ),
+      toVersion,
+      "workflow_versions",
+    );
   }
 
   /** The graph of one version, or null when the workflow has no such version. A version never changes. */
@@ -339,12 +344,19 @@ export class WorkflowStore {
            WHERE t.workflow_id = ? ORDER BY t.node_id`,
         )
         .all(workflowId),
-    ).map((row) => ({
-      nodeId: requiredStringColumn(row, "node_id"),
-      type: checkedColumn(row, "kind", STORED_TRIGGER_KINDS),
-      nextDueAt: optionalStringColumn(row, "next_due_at"),
-      webhookUrl: optionalStringColumn(row, "url"),
-    }));
+    ).flatMap((row) => {
+      const trigger = readableRow(
+        row,
+        (value) => ({
+          nodeId: requiredStringColumn(value, "node_id"),
+          type: checkedColumn(value, "kind", STORED_TRIGGER_KINDS),
+          nextDueAt: optionalStringColumn(value, "next_due_at"),
+          webhookUrl: optionalStringColumn(value, "url"),
+        }),
+        "workflow_triggers",
+      );
+      return trigger ? [trigger] : [];
+    });
   }
 
   /**

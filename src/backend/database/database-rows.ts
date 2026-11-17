@@ -46,11 +46,25 @@ export function optionalNumberColumn(row: DynamicRecord, key: string): number | 
   throw new Error(`Invalid SQLite column ${key}.`);
 }
 
+/**
+ * A text in an enum column that this build does not know. A newer release, or a hand edit, wrote it.
+ * `readableRows` leaves the row out of a list; the value stays in the database.
+ */
+export class UnknownStoredValueError extends Error {
+  readonly column: string;
+
+  constructor(column: string) {
+    super(`Invalid SQLite column ${column}.`);
+    this.column = column;
+  }
+}
+
 /** A column that a CHECK constraint holds to `values`. */
 export function checkedColumn<T extends string>(row: DynamicRecord, key: string, values: readonly T[]): T {
   const value = row[key];
-  if (!isOneOf(values, value)) throw new Error(`Invalid SQLite column ${key}.`);
-  return value;
+  if (isOneOf(values, value)) return value;
+  if (isString(value)) throw new UnknownStoredValueError(key);
+  throw new Error(`Invalid SQLite column ${key}.`);
 }
 
 export function decodeConversationThreadRow(
