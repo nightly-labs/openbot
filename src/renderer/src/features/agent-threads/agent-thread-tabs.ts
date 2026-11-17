@@ -20,6 +20,8 @@ import {
 } from "./thread-tabs-storage";
 
 const NO_TABS: AgentThreadTabs = { open: [], active: null, side: [] };
+/** The seen-through time of an agent that had no side thread when this device first showed it. */
+const BEFORE_ANY_THREAD = new Date(0).toISOString();
 /** The window that shows the Undo toast finishes the delete. Another window waits this much longer. */
 const OTHER_WINDOW_DELAY_MS = 5_000;
 
@@ -495,7 +497,8 @@ export function createAgentThreadTabs(options: AgentThreadTabsOptions) {
       const snapshot = tasks.snapshot(agentId);
       if (!snapshot) return null;
       const stored = readThreadsSeenThrough(serverId(), agentId);
-      let newest = stored ?? sessionStart;
+      // Only creation times of the host are kept, never the clock of this device, which can differ.
+      let newest = stored ?? BEFORE_ANY_THREAD;
       const added: string[] = [];
       for (const entry of snapshot.tasks) {
         if (entry.createdAt > newest) newest = entry.createdAt;

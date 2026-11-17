@@ -85,6 +85,7 @@ function ThreadMenuTrigger(props: ThreadHeaderProps & { mode: ThreadRowMode }) {
           data-attention={threadAttention(thread().status)}
           title={thread().title}
           aria-label={t("conversation.threads.current", { title: thread().title })}
+          aria-description={unreadInMenu() ? t("conversation.threads.allUnread") : undefined}
         >
           {/* The open thread as its selected tab shows it: the icon slot, the title, then the chevron. */}
           <span class="agent-threads-switcher-icon" aria-hidden="true">
