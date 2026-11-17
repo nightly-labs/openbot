@@ -39,7 +39,7 @@ export async function routeAgentActiveQueues(
         context.agentLevel(agentId) !== "none",
     )
     .slice(0, AGENT_ACTIVE_QUEUES_LIMIT);
-  return json(200, inFrame(agents.listActiveQueues(agentIds).map(withoutHostAddresses)));
+  return json(200, inFrame(agents.listActiveQueues(agentIds)));
 }
 
 /** A preview URL is an address on this computer: a client reads the file through its own route. */
@@ -47,7 +47,7 @@ function withoutHostAddresses(queue: QueueSnapshot): QueueSnapshot {
   return {
     agentId: queue.agentId,
     ...(queue.welcome ? { welcome: true as const } : {}),
-    deliveries: queue.deliveries.slice(0, AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT).map((delivery) => ({
+    deliveries: queue.deliveries.map((delivery) => ({
       ...delivery,
       attachments: delivery.attachments.map((attachment) => ({ ...attachment, previewUrl: null })),
     })),
@@ -55,8 +55,9 @@ function withoutHostAddresses(queue: QueueSnapshot): QueueSnapshot {
 }
 
 /**
- * The queues that fit in one WebRTC frame, in the order of the agent list. An agent that does not fit
- * is named in `omitted`, and the client reads its queue on the released route.
+ * The queues that fit in one WebRTC frame, in the order of the agent list. An agent that does not fit,
+ * or that has more open work than one answer carries, is named in `omitted`, and the client reads its
+ * queue on the released route.
  */
 function inFrame(queues: readonly QueueSnapshot[]): { queues: QueueSnapshot[]; omitted: string[] } {
   const omittedIds = queues.map((queue) => queue.agentId);
@@ -65,10 +66,15 @@ function inFrame(queues: readonly QueueSnapshot[]): { queues: QueueSnapshot[]; o
   const kept: QueueSnapshot[] = [];
   const omitted: string[] = [];
   for (const queue of queues) {
-    const size = Buffer.byteLength(JSON.stringify(queue)) + 1;
+    if (queue.deliveries.length > AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT) {
+      omitted.push(queue.agentId);
+      continue;
+    }
+    const wire = withoutHostAddresses(queue);
+    const size = Buffer.byteLength(JSON.stringify(wire)) + 1;
     if (bytes + size <= WEBRTC_FRAME_BODY_BUDGET) {
       bytes += size;
-      kept.push(queue);
+      kept.push(wire);
     } else omitted.push(queue.agentId);
   }
   return { queues: kept, omitted };

@@ -85,8 +85,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ACTIVE_QUEUES_ROUTES,
-  type AgentActiveQueues,
-  isAgentActiveQueues,
+  decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import {
   AGENT_QUEUE_TASK_CAPABILITY,
@@ -1710,9 +1709,4 @@ export function agentIpcHandlers({
       }),
     },
   };
-}
-
-function decodeAgentActiveQueues(value: unknown): AgentActiveQueues {
-  if (!isAgentActiveQueues(value)) throw new Error("Invalid remote agent queues.");
-  return value;
 }

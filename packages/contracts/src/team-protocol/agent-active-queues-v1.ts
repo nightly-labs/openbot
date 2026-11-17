@@ -12,8 +12,8 @@
 // deliveries of the failed turn that the runtime snapshot reports for it, in queue order, and
 // `welcome: true` while the agent prepares its welcome. A delivery has the shape of the released queue
 // route, without a preview URL: that is an address on the host. The host adds agents while they fit in
-// one WebRTC frame; `omitted` names the agents that did not fit, and the client reads those on the
-// released route. Each listed agent has its full open work, not a change. Widening any of it needs a
+// one WebRTC frame; `omitted` names the agents that did not fit, or that have more than 200 open
+// deliveries, and the client reads those on the released route. Each listed agent has its full open work, not a change. Widening any of it needs a
 // second capability string.
 import { isQueueDelivery, isQueueSnapshot, type QueueSnapshot } from "../ipc-queue";
 import { isDynamicRecord, isString } from "../runtime-values";
@@ -133,4 +133,9 @@ export function isAgentActiveQueues(value: unknown): value is AgentActiveQueues 
     Array.isArray(value.omitted) &&
     value.omitted.every(isString)
   );
+}
+
+export function decodeAgentActiveQueues(value: unknown): AgentActiveQueues {
+  if (!isAgentActiveQueues(value)) throw new Error("Invalid agent queues.");
+  return value;
 }

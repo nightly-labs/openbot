@@ -253,15 +253,19 @@ const Turns = createSimpleContext({
      * `loadQueue`: an answer that arrives after it does not replace it.
      */
     function loadQueues(agentIds: string[]): void {
-      if (agentIds.length === 0) return;
+      // The open chat needs its finished deliveries too: it gets a full read.
+      const opened = untrack(activeAgentId);
+      if (opened && agentIds.includes(opened)) loadQueue(opened);
+      const rows = agentIds.filter((agentId) => agentId !== opened);
+      if (rows.length === 0) return;
       const requests = new Map(
-        agentIds.map((agentId) => {
+        rows.map((agentId) => {
           const queueRequest = (queueSnapshotRequests.get(agentId) ?? 0) + 1;
           queueSnapshotRequests.set(agentId, queueRequest);
           return [agentId, queueRequest] as const;
         }),
       );
-      void readQueues(agentIds).then((queues) => {
+      void readQueues(rows).then((queues) => {
         if (!scopeIsCurrent()) return;
         const active = untrack(activeAgentId);
         const loaded = queues.flatMap((queue) =>
@@ -274,8 +278,8 @@ const Turns = createSimpleContext({
     }
 
     /**
-     * One list read, and a read of each queue that it did not carry. An older host has no list (null), so
-     * each queue is read. As in `loadQueue`, a failed read keeps the last queue; the next load or
+     * One list read, and a read of each queue that it did not carry. An older host has no list (null), and
+     * a list read can fail, so then each queue is read. As in `loadQueue`, a failed read keeps the last queue; the next load or
      * queue-changed event updates it.
      */
     async function readQueues(agentIds: string[]): Promise<QueueSnapshot[]> {
@@ -283,7 +287,8 @@ const Turns = createSimpleContext({
       try {
         listed = await turnsPort().agent.listActiveQueues(agentIds);
       } catch {
-        return [];
+        // As on the web client: each queue read can still succeed.
+        listed = null;
       }
       const each = await Promise.all(
         (listed?.omitted ?? agentIds).map((agentId) =>

@@ -1843,7 +1843,8 @@ export function createWebWorkspace(
           const pending = [...queueListPending];
           queueListPending.clear();
           const listed = pending.filter((id) => id !== selectedId).slice(0, AGENT_ACTIVE_QUEUES_LIMIT);
-          for (const id of pending) if (!listed.includes(id)) loadQueue(id);
+          const inList = new Set(listed);
+          for (const id of pending) if (!inList.has(id)) loadQueue(id);
           if (listed.length === 0) continue;
           const revisions = new Map(listed.map((id) => [id, queueRevisions.get(id) ?? 0]));
           let answer: AgentActiveQueues;
@@ -1867,6 +1868,8 @@ export function createWebWorkspace(
               for (const queue of fresh) draft.queues[queue.agentId] = queue;
             });
           for (const id of answer.omitted) if (revisions.has(id)) loadQueue(id);
+          // The user opened this agent during the read: its chat needs the full queue.
+          if (selectedId && revisions.has(selectedId)) loadQueue(selectedId);
         }
       } finally {
         if (queueListRunning === current) queueListRunning = null;

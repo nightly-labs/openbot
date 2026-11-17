@@ -99,6 +99,7 @@ import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import { TEAM_PROTOCOL_V1_WEBSOCKET } from "@openbot/contracts/team-protocol";
 import {
+  AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT,
   AGENT_ACTIVE_QUEUES_CAPABILITY,
   AGENT_ACTIVE_QUEUES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
@@ -11037,6 +11038,18 @@ try {
         ids(large).length === visibleIds.length - 1 &&
         Buffer.byteLength(large.text) <= WEBRTC_FRAME_BODY_BUDGET,
       { status: large.status, bytes: large.text.length, omitted: field(large.body, "omitted"), queues: ids(large) },
+    );
+    // Agent Ada has more open deliveries than one answer carries: Ada is omitted, not cut.
+    activeQueueDeliveries = AGENT_ACTIVE_QUEUE_DELIVERY_LIMIT + 1;
+    const long = await call("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, { token: bobToken, json: {}, capabilities });
+    activeQueueDeliveries = 1;
+    check(
+      "an agent with more open deliveries than one answer carries is named in omitted, not cut",
+      long.status === 200 &&
+        isDeepStrictEqual(field(long.body, "omitted"), ["agent-ada"]) &&
+        !ids(long).includes("agent-ada") &&
+        ids(long).length === visibleIds.length - 1,
+      { status: long.status, omitted: field(long.body, "omitted"), queues: ids(long) },
     );
   }
 

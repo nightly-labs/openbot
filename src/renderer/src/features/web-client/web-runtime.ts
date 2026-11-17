@@ -100,7 +100,7 @@ import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   AGENT_ACTIVE_QUEUES_ROUTES,
   type AgentActiveQueues,
-  isAgentActiveQueues,
+  decodeAgentActiveQueues,
 } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { AGENT_COLORS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-colors-v1";
 import {
@@ -1599,7 +1599,7 @@ export function createWebWorkspaceRuntime(
     stop: (id, turnId) =>
       Effect.runPromise(interruptAgentTurn(teamApi, id, turnId).pipe(Effect.mapError((error) => error.cause))),
     queue: (id) => teamApi("GET", TEAM_API_ROUTES.agent.queue(id), (value) => queueSnapshot(id, value)),
-    activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeActiveQueues, { agentIds }),
+    activeQueues: (agentIds) => teamApi("POST", AGENT_ACTIVE_QUEUES_ROUTES.list, decodeAgentActiveQueues, { agentIds }),
     editQueue: ({ agentId, ...edit }) =>
       teamApi("POST", TEAM_API_ROUTES.agent.queueEdit(agentId), (value) => queueSnapshot(agentId, value), edit),
     cancelQueued: (input) =>
@@ -2137,9 +2137,4 @@ function decodeWebConversationPage(value: unknown): ConversationPage {
       ...optionalHistoryExtent(value.pageInfo),
     },
   };
-}
-
-function decodeActiveQueues(value: unknown): AgentActiveQueues {
-  if (!isAgentActiveQueues(value)) throw new Error("Invalid agent queues.");
-  return value;
 }
