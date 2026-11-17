@@ -1253,8 +1253,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (onApiKey) status = yield* this.#readAuthStatusEffect(true, timeoutMs);
     this.#onApiKey = onApiKey && status.loggedIn === true;
     this.#accountRead = true;
+    this.#cliApiKey = status.loggedIn === true && !this.#onApiKey && (yield* this.#billsOwnApiKey(status));
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
-    this.#cliApiKey = !this.#onApiKey && (yield* this.#billsOwnApiKey(status));
     return {
       account: {
         type: this.#onApiKey
@@ -1272,14 +1272,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
 
   /**
    * Whether `auth status` names an API key that OpenBot did not give the CLI: an `apiKeyHelper`, or a key
-   * in the user's environment or Claude settings. The status does not name a gateway that takes the key,
-   * so a base URL in the environment or the settings is not Anthropic billing.
+   * in the user's environment or Claude settings. A Console sign-in (`/login managed key`) and a cloud
+   * backend are not such a key. The status does not name a gateway that takes the key, so a base URL in
+   * the environment or the settings is not Anthropic billing.
    */
   readonly #billsOwnApiKey = Effect.fn("ClaudeAgentClient.billsOwnApiKey")(function* (
     this: ClaudeAgentClient,
     status: DynamicRecord,
   ) {
-    if (!isString(status.apiKeySource) || status.apiKeySource === "none") return false;
+    if (status.apiKeySource !== "ANTHROPIC_API_KEY" && status.apiKeySource !== "apiKeyHelper") return false;
+    if (status.apiProvider !== undefined && status.apiProvider !== "firstParty") return false;
+    if (status.authMethod !== "api_key" && status.authMethod !== "api_key_helper") return false;
     const environment = { ...claudeEnvironment(this.#cli), ...this.#environment(false) };
     if (this.#environment(false).ANTHROPIC_API_KEY || environment.ANTHROPIC_BASE_URL) return false;
     const settings = yield* readClaudeSettingsFile(
