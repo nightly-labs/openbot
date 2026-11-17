@@ -4433,6 +4433,15 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "acp" && origin?.stderr) {
+        // A custom agent can be any program, and its stderr is a log in a form OpenBot cannot read.
+        // A Python traceback is one record per line, so one failure was a stack of toasts with lines
+        // such as `raise HTTPError(...)` (#10908). Failures reach the user in the protocol: a failed
+        // request or turn, and a crash as the process exit, which keeps the last stderr line.
+        // OpenBot's own reports of the agent, such as a model list that failed, have no stderr mark.
+        stderrLogger.warn("A custom agent logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (client.provider === "mistral") {
         // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
         // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the

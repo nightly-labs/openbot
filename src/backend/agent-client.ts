@@ -10,6 +10,8 @@ export type AgentProvider = AgentProviderId;
 /** Where a diagnostic came from. See `AgentClient.on("diagnostic")`. */
 export interface DiagnosticOrigin {
   readonly duringStop: boolean;
+  /** Set when the text is a record of the agent process's stderr, not a report that OpenBot wrote. */
+  readonly stderr?: boolean;
 }
 
 export interface AgentClient {
