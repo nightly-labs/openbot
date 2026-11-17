@@ -314,13 +314,16 @@ function AgentTaskChat({
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
   const showThinking = useThinkingDisplayPreference((state) => state.enabled);
-  const turnSummaries = useMemo(() => {
+  const allTurnSummaries = useMemo(() => {
     lastTurnSummaries.current = conversation.data
       ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
       : undefined;
-    // With the thinking display off, a finished turn shows no steps row.
-    return showThinking ? lastTurnSummaries.current : answerlessTurnSummaries(lastTurnSummaries.current);
-  }, [conversation.data, activeTurnId, turnLines, showThinking]);
+    return lastTurnSummaries.current;
+  }, [conversation.data, activeTurnId, turnLines]);
+  // With the thinking display off, only a turn with no answer keeps its steps row. A separate memo
+  // keeps the map while a streamed word leaves the summaries the same.
+  const answerlessSummaries = useMemo(() => answerlessTurnSummaries(allTurnSummaries), [allTurnSummaries]);
+  const turnSummaries = showThinking ? allTurnSummaries : answerlessSummaries;
   const rowShown = useChatRowShown(turnSummaries);
   const openTurn = useCallback(
     (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
