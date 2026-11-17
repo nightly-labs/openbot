@@ -804,7 +804,8 @@ interface ProviderModelCatalog {
   /**
    * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
    * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
-   * not keep the list it had at its start (#8495).
+   * not keep the list it had at its start (#8495). For a CLI whose list never changes while it runs,
+   * such as Codex, the reread compares the settings of `source` and restarts the CLI when they change.
    */
   readonly relistWhileRunning?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
@@ -822,8 +823,15 @@ interface ProviderModelCatalog {
    * Where the CLI's own settings say its models come from, when that is not the provider's own list,
    * such as a Codex model provider or model list file (#9956). Read with each list. A failed read
    * clears it, so the picker never shows a source that it could not check.
+   *
+   * `startSettings`: the settings, as they are now, that the CLI reads into its list only at its start.
+   * When they change while the process runs, the process restarts when its turns end (#10268). Null
+   * when they are not known this time, so nothing is compared.
    */
-  source?(client: AgentClient, timeoutMs: number): Effect.Effect<ProviderModelSource | null, unknown>;
+  source?(
+    client: AgentClient,
+    timeoutMs: number,
+  ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
 /**
@@ -1043,7 +1051,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource },
+    // Codex reads its list only at its start. The idle reread compares its start settings, so a model
+    // that the user adds in `config.toml` comes without a restart from the user (#10268).
+    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) => {
       // Codex reads the system roots itself and skips a root that it cannot parse. With
