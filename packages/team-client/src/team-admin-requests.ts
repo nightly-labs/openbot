@@ -403,7 +403,12 @@ import {
   routinesOnceUnsupported,
   saveOnceEventRoutine,
 } from "./routines-once";
-import { type TeamApiRequest, withRoutineRunPlaces } from "./team-api-requests";
+import {
+  listRoutinePauseReasons,
+  type TeamApiRequest,
+  withRoutinePauseReasons,
+  withRoutineRunPlaces,
+} from "./team-api-requests";
 
 export class TeamAdminRequestError extends Schema.TaggedError<TeamAdminRequestError>()("TeamAdminRequestError", {
   cause: Schema.Defect(),
@@ -582,7 +587,9 @@ export function getEventStatus(request: TeamApiRequest): Effect.Effect<EventStat
 /**
  * With `recovery`, for a host with `routine-recovery-v1`, the routines carry `missedPolicy`. With
  * `runPlaces`, for a host with `routine-run-place-v1`, the routines of an agent carry `runIn`. With
- * `once`, for a host with `routines-once-v1`, the list adds the `once` routines of the owner.
+ * `once`, for a host with `routines-once-v1`, the list adds the `once` routines of the owner. With
+ * `pauseReasons`, for a host with `routine-pause-reasons-v1`, a paused routine of an agent carries
+ * `pausedByRun`.
  */
 export function listEventRoutines(
   request: TeamApiRequest,
@@ -590,8 +597,9 @@ export function listEventRoutines(
   recovery = false,
   runPlaces = false,
   once = false,
+  pauseReasons = false,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
-  const routines = listReleasedEventRoutines(request, input, recovery, runPlaces);
+  const routines = listReleasedEventRoutines(request, input, recovery, runPlaces, pauseReasons);
   if (!once) return routines;
   const onceRoutines = adminCall(() => listOnceEventRoutines(onceSend(request), input.owner));
   return Effect.all([routines, onceRoutines], { concurrency: "unbounded" }).pipe(
@@ -604,16 +612,18 @@ function listReleasedEventRoutines(
   input: ListEventRoutinesInput,
   recovery: boolean,
   runPlaces: boolean,
+  pauseReasons: boolean,
 ): Effect.Effect<EventRoutine[], TeamAdminRequestError> {
   const path = recovery ? ROUTINE_RECOVERY_ROUTES.listRoutines : EVENTS_ROUTES.listRoutines;
   const routines = adminCall(() => request("POST", path, decodeEventRoutines, eventBody(input)));
   const { owner } = input;
-  if (!runPlaces || owner.kind !== "agent") return routines;
-  const places = adminCall(() =>
-    request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId: owner.id }),
-  );
-  return Effect.all([routines, places], { concurrency: "unbounded" }).pipe(
-    Effect.map(([list, entries]) => withRoutineRunPlaces(list, entries)),
+  if (owner.kind !== "agent" || (!runPlaces && !pauseReasons)) return routines;
+  const places = runPlaces
+    ? adminCall(() => request("POST", ROUTINE_RUN_PLACE_ROUTES.list, decodeRoutineRunPlaces, { agentId: owner.id }))
+    : Effect.succeed([]);
+  const reasons = pauseReasons ? adminCall(() => listRoutinePauseReasons(request, owner.id)) : Effect.succeed([]);
+  return Effect.all([routines, places, reasons], { concurrency: "unbounded" }).pipe(
+    Effect.map(([list, entries, paused]) => withRoutinePauseReasons(withRoutineRunPlaces(list, entries), paused)),
   );
 }
 

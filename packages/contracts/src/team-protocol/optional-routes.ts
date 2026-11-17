@@ -128,6 +128,7 @@ import { ANDROID_PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-android-
 import { PUSH_NOTIFICATIONS_CODECS } from "./push-notifications-v1";
 import { ROUTINE_FLOW_STOP_CODECS } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CODECS } from "./routine-flows-v1";
+import { ROUTINE_PAUSE_REASONS_CODECS } from "./routine-pause-reasons-v1";
 import { ROUTINE_RECOVERY_CODECS } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CODECS } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CODECS } from "./routine-run-command-v1";
@@ -265,6 +266,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...ROUTINE_FLOW_STOP_CODECS,
   ...ROUTINE_RECOVERY_CODECS,
   ...ROUTINE_RUN_PLACE_CODECS,
+  ...ROUTINE_PAUSE_REASONS_CODECS,
   ...ROUTINE_RESULTS_CODECS,
   ...WEBHOOK_TESTS_CODECS,
   ...WEBHOOK_SENDER_SECRET_CODECS,

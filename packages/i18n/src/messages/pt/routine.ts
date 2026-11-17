@@ -238,6 +238,7 @@ export const messages = {
   "routine.settings.loading": "Carregando rotinas…",
   "routine.settings.empty": "Nenhuma rotina ainda.",
   "routine.settings.paused": "Pausada",
+  "routine.settings.pausedByRun": "Pausada pela execução das {time}",
   "routine.settings.completed": "Concluída · {schedule}",
   "routine.settings.active": "Ativa",
   "routine.settings.pauseFailed": "Não foi possível pausar esta rotina.",
