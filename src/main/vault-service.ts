@@ -277,6 +277,35 @@ function summary(record: VaultRecord): VaultItemSummary[] {
   ];
 }
 
+/**
+ * A new login for the host and username of a saved login that `allows` gives changes that login, as
+ * `saveTypedLogin` does. Two such logins look the same in `list_logins`, so an agent filled the old
+ * password (#10223). Empty notes and an omitted two-step key keep the saved ones, and the login keeps
+ * its agents unless the input names agents.
+ */
+function newLoginAsEdit(
+  record: VaultRecord,
+  input: VaultSaveInput,
+  allows: (login: StoredLogin) => boolean,
+): VaultSaveInput {
+  if (input.kind !== "login" || input.id !== null) return input;
+  const host = loginHost(input.website);
+  const saved =
+    host === undefined
+      ? undefined
+      : record.logins.find(
+          (login) => allows(login) && login.username === input.username && loginHost(login.website) === host,
+        );
+  if (!saved) return input;
+  const { agents, ...login } = input;
+  return {
+    ...login,
+    id: saved.id,
+    notes: login.notes || saved.notes,
+    ...(agents ? { agents } : {}),
+  };
+}
+
 function replaceOrAdd<T extends { id: string }>(items: readonly T[], item: T): T[] {
   return items.some(({ id }) => id === item.id)
     ? items.map((current) => (current.id === item.id ? item : current))
@@ -327,7 +356,15 @@ export class VaultService {
   }
 
   readonly save = Effect.fn("VaultService.save")(function* (this: VaultService, input: VaultSaveInput) {
-    yield* this.#change((record) => this.#put(record, input, undefined).record);
+    // The owner can use every login.
+    yield* this.#change(
+      (record) =>
+        this.#put(
+          record,
+          newLoginAsEdit(record, input, () => true),
+          undefined,
+        ).record,
+    );
     return this.state();
   });
 
@@ -654,8 +691,12 @@ export class VaultService {
     const outcome: { saved: VaultAgentResult | null } = { saved: null };
     yield* this.#change((record) => {
       // The same checks as the Vault page: an HTTPS website, a card number that passes the Luhn check.
-      // A new item is for every agent; the user can choose its agents in the Vault page.
-      const next = this.#put(record, { ...decodeVaultSaveInput(item), agents: null }, agent.name);
+      // A new item is for every agent; the user can choose its agents in the Vault page. A login that
+      // this agent uses for the same host and username gets the new values and keeps its agents.
+      const input = newLoginAsEdit(record, { ...decodeVaultSaveInput(item), agents: null }, (login) =>
+        vaultItemAllows(login, agent.id),
+      );
+      const next = this.#put(record, input, agent.name);
       outcome.saved = itemName(next.record, next.id);
       return next.record;
     });
