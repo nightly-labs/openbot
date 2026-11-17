@@ -4327,8 +4327,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   }
 
   /**
-   * Whether the agent's pool has another account that is ready for its model. A spent quota moves also
-   * an agent that an agent pinned to its account. With no other account, the agent stays where it is.
+   * Whether the agent's pool has another account that is ready for its model. Unlike `#poolBackup`, it
+   * does not keep the account that an agent chose for it: a spent quota ends that choice, as a limit
+   * does in `#keepsPinnedAccount`.
    */
   #poolHasOtherAccount(agentId: string): boolean {
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
