@@ -54,6 +54,9 @@ interface Outcome {
   prompts: number;
 }
 
+/** Stopped at the end: it closes the fake `kiro-cli` processes, which run until their client stops them. */
+let running: { stop: () => Effect.Effect<void, { readonly cause: unknown }> } | null = null;
+
 const report: {
   passed: boolean;
   kiro?: Outcome & { argv: string[] | undefined };
@@ -116,6 +119,7 @@ try {
     timezone: () => "UTC",
     credentials: { ...NO_PROVIDER_CREDENTIALS, customAgents: () => customAgents },
   });
+  running = agents;
   await runCauseEffect(agents.initialize());
 
   const idle = (agentId: string) =>
@@ -194,6 +198,7 @@ try {
   report.error = error instanceof Error ? error.message : String(error);
   process.exitCode = 1;
 } finally {
+  if (running) await runCauseEffect(running.stop()).catch(() => undefined);
   await mkdir(OUT, { recursive: true });
   await writeFile(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
