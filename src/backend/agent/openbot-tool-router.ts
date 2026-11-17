@@ -349,9 +349,10 @@ const FEEDBACK_ERROR_THREADS = 200;
 /** The routine run turns whose pause or failure the router keeps; a run reports both in one turn. */
 const ROUTINE_RUN_TURNS = 200;
 
-/** What a routine run turn did to its own routines, so a failure and a pause in it agree (#9856). */
+/** What a routine run turn did to its own routines, so a pause agrees with how the run ends (#9856, #10492). */
 interface RoutineRunTurn {
-  failed: boolean;
+  /** The run already ended: with a reported failure, or with nothing to report. */
+  ended: "failed" | "quiet" | null;
   /** Each routine that the turn paused, with its `updatedAt` just after that pause. */
   paused: { agentId: string; routineId: string; updatedAt: string }[];
 }
@@ -2330,10 +2331,18 @@ export class OpenBotToolRouter {
         return openBotToolFailure(
           "Send your result to the teammate who asked with openbot.send_message first, then call this tool again.",
         );
+      // Nothing to report is not a stop condition either: a run that paused its own routine turns it on
+      // again (#10492), as a failed run does.
+      const resumed = this.#endRoutineRunTurn(params, "quiet").includes("resumed")
+        ? "Nothing to report is not a stop condition, so this routine is on again. "
+        : "";
       return openBotToolResult(
         outcome === "quiet"
-          ? { status: "quiet", note: "This turn ends without a message or a notification. End your turn now." }
-          : { status: "shown", note: "Someone waits for this answer. Report the result as usual." },
+          ? {
+              status: "quiet",
+              note: `${resumed}This turn ends without a message or a notification. End your turn now.`,
+            }
+          : { status: "shown", note: `${resumed}Someone waits for this answer. Report the result as usual.` },
       );
     }
 
@@ -2354,12 +2363,7 @@ export class OpenBotToolRouter {
       if (!this.#hooks.reportRoutineFailure(senderAgentId, params.turnId, reason, channelRun?.part === "owner"))
         return openBotToolFailure("Use this tool only in a routine run.");
       // A failure is not a stop condition: a run that paused its own routine turns it on again (#9856).
-      // The failure ends every routine run of the turn, so each routine that the turn paused counts.
-      const paused = this.#routineRunTurns.get(params.turnId)?.paused ?? [];
-      this.#noteRoutineRunTurn(params.turnId, { failed: true, paused: [] });
-      if (paused.length === 0)
-        return openBotToolResult({ status: "failed", note: "This run ends as failed. Give your answer as usual." });
-      const results = paused.map((pause) => this.#routines.resumeAfterFailedRun(pause, params));
+      const results = this.#endRoutineRunTurn(params, "failed");
       return openBotToolResult({
         status: "failed",
         note: results.includes("failed")
@@ -2382,9 +2386,11 @@ export class OpenBotToolRouter {
 
     const runPause = this.#runRoutinePause(params, senderAgentId);
     const runTurn = this.#routineRunTurns.get(params.turnId);
-    if (runPause !== null && runTurn?.failed)
+    if (runPause !== null && runTurn?.ended)
       return openBotToolFailure(
-        "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual.",
+        runTurn.ended === "failed"
+          ? "This run reported that the task could not be done. A failure is not a stop condition, so this routine stays on. Give your answer as usual."
+          : "This run has nothing to report. Nothing to report is not a stop condition, so this routine stays on. End your turn now.",
       );
     const routineResult = yield* this.#routines.handleTool(params, senderAgentId, () =>
       this.#requestedByPerson(senderAgentId, params.turnId, executionThreadId),
@@ -2396,7 +2402,7 @@ export class OpenBotToolRouter {
         : undefined;
     if (runPause !== null && pausedRoutine)
       this.#noteRoutineRunTurn(params.turnId, {
-        failed: false,
+        ended: null,
         paused: [...(runTurn?.paused ?? []), { ...runPause, updatedAt: pausedRoutine.updatedAt }],
       });
     if (routineResult) return routineResult;
@@ -3116,6 +3122,17 @@ export class OpenBotToolRouter {
     const active =
       ownRun && this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
     return active ? { agentId: senderAgentId, routineId } : null;
+  }
+
+  /**
+   * Ends the routine runs of the turn as failed or with nothing to report, and turns on again each
+   * routine that the turn paused: neither is a stop condition. The end applies to every routine run
+   * of the turn, so each routine that the turn paused counts. An earlier failure stays the end.
+   */
+  #endRoutineRunTurn(params: DynamicToolCallParams, ended: "failed" | "quiet"): ("resumed" | "kept" | "failed")[] {
+    const runTurn = this.#routineRunTurns.get(params.turnId);
+    this.#noteRoutineRunTurn(params.turnId, { ended: runTurn?.ended === "failed" ? "failed" : ended, paused: [] });
+    return (runTurn?.paused ?? []).map((pause) => this.#routines.resumeAfterRunPause(pause, params));
   }
 
   #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {
