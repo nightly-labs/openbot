@@ -1,6 +1,6 @@
 import { isBoundedString, isIdentifier } from "./ipc-bounded-values";
 import { isBoolean, isDynamicRecord, isNumber, isOneOf, isString } from "./runtime-values";
-import { GITHUB_REPOSITORY_NAME_PATTERN } from "./signal-protocol/github-route";
+import { GITHUB_OWNER_NAME_PATTERN, GITHUB_REPOSITORY_NAME_PATTERN } from "./signal-protocol/github-route";
 
 /**
  * GitHub triggers and outputs of workflows. A GitHub trigger starts a run when the OpenBot GitHub App
@@ -105,6 +105,41 @@ export function workflowGitHubTriggerRepositoryFields(repositories: readonly str
   repositories: string;
 } {
   return { repository: repositories[0] ?? "", repositories: repositories.join("\n") };
+}
+
+/** A user or organization login. */
+export function isGitHubOwnerName(value: unknown): value is string {
+  return isString(value) && GITHUB_OWNER_NAME_PATTERN.test(value);
+}
+
+/**
+ * The owners of a GitHub trigger, without repeats. `owners` holds one login a line. The trigger watches
+ * every repository of each owner that the App reaches, also one that the owner makes later. Hosts and
+ * clients that do not know `owners` ignore it.
+ */
+export function workflowGitHubTriggerOwners(fields: { readonly owners?: unknown }): string[] {
+  const seen = new Set<string>();
+  return workflowListField(fields.owners).filter((owner) => {
+    const key = owner.toLowerCase();
+    if (!isGitHubOwnerName(owner) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/** The suffix of a watch value that names all repositories of an owner, as in `owner/*`. */
+export const WORKFLOW_GITHUB_OWNER_WATCH_SUFFIX = "/*";
+
+/** `owner/*`, the watch value of all repositories of an owner. */
+export function workflowGitHubOwnerWatch(owner: string): string {
+  return `${owner}${WORKFLOW_GITHUB_OWNER_WATCH_SUFFIX}`;
+}
+
+/** The owner of an `owner/*` watch value, or null for a repository name. */
+export function workflowGitHubWatchOwner(value: string): string | null {
+  if (!value.endsWith(WORKFLOW_GITHUB_OWNER_WATCH_SUFFIX)) return null;
+  const owner = value.slice(0, -WORKFLOW_GITHUB_OWNER_WATCH_SUFFIX.length);
+  return isGitHubOwnerName(owner) ? owner : null;
 }
 
 /** An issue or a pull request. */

@@ -18,8 +18,11 @@ import {
   type WorkflowGitHubItem,
   type WorkflowGitHubSkipReason,
   workflowGitHubEventItemKind,
+  workflowGitHubOwnerWatch,
+  workflowGitHubTriggerOwners,
   workflowGitHubTriggerRepositories,
   workflowGitHubTriggerRepositoryFields,
+  workflowGitHubWatchOwner,
 } from "@openbot/contracts/ipc";
 import type { AppTextKey, AppTranslate } from "@openbot/i18n";
 import {
@@ -214,6 +217,15 @@ function accessProblem(
 ): AccessProblem | undefined {
   const catalog = github?.catalog();
   if (!repository || !catalog?.connected) return undefined;
+  const owner = workflowGitHubWatchOwner(repository);
+  if (owner !== null) {
+    // All repositories of an owner: a problem of one of them shows for the owner.
+    const entries = ownerRepositories(github, owner);
+    if (entries.length === 0) return "missing";
+    if (need.write && entries.some((entry) => !entry.canWrite)) return "readOnly";
+    if (need.events && entries.some((entry) => !entry.events)) return "eventsOff";
+    return undefined;
+  }
   const entry = githubRepository(github, repository);
   if (!entry) return "missing";
   if (need.write && !entry.canWrite) return "readOnly";
@@ -226,6 +238,20 @@ const ACCESS_ALERT = {
   readOnly: "workflow.github.alert.readOnly",
   eventsOff: "workflow.github.alert.eventsOff",
 } as const satisfies Record<AccessProblem, string>;
+
+const OWNER_ACCESS_ALERT = {
+  missing: "workflow.github.alert.ownerMissing",
+  readOnly: "workflow.github.alert.ownerReadOnly",
+  eventsOff: "workflow.github.alert.ownerEventsOff",
+} as const satisfies Record<AccessProblem, string>;
+
+/** The repositories of the catalog that `owner` holds. */
+function ownerRepositories(github: WorkflowGitHubCanvas | undefined, owner: string) {
+  const key = owner.toLowerCase();
+  return (github?.catalog()?.repositories ?? []).filter(
+    (repository) => repositoryOwner(repository.fullName).toLowerCase() === key,
+  );
+}
 
 /** One alert for each repository that stops the step, and one button: one page on GitHub fixes them all. */
 function AccessAlerts(props: {
@@ -247,7 +273,16 @@ function AccessAlerts(props: {
   return (
     <Show when={problems().length > 0}>
       <For each={problems()}>
-        {(entry) => <Warning>{t(ACCESS_ALERT[entry.problem], { repository: entry.repository })}</Warning>}
+        {(entry) => {
+          const owner = workflowGitHubWatchOwner(entry.repository);
+          return (
+            <Warning>
+              {owner === null
+                ? t(ACCESS_ALERT[entry.problem], { repository: entry.repository })
+                : t(OWNER_ACCESS_ALERT[entry.problem], { owner })}
+            </Warning>
+          );
+        }}
       </For>
       <OpenGitHubButton github={props.github} label={buttonLabel()} />
     </Show>
@@ -287,7 +322,12 @@ function useRepositoryChoices() {
 /** The labels and people of the repositories, as the host reads them. A name in more than one shows once. */
 function useRepositoryOptions(repositories: () => readonly string[]) {
   const board = useBoard();
-  const all = createMemo(() => repositories().map((name) => board.github()?.options(name)));
+  // An owner has many repositories; only the named ones give labels and people.
+  const all = createMemo(() =>
+    repositories()
+      .filter((name) => workflowGitHubWatchOwner(name) === null)
+      .map((name) => board.github()?.options(name)),
+  );
   /** The labels by their name in lower case. */
   const labels = createMemo(() => {
     const byKey = new Map<string, { name: string; color: string }>();
@@ -321,6 +361,8 @@ const repositoryName = (fullName: string) => fullName.slice(fullName.indexOf("/"
 /**
  * The repositories of a trigger. One reads as a choice row; more show as tags, and a tag of a repository
  * that sends no events has the warning tone. The menu groups the repositories by owner and stays open.
+ * The first row of each owner watches all its repositories, as `owner/*`, also the ones that it makes
+ * later; its repositories then show as checked. Turning one of them off watches the others by name.
  */
 function RepositoriesRow(props: {
   github: WorkflowGitHubCanvas | undefined;
@@ -329,12 +371,65 @@ function RepositoriesRow(props: {
   onChange: (values: readonly string[]) => void;
 }) {
   const { t } = useText();
-  const name = () => (props.values.length > 1 ? t("workflow.github.repositories") : t("workflow.github.repository"));
+  const owners = createMemo(() => props.values.flatMap((value) => workflowGitHubWatchOwner(value) ?? []));
+  const ownerKeys = createMemo(() => new Set(owners().map((owner) => owner.toLowerCase())));
+  const ofWatchedOwner = (fullName: string) => ownerKeys().has(repositoryOwner(fullName).toLowerCase());
+  const name = () =>
+    props.values.length > 1 || owners().length > 0
+      ? t("workflow.github.repositories")
+      : t("workflow.github.repository");
   const entry = (fullName: string) => githubRepository(props.github, fullName);
-  const noEvents = (fullName: string) => entry(fullName)?.events === false;
+  const noEvents = (value: string) => {
+    const owner = workflowGitHubWatchOwner(value);
+    if (owner === null) return entry(value)?.events === false;
+    return ownerRepositories(props.github, owner).some((repository) => !repository.events);
+  };
   const icon = (fullName: string) => (entry(fullName)?.private ? <Lock aria-hidden="true" /> : <GitHubIcon />);
-  /** The values as the catalog spells them, so each one checks its row. */
-  const values = () => props.values.map((fullName) => entry(fullName)?.fullName ?? fullName);
+  const tagText = (value: string) => {
+    const owner = workflowGitHubWatchOwner(value);
+    return owner === null ? repositoryName(value) : t("workflow.github.allOf", { owner });
+  };
+  const known = () => props.github?.catalog()?.repositories.map((repository) => repository.fullName) ?? [];
+  /**
+   * The checked rows: the values as the catalog spells them, so each one checks its row, and each
+   * repository of a watched owner.
+   */
+  const checked = createMemo(() => [
+    ...props.values.map((value) => entry(value)?.fullName ?? value),
+    ...known().filter(
+      (fullName) =>
+        ofWatchedOwner(fullName) && !props.values.some((value) => value.toLowerCase() === fullName.toLowerCase()),
+    ),
+  ]);
+  const change = (next: readonly string[]) => {
+    const before = checked();
+    const added = next.find((value) => !before.includes(value));
+    const removed = before.find((value) => !next.includes(value));
+    if (added !== undefined) {
+      const owner = workflowGitHubWatchOwner(added);
+      // The owner's repositories need no own value while it watches all of them.
+      const kept =
+        owner === null
+          ? props.values
+          : props.values.filter((value) => repositoryOwner(value).toLowerCase() !== owner.toLowerCase());
+      return props.onChange([...kept, added]);
+    }
+    if (removed === undefined) return;
+    if (workflowGitHubWatchOwner(removed) === null && ofWatchedOwner(removed)) {
+      // One repository of a watched owner turns off: the owner's other repositories stay, by name.
+      const owner = repositoryOwner(removed).toLowerCase();
+      const others = known().filter(
+        (fullName) =>
+          repositoryOwner(fullName).toLowerCase() === owner && fullName.toLowerCase() !== removed.toLowerCase(),
+      );
+      const kept = props.values.filter(
+        (value) =>
+          workflowGitHubWatchOwner(value)?.toLowerCase() !== owner && value.toLowerCase() !== removed.toLowerCase(),
+      );
+      return props.onChange([...kept, ...others.filter((fullName) => !kept.includes(fullName))]);
+    }
+    props.onChange(props.values.filter((value) => value !== removed && (entry(value)?.fullName ?? value) !== removed));
+  };
   const chips = (fullName: string): PickerChip[] => [
     ...(entry(fullName)?.private ? [{ text: t("connector.github.private") }] : []),
     ...(noEvents(fullName)
@@ -343,25 +438,45 @@ function RepositoriesRow(props: {
   ];
   // A repository that the App no longer reaches stays in the list, so the user can turn it off. The rows
   // change only when the catalog or these names change: a check keeps its row and the keyboard focus.
-  const unknown = createMemo(() => props.values.filter((fullName) => !entry(fullName)), { equals: sameNames });
+  const unknown = createMemo(
+    () => props.values.filter((value) => workflowGitHubWatchOwner(value) === null && !entry(value)),
+    { equals: sameNames },
+  );
   const groups = createMemo((): PickerGroup<string>[] => {
-    const known = props.github?.catalog()?.repositories.map((repository) => repository.fullName) ?? [];
-    const names = [...unknown(), ...known];
-    return [...new Set(names.map(repositoryOwner))].map((owner) => ({
+    const names = [...unknown(), ...known()];
+    const groupOwners = [...new Set([...names.map(repositoryOwner), ...owners()])];
+    return groupOwners.map((owner) => ({
       label: owner,
-      options: names
-        .filter((fullName) => repositoryOwner(fullName) === owner)
-        .map((fullName) => ({
-          value: fullName,
-          label: repositoryName(fullName),
-          searchText: fullName,
-          tile: () => icon(fullName),
-          chips: chips(fullName),
-        })),
+      options: [
+        {
+          value: workflowGitHubOwnerWatch(owner),
+          label: t("workflow.github.allRepositories", { owner }),
+          searchText: owner,
+          tile: () => <GitHubIcon />,
+          chips: noEvents(workflowGitHubOwnerWatch(owner))
+            ? [{ icon: () => <TriangleAlert aria-hidden="true" />, text: t("workflow.github.noEvents") }]
+            : [],
+        },
+        ...names
+          .filter((fullName) => repositoryOwner(fullName) === owner)
+          .map((fullName) => ({
+            value: fullName,
+            label: repositoryName(fullName),
+            searchText: fullName,
+            tile: () => icon(fullName),
+            chips: chips(fullName),
+          })),
+      ],
     }));
   });
-  const shown = () => (props.values.length > 0 ? props.values.join(", ") : t("workflow.github.chooseRepository"));
-  const single = () => (props.values.length === 1 ? props.values[0] : undefined);
+  const shownValue = (value: string) => {
+    const owner = workflowGitHubWatchOwner(value);
+    return owner === null ? value : t("workflow.github.allRepositories", { owner });
+  };
+  const shown = () =>
+    props.values.length > 0 ? props.values.map(shownValue).join(", ") : t("workflow.github.chooseRepository");
+  const single = () =>
+    props.values.length === 1 && workflowGitHubWatchOwner(props.values[0] ?? "") === null ? props.values[0] : undefined;
   return (
     <DropdownMenu.Root placement="bottom-start" gutter={6} sameWidth>
       <DropdownMenu.Trigger
@@ -383,12 +498,12 @@ function RepositoriesRow(props: {
             fallback={
               <span class="wfn-row-value">
                 <For each={props.values}>
-                  {(fullName) => (
-                    <span class="wfn-tag" data-warning={noEvents(fullName) ? "" : undefined} title={fullName}>
-                      <Show when={noEvents(fullName)}>
+                  {(value) => (
+                    <span class="wfn-tag" data-warning={noEvents(value) ? "" : undefined} title={shownValue(value)}>
+                      <Show when={noEvents(value)}>
                         <TriangleAlert aria-hidden="true" />
                       </Show>
-                      <span class="wfn-tag-text">{repositoryName(fullName)}</span>
+                      <span class="wfn-tag-text">{tagText(value)}</span>
                     </span>
                   )}
                 </For>
@@ -409,9 +524,9 @@ function RepositoriesRow(props: {
         <PickerChecks
           label={name()}
           groups={groups()}
-          values={values()}
+          values={checked()}
           search={t("workflow.github.searchRepositories")}
-          onChange={props.onChange}
+          onChange={change}
         />
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
@@ -428,8 +543,12 @@ function useGitHubTrigger(id: () => string) {
   const board = useBoard();
   const [repository] = useField<string>(id, "repository", "", asString);
   const [storedRepositories] = useField<string>(id, "repositories", "", asString);
-  const repositories = () =>
-    workflowGitHubTriggerRepositories({ repository: repository(), repositories: storedRepositories() });
+  const [storedOwners] = useField<string>(id, "owners", "", asString);
+  /** The repositories as `owner/name`, then the owners whose repositories it all watches, as `owner/*`. */
+  const repositories = () => [
+    ...workflowGitHubTriggerRepositories({ repository: repository(), repositories: storedRepositories() }),
+    ...workflowGitHubTriggerOwners({ owners: storedOwners() }).map(workflowGitHubOwnerWatch),
+  ];
   const [event, setEvent] = useField<WorkflowGitHubEvent>(
     id,
     "event",
@@ -453,7 +572,13 @@ function useGitHubTrigger(id: () => string) {
   const setRepositories = (values: readonly string[]) => {
     const old = new Set(repositories().map((name) => name.toLowerCase()));
     const keeps = values.some((name) => old.has(name.toLowerCase()));
-    board.setFields(id(), { ...workflowGitHubTriggerRepositoryFields(values), ...(keeps ? {} : { labels: "" }) });
+    const owners = values.flatMap((value) => workflowGitHubWatchOwner(value) ?? []);
+    const named = values.filter((value) => workflowGitHubWatchOwner(value) === null);
+    board.setFields(id(), {
+      ...workflowGitHubTriggerRepositoryFields(named),
+      owners: owners.join("\n"),
+      ...(keeps ? {} : { labels: "" }),
+    });
   };
   return {
     repositories,
@@ -555,7 +680,14 @@ export function GitHubTriggerRows(props: { id: string; locked: boolean }) {
             <AccessAlerts github={github()} repositories={fields.repositories()} write={false} events />
             <Show when={fields.repositories().length > 0}>
               <SettingsFoot>
-                <EventsRow id={props.id} github={github()} withRepository={fields.repositories().length > 1} />
+                <EventsRow
+                  id={props.id}
+                  github={github()}
+                  withRepository={
+                    fields.repositories().length > 1 ||
+                    fields.repositories().some((value) => workflowGitHubWatchOwner(value) !== null)
+                  }
+                />
               </SettingsFoot>
             </Show>
           </>
@@ -849,9 +981,11 @@ export function useGitHubOutputReady(id: () => string) {
     const github = board.github();
     const targets = fields.targets();
     if (!github?.catalog()?.connected || targets.length === 0) return false;
-    const blocked = targets.some(
-      (repository) => accessProblem(github, repository, { write: true, events: false }) !== undefined,
-    );
+    // An owner blocks only when the App reaches none of its repositories; each event names one of them.
+    const blocked = targets.some((repository) => {
+      const problem = accessProblem(github, repository, { write: true, events: false });
+      return workflowGitHubWatchOwner(repository) === null ? problem !== undefined : problem === "missing";
+    });
     return !blocked && !fields.noEvent() && !fields.pullRequestOnly();
   };
 }

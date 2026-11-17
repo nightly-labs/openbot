@@ -14,7 +14,10 @@
 // "Run with last event" starts a run with the newest matching item. A trigger with two repositories starts
 // on an event of the second one and its output comments there; a list that an older client left behind,
 // whose first line is not `repository`, is not watched; a waiting event of a repository that the user
-// removed does not start. No app, provider, account, Signal or network is started.
+// removed does not start. A trigger that watches all repositories of an owner is watched as `owner/*`,
+// starts on a repository that the owner made later and comments there, does not start on another owner's
+// repository, and "Run with last event" reads the owner's repositories that the connection reaches.
+// No app, provider, account, Signal or network is started.
 //
 // Run: bun scripts/github-workflow-e2e.ts
 // Writes .openbot-build/github-workflow-e2e/report.json and exits non-zero on a failure.
@@ -105,6 +108,13 @@ const saying = (graph: WorkflowGraph): WorkflowGraph => ({
   ...graph,
   nodes: [...graph.nodes, { id: "say", kind: "prompt", at: { x: 300, y: 200 }, fields: { text: SAY } }],
   edges: [...graph.edges, { id: "edge-say", from: "say", to: "out", type: "text" }],
+});
+/** `graph` with a trigger that watches all repositories of `owners`, one a line, and no single repository. */
+const withOwners = (graph: WorkflowGraph, owners: string): WorkflowGraph => ({
+  ...graph,
+  nodes: graph.nodes.map((node) =>
+    node.id === "trigger" ? { ...node, fields: { ...node.fields, repository: "", owners } } : node,
+  ),
 });
 const githubOutput = (fields: Record<string, string>): WorkflowNode => ({
   id: "out",
@@ -200,6 +210,7 @@ try {
     githubApp: () => BOT,
     watchGitHub: (repositories) => watched.push(repositories),
     githubApi,
+    githubRepositories: () => Effect.succeed(["acme/app", "octo/one", "octo/two"]),
     delivery: () => null,
     turnAnswer: () => null,
     sendHandoff: () => Effect.fail({ cause: new Error("No agent step runs in this test.") }),
@@ -458,6 +469,25 @@ try {
     dropRow,
   );
 
+  // A trigger that watches all repositories of an owner.
+  const owned = await run(
+    workflows.create({
+      title: "Owner",
+      graph: withOwners(saying(lineOf("", [githubOutput({ action: "comment" })])), "Octo"),
+    }),
+  );
+  check("an owner is watched as `owner/*`", watched.at(-1)?.includes("Octo/*") === true, watched.at(-1));
+  const ownedRun = await startedRun(owned.summary.id, comment("octo/made-later", 3, "ana").body);
+  const ownedEnd = await runEnd(ownedRun);
+  const ownedPosted = changes.filter((change) => change.repository === "octo/made-later");
+  check(
+    "an owner trigger starts on a repository that the owner made later, and its output comments there",
+    ownedEnd.status === "done" && ownedPosted.length === 1 && ownedPosted[0]?.number === 3,
+    { ownedEnd, ownedPosted },
+  );
+  const otherOwner = await send(comment("octopus/app", 1, "ana").body);
+  check("a repository of another owner is not watched", otherOwner.status === 404, otherOwner);
+
   const hold = await run(
     workflows.create({
       title: "Hold",
@@ -633,6 +663,23 @@ try {
     '"Run with last event" starts a run with the newest item that the filters let through',
     lastEnd.status === "done" && lastItem?.number === 12,
     { lastEnd, lastItem },
+  );
+
+  const lastOwner = await run(
+    workflows.create({
+      title: "Last of an owner",
+      graph: withOwners(saying(lineOf("", [githubOutput({ action: "comment" })], "notBot")), "octo"),
+    }),
+  );
+  const lastOwnerDetail = await run(
+    workflows.githubLastEvent({ workflowId: lastOwner.summary.id, nodeId: "trigger", requestId: "last-owner" }),
+  );
+  const lastOwnerEnd = await runEnd(lastOwnerDetail.run.id);
+  const lastOwnerItem = dependencies.github.runItem(lastOwnerDetail.run.id);
+  check(
+    '"Run with last event" of an owner trigger reads the owner\'s repositories that the connection reaches',
+    lastOwnerEnd.status === "done" && lastOwnerItem?.repository === "octo/one" && lastOwnerItem.number === 12,
+    { lastOwnerEnd, lastOwnerItem },
   );
 
   report.history = await history(queue.summary.id);

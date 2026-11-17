@@ -293,6 +293,8 @@ export const messages = {
   "workflow.github.noEvents": "Нет событий",
   "workflow.github.chooseRepository": "Выберите репозиторий",
   "workflow.github.searchRepositories": "Поиск репозиториев",
+  "workflow.github.allRepositories": "Все репозитории {owner}",
+  "workflow.github.allOf": "Все: {owner}",
   "workflow.github.events.issues": "Задачи",
   "workflow.github.events.pullRequests": "Пул-реквесты",
   "workflow.github.events.both": "Задачи и пул-реквесты",
@@ -326,6 +328,10 @@ export const messages = {
   "workflow.github.alert.missing": "OpenBot не видит {repository} на GitHub.",
   "workflow.github.alert.readOnly": "OpenBot не может изменять задачи и пул-реквесты в {repository}.",
   "workflow.github.alert.eventsOff": "GitHub пока не присылает события из {repository}.",
+  "workflow.github.alert.ownerMissing": "OpenBot не видит на GitHub ни одного репозитория {owner}.",
+  "workflow.github.alert.ownerReadOnly":
+    "OpenBot не может изменять задачи и пул-реквесты в некоторых репозиториях {owner}.",
+  "workflow.github.alert.ownerEventsOff": "GitHub пока не присылает события из некоторых репозиториев {owner}.",
   "workflow.github.alert.noEvent": "Триггер не является событием GitHub. Выберите репозиторий и берите номер из входа.",
   "workflow.github.alert.pullRequestOnly":
     "«{action}» работает только с пул-реквестами. Триггер запускается на задачах.",

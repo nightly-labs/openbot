@@ -766,8 +766,9 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
   ).bind(this);
 
   /**
-   * The GitHub route ticket for the repositories that this host's GitHub triggers watch. The account
-   * service checks, with the GitHub sign-in, which of them it can see, and stores none of it.
+   * The GitHub route ticket for the repositories, and the repositories of the owners, that this host's
+   * GitHub triggers watch. The account service checks, with the GitHub sign-in, which of them it can
+   * see, and stores none of it.
    */
   readonly issueGitHubRoute = Effect.fn("CentralAuth.issueGitHubRoute")(
     function* (
@@ -775,6 +776,7 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
       hostId: string,
       githubToken: string,
       repositories: readonly string[],
+      owners: readonly string[],
     ): Effect.fn.Return<GitHubRouteTicket, CentralAuthOperationError, CentralAuthTransport> {
       const machineToken = yield* this.#hostMachineToken(hostId);
       return yield* this.#requestEffect(
@@ -782,7 +784,8 @@ export class CentralAuthManager extends EventEmitter<CentralAuthEvents> {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ machineToken, githubToken, repositories }),
+          // An account service without `owners` ignores it and names only the single repositories.
+          body: JSON.stringify({ machineToken, githubToken, repositories, ...(owners.length > 0 ? { owners } : {}) }),
         },
         decodeGitHubRouteTicket,
       );

@@ -276,6 +276,8 @@ export const messages = {
   "workflow.github.noEvents": "Sem eventos",
   "workflow.github.chooseRepository": "Escolher repositório",
   "workflow.github.searchRepositories": "Pesquisar repositórios",
+  "workflow.github.allRepositories": "Todos os repositórios de {owner}",
+  "workflow.github.allOf": "Todos de {owner}",
   "workflow.github.events.issues": "Issues",
   "workflow.github.events.pullRequests": "Pull requests",
   "workflow.github.events.both": "Issues e pull requests",
@@ -309,6 +311,10 @@ export const messages = {
   "workflow.github.alert.missing": "O OpenBot não consegue ver {repository} no GitHub.",
   "workflow.github.alert.readOnly": "O OpenBot não pode alterar issues e pull requests em {repository}.",
   "workflow.github.alert.eventsOff": "O GitHub ainda não envia eventos de {repository}.",
+  "workflow.github.alert.ownerMissing": "O OpenBot não consegue ver nenhum repositório de {owner} no GitHub.",
+  "workflow.github.alert.ownerReadOnly":
+    "O OpenBot não pode alterar issues e pull requests em alguns repositórios de {owner}.",
+  "workflow.github.alert.ownerEventsOff": "O GitHub ainda não envia eventos de alguns repositórios de {owner}.",
   "workflow.github.alert.noEvent":
     "O gatilho não é um evento do GitHub. Escolha um repositório e use o número da entrada.",
   "workflow.github.alert.pullRequestOnly": "{action} funciona apenas em pull requests. O gatilho começa em issues.",

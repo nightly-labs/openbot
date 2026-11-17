@@ -1,5 +1,6 @@
 import {
   GITHUB_ROUTE_EVENTS,
+  GITHUB_ROUTE_OWNERS_LIMIT,
   GITHUB_ROUTE_REPOSITORIES_LIMIT,
   type GitHubRouteRepository,
 } from "@openbot/contracts/signal-protocol/github-route";
@@ -89,6 +90,7 @@ const repositoriesSchema = Schema.Struct({
     Schema.Struct({
       id: Schema.Number,
       full_name: Schema.String,
+      archived: Schema.optional(Schema.Boolean),
       permissions: Schema.optional(
         Schema.Struct({
           push: Schema.optional(Schema.Boolean),
@@ -240,22 +242,31 @@ export class GitHubInstallationTokens {
   }).bind(this);
 
   /**
-   * The repositories of `names` that this user can see through an installation of the app. A name
-   * that the user cannot see, or that no installation holds, is not in the answer.
+   * The repositories of `names`, and the repositories of `owners` that are not archived, that this user
+   * can see through an installation of the app. A name that the user cannot see, or that no installation
+   * holds, is not in the answer. The named repositories come first; the answer has at most
+   * `GITHUB_ROUTE_REPOSITORIES_LIMIT` repositories.
    */
   readonly repositoryRoutes = Effect.fn("GitHubInstallationTokens.repositoryRoutes")(function* (
     this: GitHubInstallationTokens,
     userToken: string,
     names: readonly string[],
+    owners: readonly string[] = [],
   ): Effect.fn.Return<GitHubRepositoryRoute[], GitHubInstallationTokensError> {
     const wanted = new Set(names.slice(0, GITHUB_ROUTE_REPOSITORIES_LIMIT).map((name) => name.toLowerCase()));
-    if (wanted.size === 0) return [];
+    const wantedOwners = new Set(owners.slice(0, GITHUB_ROUTE_OWNERS_LIMIT).map((owner) => owner.toLowerCase()));
+    if (wanted.size === 0 && wantedOwners.size === 0) return [];
     const appId = yield* this.#readAppId();
     const user: Credential = { kind: "user", token: userToken };
     const { installations } = yield* this.#get(`/user/installations?per_page=${PAGE_SIZE}`, user, installationsSchema);
-    const routes: GitHubRepositoryRoute[] = [];
+    const named: GitHubRepositoryRoute[] = [];
+    const ofOwners: GitHubRepositoryRoute[] = [];
+    const seen = new Set<string>();
+    const full = () => wanted.size === 0 && named.length + ofOwners.length >= GITHUB_ROUTE_REPOSITORIES_LIMIT;
     for (const installation of installations.filter((entry) => entry.app_id === appId).slice(0, MAX_INSTALLATIONS)) {
-      if (wanted.size === 0) break;
+      // An installation of an owner holds the repositories of that owner only.
+      const ownerWanted = wantedOwners.has(installation.account.login.toLowerCase());
+      if ((wanted.size === 0 && !ownerWanted) || full()) continue;
       // GitHub names the events of an installation; an answer without them does not block a route.
       const events = installation.events
         ? GITHUB_ROUTE_EVENTS.every((event) => installation.events?.includes(event))
@@ -263,15 +274,22 @@ export class GitHubInstallationTokens {
       const result = yield* Effect.result(
         this.#eachRepository(installation.id, user, (repository) => {
           const name = repository.full_name.toLowerCase();
-          if (!wanted.delete(name)) return wanted.size > 0;
-          routes.push({ id: repository.id, installationId: installation.id, fullName: repository.full_name, events });
-          return wanted.size > 0;
+          if (seen.has(name)) return true;
+          const route = { id: repository.id, installationId: installation.id, fullName: repository.full_name, events };
+          if (wanted.delete(name)) {
+            seen.add(name);
+            named.push(route);
+          } else if (ownerWanted && !repository.archived && !full()) {
+            seen.add(name);
+            ofOwners.push(route);
+          }
+          return ownerWanted ? !full() : wanted.size > 0;
         }),
       );
       // A suspended installation or SAML SSO refusal must not block the others.
       if (Result.isFailure(result) && result.failure.code !== "github_failed") return yield* result.failure;
     }
-    return routes;
+    return [...named, ...ofOwners].slice(0, GITHUB_ROUTE_REPOSITORIES_LIMIT);
   }).bind(this);
 
   /**

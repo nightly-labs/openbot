@@ -16,6 +16,8 @@ import {
   type WorkflowGraph,
   type WorkflowNode,
   workflowGitHubEventItemKind,
+  workflowGitHubOwnerWatch,
+  workflowGitHubTriggerOwners,
   workflowGitHubTriggerRepositories,
   workflowListField,
 } from "@openbot/contracts/ipc";
@@ -309,6 +311,35 @@ export function githubTriggerRepositories(node: WorkflowNode): string[] {
   return workflowGitHubTriggerRepositories(node.fields);
 }
 
+/** The owners of a GitHub trigger whose repositories it all watches; empty when it has none or is not one. */
+export function githubTriggerOwners(node: WorkflowNode): string[] {
+  if (node.kind !== "trigger" || node.fields.trigger !== "github") return [];
+  return workflowGitHubTriggerOwners(node.fields);
+}
+
+/** Whether a GitHub trigger watches something: a repository or an owner. */
+export function githubTriggerWatchesAny(node: WorkflowNode): boolean {
+  return githubTriggerRepositories(node).length > 0 || githubTriggerOwners(node).length > 0;
+}
+
+/**
+ * What a GitHub trigger watches, for the GitHub route: its repositories as `owner/name`, and its owners
+ * as `owner/*`.
+ */
+export function githubTriggerWatchValues(node: WorkflowNode): string[] {
+  return [...githubTriggerRepositories(node), ...githubTriggerOwners(node).map(workflowGitHubOwnerWatch)];
+}
+
+/** Whether a GitHub trigger watches the repository `owner/name`: by its name, or by its owner. */
+export function githubTriggerWatches(node: WorkflowNode, fullName: string): boolean {
+  const repository = fullName.toLowerCase();
+  const owner = repository.slice(0, Math.max(repository.indexOf("/"), 0));
+  return (
+    githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository) ||
+    githubTriggerOwners(node).some((name) => name.toLowerCase() === owner)
+  );
+}
+
 /**
  * The graph without a repository list that an older client left behind: one that changed `repository` and
  * kept `repositories`. The host removes it on each save, so a later change back to its first name does not
@@ -331,11 +362,10 @@ export function withoutStaleGitHubRepositories(graph: WorkflowGraph): WorkflowGr
   };
 }
 
-/** Whether a GitHub trigger starts on this event of one of its repositories. */
+/** Whether a GitHub trigger starts on this event of one of its repositories or owners. */
 export function githubTriggerMatches(node: WorkflowNode, facts: GitHubEventFacts): boolean {
-  const repository = facts.repository.toLowerCase();
   return (
-    githubTriggerRepositories(node).some((name) => name.toLowerCase() === repository) &&
+    githubTriggerWatches(node, facts.repository) &&
     isOneOf(WORKFLOW_GITHUB_EVENTS, node.fields.event) &&
     facts.events.includes(node.fields.event)
   );
