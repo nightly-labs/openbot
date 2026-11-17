@@ -14,6 +14,7 @@ const COMB_ROWS = honeycombRows(12, 22, 5, "post-cta");
 // fills the block, and a blur behind the text keeps it easy to read.
 export function ContentCallToAction() {
   let section: HTMLElement | undefined;
+  let veil: HTMLDivElement | undefined;
   const chrome = useSiteChrome();
   const path = useSitePath();
   const text = () => chrome().text.cta;
@@ -32,9 +33,9 @@ export function ContentCallToAction() {
       data-revealed={revealed() ? "true" : "false"}
     >
       <div class="post-cta-comb" aria-hidden="true">
-        <AgentHoneycomb rows={COMB_ROWS} />
+        <AgentHoneycomb rows={COMB_ROWS} stillUnder={() => veil} />
       </div>
-      <div class="post-cta-veil" aria-hidden="true" />
+      <div ref={veil} class="post-cta-veil" aria-hidden="true" />
       <div class="post-container post-cta-copy">
         <h2 class="post-cta-title" id="post-cta-title">
           {text().title}
