@@ -919,23 +919,28 @@ export class ChannelService {
         const open = allTasks.filter((task) => !terminal(task));
         const eligible = this.eligibleMembers(current);
         const recipients = this.#recipients(eligible, text, command.recipientAgentId);
-        // A message to the member of the one task that runs joins that task, in any language, when the
-        // member takes messages into its running turn, as in its own chat. A message with files, a reply,
-        // a message to another member, or a task that a routine or a handoff asked for starts new work
-        // as before: their runs find the task by its request (#11037).
+        // A person's message to the member of the one task that runs joins that task, in any language,
+        // when the same person asked for it and the member takes messages into its running turn, as in
+        // its own chat. A message with no address goes to that member only when no other member could
+        // get it: the member is the lead, or the only member. A message with files, a reply, a message
+        // to another member, or another person's task (also a routine's or a handoff's) starts new work
+        // as before (#11037).
         const runningRequest = open.length === 1 && open[0]?.state === "running" ? open[0].requestMessageId : null;
-        const personAsked = messages.some(
+        const ownRequest = messages.some(
           (message) =>
-            message.id === runningRequest &&
-            message.author.kind === "member" &&
-            !/^(?:routine|agent):/u.test(message.author.id),
+            message.id === runningRequest && message.author.kind === "member" && message.author.id === actor.id,
         );
-        const running = personAsked ? (open[0]?.ownerAgentId ?? null) : null;
+        const running = ownRequest ? (open[0]?.ownerAgentId ?? null) : null;
+        const addressed =
+          running !== null &&
+          (recipients.length
+            ? recipients.every((agentId) => agentId === running)
+            : current.leadAgentId === running || eligible.every((agentId) => agentId === running));
         const continues =
           (!referenced &&
             !committed &&
+            addressed &&
             running !== null &&
-            recipients.every((agentId) => agentId === running) &&
             this.hooks.steersWhenBusy?.(running) === true) ||
           /^(?:also|instead|actually|please change|change that|correction|continue|resume|go on|keep going|yes|no|use that|make it)\b/iu.test(
             text.trim(),
