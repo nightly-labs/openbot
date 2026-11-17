@@ -2347,11 +2347,7 @@ export class ChannelService {
     if (continueWork) {
       if (!task || !current || skipped) return false;
       // The ready backup keeps this assignment and its delivery, including the interrupted work.
-      this.store.update(this.store.get(assignment.channelId), {
-        assignments: [{ ...assignment, state: "queued", turnId: null }],
-        tasks: [{ ...task, state: "queued", error: null }],
-      });
-      this.publish(assignment.channelId);
+      this.#keepAssignment(assignment, task);
       return true;
     }
     this.store.update(this.store.get(assignment.channelId), {
@@ -2365,6 +2361,33 @@ export class ChannelService {
     yield* this.#forkEvent(this.#releaseHeldAgents([assignment.agentId]));
     return true;
   });
+
+  /**
+   * Keeps the active assignment of this delivery for its turn to run again on the same model, as
+   * `requeueForLimit` keeps it for a backup. No limit holds the agent, so a routine set to skip at a
+   * limit keeps its run (#11425). False when there is no active assignment, when a transfer is pending
+   * on it, or when its task moved on.
+   */
+  keepForRetry(deliveryId: string): Effect.Effect<boolean> {
+    return Effect.sync(() => {
+      const assignment = this.store.assignmentForDelivery(deliveryId);
+      if (!assignment || !activeAssignment(assignment) || assignment.pendingRevision !== null) return false;
+      const task = this.store.tasks(assignment.channelId).find((item) => item.id === assignment.taskId);
+      if (task?.revision !== assignment.taskRevision || (task.state !== "queued" && task.state !== "running"))
+        return false;
+      this.#keepAssignment(assignment, task);
+      return true;
+    });
+  }
+
+  /** The assignment and its task wait for the same delivery to start again. */
+  #keepAssignment(assignment: ChannelAssignment, task: ChannelTask): void {
+    this.store.update(this.store.get(assignment.channelId), {
+      assignments: [{ ...assignment, state: "queued", turnId: null }],
+      tasks: [{ ...task, state: "queued", error: null }],
+    });
+    this.publish(assignment.channelId);
+  }
 
   /**
    * Whether a queued task waits for this agent: one that it owns and that has no assignment, or one

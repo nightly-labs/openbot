@@ -927,10 +927,12 @@ does the turn of an external chat conversation, such as WhatsApp (#8573).
 `MessagingThreads` keeps the conversation's status post while the turn's messages wait in the queue,
 so the conversation gets no "Stopped." before the answer. A channel task's empty turn runs once more
 in its session too, from any sender, also a person: the channel keeps the task's assignment
-(`requeueForLimit` with `continueWork`), as for a backup that continues it. Before, the task stopped
-until the person clicked Continue (#11425). The turn did no step, so it repeats nothing. A second
-empty run, or an empty turn from the person outside a channel, shows the error. A channel task shows
-`error.provider.channelNoAnswer`, which names Continue and Reassign on its card.
+(`ChannelService.keepForRetry`), as `requeueForLimit` keeps it for a backup, but with no limit rule,
+so a routine set to skip at a limit keeps its run. Only a turn of one request runs again this way.
+Before, the task stopped until the person clicked Continue (#11425). The turn did no step, so it
+repeats nothing. A second empty run, or an empty turn from the person outside a channel, shows the
+error. A Codex channel task shows `error.provider.channelNoAnswer`, which names Continue and Reassign
+on its card.
 A turn that a failed sign-in or a provider that does not answer ended after work started continues
 on the backup model, with the work steps of the turn, as after a usage limit, when the agent is set
 to switch without asking (#8406).
