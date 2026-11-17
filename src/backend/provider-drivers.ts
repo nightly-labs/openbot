@@ -1052,6 +1052,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // The variables go in the spawn environment: the app-server is one process for every agent.
       // Codex leaves a name with KEY, SECRET or TOKEN out of the shells that its agents run.
       const variables = context.providerEnvironment?.("codex") ?? {};
+      const overrides = codexVariableOverrides(variables);
       return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
@@ -1063,7 +1064,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           ...variables,
         },
         context.codexTurnContext,
-        codexVariableOverrides(variables),
+        overrides,
+        overrides.length > 0 ? "OPENAI_BASE_URL" : undefined,
       );
     },
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),

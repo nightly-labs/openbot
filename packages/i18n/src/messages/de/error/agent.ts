@@ -113,6 +113,8 @@ export const messages = {
     "Der Agent hat angehalten, bevor er seine Antwort beendet hat, daher ist die Antwort nicht vollständig. Sende die Nachricht erneut.",
   "error.agent.compactionConnectionLost":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und sende dann eine Nachricht, um fortzufahren.",
+  "error.agent.compactionConnectionLostAddress":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung. Prüfe auch die Adresse {variable} in den Einstellungen von {provider} unter Variablen: Sie muss die API-Adresse deines Modelldienstes sein, die oft auf /v1 endet. Sende dann eine Nachricht, um fortzufahren.",
   "error.agent.compactionLoopStopped":
     "{provider} hat den Kontext immer wieder komprimiert, und jedes Mal blieb er zu voll, um weiterzumachen. Daher hat OpenBot diesen Durchlauf angehalten. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, und sende dann eine Nachricht. Wenn du oder der Agent geändert habt, wann {provider} komprimiert, mach diese Änderung rückgängig.",
   "error.agent.selectedGone": "Der gewählte Agent existiert nicht mehr.",

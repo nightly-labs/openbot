@@ -103,6 +103,8 @@ export const messages = {
     "O agente parou antes de terminar a resposta, então a resposta não está completa. Envie a mensagem de novo.",
   "error.agent.compactionConnectionLost":
     "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet e envie uma mensagem para continuar.",
+  "error.agent.compactionConnectionLostAddress":
+    "A conexão parou enquanto o agente compactava o contexto, então a tarefa parou. Verifique sua conexão com a internet. Verifique também o endereço {variable} nas configurações de {provider}, em Variáveis: ele deve ser o endereço da API do seu serviço de modelos, que muitas vezes termina em /v1. Depois, envie uma mensagem para continuar.",
   "error.agent.compactionLoopStopped":
     "{provider} compactou o contexto várias vezes, e em cada vez ele continuou cheio demais para continuar, então o OpenBot parou este turno. Desative os servidores MCP ou o uso do computador de que este agente não precisa e envie uma mensagem. Se você ou o agente mudaram quando o {provider} compacta, desfaça essa mudança.",
   "error.agent.selectedGone": "O agente selecionado não existe mais.",

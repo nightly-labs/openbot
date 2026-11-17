@@ -827,6 +827,7 @@ export class TurnLifecycle {
           severity: "error",
         },
         true,
+        client,
       );
       // As a Stop does, the turn ends with Codex's `turn/completed`. A request that times out starts the
       // probe that ends a process that does not answer (`CodexAppServerClient.#checkAnswering`).
@@ -856,6 +857,7 @@ export class TurnLifecycle {
         severity: "error",
       },
       false,
+      client,
       sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
     );
     Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
@@ -872,13 +874,24 @@ export class TurnLifecycle {
     turnId: string,
     context: FailureContext & { causeCode: CauseCode },
     stalled: boolean,
+    client: AgentClient,
     loopMessage?: string,
   ): void {
     const held = this.#compactionFailures.get(turnId);
     // An error that Codex sends for the compaction that the loop stop ended keeps the loop's reason.
     if (held?.loop) return;
     const loop = loopMessage !== undefined;
-    const message = loopMessage ?? sourceText("error.agent.compactionConnectionLost");
+    // A web page from a wrong model address also reads as a lost connection, so the text names the
+    // address that the user set too (#10165).
+    const variable = client.modelAddressVariable;
+    const message =
+      loopMessage ??
+      (variable
+        ? sourceText("error.agent.compactionConnectionLostAddress", {
+            provider: agentProviderName(client.provider),
+            variable,
+          })
+        : sourceText("error.agent.compactionConnectionLost"));
     // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it. A
     // loop stop is always OpenBot's, so its `interrupted` end is a failure too.
     const stopped = stalled || loop || held?.stalled === true;
@@ -1591,7 +1604,7 @@ export class TurnLifecycle {
             causeCode: context.causeCode,
             message: this.#hooks.redactMcp(message),
           });
-          this.#holdCompactionFailure(errorTurnId, context, false);
+          this.#holdCompactionFailure(errorTurnId, context, false, source);
           return;
         }
         // A provider error moves an agent set to switch without asking to its next backup model. The

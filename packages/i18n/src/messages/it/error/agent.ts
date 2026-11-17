@@ -107,6 +107,8 @@ export const messages = {
     "L’agente si è fermato prima di finire la risposta, quindi la risposta non è completa. Invia di nuovo il messaggio.",
   "error.agent.compactionConnectionLost":
     "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet, poi invia un messaggio per continuare.",
+  "error.agent.compactionConnectionLostAddress":
+    "La connessione si è interrotta mentre l'agente compattava il contesto, quindi l’attività si è fermata. Controlla la connessione a internet. Controlla anche l’indirizzo {variable} nelle impostazioni di {provider}, in Variabili: deve essere l’indirizzo API del tuo servizio di modelli, che spesso termina con /v1. Poi invia un messaggio per continuare.",
   "error.agent.compactionLoopStopped":
     "{provider} ha compattato il contesto più e più volte, e ogni volta è rimasto troppo pieno per continuare, quindi OpenBot ha fermato questo turno. Disattiva i server MCP o l'uso del computer che questo agente non usa, poi invia un messaggio. Se tu o l'agente avete cambiato quando {provider} compatta, annulla la modifica.",
   "error.agent.selectedGone": "L'agente selezionato non esiste più.",

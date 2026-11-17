@@ -97,6 +97,8 @@ export const messages = {
   "error.agent.answerCutOff": "에이전트가 답변을 마치기 전에 멈춰서 답변이 완전하지 않습니다. 메시지를 다시 보내세요.",
   "error.agent.compactionConnectionLost":
     "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겨 작업이 멈췄어요. 인터넷 연결을 확인한 다음 메시지를 보내 계속해 주세요.",
+  "error.agent.compactionConnectionLostAddress":
+    "에이전트가 컨텍스트를 압축하는 동안 연결이 끊겨 작업이 멈췄어요. 인터넷 연결을 확인해 주세요. {provider} 설정의 변수에서 {variable} 주소도 확인해 주세요. 모델 서비스의 API 주소여야 하며, 보통 /v1로 끝나요. 그런 다음 메시지를 보내 계속해 주세요.",
   "error.agent.compactionLoopStopped":
     "{provider}이(가) 컨텍스트를 계속 압축했지만 매번 너무 가득 차 있어 계속할 수 없어서 OpenBot이 이 턴을 중지했습니다. 이 에이전트에 필요 없는 MCP 서버나 컴퓨터 사용을 끈 다음 메시지를 보내세요. 사용자나 에이전트가 {provider}의 압축 시점을 바꿨다면 그 변경을 되돌리세요.",
   "error.agent.selectedGone": "선택한 에이전트가 더 이상 없어요.",

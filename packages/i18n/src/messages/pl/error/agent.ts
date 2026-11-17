@@ -101,6 +101,8 @@ export const messages = {
     "Agent zatrzymał się przed ukończeniem odpowiedzi, więc odpowiedź jest niepełna. Wyślij wiadomość ponownie.",
   "error.agent.compactionConnectionLost":
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
+  "error.agent.compactionConnectionLostAddress":
+    "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem. Sprawdź też adres {variable} w ustawieniach {provider}, w sekcji Zmienne: musi to być adres API Twojej usługi modeli, który często kończy się na /v1. Potem wyślij wiadomość, aby kontynuować.",
   "error.agent.compactionLoopStopped":
     "{provider} kompaktował kontekst raz za razem i za każdym razem był on zbyt pełny, aby kontynuować, więc OpenBot zatrzymał tę turę. Wyłącz serwery MCP lub użycie komputera, których ten agent nie potrzebuje, a potem wyślij wiadomość. Jeśli ty lub agent zmieniliście, kiedy {provider} kompaktuje, cofnij tę zmianę.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
