@@ -7,12 +7,16 @@ import { promisify, stripVTControlCharacters } from "node:util";
 import { type AgentProviderId, agentProviderName } from "@openbot/contracts/ipc";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result } from "effect";
 import { providerCheckTimeoutMs } from "./disk-restore";
 import type { SignInRegion } from "./kimi-region";
 import { type ProviderClientOperationError, providerCall, providerFailure } from "./provider-client-effects";
 
 const execFileAsync = promisify(execFile);
+const logger = createOpenBotLogger("provider-runtime");
+/** The start failures that `resolveNativeCli` logged, by executable and code. */
+const loggedStartFailures = new Set<string>();
 // Paged history (`excludeTurns`, `thread/turns/list`, and `thread/items/list`) is required by the
 // Codex adapter. Older app-server versions only return the full thread snapshot on resume.
 const MINIMUM_CODEX_VERSION = [0, 156, 0] as const;
@@ -832,6 +836,7 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
   const candidates = yield* cliCandidates(provider, input.systemCandidates, input.bundledExecutable ?? null);
   let found = false;
   let outdated: CodexCliError | undefined;
+  let failedSource: "system" | "managed" | undefined;
   for (const candidate of candidates) {
     if (!(yield* isExecutable(candidate.executable))) continue;
     found = true;
@@ -845,22 +850,45 @@ const resolveNativeCli = Effect.fn("Cli.resolveNativeCli")(function* (
       }).pipe(Effect.catchDefect((cause) => Effect.fail(providerFailure(cause)))),
     );
     if (Result.isSuccess(attempt)) return attempt.success;
-    if (attempt.failure.cause instanceof CodexCliError && attempt.failure.cause.code === "outdated")
-      outdated = attempt.failure.cause;
-    if (isCliTimeout(attempt.failure.cause)) return yield* Effect.fail(attempt.failure);
+    const cause = attempt.failure.cause;
+    if (cause instanceof CodexCliError && cause.code === "outdated") outdated = cause;
+    else if (isCliTimeout(cause)) return yield* Effect.fail(attempt.failure);
+    else {
+      failedSource ??= candidate.source;
+      // The screen shows catalog text only, so this line is what a report of the failure has (#11520).
+      // Each provider check probes the CLI again, so one failure is logged once.
+      const failure = startFailure(cause);
+      const logged = `${candidate.executable}\0${failure.code}\0${failure.signal ?? ""}`;
+      if (!loggedStartFailures.has(logged)) {
+        loggedStartFailures.add(logged);
+        logger.warn("Provider CLI did not start.", { provider, source: candidate.source, ...failure });
+      }
+    }
   }
   if (outdated) return yield* Effect.fail(providerFailure(outdated));
+  // OpenBot's own copy has no command the user knows, so its text names a step in the app.
+  const key = !found
+    ? "error.provider.nativeMissing"
+    : failedSource === "managed"
+      ? "error.provider.nativeManagedNotStarted"
+      : "error.provider.nativeNotStarted";
   return yield* Effect.fail(
     providerFailure(
-      new CodexCliError(
-        sourceText(found ? "error.provider.nativeNotStarted" : "error.provider.nativeMissing", {
-          provider: agentProviderName(provider),
-        }),
-        found ? "invalid" : "missing",
-      ),
+      new CodexCliError(sourceText(key, { provider: agentProviderName(provider) }), found ? "invalid" : "missing"),
     ),
   );
 });
+
+/**
+ * Why a CLI did not answer its version, as codes only: the exit code or the system error, and the
+ * signal. The message and the output of a failed start can hold a private path or a secret.
+ */
+function startFailure(cause: unknown): { code: string | number | null; signal?: string } {
+  if (cause instanceof CodexCliError) return { code: cause.code };
+  if (!isDynamicRecord(cause)) return { code: null };
+  const code = typeof cause.code === "string" || typeof cause.code === "number" ? cause.code : null;
+  return typeof cause.signal === "string" ? { code, signal: cause.signal } : { code };
+}
 
 export const resolvePiCli = (input?: { systemCandidates?: string[]; bundledExecutable?: string | null | undefined }) =>
   resolveNativeCli("pi", input);

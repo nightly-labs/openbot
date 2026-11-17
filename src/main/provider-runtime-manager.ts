@@ -548,6 +548,15 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   /**
+   * Whether a provider's CLI runs on this computer, so its check also runs its version command: the
+   * provider is on, or, for Pi, a key-only provider that runs on it. A Pi that only OpenRouter runs
+   * was installed and kept as ready without a start, and failed only when OpenRouter used it (#11520).
+   */
+  readonly #runsHere = (provider: ManagedProviderId): boolean =>
+    this.#isProviderOn(provider) ||
+    (provider === "pi" && KEY_ONLY_PROVIDERS.some((keyProvider) => this.#isProviderOn(keyProvider)));
+
+  /**
    * The last check's window while that check is less than one interval old. After that the
    * computer may have slept since, and a sibling's stamp may be as old as the sleep.
    */
@@ -1046,7 +1055,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       for (const version of versions) {
         const spec = version === pinned.version ? pinned : recordedSpec(pinned, version);
         const installRoot = join(targetRoot, version);
-        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+        const failure = yield* verifyChangedRuntime(installRoot, spec, this.#lock, this.#runsHere).pipe(
           Effect.as(null),
           Effect.catch((error) => Effect.succeed(error)),
         );
@@ -1326,11 +1335,11 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
                   downloadSmallFile: (url, hash) => this.#downloadSmallFileEffect(url, hash),
                 });
                 if (spec.source === "latest") yield* writeInstallRecord(staging, spec);
-                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#isProviderOn);
+                yield* verifyInstalledRuntime(staging, spec, this.#lock, this.#runsHere);
                 const destination = this.#installRoot(spec);
                 yield* runtimeIO(() => mkdir(dirname(destination), { recursive: true }));
                 committed = yield* this.#commitEffect(staging, destination, spec);
-                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#isProviderOn);
+                yield* verifyInstalledRuntime(destination, spec, this.#lock, this.#runsHere);
                 return committed;
               }),
             );
@@ -1487,7 +1496,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   }
 
   #verifiesEffect(installRoot: string, spec: RuntimeSpec): Effect.Effect<boolean, ProviderRuntimeFailure> {
-    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#isProviderOn).pipe(
+    return verifyInstalledRuntime(installRoot, spec, this.#lock, this.#runsHere).pipe(
       Effect.as(true),
       Effect.catch(() => Effect.succeed(false)),
     );
@@ -1857,14 +1866,14 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
-  isProviderOn: (provider: ManagedProviderId) => boolean,
+  runsHere: (provider: ManagedProviderId) => boolean,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const descriptor = providerRuntimeDescriptor(spec.runtime);
   const executable = join(root, "bin", spec.executableName);
   yield* runtimeIO(() => access(executable));
   if (spec.source === "lock") yield* descriptor.verify(root, spec, lock);
   else yield* verifyInstallRecord(root, spec);
-  if (!isManagedToolRuntime(spec.runtime) && !isProviderOn(spec.runtime)) return;
+  if (!isManagedToolRuntime(spec.runtime) && !runsHere(spec.runtime)) return;
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
@@ -1942,14 +1951,15 @@ const verifyChangedRuntime = Effect.fn("ProviderRuntime.verifyChangedRuntime")(f
   root: string,
   spec: RuntimeSpec,
   lock: AgentRuntimeLock,
-  isProviderOn: (provider: ManagedProviderId) => boolean,
+  runsHere: (provider: ManagedProviderId) => boolean,
 ): Effect.fn.Return<void, ProviderRuntimeFailure> {
   const recordPath = verificationRecordPath(root);
   const key = createHash("sha256")
     .update(JSON.stringify([VERIFICATION_RECORD_LAYOUT, spec, lock[spec.runtime]]))
     .digest("hex");
-  // A tool runtime and a provider that is on also had their version checked; one that is off did not.
-  const versionChecked = isManagedToolRuntime(spec.runtime) || isProviderOn(spec.runtime);
+  // A tool runtime and a CLI that runs here also had their version checked; one that does not run did
+  // not. A record without that check makes the full check run once the CLI runs here.
+  const versionChecked = isManagedToolRuntime(spec.runtime) || runsHere(spec.runtime);
   const before = yield* runtimeFingerprint(root);
   const saved = yield* runtimeIO(() => readFile(recordPath, "utf8")).pipe(
     // A crash can leave the record empty or cut; `runtimeSync` makes that a failure, not a defect.
@@ -1963,7 +1973,7 @@ const verifyChangedRuntime = Effect.fn("ProviderRuntime.verifyChangedRuntime")(f
     saved.files.join("\n") === before.join("\n")
   )
     return;
-  yield* verifyInstalledRuntime(root, spec, lock, isProviderOn);
+  yield* verifyInstalledRuntime(root, spec, lock, runsHere);
   // A file that changed while it was read is checked again on the next start.
   const after = before === null ? null : yield* runtimeFingerprint(root);
   if (after === null || after.join("\n") !== before?.join("\n")) return;

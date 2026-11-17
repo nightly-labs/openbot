@@ -451,7 +451,10 @@ export const messages = {
   "error.provider.sessionSettingsBusy": "انتظر حتى ينتهي الدور الحالي قبل تغيير إعداد الجلسة.",
   "error.provider.piOutdated": "إصدار Pi {version} قديم جدًا. ثبّت Pi 1.1.0 أو أحدث لدعم RPC وMCP الأصلي.",
   "error.provider.nativeMissing": "واجهة {provider} CLI غير مثبتة. نزّلها في الإعدادات.",
-  "error.provider.nativeNotStarted": "تعذّر تشغيل واجهة {provider} CLI.",
+  "error.provider.nativeNotStarted":
+    "وجد OpenBot ‏{provider} الذي ثبّتّه، لكنه لم يبدأ. حدّث {provider} أو أعد تثبيته، ثم حاول مرة أخرى.",
+  "error.provider.nativeManagedNotStarted":
+    "لم يبدأ {provider} على هذا الكمبيوتر. أعد تشغيل OpenBot. إذا لم يبدأ بعد ذلك، فاختر المساعدة > الإبلاغ عن مشكلة.",
   "error.provider.nativeVersionUnreadable": "تعذّرت قراءة إصدار واجهة {provider} CLI.",
   "error.provider.piSessionBusy": "انتظر حتى ينتهي دور Pi الحالي.",
   "error.provider.acpSessionBusy": "لا يزال {provider} ينهي دورًا تم إيقافه. حاول مرة أخرى بعد قليل.",
