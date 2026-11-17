@@ -66,7 +66,9 @@ export class ExternalLinkOpener {
     const target = preference.get().target;
     const page = webPage(url);
     const openDefault = () =>
-      platform === "linux" && page ? startProgram("xdg-open", [page], true) : this.#dependencies.openDefault(url);
+      platform === "linux" && page
+        ? startProgram("xdg-open", [page], true, XDG_OPEN_ENV)
+        : this.#dependencies.openDefault(url);
     if (target.kind === "app" && page) {
       const launched = yield* Effect.result(launchApp(platform, target.path, page));
       if (Result.isSuccess(launched)) return;
@@ -118,14 +120,27 @@ function programOf(command: string): string {
  */
 const LINUX_START_FAILURE_WAIT_MS = 3_000;
 
+/** Electron also sets this for `xdg-open`: a mailcap fallback then does not wait for a terminal. */
+const XDG_OPEN_ENV = { MM_NOTTTY: "1" };
+
 /**
  * Starts a program with no shell. With `watchExit`, a program that stops with an error in the first
  * seconds failed: `xdg-open` does that when no browser opens web pages, and a browser command when
  * the browser cannot run.
  */
-function startProgram(program: string, args: string[], watchExit: boolean): Promise<void> {
+function startProgram(
+  program: string,
+  args: string[],
+  watchExit: boolean,
+  env: Record<string, string> = {},
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(program, args, { shell: false, detached: true, stdio: "ignore" });
+    const child = spawn(program, args, {
+      shell: false,
+      detached: true,
+      stdio: "ignore",
+      env: { ...process.env, ...env },
+    });
     child.once("error", reject);
     child.once("spawn", () => {
       if (!watchExit) {
