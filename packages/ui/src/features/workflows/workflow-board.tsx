@@ -259,7 +259,7 @@ export interface WfnBoard {
   resetSize?: ((id: string) => void) | undefined;
   /** Every result of a step, oldest first. */
   results: (id: string) => readonly WfnResult[];
-  /** The result that the step picked, else its result from the run on view, else its latest. */
+  /** The result that the user picked until a newer one comes, else its result from the run on view, else its latest. */
   shown: (id: string) => WfnResult | undefined;
   pick: (id: string, result: string) => void;
   /** Adds a result and shows it. */
@@ -383,8 +383,11 @@ interface BoardState {
   points: Record<string, PortPoint>;
   message: string;
   results: Record<string, WfnResult[]>;
-  /** A result that the user picked in one step. It stays until the run on view changes. */
-  picked: Record<string, string>;
+  /**
+   * A result that the user picked in one step, and the newest result of the step at that time. It
+   * stays until the run on view changes or the step gets a newer result.
+   */
+  picked: Record<string, { result: string; newest: string | undefined }>;
   viewing: number | null;
 }
 
@@ -882,7 +885,7 @@ export function createBoard(options: BoardOptions) {
     if (failed) result.failed = true;
     setState((draft) => {
       draft.results[id] = [...(draft.results[id] ?? []), result];
-      draft.picked[id] = result.id;
+      draft.picked[id] = { result: result.id, newest: result.id };
     });
   };
 
@@ -998,16 +1001,22 @@ export function createBoard(options: BoardOptions) {
     shown: (id) => {
       const list = resultsOf(id);
       const picked = state.picked[id];
-      if (picked) return list.find((result) => result.id === picked);
       const viewing = state.viewing;
+      // A result that comes after the pick replaces it, so a run that ends shows its result. A past
+      // run on view does not show new results, so its pick stays.
+      if (picked && (viewing !== null || list.at(-1)?.id === picked.newest)) {
+        return list.find((result) => result.id === picked.result);
+      }
       // A retried run has its failure first and its result after it.
       if (viewing !== null) return list.findLast((result) => result.run === viewing);
       return list.at(-1);
     },
-    pick: (id, result) =>
+    pick: (id, result) => {
+      const newest = resultsOf(id).at(-1)?.id;
       setState((draft) => {
-        draft.picked[id] = result;
-      }),
+        draft.picked[id] = { result, newest };
+      });
+    },
     record: (id, value, run) => add(id, value, run, false),
     recordFailure: (id, message, run) => add(id, message, run, true),
     viewing: () => state.viewing,
