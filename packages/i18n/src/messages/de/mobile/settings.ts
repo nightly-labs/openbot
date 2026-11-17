@@ -135,6 +135,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
+  "mobile.settings.appearance.replyDetails": "Antwortdetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Schalte ein Detail aus, um seine Zeile in Chats auszublenden. Der Agent denkt weiter, startet Subagenten und speichert Erinnerungen.",
+  "mobile.settings.appearance.showThinking": "Denken des Agenten zeigen",
+  "mobile.settings.appearance.showSubagents": "Subagenten zeigen",
+  "mobile.settings.appearance.showMemoryChanges": "Gespeicherte Erinnerungen zeigen",
   "mobile.settings.appearance.fullVisuals": "Ganze visuelle Vorschauen zeigen",
   "mobile.settings.appearance.fullVisualsFooter":
     "Ein Visual eines Agenten erscheint im Chat in voller Höhe. Wenn dies aus ist, wird ein hohes Visual abgeschnitten. Tippe darauf, um alles zu sehen.",

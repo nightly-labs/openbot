@@ -84,6 +84,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useMessageColor } from "@/features/settings/model/message-color";
 import { useRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
@@ -1533,11 +1534,18 @@ export const ChatMessageList = memo(function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
+  const rowShown = useChatRowShown(turnSummaries);
   const visibleMessages = useMemo(
     () =>
       groupRoutineRunMarkers(
         groupExchangeMarkers(
-          messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+          // The row that the chat opens at and the row before a branch line stay, also when a
+          // setting hides their kind.
+          messages.filter(
+            (message) =>
+              rowShown(message) ||
+              (message.kind !== "thinking" && (message.id === focusMessageId || message.id === branchDivider?.afterId)),
+          ),
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
@@ -1546,7 +1554,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+    [messages, rowShown, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(
@@ -1896,6 +1904,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       highlightColor,
     ],
   );
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
       (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
@@ -1909,7 +1918,9 @@ export const ChatMessageList = memo(function ChatMessageList({
         (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
     );
     // One run of text, as desktop shows it: the row clamps the label, and blank lines would fill it.
-    const latestStep = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
+    // With the thinking display off, the row says only that the agent thinks.
+    const latestStep =
+      showThinking && !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
     // A progress update shows as a message, so the row does not say it again.
     const thinkingDetail = latestStep && !latestStep.progress ? latestStep.text.replace(/\s+/gu, " ").trim() : null;
     const activityLabel =

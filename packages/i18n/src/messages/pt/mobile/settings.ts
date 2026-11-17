@@ -132,6 +132,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",
+  "mobile.settings.appearance.replyDetails": "Detalhes das respostas",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Desative um detalhe para ocultar a linha dele nos chats. O agente continua raciocinando, iniciando subagentes e salvando memórias.",
+  "mobile.settings.appearance.showThinking": "Mostrar o raciocínio do agente",
+  "mobile.settings.appearance.showSubagents": "Mostrar subagentes",
+  "mobile.settings.appearance.showMemoryChanges": "Mostrar memórias salvas",
   "mobile.settings.appearance.fullVisuals": "Mostrar prévias visuais completas",
   "mobile.settings.appearance.fullVisualsFooter":
     "Um visual de um agente aparece no chat com a altura inteira. Quando isto está desligado, um visual alto é cortado, e você toca nele para ver tudo.",

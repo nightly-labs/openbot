@@ -124,6 +124,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",
+  "mobile.settings.appearance.replyDetails": "回复详情",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "关闭某项详情即可在聊天中隐藏对应的行。智能体仍会思考、运行子智能体并保存记忆。",
+  "mobile.settings.appearance.showThinking": "显示智能体的思考",
+  "mobile.settings.appearance.showSubagents": "显示子智能体",
+  "mobile.settings.appearance.showMemoryChanges": "显示已保存的记忆",
   "mobile.settings.appearance.fullVisuals": "完整显示可视化预览",
   "mobile.settings.appearance.fullVisualsFooter":
     "智能体的可视化内容在聊天中按完整高度显示。关闭时，较高的内容会被截断，轻点即可查看全部。",

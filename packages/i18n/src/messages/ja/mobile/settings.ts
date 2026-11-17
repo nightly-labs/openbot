@@ -131,6 +131,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.replyDetails": "返信の詳細",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "詳細をオフにすると、チャットでその行が非表示になります。エージェントは引き続き思考し、サブエージェントを実行し、記憶を保存します。",
+  "mobile.settings.appearance.showThinking": "エージェントの思考を表示",
+  "mobile.settings.appearance.showSubagents": "サブエージェントを表示",
+  "mobile.settings.appearance.showMemoryChanges": "保存した記憶を表示",
   "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
   "mobile.settings.appearance.fullVisualsFooter":
     "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",

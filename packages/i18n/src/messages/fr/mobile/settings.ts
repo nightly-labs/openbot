@@ -132,6 +132,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",
+  "mobile.settings.appearance.replyDetails": "Détails des réponses",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Désactivez un détail pour masquer sa ligne dans les chats. L'agent continue de réfléchir, de lancer des sous-agents et d'enregistrer des souvenirs.",
+  "mobile.settings.appearance.showThinking": "Afficher la réflexion de l'agent",
+  "mobile.settings.appearance.showSubagents": "Afficher les sous-agents",
+  "mobile.settings.appearance.showMemoryChanges": "Afficher les souvenirs enregistrés",
   "mobile.settings.appearance.fullVisuals": "Afficher les aperçus visuels en entier",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un visuel d’un agent s’affiche dans le chat sur toute sa hauteur. Si cette option est désactivée, un visuel haut est coupé ; touchez-le pour le voir en entier.",
