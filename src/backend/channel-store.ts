@@ -417,18 +417,29 @@ export class ChannelStore {
   }
 
   page(channelId: string, before?: number, limit = 100): ChannelPage {
+    const page = this.pageWithoutExtent(channelId, before, limit);
+    return page.olderCursor === null ? page : { ...page, ...this.olderExtent(channelId, page.olderCursor) };
+  }
+
+  /**
+   * `page` without `olderCount` and `oldestAt`. `olderExtent` reads the whole older history, so a
+   * caller that cuts the page smaller asks for it once, for the cursor of the page that it sends.
+   */
+  pageWithoutExtent(channelId: string, before?: number, limit = 100): ChannelPage {
     const messages = this.messages(channelId, before, limit + 1);
     const hasOlder = messages.length > limit;
     if (hasOlder) messages.shift();
-    const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
     return {
       channel: this.get(channelId),
       tasks: this.tasks(channelId),
       messages,
-      olderCursor,
-      throughSequence: this.messages(channelId, undefined, 1)[0]?.sequence ?? 0,
-      ...(olderCursor === null ? {} : this.olderExtent(channelId, olderCursor)),
+      olderCursor: hasOlder ? (messages[0]?.sequence ?? null) : null,
+      throughSequence: this.latestSequence(channelId),
     };
+  }
+
+  private latestSequence(channelId: string): number {
+    return this.messages(channelId, undefined, 1)[0]?.sequence ?? 0;
   }
 
   /**
@@ -463,7 +474,7 @@ export class ChannelStore {
    * How many messages are older than a page, and when the first one was written: the day rail draws
    * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
    */
-  private olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
+  olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
     const row = databaseRow(
       this.database.connection
         .prepare(
@@ -1021,7 +1032,7 @@ export class ChannelStore {
   }
 
   markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
-    const maximum = this.page(channelId).throughSequence;
+    const maximum = this.latestSequence(channelId);
     if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
     return this.database.dispatch(
       `channel-read:${memberId}:${operationId}`,
