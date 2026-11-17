@@ -4755,19 +4755,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * "Delete history": deletes every message of the agent's own chat, with the mailbox copies and the
    * files that no other record uses, and ends its provider sessions, so the agent forgets the chat
    * too. No restart, sync or provider import brings a message back. The side threads, the profile,
-   * memories, workspace and browser do not change. Work that still runs or waits refuses it.
+   * memories, workspace and browser do not change. Work of the chat that still runs or waits refuses
+   * it. A messaging app's conversation runs in its own thread and lane, which the chat does not show,
+   * so its work does not (#11358).
    */
   readonly deleteAgentHistory = Effect.fn("AgentService.deleteAgentHistory")(function* (
     this: AgentService,
     agentId: string,
   ) {
     const busy = () => new ContextResetBusyError(sourceText("error.agent.waitBeforeDeleteHistory"));
+    // `mainContextBusy` also reads the running turn of the chat's own thread.
     const mainChatBusy = (agent: AgentSummary) =>
-      Boolean(
-        this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
-          (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null),
-      ) ||
-      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
+      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), [], false) ||
       this.#threads.mainContextBusy(agent);
     const target = yield* lifecycleStep("delete agent history", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
