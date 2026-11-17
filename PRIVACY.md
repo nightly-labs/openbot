@@ -1015,7 +1015,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
   not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
-  start. API keys are redacted from logs, exports and diagnostics. A password that the
+  start. When an agent has a key folder from 0.69 or earlier, or from a save without a Vault, each key
+  for that agent only is also readable in that folder, `agent-api-keys/<agentId>/<NAME>`: a link to the
+  Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
+  and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
   joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
   to that server's Vault, not to the Vault of the computer where it was typed. The
