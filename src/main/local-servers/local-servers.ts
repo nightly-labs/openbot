@@ -824,8 +824,6 @@ export class LocalServers {
         publicKey: pinned.publicKey,
         username: LOCAL_SERVER_OWNER_USERNAME,
         password: secret,
-        // The caller opens the server when it wants to, after the start succeeded (#11203).
-        select: false,
       };
       const summary = yield* this.#options.remoteServers.attachLocalServer(attach).pipe(toLocalServerFailure);
       this.#options.log.info(`A server on this computer started (pid ${child.pid ?? "unknown"}).`);

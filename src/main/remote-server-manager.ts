@@ -195,8 +195,6 @@ export interface LocalServerAttachInput {
   publicKey: string;
   username: string;
   password: string;
-  /** Selects the server: true only when the user just made it. */
-  select: boolean;
 }
 
 interface RemoteServerEvents {
@@ -1329,7 +1327,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       this.#connections.setCompatibility(stored.id, verifiedIdentity.compatibility);
       this.#connections.clearIssue(stored.id);
       this.#connections.setState(stored.id, "online");
-      yield* this.#store.attachLocal(stored, input.select);
+      yield* this.#store.attachLocal(stored);
       this.#events.syncScopes();
       this.#emitChanged();
       yield* this.#events.restart(stored.id, true);
@@ -1356,7 +1354,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         yield* this.#store.remove(serverId);
       } else {
         const encryptedToken = yield* remoteDecode(() => this.#store.sealToken(""));
-        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken }, false);
+        yield* this.#store.attachLocal({ ...current, apiUrl: STOPPED_LOCAL_SERVER_URL, encryptedToken });
         this.#connections.setState(serverId, "offline");
         this.#events.suspendReconnect(serverId);
       }
