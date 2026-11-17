@@ -3880,16 +3880,31 @@ export class BrowserHost {
       this.#reservedDownloadPaths.add(downloadPath);
       item.setSavePath(downloadPath);
       this.#activeDownloads += 1;
+      let stoppedAtLimit = false;
       // A server can send no size, or a wrong one, so the received bytes are checked as they arrive.
       item.on("updated", () => {
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
+        stoppedAtLimit = true;
         item.cancel();
         stopped(DOWNLOAD_TOO_LARGE);
       });
-      item.once("done", () => {
+      item.once("done", (_doneEvent, state) => {
         this.#activeDownloads -= 1;
         this.#reservedDownloadPaths.delete(downloadPath);
+        if (state !== "completed") {
+          if (!stoppedAtLimit) stopped("Download failed before the file was complete. Try again.");
+          return;
+        }
+        // The click only starts the download, so the agent finds the saved file in its next snapshot.
+        // A network entry at info level does not show there, so this is a load entry.
+        if (!tab || tab.secret) return;
+        tab.diagnostics.add({
+          kind: "load",
+          level: "info",
+          message: `Download complete: "${basename(downloadPath)}", ${item.getReceivedBytes()} bytes, saved at ${downloadPath}`,
+          ...diagnosticUrlField(item.getURL()),
+        });
       });
     });
   }
