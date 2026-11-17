@@ -17,17 +17,15 @@ export type ActivityColors = {
   muted: string;
   dim: string;
   name: string;
-  success: string;
   danger: string;
   running: string;
 };
 
 export function useActivityColors(): ActivityColors {
-  const [muted, dim, name, success, danger, running] = useCSSVariable([
+  const [muted, dim, name, danger, running] = useCSSVariable([
     "--openbot-text-muted",
     "--openbot-text-dim",
     "--openbot-text-secondary",
-    "--openbot-success-text",
     "--openbot-danger-text",
     "--openbot-accent-text",
   ]);
@@ -35,7 +33,6 @@ export function useActivityColors(): ActivityColors {
     muted: String(muted),
     dim: String(dim),
     name: String(name),
-    success: String(success),
     danger: String(danger),
     running: String(running),
   };
