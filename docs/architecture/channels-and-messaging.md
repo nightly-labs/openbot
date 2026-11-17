@@ -227,7 +227,8 @@ available member. These selections use no model. Other requests use
 the lead's provider, model, and reasoning setting in a separate session with no work tools. The
 request supplies the accepted result schema and the channel summary in place of the transcript.
 Routing selects each member whose role or area the request touches, and only those (`agentIds`). A
-request in the area of one member goes to that member. A greeting, a question about the channel, an
+request in the area of one member goes to that member. A request that tells one member to get parts from
+other members or to combine their answers goes to that member only, and it gives out the parts. A greeting, a question about the channel, an
 unclear request, or a request in the area of no member goes to the lead only (the prompt names the
 lead), and the lead can ask the person in its own reply. A request for opinions or feedback on shared work goes to each member whose area gives a
 different view, and a request to the whole group goes to all of them. Each selected member gets its own root task for the same request message, answers in its own reply, and
@@ -272,7 +273,8 @@ them. A lead change does not move a task that already has an owner. The member p
 Channel tools retrieve history, assign a child task, transfer ownership, and report results. The
 runtime supplies channel and caller identity. A child keeps its parent owner; a transfer changes it.
 Only assignments and awaited results start turns. Completed child results are combined before the
-owner returns. The limit is eight automatic assignments per root request and two active assignments
+owner returns. `channel_assign` and `channel_transfer` refuse a member that answers the same request in a root
+task of its own: another task made it post the same answer again (#11082). The limit is eight automatic assignments per root request and two active assignments
 per channel (`CHANNEL_PARALLEL_LIMIT`).
 
 An agent can also give work to a channel from another conversation, such as its direct chat with
