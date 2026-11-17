@@ -62,6 +62,8 @@ export type WhatsAppSessionState =
   | "connecting"
   | "open"
   | "reconnecting"
+  /** Still reconnecting, but many attempts in a row failed: the number does not work now. */
+  | "failing"
   | "logged_out"
   | "replaced"
   /** A link could not reach WhatsApp before it showed a code. */
@@ -79,6 +81,11 @@ const BACKOFF_START_MS = 2_000;
 const BACKOFF_MAX_MS = 30_000;
 const BACKOFF_FACTOR = 1.8;
 const BACKOFF_JITTER = 0.25;
+/**
+ * After this many failed attempts in a row (about 4 minutes or more), the number shows as not working,
+ * so the owner sees it and can use Reconnect. The attempts continue, and an open socket clears it.
+ */
+const FAILING_AFTER_ATTEMPTS = 12;
 /** A connection that stayed up this long starts its backoff from the beginning again. */
 const STABLE_MS = 60_000;
 /** No frame for this long means a dead socket that did not close. */
@@ -481,9 +488,9 @@ export class WhatsAppSession {
       void this.#connect();
       return;
     }
-    this.#setState("reconnecting");
     const delay = backoffDelay(this.#attempt);
     this.#attempt += 1;
+    this.#setState(this.#attempt >= FAILING_AFTER_ATTEMPTS ? "failing" : "reconnecting");
     this.#retryTimer = setTimeout(() => {
       this.#retryTimer = null;
       void this.#connect();
