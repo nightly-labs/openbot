@@ -3,6 +3,7 @@
 // the chat's subagent card shows:
 // - OpenCode: the client asks for child session updates; a child's steps, thinking, nested child,
 //   failure and a background child that ends after its turn.
+// - Kiro: the roster of its subagents gives the cards, and the updates of each subagent's session give its steps.
 // - Kimi, Cline, Hermes: a subagent tool call gives a card with its task and its report or error.
 //   Kimi's background call is not shown. A turn that the person stops stops its subagent.
 // `bun run test:acp-subagents`. Writes .openbot-build/acp-subagents-e2e/report.json.
@@ -12,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ConversationSubagent } from "@openbot/contracts/ipc";
 import { AcpAgentClient } from "../src/backend/acp-client";
-import { CLINE_ACP_FLAVOR, HERMES_ACP_FLAVOR, KIMI_ACP_FLAVOR } from "../src/backend/acp-flavor";
+import { CLINE_ACP_FLAVOR, HERMES_ACP_FLAVOR, KIMI_ACP_FLAVOR, KIRO_ACP_FLAVOR } from "../src/backend/acp-flavor";
 import { SUBAGENTS_UPDATED_METHOD, subagentsFromNotification } from "../src/backend/agent/subagent-updates";
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
@@ -108,8 +109,8 @@ async function fakeCli(name: string, style: string, log: string): Promise<AgentC
 }
 
 /** A client with an agent's flavor and no driver: the Cline driver fetches free models from the network. */
-async function flavoredClient(style: "kimi" | "cline" | "hermes"): Promise<AgentClient> {
-  const flavors = { kimi: KIMI_ACP_FLAVOR, cline: CLINE_ACP_FLAVOR, hermes: HERMES_ACP_FLAVOR };
+async function flavoredClient(style: "kimi" | "cline" | "hermes" | "kiro"): Promise<AgentClient> {
+  const flavors = { kimi: KIMI_ACP_FLAVOR, cline: CLINE_ACP_FLAVOR, hermes: HERMES_ACP_FLAVOR, kiro: KIRO_ACP_FLAVOR };
   const cli = await fakeCli(style, style, join(root, `${style}.jsonl`));
   const client = new AcpAgentClient(cli, 10_000, {
     provider: style,
@@ -263,6 +264,36 @@ try {
         error: null,
         background: false,
         steps: ["text: The logs show three restarts."],
+      },
+    ]);
+  }
+
+  // Kiro: the roster names no parent, so the one running turn owns it. A subagent ends when the roster
+  // says `terminated`, or when the roster no longer lists it. Its steps come from its own session.
+  {
+    const client = await flavoredClient("kiro");
+    const thread = await startThread(client, { cwd: workspace, model: "fake/model" });
+    const work = watch(client, thread);
+    assert.equal((await runTurn(client, thread, { text: "work" })).status, "completed");
+    await work.until("both subagents to end", (list) => list.length === 2 && list.every((s) => s.status !== "running"));
+    assert.deepEqual(save("kiro/work", work.lists), [
+      {
+        title: "Find the tests.",
+        agentType: "worker-lite",
+        prompt: "Find the tests.\nList the files.",
+        status: "completed",
+        error: null,
+        background: false,
+        steps: ["search: *.test.ts", "text: 12 test files."],
+      },
+      {
+        title: "Fix it.",
+        agentType: "worker-lite",
+        prompt: "Fix it.",
+        status: "completed",
+        error: null,
+        background: false,
+        steps: [],
       },
     ]);
   }

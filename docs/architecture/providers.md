@@ -1453,6 +1453,19 @@ or a code with `--use-device-flow`) in a terminal, then Connect reads the accoun
 `KIRO_ACP_FLAVOR.authRequiredSignsOut` reports the sign-out. A sign-in that OpenBot starts, and a code
 sign-in for a joined server, need the output of `kiro-cli login`, which was not read from a real sign-in.
 
+**Subagents.** Kiro CLI 2.37.1 sends the roster of the subagents of its process in
+`_kiro.dev/subagent/list_update` (`sessionId`, `agentName`, `initialQuery`, and `status.type` of `working`
+or `terminated`), and the work of each subagent as `session/update` of the subagent's own session.
+`KIRO_ACP_FLAVOR.subagentRoster` turns them into the subagent cards that OpenCode gives
+(`foldKiroSubagentRoster`, then `foldOpenCodeChildUpdate` for the steps). The roster names no parent
+session, so a new subagent belongs to the one session that runs a turn, or else to the session whose
+"Spawning agent crew" or `subagent` call was newest (`ACP_SUBAGENT_CLAIM_MS`). A running subagent that
+the roster no longer lists ended. The SDK hands over an extension notification and a session update in
+another order than the agent sent them, in both directions: the client waits one tick before it
+completes a turn, keeps up to 60 early updates of 16 unknown sessions until the roster names them, and
+takes a step of a subagent that already ended. Both overlaps and the cards were checked with a real
+Kiro CLI 2.37.1 (`bun run test:kiro-live`).
+
 **Models and agents.** `session/new` returns `models` (Claude and GPT ids) and `modes` (the user's Kiro
 agents). OpenBot lists the models; the modes are not used yet.
 
@@ -1475,8 +1488,10 @@ CLI (`data.sqlite3`, the runtime it downloads), and protects `settings`, `agents
 (`~/Library/Application Support/kiro-cli`) was checked. The AWS folders of an IAM Identity Center
 sign-in stay closed: whether the CLI writes them was not checked.
 
-**Not done.** `_kiro.dev/subagent/list_update` (subagent cards), `_kiro.dev/metadata` (context and credits
-usage), plan usage (`reportsUsage` is `false`), the Windows and Linux data folders, and the V3 engine.
+**Not done.** `_kiro.dev/metadata` (context usage in percent, and the credits of a turn in
+`meteringUsage`): the usage surfaces of OpenBot take tokens and US dollars, not credits, so a Kiro
+credit display needs a new field in the contracts. Plan usage (`reportsUsage` is `false`), the Windows
+and Linux data folders, and the V3 engine are not done either.
 
 ### Custom agents
 

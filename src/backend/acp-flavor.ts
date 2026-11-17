@@ -321,6 +321,14 @@ export interface AcpFlavor {
    */
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   /**
+   * The agent sends the roster of its subagents as an extension notification (`method`, with no leading
+   * underscore), and the work of each subagent as session updates of the subagent's own session.
+   * `tools` are the names that the parent's tool call that starts them can have, as its start (case
+   * ignored). The notification names no parent session, so a roster belongs to the one running turn,
+   * or else to the turn whose call of one of the `tools` was newest.
+   */
+  subagentRoster?: { readonly method: string; readonly tools: readonly string[] };
+  /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
    */
@@ -856,7 +864,13 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
  * stops working, such as an expired Identity Center session, gives the same error to a new session,
  * and the client must then report the sign-out.
  */
-export const KIRO_ACP_FLAVOR: AcpFlavor = { authRequiredSignsOut: true };
+export const KIRO_ACP_FLAVOR: AcpFlavor = {
+  authRequiredSignsOut: true,
+  // Kiro CLI 2.37.1 sends the roster of its subagents (`agentName`, `initialQuery`, `status.type` of
+  // `working` or `terminated`) in this notification, and a subagent's own tool calls in session updates.
+  // The parent's call is `subagent` in `_kiro.dev/session/update`, and its approval is titled "Spawning agent crew".
+  subagentRoster: { method: "kiro.dev/subagent/list_update", tools: ["subagent", "spawning agent"] },
+};
 
 /**
  * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have
