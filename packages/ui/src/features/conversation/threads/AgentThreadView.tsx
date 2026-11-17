@@ -214,6 +214,13 @@ export interface AgentThreadViewProps {
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onOpenLink: (url: string) => void;
+  /** Opens a file of the shared folder that a message links to. Without it, the link shows as text. */
+  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
+  /**
+   * Opens a file that a message links to, from the workspace of `agentId`: the agent that wrote the message.
+   * Without it, the link shows as text.
+   */
+  onOpenWorkspaceFile?: ((agentId: string, path: string, asWritten?: string) => void) | undefined;
   /**
    * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
@@ -567,6 +574,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const marker = message.actionMarker;
     return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
   };
+  /** Opens the files that a message of `agentId` links to, as in the agent's chat. */
+  const workspaceFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenWorkspaceFile;
+    return open && agentId ? (path: string, asWritten?: string) => open(agentId, path, asWritten) : undefined;
+  };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
     const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
@@ -597,6 +609,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
             onAttachmentAction={props.onAttachmentAction}
+            onOpenSharedFile={props.onOpenSharedFile}
+            // A workspace path is in the workspace of the agent that sent the message.
+            onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
           />
         )}
@@ -878,6 +893,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenLink={props.onOpenLink}
                           onPreview={props.onPreview}
                           onAttachmentAction={props.onAttachmentAction}
+                          onOpenSharedFile={props.onOpenSharedFile}
+                          onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}
                           onDownload={(attachment) => props.onAttachmentAction(attachment, "download")}
