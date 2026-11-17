@@ -15,6 +15,7 @@ export const messages = {
     "{provider} no puede conectarse al proveedor del modelo. Lo intenta de nuevo: intento {attempt}.",
   "status.provider.modelRetryServerError":
     "El proveedor del modelo está ocupado o tiene un error. {provider} lo intenta de nuevo: intento {attempt}.",
+  "status.provider.modelRetryRecovered": "El proveedor del modelo vuelve a responder.",
   "status.provider.retryRecovered": "{provider} vuelve a recibir respuestas de su servidor.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude respondió a la velocidad estándar. Con una suscripción de Claude, el modo rápido usa créditos de uso. Actívalos en tu cuenta de Claude.",

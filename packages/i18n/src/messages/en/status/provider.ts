@@ -16,6 +16,7 @@ export const messages = defineMessages("status.provider", {
     "{provider} cannot connect to the model provider. It tries again: attempt {attempt}.",
   "status.provider.modelRetryServerError":
     "The model provider is busy or has an error. {provider} tries again: attempt {attempt}.",
+  "status.provider.modelRetryRecovered": "The model provider answers again.",
   "status.provider.retryRecovered": "{provider} gets answers from its server again.",
   // Claude Code ran a fast mode turn at the standard speed, with the reason.
   "status.provider.claudeFastModeNeedsUsageCredits":

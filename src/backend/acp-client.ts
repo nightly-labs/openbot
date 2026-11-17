@@ -312,8 +312,11 @@ interface AcpTurn {
   modelRetries: number;
   /** The agent sent an update, a question or a tool call for the prompt that it has now. */
   answered: boolean;
-  /** The chat shows a retry of a failed model request (`AcpFlavor.retryNotice`), and no output came after it. */
-  retrying?: true;
+  /**
+   * The chat shows a retry of a failed model request, and no output came after it: the agent's own
+   * server (`AcpFlavor.retryNotice`), or the model provider behind the agent (`AcpFlavor.retryUpdate`).
+   */
+  retrying?: "agent" | "model";
   /** Questions and approvals that wait for the user. The turn is not stalled while one is open. */
   waitingOnUser: number;
   /** OpenBot ended the turn because the agent did not. Its open tool calls get no more updates. */
@@ -3313,20 +3316,6 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     }
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
-    // The agent sends a failed model request again (`AcpFlavor.retryUpdate`). A stopped turn ends by its stop.
-    // The agent tries again, so the text names it, not a custom endpoint: that is the model provider.
-    const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
-    if (retry) {
-      turn.retrying = true;
-      this.#emitTurnProgress(
-        thread,
-        turn,
-        sourceText(
-          retry.unreachable ? "status.provider.modelRetryUnreachable" : "status.provider.modelRetryServerError",
-          { provider: this.#label, attempt: retry.attempt },
-        ),
-      );
-    }
     if (turn.beforeWakeEcho) {
       if (update.sessionUpdate === "user_message_chunk" && update.content.type === "text") {
         if (isTurnContextBlock(update.content.text)) turn.beforeWakeEcho = null;
@@ -3337,14 +3326,28 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       }
       return;
     }
-    // The first output after a retry replaces the retry in the chat.
-    if (turn.retrying && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
-      delete turn.retrying;
+    // The agent sends a failed model request again (`AcpFlavor.retryUpdate`). A stopped turn ends by its stop.
+    // The agent tries again, so the text names it, not a custom endpoint: that is the model provider.
+    const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
+    if (retry) {
+      turn.retrying = "model";
       this.#emitTurnProgress(
         thread,
         turn,
-        sourceText("status.provider.retryRecovered", { provider: this.#providerName(thread) }),
+        sourceText(
+          retry.unreachable ? "status.provider.modelRetryUnreachable" : "status.provider.modelRetryServerError",
+          { provider: this.#label, attempt: retry.attempt },
+        ),
       );
+    }
+    // The first output after a retry replaces the retry in the chat.
+    if (turn.retrying && !SESSION_STATE_UPDATES.has(update.sessionUpdate)) {
+      const recovered =
+        turn.retrying === "model"
+          ? sourceText("status.provider.modelRetryRecovered")
+          : sourceText("status.provider.retryRecovered", { provider: this.#providerName(thread) });
+      delete turn.retrying;
+      this.#emitTurnProgress(thread, turn, recovered);
     }
     this.#applyTurnUpdate(thread, turn, update);
   }
@@ -4051,7 +4054,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       // A stopped turn ends by its stop. The agent can ignore the cancel and keep sending notices.
       if (!thread || !turn || turn.completing || turn.stopped) return;
       turn.lastActivityAt = Date.now();
-      turn.retrying = true;
+      turn.retrying = "agent";
       this.#emitTurnProgress(
         thread,
         turn,

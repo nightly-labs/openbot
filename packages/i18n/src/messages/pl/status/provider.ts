@@ -15,6 +15,7 @@ export const messages = {
     "{provider} nie może połączyć się z dostawcą modelu. Ponawia próbę: próba {attempt}.",
   "status.provider.modelRetryServerError":
     "Dostawca modelu jest zajęty lub zwrócił błąd. {provider} ponawia próbę: próba {attempt}.",
+  "status.provider.modelRetryRecovered": "Dostawca modelu znowu odpowiada.",
   "status.provider.retryRecovered": "{provider} znów otrzymuje odpowiedzi ze swojego serwera.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude odpowiedział ze standardową szybkością. Z subskrypcją Claude tryb szybki korzysta ze środków na użycie. Włącz je na koncie Claude.",

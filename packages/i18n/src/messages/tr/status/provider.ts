@@ -14,6 +14,7 @@ export const messages = {
     "{provider} model sağlayıcısına bağlanamıyor. Yeniden deniyor: deneme {attempt}.",
   "status.provider.modelRetryServerError":
     "Model sağlayıcısı meşgul veya bir hata verdi. {provider} yeniden deniyor: deneme {attempt}.",
+  "status.provider.modelRetryRecovered": "Model sağlayıcısı yeniden yanıt veriyor.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude standart hızda yanıt verdi. Claude aboneliğinde hızlı mod kullanım kredisi harcar. Bunu Claude hesabınızda açın.",
