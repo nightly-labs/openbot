@@ -38,7 +38,8 @@ function threadStatusLabel(status: ThreadStatus, t: TextValue["t"]): string {
 type ThreadMark = ThreadStatus | { kind: "unread" };
 
 function threadMark(status: ThreadStatus, unread: number | undefined): ThreadMark {
-  return status.kind === "idle" && (unread ?? 0) > 0 ? { kind: "unread" } : status;
+  // No turn runs in a thread that waits for other agents, so a message to read comes first there too.
+  return (status.kind === "idle" || status.kind === "awaiting") && (unread ?? 0) > 0 ? { kind: "unread" } : status;
 }
 
 /** A thread that needs the user wears the tint of its badge. */

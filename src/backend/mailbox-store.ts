@@ -977,18 +977,25 @@ export class MailboxStore {
 
   /**
    * The requests that agents sent from their side threads and that wait for an answer: the recipient
-   * has not ended the turn that runs them. An answer or a note for a failed request then goes back to
-   * the thread.
+   * has not ended the turn that runs them, and has not answered them yet, as `sideThreadWaitsFor` reads
+   * an answer. An answer or a note for a failed request then goes back to the thread.
    */
   awaitedThreadRequests(): Array<
     AgentTaskAwaitedReply & { deliveryId: string; senderAgentId: string; taskId: string }
   > {
     let messages: Map<string, StoredMessage> | undefined;
+    let answered: Set<string> | undefined;
     return this.#state.deliveries.flatMap((delivery) => {
       if (!isOneOf(AGENT_TASK_AWAITED_STATES, delivery.status)) return [];
       messages ??= this.#messagesById();
       const message = messages.get(delivery.messageId);
       if (!message?.senderTaskId || message.sender.kind !== "agent" || message.expectsReply === false) return [];
+      answered ??= new Set(
+        this.#state.messages.flatMap((answer) =>
+          isAnswer(answer) ? [`${answer.replyToMessageId}:${answer.sender.agentId}`] : [],
+        ),
+      );
+      if (answered.has(`${message.id}:${delivery.recipientAgentId}`)) return [];
       return [
         {
           deliveryId: delivery.id,

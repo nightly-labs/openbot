@@ -226,8 +226,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * in the same way, but only the messages that still wait. A task without `awaitedReplies` keeps the
    * stored requests while its state stays: a thread sends a request in a turn, and an answer or a note for
    * a failed request starts the thread again. Returns true when a waiting message changed and the stored
-   * list had a queue, or when the state of a thread with stored requests changed: then only a new read
-   * of the list gives the full queue and the current requests.
+   * list had a queue, or when a thread became idle or a thread with requests changed its state: then only
+   * a new read of the list gives the full queue and the current requests.
    */
   function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
@@ -250,7 +250,8 @@ export function createAgentTasks(options: AgentTasksOptions) {
       }
       if (task.awaitedReplies === undefined && held.awaitedReplies) {
         next.awaitedReplies = held.awaitedReplies.map((reply) => ({ ...reply }));
-        if (task.state !== held.state) staleQueue = true;
+        // A turn that ends can have sent a request, and a turn that starts can read an answer.
+        if (task.state !== held.state && (task.state === "idle" || held.awaitedReplies.length > 0)) staleQueue = true;
       }
       return next;
     });

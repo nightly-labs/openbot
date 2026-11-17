@@ -102,7 +102,7 @@ export function threadAwaitingReplies(
       id: `${messageId}:${recipientAgentId}`,
       agent,
       name: agent?.name ?? t("chat.activity.agentFallback"),
-      state: status === "queued" ? "asked" : "working",
+      state: deliveryState(status) ?? "working",
       ...(wait ? { wait } : {}),
     };
   });
