@@ -995,7 +995,12 @@ export class TurnLifecycle {
     // The first message that another agent gave a new agent can ask it to wait. The agent that made
     // it already has the new agent's id, so nobody waits for an answer (#10009).
     if (deliveries.every(({ delivery }) => this.#mailbox.isAgentSetupDelivery(delivery.id))) return false;
-    const message = sourceText("error.provider.acpNoAnswer", {
+    // A channel task stops on a card that offers Continue. Sending the message again started the
+    // work a second time there (#11425).
+    const channelTask =
+      this.#conversation.channelForThread(snapshot.threadId) !== null ||
+      deliveries.some(({ channelId }) => channelId !== undefined);
+    const message = sourceText(channelTask ? "error.provider.channelNoAnswer" : "error.provider.acpNoAnswer", {
       provider: agentProviderDescriptor(source.provider).displayName,
     });
     const context = {
@@ -2147,22 +2152,30 @@ export class TurnLifecycle {
       // Teammate results start a lead's turn, and nothing else wakes the team when that turn gives no
       // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
       // thread too (#8503). So does the turn of an
-      // external chat, whose person waits for the result (#8573); a channel task does not. It did no
-      // step, so it repeats nothing. A second empty run shows the error. A turn that Google refused
-      // with an old Gemini token runs once more too, for each sender: the CLI had a new token less
-      // than a second later (#10367). A second refusal shows the error.
-      const runsAgainHere =
+      // external chat, whose person waits for the result (#8573). A channel task's empty turn runs
+      // once more too, from any sender: else it stopped until the person clicked Continue (#11425). It
+      // did no step, so it repeats nothing. A second empty run shows the error. A turn that Google
+      // refused with an old Gemini token runs once more too, for each sender: the CLI had a new token
+      // less than a second later (#10367). A second refusal shows the error.
+      let runsAgainHere =
         !failedOver &&
         mayRunAgain &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        this.#conversation.channelForThread(snapshot.threadId) === null &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
-        (isRefusedGeminiToken(failover.context.provider, failover.message) ||
-          (failover.context.causeCode === "empty_answer" &&
-            deliveries.every(
-              ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
-            )));
+        ((channelTask && failover.context.causeCode === "empty_answer") ||
+          (this.#conversation.channelForThread(snapshot.threadId) === null &&
+            (isRefusedGeminiToken(failover.context.provider, failover.message) ||
+              (failover.context.causeCode === "empty_answer" &&
+                deliveries.every(
+                  ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
+                )))));
+      // The channel keeps the task's assignment for the run again, as for a backup that continues it.
+      for (const { delivery } of runsAgainHere && channelTask ? deliveries : []) {
+        if (yield* this.#hooks.requeueChannelDelivery(delivery.id, true)) continue;
+        runsAgainHere = false;
+        break;
+      }
       // The work that this turn did, so that the backup model continues it and does not do it again.
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running
