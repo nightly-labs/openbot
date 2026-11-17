@@ -657,7 +657,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#redactMcp = options.redactMcp;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
-      installedChosen: () => this.#installedChosen.has("codex"),
+      installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
       createClient: (cli) => {
         const client = this.#clientFactory
           ? this.#clientFactory("codex", cli)
