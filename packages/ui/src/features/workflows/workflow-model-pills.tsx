@@ -1,5 +1,5 @@
 /**
- * The model and effort pills of the LLM and agent steps. The models come from the catalogs of the
+ * The model and effort pills of the LLM and condition steps. The models come from the catalogs of the
  * board. The list offers only the providers that the host can run now or soon, and the provider of
  * the step.
  */

@@ -1,7 +1,6 @@
 /** An agent step: a task that one agent does, with the agent and its model. */
 
 import { ProviderLogo } from "@openbot/brand";
-import type { AgentModelId } from "@openbot/contracts/ipc";
 import { Bot, Button, buttonVariants, ChevronDown, DropdownMenu, Play, Textarea, TriangleAlert } from "@openbot/ui";
 import { Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
@@ -10,9 +9,8 @@ import { AgentAvatar } from "../agents/AgentAvatar";
 import { PickerMenu, type PickerOption } from "./WorkflowPicker";
 import { useBoard } from "./workflow-board";
 import type { WorkflowCatalogs } from "./workflow-model";
-import { ModelPill, modelOption } from "./workflow-model-pills";
+import { modelOption } from "./workflow-model-pills";
 import {
-  asProvider,
   asString,
   Field,
   NodeShell,
@@ -22,7 +20,6 @@ import {
   useLocked,
   useStepRun,
   useTextField,
-  type WfProvider,
   wfProviderLogo,
 } from "./workflow-node-parts";
 
@@ -105,8 +102,22 @@ function AgentPill(props: {
 }
 
 /**
- * One step that an agent does. The field holds the task, with the agent and its model at the
- * bottom, as the Higgsfield LLM Assistant holds its prompt with the model and Effort controls.
+ * The model that an agent step runs on: the agent's own model. The step does not change it, so it
+ * shows as text, not as a picker. A run sends the step to the agent with no model.
+ */
+function AgentModel(props: { agent: AgentProfile }) {
+  const board = useBoard();
+  return (
+    <span class="wfn-pill wfn-model-pill" data-static="">
+      <ProviderLogo provider={wfProviderLogo(props.agent.provider)} class="wfn-model-logo" />
+      <span>{modelOption(board.catalogs().models, props.agent.model)?.name ?? props.agent.model}</span>
+    </span>
+  );
+}
+
+/**
+ * One step that an agent does. The field holds the task, with the agent and the model that it runs
+ * on at the bottom, as the Higgsfield LLM Assistant holds its prompt with the model.
  */
 export function AgentNode(props: { id: string; agentId?: string; task?: string }) {
   const board = useBoard();
@@ -118,13 +129,6 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
     asString,
   );
   const agent = () => board.catalogs().agents.find((candidate) => candidate.id === agentId());
-  // The catalog agent is a store, so its fields too are read once here.
-  const first = untrack(() => {
-    const found = agent();
-    return { model: found?.model ?? "", provider: found?.provider ?? "codex" };
-  });
-  const [model] = useField<AgentModelId>(() => props.id, "model", first.model, asString);
-  const [provider] = useField<WfProvider>(() => props.id, "provider", first.provider, asProvider);
   const [task, setTask] = useTextField(
     () => props.id,
     "task",
@@ -173,14 +177,7 @@ export function AgentNode(props: { id: string; agentId?: string; task?: string }
               board.setFields(props.id, { agentId: choice.id, model: choice.model, provider: choice.provider })
             }
           />
-          <Show when={agent()}>
-            <ModelPill
-              provider={provider()}
-              value={model()}
-              disabled={locked()}
-              onChange={(next, nextProvider) => board.setFields(props.id, { model: next, provider: nextProvider })}
-            />
-          </Show>
+          <Show when={agent()}>{(found) => <AgentModel agent={found()} />}</Show>
         </div>
       </Field>
       <ResultField id={props.id} running={run.running()} />
