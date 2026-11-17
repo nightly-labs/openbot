@@ -124,11 +124,14 @@ export function ChatMessageGesture({
       .activeOffsetX(-16 * END_X)
       .failOffsetX(8 * END_X)
       .failOffsetY([-12, 12])
+      .onStart(() => {
+        if (timeReveal) scheduleOnRN(timeReveal.mount);
+      })
       .onUpdate((event) => {
-        timeReveal?.set(resisted(-event.translationX * END_X, MESSAGE_TIME_WIDTH, TIMES_OVERSCROLL));
+        timeReveal?.offset.set(resisted(-event.translationX * END_X, MESSAGE_TIME_WIDTH, TIMES_OVERSCROLL));
       })
       .onFinalize(() => {
-        timeReveal?.set(withSpring(0, TIMES_SETTLE));
+        timeReveal?.offset.set(withSpring(0, TIMES_SETTLE));
       });
     if (listSwipe) {
       swipe.blocksExternalGesture(listSwipe);

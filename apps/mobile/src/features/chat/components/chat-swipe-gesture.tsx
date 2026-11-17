@@ -14,19 +14,33 @@ export const ChatSwipeGestureContext = createContext<ChatSwipeGesture | null>(nu
 /** The width of the message times beside the chat, in points: the times are fully in at this distance. */
 export const MESSAGE_TIME_WIDTH = 72;
 
-/**
- * How far the message bubbles move away from Back to show the message times, in points. The times
- * are fully in at `MESSAGE_TIME_WIDTH` and stop there; the bubbles can move on past it. A swipe on a
- * message bubble sets it; each message reads it.
- */
-export const ChatTimeRevealContext = createContext<SharedValue<number> | null>(null);
+/** The swipe on a message bubble that shows the message times. */
+export interface ChatTimeReveal {
+  /**
+   * How far the message bubbles move away from Back, in points. The times are fully in at
+   * `MESSAGE_TIME_WIDTH` and stop there; the bubbles can move on past it. Each message reads it.
+   */
+  offset: SharedValue<number>;
+  /** Mounts the times of the messages. The swipe calls it when it starts. */
+  mount: () => void;
+}
+
+export const ChatTimeRevealContext = createContext<ChatTimeReveal | null>(null);
 
 /**
- * A horizontal scroll view in a message, such as a wide table or formula. In an agent's chat it is a
- * gesture handler scroll view: when it scrolls, it cancels the swipe of the chat and the reply swipe
- * of the bubble. Elsewhere, such as in a sheet, it stays the React Native scroll view.
+ * The times mount with the first swipe that shows them, not with each row of the chat, and then
+ * stay mounted.
+ */
+export const ChatTimesMountedContext = createContext(false);
+
+/**
+ * A horizontal scroll view in a message, such as a wide table or formula. In the message list of a
+ * chat it is a gesture handler scroll view: when it scrolls, it cancels the swipe of the chat and the
+ * reply and times swipes of the bubble. Elsewhere, such as in a sheet, it stays the React Native
+ * scroll view.
  */
 export function ChatHorizontalScrollView(props: ScrollViewProps) {
   const swipe = useContext(ChatSwipeGestureContext);
-  return swipe ? <GestureScrollView {...props} horizontal /> : <ScrollView {...props} horizontal />;
+  const times = useContext(ChatTimeRevealContext);
+  return swipe || times ? <GestureScrollView {...props} horizontal /> : <ScrollView {...props} horizontal />;
 }

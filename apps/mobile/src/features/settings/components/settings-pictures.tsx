@@ -289,7 +289,6 @@ const OFF_NUDGE = 0.08;
  * Settings > Conversations > swipe in an agent chat. The picture shows the panel open beside the
  * chat; the demonstration closes it and opens it again, as a swipe does. "Off" shows only the chat.
  */
-
 export function SwipePicture({ target, play }: { target: "threads" | "browser" | "off"; play: number }) {
   const width = useSharedValue(0);
   const shown = useSharedValue(1);

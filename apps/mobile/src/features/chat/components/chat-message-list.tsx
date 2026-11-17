@@ -119,7 +119,9 @@ import { ChatSelectableText } from "./chat-selectable-text";
 import {
   type ChatSwipeGesture,
   ChatSwipeGestureContext,
+  type ChatTimeReveal,
   ChatTimeRevealContext,
+  ChatTimesMountedContext,
   MESSAGE_TIME_WIDTH,
 } from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
@@ -1186,6 +1188,11 @@ const MESSAGE_TIME = { hour: "numeric", minute: "2-digit" } as const;
  * the actions sheet.
  */
 function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const mounted = useContext(ChatTimesMountedContext);
+  return mounted ? <MessageTimeLabel createdAt={createdAt} reveal={reveal} /> : null;
+}
+
+function MessageTimeLabel({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
   const { format } = useText();
   const label = useMemo(() => {
     const at = messageTime(createdAt);
@@ -1290,7 +1297,7 @@ function ChatRow({ item }: { item: VisibleMessage }) {
         />
       ) : null}
       {message.kind === "message" && timeReveal ? (
-        <MessageWithTime createdAt={message.createdAt} reveal={timeReveal}>
+        <MessageWithTime createdAt={message.createdAt} reveal={timeReveal.offset}>
           {messageRow}
         </MessageWithTime>
       ) : (
@@ -1502,8 +1509,13 @@ export const ChatMessageList = memo(function ChatMessageList({
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
-  // How far the rows move to show the message times. A swipe on the reader's own bubble sets it.
-  const timeReveal = useSharedValue(0);
+  // How far the bubbles move to show the message times. A swipe on a message bubble sets it.
+  const timeOffset = useSharedValue(0);
+  const [timesMounted, setTimesMounted] = useState(false);
+  const timeReveal = useMemo<ChatTimeReveal>(
+    () => ({ offset: timeOffset, mount: () => setTimesMounted(true) }),
+    [timeOffset],
+  );
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
@@ -2245,9 +2257,11 @@ export const ChatMessageList = memo(function ChatMessageList({
                 <RowContext value={rowContext}>
                   <ChatSwipeGestureContext value={swipeGesture ?? null}>
                     <ChatTimeRevealContext value={timeReveal}>
-                      <ListHeaderContext value={listHeader}>
-                        <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                      </ListHeaderContext>
+                      <ChatTimesMountedContext value={timesMounted}>
+                        <ListHeaderContext value={listHeader}>
+                          <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                        </ListHeaderContext>
+                      </ChatTimesMountedContext>
                     </ChatTimeRevealContext>
                   </ChatSwipeGestureContext>
                 </RowContext>
