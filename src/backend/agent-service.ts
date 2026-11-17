@@ -256,7 +256,7 @@ import {
 import { ProfileSave, standingProfileChanged, toProfileSaveFailed } from "./agent/profile-save";
 import { pickPoolAccount } from "./agent/provider-account-pool";
 import type { ProviderAccountStore } from "./agent/provider-account-store";
-import { isPlanLimitDiagnostic, providerResetDelayMs } from "./agent/provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, providerResetDelayMs } from "./agent/provider-diagnostics";
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
 import { QueueControls } from "./agent/queue-controls";
 import { quietRoutineRun } from "./agent/routine-quiet-runs";
@@ -1577,7 +1577,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     model: lead.model,
                     cause: failed.causeCode,
                   });
-                  this.#usageLimits.failed(lead.id, lead.model, providerResetDelayMs(failed.message));
+                  // A spent balance names no reset, so the lead does not go back to it by itself (#5220).
+                  const resetDelayMs = providerResetDelayMs(failed.message);
+                  const spent = resetDelayMs === null && isBalanceDiagnostic(failed.message);
+                  this.#usageLimits.failed(lead.id, lead.model, resetDelayMs, spent);
                 }
                 return Effect.void;
               }),
