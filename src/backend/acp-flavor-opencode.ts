@@ -1,6 +1,7 @@
 import { RequestError, type SessionUpdate } from "@agentclientprotocol/sdk";
 import { isFreeOpencodeModel } from "@openbot/contracts/ipc";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import { createOpenBotLogger } from "@openbot/logging";
 import type { CauseCode } from "@openbot/telemetry";
 import { type AcpCustomEndpoint, type AcpFlavor, type AcpRetryCause, shownFailureDetail } from "./acp-flavor";
 import {
@@ -11,6 +12,9 @@ import {
   isUsageLimitDiagnostic,
 } from "./agent/provider-diagnostics";
 import { isRecord } from "./protocol";
+
+// The ACP client's name, so the line also goes to the provider log (`src/main/provider-log.ts`).
+const logger = createOpenBotLogger("acp-client");
 
 /**
  * OpenCode 2.2.5 to 2.3.0 wait 300 s for a model's response headers, the stall limit, then retry.
@@ -232,8 +236,9 @@ function openCodeRequestFailure(
     return sourceText("error.provider.opencodeReasoningOverlap");
   }
   // Before the list, which reads a 5xx as a provider failure that waiting fixes; a new chat fixes this one.
+  // To the log only: a diagnostic with "failed" in it shows the server's own text in a toast too.
   if (OPENCODE_OUT_OF_MEMORY.test(reason)) {
-    log(`OpenCode model server ran out of memory: ${reason}`);
+    logger.warn("A model server ran out of memory for an OpenCode request.", { reason: redact(reason) });
     return sourceText("error.provider.opencodeOutOfMemory");
   }
   // Before the list: a gateway reports an overflow as `Upstream request failed: <reason>` too.
