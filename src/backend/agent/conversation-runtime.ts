@@ -865,6 +865,13 @@ export class ConversationRuntime {
     this.#unloadedThreads.delete(externalThreadId);
   }
 
+  /** The provider threads that this client holds, loaded or not yet unloaded. */
+  clientThreads(client: AgentClient): string[] {
+    return [...this.#loadedThreads, ...this.#unloadedThreads]
+      .filter(([, owner]) => owner === client)
+      .map(([externalThreadId]) => externalThreadId);
+  }
+
   /** Forgets the sessions one stopped process held, and leaves those of every other provider loaded. */
   unloadClientThreads(client: AgentClient): void {
     for (const threads of [this.#loadedThreads, this.#unloadedThreads]) {
