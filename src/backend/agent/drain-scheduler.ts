@@ -518,6 +518,11 @@ export class DrainScheduler {
     });
   }
 
+  /** Whether a turn runs in an external conversation of the messaging lane, also one with no delivery. */
+  messagingTurnActive(agentId: string): boolean {
+    return this.#ownThreadTurnActive(agentId, true);
+  }
+
   /** Why a new message in the agent's own chat waits now, or null when it can start at once. */
   ownChatHold(agentId: string): string | null {
     return this.#heldBy({ agentId, taskId: null });

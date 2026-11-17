@@ -1663,10 +1663,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       // A conversation in the messaging lane waits for that lane only. The others wait in the own chat's lane.
+      // A turn that the provider started itself has no delivery, but the lane still waits for it.
       busy: (agentId, linkId) =>
         this.#mailbox.inMessagingLane(agentId, linkId)
           ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
+            this.#drain.messagingTurnActive(agentId)
           : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
