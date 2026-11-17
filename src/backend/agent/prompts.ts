@@ -30,7 +30,8 @@ import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
-const MCP_SIGN_IN_PAGE_DONE = sourceText("status.agent.mcpSignInPageDone");
+// The word of the MCP sign-in card, which tells the agent to continue after the sign-in.
+const MCP_SIGN_IN_PAGE_DONE = sourceText("status.provider.confirmContinue");
 const MCP_SIGN_IN_PAGE_DECLINE = sourceText("status.agent.mcpSignInPageDecline");
 /** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
@@ -161,33 +162,37 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
 }
 
 /**
- * The sign-in page of a URL request as a Markdown link destination, or null when the card must not
- * link to it. As Codex checks it: https, with a host and with no user name or password.
+ * The sign-in page of a URL request, or null when the card must not link to it. As Codex checks it:
+ * https, with a host and with no user name or password. `url` is the Markdown link destination, and
+ * `address` is what the card shows: the page without its query, as the MCP sign-in card shows a server.
  */
-function mcpSignInPageUrl(params: unknown): string | null {
+function mcpSignInPage(params: unknown): { url: string; address: string } | null {
   const url = getString(params, "url");
   if (!url || !URL.canParse(url)) return null;
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) return null;
-  // A parenthesis ends a Markdown link destination.
-  return parsed.href.replaceAll("(", "%28").replaceAll(")", "%29");
+  return {
+    // A parenthesis ends a Markdown link destination.
+    url: parsed.href.replaceAll("(", "%28").replaceAll(")", "%29"),
+    address: `${parsed.origin}${parsed.pathname}`,
+  };
 }
 
 /**
  * A server's request to open its sign-in page, for example after its tool answered -32042 (#10152).
- * The card links to the page; the answer that the user signed in accepts the request, and the
- * provider runs the tool call again. Codex's own server for ChatGPT apps keeps its reconnect notice.
+ * The card shows where the page is and links to it, with the words of the MCP sign-in card: Continue
+ * accepts the request, and the provider runs the tool call again. Codex's own server for ChatGPT apps keeps its reconnect notice.
  */
 function mcpSignInPageQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
-  const url = mcpSignInPageUrl(params);
+  const page = mcpSignInPage(params);
   const name = serverName?.trim();
-  if (!url || !name || name === CODEX_APPS_MCP_SERVER_NAME) return null;
+  if (!page || !name || name === CODEX_APPS_MCP_SERVER_NAME) return null;
   const subject = name === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : name;
   const message = getString(params, "message")?.trim();
   return {
     id: MCP_ELICITATION_DECISION_QUESTION_ID,
     header: subject.slice(0, INPUT_LIMITS.promptHeader),
-    question: sourceText("status.agent.mcpSignInPage", { name: subject, url }),
+    question: sourceText("status.agent.mcpSignInPage", { name: subject, ...page }),
     ...(message ? { detail: message.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
     isSecret: false,
     options: [

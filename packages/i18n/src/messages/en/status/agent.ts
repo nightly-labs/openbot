@@ -1,9 +1,8 @@
 import { defineMessages } from "../../../message";
 
 export const messages = defineMessages("status.agent", {
-  "status.agent.mcpSignInPage":
-    "{name} asks you to sign in on a web page. [Open the sign-in page]({url}), then choose I signed in.",
-  "status.agent.mcpSignInPageDone": "I signed in",
+  // `{address}` is in a code span, so the card links only to the whole page.
+  "status.agent.mcpSignInPage": "{name} asks you to sign in on `{address}`. [Sign in]({url}), then choose Continue.",
   "status.agent.mcpSignInPageDoneDetail": "The agent tries the request again.",
   "status.agent.mcpSignInPageDecline": "Don't sign in",
   "status.agent.mcpSignInPageDeclineDetail": "The request stops.",
