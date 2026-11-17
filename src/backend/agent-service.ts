@@ -158,7 +158,11 @@ import {
   sameAgentBrowserProfile,
   sameAgentModelChoice,
   WORKFLOWS_USAGE_ID,
+  type WorkflowCatalogProvider,
+  type WorkflowMediaCatalog,
   type WorkflowMediaCredits,
+  type WorkflowMediaPrice,
+  type WorkflowMediaPriceRequest,
   type WorkflowMediaProvider,
   type WorkflowMediaProviders,
   type WorkflowMediaSpecs,
@@ -335,6 +339,7 @@ import { shortenDiagnostic } from "./stderr-diagnostics";
 import type { UserBrowsingLog } from "./user-browsing-log";
 import type { VaultItems } from "./vault-items";
 import { generateHiggsfieldMedia, HIGGSFIELD_MCP_HOST, readHiggsfieldCredits } from "./workflows/higgsfield-media";
+import { WorkflowMediaCatalogCache } from "./workflows/media-catalog";
 import { generateSunraMedia, readSunraCredits, SUNRA_MCP_HOST } from "./workflows/sunra-media";
 import type { WorkflowTools } from "./workflows/workflow-tools";
 import { type MediaImageRole, mediaInputText } from "./workflows/workflow-walk";
@@ -644,6 +649,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   /** Agent and channel routines of every trigger kind, with their webhook routes. */
   readonly routineRecords: RoutineRecords;
   readonly #mcp: McpGateway;
+  readonly #mediaCatalog: WorkflowMediaCatalogCache;
   readonly #mcpAgentAccess: AgentServiceOptions["mcpAgentAccess"];
   readonly #clearPictureBackground: AgentServiceOptions["clearPictureBackground"];
   readonly #providers: ProviderRuntime;
@@ -743,6 +749,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // Read late: the threads are built further down this constructor.
         refreshAllAgentRuntimes: () => this.#threads.refreshAllAgentRuntimes(),
       },
+    });
+    this.#mediaCatalog = new WorkflowMediaCatalogCache({
+      signIn: (provider) => this.#mediaSignIn(provider),
+      warn: (message, details) => logger.warn(message, details),
     });
     this.#sidebarLayout = sidebarLayout;
     this.#libraryFolders = libraryFolders;
@@ -3076,6 +3086,31 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     ),
   ).bind(this);
 
+  #mediaSignIn(provider: WorkflowCatalogProvider) {
+    return this.#mcp.serviceSignIn(provider === "sunra" ? SUNRA_MCP_HOST : HIGGSFIELD_MCP_HOST);
+  }
+
+  /**
+   * The live models of the signed-in media services; with `only`, of that one. It never fails; a
+   * service that fails gives its fixed models.
+   */
+  readonly workflowMediaCatalog = Effect.fn("AgentService.workflowMediaCatalog")(function* (
+    this: AgentService,
+    only?: WorkflowCatalogProvider,
+  ) {
+    if (this.#stopping) return { models: [] } satisfies WorkflowMediaCatalog;
+    return yield* this.#mediaCatalog.catalog(only);
+  }).bind(this);
+
+  /** What one file of a media service model costs with the choices of a step, or null with no quote. */
+  readonly workflowMediaPrice = Effect.fn("AgentService.workflowMediaPrice")(function* (
+    this: AgentService,
+    request: WorkflowMediaPriceRequest,
+  ) {
+    if (this.#stopping) return { credits: null } satisfies WorkflowMediaPrice;
+    return yield* this.#mediaCatalog.price(request);
+  }).bind(this);
+
   /** The media services beyond the agent providers that a workflow step can use now. */
   workflowMediaProviders(): WorkflowMediaProviders {
     return {
@@ -3126,6 +3161,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         provider: WorkflowMediaProvider;
         /** The id of the model at its provider. Sunra and Higgsfield read it; Codex and Grok use their default. */
         model: string;
+        /** The canvas id of the model ("sunra-…", "higgsfield-…"), which finds its plan in the live list. */
+        catalogId: string;
         /** The account of the provider that pays. Null is its own sign-in; Sunra and Higgsfield ignore it. */
         account: string | null;
         specs: WorkflowMediaSpecs;
@@ -3137,13 +3174,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       const failed = (message: string) => new ProfileGenerationFailed({ cause: new Error(message) });
       if (input.provider === "sunra") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const plan = yield* this.#mediaCatalog.sunraPlan(input.catalogId, input.kind);
         return yield* generateSunraMedia(
           {
             signIn: () => this.#mcp.serviceSignIn(SUNRA_MCP_HOST),
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
-          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+          {
+            kind: input.kind,
+            model: input.model,
+            prompt: input.prompt,
+            specs: input.specs,
+            images: input.images,
+            plan,
+          },
         ).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() => logger.warn("Could not make workflow media with Sunra.", { error: failure.message })),
@@ -3153,13 +3198,21 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       }
       if (input.provider === "higgsfield") {
         if (this.#stopping) return yield* failed(sourceText("error.backend.shuttingDown"));
+        const plan = yield* this.#mediaCatalog.higgsfieldPlan(input.catalogId, input.model, input.kind);
         return yield* generateHiggsfieldMedia(
           {
             signIn: () => this.#mcp.serviceSignIn(HIGGSFIELD_MCP_HOST),
             resolveAttachment: (attachmentId) => this.#mailbox.resolveAttachment(attachmentId),
             store: (file) => this.#mailbox.storeGeneratedAttachment(file),
           },
-          { kind: input.kind, model: input.model, prompt: input.prompt, specs: input.specs, images: input.images },
+          {
+            kind: input.kind,
+            model: input.model,
+            prompt: input.prompt,
+            specs: input.specs,
+            images: input.images,
+            plan,
+          },
         ).pipe(
           Effect.tapError((failure) =>
             Effect.sync(() =>

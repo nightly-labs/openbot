@@ -373,7 +373,9 @@ import {
   decodeWorkflowGitHubHistory,
   decodeWorkflowGitHubOptions,
   decodeWorkflowGraph,
+  decodeWorkflowMediaCatalog,
   decodeWorkflowMediaCredits,
+  decodeWorkflowMediaPrice,
   decodeWorkflowMediaProviders,
   decodeWorkflowPictureId,
   decodeWorkflowRunDetail,
@@ -944,6 +946,8 @@ const openbotApi: OpenBotDesktopApi = {
     keepPicture: decodeWorkflowPictureId,
     mediaProviders: decodeWorkflowMediaProviders,
     mediaCredits: decodeWorkflowMediaCredits,
+    mediaCatalog: decodeWorkflowMediaCatalog,
+    mediaPrice: decodeWorkflowMediaPrice,
   }),
   crm: bridgeGroup(IPC_ENDPOINTS.crm, {
     overview: decodeCrmOverview,

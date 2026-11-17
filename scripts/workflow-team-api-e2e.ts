@@ -27,6 +27,9 @@
 // its first ratio.
 // An image step with no description runs from its text input; with no description, no text and no
 // picture it fails with "mediaEmptyRequest" and never reaches the media maker.
+// The host advertises `workflows-media-catalog-v1` to a protocol 9 peer. A member reads the live models
+// of the signed-in services and the price of a step's choices; a bad price request is refused. A step
+// with a model that only the live list has reaches the media maker with its id at the service.
 // Agent steps answer through stand-ins, so no model turn is sent. The account check reads the provider
 // status, which can start a provider CLI to list its models; it never starts a turn or makes a file.
 // Run: `bun scripts/workflow-team-api-e2e.ts`.
@@ -37,7 +40,14 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import type { AgentAccessChange, WorkflowDetail, WorkflowGraph, WorkflowNode } from "@openbot/contracts/ipc";
+import type {
+  AgentAccessChange,
+  WorkflowDetail,
+  WorkflowGraph,
+  WorkflowMediaCatalogModel,
+  WorkflowMediaPriceRequest,
+  WorkflowNode,
+} from "@openbot/contracts/ipc";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -57,6 +67,11 @@ import {
   WORKFLOWS_HIGGSFIELD_ROUTES,
 } from "@openbot/contracts/team-protocol/workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-account-v1";
+import {
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CODECS,
+  WORKFLOWS_MEDIA_CATALOG_ROUTES,
+} from "@openbot/contracts/team-protocol/workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "@openbot/contracts/team-protocol/workflows-media-transparent-v1";
 import {
@@ -108,6 +123,24 @@ let higgsfieldSignedIn = false;
 const mediaAccounts: (string | null)[] = [];
 /** Whether each media request asks for a transparent image, its prompt and its aspect ratio, in order. */
 const mediaRequests: { transparent: boolean; prompt: string; aspect: string }[] = [];
+/** The model id at the provider and the catalog id of each media request, in order. */
+const mediaModels: { model: string; catalogId: string }[] = [];
+/** Each price request that reached the host's price read, in order. */
+const priceRequests: WorkflowMediaPriceRequest[] = [];
+/** A Higgsfield model that only the live list has, as the host's catalog read gives it after the sign-in. */
+const LIVE_MODEL: WorkflowMediaCatalogModel = {
+  id: "higgsfield-kling3_0_e2e",
+  provider: "higgsfield",
+  providerModel: "kling3_0_e2e",
+  name: "Kling 3.0 e2e",
+  maker: "Kuaishou",
+  kinds: ["video"],
+  aspects: ["16:9", "9:16", "1:1"],
+  durations: [5, 10],
+  resolutions: ["720p", "1080p"],
+  transparent: false,
+};
+const LIVE_PRICE = 22.5;
 /** Each crop to a custom size, in order. The stand-in crop fails while `sizeFails` is true. */
 const sizeRequests: { attachmentId: string; width: number; height: number }[] = [];
 let sizeFails = false;
@@ -339,11 +372,19 @@ async function startHost(): Promise<Host> {
           sunra: sunraSignedIn ? { available: 120, quota: 500 } : null,
           higgsfield: higgsfieldSignedIn ? { available: 42, quota: null } : null,
         }),
+      // As the app answers: the live Higgsfield list after the sign-in. No Sunra or Higgsfield call is made.
+      mediaCatalog: () => Effect.succeed({ models: higgsfieldSignedIn ? [LIVE_MODEL] : [] }),
+      mediaPrice: (request) =>
+        Effect.sync(() => {
+          priceRequests.push(request);
+          return { credits: higgsfieldSignedIn && request.model === LIVE_MODEL.id ? LIVE_PRICE : null };
+        }),
       // A step with an account goes to the real agent service, which must refuse an account that this
       // host does not have before it makes a file. A step on the own sign-in gets a stand-in file, so
       // no file is paid for.
       generateMedia: (request) => {
         mediaAccounts.push(request.account);
+        mediaModels.push({ model: request.model, catalogId: request.catalogId });
         mediaRequests.push({
           transparent: request.specs.transparent,
           prompt: request.prompt,
@@ -1629,6 +1670,112 @@ try {
       assert.equal(empty.done.error, sourceText("error.workflow.mediaEmptyRequest"), JSON.stringify(empty.done.error));
       assert.equal(empty.requests.length, 0, "an empty request never reaches the media maker");
       return { fromInput: fromInput.done.status, empty: empty.done.error };
+    },
+  );
+
+  await step(
+    "media catalog: the host advertises workflows-media-catalog-v1; a member reads the live models and a price, and a step runs a model that only the live list has",
+    async () => {
+      const capabilities = async (protocol: number) =>
+        list(
+          record((await call("GET", TEAM_API_ROUTES.compatibility, { protocol })).body, "compatibility").capabilities,
+          "capabilities",
+        );
+      assert.ok((await capabilities(TEAM_PROTOCOL_V9)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      assert.ok(!(await capabilities(TEAM_PROTOCOL_V7)).includes(WORKFLOWS_MEDIA_CATALOG_CAPABILITY));
+      const catalogCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog);
+      assert.ok(catalogCodec, "No workflows-media-catalog-v1 codec for catalog.");
+      const priceCodec = WORKFLOWS_MEDIA_CATALOG_CODECS.get(WORKFLOWS_MEDIA_CATALOG_ROUTES.price);
+      assert.ok(priceCodec, "No workflows-media-catalog-v1 codec for price.");
+      const raw = async (route: string, body: unknown, capabilities = teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9)) =>
+        call("POST", route, { token: member, body, protocol: TEAM_PROTOCOL_V9, capabilities });
+      const catalog = async () => {
+        catalogCodec.request({});
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog, {});
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        catalogCodec.response(response.status, response.body);
+        return response.body;
+      };
+      const ask: WorkflowMediaPriceRequest = {
+        model: LIVE_MODEL.id,
+        kind: "video",
+        aspect: "16:9",
+        duration: 10,
+        resolution: "1080p",
+        transparent: false,
+      };
+      const price = async (request: WorkflowMediaPriceRequest) => {
+        priceCodec.request(request);
+        const response = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, request);
+        assert.equal(response.status, 200, JSON.stringify(response.body));
+        priceCodec.response(response.status, response.body);
+        return response.body;
+      };
+      higgsfieldSignedIn = false;
+      const signedOut = await catalog();
+      assert.deepEqual(signedOut, { models: [] });
+      const priceSignedOut = await price(ask);
+      assert.deepEqual(priceSignedOut, { credits: null });
+      higgsfieldSignedIn = true;
+      try {
+        const signedIn = await catalog();
+        assert.deepEqual(signedIn, { models: [LIVE_MODEL] });
+        const before = priceRequests.length;
+        const priceSignedIn = await price(ask);
+        assert.deepEqual(priceSignedIn, { credits: LIVE_PRICE });
+        assert.deepEqual(priceRequests.slice(before), [ask], "the request reached the host's price read unchanged");
+        // A bad request is refused before it reaches the price read.
+        const badPrice = await raw(WORKFLOWS_MEDIA_CATALOG_ROUTES.price, { ...ask, duration: -1 });
+        assert.equal(badPrice.status, 400, JSON.stringify(badPrice.body));
+        assert.equal(priceRequests.length, before + 1);
+        // A step with the live model reaches the media maker with its id at Higgsfield and its catalog id.
+        const beforeModels = mediaModels.length;
+        const workflow = await hostWorkflow("Live Higgsfield model", {
+          nodes: [
+            promptNode,
+            {
+              id: "image",
+              kind: "image",
+              at: at(300),
+              fields: { model: LIVE_MODEL.id, media: "video", aspect: "16:9", duration: 10, resolution: "1080p" },
+            },
+          ],
+          edges: [{ id: "edge", from: "prompt", to: "image", type: "text" }],
+          strokes: [],
+        });
+        const started = await ok(WORKFLOWS_ROUTES.startRun, ownerToken, {
+          workflowId: workflow.id,
+          requestId: requestId(),
+        });
+        const done = await settled(text(record(started.run, "run").id, "run id"), "image");
+        assert.equal(done.status, "done", JSON.stringify(done.error));
+        assert.deepEqual(mediaModels.slice(beforeModels), [
+          { model: LIVE_MODEL.providerModel, catalogId: LIVE_MODEL.id },
+        ]);
+        const old = await raw(
+          WORKFLOWS_MEDIA_CATALOG_ROUTES.catalog,
+          {},
+          teamCapabilitiesForProtocol(TEAM_PROTOCOL_V9).filter(
+            (capability) => capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+          ),
+        );
+        assert.equal(old.status, 400, JSON.stringify(old.body));
+        assert.ok(
+          JSON.stringify(old.body).includes(sourceText("error.workflow.serverTooOld")),
+          JSON.stringify(old.body),
+        );
+        return {
+          signedOut,
+          signedIn,
+          priceSignedOut,
+          priceSignedIn,
+          badPrice: badPrice.status,
+          step: done.status,
+          old: old.status,
+        };
+      } finally {
+        higgsfieldSignedIn = false;
+      }
     },
   );
 
