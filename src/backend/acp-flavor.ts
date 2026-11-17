@@ -466,7 +466,14 @@ const PAYMENT_METHOD_WALL = /^\s*Add a payment method to continue\.?\s*$/u;
 const PAYMENT_METHOD_WALL_TEXT = /\bAdd a payment method to continue\b/u;
 
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
-export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
+export const CLINE_ACP_FLAVOR: AcpFlavor = {
+  subagentTools: ["spawn_agent"],
+  // Cline CLI 3.0.74 throws its `SessionNotFoundError` when its hub no longer has the session, and the
+  // ACP SDK sends it as "Internal error" with `data.details` "session not found: <id>". OpenBot kept
+  // the session, so each message failed, also after a restart (#11096). Only this session counts.
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
+};
 
 /**
  * GitHub Copilot CLI 1.0.105 advertises only http and sse MCP servers, and drops a stdio one, so its
