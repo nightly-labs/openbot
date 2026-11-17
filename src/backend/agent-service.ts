@@ -2019,6 +2019,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         runsTurn: (agentId) => this.#runsTurn(agentId),
         interrupt: (agentId, turnId, mayStop) =>
           this.#interruptTurn(agentId, turnId, undefined, mayStop).pipe(toToolOperationFailed),
+        canSteerNow: (agentId) => this.#canSteerNow(agentId),
         turnActivity: (agentId, turnId) => ({
           startedAt: turnId ? this.#turn.turnStartedAt(turnId) : null,
           lastEventAt: this.#turn.lastEventAt(agentId),
@@ -6487,18 +6488,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ): Effect.fn.Return<AgentMessageSteer> {
     const notSteered = <Reason extends AgentMessageSteer>(reason: Reason) => afterSteer.pipe(Effect.as(reason));
     const steerTurnId = this.#turnToSteer(agent.id, task?.taskId ?? null, snapshot);
-    if (!steerTurnId) return yield* notSteered(null);
+    if (!steerTurnId) {
+      // The turn ended between the sender's check and this delivery: an amendment becomes a request
+      // again, so it does not wait as a notice that nobody answers.
+      this.#mailbox.restoreAmendedRequest(deliveryId);
+      return yield* notSteered(null);
+    }
     const steers = (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer";
     const model = this.#drain.modelForTurn(agent.id, steerTurnId) ?? agent.model;
     if (!agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available())) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "provider-unsupported");
+      // Even without a reason on the row, an amendment must not stay a notice here.
+      this.#mailbox.restoreAmendedRequest(deliveryId);
       return yield* notSteered("provider-unsupported");
     }
     if (this.#routineRunsIn(agent, task?.threadId ?? null)) {
       if (explain && steers) yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
+      this.#mailbox.restoreAmendedRequest(deliveryId);
       return yield* notSteered("routine-run");
     }
-    if (!steers) return yield* notSteered("recipient-queues");
+    if (!steers) {
+      // The recipient changed to Queue while the message was on its way: same restore as above.
+      this.#mailbox.restoreAmendedRequest(deliveryId);
+      return yield* notSteered("recipient-queues");
+    }
     const steer = this.#steerSentMessage(
       agent,
       snapshot.threadId ?? agent.threadId,
@@ -6515,11 +6528,38 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return snapshot.activeTurnId !== this.#stoppedTurn(agentId, taskId) ? snapshot.activeTurnId : null;
   }
 
+  /**
+   * Whether a new message would join this agent's running turn right now, by the same rules
+   * `#steerWhenBusy` applies once the message is queued: Steer mode, a provider that steers natively,
+   * not a routine run, and a turn that is still running.
+   */
+  #canSteerNow(agentId: string): boolean {
+    const agent = this.#store.get(agentId);
+    if (!agent) return false;
+    if ((agent.busyMessageMode ?? this.#busyMessageMode()) !== "steer") return false;
+    const snapshot = this.#conversation.snapshotToUpdate(agentId);
+    if (!snapshot) return false;
+    if (snapshot.activeTurnId && this.#personTurn(agentId, snapshot.activeTurnId)) return false;
+    if (this.#routineRunsIn(agent, null)) return false;
+    const turnId = this.#turnToSteer(agent.id, null, snapshot);
+    if (!turnId) return false;
+    const model = this.#drain.modelForTurn(agent.id, turnId) ?? agent.model;
+    return agentSteersTurns({ provider: providerForAgent(agent), model }, this.#endpoints.available());
+  }
+
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.get(recipientAgentId);
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
-    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
-    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) return Effect.succeed(null);
+    if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) {
+      // No loaded chat or no turn to join, an app restart included: the amendment is a request again.
+      this.#mailbox.restoreAmendedRequest(deliveryId);
+      return Effect.succeed(null);
+    }
+    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) {
+      // A person's turn takes no agent message: same restore as the other exits that do not steer.
+      this.#mailbox.restoreAmendedRequest(deliveryId);
+      return Effect.succeed(null);
+    }
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 
@@ -6552,7 +6592,17 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             agentId: agent.id,
             error: failure.cause,
           });
-          if (this.#conversation.ensureSnapshot(agent.id, threadId).activeTurnId !== turnId) return null;
+          // The steer did not reach the turn. An amendment was stored as a notice only to join it, so it
+          // takes the request meaning back here — whether or not this send asks for a reason on the row.
+          // The store restores only a delivery that is still queued, so a steer that partly started the
+          // message is left alone and does not run twice.
+          this.#mailbox.restoreAmendedRequest(deliveryId);
+          // When the turn ended in between, the message starts as the next turn or waits behind it
+          // like any other, which is no fallback worth naming.
+          if (this.#conversation.ensureSnapshot(agent.id, threadId).activeTurnId !== turnId) {
+            this.#mailboxSync.emitQueue(agent.id);
+            return null;
+          }
           if (explain) {
             yield* this.#markSteerFallback(agent.id, deliveryId, "steer-failed");
             this.#mailboxSync.emitQueue(agent.id);
