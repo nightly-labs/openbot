@@ -353,6 +353,9 @@ case $command in
     require_host "run docker $command <container> on the host"
     require_root "$command"
     systemctl "$command" "$UNIT"
+    # A stop leaves a unit that failed in the `failed` state. Clear it, so that the update timer
+    # does not take the stop for a stopped start loop and start OpenBot again.
+    if [ "$command" = stop ]; then systemctl reset-failed "$UNIT" 2>/dev/null || true; fi
     ;;
   update) update_command ;;
   uninstall) uninstall_command ;;

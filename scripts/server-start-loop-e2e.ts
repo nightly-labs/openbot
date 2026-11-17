@@ -303,7 +303,7 @@ const CHECK_CASES: CheckCase[] = [
   },
   {
     name: "start loop stopped, staged 1 hour ago: stage and start again",
-    activeState: "inactive",
+    activeState: "failed",
     execMainStatus: "78",
     stampAgeMs: HOUR_MS,
     stageFails: false,
@@ -354,6 +354,15 @@ const CHECK_CASES: CheckCase[] = [
     stageFails: false,
     stagedVersion: "",
     expected: { calls: ["stage"], exitCode: 0, stampRefreshed: true },
+  },
+  {
+    name: "stopped by hand after the start loop stopped (inactive, 78): no start",
+    activeState: "inactive",
+    execMainStatus: "78",
+    stampAgeMs: HOUR_MS,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: [], exitCode: 0, stampRefreshed: false },
   },
 ];
 

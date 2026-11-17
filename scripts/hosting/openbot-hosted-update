@@ -217,11 +217,10 @@ recover() {
 }
 
 # Succeeds when OpenBot stopped its start loop and systemd does not start it again. Only the state
-# of the unit is read, never a file of the service user.
+# of the unit is read, never a file of the service user. Exit 78 leaves the unit `failed`; `openbot
+# stop` clears that state, so a server that an admin stopped is `inactive` and stays stopped.
 start_loop_stopped() {
-  local state
-  state=$(systemctl show --property=ActiveState --value openbot.service 2>/dev/null) || return 1
-  case $state in inactive | failed) ;; *) return 1 ;; esac
+  [ "$(systemctl show --property=ActiveState --value openbot.service 2>/dev/null)" = failed ] || return 1
   [ "$(systemctl show --property=ExecMainStatus --value openbot.service 2>/dev/null)" = "$START_LOOP_STATUS" ]
 }
 
