@@ -82,14 +82,16 @@ export const Saving: Story = { args: { state: "saving" } };
 
 export const Saved: Story = { args: { action: "updated", state: "saved" } };
 
-/** A scheduled run of the routine paused it, so the card says which run and gives no next run. */
+/** A scheduled run of the routine paused it, so the card says which run and offers Turn on. */
 export const PausedByItsRun: Story = {
   args: {
     action: "updated",
     routineName: "Check buyer chats",
     schedule: { kind: "custom", expression: "0 8-22/2 * * *" },
     nextRunLabel: undefined,
+    paused: true,
     pausedLabel: "Paused by its 8:00 AM run",
+    onTurnOn: fn(),
   },
 };
 
@@ -100,9 +102,21 @@ export const SaveError: Story = {
   args: { action: "updated", state: "error", errorText: "Could not save the schedule. Try again." },
 };
 
-/** The routine's own run paused it when its task was done (#10492). */
+/** A paused routine with no known reason, for example one that the person paused. */
 export const Paused: Story = {
   args: { action: "updated", paused: true, nextRunLabel: undefined, onTurnOn: fn() },
+};
+
+/** Turn on failed, for example while a joined server is offline: the card offers it again. */
+export const PausedTurnOnFailed: Story = {
+  args: {
+    action: "updated",
+    state: "error",
+    errorText: "The server is offline. Try again.",
+    paused: true,
+    nextRunLabel: undefined,
+    onTurnOn: fn(),
+  },
 };
 
 export const Deleted: Story = {

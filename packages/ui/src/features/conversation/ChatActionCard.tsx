@@ -16,7 +16,7 @@ export type ChatActionCardStatus =
   | { kind: "note"; text: string; action?: ChatActionCardAction | undefined }
   | { kind: "busy"; text: string }
   | { kind: "done"; text: string }
-  | { kind: "error"; text: string };
+  | { kind: "error"; text: string; action?: ChatActionCardAction | undefined };
 
 export interface ChatActionCardProps {
   /** The Lucide icon of the kind of record. */
@@ -91,7 +91,7 @@ function ChatActionCardFooter(props: { status?: ChatActionCardStatus | undefined
   const text = () => props.status?.text;
   const action = () => {
     const status = props.status;
-    return status?.kind === "note" ? status.action : undefined;
+    return status?.kind === "note" || status?.kind === "error" ? status.action : undefined;
   };
   return (
     <footer class={["chat-action-card-footer", { "chat-action-card-footer-empty": !props.status }]}>

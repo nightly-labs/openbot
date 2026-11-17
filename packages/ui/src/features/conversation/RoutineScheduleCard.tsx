@@ -44,6 +44,10 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
     props.nextRunLabel
       ? [t("routine.card.nextRun", { when: props.nextRunLabel }), props.timeZoneLabel].filter(Boolean).join(" · ")
       : undefined;
+  const turnOn = () => {
+    const onTurnOn = props.onTurnOn;
+    return props.paused && onTurnOn ? { label: t("routine.card.turnOn"), onClick: onTurnOn } : undefined;
+  };
   const status = (): ChatActionCardStatus | undefined => {
     switch (state()) {
       case "saving":
@@ -51,7 +55,8 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
       case "saved":
         return { kind: "done", text: [t("routine.card.saved"), nextRun()].filter(Boolean).join(" · ") };
       case "error":
-        return { kind: "error", text: props.errorText ?? t("routine.card.saveFailed") };
+        // A failed Turn on can be tried again from the card.
+        return { kind: "error", text: props.errorText ?? t("routine.card.saveFailed"), action: turnOn() };
       case "deleted":
         return { kind: "note", text: t("routine.card.deleted") };
       case "idle": {
@@ -59,7 +64,7 @@ export function RoutineScheduleCard(props: RoutineScheduleCardProps) {
           return {
             kind: "note",
             text: props.pausedLabel ?? t("routine.settings.paused"),
-            action: props.onTurnOn ? { label: t("routine.card.turnOn"), onClick: props.onTurnOn } : undefined,
+            action: turnOn(),
           };
         const text = nextRun() ?? props.pausedLabel;
         return text ? { kind: "note", text } : undefined;
