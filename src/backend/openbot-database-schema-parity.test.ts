@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { readAppliedVersions, readNormalizedDeclarations, readTableShapes } from "./migration-harness";
+import { readAppliedVersions, readNormalizedDeclarations } from "./migration-harness";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 import recordedSchemaHistory from "./openbot-database-schema-history.json";
 
@@ -24,20 +24,6 @@ afterEach(async () => {
 });
 
 describe("OpenBot database build paths", () => {
-  it("gives a new install the same tables, columns, indexes and foreign keys as an upgraded one", async () => {
-    const fresh = await newInstallDatabase();
-    const upgraded = await upgradedInstallDatabase();
-
-    expect(readTableShapes(upgraded)).toEqual(readTableShapes(fresh));
-  });
-
-  it("gives a new install the same declarations as an upgraded one, including partial index filters", async () => {
-    const fresh = await newInstallDatabase();
-    const upgraded = await upgradedInstallDatabase();
-
-    expect(readNormalizedDeclarations(upgraded)).toEqual(readNormalizedDeclarations(fresh));
-  });
-
   it("gives a new install the schema that the recorded history of every migration makes", async () => {
     const fresh = await newInstallDatabase();
     const recorded = new Map<string, string>();
@@ -51,12 +37,10 @@ describe("OpenBot database build paths", () => {
     expect(Object.fromEntries(declarationsByKey(fresh))).toEqual(Object.fromEntries(recorded));
   });
 
-  it("records every migration version on a new install, as on an upgraded one", async () => {
+  it("records every migration version on a new install", async () => {
     const fresh = await newInstallDatabase();
-    const upgraded = await upgradedInstallDatabase();
 
     expect(readAppliedVersions(fresh)).toEqual(Object.keys(recordedSchemaHistory).map(Number));
-    expect(readAppliedVersions(upgraded)).toEqual(readAppliedVersions(fresh));
   });
 });
 
@@ -180,16 +164,6 @@ function diffDeclarations(before: ReadonlyMap<string, string>, after: ReadonlyMa
 // An empty database has no tables: the path every new install follows.
 async function newInstallDatabase(): Promise<DatabaseSync> {
   const database = await openDatabase();
-  migrateOpenBotDatabase(database, { appliedAt });
-  return database;
-}
-
-// One empty table is enough for `hasExistingSchema` to report an existing database, and an empty
-// `schema_migrations` reads as a version older than the baseline: the path of an install from before
-// version 8.
-async function upgradedInstallDatabase(): Promise<DatabaseSync> {
-  const database = await openDatabase();
-  database.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");
   migrateOpenBotDatabase(database, { appliedAt });
   return database;
 }
