@@ -1351,20 +1351,20 @@ export const messages = {
   "mobile.server.providers.status.ready": "Installato",
   "mobile.server.providers.status.notInstalled": "Non installato",
   "mobile.server.providers.status.checking": "Controllo",
-  "mobile.server.providers.addAccountWithCode": "Aggiungi account con codice",
-  "mobile.server.providers.accountSignInWithCode": "Accedi con un codice",
   "mobile.server.providers.accounts": "Account",
   "mobile.server.providers.accountsHint":
     "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Un nuovo account effettua l'accesso sulla sua pagina su questo telefono.",
   "mobile.server.providers.accountsOnComputer":
     "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Aggiungi un account in OpenBot su un computer.",
   "mobile.server.providers.addAccount": "Aggiungi account",
+  "mobile.server.providers.addAccountWithCode": "Aggiungi account con codice",
   "mobile.server.providers.accountGone": "Questo account non è più su questo server.",
   "mobile.server.providers.accountFailed": "Impossibile modificare questo account. Riprova.",
   "mobile.server.providers.accountName": "Nome",
   "mobile.server.providers.accountNameHint":
     "Solo per te e gli amministratori di questo server. Lascia vuoto per mostrare l'email.",
   "mobile.server.providers.accountSignInAgain": "Accedi di nuovo",
+  "mobile.server.providers.accountSignInWithCode": "Accedi con un codice",
   "mobile.server.providers.accountsKeyHint":
     "Ogni agente usa un account. Sceglilo nelle impostazioni dell'agente. Un nuovo account richiede una chiave API di quell'account.",
   "mobile.server.providers.accountChangeKey": "Cambia chiave",

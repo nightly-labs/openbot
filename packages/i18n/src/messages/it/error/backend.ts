@@ -384,9 +384,9 @@ export const messages = {
   "error.backend.uiBlockActionNotAllowed":
     "Solo il proprietario del server o un amministratore può scegliere questa azione.",
   "error.backend.approvalInactive": "Questa approvazione non è più attiva.",
+  "error.backend.approvalOwnerOnly": "Solo il proprietario del server può approvare questa azione.",
   "error.backend.feedbackNeedsPhone":
     "Solo l'app OpenBot del telefono può inviare questa segnalazione, perché aggiunge la versione e il log di assistenza del telefono. Apri questa chat sul telefono. Se vedi questo messaggio lì, aggiorna l'app del telefono.",
-  "error.backend.approvalOwnerOnly": "Solo il proprietario del server può approvare questa azione.",
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
