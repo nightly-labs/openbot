@@ -61,10 +61,11 @@ as in a container, start it with `--appimage-extract-and-run`.
 
 ## Remote desktop is missing on Linux
 
-Remote desktop on Linux needs the x64 AppImage and an X11 session. Sunshine captures the X11 screen
+Remote desktop on Linux needs the x64 or arm64 AppImage and an X11 session. Sunshine captures the X11 screen
 and sends mouse and keyboard input through the XTest extension. Under Wayland, or with no `DISPLAY`,
 remote desktop reports that it needs an X11 session. Log in with an Xorg session, or start OpenBot
-under `xvfb-run` on a server. The arm64 AppImage does not include the runtime.
+under `xvfb-run` on a server. The Linux arm64 AppImage includes the runtime on releases with
+`linux-arm64` pinned in `native-runtime.lock.json`.
 
 ## Voice prompts fail on an older Linux
 

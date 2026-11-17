@@ -23,7 +23,7 @@ const output = process.argv[3];
 const metadataPaths = process.argv.slice(4);
 if (!repository || !output || metadataPaths.length !== remoteDesktopTargets.length) {
   throw new Error(
-    "Usage: bun scripts/create-remote-desktop-release-manifest.ts owner/repository output.json darwin-arm64.json darwin-x64.json win32-x64.json linux-x64.json",
+    "Usage: bun scripts/create-remote-desktop-release-manifest.ts owner/repository output.json darwin-arm64.json darwin-x64.json win32-x64.json linux-x64.json linux-arm64.json",
   );
 }
 
@@ -56,6 +56,7 @@ const parsedArtifacts = z
     "darwin-x64": artifactSchema,
     "win32-x64": artifactSchema,
     "linux-x64": artifactSchema,
+    "linux-arm64": artifactSchema,
   })
   .parse(artifacts);
 const manifest = createReleaseManifest({
