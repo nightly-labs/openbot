@@ -1869,6 +1869,7 @@ function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailur
   const diskFull = (error: unknown, depth: number): boolean =>
     error instanceof Error &&
     (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
       DISK_FULL_OUTPUT.test(error.message) ||
       ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
       (depth < 3 && diskFull(error.cause, depth + 1)));
