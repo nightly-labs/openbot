@@ -20,6 +20,7 @@
 // TradingView (#9209) blocks a sign-in page that returns to `127.0.0.1` or `localhost`. A joined
 // server's relayed sign-in for a client that opens `openbot://mcp-auth` must register and send that
 // link after two pages got no grant back. A relay for a client without the link keeps the loopback names.
+// Enrich (#11426) issues a secret for a public registration and wants it at the token endpoint.
 // GitLab (#9372) answers 403 to the token of an account that may not use its MCP server, after the
 // sign-in and at each Test with the saved sign-in: the refusal must say that the server refused the
 // account, not "Check the API key", and must ask for neither a key nor a sign-in. A 403 step-up
@@ -147,6 +148,8 @@ async function fakeServer(
   accountRefused: AccountRefusal | null = null,
   /** The token endpoint answers 403 with a body that is not an OAuth error. */
   tokenForbidden = false,
+  /** Enrich (#11426): a public (`none`) registration also gets a client secret. */
+  secretForPublic = false,
 ): Promise<FakeServer> {
   const state: Omit<FakeServer, "url" | "close"> = {
     registrations: [],
@@ -207,7 +210,7 @@ async function fakeServer(
           });
         return json(response, 201, {
           client_id: id,
-          ...(method === "none" ? {} : { client_secret: CLIENT_SECRET }),
+          ...(method === "none" && !secretForPublic ? {} : { client_secret: CLIENT_SECRET }),
           token_endpoint_auth_method: method,
           redirect_uris: asked.redirect_uris,
         });
@@ -318,6 +321,7 @@ async function runCase(
     accountRefused = null,
     tokenForbidden = false,
     storedTokens = false,
+    secretForPublic = false,
   }: {
     storedDiscovery?: boolean;
     secretAccepted?: boolean;
@@ -336,6 +340,7 @@ async function runCase(
     tokenForbidden?: boolean;
     /** A sign-in already on file, with a valid token, as a sign-in in an earlier run leaves it. */
     storedTokens?: boolean;
+    secretForPublic?: boolean;
   } = {},
 ): Promise<Case> {
   const server = await fakeServer(
@@ -346,6 +351,7 @@ async function runCase(
     registrationForbidden,
     accountRefused,
     tokenForbidden,
+    secretForPublic,
   );
   const records = new Map<string, McpOAuthRecord>();
   if (storedClient)
@@ -572,6 +578,23 @@ async function main(): Promise<void> {
     );
     check(stepUp, stepUp.silentTest?.needs === "sign_in", `the Test asked for: ${stepUp.silentTest?.needs}`);
     report.cases.push(stepUp);
+
+    // Enrich (#11426) lists `none` and registers it, but also issues a secret, and its token
+    // endpoint refuses a request without it. The secret goes in the body, and the sign-in works.
+    const enrich = await runCase("public-registration-with-secret", ["client_secret_post", "none"], 1, {
+      secretAccepted: true,
+      secretForPublic: true,
+    });
+    check(enrich, enrich.attempts[0]?.error === null, `the sign-in failed: ${enrich.attempts[0]?.error}`);
+    check(enrich, enrich.attempts[0]?.toolCount === 1, "the tools were not listed after the sign-in");
+    check(enrich, enrich.registrations.join() === "none", `the registration asked for ${enrich.registrations.join()}`);
+    check(
+      enrich,
+      enrich.tokenRequestsWithSecret.join() === "true",
+      "the token request did not carry the client secret",
+    );
+    check(enrich, enrich.signedIn, "no token is stored after the sign-in");
+    report.cases.push(enrich);
 
     // The token endpoint refuses the grant with 403: the sign-in failed before any account was checked.
     const tokenRefused = await runCase("token-endpoint-forbidden", ["none"], 1, { tokenForbidden: true });
