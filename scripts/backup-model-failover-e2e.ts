@@ -5,7 +5,8 @@
 // when that model is in `failing.json`. A message with `act-then-fail` writes text before it fails.
 // Checks:
 //   1. A turn that wrote text before the error continues on the backup model, and a thread turn
-//      moves to it too (#8406). These run after check 5.
+//      moves to it too (#8406). So does a WhatsApp conversation turn, and the conversation gets the
+//      backup's answer (#11015). These run after check 5.
 //   2. An agent with no backup models fails with its error, as before.
 //   3. A turn that did nothing yet runs again on the backup model, with a note and no error. The
 //      stand-in, as Claude Code, does not run a uuid again, and history import keeps one request.
@@ -838,6 +839,50 @@ try {
     failing([]);
     await restart();
     return { taskId: task.id, ran };
+  });
+
+  await check("a WhatsApp conversation turn moves to the backup model", async () => {
+    const replier = await withBackup("Replier");
+    failing([PRIMARY]);
+    const since = events.length;
+    const before = turns().length;
+    const ends: { status: string; answer: string | null }[] = [];
+    const stopListening = service.messaging.onActivity((activity) => {
+      if (activity.type === "finished" && activity.link.platformChannelId === "failover@g.us")
+        ends.push({ status: activity.status, answer: activity.answer });
+    });
+    try {
+      const connection = service.messaging.store.ensureConnection("whatsapp", "48100000000", "Phone");
+      service.messaging.store.updateConnection(connection.connectionId, { enabled: true });
+      const received = await runCauseEffect(
+        service.messaging.receive({
+          connectionId: connection.connectionId,
+          agentId: replier.id,
+          platformChannelId: "failover@g.us",
+          threadKey: "failover",
+          isDirect: false,
+          title: "Group",
+          text: "work",
+          sourcePaths: [],
+          origin: { authorId: "48200000000", authorName: "Client", platformMessageId: "failover-message" },
+          idempotencyKey: "whatsapp:failover",
+        }),
+      );
+      assert.equal(received.status, "queued");
+      await waitFor("the conversation's request to end", () => ends.length > 0);
+    } finally {
+      stopListening();
+    }
+    const ran = turns()
+      .slice(before)
+      .map((turn) => turn.model);
+    assert.deepEqual(ran, [PRIMARY, BACKUP], "The message ran on the own model, then on the backup.");
+    assert.deepEqual(ends, [{ status: "completed", answer: "Done." }], "The conversation gets the backup's answer.");
+    assert.equal(agentOf(replier.id).model, BACKUP, "The agent is on the backup model.");
+    assert.deepEqual(errorsFor(replier.id, since), [], "No error shows for the moved turn.");
+    failing([]);
+    await restart();
+    return { ran, ends };
   });
 
   await check("a thread turn that wrote text continues on the backup model", async () => {
