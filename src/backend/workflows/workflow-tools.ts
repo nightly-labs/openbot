@@ -10,6 +10,7 @@
 
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  isGitHubRepositoryName,
   isRoutineSchedule,
   isWorkflowGraph,
   WORKFLOW_BRANCHES,
@@ -23,7 +24,9 @@ import {
   type WorkflowNodeKind,
   type WorkflowPoint,
   type WorkflowRunDetail,
+  workflowGitHubTriggerRepositoryFields,
   workflowGraphProblemAt,
+  workflowListField,
 } from "@openbot/contracts/ipc";
 
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -31,6 +34,7 @@ import { Effect } from "effect";
 import { z } from "zod";
 import { openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
 import { ToolOperationFailed, toolStep } from "../agent/tool-operation";
+import { githubTriggerRepositories } from "./github-matching";
 import { runtimeFields } from "./workflow-graph";
 import { WorkflowStoreError } from "./workflow-store";
 import type { WorkflowsHandle } from "./workflows";
@@ -186,12 +190,24 @@ function refuse(message: string): never {
   throw new WorkflowEditRefused(message);
 }
 
+/**
+ * The fields that a read shows. A GitHub trigger shows the repositories that it watches, which the host
+ * reads from `repository` and `repositories` together (`workflowGitHubTriggerRepositories`).
+ */
+function readFields(node: WorkflowNode) {
+  const fields = runtimeFields(node);
+  if (node.kind !== "trigger" || node.fields.trigger !== "github") return fields;
+  const repositories = githubTriggerRepositories(node).join("\n");
+  delete fields.repositories;
+  return repositories ? { ...fields, repositories } : fields;
+}
+
 function compactGraph(graph: WorkflowGraph, layout: boolean) {
   return {
     nodes: graph.nodes.map((node) => ({
       id: node.id,
       kind: node.kind,
-      fields: runtimeFields(node),
+      fields: readFields(node),
       ...(node.schedule ? { schedule: node.schedule } : {}),
       ...(node.locked ? { locked: true } : {}),
       ...(layout ? { at: node.at, size: cardSize(node) } : {}),
@@ -330,6 +346,25 @@ function mergeFields(fields: WorkflowNode["fields"], patch: WorkflowOp["fields"]
   return next;
 }
 
+/**
+ * A trigger's fields after an op that gives `repositories`. The host takes `repository` as the first
+ * repository and drops a list that does not start with it, so the op sets both, as the canvas does.
+ * A null list clears both.
+ */
+function withRepositoryList(
+  kind: WorkflowNodeKind,
+  fields: WorkflowNode["fields"],
+  patch: WorkflowOp["fields"],
+  op: number,
+): WorkflowNode["fields"] {
+  const value = patch?.repositories;
+  if (kind !== "trigger" || value === undefined) return fields;
+  const repositories = workflowListField(value);
+  const wrong = repositories.find((name) => !isGitHubRepositoryName(name));
+  if (wrong !== undefined) refuse(`Op ${op}: "${wrong}" is not a repository name (owner/name).`);
+  return { ...fields, ...workflowGitHubTriggerRepositoryFields(repositories) };
+}
+
 function checkedSchedule(value: WorkflowOp["schedule"]) {
   if (value === undefined) return undefined;
   if (!isRoutineSchedule(value)) refuse("The schedule is not a valid routine schedule.");
@@ -399,7 +434,7 @@ function applyWorkflowOps(
         if (!op.kind) refuse(`Op ${n}: add needs kind.`);
         if (op.ref !== undefined && ids[op.ref] !== undefined) refuse(`Op ${n}: ref ${op.ref} is already used.`);
         const id = `${op.kind}-${crypto.randomUUID()}`;
-        const fields = mergeFields(newNodeFields(op.kind), op.fields);
+        const fields = withRepositoryList(op.kind, mergeFields(newNodeFields(op.kind), op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && op.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
@@ -417,7 +452,7 @@ function applyWorkflowOps(
       }
       case "update": {
         const node = resolve(op.node, n);
-        const fields = mergeFields(node.fields, op.fields);
+        const fields = withRepositoryList(node.kind, mergeFields(node.fields, op.fields), op.fields, n);
         checkAgent(fields, n);
         const scheduled = checkedSchedule(op.schedule);
         if (scheduled && node.kind !== "trigger") refuse(`Op ${n}: only a trigger has a schedule.`);
