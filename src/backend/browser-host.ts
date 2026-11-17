@@ -179,7 +179,6 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
-import { readClickTarget } from "./browser-user-click";
 import { runCauseEffect } from "./effect-boundary";
 import {
   BROWSER_STRING_MORE,
@@ -4889,23 +4888,47 @@ export class BrowserHost {
     contents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
       if (isMainFrame) recordPage();
     });
-    contents.on("input-event", (_event, input) => {
-      if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
-      const { x, y } = input;
-      if (typeof x !== "number" || typeof y !== "number" || !records()) return;
+    // Each press gives this event, also a press in a frame of another process. The input event that
+    // follows in the same call comes only from the page's own view, so a press without it is in the
+    // pixels of that frame (#10912). A live view's press gives its point in the page's pixels.
+    let press: { x: number; y: number; inPage: boolean } | null = null;
+    contents.on("before-mouse-event", (_event, input) => {
+      if (input.type !== "mouseDown" || !records()) return;
+      // The place of the press, before the press can navigate the page.
       const place = stepPlace(tab.engine.scrubText(contents.getURL()));
       if (!place) return;
-      void readClickTarget(contents, x, y).then((target) => {
-        // The tab can change hands while the page answers.
-        if (target)
-          this.#recordUserStep(tab, {
-            kind: "click",
-            ...place,
-            ...target,
-            ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
-          });
+      const zoom = contents.getZoomFactor() || 1;
+      const viewed = tab.engine.viewPress();
+      const current = viewed ? { ...viewed, inPage: true } : { x: input.x / zoom, y: input.y / zoom, inPage: false };
+      press = current;
+      setImmediate(() => {
+        if (press === current) press = null;
+        this.#recordClick(tab, place, current);
       });
     });
+    contents.on("input-event", (_event, input) => {
+      if (input.type === "mouseDown" && press) press.inPage = true;
+    });
+  }
+
+  /** Records the control under a press, in CSS pixels, as `#bindUserBrowsing` reads it. */
+  #recordClick(
+    tab: BrowserHostTab,
+    place: { host: string; path: string },
+    press: { x: number; y: number; inPage: boolean },
+  ): void {
+    if (tab.closing || tab.contents.isDestroyed()) return;
+    const record = Effect.map(tab.engine.clickTargetAt(press.x, press.y, press.inPage), (target) => {
+      // The tab can change hands while the page answers.
+      if (target)
+        this.#recordUserStep(tab, {
+          kind: "click",
+          ...place,
+          ...target,
+          ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
+        });
+    });
+    Effect.runFork(record.pipe(Effect.forkIn(tab.scope, { startImmediately: true })));
   }
 
   #noteSiteVisit(tab: BrowserHostTab, url: string): void {

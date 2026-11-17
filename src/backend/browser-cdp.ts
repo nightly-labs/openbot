@@ -12,7 +12,7 @@ import type {
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
-import { Deferred, Effect, Exit, Fiber, Scope } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
 import type { NativeImage, WebContents } from "electron";
 import {
   BROWSER_CARD_FIELDS,
@@ -98,6 +98,7 @@ import { describeBrowserTarget, stopLoadingAndWait, waitForLoading } from "./bro
 import { guardedPress } from "./browser-press-guard";
 import { createFramePacer } from "./browser-screencast-pacing";
 import { probeSettle, SETTLE_BUSY_WAIT_MS, SETTLE_RESERVE_MS, waitForSettle } from "./browser-settle";
+import { CLICK_READ_TIMEOUT_MS, readClickTarget } from "./browser-user-click";
 import { BROWSER_VALUE_TOO_LARGE } from "./model-text-limit";
 import type { VaultCardSecret } from "./vault-items";
 
@@ -439,6 +440,8 @@ export class BrowserCdpEngine {
   #viewButton: "left" | "middle" | "right" | null = null;
   /** Where the last mouse event put the pointer, so the next agent move starts there. */
   #pointer: { point: PointerPoint; sessionId: string | undefined } | null = null;
+  /** A live view's press while the page gets it, in the page's CSS pixels. */
+  #viewPress: PointerPoint | null = null;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
@@ -2761,6 +2764,7 @@ export class BrowserCdpEngine {
           this.#pointer = { point: { x: input.x, y: input.y }, sessionId: undefined };
           if (input.action === "down") this.#viewButton = input.button;
           if (input.action === "up") this.#viewButton = null;
+          if (input.action === "down") this.#viewPress = { x: input.x, y: input.y };
           yield* send("Input.dispatchMouseEvent", {
             type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
             x: input.x,
@@ -2774,12 +2778,26 @@ export class BrowserCdpEngine {
                   : 0,
             clickCount: input.action === "move" ? 0 : input.clickCount,
             modifiers: input.modifiers,
-          });
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                this.#viewPress = null;
+              }),
+            ),
+          );
         }),
       // A paste or a cut works in the focused frame, which can be a frame in another process.
       input.type === "paste" || input.type === "cut",
     );
   });
+
+  /**
+   * The point of the live view's press that the page gets now, or null. A press of the live view in a
+   * frame of another process does not move `:hover` in the page, so the host reads the press here.
+   */
+  viewPress(): PointerPoint | null {
+    return this.#viewPress;
+  }
 
   /**
    * The text a member's copy takes from the page, or null when it is longer than `max`. It goes back
@@ -2803,6 +2821,26 @@ export class BrowserCdpEngine {
         return value === null ? null : stringValue(value);
       }),
     );
+  });
+
+  /**
+   * The role and the name of the control that a person pressed, or null. `readClickTarget` says what
+   * the point is. A page that does not answer in this time gives no click step.
+   */
+  readonly clickTargetAt = Effect.fn("BrowserCdp.clickTargetAt")(function* (
+    this: BrowserCdpEngine,
+    x: number,
+    y: number,
+    inPage: boolean,
+  ) {
+    const read = this.#leaseEffect((send) =>
+      readClickTarget(send, (frameId) => this.#targetSessions.get(frameId)?.sessionId, x, y, inPage),
+    );
+    const target = yield* read.pipe(
+      Effect.timeoutOption(CLICK_READ_TIMEOUT_MS),
+      Effect.catch(() => Effect.succeed(Option.none())),
+    );
+    return Option.getOrNull(target);
   });
 
   /**
