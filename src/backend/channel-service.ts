@@ -127,6 +127,8 @@ export interface ChannelHooks {
     messageId: string,
     text: string,
   ): Effect.Effect<"accepted" | "rejected" | "uncertain", ChannelOperationError>;
+  /** Closes the open questions of the turn, as a person's message in the agent's own chat closes them. */
+  releaseQuestions?(agentId: string, threadId: string, turnId: string): void;
   changed(channelId: string, revision: number): void;
   /** The channel work that queues wait behind has changed, so every held queue needs a new hold. */
   queueHoldChanged?(): void;
@@ -1083,6 +1085,31 @@ export class ChannelService {
       for (const item of tasks) this.#tryTasks.add(item.id);
       if (current.leadAgentId && tasks.some((item) => !item.ownerAgentId)) this.hooks.retry?.(current.leadAgentId);
       this.publish(current.id);
+      // A new task waits for the turn that its member runs, and a turn that waits on a question reads
+      // nothing until the question is answered: each would wait for the other, as in the member's own
+      // chat. When the same person asked for that turn's work, its question closes as a message in that
+      // chat closes it (#11467). A continued task closes it with its steer.
+      // The message is stored already, so a failed read only goes to the log.
+      const queuedFor = new Set(
+        tasks.flatMap((item) =>
+          item.ownerAgentId && !continued.some((entry) => entry.id === item.id) ? [item.ownerAgentId] : [],
+        ),
+      );
+      const releaseQuestions = this.hooks.releaseQuestions;
+      if (queuedFor.size && releaseQuestions)
+        yield* Effect.gen({ self: this }, function* () {
+          const blocked = (yield* channelSync(() => this.store.assignments(current.id))).filter(
+            (item) => item.state === "running" && queuedFor.has(item.agentId),
+          );
+          if (!blocked.length) return;
+          const requests = yield* channelSync(() => this.store.messages(current.id));
+          for (const { agentId, turnId, requestMessageId } of blocked) {
+            const request = requests.find((entry) => entry.id === requestMessageId);
+            if (!turnId || request?.author.kind !== "member" || request.author.id !== actor.id) continue;
+            const { threadId } = yield* channelSync(() => this.store.context(current.id, agentId));
+            releaseQuestions(agentId, threadId, turnId);
+          }
+        }).pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))));
       yield* this.interruptTasks(
         current.id,
         affected.filter((item) => !continued.some((entry) => entry.id === item.id)),
