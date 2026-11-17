@@ -7,9 +7,8 @@ import type { LiveConversation } from "./use-live-conversation";
 type VoiceGlyph = "spinner" | "level" | "mic" | "micOff";
 
 /**
- * The voice mode as the composer draws it. For dictation the mic of the composer turns into one round
- * button, and two buttons come out of its sides while `split` is open. A live conversation sets `bar`:
- * the composer turns into a call bar instead, and the chat above it stays in view.
+ * A live conversation as the composer draws it: the composer turns into a call bar, and the chat above
+ * it stays in view.
  */
 export interface ComposerVoice {
   available: boolean;
@@ -27,7 +26,7 @@ export interface ComposerVoice {
   leading: { label: string; onPress: () => void };
   trailing: { label: string; icon: "send" | "interrupt"; enabled: boolean; onPress: () => void };
   /** The call bar of a live conversation: who speaks or what it does, and the words heard or read. */
-  bar?: { title: string; caption: string };
+  bar: { title: string; caption: string };
 }
 
 const LIVE_PHASES = {

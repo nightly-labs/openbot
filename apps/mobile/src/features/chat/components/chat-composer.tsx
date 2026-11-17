@@ -112,18 +112,9 @@ const REST_TEXT_GAP = 10;
 // the bar: only the drawing scales, and it then slides out to the bar's edge.
 const REST_CONTROL_SCALE = 0.8;
 
-// The voice mode turns the composer into one round button of this size.
+// A live conversation turns the composer into a call bar of this height.
 const VOICE_BUTTON_SIZE = 64;
 const CARD_RADIUS = 24;
-// The mic sits at the end of the toolbar. These move it to the centre of the
-// round button, which is where the card's own shrinking takes it most of the way.
-const VOICE_CONTROL_SHIFT_X = TOOLBAR_PADDING - (VOICE_BUTTON_SIZE - CONTROL_SIZE) / 2;
-const VOICE_CONTROL_SHIFT_Y = -(VOICE_BUTTON_SIZE - TOOLBAR_HEIGHT) / 2;
-// The glyph grows with the button instead of changing size, so the mic is the
-// same drawing when the composer comes back.
-const VOICE_CONTROL_SCALE = 1.15;
-// The voice glyph and the fill switch with the stage on this timing.
-const VOICE_FILL_DURATION = 220;
 
 const AnimatedGlassView = Animated.createAnimatedComponent(GlassView);
 const SHAPE_EASING = cubicBezier(0.23, 1, 0.32, 1);
@@ -330,12 +321,9 @@ export const ChatComposer = memo(function ChatComposer({
   const isFocused = useIsFocused();
   const latestTextRef = useRef(draft);
   const [sendGate] = useState(createComposerSendGate);
-  // The chat owns the voice mode. The composer only changes shape for it: the
-  // round button of dictation, or the call bar of a live conversation.
+  // The chat owns the live conversation. The composer only changes shape for it: the call bar of the
+  // full width.
   const voiceOpen = voice?.open ?? false;
-  // A live conversation turns the card into a call bar of the full width, not the round button.
-  const voiceBar = voice?.bar;
-  const barMode = Boolean(voiceBar);
   // Dictation keeps the composer: the words go into the field, and a strip takes the toolbar's place.
   const dictating = dictation?.active ?? false;
   // Until the last words land, the recognizer owns the draft: a key typed then stops dictation.
@@ -573,59 +561,39 @@ export const ChatComposer = memo(function ChatComposer({
     const voiced = morph.get();
     const width = interpolate(expansion.get(), [0, 1], [restWidthValue.get(), cardWidth]);
     return {
-      width: width + ((barMode ? cardWidth : VOICE_BUTTON_SIZE) - width) * voiced,
+      width: width + (cardWidth - width) * voiced,
       borderRadius: CARD_RADIUS + (VOICE_BUTTON_SIZE / 2 - CARD_RADIUS) * voiced,
     };
   });
   // Both controls stay visible and pressable in the smaller bar, so the shape
   // change owes them only a position and the size they are drawn at. Both are
   // transforms: neither control re-lays-out on a single frame of the change.
-  // In the voice mode the control rides on to the centre of the round button,
-  // so the mic the user pressed is the button they speak with.
   const controlStyle = useAnimatedStyle(() => {
     const progress = expansion.get();
-    // The call bar has its own controls, so there the control stays at the end and fades out.
-    const voiced = barMode ? 0 : morph.get();
     const x = interpolate(progress, [0, 1], [restControlShift, 0]);
     const y = interpolate(progress, [0, 1], [restControlOffset, 0]);
-    const restScale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
-    const scale = restScale + (VOICE_CONTROL_SCALE - restScale) * voiced;
+    const scale = interpolate(progress, [0, 1], [REST_CONTROL_SCALE, 1]);
     return {
       transform: [
         // The row scales about its centre, which the dictation mic moves left of the main control. This
         // keeps the main control where a row of the main control alone would put it.
-        { translateX: END_X * (x + (VOICE_CONTROL_SHIFT_X - x) * voiced + micSlack * (1 - scale)) },
-        { translateY: y + (VOICE_CONTROL_SHIFT_Y - y) * voiced },
+        { translateX: END_X * (x + micSlack * (1 - scale)) },
+        { translateY: y },
         { scale },
       ],
-      opacity: barMode ? interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP) : 1,
+      // The call bar has its own controls, so there the control stays at the end and fades out.
+      opacity: interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP),
     };
   });
   // The round button has room for one control: the dictation mic leaves in the first part of the morph.
   const dictationMicStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
   }));
-  // With Liquid Glass the round button stays glass, so the glow under it shows
-  // through and spreads on it. Without glass the card is opaque, so the agent's
-  // colour fills it while it listens. Continue is the card again.
-  const voiceFilled = !liquidGlassAvailable && voiceAccent !== undefined;
-  const voiceFill = useSharedValue(0);
-  const listening = voice?.hearing ?? false;
-  useEffect(() => {
-    voiceFill.set(
-      withTiming(listening ? 1 : 0, {
-        duration: VOICE_FILL_DURATION,
-        easing: SHAPE_EASING_FN,
-        reduceMotion: ReduceMotion.System,
-      }),
-    );
-  }, [listening, voiceFill]);
-  const voiceFillStyle = useAnimatedStyle(() => ({ opacity: barMode ? 0 : voiceFill.get() * morph.get() }));
   const plusStyle = useAnimatedStyle(() => {
     const progress = expansion.get();
     const voiced = morph.get();
     const openWidth = interpolate(progress, [0, 1], [restWidthValue.get(), cardWidth]);
-    const width = openWidth + ((barMode ? cardWidth : VOICE_BUTTON_SIZE) - openWidth) * voiced;
+    const width = openWidth + (cardWidth - openWidth) * voiced;
     return {
       // Dictation has no attachments: the plus leaves the strip's corner to Cancel.
       opacity: interpolate(voiced, [0, 0.3], [1, 0], Extrapolation.CLAMP) * (1 - dictationPresence.get()),
@@ -1058,12 +1026,6 @@ export const ChatComposer = memo(function ChatComposer({
               cardStyle,
             ]}
           >
-            {voiceFilled && voiceAccent ? (
-              <Animated.View
-                pointerEvents="none"
-                style={[{ position: "absolute", inset: 0, backgroundColor: voiceAccent.fill }, voiceFillStyle]}
-              />
-            ) : null}
             {/* Measure wrapping independently of UITextView's constrained contentSize.
                 This node keeps the field's width whatever shape the card is in, so
                 its line count gives the height and its widest line says whether the
@@ -1351,7 +1313,7 @@ export const ChatComposer = memo(function ChatComposer({
                 ) : null}
                 <Animated.View
                   style={[{ flexDirection: "row", alignItems: "center", gap: CONTROL_GAP }, controlStyle]}
-                  pointerEvents={barMode && voiceOpen ? "none" : "auto"}
+                  pointerEvents={voiceOpen ? "none" : "auto"}
                 >
                   {dictationMic && dictation ? (
                     <Animated.View
@@ -1418,10 +1380,10 @@ export const ChatComposer = memo(function ChatComposer({
                 </Animated.View>
               </View>
             </View>
-            {voiceOpen && voice && voiceBar ? (
+            {voiceOpen && voice ? (
               <VoiceCallBar
                 voice={voice}
-                bar={voiceBar}
+                bar={voice.bar}
                 avatar={voiceAvatar}
                 palette={voicePalette}
                 accent={voiceAccent}
