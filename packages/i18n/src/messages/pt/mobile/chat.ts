@@ -367,7 +367,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Entre no seu computador",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Este site não aceita um login a partir do servidor. Abra este chat no app OpenBot para computador e entre por lá.",
-  "mobile.chat.browserSecret.takeoverReload": "Depois, recarregue a página antes de escolher Concluí.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "O OpenBot não conseguiu terminar de inserir a senha ou o código. Insira na página o que falta. Depois, recarregue a página antes de escolher Concluí.",
   "mobile.chat.browserSecret.takeoverFailed": "Não foi possível concluir a solicitação.",
   "mobile.chat.browserSecret.done": "Concluí",
   "mobile.chat.browserSecret.submitOnce": "Envie uma vez para {origin}. Este valor não é adicionado ao chat.",

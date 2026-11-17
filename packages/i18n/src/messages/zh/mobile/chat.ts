@@ -353,7 +353,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "请在你的电脑上登录",
   "mobile.chat.browserSecret.signInBlockedBody":
     "此网站不接受来自服务器的登录。请在你电脑上的 OpenBot 桌面应用中打开此聊天，并在那里登录。",
-  "mobile.chat.browserSecret.takeoverReload": "然后刷新页面，再选择“我已完成”。",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot 未能完成输入密码或验证码。请在页面上补全缺少的部分。然后刷新页面，再选择“我已完成”。",
   "mobile.chat.browserSecret.takeoverFailed": "无法完成该请求。",
   "mobile.chat.browserSecret.done": "我已完成",
   "mobile.chat.browserSecret.submitOnce": "只会向 {origin} 提交一次。该值不会加入对话。",

@@ -366,7 +366,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Bilgisayarınızda oturum açın",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Bu site sunucudan oturum açmayı kabul etmiyor. Bu sohbeti bilgisayarınızdaki OpenBot masaüstü uygulamasında açın ve orada oturum açın.",
-  "mobile.chat.browserSecret.takeoverReload": "Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot parolayı veya kodu girmeyi tamamlayamadı. Eksik olanı sayfaya girin. Ardından “Bitirdim” seçeneğini seçmeden önce sayfayı yeniden yükleyin.",
   "mobile.chat.browserSecret.takeoverFailed": "İstek tamamlanamadı.",
   "mobile.chat.browserSecret.done": "Bitirdim",
   "mobile.chat.browserSecret.submitOnce": "{origin} adresine bir kez gönderin. Bu değer sohbete eklenmez.",

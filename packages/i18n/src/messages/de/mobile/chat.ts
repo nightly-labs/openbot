@@ -374,7 +374,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Melde dich auf deinem Computer an",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Diese Website akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an.",
-  "mobile.chat.browserSecret.takeoverReload": "Lade dann die Seite neu, bevor du „Fertig“ wählst.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot konnte das Passwort oder den Code nicht vollständig eingeben. Gib auf der Seite ein, was fehlt. Lade dann die Seite neu, bevor du „Fertig“ wählst.",
   "mobile.chat.browserSecret.takeoverFailed": "Die Anfrage konnte nicht abgeschlossen werden.",
   "mobile.chat.browserSecret.done": "Fertig",
   "mobile.chat.browserSecret.submitOnce": "Einmal an {origin} senden. Dieser Wert wird nicht zum Chat hinzugefügt.",

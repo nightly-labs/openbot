@@ -369,7 +369,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Inicia sesión en tu ordenador",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Este sitio no acepta un inicio de sesión desde el servidor. Abre este chat en la aplicación de escritorio de OpenBot en tu ordenador e inicia sesión allí.",
-  "mobile.chat.browserSecret.takeoverReload": "Después, vuelve a cargar la página antes de elegir «He terminado».",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot no pudo terminar de escribir la contraseña o el código. Escribe en la página lo que falta. Después, vuelve a cargar la página antes de elegir «He terminado».",
   "mobile.chat.browserSecret.takeoverFailed": "No se pudo completar la solicitud.",
   "mobile.chat.browserSecret.done": "He terminado",
   "mobile.chat.browserSecret.submitOnce": "Enviar una vez a {origin}. Este valor no se añade al chat.",
