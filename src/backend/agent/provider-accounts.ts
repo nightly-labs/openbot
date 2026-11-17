@@ -752,9 +752,10 @@ export class ProviderAccounts {
   }
 
   /**
-   * The usage of each connected account of a provider that reports usage. Each account's gate decides
+   * The usage of each account of a provider that reports usage: a connected account's reading, and the
+   * kept reading of an account in a check or after a failed one. Each connected account's gate decides
    * when it is read again; until then, or when a read fails, the kept reading answers. A read takes an
-   * agent's process or a short check. An account in a check, or after a failed one, gives its kept reading.
+   * agent's process or a short check.
    */
   readonly usage = Effect.fn("ProviderAccounts.usage")(function* (
     this: ProviderAccounts,
