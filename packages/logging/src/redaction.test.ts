@@ -279,6 +279,7 @@ describe("redactText", () => {
     const code = Array.from({ length: 40 }, (_, index) => `v${index} = close[${index}] > open[${index}]`).join("\n");
     expect(redactSecrets(code)).toBe(code);
     expect(redactSecrets(`${code}\ntoken = Bearer abcdef123456`)).toBe(`${code}\ntoken = [redacted]`);
+    expect(redactSecrets(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(`${code}\n{"apiKey":"[redacted]"}`);
   });
 
   // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
