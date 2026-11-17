@@ -2278,9 +2278,9 @@ export class AttentionRegistry {
 
   /**
    * Expires the detached questions of an agent, of one thread, or of both, and the subagent questions
-   * that outlived their turn. Call it when a task closes or is deleted, or when the agent is deleted:
-   * no message can reach them there, and a hidden question would block duplication and plan
-   * continuation.
+   * and takeovers that outlived their turn. Call it when a task closes or is deleted, or when the
+   * agent is deleted: no message can reach them there, and a hidden question would block duplication
+   * and plan continuation.
    */
   expireDetached(agentId: string | null, publicThreadId: string | null): void {
     let changed = false;
@@ -2292,6 +2292,13 @@ export class AttentionRegistry {
       changed = true;
     }
     if (changed) this.#emitRuntimeSnapshot();
+    // Resolving a takeover emits its own runtime snapshot.
+    for (const [requestId, pending] of this.#takeovers) {
+      if (!pending.subagent) continue;
+      if (agentId !== null && pending.request.agentId !== agentId) continue;
+      if (publicThreadId !== null && pending.request.threadId !== publicThreadId) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
+    }
   }
 
   /**
