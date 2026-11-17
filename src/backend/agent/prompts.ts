@@ -172,9 +172,10 @@ function mcpSignInPage(params: unknown): { url: string; address: string } | null
   const parsed = new URL(url);
   if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) return null;
   return {
-    // A parenthesis ends a Markdown link destination.
-    url: parsed.href.replaceAll("(", "%28").replaceAll(")", "%29"),
-    address: `${parsed.origin}${parsed.pathname}`,
+    // A parenthesis ends a Markdown link destination. A backtick, which a host and a query can hold,
+    // starts a code span, which Markdown reads before a link and which would change what the card shows.
+    url: parsed.href.replaceAll("(", "%28").replaceAll(")", "%29").replaceAll("`", "%60"),
+    address: `${parsed.origin}${parsed.pathname}`.replaceAll("`", "%60"),
   };
 }
 
@@ -207,17 +208,16 @@ export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] 
   const mode = getString(params, "mode") ?? "form";
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
-  let questions: AgentPromptQuestion[];
   if (mode === "url") {
     const question = mcpSignInPageQuestion(params, serverName);
-    if (!question) return null;
-    questions = [question];
-  } else if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
-  else
-    questions =
-      Object.keys(properties).length === 0
-        ? [elicitationConsentQuestion(params, serverName)].filter((question) => question !== null)
-        : elicitationFieldQuestions(params, serverName ?? "This plugin");
+    return question && validPromptQuestions([question]) ? [question] : null;
+  }
+  if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
+
+  const questions =
+    Object.keys(properties).length === 0
+      ? [elicitationConsentQuestion(params, serverName)].filter((question) => question !== null)
+      : elicitationFieldQuestions(params, serverName ?? "This plugin");
   return validPromptQuestions(questions) ? questions : null;
 }
 

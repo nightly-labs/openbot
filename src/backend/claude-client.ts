@@ -2909,8 +2909,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   /**
-   * An MCP server's question, shown on the same card as a Codex one. The card declines what it
-   * cannot show, such as a sign-in on a web page. When Claude stops waiting, the card closes.
+   * An MCP server's question, shown on the same card as a Codex one. A sign-in on an https page shows
+   * its link; the card declines what it cannot show. When Claude stops waiting, the card closes.
    */
   readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
     this: ClaudeAgentClient,
