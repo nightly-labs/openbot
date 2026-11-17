@@ -138,8 +138,16 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
     <>
       <SettingsSection title={t("mobile.workflow.trigger.github")}>
         <PickRow
-          label={t("mobile.workflow.github.repository")}
-          value={settings.repository || t("mobile.workflow.github.chooseRepository")}
+          label={t(
+            settings.repositories.length > 1
+              ? "mobile.workflow.github.repositories"
+              : "mobile.workflow.github.repository",
+          )}
+          value={
+            settings.repositories.length > 0
+              ? settings.repositories.join(", ")
+              : t("mobile.workflow.github.chooseRepository")
+          }
           disabled={!editable}
           onPress={() => openGitHubPick(node.id, "repository")}
         />
