@@ -2300,7 +2300,7 @@ export class OpenBotToolRouter {
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
+        note: "The new chat starts when this turn ends, your background subagents and commands finish, and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
       });
     }
 

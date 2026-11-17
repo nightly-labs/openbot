@@ -4620,6 +4620,15 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     // A new chat ends the automatic plan continuation of the agent's own chat.
     yield* this.#drain.endPlanContinuation(agentId, null);
+    const known = yield* lifecycleStep("clear agent context", () => this.#conversation.requireKnownAgent(agentId));
+    // The new chat closes the Claude session, and its background subagents and commands end with it.
+    // A requested new chat waits: when the work ends, Claude answers its result in a turn of its own,
+    // and the drain after that turn starts the new chat.
+    if (yield* this.#threads.mainRunsBackgroundWork(known))
+      return yield* new AgentLifecycleFailed({
+        operation: "clear agent context",
+        cause: new ContextResetBusyError(sourceText("error.agent.waitForBackgroundBeforeClearContext")),
+      });
     const threadId = yield* lifecycleStep("clear agent context", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
       const activeTurn =

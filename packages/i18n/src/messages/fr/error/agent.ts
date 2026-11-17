@@ -81,6 +81,8 @@ export const messages = {
     "Des tâches de cet agent sont en cours. Attendez qu’elles se terminent ou arrêtez-les avant de changer de fournisseur.",
   "error.agent.waitBeforeClearContext":
     "Attendez la fin du tour actif et de la file d’attente avant de commencer une nouvelle discussion.",
+  "error.agent.waitForBackgroundBeforeClearContext":
+    "Des sous-agents ou des commandes en arrière-plan de cet agent sont en cours. Attendez qu'ils se terminent avant de démarrer une nouvelle discussion.",
   "error.agent.waitBeforeCompactContext":
     "Attendez la fin du tour actif et de la file d’attente avant de compacter le contexte.",
   "error.agent.waitBeforeDeleteHistory":
