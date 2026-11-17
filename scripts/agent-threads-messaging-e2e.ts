@@ -29,8 +29,9 @@
 // 13. B steers busy messages and runs a turn in a new own chat. A notice from A (expectsReply false)
 //    goes into that running turn. A request from A also goes into it, and its result comes back to
 //    A's own chat. It needs a provider that steers natively.
-// 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
-//    come to the side thread, not to A's own chat.
+// 14. B asks A's side thread a question back without replyToMessageId. A answers with expectsReply
+//    false, and B sends the result without replyToMessageId. The question and the result come to the
+//    side thread, because it still waits for B, not to A's own chat.
 // 15. B's side thread sends A a message that needs no answer. A then sends B a new message without
 //    replyToMessageId. It comes to B's own chat, where B can start a task, not to B's side thread.
 // At the end it stops and deletes each thread that it started.
@@ -760,8 +761,10 @@ try {
         `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply true:`,
         `"${word}: Before you answer, ask me which two numbers to add. Ask with openbot.send_message as a new message:`,
         `recipientAgentIds ["${from}"], no replyToMessageId, expectsReply true, and text that starts with Q14${run}.`,
-        'Then end your turn. When I give you the numbers, send me only their sum with openbot.send_message."',
-        `When ${toAgentInfo.name} asks which numbers, answer "5 and 6" with openbot.send_message and replyToMessageId.`,
+        "Then end your turn. When I give you the numbers, send me only their sum with openbot.send_message,",
+        'no replyToMessageId."',
+        `When ${toAgentInfo.name} asks which numbers, answer "5 and 6" with openbot.send_message, replyToMessageId`,
+        "and expectsReply false.",
         "Then end your turn and reply with the single word SENT. Do not wait for the answer.",
       ].join("\n"),
     );
@@ -790,6 +793,16 @@ try {
       (e) => e?.state === "idle",
       TURN_MS,
     );
+    // A's numbers need no answer and B's sum has no reply id: only the side thread's open request routes
+    // the sum (#10273). With other values, the step would not check that.
+    // B's own chat asked the question, so A's numbers arrive there. Earlier runs leave the same numbers.
+    const numbers = (await bridge.main(to)).messages.findLast(
+      (m) => m.senderAgentId === from && m.text.includes("5 and 6"),
+    );
+    details.numbersExpectReply = numbers?.exchange?.expectsReply ?? true;
+    details.sumReplyTo = (await bridge.side(from, side.id)).messages.find(answer)?.replyToMessageId ?? null;
+    assert.equal(details.numbersExpectReply, false, "A sent the numbers with expectsReply true.");
+    assert.equal(details.sumReplyTo, null, "B sent the sum with replyToMessageId.");
     const ownChat = await bridge.main(from);
     details.questionInSenderChat = count(ownChat, question) > questionsBefore;
     details.answerInSenderChat = count(ownChat, answer) > answersBefore;
@@ -838,6 +851,10 @@ try {
     const sent = [...ownChat.messages, ...sideThread.messages].find(request);
     details.requestReplyTo = sent?.replyToMessageId ?? null;
     assert.equal(details.requestReplyTo, null, "A sent the new message with replyToMessageId.");
+    // A notice that asks for an answer keeps its side thread on purpose, and the step would not check the fix.
+    const received = (await bridge.main(from)).messages.find((m) => m.senderAgentId === to && m.text.includes(notice));
+    details.noticeExpectsReply = received?.exchange?.expectsReply ?? true;
+    assert.equal(details.noticeExpectsReply, false, "B sent the notice with expectsReply true.");
     details.requestInOwnChat = has(ownChat, request);
     details.requestInSideThread = has(sideThread, request);
     assert.equal(details.requestInSideThread, false, "B's side thread got A's new message.");
