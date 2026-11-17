@@ -77,7 +77,7 @@ export class ConversationQueries {
    * reads it for every agent whose chat is not in memory, up to 4 times a second while an agent
    * works, and the read goes back over every message after that reply (#11103). Each message write
    * moves the thread's `last_event_sequence`, an AUTOINCREMENT value, so the same revision has the
-   * same reply.
+   * same reply. A rollback can give its value again, so a read in an open transaction skips the cache.
    */
   readonly #latestReplies = new Map<
     string,
@@ -219,7 +219,8 @@ export class ConversationQueries {
     }
     const activeTurnId = optionalStringColumn(thread, "active_turn_id");
     const revision = requiredNumberColumn(thread, "last_event_sequence");
-    const known = this.#latestReplies.get(threadId);
+    const cached = !this.#core.connection.isTransaction;
+    const known = cached ? this.#latestReplies.get(threadId) : undefined;
     if (known?.agentId === agentId && known.revision === revision) {
       return { activeTurnId, latestMessage: known.message };
     }
@@ -245,7 +246,7 @@ export class ConversationQueries {
     );
     const latestJson = row ? optionalStringColumn(row, "latest_message_json") : null;
     const latestMessage = latestJson ? decodeConversationMessageJson(latestJson) : null;
-    this.#latestReplies.set(threadId, { agentId, revision, message: latestMessage });
+    if (cached) this.#latestReplies.set(threadId, { agentId, revision, message: latestMessage });
     return { activeTurnId, latestMessage };
   }
 
