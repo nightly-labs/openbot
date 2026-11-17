@@ -3,6 +3,7 @@ import { isDynamicRecord, isNumber } from "@openbot/contracts/runtime-values";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { AGENT_THREAD_SCHEMA_SQL } from "./agent-threads/agent-thread-schema";
+import { withTransaction } from "./database/sqlite-transaction";
 import { BASELINE_V8_SCHEMA_SQL } from "./migrations/0008-baseline";
 import { ANALYTICS_SCHEMA_SQL } from "./migrations/0015-agent-usage";
 import { ANALYTICS_DATE_INDEX_SQL } from "./migrations/0016-agent-usage-date-index";
@@ -228,11 +229,26 @@ export interface OpenBotMigrationOptions {
   warn?: (message: string, error: unknown) => void;
   /** The last connection closed cleanly, so SQLite removed the write-ahead log. */
   closedCleanly?: boolean;
+  /**
+   * Stops an existing database after this version. Tests use it to make the database of an older
+   * release (`src/backend/migration-harness.ts`). A new database always gets the latest version.
+   */
+  throughVersion?: number;
 }
 
 const logger = createOpenBotLogger("openbot-database-schema");
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
+
+/**
+ * True when `migrateOpenBotDatabase` will build a new database or run a migration. Both end with the
+ * full check on this connection, so a check elsewhere before them would only read the file twice.
+ */
+export function openBotDatabaseNeedsMigration(db: DatabaseSync): boolean {
+  if (!hasExistingSchema(db)) return true;
+  const currentVersion = latestAppliedVersion(readAppliedVersions(db));
+  return MIGRATIONS.some((migration) => migration.version > currentVersion);
+}
 
 export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrationOptions = {}): void {
   validateMigrationRegistry();
@@ -246,7 +262,10 @@ export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrati
   const appliedVersions = readAppliedVersions(db);
   validateAppliedVersions(appliedVersions);
   const currentVersion = latestAppliedVersion(appliedVersions);
-  const pending = MIGRATIONS.filter((migration) => migration.version > currentVersion);
+  const throughVersion = options.throughVersion ?? LATEST_SCHEMA_VERSION;
+  const pending = MIGRATIONS.filter(
+    (migration) => migration.version > currentVersion && migration.version <= throughVersion,
+  );
   // A database can hold broken references from before this upgrade. A migration that does not touch them must not
   // stop on them, and deleting them would lose rows, so each migration is checked only for the ones it adds.
   let violations: Map<string, number> | undefined;
@@ -300,17 +319,12 @@ function hasExistingSchema(db: DatabaseSync): boolean {
 }
 
 function createLatestDatabase(db: DatabaseSync, appliedAt: string): void {
-  db.exec("BEGIN IMMEDIATE");
-  try {
+  withTransaction(db, () => {
     db.exec(LATEST_SCHEMA_SQL);
     const insertMigration = db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)");
     for (const migration of MIGRATIONS) insertMigration.run(migration.version, appliedAt);
     assertForeignKeys(db, new Map());
-    db.exec("COMMIT");
-  } catch (error) {
-    if (db.isTransaction) db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 function readAppliedVersions(db: DatabaseSync): number[] {
@@ -368,15 +382,11 @@ function runMigration(
 ): Map<string, number> {
   if (migration.disableForeignKeys) db.exec("PRAGMA foreign_keys = OFF");
   try {
-    db.exec("BEGIN IMMEDIATE");
-    migration.up(db, appliedAt);
-    db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)").run(migration.version, appliedAt);
-    const violations = assertForeignKeys(db, violationsBefore);
-    db.exec("COMMIT");
-    return violations;
-  } catch (error) {
-    if (db.isTransaction) db.exec("ROLLBACK");
-    throw error;
+    return withTransaction(db, () => {
+      migration.up(db, appliedAt);
+      db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)").run(migration.version, appliedAt);
+      return assertForeignKeys(db, violationsBefore);
+    });
   } finally {
     if (migration.disableForeignKeys) db.exec("PRAGMA foreign_keys = ON");
   }
@@ -420,10 +430,16 @@ function readOldForeignKeyViolations(db: DatabaseSync): Map<string, number> {
 }
 
 function assertQuickCheck(db: DatabaseSync): void {
-  const problems = db
-    .prepare("PRAGMA quick_check(20)")
-    .all()
-    .map((row) => (isDynamicRecord(row) ? row.quick_check : row));
+  assertQuickCheckResult(
+    db
+      .prepare("PRAGMA quick_check(20)")
+      .all()
+      .map((row) => (isDynamicRecord(row) ? row.quick_check : row)),
+  );
+}
+
+/** Throws the integrity error unless the lines of a `PRAGMA quick_check` are the one line "ok". */
+export function assertQuickCheckResult(problems: readonly unknown[]): void {
   if (problems.length === 1 && problems[0] === "ok") return;
   // The lines name the damaged pages and tables, which tell a page left by a disk save from a bad index.
   logger.error("The OpenBot database failed its integrity check.", { problems });

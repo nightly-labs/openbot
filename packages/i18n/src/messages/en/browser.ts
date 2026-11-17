@@ -66,6 +66,7 @@ export const messages = defineMessages("browser", {
   "browser.liveView.pasteTooLong": "This text is too long to paste. Paste less than 100,000 characters.",
   "browser.liveView.copyTooLarge": "The selection is too long to copy. Select less text.",
   "browser.liveView.copyFailed": "Could not copy the text. Click the page and try again.",
+  "browser.liveView.pageCopied": "The page copied text. Select Copy to put it on your clipboard.",
   "browser.previews.label": "Browser previews",
   "browser.previews.resize": "Resize right panel",
   "browser.previews.empty": "No browser tabs",

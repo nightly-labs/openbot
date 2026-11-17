@@ -137,6 +137,7 @@ import {
   decodeBrowserViewInputValue,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   CHANNEL_PICTURE_CAPABILITY,
@@ -158,7 +159,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -198,9 +199,8 @@ import {
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
-import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
+import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -262,6 +262,7 @@ import {
 } from "@openbot/team-client/team-api-requests";
 import type { BrowserViewRuntime } from "@openbot/ui/features/browser/BrowserLiveView";
 import { currentText } from "@openbot/ui/text";
+import { toast } from "@openbot/ui/toast";
 import { referenceFrom } from "@openbot/user-errors";
 import { Effect } from "effect";
 import type { ServerAdminPort } from "../servers/servers-port";
@@ -581,6 +582,31 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
   "providerAccountId",
   "leaveUsageLimit",
 ]);
+
+/**
+ * Puts the text that the host's page copied on this computer's clipboard. A browser that refuses a
+ * write this long after the click, such as Safari, gets a button: a click on it is a new action.
+ */
+function writePageCopy(text: string): void {
+  // Called in the click itself, which is the user action that Safari asks for. A page that is not
+  // secure has no clipboard, and the call throws at once.
+  const write = () => {
+    try {
+      return navigator.clipboard.writeText(text);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
+  void write().catch(() => {
+    const { t } = currentText();
+    toast(t("browser.liveView.pageCopied"), {
+      action: {
+        label: t("common.copy"),
+        onClick: () => void write().catch(() => toast.error(t("browser.liveView.copyFailed"))),
+      },
+    });
+  });
+}
 
 function hostProtocolKey(accountId: string, hostId: string): string {
   return `openbot.web.host-protocol:${accountId}:${hostId}`;
@@ -1073,6 +1099,12 @@ export function createWebWorkspaceRuntime(
     request,
     () => capabilities.includes(TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY),
     () => capabilities.includes(TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY),
+    () => ({
+      cursor: false,
+      contextMenu: false,
+      viewport: null,
+      pageCopy: capabilities.includes(TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY),
+    }),
   );
   let liveView: RemoteBrowserView | null = null;
   let liveViewGeneration = 0;
@@ -1178,12 +1210,9 @@ export function createWebWorkspaceRuntime(
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
       const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      if (knownProtocol !== undefined && support.protocol.maximum !== knownProtocol) early?.drop();
-      const updateDirection = teamProtocolUpdateDirection(
-        { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
-        support.protocol,
-      );
-      if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
+      const negotiated = teamWebRtcClientProtocol(support.protocol);
+      if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
+      if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;
@@ -1214,6 +1243,9 @@ export function createWebWorkspaceRuntime(
             (reason) =>
               emitView({ type: "stopped", tabId, reason: reason || currentText().t("webClient.error.viewEnded") }),
             (copied) => emitView({ ...copied, tabId }),
+            (message) => {
+              if (message.type === "pageCopied") writePageCopy(message.text);
+            },
           ),
         );
         if (currentGeneration !== liveViewGeneration) {

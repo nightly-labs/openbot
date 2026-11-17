@@ -149,7 +149,8 @@ function ConnectorSuggestion({
           ? "unavailable"
           : row.status === "connected"
             ? "connected"
-            : // `attention` needs a new sign-in, and `unknown` failed to read: the connector page shows both.
+            : // `attention` needs a new sign-in, `paused` needs Resume, and `unknown` failed to read: the
+              // connector page shows each.
               "available";
   return (
     <SuggestionCard

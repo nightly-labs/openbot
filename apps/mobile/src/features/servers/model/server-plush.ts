@@ -48,16 +48,19 @@ function loadServerPlush(shape: ServerAppearanceShape, hex: string, pixels: numb
 }
 
 /**
- * The plush picture of `appearance` for a square of `size` points. `uri` is null while it is drawn;
- * `failed` is true when it cannot be drawn, so the caller shows its other look.
+ * The plush picture of `appearance` for a square of `size` points. With no appearance, it is the
+ * squircle in the automatic colour of the server. `enabled={false}` draws nothing, for a server
+ * that shows its logo. `uri` is null while it is drawn; `failed` is true when it cannot be drawn,
+ * so the caller shows its other look.
  */
 export function useServerPlush(
   serverId: string,
   appearance: ServerAppearance | null | undefined,
   size: number,
   saturation: number,
+  enabled = true,
 ): { uri: string | null; failed: boolean } {
-  const shape = appearance?.shape ?? null;
+  const shape = enabled ? (appearance?.shape ?? "squircle") : null;
   const hex = serverPlushHex(serverId, appearance?.color ?? null);
   const pixels = plushPixels(size, PixelRatio.get());
   const key = shape ? pictureKey(shape, hex, pixels, saturation) : null;

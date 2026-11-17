@@ -66,6 +66,8 @@ export const messages = {
   "error.agent.modelNotListed": "モデル「{model}」は使用できません。使用できるモデル: {models}。",
   "error.agent.providerNotListed":
     "現在 {provider} のモデルを使用できません。list_models を呼び出して、使用できるモデルを確認してください。",
+  "error.agent.creatorModelNotListed":
+    "あなたのモデル「{model}」は現在モデル一覧にないため、新しいエージェントはこのモデルで開始できません。数秒後にもう一度試すか、list_models に表示されるモデルを provider と model に指定してください。",
   "error.agent.reasoningEffortUnsupported":
     "モデル「{model}」は推論レベル「{effort}」に対応していません。対応している推論レベル: {efforts}。",
   "error.agent.reasoningEffortNotConfigurable":
@@ -102,6 +104,8 @@ export const messages = {
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
   "error.agent.turnStalled":
     "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.promptCancelled":
+    "{provider} が開始前にこのメッセージをキャンセルしました。メッセージをもう一度送信してください。",
   "error.agent.toolLoopStopped":
     "{provider} が失敗した手順を何度も繰り返したため、OpenBot はこのターンを停止しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.agent.answerCutOff":

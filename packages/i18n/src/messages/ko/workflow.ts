@@ -56,6 +56,8 @@ export const messages = {
   "workflow.node.locked": "잠김",
   "workflow.node.missingInput": "이 단계를 실행하려면 입력을 연결하세요.",
   "workflow.node.run": "실행",
+  "workflow.node.runPrice": "실행 · {credits}",
+  "workflow.node.runPriceLabel": "실행. 가격(크레딧): {credits}",
   "workflow.node.running": "실행 중",
   "workflow.node.stop": "중지",
   "workflow.node.retry": "다시 시도",

@@ -176,6 +176,8 @@ export type DynamicIslandAction =
   | { type: "open-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "dismiss-failure"; serverId: string; agentId: string; turnId: string }
   | { type: "review-attention"; serverId: string; agentId: string; requestId: string | number }
+  /** A chat window asks the main window to show the page of a browser takeover. See `BrowserTakeoverPage`. */
+  | ({ type: "open-browser-takeover" } & BrowserTakeoverPage)
   | {
       type: "answer-prompt";
       serverId: string;
@@ -190,6 +192,16 @@ export type DynamicIslandAction =
       requestId: string | number;
       decision: "accept" | "decline";
     };
+
+/**
+ * The page of a browser takeover in a chat window. That window shows no browser, so its card opens the
+ * page in the main window, the way the island opens a chat there.
+ */
+export interface BrowserTakeoverPage {
+  serverId: string;
+  agentId: string;
+  tabId: string;
+}
 
 export interface SetDynamicIslandInteractiveInput {
   interactive: boolean;
@@ -289,11 +301,21 @@ export function isDynamicIslandAction(value: unknown): value is DynamicIslandAct
   if (value.type === "review-attention") {
     return isDynamicIslandRequestId(value.requestId);
   }
+  if (value.type === "open-browser-takeover") return isShortString(value.tabId, 160);
   if (value.type === "respond-approval") {
     return isDynamicIslandRequestId(value.requestId) && (value.decision === "accept" || value.decision === "decline");
   }
   return (
     value.type === "answer-prompt" && isDynamicIslandRequestId(value.requestId) && isDynamicIslandAnswers(value.answers)
+  );
+}
+
+export function isBrowserTakeoverPage(value: unknown): value is BrowserTakeoverPage {
+  return (
+    isDynamicRecord(value) &&
+    isShortString(value.serverId, 160) &&
+    isShortString(value.agentId, 160) &&
+    isShortString(value.tabId, 160)
   );
 }
 

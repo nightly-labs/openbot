@@ -363,6 +363,7 @@
     "test:claude-background-hold": "bun scripts/claude-background-hold-e2e.ts",
     "test:claude-turn-context": "bun scripts/claude-turn-context-e2e.ts",
     "test:claude-late-steer": "bun scripts/claude-late-steer-e2e.ts",
+    "test:question-steer-order": "bun scripts/question-steer-order-e2e.ts",
     "test:provider-session-reuse": "bun scripts/provider-session-reuse-e2e.ts",
     "test:claude-cache": "bun scripts/claude-cache-e2e.ts",
     "bench:claude-prompt-settings": "bun scripts/claude-prompt-settings-bench.ts",

@@ -44,6 +44,8 @@ export type MarketplacePluginServer = MarketplacePluginServerBase &
          */
         command: string;
         args: string[];
+        /** Settings the server always starts with, such as the address of a local app. Never a credential. */
+        env?: Readonly<Record<string, string>>;
       }
   );
 
@@ -95,9 +97,17 @@ export function isPluginAppConfig(config: McpServerConfig, app: MarketplacePlugi
  * The row to connect again. A row that an earlier version of the listing saved moves to the address
  * the listing names now, so the new sign-in or key goes to the current server. Its headers stay
  * behind: they are the credentials of the old address. An account fragment stays with the row.
+ * A command row gets the fixed settings that the listing added after the row was saved.
  */
 export function currentPluginAppConfig(config: McpServerConfig, app: MarketplacePluginApp): McpServerConfig {
   const server = app.server;
+  if (server.transport === "stdio" && config.transport === "stdio") {
+    // A value that the row already has stays, so a setting the user changed is kept.
+    const added = Object.entries(server.env ?? {})
+      .filter(([key]) => !config.env.some((held) => held.key === key))
+      .map(([key, value]) => ({ key, value }));
+    return added.length > 0 ? { ...config, env: [...config.env, ...added] } : config;
+  }
   if (server.transport !== "http" || config.transport !== "http") return config;
   const url = withoutMcpAccountFragment(config.url);
   if (url === server.url || isListingUrl(url, server.url)) return config;

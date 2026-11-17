@@ -4,9 +4,14 @@ import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect, Result } from "effect";
-import { migrateOpenBotDatabase } from "../openbot-database-schema";
+import {
+  assertQuickCheckResult,
+  migrateOpenBotDatabase,
+  openBotDatabaseNeedsMigration,
+} from "../openbot-database-schema";
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+import { withTransaction } from "./sqlite-transaction";
 
 export interface OrchestrationEventInput {
   aggregateType: string;
@@ -35,6 +40,13 @@ export const LOWERCASE_FUNCTION = "openbot_lowercase";
 
 export interface DatabaseCoreOptions {
   userDataPath: string;
+  /**
+   * Runs `PRAGMA quick_check(20)` on the file at the path in another process and gives its lines, or
+   * null when it could not run there. Used after a stop that did not close the file: the check reads
+   * every page, and on a large file it would stop the calling thread for minutes. Without it, or when
+   * it gives null, the check runs on the calling thread as before.
+   */
+  checkIntegrity?: ((databasePath: string) => Effect.Effect<readonly unknown[] | null>) | undefined;
 }
 
 /**
@@ -51,11 +63,13 @@ export interface DatabaseCoreOptions {
 export class DatabaseCore {
   readonly path: string;
   readonly #legacyBackupRoot: string;
+  readonly #checkIntegrity: DatabaseCoreOptions["checkIntegrity"];
   #db: DatabaseSync | null = null;
 
   constructor(options: DatabaseCoreOptions) {
     this.path = join(options.userDataPath, "openbot.db");
     this.#legacyBackupRoot = join(options.userDataPath, "legacy-backup-v1");
+    this.#checkIntegrity = options.checkIntegrity;
   }
 
   initialize = Effect.fn("DatabaseCore.initialize")(function* (this: DatabaseCore) {
@@ -77,8 +91,18 @@ export class DatabaseCore {
           db.function(LOWERCASE_FUNCTION, { deterministic: true }, (value) =>
             typeof value === "string" ? value.toLocaleLowerCase() : value,
           );
+        });
+        // A migration checks the file on this thread after it runs, so a check before it would read it twice.
+        const checkIntegrity = this.#checkIntegrity;
+        const problems =
+          closedCleanly || !checkIntegrity || (yield* storedSync(() => openBotDatabaseNeedsMigration(db)))
+            ? null
+            : yield* checkIntegrity(this.path);
+        if (problems) yield* storedSync(() => assertQuickCheckResult(problems));
+        yield* storedSync(() => {
           this.#db = db;
-          this.#migrate(closedCleanly);
+          // A file that passed the check here does not need it again, unless a migration runs.
+          this.#migrate(closedCleanly || problems !== null);
         });
         yield* storedIO(() => chmod(this.path, 0o600));
       }),
@@ -118,9 +142,7 @@ export class DatabaseCore {
     );
     if (receipt) return JSON.parse(receipt.result_json);
 
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(db, () => {
       const sequences: number[] = [];
       const append = db.prepare(`
         INSERT INTO orchestration_events (
@@ -157,12 +179,8 @@ export class DatabaseCore {
           JSON.stringify(result ?? null),
         );
       }
-      if (ownsTransaction) db.exec("COMMIT");
       return result;
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   commandResult(commandId: string): unknown | undefined {
@@ -176,16 +194,10 @@ export class DatabaseCore {
 
   deleteEventsAndReceipt(commandId: string): void {
     const db = this.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       db.prepare("DELETE FROM orchestration_events WHERE command_id = ?").run(commandId);
       db.prepare("DELETE FROM orchestration_command_receipts WHERE command_id = ?").run(commandId);
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   backupLegacyFile = Effect.fn("DatabaseCore.backupLegacyFile")(function* (this: DatabaseCore, path: string) {

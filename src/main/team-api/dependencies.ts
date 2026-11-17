@@ -345,7 +345,10 @@ export type TeamApiHostedSites = Pick<HostedSiteDesktopService, "listServerSites
 /** Its presence is what `#protocolSupport` advertises `agent-hidden-v1` on. Any member can use it. */
 export type TeamApiHiddenAgents = Pick<AgentService, "listHiddenAgents" | "setAgentHidden">;
 
-/** `routine-run-place-v1`: the routine records of each agent, of every trigger kind. */
+/**
+ * `routine-run-place-v1` and `routine-pause-reasons-v1`: the routine records of each agent, of every
+ * trigger kind.
+ */
 export type TeamApiRoutineRunPlaces = Pick<AgentService["routineRecords"], "list" | "get" | "save">;
 
 /**
@@ -474,6 +477,8 @@ export type TeamApiWorkflows = Pick<
   | "keepPicture"
   | "mediaProviders"
   | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**

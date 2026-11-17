@@ -57,6 +57,8 @@ export const messages = {
   "error.agent.modelNotListed": 'המודל "{model}" אינו זמין. המודלים הזמינים: {models}.',
   "error.agent.providerNotListed":
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
+  "error.agent.creatorModelNotListed":
+    'המודל שלך "{model}" לא נמצא עכשיו ברשימת המודלים, ולכן הסוכן החדש לא יכול להתחיל איתו. אפשר לנסות שוב בעוד כמה שניות, או להגדיר ב-provider וב-model מודל ש-list_models מציג.',
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',
@@ -86,6 +88,7 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.promptCancelled": "{provider} ביטל את ההודעה הזו לפני שהתחילה. יש לשלוח את ההודעה שוב.",
   "error.agent.toolLoopStopped":
     "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
   "error.agent.answerCutOff": "הסוכן נעצר לפני שסיים את התשובה שלו, ולכן התשובה אינה מלאה. שלחו את ההודעה שוב.",

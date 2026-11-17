@@ -234,6 +234,7 @@ export const messages = {
   "routine.settings.loading": "Routines laden…",
   "routine.settings.empty": "Nog geen routines.",
   "routine.settings.paused": "Gepauzeerd",
+  "routine.settings.pausedByRun": "Gepauzeerd door de uitvoering van {time}",
   "routine.settings.completed": "Klaar · {schedule}",
   "routine.settings.active": "Actief",
   "routine.settings.pauseFailed": "Kan deze routine niet pauzeren.",

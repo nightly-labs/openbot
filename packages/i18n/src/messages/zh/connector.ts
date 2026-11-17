@@ -372,10 +372,10 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}：{name}",
   "connector.whatsapp.ownNumber": "个人号码",
   "connector.whatsapp.ownNumberDescription":
-    "只有你的“给自己发消息”聊天和你允许的人可以发消息。如果是 OpenBot 专用号码，请关闭该选项。",
+    "只有你的“给自己发消息”聊天和你允许的人可以发消息。其他人不会收到回复。关闭后，OpenBot 会给陌生人回复一个代码。",
   "connector.whatsapp.workingMessage": "“正在处理…”消息",
   "connector.whatsapp.workingMessageDescription":
-    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。关闭后只发送回答。",
+    "代理工作时，OpenBot 会发送这条消息，随后用回答替换它。等待之前请求的新请求也会收到一条等待消息。关闭后只发送回答。",
   "connector.whatsapp.statusReactions": "状态表情回应",
   "connector.whatsapp.statusReactionsDescription":
     "消息到达时，OpenBot 会用 👀 回应；回答准备好后用 ✅ 回应。关闭后不发送任何表情回应。",
@@ -393,9 +393,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "选择号码，然后在手机上的 WhatsApp 中关联这台服务器。",
   "connector.whatsapp.kindLabel": "号码",
   "connector.whatsapp.kindPersonal": "我的个人号码",
-  "connector.whatsapp.kindPersonalDescription": "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。",
+  "connector.whatsapp.kindPersonalDescription":
+    "OpenBot 只回答你的“给自己发消息”聊天和你允许的人。其他人不会收到回复。",
   "connector.whatsapp.kindDedicated": "OpenBot 专用号码",
-  "connector.whatsapp.kindDedicatedDescription": "陌生人会收到一个代码，需要把它交给你。你在这里批准他们。",
+  "connector.whatsapp.kindDedicatedDescription":
+    "OpenBot 会用这个号码回复每个陌生人一个代码，需要把它交给你。你在这里批准他们。",
   "connector.whatsapp.methodLabel": "关联方式",
   "connector.whatsapp.methodQr": "二维码",
   "connector.whatsapp.methodCode": "配对码",

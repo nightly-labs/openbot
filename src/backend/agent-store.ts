@@ -77,7 +77,7 @@ import { ProfileCreationRecovery } from "./agent/profile-creation-recovery";
 import { isEmptyStoredFile, parseStoredJson, writeFileAtomically } from "./atomic-json-file";
 import { automationRoot } from "./automation-command";
 import type { AgentModelChange } from "./database/agent-roster";
-import { OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
+import { type OpenBotDatabase, type ProviderSession, stableThreadId } from "./openbot-database";
 import { isPathInside } from "./path-containment";
 import { isRecord } from "./protocol";
 import { StoredStateFailure, storedIO, storedSync } from "./stored-state-effects";
@@ -214,7 +214,8 @@ export class AgentStore {
   constructor(
     userDataPath: string,
     homePath: string,
-    database = new OpenBotDatabase(userDataPath),
+    /** The one connection of the process to `openbot.db`. The caller owns it; the store does not open one. */
+    database: OpenBotDatabase,
     agentDefaults: () => AgentDefaults = () => DEFAULT_AGENT_DEFAULTS,
     /** The folder of the agents, shared files and downloads. A local server has its own. */
     openbotRoot = join(homePath, "OpenBot"),

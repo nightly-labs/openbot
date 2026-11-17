@@ -1,11 +1,16 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import { CONVERSATION_TRACE_STEP_LIMIT, type ConversationTurnTrace } from "@openbot/contracts/ipc";
+import {
+  CONVERSATION_TRACE_STEP_LIMIT,
+  type ConversationMessage,
+  type ConversationTurnTrace,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentStore } from "../agent-store";
 import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
+import { HistoryReferenceUnavailable } from "../database/agent-history-queries";
 import type { ProviderSession } from "../database/provider-sessions";
 import { openBotToolResult } from "./routine-tools";
 import { type ToolOperationFailed, toolStep } from "./tool-operation";
@@ -166,16 +171,27 @@ function readCursor(text: string) {
   }
 }
 
-/** A `before` that is not a cursor is a message of the chat that is read. The error names the argument. */
-const beforeMessageSchema = (inChat: (messageId: string) => boolean) =>
-  z.object({
-    before: z
-      .string()
-      .refine(
-        inChat,
-        "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again.",
-      ),
-  });
+/**
+ * The argument error for a `messageId` or a `before` that names no message of the chat after its latest
+ * reset. The "Message ID" of a teammate request also names its copy in the chat.
+ */
+function unknownReference(argument: "messageId" | "before", input: string): z.ZodError {
+  const message =
+    argument === "before"
+      ? "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again."
+      : "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.";
+  return new z.ZodError([{ code: "custom", path: [argument], input, message }]);
+}
+
+/**
+ * A message as a read shows it. The delivery states of a request to teammates change while the
+ * teammates work, and a read does not show them.
+ */
+function readContent(message: ConversationMessage | undefined): string {
+  return JSON.stringify(
+    message?.exchange ? { ...message, exchange: { ...message.exchange, deliveries: [] } } : message,
+  );
+}
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
@@ -244,6 +260,8 @@ interface HistoryEntry {
   taskId?: string;
   messageId: string;
   author: string;
+  /** Set for a request that this agent sent: the teammates it went to. */
+  sentTo?: string[];
   createdAt: string;
   text: string;
   offset: number;
@@ -454,23 +472,30 @@ export class HistoryTools {
         ? readCursor(read.before)
         : null;
     const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
-    if (beforeMessageId !== null)
-      yield* toolStep(() =>
-        beforeMessageSchema(
-          (messageId) => store.database.readConversationMessages(agentId, threadId, [messageId]).length === 1,
-        ).parse({ before: beforeMessageId }),
-      );
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
     // hits and misses reveal a redacted secret one character at a time.
     const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
+      outgoing: true,
       limit: read?.messageId ? 1 : scanLimit + 1,
       ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
     };
-    const page = yield* toolStep(() => store.database.readAgentHistory(agentId, threadId, selection));
+    const page = yield* toolStep(() => {
+      try {
+        return store.database.readAgentHistory(agentId, threadId, selection);
+      } catch (error) {
+        // The read resolves a teammate request's Message ID too. Only a reference from the agent is an
+        // argument error: other errors, and a cursor's anchor, keep their own error.
+        if (error instanceof HistoryReferenceUnavailable && read?.messageId !== undefined)
+          throw unknownReference("messageId", read.messageId);
+        if (error instanceof HistoryReferenceUnavailable && beforeMessageId !== null)
+          throw unknownReference("before", beforeMessageId);
+        throw error;
+      }
+    });
     if (cursor && cursor.resetMessageId !== page.resetMessageId)
       throw new Error(sourceText("error.agent.historyUnavailable"));
     const nextCursor = (messageId: string) =>
@@ -518,9 +543,12 @@ export class HistoryTools {
       if (offset > text.length) throw new Error(sourceText("error.agent.historyUnavailable"));
       if (search) offset = Math.max(0, match - 100);
       const excerpt = text.slice(offset, offset + (search ? 400 : 12000));
+      // The chat keeps a request to teammates as a system message; the agent wrote it.
+      const sentTo = message.exchange?.direction === "outgoing" ? message.exchange.recipientAgentIds : null;
       const entry: HistoryEntry = {
         messageId: message.id,
-        author: message.author,
+        author: sentTo ? "assistant" : message.author,
+        ...(sentTo ? { sentTo } : {}),
         createdAt: message.createdAt,
         text: excerpt,
         offset,
@@ -594,13 +622,13 @@ export class HistoryTools {
     // File reads yield. Recheck reset and message existence before any content leaves the process.
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>
-        store.database.readAgentHistory(agentId, threadId, { messageId: entry.messageId, limit: 1 }),
+        store.database.readAgentHistory(agentId, threadId, { messageId: entry.messageId, outgoing: true, limit: 1 }),
       );
       if (
         checked.resetMessageId !== page.resetMessageId ||
         checked.messages.length !== 1 ||
-        JSON.stringify(checked.messages[0]?.message) !==
-          JSON.stringify(page.messages.find((row) => row.message.id === entry.messageId)?.message)
+        readContent(checked.messages[0]?.message) !==
+          readContent(page.messages.find((row) => row.message.id === entry.messageId)?.message)
       )
         throw new Error(sourceText("error.agent.historyUnavailable"));
     }

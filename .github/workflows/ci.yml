@@ -10,11 +10,12 @@ on:
 permissions:
   contents: read
 
-# A new PR push cancels the old run. On main, each commit gets its own complete run: merges come
-# faster than one run takes, and a shared group cancelled almost every main run and its deploy.
+# A new PR push cancels the old run. On main, a run always completes, and only the newest commit
+# waits for it: GitHub cancels an older waiting run. Merges come faster than one run takes, so each
+# run tests all the commits merged since the last run, and runner use does not grow with each merge.
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.event_name != 'push' }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   GIT_CONFIG_COUNT: 1
@@ -42,6 +43,7 @@ jobs:
       api: ${{ steps.lanes.outputs.api }}
       remote: ${{ steps.lanes.outputs.remote }}
       storybook: ${{ steps.lanes.outputs.storybook }}
+      schema: ${{ steps.lanes.outputs.schema }}
       surfaces: ${{ steps.lanes.outputs.surfaces }}
     steps:
       - name: Check out repository
@@ -97,6 +99,7 @@ jobs:
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
+          lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
@@ -159,6 +162,15 @@ jobs:
           - name: Check translated What's new notes
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
+
+          # Fails after a release that changed the database schema until `releases.json` has it. It
+          # takes about 50 s, so it runs only when the database code changes: a new migration must be
+          # tested from every released schema. `git archive` needs only the tag commits.
+          - name: Check released database schemas
+            if: needs.detect.result != 'success' || needs.detect.outputs.schema == 'true'
+            run: |
+              git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
+              bun scripts/released-schema-fixtures.ts --check
 
   browser:
     # The smoke test starts the real Electron binary and opens windows, so it
@@ -312,6 +324,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
 
+      - name: Run the release version comparator E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/release-version-comparator-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -320,6 +336,7 @@ jobs:
           path: |
             .openbot-build/team-api-routes-e2e/
             .openbot-build/crm-team-api-e2e/
+            .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 
   reverse-actions-e2e:

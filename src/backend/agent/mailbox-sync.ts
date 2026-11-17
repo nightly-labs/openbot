@@ -21,6 +21,8 @@ export interface MailboxSyncHooks {
   emitError(code: string, error: unknown, agentId?: string): void;
   /** What holds the queue back, when the reason is not this agent's own running turn. */
   queueHold(agentId: string): QueueHold | null;
+  /** The requests that this agent sent from its side threads changed: one was sent, started or ended. */
+  threadRequestsChanged(agentId: string): void;
 }
 
 export interface MailboxSyncOptions {
@@ -48,6 +50,8 @@ export class MailboxSync {
   readonly #routines: RoutineScheduler;
   readonly #scope: () => Scope.Scope;
   readonly #hooks: MailboxSyncHooks;
+  /** The open side-thread requests of each sender, as its thread list last showed them. */
+  #threadRequests = new Map<string, string>();
 
   constructor(options: MailboxSyncOptions) {
     this.#database = options.database;
@@ -122,6 +126,19 @@ export class MailboxSync {
       message.reaction = message.reactions.find((reaction) => reaction.actor.kind === "user")?.emoji ?? null;
     }
     sortConversationMessages(snapshot.messages);
+  }
+
+  /** Sends the thread list of each agent whose side-thread requests changed since the last list. */
+  #emitThreadRequests(): void {
+    const requests = new Map<string, string>();
+    for (const request of this.#mailbox.awaitedThreadRequests()) {
+      const key = `${request.deliveryId}:${request.status};`;
+      requests.set(request.senderAgentId, (requests.get(request.senderAgentId) ?? "") + key);
+    }
+    const before = this.#threadRequests;
+    this.#threadRequests = requests;
+    for (const agentId of new Set([...before.keys(), ...requests.keys()]))
+      if (before.get(agentId) !== requests.get(agentId)) this.#hooks.threadRequestsChanged(agentId);
   }
 
   /**
@@ -208,6 +225,7 @@ export class MailboxSync {
     }
     this.#hooks.emit({ type: "queue-changed", snapshot: queue });
     if (routinesChanged) this.#routines.stateChanged(agentId);
+    this.#emitThreadRequests();
     const affectedAgents = new Set([agentId, ...this.#mailbox.senderAgentIdsForRecipient(agentId)]);
     for (const affectedAgentId of affectedAgents) {
       const snapshot = this.#conversation.snapshotToUpdate(affectedAgentId);

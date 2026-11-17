@@ -64,7 +64,7 @@ const DIRECT_BROWSER_DYNAMIC_TOOLS = BROWSER_DYNAMIC_TOOLS.map((namespace) => ({
  * long as the inline search (`bun run bench:codex-web-search`). The Pi-based providers have no web search,
  * and a custom ACP agent can have none, so they get the tool. Some CLIs need a condition that the OpenBot
  * sign-in meets: an Anthropic or Grok account, `kimi login`, a Mistral key, the Cline account. OpenCode
- * asks once for consent and then searches without a key.
+ * searches without a key; OpenBot gives the consent that it asks for (`opencode-agent-defaults.ts`).
  */
 const OWN_WEB_SEARCH_PROVIDERS: ReadonlySet<AgentProviderId> = new Set([
   "codex",

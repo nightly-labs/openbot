@@ -23,8 +23,9 @@ import { ToolOperationFailed, toolStep } from "./tool-operation";
 
 /**
  * The MCP tools: an agent adds, changes, tests, turns on or off, and removes the MCP servers of its
- * OpenBot server when the user asks. A server applies to every agent there, so each change waits
- * for the user's approval as other tools do, and an agent with Full access is answered for.
+ * OpenBot server when the user asks. A server goes to the agents that the user selects for it, and
+ * a new one to every agent there, so each change waits for the user's approval as other tools do,
+ * and an agent with Full access is answered for.
  *
  * No value of a header or of the environment goes in or out: a key stays in the Marketplace form, where
  * the user enters it. A sign-in is handed to the user with a card in the conversation.
@@ -59,14 +60,15 @@ const saveMcpServerToolSchema = z.strictObject({
 const namedServerSchema = z.strictObject({ name: serverName });
 const setEnabledSchema = z.strictObject({ name: serverName, enabled: z.boolean() });
 
-const MCP_SCOPE = "Every agent on this OpenBot server gets the tools of an enabled MCP server.";
+// The agents of each server are the user's choice (#10992): an agent that says they cannot be limited misleads the user.
+const MCP_SCOPE = "The user selects which agents get each server, in Marketplace, Apps.";
 const MCP_APPROVAL =
   "The user's request is the permission: call the tool without asking first. OpenBot asks the user to approve when your access needs it.";
 
 export const MCP_SERVER_TOOL_DEFINITIONS = [
   {
     name: "list_mcp_servers",
-    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, and whether it is signed in. Values are never shown. ${MCP_SCOPE} Read-only.`,
+    description: `List the MCP servers of this OpenBot server: name, transport, on or off, address or command, the names of its headers and environment variables, sign-in, and forYou: you get its tools when it is on. Values are never shown. ${MCP_SCOPE} Read-only.`,
     shape: {},
   },
   {
@@ -120,6 +122,8 @@ export interface AgentMcpServers {
   redact(text: string): string;
   /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
   forAgent(agentId: string): McpServerConfig[];
+  /** Whether the agents that the user selected for this saved server include the agent. */
+  allowsAgent(mcpServerId: string, agentId: string): boolean;
   /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
   callTool(
     config: McpServerConfig,
@@ -190,6 +194,7 @@ export function mcpServersFromGateway(
   gateway: McpGateway,
   prepareTest?: (config: McpServerConfig) => Effect.Effect<void, unknown>,
   forAgent: (agentId: string) => McpServerConfig[] = () => [],
+  allowsAgent: (mcpServerId: string, agentId: string) => boolean = () => true,
 ): AgentMcpServers {
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
@@ -209,6 +214,7 @@ export function mcpServersFromGateway(
     signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
     forAgent,
+    allowsAgent,
     callTool: (config, name, args) =>
       prepared(config).pipe(Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure))),
   };
@@ -216,6 +222,8 @@ export function mcpServersFromGateway(
 
 export interface McpServerToolCall {
   tool: McpServerToolName;
+  /** The agent that calls the tool. */
+  agentId: string;
   arguments: unknown;
   /**
    * Asks the user to approve the change that `reason` states. `cwd` is the folder a stdio server
@@ -303,7 +311,10 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const signIns = servers.signIns();
       return openBotToolResult({
         servers: [
-          ...servers.list().map((config) => describeServer(config, signIns)),
+          ...servers.list().map((config) => ({
+            ...describeServer(config, signIns),
+            forYou: servers.allowsAgent(config.id, call.agentId),
+          })),
           ...servers.builtIn().map(describeBuiltInServer),
         ],
       });

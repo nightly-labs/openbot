@@ -2414,6 +2414,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       serverId: string,
       part: { uploadId: string; index: number; sha256: string },
       bytes: Uint8Array,
+      /** The bytes of this part that the host has confirmed. Only the WebRTC transport reports them. */
+      onProgress?: (sent: number) => void,
     ): Effect.fn.Return<void, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const url = new URL(INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk, server.apiUrl);
@@ -2426,6 +2428,8 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         { method: "POST", headers: { "Content-Type": "application/octet-stream" }, body: Buffer.from(bytes) },
         true,
         INSTANCE_TRANSFER_PART_TIMEOUT_MS,
+        undefined,
+        onProgress,
       );
       yield* this.#rejectHostError(response, url);
     },

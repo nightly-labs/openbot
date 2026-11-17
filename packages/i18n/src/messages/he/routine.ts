@@ -259,6 +259,7 @@ export const messages = {
   "routine.settings.loading": "טוען שגרות…",
   "routine.settings.empty": "אין שגרות עדיין.",
   "routine.settings.paused": "מושהית",
+  "routine.settings.pausedByRun": "הושהתה על ידי ההרצה של {time}",
   "routine.settings.completed": "הושלמה · {schedule}",
   "routine.settings.active": "פעילה",
   "routine.settings.pauseFailed": "לא ניתן להשהות את השגרה הזו.",
