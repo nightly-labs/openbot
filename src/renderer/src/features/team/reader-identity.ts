@@ -1,4 +1,20 @@
-import { SIGNED_OUT_CHANNEL_MEMBER_ID } from "@openbot/contracts/ipc";
+import { type ServerSummary, SIGNED_OUT_CHANNEL_MEMBER_ID, type TeamPresenceMember } from "@openbot/contracts/ipc";
+
+export function currentReaderMember(
+  members: TeamPresenceMember[],
+  server: ServerSummary | undefined,
+  accountEmail: string | null,
+): TeamPresenceMember | undefined {
+  // Additional local servers authenticate this app as their password owner, not its cloud account.
+  if (server?.thisComputer && server.role === "owner") {
+    return members.find((member) => member.username === "owner" && member.role === "owner" && !member.disabled);
+  }
+  if (accountEmail === null) return undefined;
+  const email = accountEmail.trim().toLowerCase();
+  return members.find(
+    (member) => member.email?.trim().toLowerCase() === email || member.username.trim().toLowerCase() === email,
+  );
+}
 
 /**
  * Who the reader is, as the three ids a message can carry for them: a channel author, or the

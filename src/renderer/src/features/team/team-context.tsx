@@ -3,17 +3,15 @@ import { createMemo, createSignal, flush, onSettled } from "solid-js";
 import { EMPTY_TEAM_PRESENCE } from "../../app-defaults";
 import { createSimpleContext } from "../../simple-context";
 import { useAuth } from "../account/account-context";
+import { useServers } from "../servers/servers-context";
+import { currentReaderMember } from "./reader-identity";
 import { teamPort } from "./team-port";
 
 /**
  * Who else is on the active workspace, and which of them is the signed-in user.
  *
- * The identity match runs on email or username rather than an id because
- * presence is the team server's view of its members and the account is the cloud
- * service's view of one person; nothing joins them but the address the user
- * signed in with. A signed-out user therefore has no current member, which is
- * also what makes `directPeople` empty - a list of people to message is
- * meaningless without a "me" to exclude from it.
+ * Cloud identity matches by email or username; additional local servers use
+ * their password owner instead, regardless of cloud sign-in.
  *
  * The snapshot itself is per server, but the read that seeds it is one of the
  * eight the workspace bootstrap and `selectServer` both run, so the *load* stays
@@ -28,14 +26,15 @@ const Presence = createSimpleContext({
   name: "Presence",
   init: () => {
     const { centralAuth } = useAuth();
+    const { activeServer } = useServers();
     const [teamPresence, setTeamPresence] = createSignal<TeamPresenceSnapshot>(EMPTY_TEAM_PRESENCE);
 
     const currentTeamMember = createMemo(() => {
       const state = centralAuth();
-      if (state.status !== "signed_in") return undefined;
-      const email = state.user.email.trim().toLowerCase();
-      return teamPresence().members.find(
-        (member) => member.email?.trim().toLowerCase() === email || member.username.trim().toLowerCase() === email,
+      return currentReaderMember(
+        teamPresence().members,
+        activeServer(),
+        state.status === "signed_in" ? state.user.email : null,
       );
     });
 
