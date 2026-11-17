@@ -550,6 +550,8 @@ interface ThreadRuntime {
   subagentLimit: { resetsAt: number | null; text: string } | null;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
+  /** The process sent a message, so it started. A failure after that is of this thread, not of Claude. */
+  answered: boolean;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
   promptIds: Set<string>;
   /**
@@ -1699,6 +1701,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       endedTaskTurns: [],
       subagentLimit: null,
       lastOutputAt: Date.now(),
+      answered: false,
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
       streamMessage: { id: null, thinkingBlocks: new Map<number, string>() },
@@ -1989,28 +1992,40 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ),
       );
       if (this.#running && this.#threads.get(runtime.id) === runtime) {
-        this.#fail(new Error("Claude session stream ended unexpectedly."));
+        yield* this.#endFailedQuery(runtime, new Error("Claude session stream ended unexpectedly."));
       }
     } catch (caught) {
       if (!this.#running || this.#threads.get(runtime.id) !== runtime) return;
-      const error = runtime.stderr.addTo(caught);
-      const activeTurn = runtime.activeTurn;
-      if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
-      // A query with no sandbox for its Workspace only setting fails on its own thread, not on Claude:
-      // the other agents keep their queries, and the stop does not count as a failed start (#9925).
-      // The close waits for this consumer, so it runs in the client's scope.
-      if (CLAUDE_SANDBOX_UNAVAILABLE.test(String(error))) {
-        queryLogger.warn("Claude cannot start its sandbox for a Workspace only thread.", {
-          threadId: runtime.id,
-          error: redactText(String(error)),
-        });
-        yield* runtime.config.persistSession
-          ? this.#threads.releaseNow(runtime)
-          : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
-        return;
-      }
-      this.#fail(error instanceof Error ? error : new Error(String(error)));
+      yield* this.#endFailedQuery(runtime, runtime.stderr.addTo(caught));
     }
+  });
+
+  /**
+   * Ends a query that failed or ended by itself. A query that started fails on its own thread, not on
+   * Claude: its turn fails, and its next turn resumes the session. The other agents keep their
+   * queries, also one in the middle of a long command (#11200), and the stop does not count as a
+   * failed start. A query with no sandbox for its Workspace only setting does the same (#9925). Only
+   * a query that sent nothing stops Claude, because the CLI itself can be what does not start.
+   */
+  readonly #endFailedQuery = Effect.fn("ClaudeAgentClient.endFailedQuery")(function* (
+    this: ClaudeAgentClient,
+    runtime: ThreadRuntime,
+    error: unknown,
+  ) {
+    if (runtime.activeTurn) yield* this.#completeTurn(runtime, "failed", error);
+    const noSandbox = CLAUDE_SANDBOX_UNAVAILABLE.test(String(error));
+    if (!noSandbox && !runtime.answered) {
+      this.#fail(error instanceof Error ? error : new Error(String(error)));
+      return;
+    }
+    queryLogger.warn(
+      noSandbox ? "Claude cannot start its sandbox for a Workspace only thread." : "A Claude query failed.",
+      { threadId: runtime.id, error: redactText(String(error)) },
+    );
+    // The close waits for this consumer, so it runs in the client's scope.
+    yield* runtime.config.persistSession
+      ? this.#threads.releaseNow(runtime)
+      : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
   });
 
   #emitTurnProgress(runtime: ThreadRuntime, turn: ActiveTurn, detail: string): void {
@@ -2032,6 +2047,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     message: ClaudeStreamMessage,
   ) {
     runtime.lastOutputAt = Date.now();
+    runtime.answered = true;
     if (message.type === "command_lifecycle") {
       yield* this.#promptLifecycle(runtime, message.command_uuid, message.state);
       return;
