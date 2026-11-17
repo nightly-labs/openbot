@@ -51,14 +51,14 @@ export function createRoutineRunFailures(
         setReasons(new Map());
       }
       if (!current) return;
-      const routineIds = new Set<string>();
+      const runIds = new Map<string, string[]>();
       for (const run of runs) {
         if (lookedFor.has(run.runId)) continue;
         lookedFor.add(run.runId);
-        routineIds.add(run.routineId);
+        runIds.set(run.routineId, [...(runIds.get(run.routineId) ?? []), run.runId]);
       }
       const loading = request;
-      for (const routineId of routineIds) {
+      for (const [routineId, ids] of runIds) {
         void current
           .listRuns({ agentId: current.agentId, routineId, limit: INPUT_LIMITS.routineRunsPage })
           .then((history) => {
@@ -68,8 +68,11 @@ export function createRoutineRunFailures(
             );
             if (failed.length > 0) setReasons((known) => new Map([...known, ...failed]));
           })
-          // The marker stays without a reason when the host cannot list the runs.
-          .catch(() => undefined);
+          // The marker stays without a reason when the host cannot list the runs. The next new failed
+          // run reads again, so a host that was offline for a moment does not lose the reasons.
+          .catch(() => {
+            if (loading === request) for (const id of ids) lookedFor.delete(id);
+          });
       }
     },
   );
