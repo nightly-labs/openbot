@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync } from "node:fs";
 import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type StatementSync } from "node:sqlite";
 import { Effect, Result } from "effect";
 import {
   assertQuickCheckResult,
@@ -20,6 +20,8 @@ export interface OrchestrationEventInput {
   payload: unknown;
   occurredAt?: string;
 }
+
+const SELECT_RECEIPT_SQL = "SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?";
 
 interface ReceiptRow {
   last_sequence: number;
@@ -65,6 +67,8 @@ export class DatabaseCore {
   readonly #legacyBackupRoot: string;
   readonly #checkIntegrity: DatabaseCoreOptions["checkIntegrity"];
   #db: DatabaseSync | null = null;
+  readonly #statements = new Map<string, StatementSync>();
+  #statementsDb: DatabaseSync | null = null;
 
   constructor(options: DatabaseCoreOptions) {
     this.path = join(options.userDataPath, "openbot.db");
@@ -120,6 +124,7 @@ export class DatabaseCore {
   }, Effect.uninterruptible);
 
   close(): void {
+    this.#statements.clear();
     this.#db?.close();
     this.#db = null;
   }
@@ -129,22 +134,37 @@ export class DatabaseCore {
     return this.#db;
   }
 
+  /**
+   * A prepared statement for SQL that has no variable parts, kept for the open connection. Each
+   * streamed flush of each agent dispatches a command, and to prepare its statements again on each
+   * call parsed the same SQL hundreds of times per second with many agents.
+   */
+  statement(sql: string): StatementSync {
+    const db = this.connection;
+    if (this.#statementsDb !== db) {
+      this.#statements.clear();
+      this.#statementsDb = db;
+    }
+    let prepared = this.#statements.get(sql);
+    if (!prepared) {
+      prepared = db.prepare(sql);
+      this.#statements.set(sql, prepared);
+    }
+    return prepared;
+  }
+
   dispatch<T>(
     commandId: string,
     events: OrchestrationEventInput[],
     project: (db: DatabaseSync, sequences: number[]) => T,
   ): T {
     const db = this.connection;
-    const receipt = decodeReceiptRow(
-      db
-        .prepare("SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?")
-        .get(commandId),
-    );
+    const receipt = decodeReceiptRow(this.statement(SELECT_RECEIPT_SQL).get(commandId));
     if (receipt) return JSON.parse(receipt.result_json);
 
     return withTransaction(db, () => {
       const sequences: number[] = [];
-      const append = db.prepare(`
+      const append = this.statement(`
         INSERT INTO orchestration_events (
           event_id, command_id, aggregate_type, aggregate_id, event_type, occurred_at, payload_json
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -165,9 +185,11 @@ export class DatabaseCore {
       // A receipt is deleted with its command's events. A command that keeps no event, such as the
       // memory transaction wrapper or a channel delete that removes its own event, gets no receipt,
       // because nothing would delete it.
-      const keepsEvent = db.prepare("SELECT 1 FROM orchestration_events WHERE command_id = ? LIMIT 1").get(commandId);
+      const keepsEvent = this.statement("SELECT 1 FROM orchestration_events WHERE command_id = ? LIMIT 1").get(
+        commandId,
+      );
       if (keepsEvent) {
-        db.prepare(
+        this.statement(
           `INSERT INTO orchestration_command_receipts
             (command_id, accepted_at, first_sequence, last_sequence, result_json)
            VALUES (?, ?, ?, ?, ?)`,
@@ -184,11 +206,7 @@ export class DatabaseCore {
   }
 
   commandResult(commandId: string): unknown | undefined {
-    const receipt = decodeReceiptRow(
-      this.connection
-        .prepare("SELECT last_sequence, result_json FROM orchestration_command_receipts WHERE command_id = ?")
-        .get(commandId),
-    );
+    const receipt = decodeReceiptRow(this.statement(SELECT_RECEIPT_SQL).get(commandId));
     return receipt ? JSON.parse(receipt.result_json) : undefined;
   }
 

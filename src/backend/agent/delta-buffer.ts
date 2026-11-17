@@ -26,6 +26,11 @@ export interface PendingDeltaInput {
 
 interface BufferedDelta extends PendingDeltaInput {
   timer: NodeJS.Timeout | null;
+  /**
+   * The UTF-8 size of `text`, added up for each delta, so the size cap does not measure the whole
+   * text again on each one. A character split between two deltas counts as two, so it can be a few bytes high.
+   */
+  bytes: number;
   /** The last save failed. The size cap then waits for the timer, so a failing disk gets one write per 100 ms. */
   retrying?: boolean;
 }
@@ -68,10 +73,11 @@ export class DeltaBuffer {
     const existing = this.#pending.get(key);
     if (existing) {
       existing.text += delta.text;
-      if (!existing.retrying && Buffer.byteLength(existing.text, "utf8") >= 8 * 1024) this.#flush(key, true);
+      existing.bytes += Buffer.byteLength(delta.text, "utf8");
+      if (!existing.retrying && existing.bytes >= 8 * 1024) this.#flush(key, true);
       return;
     }
-    const pending: BufferedDelta = { ...delta, timer: null };
+    const pending: BufferedDelta = { ...delta, timer: null, bytes: Buffer.byteLength(delta.text, "utf8") };
     pending.timer = setTimeout(() => this.#flush(key, true), 100);
     this.#pending.set(key, pending);
   }

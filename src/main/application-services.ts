@@ -19,15 +19,28 @@ import { DiscordConnectFailed, toDiscordConnectFailed } from "../backend/messagi
 import { SlackConnectFailed, toSlackConnectFailed } from "../backend/messaging/slack/slack-connect";
 import { routineFlowRoutines } from "../backend/routine-flows/routine-flow-routines";
 import { RoutineFlowStore } from "../backend/routine-flows/routine-flow-store";
-import { createRoutineFlows, type RoutineFlowsHandle } from "../backend/routine-flows/routine-flows";
+import {
+  createRoutineFlows,
+  type RoutineFlowsHandle,
+  routineFlowNoticeEvent,
+} from "../backend/routine-flows/routine-flows";
 import { RoutineResultStore } from "../backend/routine-results/routine-result-store";
-import { createRoutineResults, type RoutineResultsHandle } from "../backend/routine-results/routine-results";
+import {
+  createRoutineResults,
+  type RoutineResultsHandle,
+  routineResultNoticeEvent,
+} from "../backend/routine-results/routine-results";
 import { clearFlatBackground } from "../backend/workflows/flat-background";
 import { WorkflowGitHubStore } from "../backend/workflows/workflow-github-store";
 import { WorkflowRunStore } from "../backend/workflows/workflow-run-store";
 import { WorkflowStore } from "../backend/workflows/workflow-store";
 import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/workflow-triggers";
-import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
+import {
+  createWorkflows,
+  type WorkflowNotice,
+  type WorkflowsHandle,
+  workflowNoticeEvent,
+} from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
 import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
@@ -2833,10 +2846,12 @@ export async function createApplicationServices({
       },
     }),
   );
+  // Most events are streamed text that no sweep waits for, so a fiber starts only for an event that a
+  // sweep uses.
   service.on("event", (event) => {
-    Effect.runFork(routineFlowRuntime.notice(event));
-    Effect.runFork(routineResultRuntime.notice(event));
-    Effect.runFork(workflowRuntime.notice(event));
+    if (routineFlowNoticeEvent(event)) Effect.runFork(routineFlowRuntime.notice(event));
+    if (routineResultNoticeEvent(event)) Effect.runFork(routineResultRuntime.notice(event));
+    if (workflowNoticeEvent(event)) Effect.runFork(workflowRuntime.notice(event));
   });
   teardown.push(TEARDOWN_ORDER.routineResults, "the routine results", () =>
     Effect.runPromise(routineResultRuntime.close()),

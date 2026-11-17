@@ -571,6 +571,8 @@ export class TeamApiServer {
   #stopSidebarPinsListener: (() => void) | null = null;
   #localTypingAgentId: string | null = null;
   readonly #reportedUnrepresentableAgents = new Set<string>();
+  /** By protocol and flags (`#unrepresentableAgentIds`): the JSON of each agent at its last check, and its result. */
+  readonly #representableAgents = new Map<string, Map<string, { json: string; representable: boolean }>>();
   #nextRateLimitSweepAt = 0;
 
   constructor(options: TeamApiOptions) {
@@ -1577,10 +1579,18 @@ export class TeamApiServer {
     this.#nextRateLimitSweepAt = now + RATE_LIMIT_SWEEP_MS;
   }
 
-  /** The value without the agents that this peer cannot see, as its event protocol describes them. */
-  #peerView(value: unknown, capabilities: ReadonlySet<string>, blocked: ReadonlySet<string>): unknown {
+  /**
+   * The value without the agents that this peer cannot see, as its event protocol describes them. A
+   * broadcast gives `providerHidden`, the provider-hidden agents of this protocol, read once for all clients.
+   */
+  #peerView(
+    value: unknown,
+    capabilities: ReadonlySet<string>,
+    blocked: ReadonlySet<string>,
+    providerHidden?: ReadonlySet<string>,
+  ): unknown {
     const protocol = eventProtocol(capabilities);
-    const hidden = hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol);
+    const hidden = new Set(providerHidden ?? hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol));
     for (const id of blocked) hidden.add(id);
     const visible = protocol === 1 ? legacyProviderView(value, hidden) : hiddenAgentView(value, hidden, protocol);
     return capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY) ? visible : withLegacyReasoningEfforts(visible);
@@ -1591,10 +1601,12 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
     options: { preserveSemanticTags?: boolean } = {},
     blocked: ReadonlySet<string> = new Set(),
+    providerHidden?: ReadonlySet<string>,
   ): string | null {
     const protocol = eventProtocol(capabilities);
-    const visible = this.#peerView(event, capabilities, blocked);
+    const visible = this.#peerView(event, capabilities, blocked, providerHidden);
     if (!isAgentEvent(visible) && !isTeamRealtimeEvent(visible)) return null;
+    // Keep `eventEncodingKey` in step with what this function reads from `capabilities`.
     if (protocol !== 1) {
       const encoded = (
         protocol === 8
@@ -1648,17 +1660,24 @@ export class TeamApiServer {
     // this invalidation. The released event clients have no invalidation path, so they keep the old
     // full snapshot contract. Read that snapshot only when such a client is connected, and keep the
     // read out of the synchronous event path used by modern clients.
-    const primaryAgent = this.#options.agents.listAgents().find((agent) => agent.id === event.snapshot.agentId);
+    // The broadcast reuses this list, so one event reads the agents once.
+    const agents = this.#options.agents.listAgents();
+    const primaryAgent = agents.find((agent) => agent.id === event.snapshot.agentId);
     if (!primaryAgent || primaryAgent.threadId !== event.snapshot.threadId) {
       // Execution and channel threads are consumed by their owners before this listener. A stale
       // event for a deleted agent must also never enter readConversation, which fails for an
       // agent that is gone.
-      this.#broadcastAgentEventToClients(event, "modern");
+      this.#broadcastAgentEventToClients(event, "modern", undefined, agents);
       return;
     }
-    const hasLegacyClient = [...this.#eventClients.values()].some(isLegacyConversationClient);
-    this.#broadcastAgentEventToClients(event, hasLegacyClient ? "modern" : "all");
+    const hasLegacyClient = this.#hasLegacyConversationClient();
+    this.#broadcastAgentEventToClients(event, hasLegacyClient ? "modern" : "all", undefined, agents);
     if (hasLegacyClient) this.#queueLegacyConversationEvent(event);
+  }
+
+  #hasLegacyConversationClient(): boolean {
+    for (const connection of this.#eventClients.values()) if (isLegacyConversationClient(connection)) return true;
+    return false;
   }
 
   #queueLegacyConversationEvent(event: Extract<AgentEvent, { type: "conversation" }>, retries = 0): void {
@@ -1680,7 +1699,7 @@ export class TeamApiServer {
         this.#pendingLegacyConversationReads.delete(agentId);
         return;
       }
-      if (![...this.#eventClients.values()].some(isLegacyConversationClient)) {
+      if (!this.#hasLegacyConversationClient()) {
         this.#pendingLegacyConversationReads.delete(agentId);
         return;
       }
@@ -1690,7 +1709,7 @@ export class TeamApiServer {
         this.#pendingLegacyConversationReads.delete(agentId);
         return;
       }
-      if (![...this.#eventClients.values()].some(isLegacyConversationClient)) {
+      if (!this.#hasLegacyConversationClient()) {
         this.#pendingLegacyConversationReads.delete(agentId);
         return;
       }
@@ -1726,20 +1745,53 @@ export class TeamApiServer {
     Effect.runFork(materialize);
   }
 
-  /** With `memberId`, only the connections of that member get the event. */
+  /**
+   * With `memberId`, only the connections of that member get the event. A caller that has read the agents
+   * gives them as `agentList`.
+   */
   #broadcastAgentEventToClients(
     broadcast: AgentEvent,
     audience: ConversationEventAudience = "all",
     memberId?: string,
+    agentList?: readonly AgentSummary[],
   ): void {
     const filteredConversationPayloads = new Map<string, string>();
+    // The agents, and what each protocol hides of them, are read once for all clients of this event.
+    let agents = () => {
+      const list = agentList ?? this.#options.agents.listAgents();
+      agents = () => list;
+      return list;
+    };
+    const providerHidden = new Map<number, Set<string>>();
+    const providerHiddenFor = (protocol: number) => {
+      let hidden = providerHidden.get(protocol);
+      if (!hidden) {
+        hidden = hiddenProviderAgentIds(agents(), protocol);
+        providerHidden.set(protocol, hidden);
+      }
+      return hidden;
+    };
+    // `hiddenAgentIds` without a member, by the protocol and the two flags that change it.
+    const taskHidden = new Map<string, Set<string>>();
+    const taskHiddenFor = (capabilities: ReadonlySet<string>) => {
+      const protocol = eventProtocol(capabilities);
+      const key = `${protocol}:${capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)}:${supportsTeamSemanticTags(capabilities)}`;
+      let hidden = taskHidden.get(key);
+      if (!hidden) {
+        hidden = this.#hiddenAgentIdsOf(agents(), protocol, capabilities);
+        taskHidden.set(key, hidden);
+      }
+      return hidden;
+    };
+    // Clients that read an event the same way and see the same agents get the same string: encode it once.
+    const encodedPayloads = new Map<string, string | null>();
     // The roles give each connection of one member the same agents: read them once for each member.
     const access = new Map<string, { member: AccessMember; blocked: Set<string>; key: string }>();
     const accessFor = (connection: EventClientState) => {
       const known = access.get(connection.memberId);
       if (known) return known;
       const member = this.#connectionMember(connection);
-      const blocked = this.#blockedAgentIds(member);
+      const blocked = this.#blockedAgentIds(member, agents());
       const resolved = { member, blocked, key: [...blocked].sort().join(",") };
       access.set(connection.memberId, resolved);
       return resolved;
@@ -1779,18 +1831,32 @@ export class TeamApiServer {
       const { member, blocked, key: blockedKey } = accessFor(connection);
       // Only owners and admins may read the CRM (`crm-v1`), so only they hear that it changed.
       if (event.type === "crm-changed" && !canAdministerServer(member.role)) continue;
+      const protocol = eventProtocol(connection.capabilities);
       // An event this client's protocol cannot describe is skipped for this client only. Thrown
-      // out of the loop, it would stop the event for every client after this one.
-      const encodeEvent = (event: AgentEvent, options = {}) => {
+      // out of the loop, it would stop the event for every client after this one. With `sharedAs`,
+      // the result is kept for the next client with the same encoding key and the same blocked agents.
+      const encodeEvent = (event: AgentEvent, options: { preserveSemanticTags?: boolean } = {}, sharedAs?: string) => {
+        const key =
+          sharedAs === undefined
+            ? undefined
+            : `${sharedAs}|${eventEncodingKey(connection.capabilities, options)}|${blockedKey}`;
+        if (key !== undefined && encodedPayloads.has(key)) return encodedPayloads.get(key) ?? null;
+        let encoded: string | null;
         try {
-          return this.#encodeProviderEvent(event, connection.capabilities, options, blocked);
+          encoded = this.#encodeProviderEvent(
+            event,
+            connection.capabilities,
+            options,
+            blocked,
+            providerHiddenFor(protocol),
+          );
         } catch (error) {
           (this.#options.logger ?? logger).warn("Team API event could not be encoded:", toLogValue(error));
-          return null;
+          encoded = null;
         }
+        if (key !== undefined) encodedPayloads.set(key, encoded);
+        return encoded;
       };
-      let conversationInvalidation: string | undefined;
-      let queueInvalidation: string | undefined;
       let outgoing: string;
       // `eventCapability` above has already kept an optional event from a client without its capability.
       // Completion must still reach a peer without quiet-turn-v1 through its frozen adapter.
@@ -1811,7 +1877,7 @@ export class TeamApiServer {
                 // The layout leaves out the agents that this peer cannot see, as the read route does.
                 sidebarFoldersEvent({
                   type: "sidebar-folders-changed",
-                  layout: this.#peerView(event.layout, connection.capabilities, blocked),
+                  layout: this.#peerView(event.layout, connection.capabilities, blocked, providerHiddenFor(protocol)),
                 })
               : optionalTeamEvent(
                   event.type === "agent-task-conversation"
@@ -1833,13 +1899,12 @@ export class TeamApiServer {
         // The base events go through the provider view; an optional event that names a hidden agent is left out.
         // A task event uses the hidden agents of the task routes, so a task of an agent that answers 404 does not arrive.
         const agentId = optionalEventAgentId(optional);
-        const protocol = eventProtocol(connection.capabilities);
         if (
           agentId !== null &&
           (blocked.has(agentId) ||
             (requiredCapability === AGENT_TASKS_CAPABILITY
-              ? this.hiddenAgentIds(protocol, connection.capabilities)
-              : hiddenProviderAgentIds(this.#options.agents.listAgents(), protocol)
+              ? taskHiddenFor(connection.capabilities)
+              : providerHiddenFor(protocol)
             ).has(agentId))
         )
           continue;
@@ -1851,7 +1916,7 @@ export class TeamApiServer {
                 type: optional.type,
                 ...visibleSnapshot(
                   optional,
-                  this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+                  this.#hiddenAgentIdsOf(agents(), protocol, connection.capabilities, member),
                 ),
               }
             : optional.type === "agent-colors-changed"
@@ -1859,7 +1924,7 @@ export class TeamApiServer {
                   type: optional.type,
                   ...visibleAgentColors(
                     optional,
-                    this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+                    this.#hiddenAgentIdsOf(agents(), protocol, connection.capabilities, member),
                   ),
                 }
               : optional.type === "chat-colors-changed"
@@ -1867,22 +1932,29 @@ export class TeamApiServer {
                     type: optional.type,
                     ...visibleChatColors(
                       optional,
-                      this.hiddenAgentIds(eventProtocol(connection.capabilities), connection.capabilities, member),
+                      this.#hiddenAgentIdsOf(agents(), protocol, connection.capabilities, member),
                     ),
                   }
                 : optional,
         );
       } else if (event.type === "conversation" && supportsRuntimeSnapshots) {
-        conversationInvalidation ??=
-          encodeEvent({
+        const conversationInvalidation = encodeEvent(
+          {
             type: "conversation-invalidated",
             agentId: event.snapshot.agentId,
             revision: event.snapshot.revision,
-          }) ?? undefined;
+          },
+          {},
+          "conversation-invalidated",
+        );
         if (!conversationInvalidation) continue;
         outgoing = conversationInvalidation;
       } else if (event.type === "queue-changed" && supportsRuntimeSnapshots) {
-        queueInvalidation ??= encodeEvent({ type: "queue-invalidated", agentId: event.snapshot.agentId }) ?? undefined;
+        const queueInvalidation = encodeEvent(
+          { type: "queue-invalidated", agentId: event.snapshot.agentId },
+          {},
+          "queue-invalidated",
+        );
         if (!queueInvalidation) continue;
         outgoing = queueInvalidation;
       } else if (
@@ -1900,7 +1972,7 @@ export class TeamApiServer {
           ))
       ) {
         // The payloads are shared between clients, so the key holds what the roles allow too.
-        const key = `${blockedKey}:${eventProtocol(connection.capabilities)}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
+        const key = `${blockedKey}:${protocol}:${connection.capabilities.has("opencode")}:${connection.capabilities.has("routine-event-markers")}:${connection.capabilities.has("routine-run-event-markers")}:${connection.capabilities.has("hosted-site-event-markers")}:${connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)}:${connection.capabilities.has(TEAM_PROMPT_MULTI_SELECT_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY)}:${connection.capabilities.has(TEAM_UI_BLOCK_VAULT_CAPABILITY)}:${connection.capabilities.has(SKILL_LEARNING_CAPABILITY)}:${encodingOptions.preserveSemanticTags}`;
         let filtered = filteredConversationPayloads.get(key);
         if (!filtered) {
           filtered =
@@ -1916,7 +1988,8 @@ export class TeamApiServer {
         if (!filtered) continue;
         outgoing = filtered;
       } else {
-        const payload = encodeEvent(event, encodingOptions) ?? undefined;
+        // `#eventFor` can give this client its own copy of the event; only the shared event is shared.
+        const payload = encodeEvent(event, encodingOptions, event === broadcast ? "event" : undefined);
         if (!payload) continue;
         outgoing = payload;
       }
@@ -1927,14 +2000,14 @@ export class TeamApiServer {
       if (event.type !== "turn-completed" || !supportsRuntimeSnapshots || connection.includeConversationEvents) {
         continue;
       }
-      const completionSnapshot =
-        encodeEvent(
-          {
-            type: "runtime-snapshot",
-            snapshot: runtimeSnapshot(),
-          },
-          encodingOptions,
-        ) ?? undefined;
+      const completionSnapshot = encodeEvent(
+        {
+          type: "runtime-snapshot",
+          snapshot: runtimeSnapshot(),
+        },
+        encodingOptions,
+        "runtime-snapshot",
+      );
       if (!completionSnapshot) continue;
       // The snapshot is this client's own. It does not fit, so this client loses the snapshot and
       // keeps the turn, and the clients after it in the loop still get the turn.
@@ -2468,16 +2541,30 @@ export class TeamApiServer {
     capabilities: ReadonlySet<string>,
   ): Set<string> {
     const codec = teamHttpCodec(protocol);
+    const efforts = capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY);
     const options = { preserveSemanticTags: supportsTeamSemanticTags(capabilities) };
+    // The result depends only on the agent, the protocol and these two flags. An agent that did not
+    // change since the last check keeps its result, so a request does not encode the whole roster.
+    const cacheKey = `${protocol}:${efforts}:${options.preserveSemanticTags}`;
+    const previous = this.#representableAgents.get(cacheKey);
+    const checked = new Map<string, { json: string; representable: boolean }>();
     const hidden = new Set<string>();
     for (const agent of agents) {
-      try {
-        // The list route sends a peer without reasoning-efforts-v1 the nearest level it knows.
-        const listed = capabilities.has(TEAM_REASONING_EFFORTS_CAPABILITY)
-          ? [agent]
-          : withLegacyReasoningEfforts([agent]);
-        codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, listed, options);
-      } catch {
+      const json = JSON.stringify(agent);
+      const known = previous?.get(agent.id);
+      let representable = known?.json === json ? known.representable : null;
+      if (representable === null) {
+        representable = true;
+        try {
+          // The list route sends a peer without reasoning-efforts-v1 the nearest level it knows.
+          const listed = efforts ? [agent] : withLegacyReasoningEfforts([agent]);
+          codec.encodeResponse("GET", TEAM_API_ROUTES.agents.all, 200, listed, options);
+        } catch {
+          representable = false;
+        }
+      }
+      checked.set(agent.id, { json, representable });
+      if (!representable) {
         hidden.add(agent.id);
         const key = `${protocol}:${agent.id}`;
         if (this.#reportedUnrepresentableAgents.has(key)) continue;
@@ -2487,6 +2574,8 @@ export class TeamApiServer {
         );
       }
     }
+    // Only the agents of this list stay, so a deleted agent leaves the cache.
+    this.#representableAgents.set(cacheKey, checked);
     return hidden;
   }
 
@@ -2495,7 +2584,16 @@ export class TeamApiServer {
    * With a member, also the agents that the roles close to that member.
    */
   hiddenAgentIds(protocol: number, capabilities: ReadonlySet<string>, member?: AccessMember | string): Set<string> {
-    const agents = this.#options.agents.listAgents();
+    return this.#hiddenAgentIdsOf(this.#options.agents.listAgents(), protocol, capabilities, member);
+  }
+
+  /** `hiddenAgentIds` for an agent list that the caller has already read. */
+  #hiddenAgentIdsOf(
+    agents: readonly AgentSummary[],
+    protocol: number,
+    capabilities: ReadonlySet<string>,
+    member?: AccessMember | string,
+  ): Set<string> {
     const hidden = hiddenProviderAgentIds(agents, protocol);
     for (const id of this.#unrepresentableAgentIds(
       agents.filter((agent) => !hidden.has(agent.id)),
@@ -2503,7 +2601,7 @@ export class TeamApiServer {
       capabilities,
     ))
       hidden.add(id);
-    if (member !== undefined) for (const id of this.#blockedAgentIds(member)) hidden.add(id);
+    if (member !== undefined) for (const id of this.#blockedAgentIds(member, agents)) hidden.add(id);
     return hidden;
   }
 
@@ -2530,15 +2628,17 @@ export class TeamApiServer {
   }
 
   /** The agents at `none` for `member`. */
-  #blockedAgentIds(member: AccessMember | string): Set<string> {
+  #blockedAgentIds(
+    member: AccessMember | string,
+    agents: readonly AgentSummary[] = this.#options.agents.listAgents(),
+  ): Set<string> {
     const blocked = new Set<string>();
     const resolved = this.#accessMember(member);
     const access = this.#options.agentAccess;
     const serverId = this.#options.store.getIdentity()?.serverId;
     if (!access || !serverId || canAdministerServer(resolved.role)) return blocked;
     const levels = access.levels(serverId);
-    for (const agent of this.#options.agents.listAgents())
-      if (agentAccessLevel(levels, resolved, agent.id) === "none") blocked.add(agent.id);
+    for (const agent of agents) if (agentAccessLevel(levels, resolved, agent.id) === "none") blocked.add(agent.id);
     return blocked;
   }
 
@@ -2961,6 +3061,35 @@ function eventProtocol(capabilities: ReadonlySet<string>): 1 | 4 | 5 | 6 | 7 | 8
   if (capabilities.has(TEAM_PI_MUSE_CAPABILITY)) return 7;
   if (capabilities.has(TEAM_CURSOR_CLINE_CAPABILITY)) return 6;
   return capabilities.has(TEAM_LOCAL_PROVIDERS_CAPABILITY) ? 5 : capabilities.has("opencode") ? 4 : 1;
+}
+
+/** The capabilities that `#encodeProviderEvent` reads, besides the protocol. */
+const EVENT_ENCODING_CAPABILITIES = [
+  TEAM_REASONING_EFFORTS_CAPABILITY,
+  "browser-secret-handoff",
+  BROWSER_SIGN_IN_CAPABILITY,
+  BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_CONTEXT_USAGE_CAPABILITY,
+  TEAM_USAGE_TERTIARY_CAPABILITY,
+  AGENT_PENDING_RUNTIME_CAPABILITY,
+  TEAM_UI_BLOCKS_CAPABILITY,
+  TEAM_SUBAGENTS_CAPABILITY,
+  TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
+  TEAM_VIDEO_GENERATION_CAPABILITY,
+  TEAM_MEMORY_CHANGES_CAPABILITY,
+  TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY,
+  TEAM_UI_BLOCK_VAULT_CAPABILITY,
+  SKILL_LEARNING_CAPABILITY,
+];
+
+/**
+ * Two clients with the same key and the same hidden agents get the same bytes from `#encodeProviderEvent`
+ * for one event. Add a capability here when that function starts to read it.
+ */
+function eventEncodingKey(capabilities: ReadonlySet<string>, options: { preserveSemanticTags?: boolean }): string {
+  let key = `${eventProtocol(capabilities)}:${options.preserveSemanticTags === true}:`;
+  for (const capability of EVENT_ENCODING_CAPABILITIES) key += capabilities.has(capability) ? "1" : "0";
+  return key;
 }
 
 function isLegacyConversationClient(connection: EventClientState): boolean {

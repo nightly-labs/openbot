@@ -354,6 +354,17 @@ export class AgentStore {
     return this.#state.agents.map((agent) => ({ ...agent }));
   }
 
+  /** A copy of one agent. A lookup by id copies only it, not each agent as `list` does. */
+  get(id: string): AgentSummary | undefined {
+    const agent = this.#state.agents.find((candidate) => candidate.id === id);
+    return agent ? { ...agent } : undefined;
+  }
+
+  /** Whether the agent exists. It copies no agent. */
+  has(id: string): boolean {
+    return this.#state.agents.some((agent) => agent.id === id);
+  }
+
   createAgent(input: Omit<CreateAgentInput, "initialMessage">, profileOperationId?: string) {
     return this.#creationQueue.withPermit(this.#createAgent(input, profileOperationId));
   }

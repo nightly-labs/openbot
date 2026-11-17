@@ -1586,22 +1586,30 @@ export class MailboxStore {
 
   listRuntimeWork(agentIds: readonly string[], failedTurns: ReadonlyMap<string, string>): AgentRuntimeWorkItem[] {
     const targetAgentIds = new Set(agentIds);
+    // Each runtime snapshot reads this, so the messages are read only for the few deliveries that
+    // work or failed, not all of them.
+    const candidates: { delivery: StoredDelivery; isCurrentFailure: boolean }[] = [];
+    for (const delivery of this.#state.deliveries) {
+      if (!targetAgentIds.has(delivery.recipientAgentId)) continue;
+      const isWorking = delivery.status === "starting" || delivery.status === "running";
+      const isCurrentFailure =
+        delivery.status === "failed" && delivery.turnId === failedTurns.get(delivery.recipientAgentId);
+      if (isWorking || isCurrentFailure) candidates.push({ delivery, isCurrentFailure });
+    }
+    if (candidates.length === 0) return [];
+    const candidateMessageIds = new Set(candidates.map(({ delivery }) => delivery.messageId));
+    const messages = new Map<string, StoredMessage>();
+    for (const message of this.#state.messages) {
+      if (candidateMessageIds.has(message.id)) messages.set(message.id, message);
+    }
     const working: StoredDelivery[] = [];
     const failed: StoredDelivery[] = [];
     const workingAgentIds = new Set<string>();
     const failedAgentIds = new Set<string>();
-    // The welcome's setup message is not for the user. A client shows a work item as the user's
-    // message, so the welcome turn reports its work through `QueueSnapshot.welcome` only.
-    const welcomeMessageIds = new Set(
-      this.#state.messages.filter((message) => message.welcome).map((message) => message.id),
-    );
-    for (const delivery of this.#state.deliveries) {
-      if (!targetAgentIds.has(delivery.recipientAgentId)) continue;
-      if (welcomeMessageIds.has(delivery.messageId)) continue;
-      const isWorking = delivery.status === "starting" || delivery.status === "running";
-      const isCurrentFailure =
-        delivery.status === "failed" && delivery.turnId === failedTurns.get(delivery.recipientAgentId);
-      if (!isWorking && !isCurrentFailure) continue;
+    for (const { delivery, isCurrentFailure } of candidates) {
+      // The welcome's setup message is not for the user. A client shows a work item as the user's
+      // message, so the welcome turn reports its work through `QueueSnapshot.welcome` only.
+      if (messages.get(delivery.messageId)?.welcome) continue;
       const seenAgentIds = isCurrentFailure ? failedAgentIds : workingAgentIds;
       if (seenAgentIds.has(delivery.recipientAgentId)) continue;
       seenAgentIds.add(delivery.recipientAgentId);
@@ -1611,10 +1619,6 @@ export class MailboxStore {
       ...failed.slice(0, AGENT_RUNTIME_ATTENTION_LIMIT),
       ...working.slice(0, AGENT_RUNTIME_WORKING_ITEMS_LIMIT),
     ];
-    const messageIds = new Set(selected.map((delivery) => delivery.messageId));
-    const messages = new Map(
-      this.#state.messages.filter((message) => messageIds.has(message.id)).map((message) => [message.id, message]),
-    );
     return selected.map((delivery) => {
       const message = messages.get(delivery.messageId);
       if (!message) throw new Error(`Mailbox message is missing: ${delivery.messageId}`);
