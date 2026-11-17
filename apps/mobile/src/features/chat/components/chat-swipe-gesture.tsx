@@ -40,7 +40,7 @@ export const ChatTimesMountedContext = createContext(false);
  * scroll view.
  */
 export function ChatHorizontalScrollView(props: ScrollViewProps) {
-  const swipe = useContext(ChatSwipeGestureContext);
-  const times = useContext(ChatTimeRevealContext);
-  return swipe || times ? <GestureScrollView {...props} horizontal /> : <ScrollView {...props} horizontal />;
+  // The message list always gives the times swipe, also where it gives the swipe of the chat.
+  const inList = useContext(ChatTimeRevealContext) !== null;
+  return inList ? <GestureScrollView {...props} horizontal /> : <ScrollView {...props} horizontal />;
 }
