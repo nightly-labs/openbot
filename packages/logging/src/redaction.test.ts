@@ -273,6 +273,15 @@ describe("redactText", () => {
     expect(redacted).toContain("[redacted-unscanned]");
   });
 
+  // The agent reads its own replies back. Code has far more bracket runs than the bound, and a cut
+  // reply made the agent send broken code again (#10122).
+  it("keeps the rest of the agent's own text past the scan bound", () => {
+    const code = Array.from({ length: 40 }, (_, index) => `v${index} = close[${index}] > open[${index}]`).join("\n");
+    expect(redactSecrets(code)).toBe(code);
+    expect(redactSecrets(`${code}\ntoken = Bearer abcdef123456`)).toBe(`${code}\ntoken = [redacted]`);
+    expect(redactSecrets(`${code}\n{"apiKey":"abcdef123456"}`)).toBe(`${code}\n{"apiKey":"[redacted]"}`);
+  });
+
   // The scan is synchronous and runs on provider stderr, so a line of open braces must not cost one
   // full pass per brace. Every attempt counts against the bound, not only the ones that parse.
   it("bounds the work a line of open braces can cause", () => {

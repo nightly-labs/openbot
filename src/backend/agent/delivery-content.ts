@@ -387,7 +387,7 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             ? `This replies to a message you sent in a run of your routine "${routine.routineName}". That run has ended, so its task is below. Continue that task from this result now: do its next steps, such as a request to the next teammate, before you end this turn. Then give the result to the user naturally, starting with the teammate's name.`
             : "This replies to a message you sent. Give the result to the user naturally, starting with the teammate's name.",
           "For partial or blocked work, you still own the request: finish the rest yourself, with a follow-up, or with a better teammate; do not repeat a failed call unchanged. Give the user the blocker and its Unblock action only when the user must act. When OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app and end your answer with the next field of its result.",
-          "Reply to the teammate only for another requested action or new information that unblocks its work, never with the same request or an acknowledgement.",
+          `Reply to the teammate only for another requested action or new information that unblocks its work, with replyToMessageId "${delivery.messageId}", never with the same request or an acknowledgement.`,
         ]
       : delivery.expectsReply === false
         ? [

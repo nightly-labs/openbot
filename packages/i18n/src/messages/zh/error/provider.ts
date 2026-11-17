@@ -11,6 +11,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} 未及时响应，OpenBot 已结束其进程。",
   "error.provider.acpSignInLost": "{provider} 的登录已失效，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpRefusedUntilRestart": "{provider} 拒绝了一条消息，OpenBot 已结束其进程。请重新发送消息。",
+  "error.provider.acpServerLost": "{provider} 的连接已断开。请重新发送消息。",
+  "error.provider.acpServerLostEnded": "{provider} 的连接已断开，OpenBot 已结束其进程。",
   "error.provider.acpSettingsTimedOut": "{provider} 未及时响应。请稍后重试。",
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":
@@ -163,6 +165,8 @@ export const messages = {
   "error.provider.codeLoginBadCode": "请粘贴登录页显示的验证码。",
   "error.provider.codeLoginRefused": "服务商未接受该验证码，请重新开始登录。",
   "error.provider.codeLoginUnsupported": "该服务器不支持用粘贴验证码的方式登录。请在服务器电脑的浏览器中登录。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude 无法在 Mac 上保存登录信息。请重启运行 OpenBot 的 Mac，然后重新连接 Claude。",
   "error.provider.cliBusyRetry": "{provider} CLI 正在处理对话，请等它结束后重试。",
   "error.provider.cliSigningIn": "{provider} CLI 正在登录，请完成或取消登录后再更新。",
   "error.provider.cliBusyUpdate": "{provider} CLI 正在处理对话，请等它结束后再更新。",
@@ -182,6 +186,8 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.opencodeProviderRefused":
+    "模型服务商“{provider}”拒绝了请求。OpenCode 已有该服务商的密钥，因此原因可能是你的网络：部分服务商会屏蔽 VPN、代理或部分国家和地区。请关闭 VPN 或换用其他网络，然后重试。如果错误仍然出现，密钥可能不正确：在终端中运行 `opencode auth login` 并重新输入密钥。",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":
@@ -248,10 +254,14 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini 拒绝了此请求，但没有给出原因。聊天记录中的某一项可能导致这种情况，例如智能体打开的图片。OpenBot 已带着聊天记录开启新的 Gemini 会话，请重试。如果仍然报错，请换一个模型。",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini 无法读取此聊天的已保存记录。OpenBot 已带着聊天记录开启新的 Gemini 会话。请重新发送你的消息。",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
@@ -294,6 +304,8 @@ export const messages = {
     "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 市场、应用 中检查，然后重新发送消息。",
   "error.provider.hermesRefused":
     "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请在运行此智能体的计算机上重新启动 OpenBot。",
+  "error.provider.hermesConnectionLost":
+    "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",

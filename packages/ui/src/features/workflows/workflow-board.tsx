@@ -1212,6 +1212,40 @@ export function createBoard(options: BoardOptions) {
     schedule();
   };
 
+  /**
+   * Takes the connections, the locks and the fields of a snapshot that another device changed, and
+   * writes only what is different. Typing, a drag, an open connection and the selection stay, unless
+   * the snapshot no longer has their node or connection.
+   */
+  const sync = (saved: BoardSnapshot) => {
+    const gone = new Set(saved.removed);
+    const kept = (id: string) => id in saved.fields && !gone.has(id);
+    const edgeIds = new Set(saved.edges.map((edge) => edge.id));
+    if (typing !== null && !kept(typing.slice(0, typing.lastIndexOf(":")))) typing = null;
+    setState((draft) => {
+      if (JSON.stringify(draft.edges) !== JSON.stringify(saved.edges)) {
+        draft.edges = saved.edges.map((edge) => ({ ...edge }));
+      }
+      if (draft.removed.join("\u0000") !== saved.removed.join("\u0000")) draft.removed = [...saved.removed];
+      if (draft.locked.join("\u0000") !== saved.locked.join("\u0000")) draft.locked = [...saved.locked];
+      for (const id of Object.keys(draft.fields)) if (!(id in saved.fields)) delete draft.fields[id];
+      for (const [id, fields] of Object.entries(saved.fields)) {
+        if (JSON.stringify(draft.fields[id]) !== JSON.stringify(fields)) draft.fields[id] = { ...fields };
+      }
+      if (draft.selection.some((id) => !kept(id))) draft.selection = draft.selection.filter(kept);
+      if (draft.pending && !kept(draft.pending.node)) {
+        draft.pending = null;
+        draft.draft = null;
+        draft.target = null;
+      }
+      if (draft.edge !== null && !edgeIds.has(draft.edge)) draft.edge = null;
+      if (draft.hover !== null && !edgeIds.has(draft.hover)) draft.hover = null;
+      if (draft.hoverAt && !edgeIds.has(draft.hoverAt.edge)) draft.hoverAt = null;
+      if (draft.removing !== null && !edgeIds.has(draft.removing)) draft.removing = null;
+    });
+    schedule();
+  };
+
   onSettled(() => {
     const onKey = (event: KeyboardEvent) => {
       const active = document.activeElement;
@@ -1516,6 +1550,7 @@ export function createBoard(options: BoardOptions) {
     addEdges,
     snapshot,
     restore,
+    sync,
     /** Ends the typing burst, so the next key stroke is a new change. */
     endTyping: () => {
       typing = null;

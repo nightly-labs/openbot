@@ -281,6 +281,8 @@ export const messages = {
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":
     "이 MCP 서버의 로그인이 종료되었어요. 사용자가 OpenBot에서 다시 로그인해야 해요.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot이 지금 이 MCP 서버의 로그인을 갱신하지 못했어요. 로그인은 유지되며 다음 요청에서 다시 시도해요. 이 오류가 계속되면 사용자는 OpenBot에서 이 서버에서 로그아웃한 다음 다시 로그인할 수 있어요.",
   "error.backend.mcpServerUnreachable": "OpenBot이 서버에 연결할 수 없었어요. URL과 네트워크를 확인하세요.",
   "error.backend.mcpLocalServerOff":
     "이 컴퓨터의 {address}에서 응답하는 서버가 없어요. 서버를 시작하거나 서버를 실행하는 앱에서 켠 후 다시 시도해 주세요.",

@@ -34,6 +34,7 @@ export type MobileSearchSettingId =
   | "notifications"
   | "liveActivities"
   | "privacy"
+  | "conversations"
   | "hiddenChats"
   | "deletedChannels"
   | "support"

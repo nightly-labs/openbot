@@ -43,6 +43,9 @@ export interface InboundFile {
 }
 
 /** One message that addresses OpenBot, in the same shape for every platform. */
+/** A message that stops the running request of its conversation instead of starting a new one. */
+export const CANCEL_TEXT = /^(cancel|stop)$/i;
+
 export interface InboundMessage {
   /** Stable for one message across redeliveries. */
   dedupKey: string;
