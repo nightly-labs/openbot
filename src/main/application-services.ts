@@ -852,7 +852,7 @@ function secretStorage(): SecretStorage {
   return userDataSecretStorage;
 }
 
-/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux key file. */
+/** The cipher that every encrypted file in userData uses: `safeStorage`, or the Linux and macOS key file. */
 function safeStorageCipher(
   unavailableKey: "error.app.secretStorageUnavailable" | "error.app.macSecureStorageUnavailable",
 ): SecretStorageCipher {
