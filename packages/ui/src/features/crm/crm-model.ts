@@ -419,8 +419,9 @@ const AMOUNT_MAX = 1_000_000_000_000;
 
 /** The minor units of a typed amount, or null when it is not an amount. A comma counts as the decimal point. */
 export function parseMoney(text: string, currency: string): number | null {
-  const clean = text.trim().replace(/\s/gu, "").replace(",", ".");
-  if (!/^\d+(\.\d+)?$/u.test(clean)) return null;
+  const amount = text.trim();
+  if (!/^(?:\d+|\d{1,3}(?:\p{Zs}\d{3})+)(?:[.,]\d+)?$/u.test(amount)) return null;
+  const clean = amount.replace(/\p{Zs}/gu, "").replace(",", ".");
   const digits = fractionDigits(currency);
   const [whole = "0", fraction = ""] = clean.split(".");
   if (fraction.length > digits) return null;
