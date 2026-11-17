@@ -313,6 +313,7 @@ import type { HostModelVisibilityCalls } from "../settings/provider-model-visibi
 import type { HostPromptCacheTtlCalls } from "../settings/provider-prompt-cache";
 import { createCommunityCardVisibility } from "../sidebar/community-card";
 import { createSidebarAlertCards, SidebarAlertCards } from "../sidebar/SidebarAlertCards";
+import { ServerUpgradeOffer } from "../sidebar/server-upgrade-offer";
 import { isReaderAuthor } from "../team/reader-identity";
 import type { ServerVaultOptions } from "../vault/ServerVaultPanel";
 import { createVaultStore } from "../vault/stores/vault-store";
@@ -3691,6 +3692,14 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         billingDetails={billingCalls}
                       />
                     }
+                  />
+                  {/* The larger storage tier of an almost full hosted server, as on desktop. */}
+                  <ServerUpgradeOffer
+                    billing={billingCalls}
+                    card={alertCards.storageCard.card()}
+                    server={server()}
+                    blocked={serverSettings.state.open || billingOpen() || accountSettingsOpen()}
+                    onFreeUpSpace={(serverId) => void openServerSettings(serverId, null, "storage")}
                   />
                   <ChannelCreateOverlay />
                   <GlobalSearchOverlay
