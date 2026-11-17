@@ -1663,10 +1663,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       // A conversation in the messaging lane waits for that lane only. The others wait in the own chat's lane.
+      // A turn that the provider started itself has no delivery, but the lane still waits for it.
       busy: (agentId, linkId) =>
         this.#mailbox.inMessagingLane(agentId, linkId)
           ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
+            this.#drain.messagingTurnActive(agentId)
           : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
@@ -3654,9 +3656,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The pin of an update, or undefined to keep it (#9116). An agent that names an account of a pooled
-   * provider pins it, and an agent that names the provider's own sign-in gives the account back to
-   * the pool. A person's change of the provider, model or account in the app, which shows the pool as
-   * one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
+   * provider pins it, also the provider's own sign-in as "default", and an agent that names null
+   * gives the account back to the pool. A person's change of the provider, model or account in the
+   * app, which shows the pool as one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
    * it when the agent moves to another account.
    */
   #accountPin(
@@ -3671,7 +3673,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? null
         : undefined;
     if (input.providerAccountId === undefined) return undefined;
-    return next?.providerAccountId && this.#pooled(next) ? next.providerAccountId : null;
+    if (!next || !this.#pooled(next)) return null;
+    // The provider's own sign-in is an account too: an agent that names "default" keeps it (#10661).
+    // Only null gives the agent to the pool.
+    if (next.providerAccountId) return next.providerAccountId;
+    return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
   }
 
   /** An update of the account alone also takes the new account's model when `#modelForAccount` gives one. */
@@ -4954,6 +4960,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * waits for the next drain, unless a turn in the agent's own chat starts first. Queued routine runs in
    * their own session do not end it: it starts before them, and their answers stay above its marker.
    * The user can turn the setting off while the request waits.
+   *
+   * The new chat closes the Claude session, and the background subagents and commands of that session
+   * end with it (#10743). So the request also waits for them: when the work ends, Claude answers its
+   * result in a turn of its own, and the drain after that turn starts the new chat. "New chat" from
+   * the user does not wait: a background command such as a dev server can run without end.
    */
   #startRequestedNewChat(agentId: string, queuedRuns: readonly string[] = []): Effect.Effect<void> {
     if (!this.#requestedNewChats.has(agentId)) return Effect.void;
@@ -4962,7 +4973,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#requestedNewChats.delete(agentId);
       return Effect.void;
     }
-    return this.clearAgentContext(agentId, queuedRuns).pipe(
+    const startNewChat = this.clearAgentContext(agentId, queuedRuns).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           this.#requestedNewChats.delete(agentId);
@@ -4977,6 +4988,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }),
       ),
     );
+    return this.#threads
+      .mainRunsBackgroundWork(agent)
+      .pipe(Effect.flatMap((background) => (background ? Effect.void : startNewChat)));
   }
 
   resolveChannelImage(channelId: string): ChannelImageFile | null {

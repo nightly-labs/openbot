@@ -911,7 +911,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Yeniden bağla",
   "mobile.server.connectors.whatsapp.ownNumber": "Kişisel numara",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Yalnızca OpenBot için olan bir numarada kapatın.",
+    "Yalnızca “Kendine mesaj gönder” sohbetiniz ve izin verdiğiniz kişiler yazabilir. Diğer kişiler yanıt almaz. Kapalıyken OpenBot tanımadığınız kişilere bir kodla yanıt verir.",
   "mobile.server.connectors.whatsapp.workingMessage": "“Üzerinde çalışılıyor…” mesajı",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot bunu ajan çalışırken gönderir, sonra yanıtla değiştirir. Yalnızca yanıtı göndermek için kapatın.",
@@ -934,10 +934,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Numara",
   "mobile.server.connectors.whatsapp.kindPersonal": "Kişisel numaram",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar.",
+    "OpenBot yalnızca “Kendine mesaj gönder” sohbetinizi ve izin verdiğiniz kişileri yanıtlar. Diğer kişiler yanıt almaz.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Yalnızca OpenBot için bir numara",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Tanımadığınız kişiler size iletmeleri için bir kod alır. Onları burada onaylarsınız.",
+    "OpenBot bu numaradan tanımadığınız her kişiye, size iletmesi için bir kodla yanıt verir. Onları burada onaylarsınız.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Telefon numarası",
   "mobile.server.connectors.whatsapp.phoneDescription": "+44 7700 900123 gibi ülke koduyla birlikte.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Telefon numarasını ülke koduyla birlikte yazın.",
@@ -1095,6 +1095,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.addAccountWithCode": "Kodla hesap ekle",
+  "mobile.server.providers.accountSignInWithCode": "Kodla oturum aç",
   "mobile.server.providers.accountsKeyHint":
     "Her ajan bir hesap kullanır. Hesabı ajanın ayarlarından seçin. Yeni bir hesap için o hesabın API anahtarı gerekir.",
   "mobile.server.providers.accountChangeKey": "Anahtarı değiştir",

@@ -882,7 +882,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "再リンク",
   "mobile.server.connectors.whatsapp.ownNumber": "個人の番号",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。OpenBot 専用の番号ではオフにしてください。",
+    "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
@@ -905,10 +905,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "番号",
   "mobile.server.connectors.whatsapp.kindPersonal": "自分の個人番号",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。",
+    "OpenBot は、あなたの「自分にメッセージ」チャットと、許可した人にだけ回答します。それ以外の人には返信しません。",
   "mobile.server.connectors.whatsapp.kindDedicated": "OpenBot 専用の番号",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "知らない人には、あなたに伝えるためのコードが届きます。ここでその人を承認します。",
+    "OpenBot はこの番号から、知らない人それぞれに、あなたに伝えるためのコードを返信します。ここでその人を承認します。",
   "mobile.server.connectors.whatsapp.phoneLabel": "電話番号",
   "mobile.server.connectors.whatsapp.phoneDescription": "国番号を含めて入力します（例: +44 7700 900123）。",
   "mobile.server.connectors.whatsapp.phoneInvalid": "電話番号を国番号付きで入力してください。",
@@ -1071,6 +1071,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.addAccountWithCode": "コードでアカウントを追加",
+  "mobile.server.providers.accountSignInWithCode": "コードでログイン",
   "mobile.server.providers.accountsKeyHint":
     "各エージェントは1つのアカウントを使います。エージェントの設定で選んでください。新しいアカウントには、そのアカウントの API キーが必要です。",
   "mobile.server.providers.accountChangeKey": "キーを変更",

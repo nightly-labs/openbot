@@ -268,6 +268,7 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",

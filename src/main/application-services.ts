@@ -30,7 +30,7 @@ import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/wo
 import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
-import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "./agent-defaults-settings";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
@@ -314,7 +314,7 @@ import {
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
-import { LocalServers } from "./local-servers/local-servers";
+import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -859,6 +859,31 @@ function safeStorageCipher(
   return secretStorage().cipher(() => sourceText(unavailableKey));
 }
 
+/**
+ * The account service requests go through Chromium's network stack, which uses the computer's proxy
+ * settings as the built-in browser does. Node `fetch` ignores them, so the server list and a
+ * connection timed out on a network that needs the system proxy (#10314). The requests carry a
+ * bearer token: they send no browser cookie and use no HTTP cache, as with Node `fetch`.
+ *
+ * A Chromium network failure (`net::ERR_CONNECTION_REFUSED`) is thrown as Node `fetch` throws one,
+ * a `TypeError` with the code in `cause.code`, because the account and connection errors read that.
+ * An abort rejects with the signal's reason, as in Node.
+ */
+async function accountServiceFetch(input: string | URL | Request, init?: RequestInit): Promise<Response> {
+  try {
+    return await net.fetch(input instanceof URL ? input.href : input, {
+      ...init,
+      credentials: "omit",
+      cache: "no-store",
+    });
+  } catch (error) {
+    if (!(error instanceof Error)) throw error;
+    const code = /^net::(ERR_[A-Z0-9_]+)$/u.exec(error.message)?.[1];
+    if (code === undefined) throw error;
+    throw new TypeError("fetch failed", { cause: Object.assign(error, { code }) });
+  }
+}
+
 /** How the driver's own state reads as the capability the Team API projects. */
 function computerUseCapability(state: ComputerUseState): CapabilityState {
   if (state.status === "ready") return "ready";
@@ -1274,6 +1299,7 @@ export async function createApplicationServices({
     apiUrl: centralAuthApiUrl,
     mobileConnectApiUrl: readMobileConnectApiUrl(process.env.OPENBOT_MOBILE_AUTH_API_URL, centralAuthApiUrl),
     storagePath: join(app.getPath("userData"), CENTRAL_AUTH_FILE),
+    fetch: accountServiceFetch,
     ...safeStorageCipher("error.app.macSecureStorageUnavailable"),
     keyringChanged: () => secretStorage().madeKeyFile(),
     // The system browser, where the user is signed in to the company. The language loads below.
@@ -1336,7 +1362,7 @@ export async function createApplicationServices({
   const store = new AgentStore(
     app.getPath("userData"),
     homedir(),
-    new OpenBotDatabase(app.getPath("userData")),
+    new OpenBotDatabase(app.getPath("userData"), checkDatabaseIntegrityInHost),
     () => agentDefaults.get(),
     localServerChild?.agentRoot,
   );
@@ -2048,6 +2074,11 @@ export async function createApplicationServices({
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
       onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
+        logger.warn(
+          `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
+          output.length > 0 ? `Its last output: ${output}` : "It wrote no output.",
+        ),
     }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
@@ -3583,7 +3614,8 @@ export async function createApplicationServices({
     crm,
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
-    // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
+    // Present, so the host advertises `routine-run-place-v1` and `routine-pause-reasons-v1`. Any member reads
+    // the places and the pause reasons; a change of place needs manage access.
     routineRunPlaces: service.routineRecords,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
@@ -4138,7 +4170,11 @@ export async function createApplicationServices({
           remoteServers,
           command: {
             executable: process.execPath,
-            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+            args: [
+              ...(app.isPackaged ? [] : [app.getAppPath()]),
+              ...ozonePlatformArguments(),
+              ...sandboxArguments(process.argv.slice(1)),
+            ],
           },
           trash: (path) => shell.trashItem(path),
           account: {

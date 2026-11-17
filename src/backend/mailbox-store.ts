@@ -2353,6 +2353,19 @@ export class MailboxStore {
   }
 
   /**
+   * Whether OpenBot sent the answer of the turn that ran this teammate request to the teammate, as its
+   * result, when that turn ended. Its turn then ended quiet when it held only text (#8021), so a later
+   * history import decides the same. The note for a failed request does not count.
+   */
+  hasSentResultFor(deliveryId: string): boolean {
+    const delivery = this.#state.deliveries.find((candidate) => candidate.id === deliveryId);
+    if (!delivery?.turnId) return false;
+    return [delivery.turnId, ...(delivery.resumeAfterUsageLimit?.previousTurnIds ?? [])].some(
+      (turnId) => this.#state.idempotency[`${AUTO_RESULT_KEY_PREFIX}${turnId}:${delivery.messageId}`] !== undefined,
+    );
+  }
+
+  /**
    * Answers a teammate request whose delivery failed, so the agent that asked does not wait for a
    * result that never comes (#5055). The note goes where a result would go, as a reply from the
    * teammate in the reply format, and the key sends it once. The text is the delivery's error, which

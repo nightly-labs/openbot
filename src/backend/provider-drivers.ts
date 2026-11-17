@@ -142,6 +142,11 @@ interface ProviderCliCommand {
    * when its own browser launch opens nothing.
    */
   readonly windowsPageByOpenBot?: true;
+  /**
+   * Reads the end of a failed sign-in's output, and gives a safe message for the user when it knows
+   * the reason, or null. Only for a sign-in: the process then writes to pipes (`waitForSignInProcess`).
+   */
+  readonly failureText?: (output: string) => string | null;
 }
 
 /**
@@ -242,11 +247,19 @@ const GROK_CODE_SIGN_IN: ProviderCliCommand = {
   env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
+/**
+ * On macOS, Claude Code can fail to save the sign-in in the keychain, also when the keychain is
+ * unlocked (anthropics/claude-code#104547). It then exits with code 1, and "Try again" does not help.
+ */
+function claudeSignInFailure(output: string): string | null {
+  return /couldn.t save your login/iu.test(output) ? sourceText("error.provider.claudeLoginNotSaved") : null;
+}
 const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   windowsPageByOpenBot: true,
+  failureText: claudeSignInFailure,
 };
 
 /**

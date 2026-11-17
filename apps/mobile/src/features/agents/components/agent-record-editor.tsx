@@ -1,4 +1,4 @@
-import { Host, Switch } from "@expo/ui";
+import { Host } from "@expo/ui";
 import { eventFilterDraftsValid, eventFiltersFromDrafts } from "@openbot/contracts/event-filter-value";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
@@ -40,6 +40,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { AppSwitch } from "@/shared/components/app-switch";
 import { SheetFormField } from "@/shared/components/sheet-form-field";
 import { SheetSaveAction } from "@/shared/components/sheet-save-action";
 import { haptics } from "@/shared/lib/haptics";
@@ -690,7 +691,7 @@ export function RoutineEditor({
           <SettingsRow
             trailing={
               <Host matchContents colorScheme={theme === "dark" ? "dark" : "light"}>
-                <Switch
+                <AppSwitch
                   label={t("mobile.agent.record.enabled")}
                   value={activeOverride ?? routine.active}
                   disabled={disabled || toggle.pending}

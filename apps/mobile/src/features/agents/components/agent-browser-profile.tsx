@@ -17,6 +17,7 @@ import { openBrowserProfilePage, openBrowserProfilesPage } from "@/features/serv
 import { useAgentBrowserProfile, useServerBrowserProfiles } from "@/features/servers/model/use-server-browser-profiles";
 import {
   SettingsContent,
+  SettingsGroupRow,
   SettingsNote,
   SettingsRow,
   SettingsSection,
@@ -49,8 +50,9 @@ export function AgentBrowserProfileRow({ agent }: { agent: MobileAgent }) {
   if (!available) return null;
   const choice = query.data;
   return (
-    <SettingsSection footer={t("mobile.agent.browserProfile.footer")}>
+    <SettingsGroupRow>
       <SettingsRow
+        description={t("mobile.agent.browserProfile.footer")}
         trailing={choice ? <TrailingValue value={label(choice, profiles)} /> : undefined}
         onPress={() =>
           router.push({
@@ -61,7 +63,7 @@ export function AgentBrowserProfileRow({ agent }: { agent: MobileAgent }) {
       >
         <Typography.Paragraph>{t("mobile.agent.browserProfile.label")}</Typography.Paragraph>
       </SettingsRow>
-    </SettingsSection>
+    </SettingsGroupRow>
   );
 }
 

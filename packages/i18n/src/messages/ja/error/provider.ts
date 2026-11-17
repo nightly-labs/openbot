@@ -12,6 +12,8 @@ export const messages = {
     "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
   "error.provider.acpRefusedUntilRestart":
     "{provider} がメッセージを拒否したため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLost": "{provider} の接続が切れました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLostEnded": "{provider} の接続が切れたため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSettingsTimedOut":
     "{provider} が時間内に応答しませんでした。しばらくしてからもう一度お試しください。",
   "error.provider.acpPlanUsedUp":
@@ -196,6 +198,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "プロバイダーがコードを受け付けませんでした。サインインをやり直してください。",
   "error.provider.codeLoginUnsupported":
     "このサーバーでは、貼り付けたコードでサインインできません。サーバーのコンピューターのブラウザーでサインインしてください。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude は Mac にサインイン情報を保存できませんでした。OpenBot を実行している Mac を再起動してから、Claude をもう一度接続してください。",
   "error.provider.cliBusyRetry": "{provider} CLI はターンを処理中です。終わるまで待ってから、もう一度お試しください。",
   "error.provider.cliSigningIn":
     "{provider} CLI はサインイン中です。サインインを完了するかキャンセルしてから更新してください。",
@@ -294,6 +298,8 @@ export const messages = {
     "Gemini は現在このモデルを使用できません。別のモデルを選んでから、もう一度お試しください。\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google の Gemini サービスがリクエストを完了しませんでした。数分後にもう一度お試しください。\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google はこのリクエストの Gemini サインインを受け付けませんでした。メッセージをもう一度送信してください。エラーが続く場合は、設定で Gemini を再接続してください。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini がこのリクエストを拒否しました。別のモデルを選んでから、メッセージをもう一度送信してください。再び失敗する場合は、新しいチャットを始めてください。\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -351,6 +357,8 @@ export const messages = {
     "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
   "error.provider.hermesRefused":
     "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
+  "error.provider.hermesConnectionLost":
+    "このメッセージの処理中に Hermes の接続が切れたため、作業が完了したかどうかわかりません。メッセージをもう一度送信する前に、エージェントが行ったことを確認してください。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",

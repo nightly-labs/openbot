@@ -12,6 +12,8 @@ export const messages = {
     "{provider} perdió su inicio de sesión, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} rechazó un mensaje, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
+  "error.provider.acpServerLost": "{provider} perdió su conexión. Envía tu mensaje de nuevo.",
+  "error.provider.acpServerLostEnded": "{provider} perdió su conexión, así que OpenBot terminó su proceso.",
   "error.provider.acpSettingsTimedOut": "{provider} no respondió a tiempo. Vuelve a intentarlo en un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} indica que tu plan está agotado. Elige otro modelo o mejora tu plan de {provider}.",
@@ -193,6 +195,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "El proveedor no aceptó el código. Inicia sesión de nuevo.",
   "error.provider.codeLoginUnsupported":
     "Este servidor no permite iniciar sesión con un código pegado. Inicia sesión en el navegador del equipo del servidor.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude no pudo guardar el inicio de sesión en el Mac. Reinicia el Mac donde se ejecuta OpenBot y vuelve a conectar Claude.",
   "error.provider.cliBusyRetry":
     "La CLI de {provider} está procesando un turno. Espera a que termine e inténtalo de nuevo.",
   "error.provider.cliSigningIn":
@@ -293,6 +297,8 @@ export const messages = {
     "Gemini no puede usar este modelo ahora. Elige otro modelo y vuelve a intentarlo.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "El servicio Gemini de Google no completó la solicitud. Vuelve a intentarlo en unos minutos.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google no aceptó el inicio de sesión de Gemini para esta solicitud. Envía tu mensaje de nuevo. Si el error continúa, vuelve a conectar Gemini en Ajustes.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini rechazó esta solicitud. Elige otro modelo y vuelve a enviar tu mensaje. Si vuelve a fallar, inicia un nuevo chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -345,6 +351,8 @@ export const messages = {
     "Hermes no pudo terminar este turno. Si su respuesta da un motivo, haz lo que indica. Si no, puede que un servidor MCP de este agente no esté disponible: revísalo en Marketplace, Apps, y vuelve a enviar tu mensaje.",
   "error.provider.hermesRefused":
     "Hermes rechazó este mensaje antes de empezar. Envíalo de nuevo. Si Hermes rechaza cada mensaje, reinicia OpenBot en el ordenador que ejecuta este agente.",
+  "error.provider.hermesConnectionLost":
+    "Hermes perdió su conexión durante este mensaje, así que no sabe si el trabajo terminó. Revisa lo que hizo el agente antes de enviar el mensaje de nuevo.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot no pudo usar este modelo: el modelo no aceptó su ajuste de razonamiento. Selecciona otro modelo para este agente y envía tu mensaje de nuevo.",
   "error.provider.usageLimitReached": "La cuenta alcanzó su límite de uso.",

@@ -159,14 +159,18 @@ export class PiRpc extends EventEmitter<{ record: [DynamicRecord]; diagnostic: [
   readonly request = Effect.fn("PiRpc.request")(function* (
     this: PiRpc,
     command: DynamicRecord,
-    timeoutMs = PI_REQUEST_TIMEOUT_MS,
+    /** `null`: no limit. Pi's exit still ends the request. */
+    timeoutMs: number | null = PI_REQUEST_TIMEOUT_MS,
   ) {
     const id = randomUUID();
     return yield* Effect.callback<DynamicRecord, ProviderClientOperationError>((resume) => {
-      const timer = setTimeout(() => {
-        this.#pending.delete(id);
-        resume(Effect.fail(providerFailure(new RequestTimeoutError("Pi", String(command.type)))));
-      }, timeoutMs);
+      const timer =
+        timeoutMs === null
+          ? undefined
+          : setTimeout(() => {
+              this.#pending.delete(id);
+              resume(Effect.fail(providerFailure(new RequestTimeoutError("Pi", String(command.type)))));
+            }, timeoutMs);
       this.#pending.set(id, (result) => {
         clearTimeout(timer);
         resume(result);

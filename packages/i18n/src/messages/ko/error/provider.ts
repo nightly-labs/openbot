@@ -12,6 +12,8 @@ export const messages = {
     "{provider}의 로그인이 끊어져 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
   "error.provider.acpRefusedUntilRestart":
     "{provider}이(가) 메시지를 거부하여 OpenBot이 프로세스를 종료했습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpServerLost": "{provider}의 연결이 끊겼습니다. 메시지를 다시 보내세요.",
+  "error.provider.acpServerLostEnded": "{provider}의 연결이 끊겨 OpenBot이 프로세스를 종료했습니다.",
   "error.provider.acpSettingsTimedOut": "{provider}가 제시간에 응답하지 않았습니다. 잠시 후 다시 시도하세요.",
   "error.provider.acpPlanUsedUp":
     "{provider} 요금제 사용량을 모두 사용했습니다. 다른 모델을 선택하거나 {provider} 요금제를 업그레이드하세요.",
@@ -188,6 +190,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "제공자가 코드를 수락하지 않았어요. 로그인을 다시 시작하세요.",
   "error.provider.codeLoginUnsupported":
     "이 서버는 붙여넣은 코드로 로그인할 수 없어요. 서버 컴퓨터의 브라우저에서 로그인하세요.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude가 Mac에 로그인 정보를 저장하지 못했어요. OpenBot이 실행 중인 Mac을 재시동한 다음 Claude를 다시 연결하세요.",
   "error.provider.cliBusyRetry": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 시도해 주세요.",
   "error.provider.cliSigningIn": "{provider} CLI가 로그인하는 중이에요. 로그인을 마치거나 취소한 후 업데이트하세요.",
   "error.provider.cliBusyUpdate": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 업데이트하세요.",
@@ -282,6 +286,8 @@ export const messages = {
     "Gemini가 지금은 이 모델을 사용할 수 없어요. 다른 모델을 선택한 후 다시 시도해 주세요.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google의 Gemini 서비스가 요청을 완료하지 못했어요. 몇 분 후 다시 시도해 주세요.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google이 이 요청의 Gemini 로그인을 받아들이지 않았어요. 메시지를 다시 보내 주세요. 오류가 계속되면 설정에서 Gemini를 다시 연결하세요.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini가 이 요청을 거부했어요. 다른 모델을 선택한 후 메시지를 다시 보내 주세요. 다시 실패하면 새 채팅을 시작해 주세요.\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -335,6 +341,8 @@ export const messages = {
     "Hermes가 이번 턴을 완료하지 못했습니다. 응답에 이유가 있으면 그 안내를 따르세요. 없으면 이 에이전트의 MCP 서버를 사용할 수 없는 상태일 수 있습니다. 마켓플레이스, 앱에서 확인한 다음 메시지를 다시 보내세요.",
   "error.provider.hermesRefused":
     "Hermes가 시작하기 전에 이 메시지를 거부했습니다. 다시 보내세요. Hermes가 모든 메시지를 거부하면 이 에이전트를 실행하는 컴퓨터에서 OpenBot을 다시 시작하세요.",
+  "error.provider.hermesConnectionLost":
+    "이 메시지를 처리하는 중에 Hermes의 연결이 끊겨 작업이 완료되었는지 알 수 없습니다. 메시지를 다시 보내기 전에 에이전트가 한 일을 확인하세요.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot이 이 모델을 사용할 수 없습니다. 모델이 사고 설정을 받아들이지 않았습니다. 이 에이전트에 다른 모델을 선택한 다음 메시지를 다시 보내세요.",
   "error.provider.usageLimitReached": "계정이 사용 한도에 도달했어요.",

@@ -289,6 +289,7 @@ export const messages = {
     "Le serveur de connexion a envoyé une réponse qu’OpenBot ne peut pas lire. Si le service vous donne une clé d’API ou un jeton, ajoutez-le dans les paramètres de ce serveur, puis testez de nouveau la connexion.",
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
+  "error.backend.mcpServerExitedWithOutput": "Le serveur s’est arrêté avant de répondre. Il a écrit : {detail}",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",

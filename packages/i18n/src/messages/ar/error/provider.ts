@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "لم يستجب {provider} في الوقت المحدد، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
   "error.provider.acpRefusedUntilRestart": "رفض {provider} رسالة، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLost": "فقد {provider} اتصاله. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLostEnded": "فقد {provider} اتصاله، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSettingsTimedOut": "لم يستجب {provider} في الوقت المحدد. حاول مرة أخرى بعد قليل.",
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -172,6 +174,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "لم يقبل المزوّد الرمز. ابدأ تسجيل الدخول مرة أخرى.",
   "error.provider.codeLoginUnsupported":
     "لا يمكن لهذا الخادم تسجيل الدخول برمز ملصوق. سجّل الدخول على حاسوب الخادم، في متصفحه.",
+  "error.provider.claudeLoginNotSaved":
+    "تعذّر على Claude حفظ تسجيل الدخول على جهاز Mac. أعد تشغيل جهاز Mac الذي يشغّل OpenBot، ثم اربط Claude مرة أخرى.",
   "error.provider.cliBusyRetry": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم أعد المحاولة.",
   "error.provider.cliSigningIn": "تُجري واجهة {provider} CLI تسجيل الدخول. أكمل تسجيل الدخول أو ألغه، ثم حدّث.",
   "error.provider.cliBusyUpdate": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم حدّث.",
@@ -262,6 +266,8 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -312,6 +318,8 @@ export const messages = {
     "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في المتجر، التطبيقات، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.hermesRefused":
     "رفض Hermes هذه الرسالة قبل أن تبدأ. أرسلها مرة أخرى. إذا رفض Hermes كل رسالة، فأعد تشغيل OpenBot على الكمبيوتر الذي يشغّل هذا الوكيل.",
+  "error.provider.hermesConnectionLost":
+    "فقد Hermes اتصاله أثناء هذه الرسالة، لذا لا يعرف ما إذا كان العمل قد اكتمل. تحقق مما فعله الوكيل قبل أن ترسل الرسالة مرة أخرى.",
   "error.provider.copilotThinkingRejected":
     "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",

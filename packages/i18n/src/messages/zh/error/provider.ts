@@ -11,6 +11,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "{provider} 未及时响应，OpenBot 已结束其进程。",
   "error.provider.acpSignInLost": "{provider} 的登录已失效，OpenBot 已结束其进程。请重新发送消息。",
   "error.provider.acpRefusedUntilRestart": "{provider} 拒绝了一条消息，OpenBot 已结束其进程。请重新发送消息。",
+  "error.provider.acpServerLost": "{provider} 的连接已断开。请重新发送消息。",
+  "error.provider.acpServerLostEnded": "{provider} 的连接已断开，OpenBot 已结束其进程。",
   "error.provider.acpSettingsTimedOut": "{provider} 未及时响应。请稍后重试。",
   "error.provider.acpPlanUsedUp": "{provider} 提示你的套餐额度已用完。请选择其他模型，或升级你的 {provider} 套餐。",
   "error.provider.acpMcpNotLoaded":
@@ -163,6 +165,8 @@ export const messages = {
   "error.provider.codeLoginBadCode": "请粘贴登录页显示的验证码。",
   "error.provider.codeLoginRefused": "服务商未接受该验证码，请重新开始登录。",
   "error.provider.codeLoginUnsupported": "该服务器不支持用粘贴验证码的方式登录。请在服务器电脑的浏览器中登录。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude 无法在 Mac 上保存登录信息。请重启运行 OpenBot 的 Mac，然后重新连接 Claude。",
   "error.provider.cliBusyRetry": "{provider} CLI 正在处理对话，请等它结束后重试。",
   "error.provider.cliSigningIn": "{provider} CLI 正在登录，请完成或取消登录后再更新。",
   "error.provider.cliBusyUpdate": "{provider} CLI 正在处理对话，请等它结束后再更新。",
@@ -250,6 +254,8 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -298,6 +304,8 @@ export const messages = {
     "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 市场、应用 中检查，然后重新发送消息。",
   "error.provider.hermesRefused":
     "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请在运行此智能体的计算机上重新启动 OpenBot。",
+  "error.provider.hermesConnectionLost":
+    "Hermes 在处理这条消息时连接断开，因此不知道工作是否已完成。重新发送消息前，请先检查智能体做了什么。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot 无法使用此模型：模型不接受其思考设置。请为此 Agent 选择其他模型，然后重新发送消息。",
   "error.provider.usageLimitReached": "该账号已达到用量上限。",

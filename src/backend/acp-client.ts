@@ -1278,6 +1278,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.#endIfUnresponsive(sessionId ? this.#threads.get(sessionId) : undefined),
           this.#scope,
         );
+      // A session open or a settings change of a turn sent no prompt, so the message can go again. A
+      // turn that runs in the session fails by itself, and its failure ends the process.
+      if (
+        sessionId &&
+        (method === "turn/start" || method === "thread/resume") &&
+        !this.#threads.get(sessionId)?.transport &&
+        !this.#threads.get(sessionId)?.activeTurn &&
+        this.#flavor.lostServerUntilRestart?.(error)
+      ) {
+        logger.warn("An ACP agent lost the connection to its server.", {
+          provider: this.provider,
+          reason: this.#redact(failureText(error)),
+        });
+        yield* this.#endFailingProcess(sessionId, this.#serverLostEnd(), false);
+        return yield* providerFailure(new Error(sourceText("error.provider.acpServerLost", { provider: this.#label })));
+      }
       if (
         sessionId &&
         (method === "turn/start" || method === "thread/resume") &&
@@ -1964,7 +1980,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               given = relayed.servers;
               closeRelays = relayed.close;
             }
-            const mcpServers = [...given, ...mcp.servers];
+            let mcpServers = [...given, ...mcp.servers];
             const enableMcpServers = this.#flavor.enableMcpServers;
             if (enableMcpServers) {
               const names = mcp.servers.map((server) => server.name);
@@ -1980,6 +1996,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
                 ),
               );
             }
+            const sentAt = Date.now();
             if (resume && requestedThreadId) {
               const restored = this.#restoreSessionEffect(
                 connection,
@@ -2001,6 +2018,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               id = response.sessionId;
               configOptions = response.configOptions ?? [];
               currentModelId = currentModelFromSessionSetup(response);
+            }
+            const connectLimit = this.#flavor.mcpConnectLimitMs;
+            if (connectLimit !== undefined && this.#supportsSessionResume && mcp.dropped(sentAt, connectLimit)) {
+              // The agent continued without OpenBot's tools and would not connect to the same token again (#10749).
+              this.emit("diagnostic", `${this.#label} did not load OpenBot's tools in time. The session opens again.`);
+              mcpServers = [...given, ...mcp.renew()];
+              const retriedAt = Date.now();
+              const retry = this.#restoreSessionEffect(
+                connection,
+                { sessionId: id, cwd, ...directories, mcpServers, ...meta },
+                "resume",
+              );
+              const retried = yield* Effect.result(sessionTransport ? retry : this.#whileProcessWrites(retry));
+              // The session works as before without the tools; a later session of the directory tries again.
+              if (Result.isFailure(retried) || mcp.dropped(retriedAt, connectLimit))
+                this.emit("diagnostic", `${this.#label} still did not load OpenBot's tools.`);
             }
             // The turn would run with no OpenBot tools, and the model would make up their errors (#3058).
             if (this.#flavor.mcpServersLoadWithSession && !mcp.reached())
@@ -2895,22 +2928,44 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
-      // A process that answered before and now refuses can refuse each prompt until it ends (#9718).
-      // A turn of another session, also one that still opens, must not end with it.
-      if (
-        !turn.stopped &&
-        !transport &&
-        this.#promptAnswered &&
-        this.#flavor.refusesUntilRestart?.(failure) &&
-        this.#startingThreads.size === 0 &&
-        ![...this.#openingTurns.keys()].some((id) => id !== thread.id) &&
-        ![...this.#threads.ids()].some((id) => id !== thread.id && this.#threads.get(id)?.activeTurn)
-      ) {
-        this.#promptAnswered = false;
-        yield* this.#endAgentProcess(sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }));
+      // A process that answered before and now refuses can refuse each prompt until it ends (#9718),
+      // and one that lost its server can fail each prompt until it ends (#10624).
+      if (!turn.stopped && !transport) {
+        if (this.#flavor.refusesUntilRestart?.(failure))
+          yield* this.#endFailingProcess(
+            thread.id,
+            sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }),
+            true,
+          );
+        else if (this.#flavor.lostServerUntilRestart?.(failure))
+          yield* this.#endFailingProcess(thread.id, this.#serverLostEnd(), false);
       }
     }
   });
+
+  /**
+   * Ends a process that can fail each request until it ends, so the next message starts a new
+   * process. A turn of another session, also one that still opens, must not end with it. With
+   * `answeredFirst`, a process that refused from its first prompt is not ended again.
+   */
+  #endFailingProcess(threadId: string, message: string, answeredFirst: boolean): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (
+        (answeredFirst && !this.#promptAnswered) ||
+        this.#startingThreads.size > 0 ||
+        [...this.#openingTurns.keys()].some((id) => id !== threadId) ||
+        [...this.#threads.ids()].some((id) => id !== threadId && this.#threads.get(id)?.activeTurn)
+      )
+        return Effect.void;
+      this.#promptAnswered = false;
+      return this.#endAgentProcess(message);
+    });
+  }
+
+  /** Says nothing about the message: a prompt that the agent took can have run. */
+  #serverLostEnd(): string {
+    return sourceText("error.provider.acpServerLostEnded", { provider: this.#label });
+  }
 
   /** Reports the usage of one prompt reply. `promptId` names it: a delivery that runs again keeps its turn ID. */
   #reportPromptUsage(thread: AcpThread, turn: AcpTurn, response: PromptResponse): void {
@@ -4593,16 +4648,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const turn = this.#threads.get(params.threadId)?.activeTurn;
     if (turn) turn.answered = true;
     // Only a call of the running turn: a call with no turn has a new turn id each time, so a card that
-    // waited past its call could not be joined again or closed with its turn (#9689).
-    const limit = turn?.id === params.turnId ? this.#flavor.mcpToolCallLimitMs : undefined;
+    // waited past its call could not be joined again or closed with its turn (#9689). A client that
+    // asked for no progress, such as Cursor, also stops the call at a fixed time (#10577).
+    const deadlines =
+      turn?.id === params.turnId
+        ? [
+            this.#flavor.mcpToolCallLimitMs === undefined
+              ? undefined
+              : this.#flavor.mcpToolCallLimitMs - MCP_TOOL_CALL_ANSWER_MARGIN_MS,
+            detachAfterMs,
+          ].filter((ms) => ms !== undefined)
+        : [];
     const result = yield* this.#serverRequests
-      .call(
-        "item/tool/call",
-        params,
-        signal,
-        detachAfterMs,
-        limit === undefined ? undefined : limit - MCP_TOOL_CALL_ANSWER_MARGIN_MS,
-      )
+      .call("item/tool/call", params, signal, detachAfterMs, deadlines.length > 0 ? Math.min(...deadlines) : undefined)
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
@@ -4832,14 +4890,19 @@ function startsBackgroundTask(rawOutput: unknown): boolean {
   return metadata?.status === "running" && (isString(metadata.sessionID) || isString(metadata.shellID));
 }
 
-/** A missing session, identified by the agent's flavor or by the protocol's `-32002` error. */
+/**
+ * A missing session, identified by the agent's flavor or by the protocol's `-32002` error. The
+ * protocol names the session in `data.sessionId` (ACP error page, "Unknown sessions"). Claude Agent
+ * 0.107.2 sends it so, with only "Resource not found" as the message (#10317). Older agents name it
+ * in `data.uri`.
+ */
 function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor): boolean {
   if (!(error instanceof RequestError)) return false;
   const flavored = flavor.sessionNotFound?.(error, sessionId) ?? null;
   if (flavored !== null) return flavored;
   if (error.code !== -32002) return false;
-  const uri = isRecord(error.data) ? error.data.uri : undefined;
-  return uri === sessionId || error.message.includes(sessionId);
+  const data = isRecord(error.data) ? error.data : undefined;
+  return data?.sessionId === sessionId || data?.uri === sessionId || error.message.includes(sessionId);
 }
 
 /**

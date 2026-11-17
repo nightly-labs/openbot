@@ -956,6 +956,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
+      chatRendererIds: () => new Set(windows.getChatWindows().map((window) => window.webContents.id)),
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
       keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
@@ -1538,7 +1539,8 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild) await presentApplication();
+      // A server has no desktop: invitation links open on the client, and a container has no xdg-settings (#10861).
+      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");

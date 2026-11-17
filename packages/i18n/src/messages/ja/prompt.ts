@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "ページを開いて、サインイン、確認、または同意を完了してください。その後、{name} に続行させてください。",
   "prompt.browser.openPage": "{title} を開く",
+  "prompt.browser.openFailed": "メインウィンドウでページを開けませんでした。もう一度お試しください。",
   "prompt.browser.done": "完了しました",
   "prompt.browser.pageFallback": "ブラウザーのページ",
   "prompt.browser.hostFallback": "ブラウザー",

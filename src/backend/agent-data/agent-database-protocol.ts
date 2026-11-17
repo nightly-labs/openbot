@@ -51,7 +51,18 @@ interface AgentDatabaseClose {
   databasePath: string;
 }
 
-export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose;
+/**
+ * `PRAGMA quick_check` of `openbot.db` after a stop that did not close it. The check reads every page,
+ * minutes on a large file, so the main process asks a host of its own for it. Only the main process
+ * sends it; no agent request can carry it.
+ */
+interface AgentDatabaseIntegrityCheck {
+  kind: "integrity-check";
+  id: number;
+  databasePath: string;
+}
+
+export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose | AgentDatabaseIntegrityCheck;
 
 /**
  * A request before the supervisor numbers it. Spelled as a union of two `Omit`s rather than
@@ -115,6 +126,9 @@ export const AGENT_DATABASE_LIMITS = {
   maxPageCount: 65_536,
   statementDeadlineMs: 5_000,
   hostStartDeadlineMs: 15_000,
+  /** The first wait after a second failed start in a row. It doubles up to the maximum. */
+  hostStartRetryDelayMs: 30_000,
+  maxHostStartRetryDelayMs: 300_000,
   queueWaitMs: 20_000,
   busyTimeoutMs: 2_000,
 } as const;
@@ -134,8 +148,10 @@ export const AGENT_DATABASE_METADATA_TABLE = "openbot_metadata";
 export interface AgentDatabaseHostProcess {
   send(request: AgentDatabaseRequest): void;
   onMessage(listener: (message: AgentDatabaseHostMessage) => void): void;
-  /** The host ended without being asked to. */
-  onExit(listener: () => void): void;
+  /** The host ended without being asked to. `code` is null when the transport does not give one. */
+  onExit(listener: (code: number | null) => void): void;
+  /** The end of what the host wrote to stderr, for the log when it does not start. */
+  recentOutput?(): string;
   /** End it now, whatever it is in the middle of. */
   kill(): void;
 }

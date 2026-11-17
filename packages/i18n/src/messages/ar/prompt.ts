@@ -50,6 +50,7 @@ export const messages = {
   "prompt.browser.cancelledBody": "أُلغيت خطوة المتصفح.",
   "prompt.browser.pendingBody": "افتح الصفحة لإكمال تسجيل الدخول أو التحقق أو الموافقة. ثم دع {name} يتابع.",
   "prompt.browser.openPage": "فتح {title}",
+  "prompt.browser.openFailed": "تعذّر فتح الصفحة في النافذة الرئيسية. حاول مرة أخرى.",
   "prompt.browser.done": "انتهيت",
   "prompt.browser.pageFallback": "صفحة المتصفح",
   "prompt.browser.hostFallback": "المتصفح",

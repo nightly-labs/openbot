@@ -13,6 +13,7 @@ import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import type { AgentMessage, ComposerThreadMessageMatch } from "@openbot/ui/data";
 import { currentText } from "@openbot/ui/text";
 import { createEffect, createMemo, createStore, onCleanup, untrack } from "solid-js";
+import { noteAgentRequest } from "../../agent-requests";
 import { desktopAnalytics } from "../../analytics";
 import {
   agentMessagesEqual,
@@ -1042,6 +1043,7 @@ const Conversation = createSimpleContext({
           ...(clientMessageId ? { clientMessageId } : {}),
           ...(voiceRecordingDraftId ? { voiceRecordingDraftId } : {}),
         };
+        noteAgentRequest(serverId, agentId);
         const receipt = await conversationPort().agent.sendMessage(input, serverId);
         const errorKey = agentConversationKey(serverId, agentId);
         setUiErrors((current) => ({ ...current, [errorKey]: [] }));

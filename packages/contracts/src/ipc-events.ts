@@ -1,10 +1,12 @@
 import {
+  isRoutinePausedByRun,
   isRoutineRunFields,
   isRoutineSchedule,
   ROUTINE_MISSED_POLICIES,
   ROUTINE_RUN_PLACES,
   type RoutineLimitPolicy,
   type RoutineMissedPolicy,
+  type RoutinePausedByRun,
   type RoutineRunFields,
   type RoutineRunPlace,
   type RoutineSchedule,
@@ -72,6 +74,8 @@ export interface EventRoutine {
   missedPolicy?: RoutineMissedPolicy;
   /** Set on an agent routine of this computer's host, and of a remote host with `routine-run-place-v1`. */
   runIn?: RoutineRunPlace;
+  /** As `RoutineFields.pausedByRun`: a paused agent routine that one of its own scheduled runs paused. */
+  pausedByRun?: RoutinePausedByRun;
   createdAt: string;
   updatedAt: string;
 }
@@ -270,6 +274,7 @@ function isEventRoutine(value: unknown): value is EventRoutine {
     (value.limitPolicy === undefined || value.limitPolicy === "wait" || value.limitPolicy === "skip") &&
     (value.missedPolicy === undefined || isOneOf(ROUTINE_MISSED_POLICIES, value.missedPolicy)) &&
     (value.runIn === undefined || isOneOf(ROUTINE_RUN_PLACES, value.runIn)) &&
+    (value.pausedByRun === undefined || isRoutinePausedByRun(value.pausedByRun)) &&
     isTimestamp(value.createdAt) &&
     isTimestamp(value.updatedAt)
   );

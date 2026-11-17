@@ -242,6 +242,7 @@ export const messages = {
   "routine.settings.loading": "ルーティンを読み込んでいます…",
   "routine.settings.empty": "まだルーティンはありません。",
   "routine.settings.paused": "一時停止中",
+  "routine.settings.pausedByRun": "{time} の実行で一時停止",
   "routine.settings.completed": "完了 · {schedule}",
   "routine.settings.active": "有効",
   "routine.settings.pauseFailed": "このルーティンを一時停止できませんでした。",

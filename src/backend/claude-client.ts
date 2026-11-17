@@ -528,6 +528,18 @@ interface ThreadRuntime {
   subagents: SubagentState;
   /** Background subagents and commands that outlive their turn. Stopping the process ends them (#1870). */
   backgroundTasks: number;
+  /**
+   * The background work ended while no turn ran, and the CLI starts a turn of its own to answer its
+   * result. Until that turn begins, closing the query loses the result (#10743).
+   */
+  awaitsResultTurn: boolean;
+  /** The turn that started each background subagent or command that still works, by CLI task id. */
+  taskTurns: Map<string, string>;
+  /**
+   * The turns that started the background work that ended while no turn ran, null for work of no known
+   * turn. The turn that the CLI then starts to answer the results continues them (#10847).
+   */
+  endedTaskTurns: (string | null)[];
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
@@ -610,6 +622,8 @@ interface ClaudeStreamMessage {
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
   is_error?: boolean;
+  /** The HTTP status of the API error that ended the turn, such as 429 or 529. An older CLI does not send it. */
+  api_error_status?: number | null;
   /** Why an assistant message is a refusal, such as `rate_limit`. */
   error?: string;
   /** Why an API error refused the request, such as `usage_limit_reached`. The SDK types do not declare it. */
@@ -619,6 +633,8 @@ interface ClaudeStreamMessage {
   rate_limit_info?: unknown;
   /** `background_tasks_changed`: every live background task. */
   tasks?: unknown;
+  /** `task_started`, `task_updated` and `task_notification`: the CLI's id of the background task. */
+  task_id?: unknown;
   /** `command_lifecycle`: the uuid of the message that OpenBot sent, and its state, such as `started` or `completed`. */
   command_uuid?: unknown;
   state?: unknown;
@@ -932,9 +948,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return [...this.#threads.ids()].every((id) => !this.#threads.get(id)?.backgroundTasks);
   }
 
-  /** A background subagent or command of this thread ends when its query closes. */
+  /**
+   * A background subagent or command of this thread ends when its query closes, and so does the turn
+   * that the CLI starts by itself to answer the result of work that ended.
+   */
   holdsBackgroundWork(threadId: string): Effect.Effect<boolean, ProviderClientOperationError> {
-    return Effect.sync(() => (this.#threads.get(threadId)?.backgroundTasks ?? 0) > 0);
+    return Effect.sync(() => {
+      const thread = this.#threads.get(threadId);
+      return thread !== undefined && (thread.backgroundTasks > 0 || thread.awaitsResultTurn);
+    });
   }
 
   /**
@@ -1635,6 +1657,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       plan: newClaudePlanState(),
       subagents: newSubagentState(),
       backgroundTasks: 0,
+      awaitsResultTurn: false,
+      taskTurns: new Map(),
+      endedTaskTurns: [],
       lastOutputAt: Date.now(),
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
@@ -1787,17 +1812,25 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       messageIds: new Set<string>(),
       promptStarted: false,
     };
+    // A turn that answers background work that ended continues the turns that started it. Work of an
+    // unknown turn continues none, so the lifecycle does not take the turn as quiet.
+    const continues =
+      unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
+    runtime.endedTaskTurns = [];
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
+    runtime.awaitsResultTurn = false;
     startClaudePlanTurn(runtime.plan);
     this.#threads.holdForTurn(runtime);
     this.emit("notification", {
       method: "turn/started",
-      // `unprompted` tells the lifecycle that no delivery started this turn.
+      // `unprompted` tells the lifecycle that no delivery started this turn, and `continues` names the
+      // turns whose background work it answers.
       params: {
         threadId: runtime.id,
         turn: { id: turnId, status: "inProgress" },
         ...(unprompted ? { unprompted } : {}),
+        ...(continues.length > 0 ? { continues } : {}),
       },
     });
     return turn;
@@ -2018,14 +2051,35 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.backgroundTasks = Array.isArray(message.tasks)
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
-      // The level can arrive after the turn that started the work ended, so it holds or frees the idle timer.
-      // When the work ends, the CLI starts a turn of its own to answer the result. Until that turn shows
-      // output, the idle limit must not close the thread (#6557).
+      // Claude Code 2.1.322 sends the first level after the Bash or Agent call with `run_in_background`, before
+      // its tool result, so before the result of that turn. The level that ends the work comes with no turn.
+      // With no turn, a level holds or frees the idle timer. When the work ends, the CLI starts a turn of its
+      // own to answer the result. Until that turn shows output, the idle limit must not close the thread (#6557).
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
-        else if (before > 0 && runtime.backgroundTasks === 0) this.#threads.awaitOwnTurn(runtime);
+        else if (before > 0 && runtime.backgroundTasks === 0) {
+          runtime.awaitsResultTurn = true;
+          this.#threads.awaitOwnTurn(runtime);
+        }
       }
       return;
+    }
+    // A task starts in the turn that called its tool. Its end with no turn running makes the CLI start a
+    // turn of its own, which then continues that turn (#10847). A task that ends in a turn of the CLI's
+    // own also goes to that turn, which then continues its turn too. A person's turn decides by itself.
+    if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
+      const turn = runtime.activeTurn;
+      if (message.subtype === "task_started" && turn) runtime.taskTurns.set(message.task_id, turn.id);
+      else if (message.subtype === "task_notification") {
+        const origin = runtime.taskTurns.get(message.task_id) ?? null;
+        runtime.taskTurns.delete(message.task_id);
+        if (!turn) runtime.endedTaskTurns.push(origin);
+        else if (turn.unprompted && origin !== turn.id)
+          this.emit("notification", {
+            method: "openbot/turn-continues",
+            params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+          });
+      }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {
       this.#emitSubagents(runtime, foldClaudeTaskMessage(runtime.subagents, message, new Date().toISOString()));
@@ -2292,12 +2346,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       turn.toolCalls.clear();
       // A rejected window alone is not a failure: the request can still run on overage. Only the
-      // refusal message, or a request that then failed with an API error, ends the turn on the limit.
+      // refusal message, or a request that then failed with a rate-limit error, ends the turn on the
+      // limit. Another API error, such as a 529 overload, stays a provider error (#10486). An older CLI
+      // sends no status, so its API error still counts.
       const limit = turn.usageLimit;
+      const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
       if (
         limit &&
         !interrupted &&
-        (limit.text !== null || apiError) &&
+        (limit.text !== null || limitError) &&
         !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {

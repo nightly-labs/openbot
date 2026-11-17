@@ -12,6 +12,8 @@ export const messages = {
     "{provider} потерял вход в аккаунт, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} отклонил сообщение, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
+  "error.provider.acpServerLost": "{provider} потерял соединение. Отправьте сообщение ещё раз.",
+  "error.provider.acpServerLostEnded": "{provider} потерял соединение, поэтому OpenBot завершил его процесс.",
   "error.provider.acpSettingsTimedOut": "{provider} не ответил вовремя. Повторите попытку чуть позже.",
   "error.provider.acpPlanUsedUp":
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
@@ -184,6 +186,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Провайдер не принял код. Начните вход заново.",
   "error.provider.codeLoginUnsupported":
     "Этот сервер не поддерживает вход по вставленному коду. Войдите на компьютере сервера в его браузере.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude не удалось сохранить вход на Mac. Перезапустите Mac, на котором работает OpenBot, и снова подключите Claude.",
   "error.provider.cliBusyRetry": "{provider} CLI обрабатывает ход. Дождитесь его завершения и повторите попытку.",
   "error.provider.cliSigningIn": "{provider} CLI выполняет вход. Завершите или отмените вход, затем обновите.",
   "error.provider.cliBusyUpdate": "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем обновите.",
@@ -279,6 +283,8 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google не принял вход в Gemini для этого запроса. Отправьте сообщение ещё раз. Если ошибка повторяется, подключите Gemini заново в настройках.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravitySessionRejected":
@@ -332,6 +338,8 @@ export const messages = {
     "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Каталог, Приложения и отправьте сообщение ещё раз.",
   "error.provider.hermesRefused":
     "Hermes отклонил это сообщение до начала работы. Отправьте его ещё раз. Если Hermes отклоняет каждое сообщение, перезапустите OpenBot на компьютере, где работает этот агент.",
+  "error.provider.hermesConnectionLost":
+    "Hermes потерял соединение во время этого сообщения, поэтому не знает, завершена ли работа. Проверьте, что сделал агент, прежде чем отправить сообщение ещё раз.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot не смог использовать эту модель: модель не приняла его настройку размышлений. Выберите другую модель для этого агента и отправьте сообщение ещё раз.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",

@@ -109,3 +109,59 @@ export const waitForSuccessfulProcess = Effect.fnUntraced(function* (
     }),
   );
 });
+
+/** The end of a sign-in's output that `failureText` reads. A CLI prints its reason last. */
+const SIGN_IN_OUTPUT_LIMIT = 8 * 1024;
+/** How long the rest of a failed sign-in's output has to arrive after the process exits. */
+const SIGN_IN_OUTPUT_DRAIN_MS = 1_000;
+
+/**
+ * Waits for a sign-in process as `waitForSuccessfulProcess` does. For a command with `failureText`,
+ * the process must write its output to pipes: when it fails, `failureText` reads the end of that
+ * output and can give a safe message for the user in place of the exit code. The output can hold
+ * the sign-in link, so it is not logged and not kept.
+ */
+export const waitForSignInProcess = Effect.fnUntraced(function* (
+  child: ChildProcess,
+  command: { readonly timeoutMs: number; readonly failureText?: ((output: string) => string | null) | undefined },
+) {
+  const { failureText } = command;
+  if (!failureText) return yield* waitForSuccessfulProcess(child, command.timeoutMs);
+  let output = "";
+  let closed = false;
+  const read = (chunk: Buffer) => {
+    output = (output + chunk.toString("utf8")).slice(-SIGN_IN_OUTPUT_LIMIT);
+  };
+  const close = () => {
+    closed = true;
+  };
+  child.stdout?.on("data", read);
+  child.stderr?.on("data", read);
+  child.once("close", close);
+  // `exit` can come before the last output, and `close` comes after it.
+  const outputEnded = Effect.callback<void>((resume) => {
+    if (closed) return resume(Effect.void);
+    const ended = () => resume(Effect.void);
+    child.once("close", ended);
+    return Effect.sync(() => child.off("close", ended));
+  }).pipe(Effect.timeoutOption(SIGN_IN_OUTPUT_DRAIN_MS));
+  return yield* waitForSuccessfulProcess(child, command.timeoutMs).pipe(
+    Effect.catch((failure) =>
+      Effect.gen(function* () {
+        yield* outputEnded;
+        const message = failureText(output);
+        return yield* new ProviderProcessFailed({
+          cause: message ? new ProviderSignInError({ message }) : failure.cause,
+        });
+      }),
+    ),
+    Effect.ensuring(
+      Effect.sync(() => {
+        child.stdout?.off("data", read);
+        child.stderr?.off("data", read);
+        child.off("close", close);
+        output = "";
+      }),
+    ),
+  );
+});

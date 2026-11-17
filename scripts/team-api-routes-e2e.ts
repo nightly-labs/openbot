@@ -9,6 +9,7 @@
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
+// which run paused each paused routine (`routine-pause-reasons-v1`) over the same records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // the whole copy of a pending approval (`pending-approval-v1`),
@@ -358,6 +359,10 @@ import { PROVIDERS_ADMIN_CAPABILITY, PROVIDERS_ADMIN_ROUTES } from "@openbot/con
 import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts/team-protocol/providers-v5";
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
+import {
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
 import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
@@ -10825,6 +10830,95 @@ try {
         errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
         saves().length === 2,
       [summary(gone), summary(badPlace), summary(missing), summary(hiddenAgent)],
+    );
+  }
+
+  // ---- Why a routine is paused (routine-pause-reasons-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_PAUSE_REASONS_CAPABILITY];
+    const saves = () => [...callsOf("updateRoutine"), ...callsOf("saveRoutineRecord")];
+    const savesBefore = saves().length;
+    const unchanged = routineRecords;
+    // Each routine was paused by a scheduled run of its own: a schedule routine, a webhook routine and
+    // a `once` routine. The store gives `pausedByRun` only on a paused routine.
+    routineRecords = routineRecords.map((routine) => ({
+      ...routine,
+      active: false,
+      pausedByRun: { scheduledFor: `2026-11-15T0${routine.id === "routine-hook" ? 9 : 8}:00:00.000Z` },
+    }));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-pause-reasons-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the list route without the capability gets 400 routinePauseReasonsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.routinePauseReasonsUnsupported")),
+      summary(unsupported),
+    );
+    const member = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const admin = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the run that paused each schedule routine that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
+      member.status === 200 &&
+        isDeepStrictEqual(member.body, {
+          routines: [{ routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" }],
+        }) &&
+        isDeepStrictEqual(admin.body, {
+          routines: [
+            { routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" },
+            { routineId: "routine-hook", scheduledFor: "2026-11-15T09:00:00.000Z" },
+          ],
+        }),
+      [summary(member), summary(admin)],
+    );
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    const missing = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    routineRecords = unchanged;
+    const resumed = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member who can only view the agent reads the reasons, an unknown or hidden agent gets 404, a routine with no reason is not listed, and the route saves nothing",
+      isDeepStrictEqual(viewer.body, member.body) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        isDeepStrictEqual(resumed.body, { routines: [] }) &&
+        saves().length === savesBefore,
+      [summary(viewer), summary(missing), summary(hiddenAgent), summary(resumed)],
     );
   }
 

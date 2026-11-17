@@ -44,8 +44,13 @@ import {
   type PendingChatMessage,
   presentChatMessages,
 } from "@/features/chat/model/chat-messages";
-import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import {
+  answerlessTurnSummaries,
+  finishedTurnSummaries,
+  type TurnStepsSummary,
+} from "@/features/chat/model/turn-thinking";
 import { useChatBackgroundColor } from "@/features/settings/model/chat-background";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
@@ -95,7 +100,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
+import { useComposerDictation, useComposerDictationWithSettings } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -498,7 +503,14 @@ export function ChatView({
         : undefined;
     return lastTurnSummaries.current;
   }, [conversationMessages, conversationTurnId, turnLines, target.kind]);
-  const turnSummaries = agentTurnSummaries ?? channelTurnSummaries;
+  // With the thinking display off, a finished turn shows no steps row.
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
+  const agentAnswerlessSummaries = useMemo(() => answerlessTurnSummaries(agentTurnSummaries), [agentTurnSummaries]);
+  // A channel shows only the steps rows of turns with no answer.
+  const turnSummaries = showThinking
+    ? (agentTurnSummaries ?? channelTurnSummaries)
+    : (agentAnswerlessSummaries ?? channelTurnSummaries);
+  const rowShown = useChatRowShown(turnSummaries);
   const thinkingAgentId = target.kind === "agent" ? target.id : null;
   const openTurn = useCallback(
     (turnId: string) => {
@@ -682,7 +694,7 @@ export function ChatView({
     ready && rowsShown,
     // The list draws a row for each message except the thinking steps, which the activity row or a
     // steps row shows. A finished turn with no answer draws its steps row on its thinking row.
-    rowsShown && messages.some((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+    rowsShown && messages.some(rowShown),
     lastUserId,
     questionForm?.question ? (questionForm.messageId ?? null) : null,
     holdOpening,
@@ -715,25 +727,8 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
-  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
-  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
   const voiceMissing = !speechNative;
-  const composerDictation = useMemo(
-    (): ComposerDictation =>
-      voiceMissing && !dictation.available
-        ? {
-            ...dictation,
-            available: true,
-            start: () => {
-              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
-              Keyboard.dismiss();
-              router.push("/settings/voice");
-              return false;
-            },
-          }
-        : dictation,
-    [voiceMissing, dictation],
-  );
+  const composerDictation = useComposerDictationWithSettings(dictation);
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
