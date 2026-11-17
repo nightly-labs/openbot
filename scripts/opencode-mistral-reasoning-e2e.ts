@@ -8,7 +8,8 @@
 // Cases: `other-host`, the `provider` entry that every other endpoint keeps, which must get the 422
 // (the control); `mistral`, which must finish the turn and keep the key, the header, the saved output
 // cap and the saved efforts. The `mistral` layer also holds a second endpoint and an OpenCode Go key,
-// and OpenCode must list the models of both endpoints.
+// and OpenCode must list the models of both endpoints. The `mistral` endpoint is in both blocks:
+// OpenCode 2 uses its `providers` entry, and OpenCode 1 ignores `providers` and keeps `provider`.
 // `bun scripts/opencode-mistral-reasoning-e2e.ts [<opencode binary>]`. Without an argument it uses
 // `OPENBOT_OPENCODE_PATH`. Writes .openbot-build/opencode-mistral-reasoning-e2e/report.json.
 import assert from "node:assert/strict";
@@ -178,6 +179,8 @@ function configFor(providers: readonly CustomProviderConfig[]): {
     chunkTimeout: written.chunkTimeout,
   };
   written.baseURL = local;
+  // The `provider` entry that stays beside a `providers` entry, for OpenCode 1, moves too.
+  config.provider[ENDPOINT].options.baseURL = local;
   return { format, entry, settings, content: JSON.stringify(config) };
 }
 
@@ -201,6 +204,8 @@ async function runOpenCode(
       OPENCODE_DISABLE_AUTOUPDATE: "1",
     },
     stdio: ["ignore", "pipe", "pipe"],
+    // A turn against the loopback server takes seconds. A hang must end in a failed case and a report.
+    timeout: 180_000,
   });
   let stdout = "";
   let stderr = "";
@@ -267,7 +272,7 @@ try {
   assert.equal(mistral.settings.headerTimeout, CUSTOM_ENDPOINT_SILENCE_MS, "mistral: header timeout");
   assert.equal(mistral.settings.chunkTimeout, CUSTOM_ENDPOINT_SILENCE_MS, "mistral: chunk timeout");
   const layer = JSON.parse(mistral.content);
-  assert.equal(layer.provider?.[ENDPOINT], undefined, "mistral: the endpoint must not also be a `provider` entry");
+  assert.ok(layer.provider?.[ENDPOINT], "mistral: the endpoint must keep its `provider` entry for OpenCode 1");
   assert.ok(layer.provider?.[OTHER_ENDPOINT], "mistral: the other endpoint must keep its `provider` entry");
   before = requests.length;
   const turn = await runTurn(mistral.content, "mistral");

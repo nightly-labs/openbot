@@ -128,7 +128,7 @@ interface OpenCodeConfig {
 }
 
 /** What a caller starts from: every layer except the ones this module adds. */
-export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider">;
+export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider" | "providers">;
 
 /**
  * OpenBot names its own chats and never reads OpenCode's titles. OpenCode asks its `small_model` for
@@ -274,7 +274,7 @@ function modelEntry(model: CustomProviderModel): OpenCodeModelEntry {
 function customProviderEntries(
   providers: readonly CustomProviderConfig[],
 ): Readonly<Record<string, OpenCodeProviderEntry>> | null {
-  const usable = providers.filter((provider) => provider.models.length > 0 && !isMistralApi(provider.baseUrl));
+  const usable = providers.filter((provider) => provider.models.length > 0);
   if (usable.length === 0) return null;
   return Object.fromEntries(usable.map((provider) => [provider.id, providerEntry(provider)]));
 }
@@ -292,10 +292,12 @@ function isMistralApi(baseUrl: string): boolean {
 }
 
 /**
- * The `provider` entry in OpenCode's `providers` format, with `requireReasoning` off. A `providers`
- * entry replaces the `provider` entry of the same id as a whole, so this one carries every field of
- * {@link providerEntry}, moved as OpenCode 2.2.5 moves them (`migrateStandardProvider` in
- * `packages/core/src/v1/config/migrate.ts`). Checked with `scripts/opencode-mistral-reasoning-e2e.ts`.
+ * The `provider` entry in OpenCode's `providers` format, with `requireReasoning` off. OpenCode 2.2.5
+ * and 2.3.0 use a `providers` entry in place of the `provider` entry of the same id, as a whole, so
+ * this one carries every field of {@link providerEntry}, moved as OpenCode moves them
+ * (`migrateStandardProvider` in `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores
+ * `providers`, so the `provider` entry stays for a user's own OpenCode 1. Checked with
+ * `scripts/opencode-mistral-reasoning-e2e.ts`.
  */
 function nativeProviderEntry({ npm, name, options, models }: OpenCodeProviderEntry): OpenCodeNativeProviderEntry {
   const { headers, ...settings } = options;
@@ -319,7 +321,10 @@ function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEn
   };
 }
 
-/** The `providers` block: the endpoints on Mistral's API, or null when there is none. */
+/**
+ * The `providers` block: the endpoints on Mistral's API, or null when there is none. They also stay
+ * in the `provider` block, for OpenCode 1 (see {@link nativeProviderEntry}).
+ */
 function nativeProviderEntries(
   providers: readonly CustomProviderConfig[],
 ): Readonly<Record<string, OpenCodeNativeProviderEntry>> | null {
@@ -330,10 +335,10 @@ function nativeProviderEntries(
 
 /**
  * Merges the custom providers and the stored key into a base layer. Providers only ever land under
- * the `provider` key, or `providers` for an endpoint on Mistral's API, so no provider id can reach a
- * sibling setting: an endpoint named `permission` is a provider named `permission`, not a permission
- * rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that built-in
- * provider, so the stored key must not drop its URL and models.
+ * the `provider` key, and also `providers` for an endpoint on Mistral's API, so no provider id can
+ * reach a sibling setting: an endpoint named `permission` is a provider named `permission`, not a
+ * permission rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that
+ * built-in provider, so the stored key must not drop its URL and models.
  */
 function mergeOpenCodeConfig(
   base: OpenCodeConfigBase,
