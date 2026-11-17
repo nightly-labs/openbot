@@ -212,6 +212,13 @@
     border-radius: inherit;
   }
 
+  /* A focused tab shows its X, so the X closes it. A file tab is selected only when its file opens, so
+   * a file that does not open can close too. The click that focuses the tab still selects it: the X
+   * stays under the tab while the tab is pressed, so the press and the release hit the same button. */
+  .side-panel-tab:not([data-selected]):focus-within:not(:has(> .side-panel-tab-select:active)) .side-panel-tab-close {
+    z-index: 1;
+  }
+
   .side-panel-tab:not([data-selected]) .side-panel-tab-label {
     position: absolute;
     width: 1px;
