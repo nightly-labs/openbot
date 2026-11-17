@@ -10,6 +10,7 @@ import {
   exceptionDescription,
   frameAutomationContextId,
   frameIds,
+  isFrameGone,
   isRecord,
   numberValue,
   recordValue,
@@ -595,8 +596,15 @@ export const semanticAxMatches = Effect.fn("Browser.semanticAxMatches")(function
   const matches: SemanticMatch[] = [];
   const seen = new Set<number>();
   const frameTree = yield* send("Page.getFrameTree", {}, capture.sessionId);
-  for (const frameId of frameIds(frameTree)) {
-    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId);
+  const ids = frameIds(frameTree);
+  for (const frameId of ids) {
+    // A child frame that the page removed after the tree was read has no match.
+    const tree = yield* send("Accessibility.getFullAXTree", { frameId }, capture.sessionId).pipe(
+      Effect.catchIf(
+        (failure) => frameId !== ids[0] && isFrameGone(failure),
+        () => Effect.succeed({ nodes: [] }),
+      ),
+    );
     yield* browserSync(() => assertBeforeDeadline(deadline));
     for (const node of Array.isArray(tree.nodes) ? tree.nodes.filter(isRecord) : []) {
       if (node.ignored === true) continue;
