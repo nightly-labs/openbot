@@ -1,13 +1,15 @@
 /**
  * The connection test of a stdio MCP server says why the server stopped (#10137).
  *
- * Starts real stdio servers through `testMcpServer` and checks four cases:
+ * Starts real stdio servers through `testMcpServer` and checks these cases:
  * - a server that writes its reason to stderr and stops shows that reason, and a configured
  *   secret value that it writes is masked;
  * - a server that stops without output keeps the old message;
- * - a server that writes 200 KB to stderr and answers after 2 seconds still passes, because the
- *   pipe is read all the time;
- * - a long stderr keeps only its end, within the error limit.
+ * - a server that writes 200 KB to stderr and answers each request after 1 second still passes,
+ *   because the pipe is read all the time;
+ * - a long stderr keeps only its end, within the error limit;
+ * - a secret value that crosses the point where the shown end starts is masked, not shown in part;
+ * - the colour codes of a terminal logger are removed.
  *
  * Writes `.openbot-build/mcp-stdio-exit-output-e2e.json`.
  *
@@ -34,13 +36,21 @@ if (mode === "reason") {
   process.exit(1);
 }
 if (mode === "silent") process.exit(1);
+if (mode === "split") {
+  // The value starts 1,010 characters before the end, so the last 1,000 hold only its end.
+  process.stderr.write("site " + process.env.WP_TOKEN + "\\n" + "y".repeat(990));
+  process.exit(1);
+}
+if (mode === "ansi") {
+  process.stderr.write("\\u001b[31mError: colored failure\\u001b[0m\\n");
+  process.exit(1);
+}
 if (mode === "long") {
   process.stderr.write("first line that is cut away\\n" + "x".repeat(5000) + "\\nlast line: missing WP_URL\\n");
   process.exit(1);
 }
 // "slow": fill far more than a pipe buffer, then answer late.
 process.stderr.write("log line\\n".repeat(25000));
-const delay = 2000;
 let buffer = "";
 process.stdin.setEncoding("utf8");
 process.stdin.on("data", (chunk) => {
@@ -56,7 +66,7 @@ process.stdin.on("data", (chunk) => {
         : message.method === "tools/list"
           ? { tools: [{ name: "publish", inputSchema: { type: "object" } }] }
           : {};
-    setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n"), delay / 2);
+    setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n"), 1000);
   }
 });
 `;
@@ -103,12 +113,30 @@ try {
   assert.ok(!long.error.includes("first line that is cut away"));
   assert.ok(long.error.length <= INPUT_LIMITS.mcpErrorText);
 
+  const split = await test("split");
+  assert.ok(split.error);
+  assert.deepEqual(matchingSourceKeys(split.error), ["error.backend.mcpServerExitedWithOutput"]);
+  for (let start = 1; start < SECRET.length - 4; start++)
+    assert.ok(!split.error.includes(SECRET.slice(start)), "no end of the secret value is shown");
+
+  const color = await test("ansi");
+  assert.ok(color.error);
+  assert.match(color.error, /It wrote: Error: colored failure$/u);
+  assert.ok(!color.error.includes("\u001b"));
+
   const startedAt = Date.now();
   const slow = await test("slow");
   const slowMs = Date.now() - startedAt;
   assert.deepEqual(slow, { toolCount: 1, error: null });
 
-  const report = { reason: reason.error, silent: silent.error, long: long.error, slow: { ...slow, ms: slowMs } };
+  const report = {
+    reason: reason.error,
+    silent: silent.error,
+    long: long.error,
+    split: split.error,
+    color: color.error,
+    slow: { ...slow, ms: slowMs },
+  };
   const out = resolve(".openbot-build/mcp-stdio-exit-output-e2e.json");
   await mkdir(resolve(".openbot-build"), { recursive: true });
   await writeFile(out, `${JSON.stringify(report, null, 2)}\n`);

@@ -1,5 +1,7 @@
 import { basename } from "node:path";
+import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
+import { stripVTControlCharacters } from "node:util";
 import {
   Client as ModernClient,
   StreamableHTTPClientTransport as ModernHttpTransport,
@@ -199,7 +201,6 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
               client.callTool({ name, arguments: args }, undefined, { signal, timeout: MCP_TOOL_CALL_TIMEOUT_MS }),
             ),
           ),
-          Effect.catch((failure) => explainClosedEffect(failure, transport)),
         ),
       ({ client, transport }) => closeQuietlyEffect(client, transport),
     ),
@@ -541,11 +542,18 @@ const explainClosedEffect = Effect.fnUntraced(function* (
   if (!(transport instanceof TailedStdioTransport) || !isConnectionClosed(failure.cause))
     return yield* Effect.fail(failure);
   const output = yield* transport.output();
-  return yield* Effect.fail(output ? new McpProbeFailure({ cause: new McpServerExit(output) }) : failure);
+  if (!output.text) return yield* Effect.fail(failure);
+  return yield* Effect.fail(new McpProbeFailure({ cause: new McpServerExit(output.text, output.cut) }));
 });
 
-/** How much of the end of a stdio server's stderr is kept. */
-const MCP_STDERR_TAIL = 1_000;
+/** How much of the end of a stdio server's stderr the panel shows. */
+const MCP_STDERR_SHOWN = 1_000;
+
+/**
+ * How much of the end is kept before the secrets are removed. Masking finds only whole values, so
+ * the shown part is cut after it: a value that this cut splits is at the start, which that cut drops.
+ */
+const MCP_STDERR_KEPT = 8_000;
 
 /** How long the last stderr lines can arrive after the connection closed. */
 const MCP_STDERR_SETTLE_MS = 250;
@@ -560,6 +568,7 @@ const MCP_STDERR_SETTLE_MS = 250;
 class TailedStdioTransport extends StdioClientTransport {
   #output = "";
   #cut = false;
+  #source: Readable | null = null;
   readonly #ended: Promise<void>;
 
   constructor(server: StdioServerParameters) {
@@ -567,14 +576,21 @@ class TailedStdioTransport extends StdioClientTransport {
     // The SDK gives this stream before `start`, so no early line is lost.
     const stream = this.stderr;
     const decoder = new StringDecoder("utf8");
+    const keep = (text: string) => {
+      const output = this.#output + text;
+      this.#cut ||= output.length > MCP_STDERR_KEPT;
+      this.#output = output.slice(-MCP_STDERR_KEPT);
+    };
     this.#ended = new Promise((resolve) => {
       if (!stream) return resolve();
-      stream.on("data", (chunk: Buffer) => {
-        const output = this.#output + decoder.write(chunk);
-        this.#cut ||= output.length > MCP_STDERR_TAIL;
-        this.#output = output.slice(-MCP_STDERR_TAIL);
+      stream.on("pipe", (source: Readable) => {
+        this.#source = source;
       });
-      stream.once("end", () => resolve());
+      stream.on("data", (chunk: Buffer) => keep(decoder.write(chunk)));
+      stream.once("end", () => {
+        keep(decoder.end());
+        resolve();
+      });
       stream.once("close", () => resolve());
       stream.on("error", () => resolve());
     });
@@ -584,11 +600,15 @@ class TailedStdioTransport extends StdioClientTransport {
   output() {
     return Effect.promise(() => this.#ended).pipe(
       Effect.timeoutOption(MCP_STDERR_SETTLE_MS),
-      Effect.map(() => {
-        const output = this.#output.trim();
-        return output && this.#cut ? `…${output}` : output;
-      }),
+      // Colour codes of a terminal logger are not text the panel can show.
+      Effect.map(() => ({ text: stripVTControlCharacters(this.#output).trim(), cut: this.#cut })),
     );
+  }
+
+  /** A descendant that got stderr can keep it open after the server is killed: release this end. */
+  override async close() {
+    await super.close();
+    this.#source?.destroy();
   }
 }
 
@@ -786,9 +806,21 @@ class McpTimeout extends Error {
 
 /** A stdio server that stopped before it answered, with the end of what it wrote to stderr. */
 class McpServerExit extends Error {
-  constructor(readonly output: string) {
+  constructor(
+    readonly output: string,
+    /** Whether the server wrote more than `output`. */
+    readonly cut: boolean,
+  ) {
     super("The MCP server stopped before it answered.");
   }
+}
+
+/** The end of the server's stderr that the panel shows, with the secrets removed before the cut. */
+function serverOutput(error: McpServerExit, config: McpServerConfig): string {
+  const output = redactMcpSecrets(error.output, config).trim();
+  if (!error.cut && output.length <= MCP_STDERR_SHOWN) return output;
+  // A cut can split a character in two: its lone second half is dropped.
+  return `…${output.slice(-MCP_STDERR_SHOWN).replace(/^[\uDC00-\uDFFF]/u, "")}`;
 }
 
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
@@ -813,7 +845,7 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
   // What the server wrote before it stopped says why, also when the command works in a terminal
   // (#10137). The probe secrets do not hold the configured values, so they are removed here.
   if (error instanceof McpServerExit)
-    return sourceText("error.backend.mcpServerExitedWithOutput", { detail: redactMcpSecrets(error.output, config) });
+    return sourceText("error.backend.mcpServerExitedWithOutput", { detail: serverOutput(error, config) });
   // The child exited before the handshake: the process failed to start, not the network.
   if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
   if (config.transport === "http") {
