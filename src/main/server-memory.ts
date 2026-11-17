@@ -205,9 +205,9 @@ export class ServerMemory implements HostMemory {
     }
     if (sample.available < criticalBytes(sample)) return "critical";
     const free = sample.available - this.#reservations.size * TURN_RESERVE_BYTES;
-    const low = Math.max(512 * MIB, sample.total * 0.12);
+    const low = lowBytes(sample);
     if (free < low) return "low";
-    if (this.#level !== "ok" && free < low + RECOVER_MARGIN_BYTES) return "low";
+    if (this.#level !== "ok" && free < low + Math.min(RECOVER_MARGIN_BYTES, sample.total * 0.1)) return "low";
     return "ok";
   }
 
@@ -221,6 +221,17 @@ export class ServerMemory implements HostMemory {
   #now(): number {
     return this.#options.now?.() ?? Date.now();
   }
+}
+
+/**
+ * Below a ceiling of 2.5 GiB, 512 MiB is more than a fifth of the memory. OpenBot and two agents can
+ * then leave less than 512 MiB plus `RECOVER_MARGIN_BYTES` free: a turn's own reservation makes the
+ * level "low", and it never goes back to "ok", so no tab opens and no new turn starts (#10311). There
+ * the low limit is a fifth of the ceiling, and the recover margin a tenth of it. A larger ceiling keeps
+ * 512 MiB and 256 MiB.
+ */
+function lowBytes(sample: MemorySample): number {
+  return Math.max(sample.total * 0.12, Math.min(512 * MIB, sample.total * 0.2));
 }
 
 function criticalBytes(sample: MemorySample): number {
