@@ -5,7 +5,7 @@ export const messages = {
   // Text that OpenBot posts in a Slack conversation. Slack users read it. It names no agent: in
   // Slack, every answer comes from OpenBot.
   "status.messaging.working": "Üzerinde çalışılıyor…",
-  "status.messaging.queued": "Bekleniyor: OpenBot başka bir istek üzerinde çalışıyor. Yanıt buraya gelecek.",
+  "status.messaging.queued": "Bekleniyor: önceki bir istek henüz bitmedi. Yanıt buraya gelecek.",
   "status.messaging.busy": "Çok fazla istek bekliyor. Daha sonra tekrar deneyin.",
   "status.messaging.failed": "OpenBot bu isteği tamamlayamadı. Ayrıntılar OpenBot ana makinesinde mevcuttur.",
   "status.messaging.noAnswer": "OpenBot yazılı bir yanıt olmadan tamamlandı.",

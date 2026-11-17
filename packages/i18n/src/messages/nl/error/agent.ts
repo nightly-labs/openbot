@@ -67,6 +67,8 @@ export const messages = {
   "error.agent.modelNotListed": "Model “{model}” is niet beschikbaar. Beschikbare modellen: {models}.",
   "error.agent.providerNotListed":
     "Er is nu geen model van {provider} beschikbaar. Roep list_models aan om de beschikbare modellen te zien.",
+  "error.agent.creatorModelNotListed":
+    "Je model ‘{model}’ staat nu niet in de modellijst, dus de nieuwe agent kan er niet mee starten. Probeer het over een paar seconden opnieuw, of zet provider en model op een model dat list_models toont.",
   "error.agent.reasoningEffortUnsupported":
     "Model “{model}” ondersteunt redeneerniveau “{effort}” niet. Ondersteunde niveaus: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -104,6 +106,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.promptCancelled":
+    "{provider} heeft dit bericht geannuleerd voordat het begon. Stuur het bericht opnieuw.",
   "error.agent.toolLoopStopped":
     "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
   "error.agent.answerCutOff":

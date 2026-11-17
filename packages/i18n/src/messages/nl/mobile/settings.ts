@@ -130,6 +130,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
+  "mobile.settings.appearance.replyDetails": "Antwoorddetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Zet een detail uit om de rij ervan in chats te verbergen. De agent blijft denken, subagents starten en herinneringen opslaan.",
+  "mobile.settings.appearance.showThinking": "Denken van agent tonen",
+  "mobile.settings.appearance.showSubagents": "Subagents tonen",
+  "mobile.settings.appearance.showMemoryChanges": "Opgeslagen herinneringen tonen",
   "mobile.settings.appearance.fullVisuals": "Volledige visuele voorbeelden tonen",
   "mobile.settings.appearance.fullVisualsFooter":
     "Een visual van een agent staat op volle hoogte in de chat. Als dit uit staat, wordt een hoge visual afgekapt. Tik erop om alles te zien.",
@@ -246,8 +252,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Uit",
   "mobile.settings.conversations.swipeFooter":
-    "Vegen weg van Terug in de chat van een agent opent dit. Vegen over een bericht beantwoordt het nog steeds.",
+    "Vegen weg van Terug in de chat van een agent opent dit. Dezelfde veeg over een bericht toont de tijden van de berichten.",
   "mobile.settings.conversations.pullInfo": "Omhoog trekken voor info",
   "mobile.settings.conversations.pullInfoFooter":
     "Trek in een chat, kanaal of thread omhoog voorbij het laatste bericht en laat los om de info te openen.",
@@ -384,6 +391,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Het proces kon niet worden gestopt.",
   "mobile.settings.agents.processes.stopTitle": "Dit programma stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Proces {pid} stoppen",
+  "mobile.settings.quickActions.title": "App-symboolmenu",
+  "mobile.settings.quickActions.footer":
+    "Houd het OpenBot-symbool ingedrukt om deze acties te zien. Je kunt er maximaal {count} aanzetten.",
+  "mobile.settings.quickActions.latestChat": "Laatste chat",
+  "mobile.settings.quickActions.secondChat": "Op één na laatste chat",
   "mobile.settings.shortcuts.title": "Opdrachten",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Geen",

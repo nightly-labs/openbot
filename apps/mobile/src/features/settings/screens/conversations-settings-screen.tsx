@@ -118,6 +118,11 @@ export function ConversationsSettingsScreen() {
               label: t("mobile.settings.conversations.swipeBrowser"),
               picture: (play) => <SwipePicture target="browser" play={play} />,
             },
+            {
+              value: "off",
+              label: t("mobile.settings.conversations.swipeOff"),
+              picture: (play) => <SwipePicture target="off" play={play} />,
+            },
           ]}
           onChange={(next) => save("swipe", saveChatSwipePreference(next))}
         />

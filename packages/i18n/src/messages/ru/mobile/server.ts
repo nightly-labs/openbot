@@ -466,7 +466,6 @@ export const messages = {
   "mobile.server.route.providers": "Провайдеры",
   "mobile.server.route.provider": "Провайдер",
   "mobile.server.route.providerModels": "Модели",
-  "mobile.server.route.mcp": "Серверы MCP",
   "mobile.server.route.mcpServer": "Сервер MCP",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (вы)",
@@ -1008,10 +1007,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Привязать заново",
   "mobile.server.connectors.whatsapp.ownNumber": "Личный номер",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Выключите, если номер только для OpenBot.",
+    "Писать могут только вы в чате «Сообщение себе» и люди, которым вы разрешили. Другие люди не получают ответа. Если выключено, OpenBot отвечает незнакомым людям кодом.",
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+    "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Запрос, который ждёт предыдущий, тоже получает сообщение об ожидании. Выключите, чтобы отправлять только ответ.",
   "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
@@ -1031,10 +1030,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Номер",
   "mobile.server.connectors.whatsapp.kindPersonal": "Мой личный номер",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили.",
+    "OpenBot отвечает только в вашем чате «Сообщение себе» и людям, которым вы разрешили. Другие люди не получают ответа.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Номер только для OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Незнакомые люди получают код, который нужно передать вам. Вы одобряете их здесь.",
+    "OpenBot отвечает с этого номера каждому незнакомому человеку кодом, который нужно передать вам. Вы одобряете их здесь.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Номер телефона",
   "mobile.server.connectors.whatsapp.phoneDescription": "С кодом страны, например +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Введите номер телефона с кодом страны.",
@@ -1200,6 +1199,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Установлено",
   "mobile.server.providers.status.notInstalled": "Не установлено",
   "mobile.server.providers.status.checking": "Проверка",
+  "mobile.server.providers.addAccountWithCode": "Добавить аккаунт по коду",
+  "mobile.server.providers.accountSignInWithCode": "Войти по коду",
   "mobile.server.providers.accountsKeyHint":
     "Каждый агент использует один аккаунт. Выберите его в настройках агента. Новому аккаунту нужен API-ключ этого аккаунта.",
   "mobile.server.providers.accountChangeKey": "Сменить ключ",
@@ -1307,29 +1308,12 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "По умолчанию для новых агентов",
   "mobile.server.providers.startsWith": "Новые агенты запускаются с {name}.",
   "mobile.server.providers.connectFirst": "Сначала подключите {name}.",
-  "mobile.server.settings.mcp": "Серверы MCP",
-  "mobile.server.settings.mcpCount": {
-    one: "{count} сервер",
-    few: "{count} сервера",
-    many: "{count} серверов",
-    other: "{count} сервера",
-  },
   "mobile.server.mcp.unsupported": "Обновите OpenBot на этом сервере, чтобы управлять его серверами MCP здесь.",
   "mobile.server.mcp.unavailable":
     "Подключитесь к этому серверу как владелец или администратор, чтобы управлять его серверами MCP.",
   "mobile.server.mcp.accessUnsupported":
     "Обновите OpenBot на этом сервере, чтобы выбирать, кто получает его серверы MCP.",
-  "mobile.server.mcp.description":
-    "Серверы MCP дают агентам этого сервера больше инструментов. Агенты Claude и Codex получают только серверы из этого списка.",
   "mobile.server.mcp.loading": "Загрузка серверов MCP…",
-  "mobile.server.mcp.loadFailed": "Не удалось загрузить серверы MCP.",
-  "mobile.server.mcp.empty": "Серверов MCP пока нет.",
-  "mobile.server.mcp.retry": "Повторить",
-  "mobile.server.mcp.add": "Добавить сервер MCP",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "Вкл.",
-  "mobile.server.mcp.disabled": "Выкл.",
-  "mobile.server.mcp.signedIn": "Вход выполнен",
   "mobile.server.mcp.gone": "Этого сервера MCP больше нет на этом сервере.",
   "mobile.server.mcp.addTitle": "Добавить сервер MCP",
   "mobile.server.mcp.addConfirm": "Добавить",

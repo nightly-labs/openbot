@@ -124,6 +124,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",
+  "mobile.settings.appearance.replyDetails": "回复详情",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "关闭某项详情即可在聊天中隐藏对应的行。智能体仍会思考、运行子智能体并保存记忆。",
+  "mobile.settings.appearance.showThinking": "显示智能体的思考",
+  "mobile.settings.appearance.showSubagents": "显示子智能体",
+  "mobile.settings.appearance.showMemoryChanges": "显示已保存的记忆",
   "mobile.settings.appearance.fullVisuals": "完整显示可视化预览",
   "mobile.settings.appearance.fullVisualsFooter":
     "智能体的可视化内容在聊天中按完整高度显示。关闭时，较高的内容会被截断，轻点即可查看全部。",
@@ -233,7 +239,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
   "mobile.settings.conversations.swipeThreads": "话题",
   "mobile.settings.conversations.swipeBrowser": "浏览器",
-  "mobile.settings.conversations.swipeFooter": "在助手聊天中朝返回的反方向滑动会打开此项。在消息上滑动仍会回复该消息。",
+  "mobile.settings.conversations.swipeOff": "关闭",
+  "mobile.settings.conversations.swipeFooter":
+    "在助手聊天中朝返回的反方向滑动会打开此项。在消息上同样滑动会显示消息的时间。",
   "mobile.settings.conversations.pullInfo": "上拉查看信息",
   "mobile.settings.conversations.pullInfoFooter": "在聊天、频道或话题中越过最新消息继续上拉并松开，即可打开其信息。",
   "mobile.settings.conversations.fullQualityPhotos": "以原始画质发送照片",
@@ -483,6 +491,10 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "无法停止该进程。",
   "mobile.settings.agents.processes.stopTitle": "要停止此程序吗？",
   "mobile.settings.agents.processes.stopLabel": "停止进程 {pid}",
+  "mobile.settings.quickActions.title": "应用图标菜单",
+  "mobile.settings.quickActions.footer": "长按 OpenBot 图标即可看到这些操作。最多可以开启 {count} 个。",
+  "mobile.settings.quickActions.latestChat": "最近的聊天",
+  "mobile.settings.quickActions.secondChat": "第二近的聊天",
   "mobile.settings.shortcuts.title": "快捷指令",
   "mobile.settings.shortcuts.agent": "智能体",
   "mobile.settings.shortcuts.none": "无",

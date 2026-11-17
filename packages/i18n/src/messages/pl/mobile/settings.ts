@@ -140,6 +140,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
+  "mobile.settings.appearance.replyDetails": "Szczegóły odpowiedzi",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Wyłącz szczegół, aby ukryć jego wiersz w czatach. Agent nadal rozumuje, uruchamia subagentów i zapisuje wspomnienia.",
+  "mobile.settings.appearance.showThinking": "Pokazuj myślenie agenta",
+  "mobile.settings.appearance.showSubagents": "Pokazuj subagentów",
+  "mobile.settings.appearance.showMemoryChanges": "Pokazuj zapisane wspomnienia",
   "mobile.settings.appearance.fullVisuals": "Pokazuj pełne podglądy wizualne",
   "mobile.settings.appearance.fullVisualsFooter":
     "Wizualizacja od agenta ma w czacie pełną wysokość. Gdy to jest wyłączone, wysoka wizualizacja jest przycięta. Dotknij jej, aby zobaczyć całość.",
@@ -256,8 +262,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
   "mobile.settings.conversations.swipeThreads": "Wątki",
   "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
+  "mobile.settings.conversations.swipeOff": "Wyłączone",
   "mobile.settings.conversations.swipeFooter":
-    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. Przesunięcie dymka wiadomości nadal na nią odpowiada.",
+    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. To samo przesunięcie na wiadomości pokazuje godziny wiadomości.",
   "mobile.settings.conversations.pullInfo": "Pociągnięcie w górę: informacje",
   "mobile.settings.conversations.pullInfoFooter":
     "Pociągnij w górę za ostatnią wiadomość w czacie, kanale lub wątku i puść, aby otworzyć informacje.",
@@ -539,6 +546,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Nie udało się zatrzymać procesu.",
   "mobile.settings.agents.processes.stopTitle": "Zatrzymać ten program?",
   "mobile.settings.agents.processes.stopLabel": "Zatrzymaj proces {pid}",
+  "mobile.settings.quickActions.title": "Menu ikony aplikacji",
+  "mobile.settings.quickActions.footer":
+    "Przytrzymaj ikonę OpenBot, aby zobaczyć te akcje. Możesz włączyć maksymalnie {count}.",
+  "mobile.settings.quickActions.latestChat": "Ostatni czat",
+  "mobile.settings.quickActions.secondChat": "Przedostatni czat",
   "mobile.settings.shortcuts.title": "Skróty",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Brak",

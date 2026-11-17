@@ -637,6 +637,12 @@ starts each stdio server itself (`mcp-stdio-relay.ts`) and gives OpenCode a Stre
 127.0.0.1 with a bearer token. The sessions of one directory share the relay of each server, and the
 last of them to close stops it and its process group.
 
+OpenCode also keeps one `openbot` server for each directory, so the sessions of one directory share
+its token in the local MCP bridge. OpenCode gives a server 30 s to connect, then continues without it
+and does not connect again while the settings stay the same (#10749). When the bridge did not list
+its tools within that time after the session request, OpenBot gives the directory a new token and
+resumes the session once. The earlier tokens stay valid until the last session of the directory closes.
+
 OpenCode adds its own system prompt, tools, skill listing and Code Mode catalog to each request of an
 agent. `opencode-agent-defaults.ts` denies the parts that an OpenBot agent does not use: the
 `question` tool (OpenBot has `ask_user`), the `opencode_list_mcp_resources` and
@@ -748,7 +754,9 @@ Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
 `isFreeOpencodeModel` in `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `packages/ui/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
-about what costs money.
+about what costs money. A model of a custom endpoint that Pi runs gets the badge by the same name
+rule (`isFreeOpencodeModelName`). Pi gets cost 0 for each endpoint model, so its cost does not
+show that a model is free.
 
 A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.1.1 fails a turn on
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`

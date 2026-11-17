@@ -45,12 +45,13 @@ export const messages = {
   "prompt.browser.title.pending": "Wykonaj krok: {host}",
   "prompt.browser.cancelled": "Anulowano",
   "prompt.browser.reload":
-    "Dokończ logowanie, a potem przeładuj stronę w przeglądarce, zanim wybierzesz „Gotowe”. Sprawdzanie strony pozostaje zablokowane do jej przeładowania.",
+    "OpenBot nie mógł dokończyć wpisywania hasła ani kodu. Sprawdź stronę i wpisz to, czego brakuje. Dokończ logowanie, a potem przeładuj stronę w przeglądarce, zanim wybierzesz „Gotowe”. Sprawdzanie strony pozostaje zablokowane do jej przeładowania.",
   "prompt.browser.continuing": "{name} kontynuuje.",
   "prompt.browser.cancelledBody": "Krok w przeglądarce został anulowany.",
   "prompt.browser.pendingBody":
     "Otwórz stronę, aby dokończyć logowanie, weryfikację lub wyrażenie zgody. Następnie pozwól agentowi {name} kontynuować.",
   "prompt.browser.openPage": "Otwórz: {title}",
+  "prompt.browser.openFailed": "Nie udało się otworzyć strony w oknie głównym. Spróbuj ponownie.",
   "prompt.browser.done": "Gotowe",
   "prompt.browser.pageFallback": "Strona przeglądarki",
   "prompt.browser.hostFallback": "przeglądarka",

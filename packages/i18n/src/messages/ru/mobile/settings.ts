@@ -140,6 +140,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
+  "mobile.settings.appearance.replyDetails": "Детали ответов",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Выключите деталь, чтобы скрыть её строку в чатах. Агент продолжает размышлять, запускать субагентов и сохранять воспоминания.",
+  "mobile.settings.appearance.showThinking": "Показывать размышления агента",
+  "mobile.settings.appearance.showSubagents": "Показывать субагентов",
+  "mobile.settings.appearance.showMemoryChanges": "Показывать сохранённые воспоминания",
   "mobile.settings.appearance.fullVisuals": "Показывать визуальные превью полностью",
   "mobile.settings.appearance.fullVisualsFooter":
     "Визуальный ответ агента показывается в чате на всю высоту. Если выключено, высокий ответ обрезается; нажмите на него, чтобы увидеть всё.",
@@ -256,8 +262,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
   "mobile.settings.conversations.swipeThreads": "Ветки",
   "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeOff": "Выкл.",
   "mobile.settings.conversations.swipeFooter":
-    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Свайп по сообщению по-прежнему отвечает на него.",
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Тот же свайп по сообщению показывает время сообщений.",
   "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
   "mobile.settings.conversations.pullInfoFooter":
     "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",
@@ -539,6 +546,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Не удалось остановить процесс.",
   "mobile.settings.agents.processes.stopTitle": "Остановить эту программу?",
   "mobile.settings.agents.processes.stopLabel": "Остановить процесс {pid}",
+  "mobile.settings.quickActions.title": "Меню значка приложения",
+  "mobile.settings.quickActions.footer":
+    "Нажмите и удерживайте значок OpenBot, чтобы увидеть эти действия. Можно включить до {count}.",
+  "mobile.settings.quickActions.latestChat": "Последний чат",
+  "mobile.settings.quickActions.secondChat": "Предпоследний чат",
   "mobile.settings.shortcuts.title": "Быстрые команды",
   "mobile.settings.shortcuts.agent": "Агент",
   "mobile.settings.shortcuts.none": "Нет",

@@ -201,9 +201,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "ביטול התשובה",
   "mobile.chat.composer.messageAgent": "הודעה אל {name}",
   "mobile.chat.composer.pasteFailed": "לא ניתן לצרף את הטקסט שהודבק",
-  "mobile.chat.composer.cancelDictation": "ביטול ההכתבה",
   "mobile.chat.voice.listening": "מאזין…",
-  "mobile.chat.voice.continue": "המשך הכתבה",
   "mobile.chat.liveVoice.start": "התחלת שיחה קולית",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "מתחיל",
@@ -370,7 +368,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "יש להתחבר במחשב שלך",
   "mobile.chat.browserSecret.signInBlockedBody":
     "האתר הזה לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם.",
-  "mobile.chat.browserSecret.takeoverReload": "לאחר מכן יש לטעון את הדף מחדש לפני שבוחרים ב״סיימתי״.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot לא הצליח להשלים את הזנת הסיסמה או הקוד. יש להזין בדף את מה שחסר. לאחר מכן יש לטעון את הדף מחדש לפני שבוחרים ב״סיימתי״.",
   "mobile.chat.browserSecret.takeoverFailed": "לא ניתן להשלים את הבקשה.",
   "mobile.chat.browserSecret.done": "סיימתי",
   "mobile.chat.browserSecret.submitOnce": "שליחה חד-פעמית אל {origin}. הערך הזה לא מתווסף לצ'אט.",
@@ -537,6 +536,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "עצור את הסוכן ושלח עכשיו את ההודעה הבאה בתור",
   "mobile.chat.queue.deleteNext": "מחיקת ההודעה הבאה בתור",
   "mobile.chat.queue.moveFirst": "העברה לראש התור",
+  "mobile.chat.queue.runInNewThread": "הרצה בשרשור חדש",
+  "mobile.chat.queue.runNextInNewThread": "הרצת ההודעה הבאה בתור בשרשור חדש",
   "mobile.chat.queue.deleteTitle": "למחוק את ההודעה בתור?",
   "mobile.chat.queue.deleteMessage": "הסוכן לא יקבל אותה לעולם.",
   "mobile.chat.queue.keep": "שמירה",

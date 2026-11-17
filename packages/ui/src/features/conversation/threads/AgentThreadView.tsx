@@ -30,6 +30,7 @@ import {
   type AttachmentDownloads,
   type AttachmentMediaSource,
 } from "@openbot/ui/features/conversation/AttachmentCards";
+import { AwaitingReplies, type AwaitingReplyItem } from "@openbot/ui/features/conversation/AwaitingReplies";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
 import { type ChangeMarkerActions, ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
@@ -317,6 +318,8 @@ export interface AgentThreadViewProps {
    * start of each queued message: a joined server sends no more on `agent-tasks-v1`.
    */
   queue?: AgentThreadQueue | undefined;
+  /** The agents that the thread asked and that have not answered yet, as the agent's own chat shows them. */
+  awaiting?: readonly AwaitingReplyItem[] | undefined;
   /**
    * The actions for text selected in the thread. Quote puts the text in this message box, and a send
    * goes to this thread. Without it, selected text has no actions.
@@ -960,6 +963,9 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                 body={task().error || t("conversation.threads.view.failedBody")}
               />
             )}
+          </ComposerStackCard>
+          <ComposerStackCard when={props.awaiting?.length ? props.awaiting : undefined}>
+            {(items) => <AwaitingReplies items={items()} onOpenAgent={props.onSelectAgent} />}
           </ComposerStackCard>
           <Show when={props.queue}>
             {(queue) => (

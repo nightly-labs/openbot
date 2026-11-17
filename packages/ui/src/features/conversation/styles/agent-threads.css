@@ -491,6 +491,23 @@
   background: var(--openbot-unread-surface);
 }
 
+/* The same dot on the thread list button, for unread replies in a thread that the header does not show. */
+.agent-threads-menu-button.ui-button,
+.agent-threads-switcher.ui-button {
+  position: relative;
+}
+
+.agent-threads-menu-unread {
+  position: absolute;
+  inset-block-start: var(--openbot-space-0-5);
+  inset-inline-end: var(--openbot-space-0-5);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--openbot-radius-pill);
+  background: var(--openbot-unread-surface);
+  pointer-events: none;
+}
+
 /* The pill of the sidebar badge, with the dots while the agent works. */
 .agent-threads-state-working {
   width: 24px;

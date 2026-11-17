@@ -257,8 +257,12 @@ while a person holds the tab (takeover or Take control), so no step is the agent
 secret tab, a private sign-in, a tab without an owner agent, and a page that is not http(s). A step is
 a page that loads (host, path and title, without the query or the hash; `stepPlace` replaces a
 path part that looks like a code, such as a reset token, with `:id`) or a press on a control
-(`input-event` mouseDown; `browser-user-click.ts` reads the role and the name in isolated world 1020,
-with a 1 second limit). A press outside a control, on a password field, or on a field whose
+(`before-mouse-event` mouseDown; `browser-user-click.ts` reads the role and the name in the CDP
+automation world, with a 1 second limit). The read goes into open shadow roots and into frames, also
+frames of another process. A press in such a frame gives no `input-event` and its point is in the
+frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A live
+view's press does not move `:hover`; the engine gives its point in the page's pixels. A press
+outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
 never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
 `openbot-browsing-steps-v1.json` (no migration), the newest 80 per agent. The next memory review of the
@@ -687,7 +691,17 @@ no native menu: that menu would show on the host's screen. Only http and https a
 message. A host with `browser-view-viewport` holds the page at the size a socket asks for with
 `viewport=WxH` while that socket is open, through the same device metrics override as an agent's
 `set_environment`, so a resize of the host's window does not change the page. A tab with a custom
-size from `set_environment` keeps it. The phone asks for 1280x800. On the phone, the view runs in the
+size from `set_environment` keeps it. A host with `browser-view-page-copy-v1` sends the text that the
+page itself copies (a "Copy code" button: `navigator.clipboard.writeText` or `write`, or a trusted
+`copy` event) as a `pageCopied` message to a socket opened with `pageCopy=1`. While that view runs,
+the CDP engine keeps one `Runtime.evaluate` with `awaitPromise` open in the page's main world. It hooks
+those calls, and trusted `copy` events in the capture phase, once a document. It answers every open
+view with the text of the next one made during a user action. It turns on no CDP domain:
+`Runtime.enable` is a sign of automation that bot checks look for. The host sends the text only
+within 5 seconds of that socket's own click or key, and the client also drops it after that time.
+So a copy with no recent input from that member, such as one an agent makes alone, stays on the host. The desktop client writes it with Electron's clipboard, the web
+client with `navigator.clipboard` (a toast with a Copy button when the browser refuses), and the
+phone with `expo-clipboard`. The phone asks for 1280x800. On the phone, the view runs in the
 hidden page that holds the Team peer (`features/browser/model/browser-view-bridge.ts`). That page
 sends each frame to the screen as base64 and holds the newest frame until the screen has drawn the
 previous one. Back, forward, reload, new tab and close tab use the released `browser-control`

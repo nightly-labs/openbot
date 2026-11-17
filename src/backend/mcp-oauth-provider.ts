@@ -1020,6 +1020,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * The `/callback` form only when the registration names it and not this run's address: a server
    * that refused `/mcp-auth` registered it (see `watchRegistration`).
+   *
+   * A loopback name also matches when the registration names it with no port. Magnific's Keycloak
+   * saves `http://localhost/mcp-auth` for `http://localhost:<port>/mcp-auth`, and refuses the
+   * `127.0.0.1` form on the authorization page (#10877).
    */
   get redirectUrl(): string {
     const record = this.#record();
@@ -1029,8 +1033,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const deepLink = this.#deepLinkRedirectUrl;
     if (deepLink && client.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
-    if (localhost && client.redirect_uris.includes(localhost)) return localhost;
-    if (client.redirect_uris.includes(own)) return own;
+    if (localhost && registersAddress(client.redirect_uris, localhost)) return localhost;
+    if (registersAddress(client.redirect_uris, own)) return own;
     for (const address of [own, localhost]) {
       const callback = address ? callbackRedirectUrl(address) : null;
       if (callback && registersAddress(client.redirect_uris, callback)) return callback;
@@ -1149,7 +1153,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     // The last browser trip on the address of this registration got no grant back: register the
     // next address (see the constructor). A client metadata document lists only one address.
     const retry = this.#retryRedirectUrl;
-    if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !client.redirect_uris.includes(retry))
+    if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !registersAddress(client.redirect_uris, retry))
       return this.#register();
     // A registration made before its scope named `offline_access` refuses the request that adds it.
     // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.

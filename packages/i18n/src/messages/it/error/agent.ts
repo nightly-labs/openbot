@@ -66,6 +66,8 @@ export const messages = {
   "error.agent.modelNotListed": "Il modello «{model}» non è disponibile. Modelli disponibili: {models}.",
   "error.agent.providerNotListed":
     "Al momento nessun modello di {provider} è disponibile. Chiama list_models per vedere i modelli disponibili.",
+  "error.agent.creatorModelNotListed":
+    "Il tuo modello «{model}» al momento non è nell’elenco dei modelli, quindi il nuovo agente non può iniziare con esso. Riprova tra qualche secondo, oppure imposta provider e model su un modello mostrato da list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Il modello «{model}» non supporta il livello di impegno «{effort}». Livelli supportati: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -101,6 +103,8 @@ export const messages = {
   "error.agent.endpointRemoved": "L'endpoint usato da questo agente è stato rimosso. Scegli un altro modello.",
   "error.agent.turnStalled":
     "{provider} ha smesso di rispondere, quindi OpenBot ha terminato questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
+  "error.agent.promptCancelled":
+    "{provider} ha annullato questo messaggio prima che iniziasse. Invia di nuovo il messaggio.",
   "error.agent.toolLoopStopped":
     "{provider} ha ripetuto molte volte un passaggio non riuscito, quindi OpenBot ha interrotto questo turno. Invia di nuovo il messaggio o scegli un altro modello.",
   "error.agent.answerCutOff":

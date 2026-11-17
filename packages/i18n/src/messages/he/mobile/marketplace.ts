@@ -93,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "עזור לי להשתמש במיומנות הזו.",
   "mobile.marketplace.app.add": "הוספת אפליקציה",
+  "mobile.marketplace.app.addCustom": "הוספה מותאמת אישית",
   "mobile.marketplace.app.connect": "חיבור",
   "mobile.marketplace.app.connectTitle": "חיבור {name}",
   "mobile.marketplace.app.keyIntro": "יש להדביק את המפתח מהחשבון. השרת בודק אותו לפני ששומר את האפליקציה.",

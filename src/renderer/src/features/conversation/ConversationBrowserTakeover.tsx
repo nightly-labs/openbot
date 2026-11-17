@@ -1,7 +1,11 @@
+import { classifyFailure } from "@openbot/telemetry";
 import { BrowserTakeoverCard } from "@openbot/ui/features/conversation/ConversationPrompts";
 import { useText } from "@openbot/ui/text";
 import { Loading, Show } from "solid-js";
+import { actionToast } from "../../action-toast";
+import { usePlatform } from "../../platform";
 import { browserSecretVault } from "./browser-secret-vault";
+import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 
@@ -17,11 +21,36 @@ export function ConversationBrowserTakeover() {
     browserTakeoverResolution,
     browserTakeoverTab,
     openBrowserTakeoverTab,
+    canOpenBrowserTakeoverTab,
     localSignIn,
     respondToBrowserTakeover,
   } = useConversationViewScope();
-  const { t } = useText();
+  const { t, errorMessage } = useText();
   const runtime = conversationRuntime(props);
+  const platform = usePlatform();
+  /**
+   * A chat window shows no browser, so the main window opens the page (#10055). Elsewhere the page opens
+   * here, and a page that this view cannot open is not offered.
+   */
+  const openPage = () => {
+    const chatWindow = platform.chatWindow;
+    const request = props.browserTakeover;
+    if (chatWindow && request) {
+      return () =>
+        void conversationPort()
+          .dynamicIsland.openBrowserTakeover({
+            serverId: chatWindow.serverId,
+            agentId: request.agentId,
+            tabId: request.tabId,
+          })
+          .catch((error: unknown) =>
+            actionToast.error(errorMessage(error, t("prompt.browser.openFailed")), {
+              report: { operation: "other", source: "action", cause_code: classifyFailure(error) },
+            }),
+          );
+    }
+    return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
+  };
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const agentName = () =>
     (channel ? channel.interactionAgentName() : props.agent?.name) ?? t("chat.message.agentFallback");
@@ -35,7 +64,7 @@ export function ConversationBrowserTakeover() {
             tab={browserTakeoverTab()}
             preview={browserTakeoverPreview().preview}
             previewStatus={browserTakeoverPreview().status}
-            onOpen={openBrowserTakeoverTab}
+            onOpen={openPage()}
             onComplete={() => respondToBrowserTakeover("complete")}
             onCancel={() => respondToBrowserTakeover("cancel")}
             onSignInLocally={localSignIn.canStartForTakeover() ? localSignIn.startForTakeover : undefined}

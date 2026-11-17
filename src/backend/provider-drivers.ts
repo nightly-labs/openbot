@@ -702,6 +702,12 @@ export interface ProviderClientContext {
    * (`PROVIDER_ENVIRONMENT_RESERVED_NAMES`). Optional for the same reason as `reportMcpDrops`.
    */
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
+  /**
+   * The HTTP requests that OpenBot itself sends to a provider's service, such as the Gemini quota
+   * read. The app gives Chromium's network stack, which uses the computer's proxy settings; Node
+   * `fetch` ignores them (#11278). Optional: without it the read uses Node `fetch`.
+   */
+  readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 /**
@@ -1355,6 +1361,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                   ANTIGRAVITY_TOKEN_FILE,
                 ),
                 model,
+                ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
               }),
       }),
     // A profile-generation client asks one question and must not act: no MCP servers, and every

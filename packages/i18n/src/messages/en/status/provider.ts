@@ -31,4 +31,7 @@ export const messages = defineMessages("status.provider", {
     "Claude answered at the standard speed. Fast mode is turned off in the Claude Code settings or by your organization.",
   "status.provider.claudeFastModeUnavailable":
     "Claude answered at the standard speed. Claude Code could not use fast mode for this turn.",
+  // A Claude sign-in whose CLI uses an API key from the Claude Code settings or the environment.
+  "status.provider.claudeOwnApiKey":
+    "Claude Code is set to use an Anthropic API key. Anthropic bills each request to the key's API credit, not to your Claude plan. To use your plan, remove the key from the Claude Code settings or the environment variables, then restart OpenBot.",
 });

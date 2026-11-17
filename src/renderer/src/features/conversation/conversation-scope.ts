@@ -574,6 +574,8 @@ export function createConversationViewScope(props: ConversationProps) {
     browserAddress,
     setBrowserAddress,
     setComposerError: setScopedComposerError,
+    takeoverPageRequest: controller.browserTakeoverPageRequest,
+    setTakeoverPageRequest: controller.setBrowserTakeoverPageRequest,
     panels: {
       activeRightPanel,
       setActiveRightPanel,
@@ -593,6 +595,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverResolution,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    canOpenBrowserTakeoverTab,
     localSignIn,
     activeBrowserControl,
     actingBrowserControl,
@@ -1738,8 +1741,9 @@ export function createConversationViewScope(props: ConversationProps) {
       event.stopImmediatePropagation();
       void closeBrowserTab(tab.id);
     };
+    // The reaction picker opens in a portal, outside `.message-actions`, so a press in it is not outside.
     const closeMessageMenus = (event: MouseEvent) => {
-      if (event.target instanceof Element && event.target.closest(".message-actions")) return;
+      if (event.target instanceof Element && event.target.closest(".message-actions, .reaction-picker")) return;
       setOpenReactionMessageId(null);
       setExpandedEmojiMessageId(null);
     };
@@ -2713,6 +2717,7 @@ export function createConversationViewScope(props: ConversationProps) {
     browserTakeoverTab,
     respondToBrowserTakeover,
     openBrowserTakeoverTab,
+    canOpenBrowserTakeoverTab,
     localSignIn,
     activeChatSearchIndex,
     agentActivity,

@@ -322,12 +322,16 @@
   margin-bottom: 0;
 }
 
+/*
+ * The switch has its own row, and the buttons fill one bar under it. Thus the layout is the same for
+ * each language and each set of buttons, and no button goes past the panel edge.
+ */
 .agent-routine-editor-actions {
   display: flex;
   min-height: 34px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin: 0;
   border: 0;
   padding: 0;
@@ -345,6 +349,7 @@
 /* The shared field puts the label first and fills the row. Here the switch comes first, beside its state word. */
 .ui-switch-field.agent-routine-active-toggle {
   width: auto;
+  align-self: flex-start;
   flex-direction: row-reverse;
   justify-content: flex-end;
 }
@@ -356,12 +361,13 @@
 
 .agent-routine-action-buttons {
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 7px;
 }
 
 .agent-routine-action-buttons button {
+  flex: 1 1 auto;
+  justify-content: center;
   min-height: 32px;
   border-radius: var(--openbot-radius-md);
   padding-inline: 11px;

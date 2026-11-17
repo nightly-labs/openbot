@@ -62,6 +62,8 @@ export const messages = {
   "error.agent.modelNotListed": '모델 "{model}"을(를) 사용할 수 없어요. 사용 가능한 모델: {models}.',
   "error.agent.providerNotListed":
     "지금 사용할 수 있는 {provider} 모델이 없어요. list_models를 호출해 사용 가능한 모델을 확인하세요.",
+  "error.agent.creatorModelNotListed":
+    '내 모델 "{model}"이(가) 지금 모델 목록에 없어서 새 에이전트를 이 모델로 시작할 수 없어요. 몇 초 후에 다시 시도하거나, list_models에 표시되는 모델을 provider와 model에 지정하세요.',
   "error.agent.reasoningEffortUnsupported":
     '모델 "{model}"은(는) 추론 강도 "{effort}"을(를) 지원하지 않아요. 지원하는 강도: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": '모델 "{model}"에는 추론 강도 설정이 없어서 강도를 바꿀 수 없어요.',
@@ -92,6 +94,7 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.promptCancelled": "{provider}이(가) 시작 전에 이 메시지를 취소했어요. 메시지를 다시 보내 주세요.",
   "error.agent.toolLoopStopped":
     "{provider}이(가) 실패한 단계를 여러 번 반복해서 OpenBot이 이 턴을 중지했습니다. 메시지를 다시 보내거나 다른 모델을 선택하세요.",
   "error.agent.answerCutOff": "에이전트가 답변을 마치기 전에 멈춰서 답변이 완전하지 않습니다. 메시지를 다시 보내세요.",

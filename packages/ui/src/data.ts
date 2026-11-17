@@ -250,6 +250,8 @@ export interface AgentMessage {
   /** The person who wrote a `you` message. Absent on the reader's own older messages. */
   senderMember?: ConversationMessageSender | undefined;
   replyToMessageId?: string | null | undefined;
+  /** Set on a message that joined a turn that was already running (`ConversationMessage.steered`). */
+  steered?: true | undefined;
   attachments?: AttachmentSummary[] | undefined;
   /** The user's own recording of a spoken message. It stays on this computer; the agent gets the text. */
   voiceRecording?: AttachmentSummary | undefined;

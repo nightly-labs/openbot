@@ -417,7 +417,6 @@ export const messages = {
   "mobile.server.route.providers": "Aanbieders",
   "mobile.server.route.provider": "Aanbieder",
   "mobile.server.route.providerModels": "Modellen",
-  "mobile.server.route.mcp": "MCP-servers",
   "mobile.server.route.mcpServer": "MCP-server",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (jij)",
@@ -883,10 +882,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Opnieuw koppelen",
   "mobile.server.connectors.whatsapp.ownNumber": "Persoonlijk nummer",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Zet dit uit voor een nummer alleen voor OpenBot.",
+    "Alleen je chat “Bericht aan jezelf” en de mensen die je toestaat kunnen schrijven. Andere mensen krijgen geen antwoord. Als dit uit staat, antwoordt OpenBot onbekende mensen met een code.",
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+    "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Een verzoek dat op een eerder verzoek wacht, krijgt ook een wachtbericht. Zet dit uit om alleen het antwoord te sturen.",
   "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
@@ -906,10 +905,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Nummer",
   "mobile.server.connectors.whatsapp.kindPersonal": "Mijn persoonlijke nummer",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat.",
+    "OpenBot antwoordt alleen in je chat “Bericht aan jezelf” en aan de mensen die je toestaat. Andere mensen krijgen geen antwoord.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Een nummer alleen voor OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Onbekende mensen krijgen een code om aan jou te geven. Je keurt ze hier goed.",
+    "OpenBot antwoordt vanaf dit nummer elke onbekende persoon met een code om aan jou te geven. Je keurt ze hier goed.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Telefoonnummer",
   "mobile.server.connectors.whatsapp.phoneDescription": "Met de landcode, zoals +31 6 12345678.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Typ het telefoonnummer met de landcode.",
@@ -1068,6 +1067,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.addAccountWithCode": "Account toevoegen met code",
+  "mobile.server.providers.accountSignInWithCode": "Inloggen met code",
   "mobile.server.providers.accountsKeyHint":
     "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
   "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",
@@ -1171,23 +1172,11 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "Standaard voor nieuwe agents",
   "mobile.server.providers.startsWith": "Nieuwe agents starten met {name}.",
   "mobile.server.providers.connectFirst": "Verbind eerst {name}.",
-  "mobile.server.settings.mcp": "MCP-servers",
-  "mobile.server.settings.mcpCount": { one: "{count} server", other: "{count} servers" },
   "mobile.server.mcp.unsupported": "Werk OpenBot bij op deze server om de MCP-servers hier te beheren.",
   "mobile.server.mcp.unavailable":
     "Maak verbinding met deze server als eigenaar of beheerder om de MCP-servers te beheren.",
   "mobile.server.mcp.accessUnsupported": "Werk OpenBot bij op deze server om te kiezen wie de MCP-servers krijgt.",
-  "mobile.server.mcp.description":
-    "MCP-servers geven de agents van deze server meer tools. Claude- en Codex-agents krijgen alleen de servers in deze lijst.",
   "mobile.server.mcp.loading": "MCP-servers laden…",
-  "mobile.server.mcp.loadFailed": "Kan de MCP-servers niet laden.",
-  "mobile.server.mcp.empty": "Nog geen MCP-servers.",
-  "mobile.server.mcp.retry": "Probeer opnieuw",
-  "mobile.server.mcp.add": "MCP-server toevoegen",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "Aan",
-  "mobile.server.mcp.disabled": "Uit",
-  "mobile.server.mcp.signedIn": "Ingelogd",
   "mobile.server.mcp.gone": "Deze MCP-server staat niet meer op deze server.",
   "mobile.server.mcp.addTitle": "MCP-server toevoegen",
   "mobile.server.mcp.addConfirm": "Toevoegen",

@@ -134,7 +134,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
           findMessageDelivery: () => null,
           quietRoutineDelivery: (deliveryId) => deliveryId === QUIET_DELIVERY_ID || deliveryId === FAILED_DELIVERY_ID,
           quietTeammateThread: true,
-          hasOwnReplyFrom: (deliveryId) => deliveryId === REQUEST_DELIVERY_ID || deliveryId === QUESTION_DELIVERY_ID,
+          requestAnswered: (deliveryId) => deliveryId === REQUEST_DELIVERY_ID || deliveryId === QUESTION_DELIVERY_ID,
         }),
       );
     };
