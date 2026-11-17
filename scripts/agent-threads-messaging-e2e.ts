@@ -31,6 +31,8 @@
 //    A's own chat. It needs a provider that steers natively.
 // 14. B asks A's side thread a question back without replyToMessageId. The question and the answer
 //    come to the side thread, not to A's own chat.
+// 15. B's side thread sends A a message that needs no answer. A then sends B a new message without
+//    replyToMessageId. It comes to B's own chat, where B can start a task, not to B's side thread.
 // At the end it stops and deletes each thread that it started.
 // Writes .openbot-build/agent-threads-messaging-e2e/report.json.
 import assert from "node:assert/strict";
@@ -793,6 +795,53 @@ try {
     details.answerInSenderChat = count(ownChat, answer) > answersBefore;
     assert.equal(details.questionInSenderChat, false, "A's own chat got the question to its side thread.");
     assert.equal(details.answerInSenderChat, false, "A's own chat got the answer to its side thread.");
+  });
+  // 15. A new message after a teammate's message that needs no answer is a new request. It goes to the
+  //    teammate's own chat, not to the side thread that sent that message (#10273).
+  await step("new message after a side thread's notice goes to the own chat", async (details) => {
+    const notice = `N15${run}`;
+    const marker = `R15${run}`;
+    const request = (m: ConversationMessage) => m.senderAgentId === from && m.text.includes(marker);
+    // The person gives A the instruction, so A does not refuse a request in a message that needs no answer.
+    const answersBefore = count(await bridge.main(from), (m) => m.author === "assistant");
+    await bridge.send(
+      from,
+      [
+        `When ${toAgentInfo.name} sends you a message that starts with ${notice}, send ${toAgentInfo.name}`,
+        `(agent id "${to}") a new message with openbot.send_message: no replyToMessageId, expectsReply false,`,
+        `and text that starts with ${marker}. Now reply with the single word OK.`,
+      ].join("\n"),
+    );
+    await waitFor(
+      page,
+      "A reads the instruction",
+      () => bridge.main(from),
+      (s) => idle(s) && count(s, (m) => m.author === "assistant") > answersBefore,
+      TURN_MS,
+    );
+    const side = await bridge.startTask(
+      to,
+      [
+        `Use openbot.send_message to send ${fromAgentInfo.name} (agent id "${from}") the message "${notice}",`,
+        "with expectsReply false. Then end your turn and reply with the single word SENT.",
+      ].join("\n"),
+    );
+    details.taskId = side.id;
+    const [ownChat, sideThread] = await waitFor(
+      page,
+      "A's new message comes to B",
+      () => Promise.all([bridge.main(to), bridge.side(to, side.id)]),
+      (snapshots) => snapshots.some((s) => has(s, request)),
+      TURN_MS,
+    );
+    // With a reply id, the message continues the side thread on purpose, and the step would not check the fix.
+    const sent = [...ownChat.messages, ...sideThread.messages].find(request);
+    details.requestReplyTo = sent?.replyToMessageId ?? null;
+    assert.equal(details.requestReplyTo, null, "A sent the new message with replyToMessageId.");
+    details.requestInOwnChat = has(ownChat, request);
+    details.requestInSideThread = has(sideThread, request);
+    assert.equal(details.requestInSideThread, false, "B's side thread got A's new message.");
+    assert.equal(details.requestInOwnChat, true, "B's own chat did not get A's new message.");
   });
   report.passed = report.steps.every((entry) => entry.passed);
 } finally {
