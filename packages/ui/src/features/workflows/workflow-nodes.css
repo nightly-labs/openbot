@@ -1632,7 +1632,7 @@ fieldset.wfn-picker-group {
  * A node that can take the open connection goes up too, so the selected node does not cover its port.
  */
 .wfn-stage .wfn-node:has(> .wfn-ports):is([data-selected], :focus-within),
-.wfn-stage .wfn-node:has(> .wfn-ports .wfn-port[data-target]) {
+.wfn-stage .wfn-node:has(.wfn-port[data-target]) {
   z-index: 2;
 }
 
