@@ -508,4 +508,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Also on Windows, where each process start unpacks about 310 MB (`antigravityTemp`) that a new or
   // reopened session waits for. One shared process kept a harness for each session it opened (#5497).
   sessionProcesses: true,
+  // `model/list` opens a second probe session after the start already listed the models. When it
+  // failed, timed out or listed none, a signed-in Gemini row showed no models until a restart (#11079).
+  keepModelsOnRefreshFailure: true,
 };
