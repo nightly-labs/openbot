@@ -882,6 +882,39 @@ try {
       },
     );
 
+    await step(
+      "prompt: an allowed person on a personal number writes to the owner, not to the agent (#11470)",
+      async () => {
+        const strangerJid = `${STRANGER}@s.whatsapp.net`;
+        const link = agents.messaging.store.linkByKey(connectionId(agents), strangerJid, "dm");
+        assert.ok(link, "No conversation for the allowed person.");
+        const request = mailbox.unresolvedMessagingDeliveries(link.linkId)[0];
+        assert.ok(request, "No request waits in the allowed person's chat.");
+        const prompt = async () =>
+          (await runCauseEffect(agents.messaging.prepare({ delivery: request.delivery, managedAttachments: [] })))
+            ?.text ?? "";
+        const dedicated = await prompt();
+        assert.ok(dedicated.includes("Place: a direct message to you."), "A dedicated number lost its own framing.");
+        assert.ok(!dedicated.includes("message from the OpenBot user"), "A dedicated number answers as the owner.");
+        await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, true));
+        try {
+          const personal = await prompt();
+          assert.ok(
+            personal.includes("The person writes to the OpenBot user, not to you."),
+            "The agent reads a message to the owner as a message to itself.",
+          );
+          assert.ok(
+            personal.includes("WhatsApp shows your answer as a message from the OpenBot user."),
+            "The agent does not know that its answer shows as the owner.",
+          );
+          assert.ok(!personal.includes("Place: a direct message to you."), "The personal number kept the bot framing.");
+        } finally {
+          await runCauseEffect(messaging.setWhatsAppOwnNumber(OWNER, false));
+        }
+        return { dedicated: "direct message to you", personal: "writes to the OpenBot user" };
+      },
+    );
+
     await step("pairing limit: at most three requests wait, and the fourth person gets no answer", async () => {
       for (const suffix of ["01", "02", "03", "04"])
         phone.current().receive([message({ chat: `486009999${suffix}@s.whatsapp.net`, text: "hi" })]);
