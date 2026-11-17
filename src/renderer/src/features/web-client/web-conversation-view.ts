@@ -77,7 +77,8 @@ export function createWebConversationView(options: {
     if (workspace.state.status !== "online") return;
     const page = promptPage();
     if (!page?.threadId) return;
-    const pending = workspace.state.prompts.find(
+    // The newest first: a question that outlived its turn stays in the list, and a later one shows over it.
+    const pending = workspace.state.prompts.findLast(
       (item) =>
         item.agentId === page.agentId && item.threadId === page.threadId && !isAnswered(item.turnId, item.requestId),
     );

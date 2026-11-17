@@ -68,7 +68,7 @@ function without(current: readonly MobileThreadWait[], drop: (wait: MobileThread
  * Folds one host event into the pending requests of one server. Only a request on a thread that
  * `isTaskThread` knows is a side-thread wait; the agent's chat shows the others. A snapshot is the
  * current state, a task list marks the requests of its running threads, and a thread that no longer
- * runs waits on nothing.
+ * runs waits on nothing but a question that outlives its turn, until the task closes.
  */
 export function reduceThreadWaits(
   current: readonly MobileThreadWait[],
@@ -119,13 +119,14 @@ export function reduceThreadWaits(
       );
     case "agent-tasks-changed": {
       const { agentId, tasks } = event.snapshot;
-      const threads = new Map(tasks.map((task) => [task.threadId, task.state === "running"]));
+      const states = new Map(tasks.map((task) => [task.threadId, task.state]));
       const next = current.flatMap((wait) => {
         if (wait.agentId !== agentId) return [wait];
-        const running = threads.get(wait.threadId);
+        const state = states.get(wait.threadId);
         // A request on a thread that is not a task is a wait of the agent's chat; it stays.
-        if (running === undefined) return wait.task ? [] : [wait];
-        if (!running) return [];
+        if (state === undefined) return wait.task ? [] : [wait];
+        // The host keeps a question that outlives its turn until the task closes (#11440).
+        if (state !== "running" && (wait.reason !== "question" || state === "closed")) return [];
         return [wait.task ? wait : { ...wait, task: true }];
       });
       return next.length === current.length && next.every((wait, index) => wait === current[index]) ? current : next;
@@ -150,11 +151,7 @@ export function hostAwaitsQuestion(
   requestId: string | number,
 ): boolean {
   return waits.some(
-    (wait) =>
-      wait.reason === "question" &&
-      wait.agentId === agentId &&
-      wait.turnId === turnId &&
-      String(wait.requestId) === String(requestId),
+    (wait) => wait.reason === "question" && wait.turnId === turnId && sameRequest(wait, { agentId, requestId }),
   );
 }
 
