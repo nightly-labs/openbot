@@ -130,18 +130,20 @@ function fitHeaderPicker(header: HTMLElement) {
   const overflows = () => [...parts()].some((part) => part.scrollWidth - part.clientWidth > 1);
   const picker = modelPickerFit(header, overflows, () => measure());
   const measure = () => {
-    if (header.querySelector(".agent-threads-tabs")) return;
+    // A part can mount after the header, such as the picker. Observing a part again has no effect.
+    for (const part of parts()) observer.observe(part);
+    // A thread row that is not in its tab mode shows the picker as its icon (header-controls.css).
+    if (header.querySelector('.agent-threads-tabs, .agent-threads-header:not([data-mode="tabs"])')) return;
     // A chat with no agent, such as a channel, has no picker, so no step stays from an agent's chat.
     if (header.querySelector(".provider-model-trigger")) picker.fit();
     else delete header.dataset.modelFit;
   };
   const observer = new ResizeObserver(measure);
   observer.observe(header);
-  for (const part of parts()) observer.observe(part);
   measure();
   return () => {
     observer.disconnect();
-    picker.release();
+    picker.stop();
   };
 }
 

@@ -52,10 +52,9 @@ export function modelPickerFit(header: HTMLElement, overflows: () => boolean, re
       if (!released) remeasure();
     });
   };
-  /** The owner goes away: the picker shows in full until the next owner fits it. */
-  const release = () => {
+  /** The owner goes away. The step stays, so the next owner continues from it with no jump. */
+  const stop = () => {
     released = true;
-    show(0);
   };
-  return { fit, release };
+  return { fit, stop };
 }

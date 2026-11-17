@@ -458,7 +458,7 @@ export function ThreadTabs(props: ThreadHeaderProps) {
       window.removeEventListener("pointercancel", onDragEnd);
       if (drag) cancelAnimationFrame(drag.frame);
       if (drag?.away) setCarriedThreadTab(null);
-      picker?.release();
+      picker?.stop();
       document.removeEventListener("focusin", keepFocus);
       document.removeEventListener("pointerdown", onPointer, true);
     };
