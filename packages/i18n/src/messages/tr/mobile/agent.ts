@@ -409,6 +409,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "Uzun bir görevden önce ajan planını gösterir. 10 sn sonra veya Başlat'a bastığınızda başlar.",
   "mobile.agent.workspace.title": "Çalışma alanı klasörü",
+  "mobile.agent.workspace.footer": "Bu ajanın ana makinedeki klasörü.",
   "mobile.agent.advanced.behavior": "Davranış",
   "mobile.agent.advanced.workspace": "Çalışma alanı",
   "mobile.agent.advanced.chat": "Sohbet",

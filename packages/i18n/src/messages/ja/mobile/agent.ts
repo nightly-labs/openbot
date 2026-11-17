@@ -400,6 +400,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "長いタスクの前に、エージェントが計画を表示します。10 秒後、または開始を押すと始まります。",
   "mobile.agent.workspace.title": "ワークスペースのフォルダー",
+  "mobile.agent.workspace.footer": "ホストのコンピューター上にある、このエージェントのフォルダーです。",
   "mobile.agent.advanced.behavior": "動作",
   "mobile.agent.advanced.workspace": "ワークスペース",
   "mobile.agent.advanced.chat": "チャット",

@@ -390,6 +390,7 @@ export const messages = defineMessages("mobile.agent", {
   "mobile.agent.planCard.footer":
     "Before a long task, the agent shows its plan. It starts after 10 s, or when you press Start.",
   "mobile.agent.workspace.title": "Workspace folder",
+  "mobile.agent.workspace.footer": "The folder of this agent on the host computer.",
   "mobile.agent.advanced.behavior": "Behavior",
   "mobile.agent.advanced.workspace": "Workspace",
   "mobile.agent.advanced.chat": "Chat",

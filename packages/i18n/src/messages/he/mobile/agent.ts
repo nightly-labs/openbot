@@ -392,6 +392,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "לפני משימה ארוכה הסוכן מציג את התוכנית שלו. היא מתחילה אחרי 10 שניות, או כשלוחצים על התחלה.",
   "mobile.agent.workspace.title": "תיקיית סביבת עבודה",
+  "mobile.agent.workspace.footer": "התיקייה של הסוכן הזה במחשב המארח.",
   "mobile.agent.advanced.behavior": "התנהגות",
   "mobile.agent.advanced.workspace": "סביבת עבודה",
   "mobile.agent.advanced.chat": "צ'אט",

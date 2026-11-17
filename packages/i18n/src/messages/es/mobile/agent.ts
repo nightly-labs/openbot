@@ -398,6 +398,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "Antes de una tarea larga, el agente muestra su plan. Empieza tras 10 s o cuando pulsas Iniciar.",
   "mobile.agent.workspace.title": "Carpeta del espacio de trabajo",
+  "mobile.agent.workspace.footer": "La carpeta de este agente en el equipo host.",
   "mobile.agent.advanced.behavior": "Comportamiento",
   "mobile.agent.advanced.workspace": "Espacio de trabajo",
   "mobile.agent.advanced.chat": "Chat",

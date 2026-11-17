@@ -406,6 +406,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "Vor einer langen Aufgabe zeigt der Agent seinen Plan. Er beginnt nach 10 s oder wenn du auf Start drückst.",
   "mobile.agent.workspace.title": "Arbeitsbereichsordner",
+  "mobile.agent.workspace.footer": "Der Ordner dieses Agenten auf dem Host-Computer.",
   "mobile.agent.advanced.behavior": "Verhalten",
   "mobile.agent.advanced.workspace": "Arbeitsbereich",
   "mobile.agent.advanced.chat": "Chat",

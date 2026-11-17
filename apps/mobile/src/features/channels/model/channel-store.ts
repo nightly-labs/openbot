@@ -668,6 +668,12 @@ export class MobileChannelStore {
     if (!changesHistory) return;
     // A read that started before the change must not bring the earlier page back.
     entry.writes += 1;
+    // A latest page keeps the older loaded messages next to it, so a deleted history drops the page.
+    if (path === CHAT_HISTORY_ROUTES.channelDelete && entry.state.pages.has(channelId)) {
+      const pages = new Map(entry.state.pages);
+      pages.delete(channelId);
+      this.publish(entry, { pages });
+    }
     await this.refresh(serverId, channelId);
   }
   async delete(serverId: string, channelId: string) {

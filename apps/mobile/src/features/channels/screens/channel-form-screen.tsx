@@ -1,5 +1,5 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import { type ChannelDraft, type ChannelSummary, isChannelDraft } from "@openbot/contracts/ipc";
+import { type ChannelDraft, type ChannelSummary, canAdministerServer, isChannelDraft } from "@openbot/contracts/ipc";
 import * as Crypto from "expo-crypto";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import { usePreventRemove } from "expo-router/react-navigation";
@@ -100,9 +100,8 @@ function ChannelForm({
 }) {
   const { t, errorMessage } = useText();
   const agents = useMobileWorkspaceSelector((current) => current.agents);
-  const canManage = useMobileWorkspaceSelector(
-    (current) => current.servers.find((server) => server.id === serverId)?.role !== "member",
-  );
+  const role = useMobileWorkspaceSelector((current) => current.servers.find((server) => server.id === serverId)?.role);
+  const canManage = role !== "member";
   const { theme } = useUniwind();
   const openAgentPicker = useChannelAgentPicker((state) => state.open);
   const foreground = String(useThemeColor("foreground"));
@@ -363,7 +362,7 @@ function ChannelForm({
           channelName={channel.name}
           store={store}
           available={available && !saving && !finished}
-          canDeleteHistory={canManage}
+          canDeleteHistory={canAdministerServer(role)}
         />
       ) : null}
       {!create && !channel?.archived ? (

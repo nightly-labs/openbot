@@ -378,6 +378,7 @@ export const messages = {
   "mobile.agent.planCard.label": "长任务开始前显示计划",
   "mobile.agent.planCard.footer": "长任务开始前，助手会先显示计划。10 秒后或你点按“开始”时，任务开始。",
   "mobile.agent.workspace.title": "工作区文件夹",
+  "mobile.agent.workspace.footer": "该助手在主机电脑上的文件夹。",
   "mobile.agent.advanced.behavior": "行为",
   "mobile.agent.advanced.workspace": "工作区",
   "mobile.agent.advanced.chat": "对话",

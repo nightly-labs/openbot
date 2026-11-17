@@ -393,6 +393,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "긴 작업 전에 에이전트가 계획을 보여줘요. 10초 후 또는 시작을 누르면 작업이 시작돼요.",
   "mobile.agent.workspace.title": "워크스페이스 폴더",
+  "mobile.agent.workspace.footer": "호스트 컴퓨터에 있는 이 에이전트의 폴더예요.",
   "mobile.agent.advanced.behavior": "동작",
   "mobile.agent.advanced.workspace": "워크스페이스",
   "mobile.agent.advanced.chat": "채팅",

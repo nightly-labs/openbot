@@ -187,7 +187,9 @@ function AgentForm({
     canManageAgentPlanCard(agent.serverId);
   const showWorkspace = Boolean(agent.workspacePath) || canManageBrowserProfiles(agent.serverId);
   // As on desktop, Compact is in the context sheet of the composer, not here.
-  const showChatActions = canStartNewChat(agent.serverId) || showDeleteHistory;
+  // The host needs `chat` access for a new chat, as the context sheet checks.
+  const showNewChat = canStartNewChat(agent.serverId) && accessLevel !== "view";
+  const showChatActions = showNewChat || showDeleteHistory;
   const showAdvanced = showBehavior || showWorkspace || showChatActions;
   const [edits, setEdits] = useState<AgentEdits>({});
   const foreground = useThemeColor("foreground");
@@ -493,7 +495,7 @@ function AgentForm({
               <AgentBrowserProfileRow agent={agent} />
               {agent.workspacePath ? (
                 <SettingsGroupRow>
-                  <SettingsRow>
+                  <SettingsRow description={t("mobile.agent.workspace.footer")}>
                     <Typography.Paragraph>{t("mobile.agent.workspace.title")}</Typography.Paragraph>
                     <Typography.Paragraph selectable type="body-xs" className="text-grouped-secondary">
                       {agent.workspacePath}
@@ -505,9 +507,7 @@ function AgentForm({
           ) : null}
           {showChatActions ? (
             <SettingsSection title={t("mobile.agent.advanced.chat")} rowsDrawSeparators>
-              {canStartNewChat(agent.serverId) ? (
-                <AgentNewChatSection agent={agent} available={available} grouped />
-              ) : null}
+              {showNewChat ? <AgentNewChatSection agent={agent} available={available} grouped /> : null}
               {showDeleteHistory ? <AgentDeleteHistoryRow agent={agent} available={available} /> : null}
             </SettingsSection>
           ) : null}

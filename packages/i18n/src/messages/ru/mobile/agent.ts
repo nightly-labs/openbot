@@ -426,6 +426,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "Перед долгой задачей агент показывает свой план. Он начинает через 10 с или когда вы нажимаете «Начать».",
   "mobile.agent.workspace.title": "Папка рабочего пространства",
+  "mobile.agent.workspace.footer": "Папка этого агента на компьютере-хосте.",
   "mobile.agent.advanced.behavior": "Поведение",
   "mobile.agent.advanced.workspace": "Рабочее пространство",
   "mobile.agent.advanced.chat": "Чат",

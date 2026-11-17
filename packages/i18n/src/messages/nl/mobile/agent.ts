@@ -399,6 +399,7 @@ export const messages = {
   "mobile.agent.planCard.footer":
     "Vóór een lange taak toont de agent zijn plan. Hij begint na 10 s, of als je op Starten drukt.",
   "mobile.agent.workspace.title": "Werkruimtemap",
+  "mobile.agent.workspace.footer": "De map van deze agent op de hostcomputer.",
   "mobile.agent.advanced.behavior": "Gedrag",
   "mobile.agent.advanced.workspace": "Werkruimte",
   "mobile.agent.advanced.chat": "Chat",

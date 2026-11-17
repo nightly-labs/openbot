@@ -217,7 +217,7 @@ export function AgentCompactSection({
  */
 export function AgentDeleteHistoryRow({ agent, available }: { agent: MobileAgent; available: boolean }) {
   const { t } = useText();
-  const { deleteAgentHistory, loadLatestMessages } = useMobileWorkspaceActions();
+  const { deleteAgentHistory, loadLatestMessages, conversationStore } = useMobileWorkspaceActions();
   const [deleting, setDeleting] = useState(false);
 
   function remove(): void {
@@ -227,7 +227,7 @@ export function AgentDeleteHistoryRow({ agent, available }: { agent: MobileAgent
         void haptics.notification("success");
         // A window around a search result keeps the messages that the empty latest page does not
         // name, so the chat reads its latest page again.
-        void loadLatestMessages(agent.id, agent.serverId).catch(() => undefined);
+        if (conversationStore.get(agent.id)) void loadLatestMessages(agent.id, agent.serverId).catch(() => undefined);
       })
       .catch((cause: unknown) => {
         void haptics.notification("error");

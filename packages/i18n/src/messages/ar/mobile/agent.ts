@@ -428,6 +428,7 @@ export const messages = {
   "mobile.agent.planCard.label": "عرض الخطة قبل المهام الطويلة",
   "mobile.agent.planCard.footer": "قبل مهمة طويلة، يعرض الوكيل خطته. يبدأ بعد 10 ث، أو عندما تضغط «بدء».",
   "mobile.agent.workspace.title": "مجلد مساحة العمل",
+  "mobile.agent.workspace.footer": "مجلد هذا الوكيل على حاسوب المضيف.",
   "mobile.agent.advanced.behavior": "السلوك",
   "mobile.agent.advanced.workspace": "مساحة العمل",
   "mobile.agent.advanced.chat": "الدردشة",
