@@ -796,8 +796,9 @@ const TIME_LEFT_FIRST_MS = 3_000;
  * The last report before those 30 seconds stays, so a client that reports once for each 8 MB part
  * on a slow connection also gets an estimate. The clock moves the estimate between reports, so an
  * upload that stops gets a longer time. When no bytes arrive for 30 seconds, or for two times the
- * usual time between reports, it has none. A resumed upload measures from its first report, so the
- * parts that the server already had do not count as speed.
+ * usual time between reports, it has none, and when bytes arrive again it measures from there. A
+ * resumed upload measures from its first report, so the parts that the server already had do not
+ * count as speed.
  */
 function createSecondsLeft(progress: () => TransferUploadState) {
   const samples: { at: number; sent: number }[] = [];
@@ -809,7 +810,15 @@ function createSecondsLeft(progress: () => TransferUploadState) {
   onCleanup(() => clearInterval(timer));
   return createMemo(() => {
     const { sent, total } = progress();
-    if (samples.at(-1)?.sent !== sent) samples.push({ at: Date.now(), sent });
+    if (samples.at(-1)?.sent !== sent) {
+      const at = Date.now();
+      const latest = samples.at(-1);
+      const previous = samples.at(-2);
+      // Bytes after a stop: the speed from before the stop is not the speed now.
+      if (latest && previous && at - latest.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * (latest.at - previous.at)))
+        samples.length = 0;
+      samples.push({ at, sent });
+    }
     const time = Math.max(now(), samples.at(-1)?.at ?? 0);
     while (samples.length > 2 && time - (samples[1]?.at ?? time) >= TIME_LEFT_WINDOW_MS) samples.shift();
     const first = samples[0];
