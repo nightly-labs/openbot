@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { isDeepStrictEqual } from "node:util";
-import type { ConversationMessage, ConversationSnapshot } from "@openbot/contracts/ipc";
+import type { ConversationMessage, ConversationSnapshot, ImageGenerationInfo } from "@openbot/contracts/ipc";
 import { mergeImageGenerationInfo } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
 import type { AgentRoster } from "./agent-roster";
@@ -901,6 +901,32 @@ export function activityTurnId(eventType: string, detail: unknown, activeTurnId:
     : activeTurnId;
 }
 
+/**
+ * A generated image that OpenBot could not save, or that stopped, keeps its status and its reason when
+ * provider history comes again. The history can mark the call completed but gives OpenBot no file, and
+ * a completed image with no file showed only "The generated image preview is unavailable" (#10267).
+ */
+export function keptUnsavedImage(
+  existing: ConversationMessage,
+  imported: ConversationMessage,
+  imageGeneration: ImageGenerationInfo | undefined,
+): Partial<ConversationMessage> {
+  if (
+    existing.itemType !== "image_generation" ||
+    (existing.status !== "failed" && existing.status !== "interrupted") ||
+    existing.attachments?.length ||
+    imported.attachments?.length
+  )
+    return {};
+  const stored = existing.imageGeneration;
+  return {
+    status: existing.status,
+    ...(stored?.error === undefined
+      ? {}
+      : { imageGeneration: { ...(imageGeneration ?? stored), error: stored.error } }),
+  };
+}
+
 function mergeImportedMessage(existing: ConversationMessage, imported: ConversationMessage): ConversationMessage {
   const attachments = mergeValues(existing.attachments, imported.attachments, (attachment) => attachment.id);
   const reactions = mergeValues(existing.reactions, imported.reactions, (reaction) => JSON.stringify(reaction));
@@ -919,6 +945,7 @@ function mergeImportedMessage(existing: ConversationMessage, imported: Conversat
     ...(imported.exchange === undefined && existing.exchange ? { exchange: existing.exchange } : {}),
     ...(imported.senderMember === undefined && existing.senderMember ? { senderMember: existing.senderMember } : {}),
     ...(imageGeneration ? { imageGeneration } : {}),
+    ...keptUnsavedImage(existing, imported, imageGeneration),
   };
 }
 
