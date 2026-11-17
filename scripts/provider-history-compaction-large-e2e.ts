@@ -15,7 +15,7 @@
 // Writes `.openbot-build/provider-history-compaction-large/report.json` and exits non-zero when a row is
 // wrong. The report holds sizes, times and counts only.
 
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, rmSync, statfsSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -285,6 +285,8 @@ const STAGING_JOIN = `provider_history_staging s
 interface TableSize {
   /** Pages of the table and its indexes (`dbstat`). */
   tableAndIndexBytes: number;
+  /** Free bytes inside those pages. */
+  unusedBytes: number;
   itemJsonBytes: number;
   rows: number;
   fileBytes: number;
@@ -293,13 +295,11 @@ interface TableSize {
 
 function tableSize(db: DatabaseSync): TableSize {
   const pageSize = numberOf(db, "SELECT page_size AS n FROM pragma_page_size");
+  const pages = `FROM dbstat WHERE name = 'provider_history_staging' OR name LIKE 'provider_history_staging_%'
+    OR name = 'sqlite_autoindex_provider_history_staging_1'`;
   return {
-    tableAndIndexBytes: numberOf(
-      db,
-      `SELECT SUM(pgsize) AS n FROM dbstat
-       WHERE name = 'provider_history_staging' OR name LIKE 'provider_history_staging_%'
-          OR name = 'sqlite_autoindex_provider_history_staging_1'`,
-    ),
+    tableAndIndexBytes: numberOf(db, `SELECT SUM(pgsize) AS n ${pages}`),
+    unusedBytes: numberOf(db, `SELECT SUM(unused) AS n ${pages}`),
     itemJsonBytes: numberOf(db, "SELECT SUM(length(CAST(item_json AS BLOB))) AS n FROM provider_history_staging"),
     rows: numberOf(db, "SELECT COUNT(*) AS n FROM provider_history_staging"),
     fileBytes: fileBytes(databasePath),
@@ -427,6 +427,9 @@ const groupsBefore = rows(
 const expected = expectedValues(inspect);
 inspect.close();
 
+// On a real computer the file is on disk long before the start. Write the generated pages to disk
+// now, so the first checkpoint of the compaction does not wait for them.
+spawnSync("sync");
 const first = await runChild(5);
 const repeat = await runChild(5);
 
@@ -473,6 +476,8 @@ const report = {
     noWrongOrMissingRow: check.wrong === 0 && check.missing === 0,
     firstStartCompactedEveryRow: first.result.rows === check.expectedCompacted,
     nextStartCompactsNothing: repeat.result.rows === 0,
+    // An UPDATE leaves the page of each large item almost empty (about 80% unused in total).
+    compactedPagesAreNotLeftEmpty: sizeAfter.unusedBytes < sizeAfter.tableAndIndexBytes * 0.25,
   },
 };
 writeFileSync(join(OUT, "report.json"), `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });

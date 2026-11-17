@@ -552,13 +552,40 @@ export class ProviderHistoryStore {
   }
 }
 
-/** Replaces each row's `item_json` with its hash and gives the bytes it replaced. */
+/**
+ * Replaces each row's `item_json` with its hash and gives the bytes it replaced. The row keeps its
+ * row id and its other columns. It is deleted and inserted again, not updated: SQLite merges a page
+ * that is less than one third full only on a delete. An update leaves the page of each large item
+ * almost empty, at about 4 KiB for each item.
+ */
 function compactRows(db: DatabaseSync, rows: readonly DynamicRecord[]): number {
-  const update = db.prepare("UPDATE provider_history_staging SET item_json = ? WHERE rowid = ?");
+  const select = db.prepare(
+    `SELECT session_id, turn_id, item_key, item_index, imported, updated_at
+     FROM provider_history_staging WHERE rowid = ?`,
+  );
+  const remove = db.prepare("DELETE FROM provider_history_staging WHERE rowid = ?");
+  const insert = db.prepare(
+    `INSERT INTO provider_history_staging
+       (rowid, session_id, turn_id, item_key, item_index, item_json, imported, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  );
   let bytes = 0;
   for (const row of rows) {
+    const rowId = requiredNumberColumn(row, "row_id");
     const itemJson = requiredStringColumn(row, "item_json");
-    update.run(compactedItemJson(itemJson), requiredNumberColumn(row, "row_id"));
+    const kept = databaseRow(select.get(rowId));
+    if (!kept) continue;
+    remove.run(rowId);
+    insert.run(
+      rowId,
+      requiredStringColumn(kept, "session_id"),
+      requiredStringColumn(kept, "turn_id"),
+      requiredStringColumn(kept, "item_key"),
+      requiredNumberColumn(kept, "item_index"),
+      compactedItemJson(itemJson),
+      requiredNumberColumn(kept, "imported"),
+      requiredStringColumn(kept, "updated_at"),
+    );
     bytes += Buffer.byteLength(itemJson);
   }
   return bytes;
