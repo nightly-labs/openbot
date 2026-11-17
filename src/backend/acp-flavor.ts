@@ -337,6 +337,12 @@ export interface AcpFlavor {
    */
   mcpServersLoadWithSession?: true;
   /**
+   * How long the agent waits for an MCP server of a session to connect. Then it continues without the
+   * server and does not connect again while the server's settings stay the same. A session that
+   * OpenBot's servers did not reach in time is restored once with new tokens.
+   */
+  mcpConnectLimitMs?: number;
+  /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
    * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
    * (`startStdioMcpRelay`), sends it as http, and stops it when the session closes.
