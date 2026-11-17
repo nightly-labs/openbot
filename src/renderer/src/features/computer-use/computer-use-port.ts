@@ -8,7 +8,7 @@ import type { OpenBotDesktopApi } from "@openbot/contracts/ipc";
 export interface ComputerUsePort {
   computerUse: OpenBotDesktopApi["computerUse"];
   remoteDesktop: Pick<OpenBotDesktopApi["remoteDesktop"], "checkSetup">;
-  update: Pick<OpenBotDesktopApi["update"], "restartWhenIdle">;
+  update: Pick<OpenBotDesktopApi["update"], "getStatus" | "restartWhenIdle">;
 }
 
 /** Read on each call: tests and stories replace `window.openbot` per case. */

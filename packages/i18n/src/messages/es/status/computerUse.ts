@@ -9,8 +9,6 @@ export const messages = {
   "status.computerUse.driverStopped": "El controlador de uso del equipo se detuvo.",
   "status.computerUse.unsupported": "El uso del equipo está disponible en macOS, Windows y Linux.",
   "status.computerUse.driverMissing": "Esta versión de OpenBot no incluye un controlador de uso del equipo.",
-  "status.computerUse.restartRequired":
-    "macOS sigue impidiendo que OpenBot haga clic y escriba, aunque los dos permisos están activados. Reinicia OpenBot. Si vuelve a pasar, haz clic en Gestionar junto a Accesibilidad, quita OpenBot de la lista, añádelo de nuevo y reinicia OpenBot.",
   "status.computerUse.progressActing": "Usando una aplicación de este equipo…",
   "status.computerUse.progressDeciding": "Decidiendo el siguiente paso en la aplicación…",
 } as const satisfies PartialTranslation<typeof source>;

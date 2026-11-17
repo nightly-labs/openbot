@@ -9,8 +9,6 @@ export const messages = {
   "status.computerUse.driverStopped": "Sterownik Sterowania komputerem się zatrzymał.",
   "status.computerUse.unsupported": "Sterowanie komputerem jest dostępne w systemach macOS, Windows i Linux.",
   "status.computerUse.driverMissing": "Ta wersja OpenBot nie zawiera sterownika Sterowania komputerem.",
-  "status.computerUse.restartRequired":
-    "macOS nadal blokuje klikanie i pisanie przez OpenBot, choć oba uprawnienia są włączone. Uruchom ponownie OpenBot. Jeśli to wróci, kliknij Zarządzaj obok pozycji Dostępność, usuń OpenBot z listy, dodaj go ponownie i uruchom ponownie OpenBot.",
   "status.computerUse.progressActing": "Korzysta z aplikacji na tym komputerze…",
   "status.computerUse.progressDeciding": "Wybiera następny krok w aplikacji…",
 } as const satisfies PartialTranslation<typeof source>;

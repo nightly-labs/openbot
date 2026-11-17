@@ -816,12 +816,9 @@ function initialState(platform: NodeJS.Platform, supported: boolean, executable:
   return { status: "permissions-required", permissions: ungranted(platform), message: null };
 }
 
+/** The panel writes its own steps for this status, so the state carries no message. */
 function restartRequiredState(permissions: readonly ComputerUsePermission[]): ComputerUseState {
-  return {
-    status: "restart-required",
-    permissions,
-    message: sourceText("status.computerUse.restartRequired"),
-  };
+  return { status: "restart-required", permissions, message: null };
 }
 
 function requiredPermissions(platform: NodeJS.Platform): readonly MacPermissionId[] {

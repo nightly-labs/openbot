@@ -102,18 +102,22 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     }
   }
 
-  /** Restarts OpenBot when no work runs, as Settings > Updates does. A busy agent shows its toast. */
+  /**
+   * Restarts OpenBot when no work runs, as Settings > Updates does, and installs a downloaded update
+   * with the same restart. A busy agent shows the restart toast, where the user can cancel it.
+   */
   async function restart(): Promise<void> {
     if (restarting()) return;
     setRestarting(true);
     setRestartError(null);
     try {
-      await computerUsePort().update.restartWhenIdle("relaunch");
+      const update = computerUsePort().update;
+      const status = await update.getStatus();
+      await update.restartWhenIdle(status.phase === "ready" && status.managedByHost !== true ? "update" : "relaunch");
     } catch (cause) {
-      if (!disposed) {
-        setRestartError(errorMessage(cause, t("update.idleRestart.requestFailed")));
-        setRestarting(false);
-      }
+      if (!disposed) setRestartError(errorMessage(cause, t("update.idleRestart.requestFailed")));
+    } finally {
+      if (!disposed) setRestarting(false);
     }
   }
 
@@ -224,9 +228,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
           </AlertIcon>
           <AlertContent>
             <AlertTitle>{t("computerUse.restartRequired.title")}</AlertTitle>
-            <AlertDescription>
-              {restartError() ?? errorMessage(state()?.message, t("computerUse.restartRequired.title"))}
-            </AlertDescription>
+            <AlertDescription>{restartError() ?? t("computerUse.restartRequired.description")}</AlertDescription>
           </AlertContent>
           <AlertActions>
             <Button type="button" variant="outline" size="sm" loading={restarting()} onClick={() => void restart()}>

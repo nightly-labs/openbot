@@ -21,6 +21,8 @@ export const messages = defineMessages("computerUse", {
     "OpenBot can see and interact with apps on this computer. This system asks for no extra permission.",
   "computerUse.openSettingsFailed.title": "Couldn’t open System Settings",
   "computerUse.restartRequired.title": "Restart OpenBot to finish Computer Use",
+  "computerUse.restartRequired.description":
+    "macOS still blocks OpenBot from clicking and typing, although both permissions are on. Restart OpenBot. If this comes back, click Manage next to Accessibility, remove OpenBot from the list, add it again, and restart OpenBot.",
   "computerUse.restartRequired.action": "Restart OpenBot",
   "computerUse.compact.title": "Enable Computer Use",
   "computerUse.compact.description": "Let OpenBot see and interact with apps on this computer.",

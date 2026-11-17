@@ -360,8 +360,9 @@ class CallAnswerLines extends Transform {
     if (!whole) this.push(line);
     else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
     else {
-      if (isAccessibilityRefusal(line)) this.#refused();
+      // The answer goes to the agent first; the refusal then takes the tools back.
       this.push(withCopy(line, this.#answering?.tool === "get_window_state" ? this.#readScreenshot : undefined));
+      if (isAccessibilityRefusal(line)) this.#refused();
     }
   }
 
