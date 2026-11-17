@@ -278,7 +278,7 @@ export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrati
     } catch (error) {
       // The startup log keeps only the message, so the cause is logged here.
       logger.error(`OpenBot database migration to version ${migration.version} failed.`, toLogValue(error));
-      throw new DatabaseMigrationError(`OpenBot database migration to version ${migration.version} failed.`, {
+      throw new Error(`OpenBot database migration to version ${migration.version} failed.`, {
         cause: error,
       });
     }
@@ -352,12 +352,6 @@ export class NewerDatabaseError extends Error {
     super(`OpenBot database version ${databaseVersion} is newer than this application supports (${supportedVersion}).`);
   }
 }
-
-/**
- * A migration failed, and its transaction rolled back. The message is the same as before. A server
- * stops its start loop at once on it (`src/main/server-start-halt.ts`).
- */
-export class DatabaseMigrationError extends Error {}
 
 function validateAppliedVersions(versions: number[]): void {
   const newestVersion = versions.at(-1) ?? 0;

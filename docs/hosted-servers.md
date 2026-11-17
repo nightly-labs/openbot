@@ -569,7 +569,9 @@ The Linux build contains `scripts/hosting/` (without the TypeScript files) in `r
 On a server, root runs `openbot-hosted-update`:
 
 1. `openbot-update.timer` runs `check` 5 to 10 minutes after each start of the timer and then
-   about each 6 hours. `check` runs `stage`, and then the step that [Start loop](#start-loop) describes. It reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
+   about each hour. `check` runs `stage` when no `stage` of `check` succeeded in the last 6 hours
+   (`/run/openbot-update.staged`, so the first `check` after a boot stages), and then the step that
+   [Start loop](#start-loop) describes. `stage` reads the `latest-linux.yml` (`latest-linux-arm64.yml` on arm64) of the
    latest GitHub release, the manifest that the Linux desktop updater reads. When that version is newer than the installed one, it downloads the
    AppImage, checks its SHA-512 against the manifest, unpacks it in `/var/tmp`, checks that it has
    all hosting files, installs the packages in the `packages.txt` of that release, and copies it
@@ -623,10 +625,12 @@ A server has no window for the recovery window of the desktop. A server whose st
 failed started again each 10 seconds, without an end, in earlier releases. Now main stops the loop
 (`src/main/server-start-halt.ts`):
 
-- at the first failure when a restart cannot help: the database is from a newer OpenBot
-  (`newer_database`), or a migration failed and rolled back (`migration_failed`);
-- for all other failures, at the start that follows 3 failed starts in a row of the same version
-  (`start_failed`). This is the count of the desktop recovery window (`start-attempts.ts`).
+- at the first failure when the database is from a newer OpenBot (`newer_database`): a restart
+  cannot help;
+- for all other failures, at the third failed start in a row of the same version (`start_failed`).
+  A failed migration rolls back and counts as a failed start, because its cause can be temporary
+  (a full disk, a lock). A start that fails with an error stops the loop at once; after a crash,
+  the next start stops it. This is the count of the desktop recovery window (`start-attempts.ts`).
 
 Main then writes `openbot-start-halt-v1.json` in its user data folder and exits with 78. The file
 has the reason word, the app version and a time only. `openbot.service` has
@@ -637,8 +641,9 @@ start stops the loop again. These start OpenBot again:
 
 - a restart or a resume of the server, or `sudo openbot restart` or `start`;
 - `sudo openbot update`;
-- `check` of `openbot-update.timer`, about each 6 hours: when `openbot.service` is stopped with
-  status 78, it starts the service again, after `apply` when a newer release is staged. A hosted
+- `check` of `openbot-update.timer`, about each hour: when `openbot.service` is stopped with
+  status 78, it runs `stage` and starts the service again, after `apply` when a newer release is
+  staged. A hosted
   owner has no shell, and a failure can be temporary (a full disk, no network), so each run tries
   once more. It reads only the state of the unit (`ActiveState`, `ExecMainStatus`), never a file of
   the service user.

@@ -3,23 +3,45 @@
 // `OPENBOT_E2E_SERVER_START_GUARD=1` turns on the server behavior of the start.
 //
 // Run: bun scripts/server-start-loop-e2e.ts
-// Stop this worktree's own dev stack first: the script starts and stops the stack eight times.
+// Stop this worktree's own dev stack first: the script starts and stops the stack twelve times.
 //
-// The runs use their own dev profile (`OpenBot Dev wt-<hash of "server-start-loop-e2e" and this path>`),
-// so the worktree's normal dev data does not change.
+// First, bash runs the real `check` of scripts/hosting/openbot-hosted-update with a stub `systemctl`
+// and `stage`: `openbot-update.timer` runs it each hour, it starts a stopped start loop again at each
+// run, and it stages only about each 6 hours while OpenBot runs.
+//
+// Then the app. The runs use their own dev profile (`OpenBot Dev wt-<hash of "server-start-loop-e2e"
+// and this path>`), so the worktree's normal dev data does not change. A "migration" run removes the
+// marker of the latest migration and adds a trigger that refuses it again: the real migration runs,
+// fails and rolls back. The test then puts the marker back.
 // 0. A normal start, so that the profile has its database.
-// 1-3. The main process crashes before the database opens (`OPENBOT_E2E_FORCE_START_FAILURE=crash`).
+// 1-2. A migration fails: a failed start, and no halt.
+// 3. The main process crashes before the database opens (`OPENBOT_E2E_FORCE_START_FAILURE=crash`).
 // 4. No flag: three failures, so the server stops its start loop before the start. It exits with 78
 //    and writes the reason `start_failed`. It does not count as a fourth failure.
 // 5. No flag: the start after a halt tries once more. It removes the reason file and finishes.
-// 6. The database has a migration version that is newer than this build: the server stops at once
+// 6-7. Two crashes.
+// 8. A migration fails: the third failure in a row, so the server stops its start loop at once.
+// 9. No flag: the start after a halt tries once more and finishes.
+// 10. The database has a migration version that is newer than this build: the server stops at once
 //    with `newer_database`. The test then removes that version.
-// 7. No flag: the start tries again and finishes.
+// 11. No flag: the start tries again and finishes.
 // It writes .openbot-build/server-start-loop-e2e/report.json, and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { type ChildProcess, execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -37,6 +59,9 @@ const POLL_MS = 250;
 const RUN_TIMEOUT_MS = 5 * 60_000;
 // Far above each migration version that OpenBot can have.
 const NEWER_DATABASE_VERSION = 999_999;
+const MIGRATION_TRIGGER = "server_start_loop_e2e_refuse_marker";
+const HOSTING = join(ROOT, "scripts", "hosting");
+const HOUR_MS = 60 * 60_000;
 const logger = createOpenBotLogger(NAME);
 
 const instanceId = `wt-${createHash("sha256").update(`openbot:${NAME}:${ROOT}`).digest("hex")}`;
@@ -63,7 +88,7 @@ const HaltFile = Schema.Struct({
 type Halt = typeof HaltFile.Type;
 const decodeHalt = Schema.decodeUnknownOption(HaltFile, { onExcessProperty: "error" });
 
-type Mode = "crash" | "none";
+type Mode = "crash" | "migration" | "none";
 interface RunReport {
   run: number;
   mode: Mode;
@@ -117,8 +142,8 @@ function startStack(run: number, mode: Mode): { child: ChildProcess; exit: Promi
   };
   // An Electron harness shell sets it, and Electron then starts as Node.
   delete env.ELECTRON_RUN_AS_NODE;
-  if (mode === "none") delete env.OPENBOT_E2E_FORCE_START_FAILURE;
-  else env.OPENBOT_E2E_FORCE_START_FAILURE = mode;
+  if (mode === "crash") env.OPENBOT_E2E_FORCE_START_FAILURE = mode;
+  else delete env.OPENBOT_E2E_FORCE_START_FAILURE;
   const child = spawn("bun", ["run", "dev"], { cwd: ROOT, env, stdio: ["ignore", logFile, logFile] });
   const exit = new Promise<number | null>((done) => child.once("exit", (code) => done(code)));
   void exit.then(() => closeSync(logFile));
@@ -148,8 +173,205 @@ function setNewerDatabase(on: boolean): void {
   }
 }
 
+/** The marker of the latest migration, which a "migration" run removes. */
+interface MigrationMarker {
+  version: number;
+  appliedAt: string;
+}
+
+const decodeMarkerRow = Schema.decodeUnknownOption(
+  Schema.Struct({ version: Schema.Number, applied_at: Schema.String }),
+);
+
+/** The real latest migration runs again at the next start, and the trigger makes it fail and roll back. */
+function breakLatestMigration(): MigrationMarker {
+  const database = new DatabaseSync(databasePath);
+  try {
+    const row = Option.getOrNull(
+      decodeMarkerRow(
+        database.prepare("SELECT version, applied_at FROM schema_migrations ORDER BY version DESC LIMIT 1").get(),
+      ),
+    );
+    assert.ok(row, "the database has migrations");
+    database.prepare("DELETE FROM schema_migrations WHERE version = ?").run(row.version);
+    database.exec(
+      `CREATE TRIGGER ${MIGRATION_TRIGGER} BEFORE INSERT ON schema_migrations WHEN NEW.version = ${row.version} BEGIN SELECT RAISE(ABORT, 'server-start-loop-e2e'); END`,
+    );
+    return { version: row.version, appliedAt: row.applied_at };
+  } finally {
+    database.close();
+  }
+}
+
+function repairLatestMigration(marker: MigrationMarker): void {
+  const database = new DatabaseSync(databasePath);
+  try {
+    database.exec(`DROP TRIGGER IF EXISTS ${MIGRATION_TRIGGER}`);
+    database
+      .prepare("INSERT OR IGNORE INTO schema_migrations(version, applied_at) VALUES (?, ?)")
+      .run(marker.version, marker.appliedAt);
+  } finally {
+    database.close();
+  }
+}
+
+interface CheckCase {
+  name: string;
+  activeState: string;
+  execMainStatus: string;
+  /** The age of the stage stamp, or null when there is none. */
+  stampAgeMs: number | null;
+  stageFails: boolean;
+  /** The version that `staged_version` gives, or "" when no release is staged. */
+  stagedVersion: string;
+  expected: { calls: string[]; exitCode: number; stampRefreshed: boolean };
+}
+
+interface CheckResult extends CheckCase {
+  calls: string[];
+  exitCode: number | null;
+  stampRefreshed: boolean;
+}
+
+/**
+ * Runs the real `check` in bash with a stub `systemctl`, `stage` and `apply`. Sourcing the script
+ * runs only its definitions.
+ */
+function runCheck(entry: CheckCase): CheckResult {
+  const directory = mkdtempSync(join(tmpdir(), `${NAME}-`));
+  try {
+    const stamp = join(directory, "staged");
+    const calls = join(directory, "calls");
+    writeFileSync(calls, "");
+    if (entry.stampAgeMs !== null) {
+      writeFileSync(stamp, "");
+      const time = new Date(Date.now() - entry.stampAgeMs);
+      utimesSync(stamp, time, time);
+    }
+    const before = stampTime(stamp);
+    const script = [
+      'source "$1"',
+      'STAGE_STAMP="$2"',
+      'CALLS="$3"',
+      "systemctl() {",
+      '  case "$*" in',
+      '    *ActiveState*) echo "$E2E_ACTIVE_STATE" ;;',
+      '    *ExecMainStatus*) echo "$E2E_EXEC_MAIN_STATUS" ;;',
+      '    *) echo "systemctl $*" >>"$CALLS" ;;',
+      "  esac",
+      "}",
+      'stage() { echo stage >>"$CALLS"; [ "$E2E_STAGE_FAILS" = 0 ]; }',
+      'apply() { echo apply >>"$CALLS"; }',
+      'staged_version() { echo "$E2E_STAGED_VERSION"; }',
+      "check",
+    ].join("\n");
+    const result = Bun.spawnSync(["bash", "-c", script, NAME, join(HOSTING, "openbot-hosted-update"), stamp, calls], {
+      env: {
+        PATH: process.env.PATH ?? "",
+        E2E_ACTIVE_STATE: entry.activeState,
+        E2E_EXEC_MAIN_STATUS: entry.execMainStatus,
+        E2E_STAGE_FAILS: entry.stageFails ? "1" : "0",
+        E2E_STAGED_VERSION: entry.stagedVersion,
+      },
+    });
+    const after = stampTime(stamp);
+    return {
+      ...entry,
+      calls: readFileSync(calls, "utf8").split("\n").filter(Boolean),
+      exitCode: result.exitCode,
+      stampRefreshed: after !== null && after !== before,
+    };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function stampTime(path: string): number | null {
+  return existsSync(path) ? statSync(path).mtimeMs : null;
+}
+
+const START = "systemctl start --no-block openbot.service";
+const CHECK_CASES: CheckCase[] = [
+  {
+    name: "start loop stopped, first run after a boot: stage and start",
+    activeState: "failed",
+    execMainStatus: "78",
+    stampAgeMs: null,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: ["stage", START], exitCode: 0, stampRefreshed: true },
+  },
+  {
+    name: "start loop stopped, staged 1 hour ago: stage and start again",
+    activeState: "inactive",
+    execMainStatus: "78",
+    stampAgeMs: HOUR_MS,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: ["stage", START], exitCode: 0, stampRefreshed: true },
+  },
+  {
+    name: "start loop stopped, stage fails: start all the same, and fail",
+    activeState: "failed",
+    execMainStatus: "78",
+    stampAgeMs: HOUR_MS,
+    stageFails: true,
+    stagedVersion: "",
+    expected: { calls: ["stage", START], exitCode: 1, stampRefreshed: false },
+  },
+  {
+    name: "start loop stopped, a release is staged: install it and start",
+    activeState: "failed",
+    execMainStatus: "78",
+    stampAgeMs: HOUR_MS,
+    stageFails: false,
+    stagedVersion: "99.0.0",
+    expected: { calls: ["stage", "apply", START], exitCode: 0, stampRefreshed: true },
+  },
+  {
+    name: "running, staged 1 hour ago: nothing",
+    activeState: "active",
+    execMainStatus: "0",
+    stampAgeMs: HOUR_MS,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: [], exitCode: 0, stampRefreshed: false },
+  },
+  {
+    name: "running, staged 7 hours ago: stage only",
+    activeState: "active",
+    execMainStatus: "0",
+    stampAgeMs: 7 * HOUR_MS,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: ["stage"], exitCode: 0, stampRefreshed: true },
+  },
+  {
+    name: "stopped by hand (status 0): stage when due, no start",
+    activeState: "inactive",
+    execMainStatus: "0",
+    stampAgeMs: null,
+    stageFails: false,
+    stagedVersion: "",
+    expected: { calls: ["stage"], exitCode: 0, stampRefreshed: true },
+  },
+];
+
+/** `openbot-update.timer` runs `check` each hour, and `openbot-update.service` runs `check`. */
+function checkTimerUnits(): { timer: string; service: string } {
+  const timer = readFileSync(join(HOSTING, "openbot-update.timer"), "utf8");
+  const service = readFileSync(join(HOSTING, "openbot-update.service"), "utf8");
+  const interval = timer.match(/^OnUnitActiveSec=(.+)$/mu)?.[1];
+  assert.equal(interval, "1h", "openbot-update.timer runs each hour");
+  assert.match(service, /^ExecStart=\/opt\/OpenBot\/hosted\/openbot-hosted-update check$/mu);
+  return { timer: interval, service: "check" };
+}
+
 mkdirSync(OUT, { recursive: true });
 const runs: RunReport[] = [];
+const checks: CheckResult[] = [];
+let units: ReturnType<typeof checkTimerUnits> | null = null;
+let brokenMigration: MigrationMarker | null = null;
 let appVersion: string | null = null;
 let passed = false;
 let error: string | undefined;
@@ -176,20 +398,49 @@ async function finishingRun(run: number): Promise<Attempts> {
   return begun;
 }
 
-/** A start that ends by itself: a forced crash, or a halt. */
+/** A start that ends by itself: a forced crash, a failed migration, or a halt. */
 async function endingRun(run: number, mode: Mode, expectedFailures: number): Promise<number | null> {
   const startedAt = Date.now();
+  if (mode === "migration") brokenMigration = breakLatestMigration();
   stack.running = startStack(run, mode);
   const begun = await waitFor(`run ${run} records its attempt`, () => startedAfter(startedAt));
   assert.equal(begun.appVersion, appVersion, `run ${run} has the version of run 0`);
   assert.equal(begun.consecutiveFailures, expectedFailures, `run ${run} counts the earlier failures`);
   const exitCode = await stack.running.exit;
   stack.running = null;
+  if (brokenMigration) {
+    repairLatestMigration(brokenMigration);
+    brokenMigration = null;
+  }
   runs.push({ run, mode, exitCode, attemptsAfter: readAttempts(), haltAfter: readHalt() });
   return exitCode;
 }
 
+/** A migration fails before the third failure: a failed start, and the server does not stop its loop. */
+async function migrationFailureWithoutHalt(run: number, expectedFailures: number): Promise<void> {
+  const exitCode = await endingRun(run, "migration", expectedFailures);
+  assert.notEqual(exitCode, START_LOOP_EXIT_CODE, `run ${run}: a failed migration alone does not stop the loop`);
+  assert.equal(existsSync(haltPath), false, `run ${run} writes no reason file`);
+  const attempts = readAttempts();
+  assert.deepEqual(
+    { state: attempts?.attempt?.state, failures: attempts?.consecutiveFailures },
+    { state: "failed", failures: expectedFailures },
+    `run ${run} is a failed start`,
+  );
+}
+
 try {
+  units = checkTimerUnits();
+  for (const entry of CHECK_CASES) {
+    const result = runCheck(entry);
+    checks.push(result);
+    assert.deepEqual(
+      { calls: result.calls, exitCode: result.exitCode, stampRefreshed: result.stampRefreshed },
+      entry.expected,
+      `check: ${entry.name}`,
+    );
+  }
+
   // Only this test's files in this test's profile. The rest of the profile stays.
   for (const path of [attemptsPath, `${attemptsPath}.tmp`, haltPath, `${haltPath}.tmp`]) rmSync(path, { force: true });
 
@@ -197,8 +448,8 @@ try {
   assert.ok(appVersion, "run 0 gave the app version");
   const version: string = appVersion;
 
-  await endingRun(1, "crash", 0);
-  await endingRun(2, "crash", 1);
+  await migrationFailureWithoutHalt(1, 0);
+  await migrationFailureWithoutHalt(2, 1);
   await endingRun(3, "crash", 2);
   assert.equal(existsSync(haltPath), false, "a crash writes no reason file");
 
@@ -211,15 +462,24 @@ try {
 
   await finishingRun(5);
 
+  await endingRun(6, "crash", 0);
+  await endingRun(7, "crash", 1);
+  const migrationHaltCode = await endingRun(8, "migration", 2);
+  assert.equal(migrationHaltCode, START_LOOP_EXIT_CODE, "a failed migration as the third failure stops the loop");
+  assertHalt("start_failed", version);
+  assert.equal(readAttempts()?.attempt?.state, "failed", "the third failure counts");
+
+  await finishingRun(9);
+
   setNewerDatabase(true);
   newerDatabase = true;
-  const newerCode = await endingRun(6, "none", 0);
+  const newerCode = await endingRun(10, "none", 0);
   assert.equal(newerCode, START_LOOP_EXIT_CODE, "data from a newer version stops the loop at once");
   assertHalt("newer_database", version);
   setNewerDatabase(false);
   newerDatabase = false;
 
-  await finishingRun(7);
+  await finishingRun(11);
   assert.equal(existsSync(haltPath), false);
   passed = true;
 } catch (cause) {
@@ -230,9 +490,10 @@ try {
     await stack.running.exit;
   }
   if (newerDatabase) setNewerDatabase(false);
+  if (brokenMigration) repairLatestMigration(brokenMigration);
   writeFileSync(
     join(OUT, "report.json"),
-    `${JSON.stringify({ passed, appVersion, instanceId, runs, error }, null, 2)}\n`,
+    `${JSON.stringify({ passed, appVersion, instanceId, units, checks, runs, error }, null, 2)}\n`,
   );
   logger.info(`${passed ? "PASS" : "FAIL"}: report in ${join(OUT, "report.json")}`);
   if (!passed) {

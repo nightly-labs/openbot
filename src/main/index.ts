@@ -2094,10 +2094,11 @@ if (!hasSingleInstanceLock) {
       logger.error("OpenBot failed to start:", toLogValue(error));
       // Data that a newer version saved has its own recovery, and a new release ends that loop.
       if (!(error instanceof NewerDatabaseError)) startAttempts?.failed("error");
-      // A server stops its start loop when a restart cannot help, or when the failures reached the limit.
+      // A server stops its start loop when a restart cannot help (data from a newer version), or at the
+      // third failed start in a row. A failed migration counts as a failed start.
       if (serverStartGuard) {
         const reason = startHaltReason(error);
-        if (reason !== "start_failed" || startAttempts?.failureLimitReached) haltServerStart(reason);
+        if (reason === "newer_database" || startAttempts?.failureLimitReached) haltServerStart(reason);
         app.quit();
         return;
       }

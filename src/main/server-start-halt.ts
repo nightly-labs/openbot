@@ -1,7 +1,7 @@
 import { readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { Effect, Option, Schema } from "effect";
-import { DatabaseMigrationError, NewerDatabaseError } from "../backend/openbot-database-schema";
+import { NewerDatabaseError } from "../backend/openbot-database-schema";
 
 /**
  * A server has no recovery window, so it stops its start loop: it writes the reason file and exits
@@ -14,7 +14,7 @@ import { DatabaseMigrationError, NewerDatabaseError } from "../backend/openbot-d
 export const START_LOOP_EXIT_CODE = 78;
 export const START_HALT_FILE = "openbot-start-halt-v1.json";
 
-const StartHaltReason = Schema.Literals(["newer_database", "migration_failed", "start_failed"]);
+const StartHaltReason = Schema.Literals(["newer_database", "start_failed"]);
 export type StartHaltReason = typeof StartHaltReason.Type;
 
 const StartHaltRecord = Schema.Struct({
@@ -33,12 +33,14 @@ class StartHaltFileFailure extends Schema.TaggedError<StartHaltFileFailure>()("S
 /** The causes that a start error can wrap. A limit, so a loop of causes cannot stop the start. */
 const MAX_CAUSE_DEPTH = 8;
 
-/** The reason of a failed start. Only the class of the error is read, never its text. */
+/**
+ * The reason of a failed start. Only the class of the error is read, never its text. A failed
+ * migration is a `start_failed` too: it rolled back, and a full disk or a lock can be temporary.
+ */
 export function startHaltReason(error: unknown): StartHaltReason {
   let current: unknown = error;
   for (let depth = 0; depth < MAX_CAUSE_DEPTH && current instanceof Error; depth += 1) {
     if (current instanceof NewerDatabaseError) return "newer_database";
-    if (current instanceof DatabaseMigrationError) return "migration_failed";
     current = current.cause;
   }
   return "start_failed";
