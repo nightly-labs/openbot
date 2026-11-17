@@ -3183,19 +3183,25 @@ export class MailboxStore {
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
    * threads. External conversation work counts as before it had its own lane. Channel work counts
    * only with `includeChannels`: on a provider that runs one turn at a time, a channel turn holds the
-   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued.
+   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued. Without
+   * `includeMessaging`, the work of the messaging lane does not count.
    */
   hasUnfinishedDeliveryOutsideTasks(
     agentId: string,
     includeChannels: boolean,
     exceptQueued: readonly string[] = [],
+    includeMessaging = true,
   ): boolean {
     const messages = this.#messagesById();
     return this.#state.deliveries.some((delivery) => {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
       if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
-      return lane === null || lane === MESSAGING_LANE || (includeChannels && laneChannelId(lane) !== null);
+      return (
+        lane === null ||
+        (includeMessaging && lane === MESSAGING_LANE) ||
+        (includeChannels && laneChannelId(lane) !== null)
+      );
     });
   }
 
