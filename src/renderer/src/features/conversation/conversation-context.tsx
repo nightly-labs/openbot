@@ -351,11 +351,15 @@ const Conversation = createSimpleContext({
     // raw body of a streamed message: the next delta would append to the preview, not to the text.
     // Main adds text to a message before it sends the buffered delta, so the preview can hold text
     // that the first delta also holds. A message added from the preview starts with an empty raw body.
-    function applyRuntimeMessages(messages: AgentRuntimeSnapshot["latestMessages"]): void {
-      const agentIds = new Set(messages.map((message) => message.agentId));
+    // A window around an old message, from a search, does not reach the end of the thread: the
+    // preview would show there as a cut copy below older messages (#11539). Its snapshot does not
+    // add new messages either; "Scroll to latest message" loads them.
+    function applyRuntimeMessages(latestMessages: AgentRuntimeSnapshot["latestMessages"]): void {
       // The draft includes pending page writes from this event batch. Outside
       // the setter, store keys can precede their committed conversation values.
       setConversations((current) => {
+        const messages = latestMessages.filter((message) => current[message.agentId]?.windowMode !== "around");
+        const agentIds = new Set(messages.map((message) => message.agentId));
         const currentMessages = Object.fromEntries(
           Object.entries(current).map(([id, conversation]) => [id, conversation.messages]),
         );
