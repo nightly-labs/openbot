@@ -204,6 +204,12 @@ const ACP_STOP_GRACE_MS = 10_000;
  */
 const ACP_REPEATED_TOOL_FAILURES = 5;
 
+/**
+ * How long a steer by prompt waits for the agent to take it or refuse it (`#steerByPrompt`). Antigravity
+ * 1.5.10 gave each answer within 5 ms in a live probe.
+ */
+const ACP_STEER_ANSWER_MS = 3_000;
+
 /** How often OpenBot asks `session/list` whether a session with a background task has changed. */
 const ACP_BACKGROUND_POLL_MS = 2_000;
 
@@ -308,6 +314,10 @@ interface AcpTurn {
   task: Fiber.Fiber<void, ProviderClientOperationError> | null;
   /** The replies to the prompts that steered this turn (`#steerByPrompt`), in the order sent. */
   readonly steerReplies: Deferred.Deferred<Result.Result<PromptResponse, ProviderClientOperationError>>[];
+  /** Completes when the agent answers the last prompt sent for this turn (`#turnPrompt`). */
+  lastPrompt: Deferred.Deferred<void> | null;
+  /** Sends the steers by prompt one at a time, so each one knows the prompt that it joins. */
+  readonly steerLock: Semaphore.Semaphore;
   /** When the agent last sent an update for this turn, or the user last answered it. */
   lastActivityAt: number;
   /** The model retry notices since the agent's last other update (`AcpFlavor.modelRetryUpdate`). */
@@ -1504,7 +1514,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
             messageId: getString(params, "clientUserMessageId"),
             blocks,
           });
-        else yield* this.#steerByPrompt(thread, turn, blocks);
+        else yield* turn.steerLock.withPermit(this.#steerByPrompt(thread, turn, blocks));
         turn.lastActivityAt = Date.now();
         // A steer can start a new model request, and its first retry gets the whole limit again.
         turn.modelRetries = 0;
@@ -2757,6 +2767,8 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       completing: false,
       task: null,
       steerReplies: [],
+      lastPrompt: null,
+      steerLock: Semaphore.makeUnsafe(1),
       lastActivityAt: Date.now(),
       modelRetries: 0,
       answered: false,
@@ -3114,24 +3126,61 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * `steerByPromptCapability`). The agent answers the prompt before it with `end_turn`: Antigravity at
    * once, Devin when the run ends. `#consumePrompt` then waits for this reply.
    * The request returns when the prompt is sent: its reply comes at the end of the turn.
+   * Antigravity (`steerByPromptSince`) answers the open prompt at once when it takes the steer. While
+   * that prompt waits for an approval or a question, it refuses the steer at once, also when OpenBot
+   * has not received that request yet. So the request waits for one of the two answers. A refused
+   * steer keeps the turn, and the message waits in the queue (#11107).
    */
   readonly #steerByPrompt = Effect.fn("AcpAgentClient.steerByPrompt")(function* (
     this: AcpAgentClient,
     thread: AcpThread,
     turn: AcpTurn,
     prompt: ContentBlock[],
-  ): Effect.fn.Return<void> {
+  ): Effect.fn.Return<void, ProviderClientOperationError> {
+    // A steer that waited for another one checks the turn again.
+    if (thread.activeTurn !== turn || turn.stopped || turn.completing || turn.waitingOnUser > 0)
+      return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
+    const open = turn.lastPrompt;
     const reply = Deferred.makeUnsafe<Result.Result<PromptResponse, ProviderClientOperationError>>();
     turn.steerReplies.push(reply);
     yield* Effect.forkIn(
-      providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
-        Effect.result,
-        Effect.flatMap((result) => Deferred.succeed(reply, result)),
-      ),
+      this.#turnPrompt(thread, turn, prompt).pipe(Effect.flatMap((result) => Deferred.succeed(reply, result))),
       this.#scope,
       { startImmediately: true },
     );
+    // With no prompt open, as during a background command, the agent holds the steer until it is free.
+    if (this.#flavor.steerByPromptSince === undefined || !open || Deferred.isDoneUnsafe(open)) return;
+    const first = yield* Effect.raceFirst(
+      Effect.raceFirst(Deferred.await(reply), Deferred.await(open).pipe(Effect.as(null))),
+      // An agent that gives neither answer keeps the steer, as before.
+      Effect.sleep(ACP_STEER_ANSWER_MS).pipe(Effect.as(null)),
+    );
+    if (first === null || Result.isSuccess(first)) return;
+    const index = turn.steerReplies.indexOf(reply);
+    if (index >= 0) turn.steerReplies.splice(index, 1);
+    turn.lastPrompt = open;
+    logger.warn("An ACP agent refused a steer prompt. The message waits in the queue.", {
+      provider: this.provider,
+      cause: this.#redact(failureText(first.failure.cause)),
+    });
+    return yield* providerFailure(new Error(sourceText("error.backend.steerTurnChanged")));
   });
+
+  /** Sends a prompt of the turn. `turn.lastPrompt` completes when the agent answers it or the send ends. */
+  #turnPrompt(
+    thread: AcpThread,
+    turn: AcpTurn,
+    prompt: ContentBlock[],
+  ): Effect.Effect<Result.Result<PromptResponse, ProviderClientOperationError>> {
+    return Effect.suspend(() => {
+      const answered = Deferred.makeUnsafe<void>();
+      turn.lastPrompt = answered;
+      return providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
+        Effect.result,
+        Effect.ensuring(Deferred.succeed(answered, undefined)),
+      );
+    });
+  }
 
   /**
    * Sends a prompt. An agent that keeps a silent prompt open for background tasks gets it once more
@@ -3149,9 +3198,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     prompt: ContentBlock[],
     params: unknown,
   ): Effect.fn.Return<Result.Result<PromptResponse, ProviderClientOperationError>> {
-    const send = providerCall(() => this.#sessionConnection(thread).prompt({ sessionId: thread.id, prompt })).pipe(
-      Effect.result,
-    );
+    const send = this.#turnPrompt(thread, turn, prompt);
     if (!this.#flavor.promptOpenForBackgroundTasks || !this.#supportsSessionResume) return yield* send;
     const limit = this.options.firstUpdateMs ?? ACP_FIRST_UPDATE_MS;
     const silent = Effect.sleep(limit).pipe(
