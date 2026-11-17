@@ -796,6 +796,9 @@ export class ProviderRuntime implements ProviderPort {
       isSignedOut: (provider) => this.signInRequired(provider),
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
+      // Apart from the read: the restart reads the catalogue again itself.
+      startSettingsChanged: (provider) =>
+        this.restartProviderWhenIdle(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
     });
   }
 

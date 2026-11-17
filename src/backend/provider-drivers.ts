@@ -822,8 +822,14 @@ interface ProviderModelCatalog {
    * Where the CLI's own settings say its models come from, when that is not the provider's own list,
    * such as a Codex model provider or model list file (#9956). Read with each list. A failed read
    * clears it, so the picker never shows a source that it could not check.
+   *
+   * `startSettings`: the settings, as they are now, that the CLI reads into its list only at its start.
+   * When they change while the process runs, the process restarts when its turns end (#10268).
    */
-  source?(client: AgentClient, timeoutMs: number): Effect.Effect<ProviderModelSource | null, unknown>;
+  source?(
+    client: AgentClient,
+    timeoutMs: number,
+  ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string }, unknown>;
 }
 
 /**
@@ -1043,7 +1049,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource },
+    // Codex reads its list only at its start. The idle reread compares its start settings, so a model
+    // that the user adds in `config.toml` comes without a restart from the user (#10268).
+    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) => {
       // Codex reads the system roots itself and skips a root that it cannot parse. With

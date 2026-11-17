@@ -1,3 +1,5 @@
+import { statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import {
   DEFAULT_MODEL_SERVERS,
   PROVIDER_MODEL_SOURCE_NAME_LIMIT,
@@ -46,11 +48,34 @@ function builtInName(providerId: string): string {
   return BUILT_IN_NAMES.get(providerId) ?? providerId;
 }
 
-/** Reads the source from the running Codex. Fails as `config/read` fails. */
+/**
+ * The settings that Codex reads into its model list only when its process starts (#10268): the model
+ * provider and its entry, and the model list file with the time it last changed. `config/read` gives
+ * them as they are now, also to a process that started before they changed. Codex itself keeps the same
+ * fields to know when its list is out of date (`app-server/src/model_catalog.rs`). Other values of
+ * `config.toml`, such as trusted projects that Codex writes itself, are not in it.
+ */
+function codexStartSettings(config: unknown) {
+  const providerId = getString(config, "model_provider")?.trim() || OPENAI_PROVIDER_ID;
+  const provider = getRecord(getRecord(config, "model_providers"), providerId);
+  // Codex 0.167 gives a path; newer versions give a `file:` URI.
+  const catalog = getString(config, "model_catalog_json")?.trim() || null;
+  return Effect.try(() => {
+    if (!catalog) return null;
+    const file = statSync(catalog.startsWith("file:") ? fileURLToPath(catalog) : catalog);
+    return [file.mtimeMs, file.size];
+  }).pipe(
+    Effect.orElseSucceed(() => null),
+    Effect.map((catalogVersion) => JSON.stringify([providerId, provider, catalog, catalogVersion])),
+  );
+}
+
+/** Reads the source and the start settings from the running Codex. Fails as `config/read` fails. */
 export const readCodexModelSource = Effect.fn("Agent.readCodexModelSource")(function* (
   client: AgentClient,
   timeoutMs: number,
 ) {
   const response = yield* client.request("config/read", { includeLayers: false }, decodeRecordResponse, timeoutMs);
-  return codexModelSource(getRecord(response, "config"));
+  const config = getRecord(response, "config");
+  return { source: codexModelSource(config), startSettings: yield* codexStartSettings(config) };
 });

@@ -30,6 +30,8 @@ export interface ModelCatalogOptions {
   requestTimeoutMs: number;
   /** Keeps a failed model list on the provider row. */
   recordProviderError(provider: AgentProvider, error: unknown): void;
+  /** The settings that the provider's running process read at its start changed, so its list is old. */
+  startSettingsChanged(provider: AgentProvider): Effect.Effect<void>;
 }
 
 /**
@@ -41,6 +43,8 @@ export class ModelCatalog {
   #models = structuredClone(FALLBACK_MODELS);
   /** The source of each provider whose CLI settings give its models from elsewhere (`ProviderModelCatalog.source`). */
   readonly #sources = new Map<AgentProvider, ProviderModelSource>();
+  /** The last `startSettings` that each client gave (`ProviderModelCatalog.source`). */
+  readonly #startSettings = new WeakMap<AgentClient, string>();
 
   constructor(options: ModelCatalogOptions) {
     this.#options = options;
@@ -72,7 +76,17 @@ export class ModelCatalog {
     const result = yield* Effect.result(catalog.source(client, providerCheckTimeoutMs(5_000)));
     if (this.#options.client(provider) !== client) return false;
     if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
-    const source = Result.isSuccess(result) ? result.success : null;
+    const source = Result.isSuccess(result) ? result.success.source : null;
+    if (Result.isSuccess(result)) {
+      // The first read of a client is near its start, so it gives the settings that its process read.
+      const { startSettings } = result.success;
+      const atStart = this.#startSettings.get(client);
+      this.#startSettings.set(client, startSettings);
+      if (atStart !== undefined && atStart !== startSettings) {
+        logger.info("A provider's model settings changed while it ran.", { provider });
+        yield* this.#options.startSettingsChanged(provider);
+      }
+    }
     const before = JSON.stringify(this.#sources.get(provider) ?? null);
     if (source) this.#sources.set(provider, source);
     else this.#sources.delete(provider);
