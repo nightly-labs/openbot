@@ -54,10 +54,17 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
   return mask(toSecretSafeValue(record));
 }
 
+/**
+ * Setting words that are never a credential. A provider gets them as values, such as the GitHub
+ * connection's `useHttpPath=true`, and masking them changed `QA_READY=true` in an agent's answer to
+ * `QA_READY=•••`, so a workflow condition took the wrong branch (#10680).
+ */
+const CONFIG_LITERALS = new Set(["true", "false", "yes", "no", "on", "off", "null", "none"]);
+
 function maskValues(text: string, values: Iterable<string>): string {
   let result = text;
   for (const value of values) {
-    if (value.length < 4) continue;
+    if (value.length < 4 || CONFIG_LITERALS.has(value.toLowerCase())) continue;
     result = result.split(value).join(MASK);
   }
   return result;
