@@ -93,14 +93,14 @@ Not confirmed: desktop users other than the developer (no central source).
 
 | # | Item | State |
 |---|---|---|
-| 1 | The bootstrap capability list stays at 64; one size check per protocol | IN REVIEW (#10777, reopened) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | BLOCKED: clients check only protocol 3 (step 1 in review: #10811) |
-| 3 | A server stops a start loop and reports the reason through the Team API | TODO |
-| 4 | Desktop start recovery offers only a release that can open the database | TODO |
-| 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
-| 6 | No implicit `new OpenBotDatabase()`; one release version comparator | TODO |
+| 1 | The bootstrap capability list stays at 64; one size check per protocol | DONE (#10777, `b8f6ab2738`) |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | IN PROGRESS: step 1 done (#10811, `fad280c74b`); the share sender step needs a store build |
+| 3 | A server stops a start loop and reports the reason through the Team API | PARTLY DONE: the loop stops (#10775, `932be637d6`); safe mode needs product decisions |
+| 4 | Desktop start recovery offers only a release that can open the database | DONE (#10780, `dfca5813c1`) |
+| 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
+| 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
 | 15 | Copy `openbot.db` before a migration (PR #7150) | DROPPED: not practical for large databases (#7150 closed) |
-| 24 | Minimum app version for each surface; blocking "Update required" screen | IN REVIEW (#10803; reworked to a manual minimum with a 60-day floor) |
+| 24 | Minimum app version for each surface; blocking "Update required" screen | DONE (#10803; a manual minimum with a 60-day floor) |
 
 ### 1. Bootstrap list stays at 64
 
@@ -220,12 +220,12 @@ send new user data (`PRIVACY.md` if outbound data changes).
 
 | # | Item | State |
 |---|---|---|
-| 7 | Shared migration test harness (migrate to version N, fixtures per released schema) | IN REVIEW (#10818, with 12; rebase after #10806) |
-| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | IN REVIEW (#10806; no `name` column: the check stops a renumber) |
-| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | IN REVIEW (#10805; list reads skip the row; wire decoders unchanged) |
-| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | IN REVIEW (#10801) |
+| 7 | Shared migration test harness (migrate to version N, fixtures per released schema) | DONE (#10818, with 12, `56ae679776`) |
+| 8 | One frozen file per migration, CI check against the last release tag, migration `name` column | DONE (#10806, `6b2da3b900`; no `name` column: the check stops a renumber) |
+| 9 | Unknown enum values decode to an `unknown` case (`checkedColumn`, wire decoders) | DROPPED: developer decision, 2026-11-17 (#10805 closed) |
+| 10 | One `withTransaction` helper with SAVEPOINT nesting, a GritQL rule, and AGENTS.md text | DONE (#10801, `511572aee3`) |
 | 11 | One capability registry generates all capability lists; strict `supports()` (after item 2) | TODO |
-| 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | IN REVIEW (#10818; 1.96 GB: 25.5 s, v39 needs about 2x the file in free disk) |
+| 12 | Upgrade E2E from N-k releases, from a large database, and from a fixed old database | DONE (#10818; 1.96 GB: 25.5 s, v39 needs about 2x the file in free disk) |
 
 ## Phase 3: durable state
 
