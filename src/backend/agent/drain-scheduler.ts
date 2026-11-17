@@ -7,7 +7,7 @@ import {
   type AgentSummary,
   CHANNEL_RESUME_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
-import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
@@ -61,6 +61,22 @@ export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved"
 
 const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
+/**
+ * The catalog keys of a start that found its provider not downloaded (`cli.ts`). They hold no detail:
+ * the one placeholder, in `nativeMissing`, is OpenBot's own provider name.
+ */
+const PROVIDER_MISSING_KEYS: ReadonlySet<string> = new Set([
+  "error.provider.codexMissing",
+  "error.provider.claudeMissing",
+  "error.provider.grokMissing",
+  "error.provider.opencodeMissing",
+  "error.provider.antigravityMissing",
+  "error.provider.cursorMissing",
+  "error.provider.clineMissing",
+  "error.provider.kimiMissing",
+  "error.provider.hermesMissing",
+  "error.provider.nativeMissing",
+]);
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
 /**
@@ -1343,11 +1359,12 @@ export class DrainScheduler {
           this.#mailboxSync.emitQueue(delivery.recipientAgentId);
           // The agent that asked gets the failure as its answer; the drain of the sender below starts it.
           yield* this.#answerFailedRequest(delivery.id, delivery.recipientAgentId);
+          const startReason = this.#startReason(recipient, error);
           if (this.#channels)
             yield* this.#channels
-              .deliveryFailed(delivery.id, this.#channelStartReason(recipient, error))
+              .deliveryFailed(delivery.id, startReason ?? CHANNEL_START_FAILED)
               .pipe(toDeliveryStartFailed);
-          this.#messaging?.deliveryFailed(delivery.id);
+          this.#messaging?.deliveryFailed(delivery.id, startReason);
           // The provider refused the session or the turn, so no turn line records the failure.
           logger.warn("A message did not start.", {
             agentId: delivery.recipientAgentId,
@@ -1535,28 +1552,33 @@ export class DrainScheduler {
   }
 
   /**
-   * What a stopped channel task says when its provider did not start it. A sign-in is the start
-   * failure that the reader can fix, so the task names it instead of the general reason (#6684): the
-   * provider's own sign-in text when the start failed with it, such as a request for an API key, and an
-   * expired sign-in otherwise, also when the provider refused the account before its check marked it.
-   * Only catalog text goes to the channel: every reader of it sees it, in the reader's language.
-   * Another Codex app that holds the thread is the same: Resume fails until the reader closes it there.
+   * What a stopped channel task or an external conversation says when the provider did not start
+   * it, or null for the general reason. A sign-in is the start failure that the reader can fix, so it
+   * is named instead of the general reason (#6684): the provider's own sign-in text when the start
+   * failed with it, such as a request for an API key, and an expired sign-in otherwise, also when the
+   * provider refused the account before its check marked it. A provider that is not downloaded is
+   * named too (#10597). Only catalog text goes out: every reader of it sees it, in the reader's
+   * language. Another Codex app that holds the thread is the same: a new try fails until the reader
+   * closes it there.
    */
-  #channelStartReason(recipient: AgentSummary | undefined, error: unknown): string {
+  #startReason(recipient: AgentSummary | undefined, error: unknown): string | null {
     if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
-    if (!recipient || !(error instanceof Error)) return CHANNEL_START_FAILED;
+    if (!recipient || !(error instanceof Error)) return null;
     const provider = providerForAgent(recipient);
-    const signInText =
-      error instanceof ProviderSignInError ||
-      (this.#providers.signInRequired(provider) &&
-        this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message);
+    const statusText =
+      this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message;
+    // The status of the agent's own provider keeps the text of the missing download, and the start
+    // fails with it. The general status message can be about another provider, so it is not used.
+    if (statusText && matchingSourceKeys(error.message).some((key) => PROVIDER_MISSING_KEYS.has(key)))
+      return error.message;
+    const signInText = error instanceof ProviderSignInError || (this.#providers.signInRequired(provider) && statusText);
     // A fixed catalog text holds nothing from the provider. A placeholder can carry the provider's own
     // words, and a text outside the catalog, such as "Connect ChatGPT to continue.", is not translated.
     if (signInText && isFixedSourceText(error.message)) return error.message;
     // The agent runs on this provider, which it can only choose while signed in, so its sign-in expired.
     if (signInText || classifyUserError(error) === "auth")
       return sourceText("error.provider.signInExpired", { provider: providerLabel(provider) });
-    return CHANNEL_START_FAILED;
+    return null;
   }
 
   /**

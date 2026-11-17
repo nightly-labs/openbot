@@ -2668,11 +2668,12 @@ function finalPost(
       text: quiet || answerOnly ? "" : sourceText("status.messaging.stopped"),
       reaction: reacts ? "stopped" : null,
     };
-  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
+  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
+  // the catalog text of a start that failed, such as a provider that is not downloaded, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
-      text: quiet ? "" : sourceText("status.messaging.failed"),
+      text: quiet ? "" : (activity.reason ?? sourceText("status.messaging.failed")),
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;
