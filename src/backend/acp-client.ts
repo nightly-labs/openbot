@@ -4823,8 +4823,9 @@ function startsBackgroundTask(rawOutput: unknown): boolean {
 
 /**
  * A missing session, identified by the agent's flavor or by the protocol's `-32002` error. The
- * protocol names the session in `data.sessionId`, as ACP SDK 2.x and Claude Agent 0.107.2 send it
- * with only "Resource not found" as the message (#10317). Older agents name it in `data.uri`.
+ * protocol names the session in `data.sessionId` (ACP error page, "Unknown sessions"). Claude Agent
+ * 0.107.2 sends it so, with only "Resource not found" as the message (#10317). Older agents name it
+ * in `data.uri`.
  */
 function isSessionNotFound(error: unknown, sessionId: string, flavor: AcpFlavor): boolean {
   if (!(error instanceof RequestError)) return false;
