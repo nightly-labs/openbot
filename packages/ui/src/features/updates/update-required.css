@@ -1,5 +1,10 @@
-/* "Update required" uses the sign-in layout (`auth.css`). These rules add only its progress and its
-   secondary action. */
+/* "Update required" uses the sign-in layout (`auth.css`). These rules add only its failure alert,
+   its progress and its secondary action. */
+
+.update-required-alert {
+  margin-top: 24px;
+  text-align: start;
+}
 
 .update-required-progress {
   display: flex;

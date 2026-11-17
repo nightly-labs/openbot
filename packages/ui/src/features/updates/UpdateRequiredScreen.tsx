@@ -1,7 +1,9 @@
 import { AppLogo, type AppLogoVariant } from "@openbot/brand";
 import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { createSignal, Show } from "solid-js";
+import { Alert, AlertContent, AlertDescription, AlertIcon, AlertTitle } from "../../alert";
 import { Button } from "../../button";
+import { TriangleAlert } from "../../icons";
 import { Progress } from "../../progress";
 import { useText } from "../../text";
 import { restartReasonKey } from "./restart-reasons";
@@ -49,6 +51,11 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
       ? errorMessage(props.status.message, t("update.required.failed"))
       : null;
   const failure = () => actionError() ?? statusError();
+  // The title says that the update failed; the description says why, when the cause is known.
+  const failureDetail = () => {
+    const message = failure();
+    return message === t("update.required.failed") ? null : message;
+  };
   async function update(): Promise<void> {
     setActionError(null);
     try {
@@ -79,7 +86,17 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
               minimum: props.status.requiredVersion ?? "",
             })}
           </p>
-          <Show when={failure()}>{(message) => <p class="account-login-error">{message()}</p>}</Show>
+          <Show when={failure() !== null}>
+            <Alert tone="danger" role="alert" class="update-required-alert">
+              <AlertIcon>
+                <TriangleAlert />
+              </AlertIcon>
+              <AlertContent>
+                <AlertTitle>{t("update.required.failed")}</AlertTitle>
+                <Show when={failureDetail()}>{(detail) => <AlertDescription>{detail()}</AlertDescription>}</Show>
+              </AlertContent>
+            </Alert>
+          </Show>
           <Show
             when={presentation().supported}
             fallback={

@@ -1,4 +1,5 @@
 import type { UpdateStatus } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { UpdateRequiredScreen } from "@openbot/ui/features/updates/UpdateRequiredScreen";
 import { fn } from "storybook/test";
 import type { Meta, StoryObj } from "storybook-solidjs-vite";
@@ -55,7 +56,7 @@ export const Failed: Story = {
       ...BELOW_MINIMUM,
       phase: "error",
       progress: null,
-      message: "The download stopped.",
+      message: sourceText("error.update.downloadStalled"),
       errorCode: "download_failed",
     },
   },
