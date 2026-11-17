@@ -148,6 +148,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} {time}",
   "routine.card.timeZone": "{city} 時間",
   "routine.card.saved": "保存しました",
+  "routine.card.turnOn": "オンにする",
   "routine.card.saveFailed": "スケジュールを保存できませんでした。",
   "routine.card.deleted": "このルーティンは削除されました。",
   "routine.card.created": "ルーティンを作成しました",

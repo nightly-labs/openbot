@@ -150,6 +150,7 @@ export const messages = defineMessages("routine", {
   "routine.card.nextRunAt": "{day} at {time}",
   "routine.card.timeZone": "{city} time",
   "routine.card.saved": "Saved",
+  "routine.card.turnOn": "Turn on",
   "routine.card.saveFailed": "Could not save the schedule.",
   "routine.card.deleted": "This routine was deleted.",
   "routine.card.created": "Created routine",

@@ -151,6 +151,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} saat {time}",
   "routine.card.timeZone": "{city} saati",
   "routine.card.saved": "Kaydedildi",
+  "routine.card.turnOn": "Aç",
   "routine.card.saveFailed": "Zamanlama kaydedilemedi.",
   "routine.card.deleted": "Bu rutin silindi.",
   "routine.card.created": "Rutin oluşturuldu",

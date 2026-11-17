@@ -178,6 +178,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} o {time}",
   "routine.card.timeZone": "Czas: {city}",
   "routine.card.saved": "Zapisano",
+  "routine.card.turnOn": "Włącz",
   "routine.card.saveFailed": "Nie udało się zapisać harmonogramu.",
   "routine.card.deleted": "Ta rutyna została usunięta.",
   "routine.card.created": "Utworzono rutynę",

@@ -190,6 +190,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} في {time}",
   "routine.card.timeZone": "توقيت {city}",
   "routine.card.saved": "تم الحفظ",
+  "routine.card.turnOn": "تشغيل",
   "routine.card.saveFailed": "تعذّر حفظ الجدول.",
   "routine.card.deleted": "حُذفت هذه المهمة الدورية.",
   "routine.card.created": "أُنشئت مهمة دورية",

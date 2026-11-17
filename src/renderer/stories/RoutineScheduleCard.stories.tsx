@@ -89,6 +89,11 @@ export const SaveError: Story = {
   args: { action: "updated", state: "error", errorText: "Could not save the schedule. Try again." },
 };
 
+/** The routine's own run paused it when its task was done (#10492). */
+export const Paused: Story = {
+  args: { action: "updated", paused: true, nextRunLabel: undefined, onTurnOn: fn() },
+};
+
 export const Deleted: Story = {
   args: { state: "deleted", nextRunLabel: undefined },
 };

@@ -139,6 +139,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} om {time}",
   "routine.card.timeZone": "Tijd in {city}",
   "routine.card.saved": "Opgeslagen",
+  "routine.card.turnOn": "Inschakelen",
   "routine.card.saveFailed": "Kan het schema niet opslaan.",
   "routine.card.deleted": "Deze routine is verwijderd.",
   "routine.card.created": "Routine gemaakt",

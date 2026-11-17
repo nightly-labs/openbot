@@ -151,6 +151,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} um {time}",
   "routine.card.timeZone": "Ortszeit {city}",
   "routine.card.saved": "Gespeichert",
+  "routine.card.turnOn": "Einschalten",
   "routine.card.saveFailed": "Der Zeitplan konnte nicht gespeichert werden.",
   "routine.card.deleted": "Diese Routine wurde gelöscht.",
   "routine.card.created": "Routine erstellt",

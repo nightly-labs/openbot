@@ -156,6 +156,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} ב-{time}",
   "routine.card.timeZone": "שעון {city}",
   "routine.card.saved": "נשמר",
+  "routine.card.turnOn": "הפעלה",
   "routine.card.saveFailed": "לא ניתן לשמור את התזמון.",
   "routine.card.deleted": "השגרה הזו נמחקה.",
   "routine.card.created": "שגרה נוצרה",

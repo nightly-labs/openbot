@@ -151,6 +151,7 @@ export const messages = {
   "routine.card.nextRunAt": "{day} {time}",
   "routine.card.timeZone": "{city}时间",
   "routine.card.saved": "已保存",
+  "routine.card.turnOn": "开启",
   "routine.card.saveFailed": "无法保存计划。",
   "routine.card.deleted": "该自动化任务已被删除。",
   "routine.card.created": "创建了自动化任务",

@@ -57,14 +57,15 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
   // Saves run one after another, so a slow host cannot apply an older schedule last.
   let saveQueue = Promise.resolve();
 
-  function saveSchedule(schedule: RoutineSchedule): void {
+  /** `turnOn` also turns a paused routine on again, as the switch in the settings panel does. */
+  function saveSchedule(schedule: RoutineSchedule, turnOn = false): void {
     const request = ++saveRequest;
     requested = schedule;
     setSave({ status: "saving" });
-    saveQueue = saveQueue.then(() => sendSchedule(schedule, request));
+    saveQueue = saveQueue.then(() => sendSchedule(schedule, request, turnOn));
   }
 
-  async function sendSchedule(schedule: RoutineSchedule, request: number) {
+  async function sendSchedule(schedule: RoutineSchedule, request: number, turnOn: boolean) {
     // Read when the save starts, so it keeps a rename or a pause that an earlier save loaded.
     const current = routine();
     // A done one-time routine that gets a later time is active again, so it runs at that time.
@@ -75,7 +76,7 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
         routineId: current.id,
         name: current.name,
         instruction: current.instruction,
-        active: current.active || (done && later),
+        active: turnOn || current.active || (done && later),
         timezone: current.timezone,
         schedule,
       });
@@ -91,6 +92,14 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
     }
   }
 
+  // A later change made elsewhere, such as a pause in the settings panel, replaces "Saved": the card
+  // then shows the routine as it is now.
+  const cardState = () => {
+    const status = save().status;
+    const saved = lastSaved();
+    return status === "saved" && saved && props.routine.updatedAt > saved.updatedAt ? "idle" : status;
+  };
+
   const errorText = () => {
     const current = save();
     return current.status === "error" ? current.message : undefined;
@@ -103,10 +112,14 @@ export function RoutineChatCard(props: RoutineChatCardProps) {
       schedule={draft()}
       // Only this computer's host keeps a one-time routine, so only its card offers the one-time kind.
       kinds={routine().trigger.schedule.kind === "once" ? ROUTINE_LOCAL_DRAFT_KINDS : ROUTINE_SAVED_DRAFT_KINDS}
-      state={save().status}
+      state={cardState()}
       errorText={errorText()}
       nextRunLabel={nextRunLabel(routine(), text)}
       timeZoneLabel={timeZoneLabel(routine(), text)}
+      // A routine can pause itself when its task is done (#10492). A done one-time routine stays off
+      // as a record: it runs again only with a new time.
+      paused={!routine().active && !routineOnceCompleted({ ...routine(), schedule: routine().trigger.schedule })}
+      onTurnOn={() => saveSchedule(routine().trigger.schedule, true)}
       onChange={(next) => {
         pending = next;
         setDraft(next);
