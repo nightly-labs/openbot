@@ -314,7 +314,7 @@ import {
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
-import { LocalServers } from "./local-servers/local-servers";
+import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -4169,7 +4169,11 @@ export async function createApplicationServices({
           remoteServers,
           command: {
             executable: process.execPath,
-            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+            args: [
+              ...(app.isPackaged ? [] : [app.getAppPath()]),
+              ...ozonePlatformArguments(),
+              ...sandboxArguments(process.argv.slice(1)),
+            ],
           },
           trash: (path) => shell.trashItem(path),
           account: {
