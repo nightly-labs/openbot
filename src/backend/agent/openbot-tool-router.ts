@@ -3508,7 +3508,8 @@ export class OpenBotToolRouter {
       let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
         updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
-      } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+      } else if (args.avatarSeed !== undefined) {
+        // Only a new generated face replaces an image. A color keeps it, as in the agent settings (#10431).
         updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
       return {
