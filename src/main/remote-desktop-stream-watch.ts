@@ -34,7 +34,8 @@ export function remoteDesktopStreamWatchScript(serverId: string): string {
 // One viewer origin can show several servers, so each server keeps its own quality.
 const QUALITY_KEY = ${JSON.stringify(`openbot-remote-quality:${serverId}`)};
 const sessionId = /\\/sessions\\/([A-Za-z0-9-]+)\\/moonlight(?:\\/|$)/.exec(location.pathname)?.[1];
-const phone = "ReactNativeWebView" in window;
+// The phone app's page script sets this before the page loads, in every release with remote desktop.
+const phone = "__openbotRemote" in window;
 let lowered = false;
 if (!phone) {
   // The desktop app and the browser set no rate of their own, so Moonlight's defaults apply unless
