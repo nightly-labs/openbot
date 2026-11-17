@@ -251,20 +251,14 @@ async function buildIndex(
   identity: FileIdentity,
   signal: AbortSignal,
 ): Promise<number> {
-  // A transcript can write one record more than once. Like the Claude Agent SDK, keep the place of
-  // the first copy (`seq`) and the contents of the last.
+  // A transcript can write one record more than once (#11557). Keep the first copy: an indexed row
+  // never changes, because a resumed read does not send the turns before its resume point again.
   const insert = database.prepare(
     `INSERT INTO entries
       (uuid, type, offset, length, parent_uuid, timestamp, session_id, parent_tool_use_id,
        parent_agent_id, is_sidechain, is_meta, team_name, subtype, compact_metadata, visible_user)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(uuid) DO UPDATE SET
-      type = excluded.type, offset = excluded.offset, length = excluded.length,
-      parent_uuid = excluded.parent_uuid, timestamp = excluded.timestamp, session_id = excluded.session_id,
-      parent_tool_use_id = excluded.parent_tool_use_id, parent_agent_id = excluded.parent_agent_id,
-      is_sidechain = excluded.is_sidechain, is_meta = excluded.is_meta, team_name = excluded.team_name,
-      subtype = excluded.subtype, compact_metadata = excluded.compact_metadata,
-      visible_user = excluded.visible_user`,
+     ON CONFLICT(uuid) DO NOTHING`,
   );
   let nextOffset = startOffset;
   let lineNumber = 0;
