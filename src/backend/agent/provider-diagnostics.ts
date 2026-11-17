@@ -423,9 +423,12 @@ export function isImageCountDiagnostic(message: string): boolean {
  * image of the session at a small fixed token cost, so a session with many images grows past this
  * byte limit before its token-based compaction starts, and each later turn fails the same way until
  * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ * Google's Gemini API writes FAILED_PRECONDITION "The message size exceeds 30.000MB limit". The
+ * Antigravity CLI compacts a session by tokens and keeps each image that the agent opened, so a
+ * session with many images grows past it in the same way, and `/compact` fails too (#10517).
  */
 export function isRequestBodyLimitDiagnostic(message: string): boolean {
-  return /\brequest body exceeds \d+ bytes\b/iu.test(message);
+  return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
 }
 
 /**
