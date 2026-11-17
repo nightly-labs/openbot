@@ -1342,6 +1342,15 @@
   color: var(--openbot-text-readable);
 }
 
+/*
+ * A solid bubble is the agent's color, light or dark in both themes. Its quote takes the text color
+ * of the bubble, as its other text does, and not the theme color, which can be the bubble color.
+ */
+.ui-bubble.message-bubble-solid .message-reply-context {
+  border-inline-start-color: var(--openbot-text-dim);
+  color: var(--openbot-text-secondary);
+}
+
 /* A quote that opens its original. The button lies over the whole quote, its start mark included. */
 .message-reply-context[data-opens] {
   position: relative;
