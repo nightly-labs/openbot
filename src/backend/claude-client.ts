@@ -1490,9 +1490,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       this.#agentEnvironment?.().CLAUDE_CONFIG_DIR ?? process.env.CLAUDE_CONFIG_DIR ?? join(homedir(), ".claude");
     yield* clearClaudeNeedsAuthMarks(
       configDirectory,
-      usable?.flatMap((server) =>
-        server.proxied || (server.url && server.config.headers.length > 0) ? [server.config.name] : [],
-      ) ?? [],
+      usable?.flatMap((server) => (server.url ? [server.config.name] : [])) ?? [],
     );
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
@@ -3000,8 +2998,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   });
 
   /**
-   * An MCP server's question, shown on the same card as a Codex one. The card declines what it
-   * cannot show, such as a sign-in on a web page. When Claude stops waiting, the card closes.
+   * An MCP server's question, shown on the same card as a Codex one. A sign-in on an https page shows
+   * its link; the card declines what it cannot show. When Claude stops waiting, the card closes.
    */
   readonly #requestElicitationEffect = Effect.fn("ClaudeAgentClient.requestElicitation")(function* (
     this: ClaudeAgentClient,
@@ -3168,12 +3166,13 @@ export function claudeBrowserTools(call: (name: string, args: unknown) => Promis
  * Removes the CLI's "needs sign-in" marks of the servers in `names` before a query starts (#6325).
  * After a 401, the CLI writes the server name to `mcp-needs-auth-cache.json` in its configuration
  * folder, and for 15 minutes each new process skips a server of that name without a connection,
- * whatever its URL and headers are now. The names are the rows that go through the sign-in proxy,
- * which never answers 401, so their marks are from before the sign-in, when the row's own URL
- * refused the CLI. The names also include the http rows that send headers the user typed, such as
- * an API key: a mark can be from before the key, and the CLI keeps it for the new key too (#6556).
- * When the key is wrong, the CLI asks the server once and marks the row again. The file is the
- * CLI's own: a missing or unknown file stays as it is.
+ * whatever its URL and headers are now. The names are all the http rows that OpenBot hands over.
+ * A row that goes through the sign-in proxy never answers 401, so its mark is from before the
+ * sign-in. A row with headers the user typed, such as an API key, can have a mark from before the
+ * key (#6556). A row with neither can have a mark from a 401 that the server no longer sends, while
+ * OpenBot's own test finds it ready, and the user had no way to clear the mark (#10152). When the
+ * server still refuses, the CLI asks it once and marks the row again. The file is the CLI's own: a
+ * missing or unknown file stays as it is.
  */
 const clearClaudeNeedsAuthMarks = Effect.fn("ClaudeAgentClient.clearNeedsAuthMarks")(
   function* (configDirectory: string, names: readonly string[]) {
