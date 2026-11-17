@@ -21,9 +21,9 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot이 이 컴퓨터의 앱을 보고 조작할 수 있어요. 이 시스템에서는 추가 권한이 필요하지 않아요.",
   "computerUse.openSettingsFailed.title": "시스템 설정을 열 수 없어요",
-  "computerUse.restartRequired.title": "컴퓨터 제어를 마치려면 OpenBot을 다시 시작하세요",
+  "computerUse.restartRequired.title": "다시 시작해야 해요",
   "computerUse.restartRequired.description":
-    "두 권한이 모두 켜져 있지만 macOS가 OpenBot의 클릭과 입력을 계속 막고 있어요. OpenBot을 다시 시작하세요. 다시 나타나면 '손쉬운 사용' 옆의 '관리'를 클릭하고, 목록에서 OpenBot을 제거한 뒤 다시 추가하고, OpenBot을 다시 시작하세요.",
+    "macOS가 아직 클릭과 입력을 막고 있어요. 다시 시작한 뒤에도 그러면 '손쉬운 사용'에서 OpenBot을 제거하고 다시 추가하세요.",
   "computerUse.restartRequired.action": "OpenBot 다시 시작",
   "computerUse.compact.title": "컴퓨터 제어 켜기",
   "computerUse.compact.description": "OpenBot이 이 컴퓨터의 앱을 보고 조작하도록 허용해요.",

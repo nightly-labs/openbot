@@ -20,9 +20,9 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot kann Apps auf diesem Computer sehen und bedienen. Dieses System fordert keine zusätzliche Berechtigung an.",
   "computerUse.openSettingsFailed.title": "Systemeinstellungen konnten nicht geöffnet werden",
-  "computerUse.restartRequired.title": "OpenBot neu starten, um die Computersteuerung abzuschließen",
+  "computerUse.restartRequired.title": "Neustart erforderlich",
   "computerUse.restartRequired.description":
-    "macOS blockiert Klicks und Eingaben von OpenBot weiterhin, obwohl beide Berechtigungen aktiv sind. Starte OpenBot neu. Wenn das wieder passiert, klicke neben „Bedienungshilfen“ auf „Verwalten“, entferne OpenBot aus der Liste, füge es wieder hinzu und starte OpenBot neu.",
+    "macOS blockiert weiterhin Klicks und Eingaben. Wenn das nach einem Neustart wieder passiert, entferne OpenBot aus „Bedienungshilfen“ und füge es erneut hinzu.",
   "computerUse.restartRequired.action": "OpenBot neu starten",
   "computerUse.compact.title": "Computersteuerung aktivieren",
   "computerUse.compact.description": "Erlaube OpenBot, Apps auf diesem Computer zu sehen und zu bedienen.",

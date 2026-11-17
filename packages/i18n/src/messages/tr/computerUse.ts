@@ -20,9 +20,9 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot bu bilgisayardaki uygulamaları görebilir ve onlarla etkileşime girebilir. Bu sistem fazladan izin istemez.",
   "computerUse.openSettingsFailed.title": "Sistem Ayarları açılamadı",
-  "computerUse.restartRequired.title": "Bilgisayar Kullanımını tamamlamak için OpenBot'u yeniden başlatın",
+  "computerUse.restartRequired.title": "Yeniden başlatma gerekli",
   "computerUse.restartRequired.description":
-    "İki izin de açık olsa da macOS, OpenBot'un tıklamasını ve yazmasını hâlâ engelliyor. OpenBot'u yeniden başlatın. Bu yine olursa Erişilebilirlik'in yanındaki Yönet'e tıklayın, OpenBot'u listeden kaldırın, yeniden ekleyin ve OpenBot'u yeniden başlatın.",
+    "macOS hâlâ tıklamayı ve yazmayı engelliyor. Yeniden başlattıktan sonra yine olursa OpenBot'u Erişilebilirlik'ten kaldırıp yeniden ekleyin.",
   "computerUse.restartRequired.action": "OpenBot'u yeniden başlat",
   "computerUse.compact.title": "Bilgisayar Kullanımını etkinleştir",
   "computerUse.compact.description":

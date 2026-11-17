@@ -21,9 +21,9 @@ export const messages = {
   "computerUse.ready.description":
     "OpenBot peut voir les apps de cet ordinateur et interagir avec elles. Ce système ne demande aucune autorisation supplémentaire.",
   "computerUse.openSettingsFailed.title": "Impossible d’ouvrir Réglages Système",
-  "computerUse.restartRequired.title": "Redémarrez OpenBot pour terminer Computer Use",
+  "computerUse.restartRequired.title": "Redémarrage nécessaire",
   "computerUse.restartRequired.description":
-    "macOS empêche toujours OpenBot de cliquer et de saisir, bien que les deux autorisations soient activées. Redémarrez OpenBot. Si cela se reproduit, cliquez sur Gérer à côté d’Accessibilité, retirez OpenBot de la liste, ajoutez-le de nouveau, puis redémarrez OpenBot.",
+    "macOS bloque toujours les clics et la saisie. Si cela revient après un redémarrage, retirez OpenBot d’Accessibilité, puis ajoutez-le de nouveau.",
   "computerUse.restartRequired.action": "Redémarrer OpenBot",
   "computerUse.compact.title": "Activer Computer Use",
   "computerUse.compact.description":
