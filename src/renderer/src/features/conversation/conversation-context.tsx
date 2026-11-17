@@ -759,13 +759,47 @@ const Conversation = createSimpleContext({
       }
     }
 
+    /**
+     * A page that streamed text overtook is not applied, but the place of the older messages that it
+     * gives is still right. A chat with no place of its own, such as a chat trimmed while it was not
+     * open, takes it: without it, a scroll up loads nothing (#11240). The chat keeps its own, newer
+     * copy of each message, and gets only the page's messages before its first one.
+     */
+    function keepOlderHistoryPlace(page: ConversationPage): void {
+      const conversation = conversations[page.agentId];
+      const own = conversation?.page;
+      if (!conversation || (own && !(own.hasOlder && !own.olderCursor))) return;
+      const mapped = toAgentMessages(page.messages, page.agentId);
+      const first = conversation.messages[0];
+      const start = first ? mapped.findIndex((message) => message.id === first.id) : -1;
+      // The chat must meet the page, or the place would leave a gap that the reader does not see.
+      if (start === -1 && !conversation.messages.some((message) => message.id === mapped[0]?.id)) return;
+      const older = mapped.slice(0, Math.max(start, 0));
+      updateConversation(page.agentId, (current) => {
+        current.messages = [
+          ...older.map((message) => createStoredMessage({ ...message, animate: false })),
+          ...current.messages,
+        ];
+        current.references = {
+          ...current.references,
+          ...Object.fromEntries(
+            Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
+          ),
+        };
+        current.page = page.pageInfo;
+      });
+    }
+
     function applyConversationPage(
       page: ConversationPage,
       merge: "replace" | "older" | "latest",
       windowMode?: "latest" | "around",
     ): boolean {
       flushConversationDeltas();
-      if (page.revision < (conversations[page.agentId]?.revision ?? -1)) return false;
+      if (page.revision < (conversations[page.agentId]?.revision ?? -1)) {
+        if (merge !== "older") keepOlderHistoryPlace(page);
+        return false;
+      }
       for (const message of page.messages) {
         const key = agentMessageKey(page.agentId, message.id);
         if (message.author !== "user" && message.status === "streaming") rawAgentMessageBodies.set(key, message.text);
