@@ -12,7 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { compareReleaseVersions, parseReleaseVersion } from "@openbot/contracts/release-version";
+import { compareReleaseVersions, parseReleaseVersion } from "../packages/contracts/src/release-version";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TABLE = join(ROOT, "src/main/released-schema-versions.ts");
