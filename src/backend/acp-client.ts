@@ -558,6 +558,8 @@ export interface AcpProviderOptions {
   customEndpoint?: (modelId: string | null) => AcpCustomEndpoint | null;
   /** Whether OpenBot sends a saved API key for the provider of a model. Never the key itself. */
   savedKey?: (modelId: string | null) => boolean;
+  /** Whether the agent's own store has a key for a provider, such as OpenCode's. Never the key itself. */
+  providerKeyStored?: (provider: string) => boolean;
   /**
    * Values to mask in every diagnostic and error this client emits, read at each use: the custom
    * agent's environment values, which have no secret name that `redactText` could know them by.
@@ -4210,6 +4212,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           thread.currentModelId,
           this.options.customEndpoint?.(thread.currentModelId) ?? null,
           this.options.savedKey?.(thread.currentModelId) ?? false,
+          (provider) => this.options.providerKeyStored?.(provider) ?? false,
         ) ??
         detail;
       // A fixed code, so analytics and failover need not read the cause again from the sentence.

@@ -205,6 +205,8 @@ export const messages = {
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.opencodeProviderRefused":
+    "Dostawca modelu „{provider}” odrzucił żądanie. OpenCode ma klucz do tego dostawcy, więc przyczyną może być Twoja sieć: niektórzy dostawcy blokują VPN, serwery proxy lub niektóre kraje. Wyłącz VPN albo użyj innej sieci, a potem spróbuj ponownie. Jeśli błąd się powtarza, klucz może być nieprawidłowy: uruchom `opencode auth login` w terminalu i wpisz klucz ponownie.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode odrzucił ten darmowy model. Niektóre darmowe modele nie są dostępne w każdym kraju. Wybierz inny model z etykietą Darmowy albo wklej klucz OpenCode Go w ustawieniach OpenCode i wybierz model OpenCode Go.",
   "error.provider.customEndpointKeyRefused":

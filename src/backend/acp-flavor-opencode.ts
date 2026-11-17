@@ -97,12 +97,17 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
  * OpenCode 2.2.5 also answers this way for an OpenCode Go key that the service refuses, such as an
  * expired key. Only OpenCode's log has the reason, so a user with a saved key was told to add a key
  * (#9095). OpenBot sends its saved key only to OpenCode Go.
+ *
+ * OpenCode 2.3.0 also answers this way for each HTTP 403 of the provider, such as a firewall that
+ * blocks a VPN address. With a key in OpenCode's own store, the provider refused the request; the
+ * key is not missing (#10166).
  */
 function openCodeAuthRequired(
   error: unknown,
   model: string | null,
   endpoint: AcpCustomEndpoint | null,
   savedKey: boolean,
+  providerKeyStored: (provider: string) => boolean,
 ): string | null {
   if (!(error instanceof RequestError) || error.code !== -32000) return null;
   if (endpoint)
@@ -114,9 +119,10 @@ function openCodeAuthRequired(
     return sourceText("error.provider.opencodeFreeModelRefused");
   if (savedKey) return sourceText("error.provider.opencodeKeyRefused");
   const provider = model?.includes("/") ? model.slice(0, model.indexOf("/")) : "";
-  return provider
-    ? sourceText("error.provider.opencodeAuthRequired", { provider })
-    : sourceText("error.provider.opencodeAuthRequiredUnknown");
+  if (!provider) return sourceText("error.provider.opencodeAuthRequiredUnknown");
+  return providerKeyStored(provider)
+    ? sourceText("error.provider.opencodeProviderRefused", { provider })
+    : sourceText("error.provider.opencodeAuthRequired", { provider });
 }
 
 /**
@@ -254,8 +260,8 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
           (typeof error.data.cwd === "string" &&
             error.message === `Invalid params: session ${sessionId} does not belong to cwd: ${error.data.cwd}`))
       : null,
-  turnFailure: (error, detail, redact, log, model, endpoint, savedKey) => {
-    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey);
+  turnFailure: (error, detail, redact, log, model, endpoint, savedKey, providerKeyStored) => {
+    const authRequired = openCodeAuthRequired(error, model, endpoint, savedKey, providerKeyStored);
     if (authRequired) return authRequired;
     // Google answers "API key not valid" (#1388).
     if (/invalid api key|api key not valid|unauthori[sz]ed|token refresh failed|authentication failed/i.test(detail))

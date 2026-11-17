@@ -213,6 +213,8 @@ export const messages = {
     'O OpenCode não tem login no provedor do modelo "{provider}". Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.',
   "error.provider.opencodeAuthRequiredUnknown":
     "O OpenCode não tem login no provedor deste modelo. Escolha um modelo com o rótulo Grátis ou conecte o provedor: cole uma chave do OpenCode Go nas configurações do OpenCode ou execute `opencode auth login` em um terminal. Depois, tente novamente.",
+  "error.provider.opencodeProviderRefused":
+    'O provedor do modelo "{provider}" recusou a solicitação. O OpenCode tem uma chave para este provedor, então a causa pode ser a sua rede: alguns provedores bloqueiam VPNs, proxies ou alguns países. Desative a VPN ou use outra rede e tente novamente. Se o erro continuar, a chave pode estar incorreta: execute `opencode auth login` em um terminal e digite a chave novamente.',
   "error.provider.opencodeFreeModelRefused":
     "O OpenCode recusou este modelo grátis. Alguns modelos grátis não estão disponíveis em todos os países. Escolha outro modelo com o rótulo Grátis ou cole uma chave do OpenCode Go nas configurações do OpenCode e escolha um modelo do OpenCode Go.",
   "error.provider.customEndpointKeyRefused":

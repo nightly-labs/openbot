@@ -191,6 +191,8 @@ export const messages = {
     "لا يملك OpenCode تسجيل دخول لمزوّد النموذج «{provider}». اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
   "error.provider.opencodeAuthRequiredUnknown":
     "لا يملك OpenCode تسجيل دخول لمزوّد هذا النموذج. اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
+  "error.provider.opencodeProviderRefused":
+    'رفض مزوّد النموذج "{provider}" الطلب. لدى OpenCode مفتاح لهذا المزوّد، لذا قد تكون الشبكة هي السبب: بعض المزوّدين يحظرون شبكات VPN أو الوكلاء أو بعض الدول. أوقف VPN أو استخدم شبكة أخرى، ثم أعد المحاولة. إذا استمر الخطأ، فقد يكون المفتاح غير صحيح: شغّل `opencode auth login` في نافذة طرفية وأدخل المفتاح مرة أخرى.',
   "error.provider.opencodeFreeModelRefused":
     "رفض OpenCode هذا النموذج المجاني. بعض النماذج المجانية غير متاحة في كل البلدان. اختر نموذجًا آخر يحمل التسمية Free، أو الصق مفتاح OpenCode Go في إعدادات OpenCode واختر نموذج OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
