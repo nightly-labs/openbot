@@ -177,6 +177,20 @@ const beforeMessageSchema = (inChat: (messageId: string) => boolean) =>
       ),
   });
 
+/**
+ * A `messageId` that names no message of the chat read. The id of a teammate request, its "Message ID",
+ * also names its copy in this chat. The error names the argument, as for `before`.
+ */
+const messageIdSchema = (inChat: (messageId: string) => boolean) =>
+  z.object({
+    messageId: z
+      .string()
+      .refine(
+        inChat,
+        "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.",
+      ),
+  });
+
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
   if (tool !== "history_search") return false;
@@ -244,6 +258,8 @@ interface HistoryEntry {
   taskId?: string;
   messageId: string;
   author: string;
+  /** Set for a request that this agent sent: the teammates it went to. */
+  sentTo?: string[];
   createdAt: string;
   text: string;
   offset: number;
@@ -454,6 +470,18 @@ export class HistoryTools {
         ? readCursor(read.before)
         : null;
     const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
+    const readMessageId = read?.messageId;
+    if (readMessageId !== undefined)
+      yield* toolStep(() =>
+        messageIdSchema((messageId) => {
+          try {
+            store.database.readAgentHistory(agentId, threadId, { messageId, outgoing: true, limit: 1 });
+            return true;
+          } catch {
+            return false;
+          }
+        }).parse({ messageId: readMessageId }),
+      );
     if (beforeMessageId !== null)
       yield* toolStep(() =>
         beforeMessageSchema(
@@ -466,6 +494,7 @@ export class HistoryTools {
     // hits and misses reveal a redacted secret one character at a time.
     const scanLimit = search ? SEARCH_SCAN_ROWS : limit;
     const selection = {
+      outgoing: true,
       limit: read?.messageId ? 1 : scanLimit + 1,
       ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
@@ -518,9 +547,12 @@ export class HistoryTools {
       if (offset > text.length) throw new Error(sourceText("error.agent.historyUnavailable"));
       if (search) offset = Math.max(0, match - 100);
       const excerpt = text.slice(offset, offset + (search ? 400 : 12000));
+      // The chat keeps a request to teammates as a system message; the agent wrote it.
+      const sentTo = message.exchange?.direction === "outgoing" ? message.exchange.recipientAgentIds : null;
       const entry: HistoryEntry = {
         messageId: message.id,
-        author: message.author,
+        author: sentTo ? "assistant" : message.author,
+        ...(sentTo ? { sentTo } : {}),
         createdAt: message.createdAt,
         text: excerpt,
         offset,
@@ -594,7 +626,7 @@ export class HistoryTools {
     // File reads yield. Recheck reset and message existence before any content leaves the process.
     for (const entry of result.messages) {
       const checked = yield* toolStep(() =>
-        store.database.readAgentHistory(agentId, threadId, { messageId: entry.messageId, limit: 1 }),
+        store.database.readAgentHistory(agentId, threadId, { messageId: entry.messageId, outgoing: true, limit: 1 }),
       );
       if (
         checked.resetMessageId !== page.resetMessageId ||
