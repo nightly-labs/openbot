@@ -67,7 +67,6 @@ import { END_X, fieldDirectionStyle, layoutDirection, MIRROR_IN_RTL, textDirecti
 import { editMentionDraft, insertMention, mentionDraft, mentionQuery } from "../model/chat-mentions";
 import { applyMarkdownListEdit, markdownListReturn } from "../model/composer-lists";
 import { largePastedText } from "../model/composer-paste";
-import { deleteComposerFiles } from "../model/composer-requests";
 import { createComposerSendGate } from "../model/composer-send";
 import { composerAction } from "../model/voice-dictation";
 import type { VoicePalette } from "../model/voice-palette";
@@ -76,7 +75,7 @@ import { AttachmentPreviewSheet } from "./attachment-preview-sheet";
 import { ComposerAttachmentTile, localPreviewUri } from "./composer-attachment-tile";
 import type { ComposerContextMeter } from "./composer-context-ring";
 import { DictationMic, DictationStrip, LONG_PRESS_MS } from "./composer-dictation";
-import { ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
+import { addPastedFiles, ComposerPasteTarget, type PastedFiles } from "./composer-paste-target";
 import type { ComposerVoice } from "./composer-voice";
 import type { ChatAttachments } from "./use-chat-attachments";
 import type { ComposerDictation } from "./use-composer-dictation";
@@ -412,26 +411,7 @@ export const ChatComposer = memo(function ChatComposer({
     }, FOCUS_RETRY_INTERVAL_MS);
     return () => clearInterval(retry);
   }, [isFocused, disabled, handoffFocusVersion]);
-  // The copies are read as attachments in the same way as a share from another app, then deleted.
-  const pasteFiles = ({ files: pasted, failed }: PastedFiles) => {
-    if (!attachments) {
-      deleteComposerFiles(pasted);
-      return;
-    }
-    void attachments
-      .addShared("", pasted, () => {})
-      .finally(() => {
-        deleteComposerFiles(pasted);
-        if (failed === 0) return;
-        void haptics.notification("error");
-        showFailureAlert(
-          undefined,
-          "turn",
-          t("mobile.chat.attachment.addFailed"),
-          t("mobile.chat.attachment.unavailable"),
-        );
-      });
-  };
+  const pasteFiles = (pasted: PastedFiles) => addPastedFiles(attachments, pasted);
   const pendingCursor = useRef<number | null>(null);
   useLayoutEffect(() => {
     if (pendingCursor.current === null) return;
