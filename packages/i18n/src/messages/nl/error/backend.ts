@@ -282,6 +282,7 @@ export const messages = {
     "De inlogserver stuurde een antwoord dat OpenBot niet kan lezen. Als de dienst je een API-sleutel of token geeft, voeg die dan toe aan de instellingen van deze server en test de verbinding opnieuw.",
   "error.backend.mcpServerExited":
     "De server is gestopt voordat hij antwoordde. Voer de opdracht uit in een terminal om de fout te zien.",
+  "error.backend.mcpServerExitedWithOutput": "De server is gestopt voordat hij antwoordde. Hij schreef: {detail}",
   "error.backend.mcpServerFailedToStart": "De server is niet gestart: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopte met wachten voordat de server was gestart, dus de agents ervan krijgen de tools van deze server niet.",
