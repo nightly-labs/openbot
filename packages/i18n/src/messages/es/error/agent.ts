@@ -195,4 +195,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows devolvió una imagen vacía. Pide al usuario que desbloquee el equipo y cierre el contenido protegido. Una directiva de la organización también puede impedir la captura de pantalla.",
   "error.agent.screenCaptureFailed": "La captura de pantalla falló. Inténtalo de nuevo.",
+  "error.agent.noReadyBackup": "Ningún modelo de respaldo pudo tomar este mensaje: {models}.",
+  "error.agent.backupAtLimit": "{model} está en su límite de uso",
+  "error.agent.backupUnavailable": "{model} no está disponible",
 } as const satisfies PartialTranslation<typeof source>;

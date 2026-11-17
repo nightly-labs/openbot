@@ -188,4 +188,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows가 빈 이미지를 반환했어요. 사용자에게 컴퓨터 잠금을 해제하고 보호된 콘텐츠를 닫도록 요청하세요. 조직의 정책이 화면 캡처를 막을 수도 있어요.",
   "error.agent.screenCaptureFailed": "화면 캡처에 실패했어요. 다시 시도해 주세요.",
+  "error.agent.noReadyBackup": "이 메시지를 이어받을 백업 모델이 없습니다: {models}.",
+  "error.agent.backupAtLimit": "{model}은(는) 사용 한도에 도달했습니다",
+  "error.agent.backupUnavailable": "{model}은(는) 사용할 수 없습니다",
 } as const satisfies PartialTranslation<typeof source>;

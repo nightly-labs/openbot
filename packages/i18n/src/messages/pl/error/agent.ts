@@ -188,4 +188,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows zwrócił pusty obraz. Poproś użytkownika, aby odblokował komputer i zamknął chronione treści. Przechwytywanie ekranu może też blokować zasada organizacji.",
   "error.agent.screenCaptureFailed": "Przechwycenie ekranu nie powiodło się. Spróbuj ponownie.",
+  "error.agent.noReadyBackup": "Żaden model zapasowy nie mógł przejąć tej wiadomości: {models}.",
+  "error.agent.backupAtLimit": "{model} osiągnął limit użycia",
+  "error.agent.backupUnavailable": "{model} jest niedostępny",
 } as const satisfies PartialTranslation<typeof source>;

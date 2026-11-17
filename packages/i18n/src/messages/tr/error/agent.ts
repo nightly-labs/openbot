@@ -185,4 +185,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows boş bir görüntü verdi. Kullanıcıdan bilgisayarın kilidini açmasını ve korumalı içeriği kapatmasını isteyin. Bir kuruluş ilkesi de ekran yakalamayı engelleyebilir.",
   "error.agent.screenCaptureFailed": "Ekran yakalama başarısız oldu. Tekrar deneyin.",
+  "error.agent.noReadyBackup": "Bu mesajı hiçbir yedek model devralamadı: {models}.",
+  "error.agent.backupAtLimit": "{model} kullanım sınırında",
+  "error.agent.backupUnavailable": "{model} kullanılamıyor",
 } as const satisfies PartialTranslation<typeof source>;

@@ -187,4 +187,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows вернула пустое изображение. Попросите пользователя разблокировать компьютер и закрыть защищённое содержимое. Снимки экрана также может запрещать политика организации.",
   "error.agent.screenCaptureFailed": "Не удалось сделать снимок экрана. Повторите попытку.",
+  "error.agent.noReadyBackup": "Ни одна резервная модель не смогла принять это сообщение: {models}.",
+  "error.agent.backupAtLimit": "{model} достигла предела использования",
+  "error.agent.backupUnavailable": "{model} недоступна",
 } as const satisfies PartialTranslation<typeof source>;

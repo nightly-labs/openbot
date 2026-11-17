@@ -249,11 +249,14 @@ export function classifyFailure(error: unknown): CauseCode {
   )
     return "billing";
   // Claude Code names a spent spend cap "You've hit your monthly spend limit" (#8998). Cline names its
-  // plan before "limit": "You have reached your weekly Clinepass limit" (#10674).
+  // plan before "limit": "You have reached your weekly Clinepass limit" (#10674). Antigravity writes
+  // "Your AI credits balance is too low to continue." when its account's quota is spent; it names no
+  // reset, so it is not a plan window, but a backup model passes it as a usage limit does (#11464).
   if (
     /\b(?:usage limit|hit your (?:weekly |session |\d+-hour )?limit|(?:hit|reached) your (?:weekly|session|\d+-hour) (?!(?:spend|rate|context|tokens?|requests?)\b)[\w-]+ limit|hit your (?:[\w']+ ){0,2}spend limit|quota (?:exceeded|reached|exhausted)|free[ _-]usage[ _-]exhausted|key limit exceeded)\b/iu.test(
       message,
-    )
+    ) ||
+    /\bcredits? balance\b.{0,40}\btoo low\b/iu.test(message)
   )
     return "usage_limit";
   if (/\b(?:timed? out|ETIMEDOUT|gateway time-?out|deadline exceeded|DEADLINE_EXCEEDED)\b/iu.test(message))

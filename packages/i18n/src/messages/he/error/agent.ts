@@ -178,4 +178,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows החזירה תמונה ריקה. יש לבקש מהמשתמש לבטל את נעילת המחשב ולסגור תוכן מוגן. גם מדיניות של הארגון יכולה לחסום צילום מסך.",
   "error.agent.screenCaptureFailed": "צילום המסך נכשל. יש לנסות שוב.",
+  "error.agent.noReadyBackup": "אף מודל גיבוי לא יכול היה לקחת את ההודעה הזו: {models}.",
+  "error.agent.backupAtLimit": "{model} הגיע למגבלת השימוש שלו",
+  "error.agent.backupUnavailable": "{model} אינו זמין",
 } as const satisfies PartialTranslation<typeof source>;

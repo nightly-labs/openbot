@@ -211,4 +211,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows hat ein leeres Bild geliefert. Bitte den Benutzer, den Computer zu entsperren und geschützte Inhalte zu schließen. Auch eine Richtlinie der Organisation kann die Bildschirmaufnahme verhindern.",
   "error.agent.screenCaptureFailed": "Die Bildschirmaufnahme ist fehlgeschlagen. Versuche es erneut.",
+  "error.agent.noReadyBackup": "Kein Ersatzmodell konnte diese Nachricht übernehmen: {models}.",
+  "error.agent.backupAtLimit": "{model} hat sein Nutzungslimit erreicht",
+  "error.agent.backupUnavailable": "{model} ist nicht verfügbar",
 } as const satisfies PartialTranslation<typeof source>;

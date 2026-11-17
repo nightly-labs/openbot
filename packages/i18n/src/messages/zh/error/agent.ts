@@ -167,4 +167,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows 返回了空图像。请让用户解锁电脑并关闭受保护的内容；组织策略也可能阻止截屏。",
   "error.agent.screenCaptureFailed": "截屏失败，请重试。",
+  "error.agent.noReadyBackup": "没有备用模型可以接手这条消息：{models}。",
+  "error.agent.backupAtLimit": "{model} 已达到使用上限",
+  "error.agent.backupUnavailable": "{model} 不可用",
 } as const satisfies PartialTranslation<typeof source>;

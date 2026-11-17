@@ -1925,6 +1925,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         emitToolUsage: (usage) => this.emit("toolUsage", usage),
         turnModel: (agentId, turnId) => this.#drain.modelForTurn(agentId, turnId),
         mayFailOver: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
+        backupUnavailable: (agentId) => this.#backupUnavailable(agentId),
         poolHasOtherAccount: (agentId) => this.#poolHasOtherAccount(agentId),
         mayContinueOnBackup: (agentId) => this.#mayContinueStoppedWork(agentId),
         requeueChannelDelivery: (deliveryId, continueWork) => this.#requeueChannelDelivery(deliveryId, continueWork),
@@ -4394,6 +4395,28 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         this.#usageLimitReady(choice) &&
         !(workspaceAccessEnforced(agent) && workspaceOnlyUnavailable(choice.provider)),
     );
+  }
+
+  /**
+   * The agent's backup models that could not take a failed turn, and why, for a message that says no
+   * backup was ready (#11464). Null when the agent has no backup order, or when every model in it
+   * could take the turn: only a failure that reached the end of its turn asks.
+   */
+  #backupUnavailable(agentId: string): { limited: string[]; unavailable: string[] } | null {
+    const agent = this.#store.list().find((candidate) => candidate.id === agentId);
+    if (!agent?.backupModels || agent.backupModels.order.length === 0) return null;
+    const current = agentModelChoice(agent);
+    const limited: string[] = [];
+    const unavailable: string[] = [];
+    for (const choice of agent.backupModels.order) {
+      if (sameAgentModelChoice(choice, current)) continue;
+      const limit = usageLimitOf(choice);
+      if (this.#usageLimits.isLimited(limit) || this.#usageLimits.isFailed(limit)) limited.push(choice.model);
+      else if (!this.#modelChoiceReady(choice)) unavailable.push(choice.model);
+      // A ready backup exists, so the failure did not stop because of the order: say nothing.
+      else return null;
+    }
+    return limited.length === 0 && unavailable.length === 0 ? null : { limited, unavailable };
   }
 
   /**

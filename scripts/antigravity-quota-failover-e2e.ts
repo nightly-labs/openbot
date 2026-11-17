@@ -59,7 +59,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-credits", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -81,9 +81,14 @@ function handle(message) {
     const model = current.get(params.sessionId) ?? MODELS[0];
     const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent") && text.includes("QUOTA-NOW");
     const rate = model === "gemini-rate" && text.includes("RATE-NOW");
-    log({ model, quota, rate, text });
+    const credits = model === "gemini-credits" && text.includes("CREDITS-NOW");
+    log({ model, quota, rate, credits, text });
     if (rate) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Agent execution error: request failed with code 429" } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
+    }
+    if (credits) {
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Your AI credits balance is too low to continue." } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
     if (quota) {
@@ -115,6 +120,7 @@ interface Prompt {
   model: string;
   quota: boolean;
   rate: boolean;
+  credits: boolean;
   text: string;
 }
 
@@ -122,8 +128,16 @@ interface CaseReport {
   name: string;
   status: string;
   model: string | undefined;
-  prompts: { model: string; quota: boolean; rate: boolean; continuation: boolean; workSteps: boolean }[];
+  prompts: {
+    model: string;
+    quota: boolean;
+    rate: boolean;
+    credits: boolean;
+    continuation: boolean;
+    workSteps: boolean;
+  }[];
   errors: number;
+  failure?: string;
   passed: boolean;
 }
 
@@ -239,6 +253,7 @@ async function runCase(
         model: prompt.model,
         quota: prompt.quota,
         rate: prompt.rate,
+        credits: prompt.credits,
         continuation: prompt.text.includes(CONTINUATION),
         workSteps: prompt.text.includes("Read notes.txt"),
       })),
@@ -250,6 +265,42 @@ async function runCase(
   assert.equal(result.model, BACKUP, `${name}: the agent is on the backup model`);
   assert.equal(result.errors, 0, `${name}: no error shows`);
   return result;
+}
+
+/** An agent whose only backup is a model of a provider that is off: the failure names that backup. */
+async function runNoReadyBackupCase(): Promise<string> {
+  const agent = await runCauseEffect(
+    agents.createAgent({
+      name: "no ready backup",
+      description: "Checks a spent credits balance with no ready backup.",
+      avatarSeed: "no-ready-backup",
+      avatarHue: null,
+      provider: "antigravity",
+      model: "gemini-credits",
+      initialMessage: "Hello.",
+    }),
+  );
+  await waitFor("no ready backup: the first turn", () => idle(agent.id));
+  await runCauseEffect(
+    agents.updateAgent({
+      agentId: agent.id,
+      backupModels: { automatic: true, order: [{ provider: "openrouter", model: "openrouter/free" }] },
+    }),
+  );
+  const receipt = await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "CREDITS-NOW" }));
+  const deliveryId = receipt.deliveries[0]?.id;
+  assert.ok(deliveryId, "no ready backup: the message has a delivery");
+  const status = await waitFor("no ready backup: the message to end", () => {
+    const value = mailbox.getDelivery(deliveryId)?.delivery.status;
+    return value === "completed" || value === "failed" || value === "interrupted" ? value : null;
+  });
+  const error = mailbox.getDelivery(deliveryId)?.delivery.error ?? "";
+  assert.equal(status, "failed", `no ready backup: ${error}`);
+  assert.ok(
+    error.includes("openrouter/free"),
+    `no ready backup: the failure names the backup that could not take it: ${error}`,
+  );
+  return error;
 }
 
 try {
@@ -310,6 +361,28 @@ try {
     "The message runs again on the backup after a rate limit.",
   );
   rate.passed = true;
+
+  const credits = await runCase("spent credits balance before work", "gemini-credits", true, "CREDITS-NOW");
+  assert.deepEqual(
+    credits.prompts.map((prompt) => [prompt.model, prompt.continuation]),
+    [
+      ["gemini-credits", false],
+      [BACKUP, false],
+    ],
+    "The message runs again on the backup after a spent credits balance.",
+  );
+  credits.passed = true;
+
+  const noReadyBackup = await runNoReadyBackupCase();
+  report.cases.push({
+    name: "spent credits balance with no ready backup",
+    status: "failed",
+    model: "gemini-credits",
+    prompts: [],
+    errors: 1,
+    failure: noReadyBackup,
+    passed: noReadyBackup.includes("openrouter/free"),
+  });
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

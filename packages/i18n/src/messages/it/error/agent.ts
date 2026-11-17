@@ -197,4 +197,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows ha restituito un'immagine vuota. Chiedi all'utente di sbloccare il computer e chiudere i contenuti protetti. Anche un criterio dell'organizzazione può bloccare l'acquisizione dello schermo.",
   "error.agent.screenCaptureFailed": "L'acquisizione dello schermo non è riuscita. Riprova.",
+  "error.agent.noReadyBackup": "Nessun modello di riserva ha potuto riprendere questo messaggio: {models}.",
+  "error.agent.backupAtLimit": "{model} ha raggiunto il limite di utilizzo",
+  "error.agent.backupUnavailable": "{model} non è disponibile",
 } as const satisfies PartialTranslation<typeof source>;

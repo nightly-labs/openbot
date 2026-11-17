@@ -179,4 +179,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "أعاد Windows صورة فارغة. اطلب من المستخدم إلغاء قفل الحاسوب وإغلاق المحتوى المحمي. يمكن أيضًا لسياسة المؤسسة إيقاف التقاط الشاشة.",
   "error.agent.screenCaptureFailed": "فشل التقاط الشاشة. أعد المحاولة.",
+  "error.agent.noReadyBackup": "لا يوجد نموذج احتياطي متاح لهذه الرسالة: {models}.",
+  "error.agent.backupAtLimit": "{model} وصل إلى حد الاستخدام",
+  "error.agent.backupUnavailable": "{model} غير متاح",
 } as const satisfies PartialTranslation<typeof source>;

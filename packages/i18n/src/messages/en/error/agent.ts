@@ -191,4 +191,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.screenCaptureEmptyWindows":
     "Windows gave an empty image. Ask the user to unlock the computer and close protected content. A policy of the organization can also stop screen capture.",
   "error.agent.screenCaptureFailed": "The screen capture failed. Try again.",
+  "error.agent.noReadyBackup": "No backup model could take this message: {models}.",
+  "error.agent.backupAtLimit": "{model} is at its usage limit",
+  "error.agent.backupUnavailable": "{model} is not available",
 });

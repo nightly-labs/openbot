@@ -200,4 +200,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows a renvoyé une image vide. Demandez à l’utilisateur de déverrouiller l’ordinateur et de fermer le contenu protégé. Une stratégie de l’organisation peut aussi bloquer la capture d’écran.",
   "error.agent.screenCaptureFailed": "La capture d’écran a échoué. Réessayez.",
+  "error.agent.noReadyBackup": "Aucun modèle de secours n’a pu prendre ce message : {models}.",
+  "error.agent.backupAtLimit": "{model} a atteint sa limite d’utilisation",
+  "error.agent.backupUnavailable": "{model} n’est pas disponible",
 } as const satisfies PartialTranslation<typeof source>;

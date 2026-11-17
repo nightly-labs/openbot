@@ -200,4 +200,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows が空の画像を返しました。コンピューターのロックを解除し、保護されたコンテンツを閉じるようユーザーに依頼してください。組織のポリシーによって画面キャプチャが止められている場合もあります。",
   "error.agent.screenCaptureFailed": "画面キャプチャに失敗しました。もう一度お試しください。",
+  "error.agent.noReadyBackup": "このメッセージを引き継げる予備モデルがありません: {models}。",
+  "error.agent.backupAtLimit": "{model} は利用上限に達しています",
+  "error.agent.backupUnavailable": "{model} は利用できません",
 } as const satisfies PartialTranslation<typeof source>;

@@ -206,4 +206,7 @@ export const messages = {
   "error.agent.screenCaptureEmptyWindows":
     "Windows gaf een leeg beeld. Vraag de gebruiker om de computer te ontgrendelen en beschermde inhoud te sluiten. Ook een beleid van de organisatie kan schermopname blokkeren.",
   "error.agent.screenCaptureFailed": "De schermopname is mislukt. Probeer het opnieuw.",
+  "error.agent.noReadyBackup": "Geen enkel reservemodel kon dit bericht overnemen: {models}.",
+  "error.agent.backupAtLimit": "{model} zit op zijn gebruikslimiet",
+  "error.agent.backupUnavailable": "{model} is niet beschikbaar",
 } as const satisfies PartialTranslation<typeof source>;

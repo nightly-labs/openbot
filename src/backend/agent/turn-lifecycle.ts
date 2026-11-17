@@ -268,6 +268,11 @@ export interface TurnHooks {
   turnModel(agentId: string, turnId: string): string | null;
   /** Whether a provider error moves this agent to a backup model: it switches without asking and has a ready one. */
   mayFailOver(agentId: string): boolean;
+  /**
+   * The agent's backup models that could not take a failed turn, split by why: at its usage limit or
+   * after a provider error, and not ready at all. Null when the agent has no backup order to report.
+   */
+  backupUnavailable(agentId: string): { limited: string[]; unavailable: string[] } | null;
   /** Whether the agent's pool has another account that is ready for its model. */
   poolHasOtherAccount(agentId: string): boolean;
   /**
@@ -925,15 +930,32 @@ export class TurnLifecycle {
   }
 
   /** Shows a provider error that was held for a failover that did not happen, as it shows with no backup. */
-  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError): void {
+  #showFailoverError(agentId: string, threadId: string, failover: HeldProviderError, explainBackups = false): void {
     const taskId = this.#taskForThread(agentId, threadId);
+    // A provider error that could not move the turn says why no backup took it, instead of leaving
+    // only the provider's own sentence, which reads as if no backup were set (#11464).
+    const message =
+      explainBackups && !failover.quiet && failover.context.causeCode !== "empty_answer"
+        ? this.#withBackupReason(agentId, failover.message)
+        : failover.message;
     if (taskId === null && !failover.quiet) {
-      this.#hooks.emitError("agent_error", failover.message, agentId, failover.context, failover.link);
+      this.#hooks.emitError("agent_error", message, agentId, failover.context, failover.link);
       return;
     }
     this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...failover.context });
     // A thread shows no usage notice, so its failed turn keeps the provider's text (#5220).
-    if (taskId !== null) this.#hooks.taskFailed(taskId, failover.message);
+    if (taskId !== null) this.#hooks.taskFailed(taskId, message);
+  }
+
+  /** The provider's message, then the agent's backup models that could not take it and why. */
+  #withBackupReason(agentId: string, message: string): string {
+    const backup = this.#hooks.backupUnavailable(agentId);
+    if (backup === null) return message;
+    const parts = [
+      ...backup.limited.map((model) => sourceText("error.agent.backupAtLimit", { model })),
+      ...backup.unavailable.map((model) => sourceText("error.agent.backupUnavailable", { model })),
+    ];
+    return `${message}\n\n${sourceText("error.agent.noReadyBackup", { models: parts.join("; ") })}`;
   }
 
   /**
@@ -1670,6 +1692,17 @@ export class TurnLifecycle {
           this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
           return;
         }
+        // A provider error that could not move the turn says why no backup took it. The provider's
+        // own sentence reads as if no backup were set (#11464).
+        const explained =
+          notification.method === "error" &&
+          agentId !== undefined &&
+          FAILOVER_CAUSES.has(context.causeCode) &&
+          context.causeCode !== "empty_answer"
+            ? this.#withBackupReason(agentId, message)
+            : message;
+        // The turn's failure, which the end of the turn writes to its deliveries, keeps this text.
+        if (explained !== message && errorTurnId !== null) this.#turnErrors.set(errorTurnId, explained);
         // A warning does not end the turn. When its text is empty, a path, a stack or too long, the
         // banner showed "The agent could not continue" in its place while the turn went on. Codex
         // warnings on Windows quote `C:\` paths. The log keeps the text and the failure count keeps
@@ -1686,8 +1719,8 @@ export class TurnLifecycle {
           notification.method === "error" && agentId && threadId ? this.#taskForThread(agentId, threadId) : null;
         if (taskId !== null) {
           this.#hooks.emitFailure?.({ code: "agent_error", ...(agentId ? { agentId } : {}), ...context });
-          this.#hooks.taskFailed(taskId, message);
-        } else this.#hooks.emitError(`agent_${notification.method}`, message, agentId, context, link);
+          this.#hooks.taskFailed(taskId, explained);
+        } else this.#hooks.emitError(`agent_${notification.method}`, explained, agentId, context, link);
       }
     }
   }).bind(this);
@@ -2273,7 +2306,7 @@ export class TurnLifecycle {
         this.#markFailed(agentId, model, failover);
       // The turn did work that no backup continues, or nothing waits to run again: the error shows as
       // it does with no backup.
-      if (failover) this.#showFailoverError(agentId, threadId, failover);
+      if (failover) this.#showFailoverError(agentId, threadId, failover, true);
       if (compactionFailure && compactionContinuation)
         this.#hooks.emitFailure?.({ code: "agent_error", agentId, ...compactionFailure.context });
       else if (compactionFailure && status === "failed" && !failover)
