@@ -1992,11 +1992,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ),
       );
       if (this.#running && this.#threads.get(runtime.id) === runtime) {
-        yield* this.#endFailedQuery(runtime, new Error("Claude session stream ended unexpectedly."));
+        yield* this.#endFailedQuery(runtime, new Error("Claude session stream ended unexpectedly."), false);
       }
     } catch (caught) {
       if (!this.#running || this.#threads.get(runtime.id) !== runtime) return;
-      yield* this.#endFailedQuery(runtime, runtime.stderr.addTo(caught));
+      yield* this.#endFailedQuery(runtime, runtime.stderr.addTo(caught), true);
     }
   });
 
@@ -2006,15 +2006,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
    * queries, also one in the middle of a long command (#11200), and the stop does not count as a
    * failed start. A query with no sandbox for its Workspace only setting does the same (#9925). Only
    * a query that sent nothing stops Claude, because the CLI itself can be what does not start.
+   * `failed`: the query failed, so its turn fails also when Claude stops. A stream that ended leaves
+   * that turn to the restart recovery.
    */
   readonly #endFailedQuery = Effect.fn("ClaudeAgentClient.endFailedQuery")(function* (
     this: ClaudeAgentClient,
     runtime: ThreadRuntime,
     error: unknown,
+    failed: boolean,
   ) {
-    if (runtime.activeTurn) yield* this.#completeTurn(runtime, "failed", error);
     const noSandbox = CLAUDE_SANDBOX_UNAVAILABLE.test(String(error));
-    if (!noSandbox && !runtime.answered) {
+    const ownThread = noSandbox || runtime.answered;
+    if (runtime.activeTurn && (failed || ownThread)) yield* this.#completeTurn(runtime, "failed", error);
+    if (!ownThread) {
       this.#fail(error instanceof Error ? error : new Error(String(error)));
       return;
     }
