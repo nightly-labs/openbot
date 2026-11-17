@@ -583,7 +583,8 @@ On a server, root runs `openbot-hosted-update`:
    a complete disk, or when `.applying` shows an interrupted copy. `openbot.service` does not
    require it, so it starts after a failure too: with the old release, or with a partial copy after
    a failed copy, until the next start. On a self-installed server, the new release starts at the
-   next boot. A hosted server installs it itself: when the release is staged, OpenBot asks root to
+   next boot, or when idle if the automatic update switch is on (it is off by default). A hosted
+   server installs it itself: when the release is staged, OpenBot asks root to
    install it when idle, and when no connected client changed data or typed for 5 minutes and the
    start was 5 minutes ago. Reading is not use. Server Settings shows this wait as "other work",
    because `host-update-v1` has no reason for it. The automatic update switch of a hosted server

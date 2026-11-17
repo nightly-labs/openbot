@@ -5,6 +5,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { UpdateStatus } from "@openbot/contracts/ipc";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import type { AppTranslate } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
@@ -16,7 +17,6 @@ import { readUpdatePreference, UPDATE_PREFERENCE_FILE } from "./update-preferenc
 import {
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   UPDATE_INSTALL_TIMEOUT_MS,

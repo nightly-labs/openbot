@@ -192,8 +192,10 @@ import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
+import { highestCommonTeamProtocol, type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "./v1";
+import { TEAM_PROTOCOL_V3 } from "./v3";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
-import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
@@ -783,12 +785,19 @@ export function isAgentMessageRoute(method: string, path: string): boolean {
   return method === "POST" && /^\/v1\/agents\/[^/]+\/messages$/u.test(new URL(path, "http://openbot.invalid").pathname);
 }
 
-// Keep the first request readable by every released peer. The v7 marker lets a current
-// host return the expanded list; older hosts ignore the marker and retain all old features.
-// A protocol 6 peer reads at most 64 capabilities, so each new capability is v7 only.
-// The v8 marker stays out: a client sends it only after the host reports protocol 8.
+// Keep the first request readable by every released peer. A client also sends this list to a host
+// of protocol 6 or older. Those hosts read at most 64 capabilities (`TEAM_PROTOCOL_CAPABILITY_LIMITS`):
+// over WebRTC they refuse a longer request, and over HTTP they read it as no capabilities.
+// So each new capability is v7 only. The v7 and v9 markers stay in: a current host reads the
+// protocol from them and returns the expanded list, and an older host ignores them. The v8 marker
+// stays out: a client sends it only after the host reports protocol 8.
 export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
   (capability) =>
+    // No host of protocol 6 or older knows these three. They came after v0.34.1, the last protocol 6
+    // release, and took the list over 64. A host of protocol 7 or newer gets them in its own list.
+    capability !== TEAM_ZIP_ATTACHMENTS_CAPABILITY &&
+    capability !== AGENT_HOST_SETTINGS_CAPABILITY &&
+    capability !== MCP_SIGN_IN_CAPABILITY &&
     capability !== TEAM_OPEN_PROVIDERS_CAPABILITY &&
     capability !== AGENT_MEMORIES_CAPABILITY &&
     capability !== AGENT_SESSION_SETTINGS_CAPABILITY &&
@@ -1123,6 +1132,23 @@ const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V8_CURRENT_CAPABILIT
     capability !== PROVIDERS_V8_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY,
 );
+/**
+ * The protocols that mobile and the web client speak through `packages/team-client`. They send protocol 9
+ * requests; an older host reads them with its own codec. Protocol 3 is the oldest host that they accepted.
+ */
+export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
+  minimum: TEAM_PROTOCOL_V3,
+  maximum: TEAM_PROTOCOL_V9,
+};
+
+/** The highest protocol that a WebRTC client and a host both speak, or which side must update. */
+export function teamWebRtcClientProtocol(
+  host: TeamProtocolSupportV1["protocol"],
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+) {
+  return { protocol: highestCommonTeamProtocol(client, host), update: teamProtocolUpdateDirection(client, host) };
+}
+
 export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
   if (protocol === null || protocol === undefined || protocol < 7) return TEAM_BOOTSTRAP_CAPABILITIES;
   if (protocol >= 9) return TEAM_CURRENT_CAPABILITIES;

@@ -175,7 +175,7 @@ import { ContextResetBusyError } from "@openbot/contracts/team-protocol/context-
 import type { QueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
-import { classifyFailure } from "@openbot/telemetry";
+import { type CauseCode, classifyFailure, isCauseCode } from "@openbot/telemetry";
 import { Cause, Deferred, Effect, Exit, Fiber, Result, Schema, Scope, Semaphore } from "effect";
 import { AgentMemories } from "./agent/agent-memories";
 import { AgentRemoval, AgentRemovalFailed } from "./agent/agent-removal";
@@ -256,7 +256,7 @@ import {
 import { ProfileSave, standingProfileChanged, toProfileSaveFailed } from "./agent/profile-save";
 import { pickPoolAccount } from "./agent/provider-account-pool";
 import type { ProviderAccountStore } from "./agent/provider-account-store";
-import { isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { isBalanceDiagnostic, isPlanLimitDiagnostic, providerResetDelayMs } from "./agent/provider-diagnostics";
 import { type AgentClientFactory, ProviderRuntime, toProviderOperationFailed } from "./agent/provider-runtime";
 import { QueueControls } from "./agent/queue-controls";
 import { quietRoutineRun } from "./agent/routine-quiet-runs";
@@ -279,7 +279,7 @@ import {
 import { ThreadLifecycle } from "./agent/thread-lifecycle";
 import { ToolOperationFailed, toToolOperationFailed } from "./agent/tool-operation";
 import { TurnContext } from "./agent/turn-context";
-import { type AgentBrowserHost, TurnLifecycle } from "./agent/turn-lifecycle";
+import { type AgentBrowserHost, FAILOVER_CAUSES, TurnLifecycle } from "./agent/turn-lifecycle";
 import { sideSessionUsageObserver, workflowUsageObserver } from "./agent/usage-collection";
 import { toUsageReadFailed, UsageLimitGate, type UsageLimitKey } from "./agent/usage-limit-gate";
 import type { VideoReaderHost } from "./agent/video-reader";
@@ -326,7 +326,14 @@ import { isAnswer, MessagingThreads, toMessagingThreadFailed } from "./messaging
 import type { CustomProviderConfig } from "./opencode-config";
 import type { PasswordVault } from "./password-vault";
 import { canConfineProcesses } from "./process-confinement";
-import { decodeRecordResponse, getRecord, getString, type ThreadItem } from "./protocol";
+import {
+  type AppServerNotification,
+  decodeRecordResponse,
+  getRecord,
+  getString,
+  isRecord,
+  type ThreadItem,
+} from "./protocol";
 import { NO_PROVIDER_CREDENTIALS, type ProviderClientContext, requireProviderDriver } from "./provider-drivers";
 import { providerHistoryPersistence } from "./provider-history-persistence";
 import { recordAgentRestartActivity } from "./restart-activity";
@@ -1529,8 +1536,18 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           // A routing turn uses the one try that a person's message gave the lead, before it starts, so the
           // other lanes stay held. The member that it picks gets its own. A summary is not that turn.
           if (!background) this.#usageLimits.tryStarted(selected.id);
+          // The cause of the provider error that ended the turn, read as a member turn reads it.
+          let providerError: { causeCode: CauseCode; message: string } | null = null;
+          const observe = (notification: AppServerNotification) => {
+            const params = notification.params;
+            if (notification.method !== "error" || !isRecord(params) || params.willRetry === true) return;
+            const error = getRecord(params, "error");
+            const message = getString(params, "message") ?? getString(error, "message") ?? "";
+            const causeCode = isCauseCode(params.causeCode) ? params.causeCode : classifyFailure(error ?? message);
+            providerError = { causeCode, message };
+          };
           return yield* this.#profileClients
-            .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled))
+            .run(client, (cancelled) => generateTextWithoutTools(client, turnModel, prompt, cancelled, observe))
             .pipe(
               // A routing turn can be the first one a spent plan refuses: in its completion, or as the
               // error of the `turn/start` request. It holds the model that ran it the way a refused member turn
@@ -1542,9 +1559,30 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                     : failure.cause instanceof Error && isPlanLimitDiagnostic(failure.cause.message)
                       ? null
                       : undefined;
-                return resetsAt === undefined
-                  ? Effect.void
-                  : this.#usageLimits.reached(selected.id, resetsAt, selected.model);
+                if (resetsAt !== undefined) return this.#usageLimits.reached(selected.id, resetsAt, selected.model);
+                // A provider error that moves a member turn to a backup model, such as a spent Gemini quota,
+                // passes over the routing turn's model too. The channel keeps the task queued, and the move
+                // to the backup routes it again (#11389). With no ready backup, the error shows as before. A
+                // member whose model ran the turn in place of the lead keeps its model: the channel waits for the lead.
+                const failed: { causeCode: CauseCode; message: string } | null = providerError;
+                if (
+                  !background &&
+                  selected === lead &&
+                  failed &&
+                  FAILOVER_CAUSES.has(failed.causeCode) &&
+                  (this.#usageLimitBackup(lead.id) !== undefined || this.#poolBackup(lead.id))
+                ) {
+                  logger.info("A provider error stopped a routing turn, so the lead moves to its backup model.", {
+                    provider: lead.provider,
+                    model: lead.model,
+                    cause: failed.causeCode,
+                  });
+                  // A spent balance names no reset, so the lead does not go back to it by itself (#5220).
+                  const resetDelayMs = providerResetDelayMs(failed.message);
+                  const spent = resetDelayMs === null && isBalanceDiagnostic(failed.message);
+                  this.#usageLimits.failed(lead.id, lead.model, resetDelayMs, spent);
+                }
+                return Effect.void;
               }),
             );
         }).pipe(toChannelOperationError),
@@ -1583,6 +1621,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       quietRoutineRequest: (requestMessageId) => this.#channelRoutines.quietRun(requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
+      failedOver: (agentId) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        return (
+          agent !== undefined &&
+          this.#usageLimits.isFailed(usageLimitOf(agentModelChoice(agent))) &&
+          (this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId))
+        );
+      },
       steersWhenBusy: (agentId) => {
         const agent = this.#store.list().find((item) => item.id === agentId);
         return (
@@ -4755,20 +4801,27 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * "Delete history": deletes every message of the agent's own chat, with the mailbox copies and the
    * files that no other record uses, and ends its provider sessions, so the agent forgets the chat
    * too. No restart, sync or provider import brings a message back. The side threads, the profile,
-   * memories, workspace and browser do not change. Work that still runs or waits refuses it.
+   * memories, workspace and browser do not change. Work of the chat that still runs or waits refuses
+   * it. A messaging app's conversation runs in its own thread and lane, which the chat does not show,
+   * so its work does not (#11358).
    */
   readonly deleteAgentHistory = Effect.fn("AgentService.deleteAgentHistory")(function* (
     this: AgentService,
     agentId: string,
   ) {
     const busy = () => new ContextResetBusyError(sourceText("error.agent.waitBeforeDeleteHistory"));
-    const mainChatBusy = (agent: AgentSummary) =>
-      Boolean(
-        this.#conversation.workingSnapshot(agentId)?.activeTurnId ??
-          (agent.threadId ? this.#store.database.readActiveTurnId(agentId, agent.threadId) : null),
-      ) ||
-      this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId)) ||
-      this.#threads.mainContextBusy(agent);
+    // `mainContextBusy` reads the running turn of the chat's own thread. A conversation that is not
+    // in the messaging lane, as on a provider that runs one turn at a time, still holds the chat.
+    const mainChatBusy = (agent: AgentSummary) => {
+      const working = this.#conversation.workingSnapshot(agentId);
+      return (
+        Boolean(
+          working?.activeTurnId && !(working.threadId && this.messaging.inMessagingLane(agentId, working.threadId)),
+        ) ||
+        this.#mailbox.hasUnfinishedDeliveryOutsideTasks(agentId, this.#tasks.oneTurnAtATime(agentId), [], false) ||
+        this.#threads.mainContextBusy(agent)
+      );
+    };
     const target = yield* lifecycleStep("delete agent history", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
       if (mainChatBusy(agent)) throw busy();
@@ -6240,9 +6293,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const ofTurn = (messages: readonly ConversationMessage[]) =>
       messages.filter((message) => message.turnId === turnId);
     const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
-    const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
-    const messages =
-      loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+    // An unloaded chat reads the rows of this turn only, not the whole history of the thread.
+    const messages = loaded.length > 0 ? loaded : this.#store.database.readTurnAssistantMessages(agentId, turnId);
     return messages.findLast(isAnswer)?.text ?? null;
   }
 

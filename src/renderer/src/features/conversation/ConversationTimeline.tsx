@@ -356,12 +356,13 @@ export function ConversationTimeline() {
       return null;
     return { ...state.compaction, timestamp: new Date(state.compaction.startedAt).toISOString() };
   };
-  const compactionBefore = () => {
+  // Each row compares its id with this, so it is computed once for each change, not once for each row.
+  const compactionBefore = createMemo(() => {
     const startedAt = props.contextState?.compaction?.startedAt;
     return startedAt === undefined
       ? undefined
       : timelineMessages().find((message) => message.createdAt && Date.parse(message.createdAt) > startedAt)?.id;
-  };
+  });
   const CompactionMarker = () => (
     <Show when={compaction()}>{(state) => <ContextCompactionMarker compaction={state()} />}</Show>
   );
@@ -999,8 +1000,9 @@ export function ConversationTimeline() {
                 const referencedMessage = createMemo(() => {
                   const replyToMessageId = message()?.replyToMessageId;
                   if (!replyToMessageId) return undefined;
+                  const referencedIndex = timelineIndexById().get(replyToMessageId);
                   return (
-                    timelineMessages().find((candidate) => candidate.id === replyToMessageId) ??
+                    (referencedIndex === undefined ? undefined : timelineMessages()[referencedIndex]) ??
                     props.messageReferences?.[replyToMessageId]
                   );
                 });

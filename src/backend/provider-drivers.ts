@@ -1243,7 +1243,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             ...agentEnvironment,
             ...opencodeEnv(cli),
             // A file below the user's project config. `OPENCODE_AGENT_CONFIG` is above all of it.
-            ...openCodeAgentDefaultsEnv(context.providerStateDirectory, { ...process.env, ...agentEnvironment }),
+            ...openCodeAgentDefaultsEnv(
+              context.providerStateDirectory,
+              { ...process.env, ...agentEnvironment },
+              cli.version,
+            ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };

@@ -56,7 +56,7 @@ import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { runIdOrigins } from "./message-run-ids";
-import { OpenBotDatabase } from "./openbot-database";
+import type { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
@@ -337,7 +337,11 @@ export class MailboxStore {
     reactionKeys: new Set<string>(),
   };
 
-  constructor(userDataPath: string, sharedRoot: string, database = new OpenBotDatabase(userDataPath)) {
+  /**
+   * `database` is the one connection of the process to `openbot.db`, the one that `AgentStore` holds.
+   * A second connection would run the migrations again and compete for the write lock.
+   */
+  constructor(userDataPath: string, sharedRoot: string, database: OpenBotDatabase) {
     this.#statePath = join(userDataPath, "mailbox.json");
     this.#files = new AttachmentFiles({ userDataPath, sharedRoot });
     this.#database = database;
@@ -3179,19 +3183,25 @@ export class MailboxStore {
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
    * threads. External conversation work counts as before it had its own lane. Channel work counts
    * only with `includeChannels`: on a provider that runs one turn at a time, a channel turn holds the
-   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued.
+   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued. Without
+   * `includeMessaging`, the work of the messaging lane does not count.
    */
   hasUnfinishedDeliveryOutsideTasks(
     agentId: string,
     includeChannels: boolean,
     exceptQueued: readonly string[] = [],
+    includeMessaging = true,
   ): boolean {
     const messages = this.#messagesById();
     return this.#state.deliveries.some((delivery) => {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
       if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
-      return lane === null || lane === MESSAGING_LANE || (includeChannels && laneChannelId(lane) !== null);
+      return (
+        lane === null ||
+        (includeMessaging && lane === MESSAGING_LANE) ||
+        (includeChannels && laneChannelId(lane) !== null)
+      );
     });
   }
 

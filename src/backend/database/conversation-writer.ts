@@ -97,7 +97,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         db.prepare(
@@ -274,7 +274,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? snapshot.revision;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === snapshot.agentId);
+        const agent = this.#roster.getAgent(snapshot.agentId);
         if (!agent) throw new Error(`Unknown agent for conversation: ${snapshot.agentId}`);
         this.#roster.ensureThreadProjection(db, agent, sequence);
         supersedeStreamedMessageEvents(db, threadId, messageId, input.eventType, sequence);
@@ -347,7 +347,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent || agent.threadId !== input.threadId) {
           throw new Error(`Unknown agent thread for conversation append: ${input.agentId}`);
         }
@@ -494,7 +494,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         const threadOwner = databaseRow(
           db.prepare("SELECT agent_id FROM projection_threads WHERE thread_id = ?").get(input.threadId),
         );
@@ -536,6 +536,7 @@ export class ConversationWriter {
             (attachment_id, owner_kind, owner_id, name, path, metadata_json, created_at, last_event_sequence)
           VALUES (?, 'thread-message', ?, ?, '', ?, ?, ?)
         `);
+        let appendOrdinal: number | undefined;
         for (const imported of changedMessages) {
           const existingRow = databaseRow(findOrdinal.get(input.threadId, imported.id));
           const existing = existingRow
@@ -545,9 +546,18 @@ export class ConversationWriter {
           // merge below, but a streamed update must replace status and text from the caller. The
           // historical merge keeps the old turn id and can therefore preserve stale live state.
           const message = existing ? mergeLiveMessage(existing, imported) : imported;
-          const ordinal = existingRow
-            ? requiredNumberColumn(existingRow, "ordinal")
-            : requiredNumberColumn(databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 }, "ordinal");
+          let ordinal: number;
+          if (existingRow) {
+            ordinal = requiredNumberColumn(existingRow, "ordinal");
+          } else {
+            // Read the thread's next ordinal once; each new message of this write takes the one after.
+            appendOrdinal ??= requiredNumberColumn(
+              databaseRow(nextOrdinal.get(input.threadId)) ?? { ordinal: 0 },
+              "ordinal",
+            );
+            ordinal = appendOrdinal;
+            appendOrdinal += 1;
+          }
           upsert.run(
             input.threadId,
             message.id,
@@ -759,7 +769,7 @@ export class ConversationWriter {
       ],
       (db, sequences) => {
         const sequence = sequences[0] ?? 0;
-        const agent = this.#roster.listAgents().find((candidate) => candidate.id === input.agentId);
+        const agent = this.#roster.getAgent(input.agentId);
         if (!agent) {
           throw new Error(`Unknown agent thread for provider history: ${input.agentId}`);
         }
