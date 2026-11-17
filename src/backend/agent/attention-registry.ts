@@ -1411,7 +1411,6 @@ export class AttentionRegistry {
       turnId,
       tabId,
       ...(params.tool === "request_takeover" && isOneOf(BROWSER_TAKEOVER_REASONS, reason) ? { reason } : {}),
-      ...(request.subagent ? { subagent: true as const } : {}),
     };
     const call = takeoverCall();
     const pending: PendingBrowserTakeover = {
@@ -2236,7 +2235,8 @@ export class AttentionRegistry {
     }
     for (const [requestId, pending] of this.#takeovers) {
       if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
-      if (completed && pending.subagent) continue;
+      // A detached card waits for the next call of its turn (#9689), which cannot come after the turn ends.
+      if (completed && pending.subagent && !pending.detached) continue;
       this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
     for (const [tabId, held] of this.#heldTakeoverResults) {
