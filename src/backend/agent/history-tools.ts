@@ -171,30 +171,17 @@ function readCursor(text: string) {
   }
 }
 
-/** A `before` that is not a cursor is a message of the chat that is read. The error names the argument. */
-const beforeMessageSchema = (inChat: (messageId: string) => boolean) =>
-  z.object({
-    before: z
-      .string()
-      .refine(
-        inChat,
-        "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again.",
-      ),
-  });
-
 /**
- * A `messageId` that names no message of the chat read. The id of a teammate request, its "Message ID",
- * also names its copy in this chat. The error names the argument, as for `before`.
+ * The argument error for a `messageId` or a `before` that names no message of the chat after its latest
+ * reset. The "Message ID" of a teammate request also names its copy in the chat.
  */
-const messageIdSchema = (inChat: (messageId: string) => boolean) =>
-  z.object({
-    messageId: z
-      .string()
-      .refine(
-        inChat,
-        "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.",
-      ),
-  });
+function unknownReference(argument: "messageId" | "before", input: string): z.ZodError {
+  const message =
+    argument === "before"
+      ? "Use nextCursor or a messageId from an earlier answer of this chat. For another chat, send its taskId again."
+      : "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.";
+  return new z.ZodError([{ code: "custom", path: [argument], input, message }]);
+}
 
 /**
  * A message as a read shows it. The delivery states of a request to teammates change while the
@@ -485,19 +472,6 @@ export class HistoryTools {
         ? readCursor(read.before)
         : null;
     const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
-    // The read resolves a teammate request's Message ID too. Other errors are not argument errors.
-    const inChat = (messageId: string) => {
-      try {
-        store.database.readAgentHistory(agentId, threadId, { messageId, outgoing: true, limit: 1 });
-        return true;
-      } catch (error) {
-        if (error instanceof HistoryReferenceUnavailable) return false;
-        throw error;
-      }
-    };
-    const readMessageId = read?.messageId;
-    if (readMessageId !== undefined) yield* toolStep(() => messageIdSchema(inChat).parse({ messageId: readMessageId }));
-    if (beforeMessageId !== null) yield* toolStep(() => beforeMessageSchema(inChat).parse({ before: beforeMessageId }));
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
@@ -509,7 +483,19 @@ export class HistoryTools {
       ...(cursor ? { before: cursor.anchorMessageId } : beforeMessageId ? { before: beforeMessageId } : {}),
       ...(read?.messageId ? { messageId: read.messageId } : {}),
     };
-    const page = yield* toolStep(() => store.database.readAgentHistory(agentId, threadId, selection));
+    const page = yield* toolStep(() => {
+      try {
+        return store.database.readAgentHistory(agentId, threadId, selection);
+      } catch (error) {
+        // The read resolves a teammate request's Message ID too. Only a reference from the agent is an
+        // argument error: other errors, and a cursor's anchor, keep their own error.
+        if (error instanceof HistoryReferenceUnavailable && read?.messageId !== undefined)
+          throw unknownReference("messageId", read.messageId);
+        if (error instanceof HistoryReferenceUnavailable && beforeMessageId !== null)
+          throw unknownReference("before", beforeMessageId);
+        throw error;
+      }
+    });
     if (cursor && cursor.resetMessageId !== page.resetMessageId)
       throw new Error(sourceText("error.agent.historyUnavailable"));
     const nextCursor = (messageId: string) =>
