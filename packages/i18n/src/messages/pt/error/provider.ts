@@ -245,6 +245,8 @@ export const messages = {
     "Os modelos gratuitos do OpenCode atingiram o limite de uso. Todos os modelos gratuitos compartilham esse limite. Para continuar, cole uma chave do OpenCode Go nas configurações do OpenCode ou escolha um modelo de outro provedor.",
   "error.provider.opencodeProviderFailed":
     "Ocorreu uma falha no provedor do modelo. Sua conexão não é a causa. Tente novamente mais tarde ou escolha outro modelo.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Este modelo não está disponível para você. Escolha outro modelo para este agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "A resposta do modelo foi interrompida ou não era válida. Envie sua mensagem de novo ou escolha outro modelo.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
