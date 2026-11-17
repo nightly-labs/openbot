@@ -28,6 +28,8 @@ const STATES: Record<WhatsAppSessionState, MessagingConnectionState | null> = {
   connecting: "connecting",
   open: "connected",
   reconnecting: "reconnecting",
+  // The number shows as not working, with Reconnect. The next open socket sets it to connected.
+  failing: "error",
   logged_out: "invalid_token",
   // Another client took the session. The service keeps the state until the owner reconnects.
   replaced: "error",
