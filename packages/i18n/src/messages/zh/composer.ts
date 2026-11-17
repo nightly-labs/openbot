@@ -66,6 +66,8 @@ export const messages = {
   "composer.voice.blocked": "麦克风权限被拒绝。请在系统设置中允许 OpenBot 使用麦克风。",
   "composer.voice.noMicrophone": "没有可用的麦克风。",
   "composer.voice.startFailed": "OpenBot 无法开始录音。",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot 无法打开麦克风。请关闭正在使用麦克风的其他应用，确认麦克风已连接并在系统设置中允许使用，然后重试。",
   "composer.voice.transcribeFailed": "OpenBot 无法转写这段录音。",
   "composer.reply.toYou": "回复你的消息",
   "composer.reply.toAgent": "回复助手",

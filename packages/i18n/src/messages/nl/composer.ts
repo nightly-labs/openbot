@@ -74,6 +74,8 @@ export const messages = {
     "Toegang tot de microfoon is geblokkeerd. Geef OpenBot toegang tot de microfoon in de systeeminstellingen.",
   "composer.voice.noMicrophone": "Er is geen microfoon beschikbaar.",
   "composer.voice.startFailed": "OpenBot kan de spraakopname niet starten.",
+  "composer.voice.microphoneUnavailable":
+    "OpenBot kan de microfoon niet openen. Sluit andere apps die hem gebruiken, controleer of hij is aangesloten en is toegestaan in de systeeminstellingen, en probeer het opnieuw.",
   "composer.voice.transcribeFailed": "OpenBot kan deze opname niet uitschrijven.",
   "composer.reply.toYou": "Antwoord op je bericht",
   "composer.reply.toAgent": "Antwoord aan agent",
