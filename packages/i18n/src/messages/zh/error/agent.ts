@@ -86,7 +86,7 @@ export const messages = {
   "error.agent.compactionConnectionLost":
     "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，然后发送消息以继续。",
   "error.agent.compactionConnectionLostAddress":
-    "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，并检查 {provider} 设置中“变量”下的 {variable} 地址：它必须是模型服务的 API 地址，通常以 /v1 结尾。然后发送消息以继续。",
+    "助手压缩上下文时连接中断，因此任务已停止。请检查网络连接，并确认 {provider} 设置中“变量”下的 {variable} 是模型服务的 API 地址（通常以 /v1 结尾）。然后发送一条消息。",
   "error.agent.compactionLoopStopped":
     "{provider} 反复压缩上下文，但每次压缩后仍然太满，无法继续，因此 OpenBot 停止了这一轮。请关闭此智能体不需要的 MCP 服务器或电脑操控，然后发送一条消息。如果你或智能体更改过 {provider} 的压缩时机，请撤销该更改。",
   "error.agent.selectedGone": "所选的助手已不存在。",

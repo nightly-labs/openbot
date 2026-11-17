@@ -100,7 +100,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.compactionConnectionLost":
     "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection, then send a message to continue.",
   "error.agent.compactionConnectionLostAddress":
-    "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection. Also check the {variable} address in the {provider} settings, under Variables: it must be the API address of your model service, which often ends in /v1. Then send a message to continue.",
+    "The connection stopped while the agent compacted its context, so the task stopped. Check your internet connection. Also make sure that {variable} under Variables in the {provider} settings is the API address of your model service, which often ends in /v1. Then send a message.",
   "error.agent.compactionLoopStopped":
     "{provider} compacted the context again and again, and each time it stayed too full to continue, so OpenBot stopped this turn. Turn off the MCP servers or computer use that this agent does not need, then send a message. If you or the agent changed when {provider} compacts, undo that change.",
   "error.agent.selectedGone": "The selected agent no longer exists.",
