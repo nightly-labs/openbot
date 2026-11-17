@@ -6994,10 +6994,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
   }
 
-  /** Whether each message of this running turn is from a person. */
+  /**
+   * Whether only people on this computer sent the messages of this running turn. The drain links the
+   * messages to a turn a moment after it publishes the turn, so until then the messages that start it
+   * count. A team member on another computer cannot use the person-only tools, so their turn does not
+   * hold messages from agents back.
+   */
   #personTurn(agentId: string, turnId: string): boolean {
-    const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
-    return deliveries.length > 0 && deliveries.every(({ delivery }) => delivery.sender.kind === "user");
+    const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, null);
+    return (
+      deliveries.length > 0 &&
+      deliveries.every(({ delivery }) => {
+        if (delivery.sender.kind !== "user") return false;
+        const member = this.#mailbox.senderMember(delivery.messageId);
+        return member === undefined || !(this.channels.hooks.remotePerson?.(member.id) ?? false);
+      })
+    );
   }
 
   /**
