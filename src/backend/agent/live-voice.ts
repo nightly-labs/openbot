@@ -131,14 +131,17 @@ const SAME_TURN_REPLY = "The agent answered this request together with the previ
  */
 const RELAY_DELEGATION = /^<realtime_delegation>\s*(?:<source>[^<]*<\/source>\s*)?<input>([^<]*)<\/input>/;
 
-/** The request in a copied Codex wrapper, or the text as it is. Only a complete `<input>` counts. */
+/**
+ * The request in a copied Codex wrapper, or the text as it is. Only a complete `<input>` with text counts:
+ * Codex also saves the call in wrappers with an empty `<input>`, and such a request must not get lost.
+ */
 function relayRequest(text: string): string {
   const input = RELAY_DELEGATION.exec(text)?.[1]
     ?.replaceAll("&lt;", "<")
     .replaceAll("&gt;", ">")
     .replaceAll("&amp;", "&")
     .trim();
-  return input ?? text;
+  return input || text;
 }
 
 const logger = createOpenBotLogger("live-voice");
