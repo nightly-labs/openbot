@@ -248,7 +248,7 @@ export function attachmentIpcHandlers({
         local: async (parsed) => {
           // A chat link can name a folder. The file manager shows it; nothing opens it.
           const sharedFile = await runCauseEffect(
-            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal" }),
+            service.resolveSharedFile(parsed.path, { allowDirectory: parsed.action === "reveal", followLinks: true }),
           );
           // A member upload lands in the shared folder too, so a shared file opens only when its type is safe.
           await deliverLocalFile(sharedFile.path, sharedFile.name, parsed.action, () =>
@@ -294,7 +294,7 @@ export function attachmentIpcHandlers({
       previewSharedFile: scopedHandler(parsePreviewSharedFile, {
         local: async (parsed) => {
           const generation = filePreviewPages.generation;
-          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path));
+          const sharedFile = await runCauseEffect(service.resolveSharedFile(parsed.path, { followLinks: true }));
           return runCauseEffect(
             localFilePreview(sharedFile.path, sharedFile.name, sharedFile.size, generation, parsed.maxBytes),
           );

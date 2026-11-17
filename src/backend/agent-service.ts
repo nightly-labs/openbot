@@ -4990,7 +4990,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   resolveSharedFile(
     inputPath: string,
-    options?: { allowDirectory?: boolean },
+    options?: { allowDirectory?: boolean; followLinks?: boolean },
   ): Effect.Effect<ResolvedSharedFile, AgentLifecycleFailed> {
     return resolveSharedFile(this.#store.sharedRoot, inputPath, options).pipe(
       Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause })),
