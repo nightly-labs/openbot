@@ -187,6 +187,12 @@
       "version": "1.0.0",
       "featured": false,
       "detailSha256": "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449"
+    },
+    {
+      "slug": "muapi",
+      "version": "1.0.0",
+      "featured": false,
+      "detailSha256": "0518b4497462126f787103e7415d368b6950f02270c0c5723bb7a7b3a76f7732"
     }
   ]
 }

@@ -204,6 +204,12 @@ export const PLUGIN_CATALOG_INDEX: PluginCatalogIndex = {
       featured: false,
       detailSha256: "5014d267e7627c50d84ea1823d04e4d6c6f18e7096319f3e1351972e656c4449",
     },
+    {
+      slug: "muapi",
+      version: "1.0.0",
+      featured: false,
+      detailSha256: "0518b4497462126f787103e7415d368b6950f02270c0c5723bb7a7b3a76f7732",
+    },
   ],
 };
 
@@ -1445,6 +1451,60 @@ export const PLUGIN_CATALOG_DETAILS: Record<string, PluginCatalogDetail> = {
     websiteUrl: "https://clickup.com",
     privacyPolicyUrl: "https://clickup.com/terms/privacy",
     termsUrl: "https://clickup.com/terms",
+    skills: [],
+  },
+  muapi: {
+    slug: "muapi",
+    name: "MuAPI",
+    tagline: "Image and video generation",
+    description:
+      "MuAPI lets agents generate and edit images and short videos with hundreds of models, and animate stills, through one MCP server. An API key from the MuAPI dashboard goes into one Authorization header. Each generation spends credits on that account.",
+    category: "design",
+    creatorName: "MuAPI",
+    iconUrl: "https://muapi.ai/icon.png",
+    version: "1.0.0",
+    prompts: [
+      {
+        id: "prompt-hero",
+        text: "Generate three square hero images for a matte black water bottle, and show me the model and cost first.",
+      },
+      { id: "prompt-animate", text: "Animate this product photo into a five second clip." },
+      { id: "prompt-edit", text: "Remove the background from this image and place it on a plain studio backdrop." },
+    ],
+    apps: [
+      {
+        id: "app-muapi-mcp",
+        name: "MuAPI",
+        description: "Image and video generation, editing and upscaling, over the MuAPI MCP server with an API key.",
+        iconUrl: "https://muapi.ai/icon.png",
+        server: {
+          name: "muapi",
+          transport: "http",
+          url: "https://api.muapi.ai/mcp",
+          auth: [
+            {
+              id: "muapi-key",
+              kind: "key",
+              label: "API key",
+              fields: [
+                {
+                  id: "token",
+                  label: "API key",
+                  header: "Authorization",
+                  prefix: "Bearer ",
+                  hint: "MuAPI dashboard → Access keys",
+                },
+              ],
+              docsUrl: "https://muapi.ai/access-keys",
+              docsLabel: "Create a key",
+            },
+          ],
+        },
+      },
+    ],
+    websiteUrl: "https://muapi.ai",
+    privacyPolicyUrl: "https://muapi.ai/privacy",
+    termsUrl: "https://muapi.ai/terms",
     skills: [],
   },
 };
