@@ -172,6 +172,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "لم يقبل المزوّد الرمز. ابدأ تسجيل الدخول مرة أخرى.",
   "error.provider.codeLoginUnsupported":
     "لا يمكن لهذا الخادم تسجيل الدخول برمز ملصوق. سجّل الدخول على حاسوب الخادم، في متصفحه.",
+  "error.provider.claudeLoginNotSaved":
+    "تعذّر على Claude حفظ تسجيل الدخول على جهاز Mac. أعد تشغيل جهاز Mac الذي يشغّل OpenBot، ثم اربط Claude مرة أخرى.",
   "error.provider.cliBusyRetry": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم أعد المحاولة.",
   "error.provider.cliSigningIn": "تُجري واجهة {provider} CLI تسجيل الدخول. أكمل تسجيل الدخول أو ألغه، ثم حدّث.",
   "error.provider.cliBusyUpdate": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم حدّث.",

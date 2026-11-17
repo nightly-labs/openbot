@@ -187,6 +187,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "De aanbieder heeft de code niet geaccepteerd. Start het inloggen opnieuw.",
   "error.provider.codeLoginUnsupported":
     "Deze server kan niet inloggen met een geplakte code. Log in op de servercomputer, in de browser daar.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude kan de aanmelding niet opslaan op de Mac. Start de Mac waarop OpenBot draait opnieuw op en verbind Claude daarna opnieuw.",
   "error.provider.cliBusyRetry":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en probeer het opnieuw.",
   "error.provider.cliSigningIn":

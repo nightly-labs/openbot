@@ -196,6 +196,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "プロバイダーがコードを受け付けませんでした。サインインをやり直してください。",
   "error.provider.codeLoginUnsupported":
     "このサーバーでは、貼り付けたコードでサインインできません。サーバーのコンピューターのブラウザーでサインインしてください。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude は Mac にサインイン情報を保存できませんでした。OpenBot を実行している Mac を再起動してから、Claude をもう一度接続してください。",
   "error.provider.cliBusyRetry": "{provider} CLI はターンを処理中です。終わるまで待ってから、もう一度お試しください。",
   "error.provider.cliSigningIn":
     "{provider} CLI はサインイン中です。サインインを完了するかキャンセルしてから更新してください。",

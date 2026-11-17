@@ -188,6 +188,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "제공자가 코드를 수락하지 않았어요. 로그인을 다시 시작하세요.",
   "error.provider.codeLoginUnsupported":
     "이 서버는 붙여넣은 코드로 로그인할 수 없어요. 서버 컴퓨터의 브라우저에서 로그인하세요.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude가 Mac에 로그인 정보를 저장하지 못했어요. OpenBot이 실행 중인 Mac을 재시동한 다음 Claude를 다시 연결하세요.",
   "error.provider.cliBusyRetry": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 다시 시도해 주세요.",
   "error.provider.cliSigningIn": "{provider} CLI가 로그인하는 중이에요. 로그인을 마치거나 취소한 후 업데이트하세요.",
   "error.provider.cliBusyUpdate": "{provider} CLI가 턴을 처리하는 중이에요. 끝날 때까지 기다린 후 업데이트하세요.",

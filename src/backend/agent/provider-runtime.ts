@@ -128,7 +128,7 @@ import {
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
-  waitForSuccessfulProcess,
+  waitForSignInProcess,
 } from "./provider-status";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
@@ -1896,7 +1896,7 @@ export class ProviderRuntime implements ProviderPort {
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
                       env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
-                      stdio: "ignore",
+                      stdio: signIn.command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
                       windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -1905,7 +1905,7 @@ export class ProviderRuntime implements ProviderPort {
                 }),
                 (child) => stopProcessTree(child).pipe(Effect.orDie),
               );
-              return { child, done: waitForSuccessfulProcess(child, signIn.command.timeoutMs) };
+              return { child, done: waitForSignInProcess(child, signIn.command) };
             }),
           )
           .pipe(toProviderOperationFailed);
