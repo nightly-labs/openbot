@@ -1992,33 +1992,29 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         ),
       );
       if (this.#running && this.#threads.get(runtime.id) === runtime) {
-        yield* this.#endFailedQuery(runtime, new Error("Claude session stream ended unexpectedly."), false);
+        this.#fail(new Error("Claude session stream ended unexpectedly."));
       }
     } catch (caught) {
       if (!this.#running || this.#threads.get(runtime.id) !== runtime) return;
-      yield* this.#endFailedQuery(runtime, runtime.stderr.addTo(caught), true);
+      yield* this.#endFailedQuery(runtime, runtime.stderr.addTo(caught));
     }
   });
 
   /**
-   * Ends a query that failed or ended by itself. A query that started fails on its own thread, not on
-   * Claude: its turn fails, and its next turn resumes the session. The other agents keep their
-   * queries, also one in the middle of a long command (#11200), and the stop does not count as a
-   * failed start. A query with no sandbox for its Workspace only setting does the same (#9925). Only
-   * a query that sent nothing stops Claude, because the CLI itself can be what does not start.
-   * `failed`: the query failed, so its turn fails also when Claude stops. A stream that ended leaves
-   * that turn to the restart recovery.
+   * Ends a query that failed. A query that started fails on its own thread, not on Claude: its turn
+   * fails, and its next turn resumes the session. The other agents keep their queries, also one in
+   * the middle of a long command (#11200), and the stop does not count as a failed start. A query
+   * with no sandbox for its Workspace only setting does the same (#9925). Only a query that sent
+   * nothing stops Claude, because the CLI itself can be what does not start.
    */
   readonly #endFailedQuery = Effect.fn("ClaudeAgentClient.endFailedQuery")(function* (
     this: ClaudeAgentClient,
     runtime: ThreadRuntime,
     error: unknown,
-    failed: boolean,
   ) {
     const noSandbox = CLAUDE_SANDBOX_UNAVAILABLE.test(String(error));
-    const ownThread = noSandbox || runtime.answered;
-    if (runtime.activeTurn && (failed || ownThread)) yield* this.#completeTurn(runtime, "failed", error);
-    if (!ownThread) {
+    if (!noSandbox && !runtime.answered) {
+      if (runtime.activeTurn) yield* this.#completeTurn(runtime, "failed", error);
       this.#fail(error instanceof Error ? error : new Error(String(error)));
       return;
     }
@@ -2026,10 +2022,17 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       noSandbox ? "Claude cannot start its sandbox for a Workspace only thread." : "A Claude query failed.",
       { threadId: runtime.id, error: redactText(String(error)) },
     );
-    // The close waits for this consumer, so it runs in the client's scope.
+    // Out of the pool before the turn ends, so a message that the end lets start opens the thread
+    // again, not this ended query. The close waits for this consumer, so it runs in the client's scope.
     yield* runtime.config.persistSession
       ? this.#threads.releaseNow(runtime)
       : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
+    const turn = runtime.activeTurn;
+    if (!turn) return;
+    // The ended query sends no result for its open tool calls.
+    for (const [toolCallId, { name }] of turn.toolCalls) this.#emitToolCall(runtime, toolCallId, name, true);
+    turn.toolCalls.clear();
+    yield* this.#completeTurn(runtime, "failed", error);
   });
 
   #emitTurnProgress(runtime: ThreadRuntime, turn: ActiveTurn, detail: string): void {
