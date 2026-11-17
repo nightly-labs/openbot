@@ -84,7 +84,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
-import { useHiddenChatDetail, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useMessageColor } from "@/features/settings/model/message-color";
 import { useRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
@@ -1534,14 +1534,17 @@ export const ChatMessageList = memo(function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
-  const hiddenDetail = useHiddenChatDetail();
+  const rowShown = useChatRowShown(turnSummaries);
   const visibleMessages = useMemo(
     () =>
       groupRoutineRunMarkers(
         groupExchangeMarkers(
-          // The settings can hide the subagents and saved memories rows.
+          // The row that the chat opens at and the row before a branch line stay, also when a
+          // setting hides their kind.
           messages.filter(
-            (message) => (message.kind !== "thinking" || turnSummaries?.has(message.id)) && !hiddenDetail(message),
+            (message) =>
+              rowShown(message) ||
+              (message.kind !== "thinking" && (message.id === focusMessageId || message.id === branchDivider?.afterId)),
           ),
         ),
         {
@@ -1551,7 +1554,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, hiddenDetail, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+    [messages, rowShown, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(

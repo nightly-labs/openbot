@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import { useCallback } from "react";
 import { create } from "zustand";
 import type { ChatMessage } from "@/features/chat/model/chat-messages";
+import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 
 export type ChatDetailPreference = { enabled: boolean; ready: boolean; saving: boolean };
 
@@ -57,13 +58,20 @@ export async function loadChatDetailPreferences(): Promise<void> {
   await Promise.all([thinking.load(), subagents.load(), memoryChanges.load()]);
 }
 
-/** Whether a chat row stays hidden by the subagents or the saved memories setting. */
-export function useHiddenChatDetail(): (message: ChatMessage) => boolean {
+/**
+ * Whether the chat draws a row for a message. A thinking step has a row only with a steps row on it,
+ * and the settings can hide the subagents and saved memories rows.
+ */
+export function useChatRowShown(
+  turnSummaries: ReadonlyMap<string, TurnStepsSummary> | undefined,
+): (message: ChatMessage) => boolean {
   const showSubagents = useSubagentsDisplayPreference((state) => state.enabled);
   const showMemories = useMemoryChangesDisplayPreference((state) => state.enabled);
   return useCallback(
     (message: ChatMessage) =>
-      (message.kind === "subagents" && !showSubagents) || (message.kind === "memory-changes" && !showMemories),
-    [showSubagents, showMemories],
+      (message.kind !== "thinking" || Boolean(turnSummaries?.has(message.id))) &&
+      !(message.kind === "subagents" && !showSubagents) &&
+      !(message.kind === "memory-changes" && !showMemories),
+    [turnSummaries, showSubagents, showMemories],
   );
 }
