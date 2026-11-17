@@ -3895,12 +3895,13 @@ export class BrowserHost {
         if (state === "interrupted") stopped("Download failed before the file was complete. Try again.");
         if (state !== "completed") return;
         // The click only starts the download, so the agent finds the saved file in its next snapshot.
-        // A network entry at info level does not show there, so this is a load entry.
+        // A network entry at info level does not show there, so this is a load entry. The path comes first and
+        // only once, so the length limit of an entry does not cut it.
         if (!tab || tab.secret) return;
         tab.diagnostics.add({
           kind: "load",
           level: "info",
-          message: `Download complete: "${basename(downloadPath)}", ${item.getReceivedBytes()} bytes, saved at ${downloadPath}`,
+          message: `Download complete: saved at ${downloadPath} (${item.getReceivedBytes()} bytes)`,
           ...diagnosticUrlField(item.getURL()),
         });
       });
