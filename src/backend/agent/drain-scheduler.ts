@@ -7,7 +7,7 @@ import {
   type AgentSummary,
   CHANNEL_RESUME_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
-import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { classifyUserError } from "@openbot/user-errors";
 import { Deferred, Effect, Result, Schema } from "effect";
@@ -61,17 +61,21 @@ export const REMOVED_ENDPOINT_MESSAGE = sourceText("error.agent.endpointRemoved"
 
 const logger = createOpenBotLogger("drain-scheduler");
 const CHANNEL_START_FAILED = "The provider could not start this assignment. Resume to try again.";
-/** The fixed texts of a start that found its provider not downloaded (`cli.ts`). They hold no detail. */
-const PROVIDER_MISSING_TEXTS: ReadonlySet<string> = new Set([
-  sourceText("error.provider.codexMissing"),
-  sourceText("error.provider.claudeMissing"),
-  sourceText("error.provider.grokMissing"),
-  sourceText("error.provider.opencodeMissing"),
-  sourceText("error.provider.antigravityMissing"),
-  sourceText("error.provider.cursorMissing"),
-  sourceText("error.provider.clineMissing"),
-  sourceText("error.provider.kimiMissing"),
-  sourceText("error.provider.hermesMissing"),
+/**
+ * The catalog keys of a start that found its provider not downloaded (`cli.ts`). They hold no detail:
+ * the one placeholder, in `nativeMissing`, is OpenBot's own provider name.
+ */
+const PROVIDER_MISSING_KEYS: ReadonlySet<string> = new Set([
+  "error.provider.codexMissing",
+  "error.provider.claudeMissing",
+  "error.provider.grokMissing",
+  "error.provider.opencodeMissing",
+  "error.provider.antigravityMissing",
+  "error.provider.cursorMissing",
+  "error.provider.clineMissing",
+  "error.provider.kimiMissing",
+  "error.provider.hermesMissing",
+  "error.provider.nativeMissing",
 ]);
 /** How long messages wait for their turn after the provider did not confirm `turn/start` in time. */
 const TURN_START_GRACE_MS = 5 * 60_000;
@@ -1559,15 +1563,15 @@ export class DrainScheduler {
    */
   #startReason(recipient: AgentSummary | undefined, error: unknown): string | null {
     if (isCodexThreadInUse(error)) return sourceText("error.provider.codexThreadInUse");
-    if (!(error instanceof Error)) return null;
-    // The provider status keeps the text of the missing download, and the start fails with it.
-    if (PROVIDER_MISSING_TEXTS.has(error.message)) return error.message;
-    if (!recipient) return null;
+    if (!recipient || !(error instanceof Error)) return null;
     const provider = providerForAgent(recipient);
-    const signInText =
-      error instanceof ProviderSignInError ||
-      (this.#providers.signInRequired(provider) &&
-        this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message);
+    const statusText =
+      this.#providers.status().providers?.find((status) => status.id === provider)?.message === error.message;
+    // The status of the agent's own provider keeps the text of the missing download, and the start
+    // fails with it. The general status message can be about another provider, so it is not used.
+    if (statusText && matchingSourceKeys(error.message).some((key) => PROVIDER_MISSING_KEYS.has(key)))
+      return error.message;
+    const signInText = error instanceof ProviderSignInError || (this.#providers.signInRequired(provider) && statusText);
     // A fixed catalog text holds nothing from the provider. A placeholder can carry the provider's own
     // words, and a text outside the catalog, such as "Connect ChatGPT to continue.", is not translated.
     if (signInText && isFixedSourceText(error.message)) return error.message;
