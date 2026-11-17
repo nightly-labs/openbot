@@ -1,11 +1,16 @@
 import { chatVisualReply } from "@openbot/contracts/chat-visual";
-import { CONVERSATION_TRACE_STEP_LIMIT, type ConversationTurnTrace } from "@openbot/contracts/ipc";
+import {
+  CONVERSATION_TRACE_STEP_LIMIT,
+  type ConversationMessage,
+  type ConversationTurnTrace,
+} from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { AgentStore } from "../agent-store";
 import type { AgentThreadRecord } from "../agent-threads/agent-thread-store";
+import { HistoryReferenceUnavailable } from "../database/agent-history-queries";
 import type { ProviderSession } from "../database/provider-sessions";
 import { openBotToolResult } from "./routine-tools";
 import { type ToolOperationFailed, toolStep } from "./tool-operation";
@@ -190,6 +195,16 @@ const messageIdSchema = (inChat: (messageId: string) => boolean) =>
         "This chat has no such message after its latest reset. Use a messageId from an earlier answer of this chat, or the Message ID of a teammate request. For another chat, send its taskId again.",
       ),
   });
+
+/**
+ * A message as a read shows it. The delivery states of a request to teammates change while the
+ * teammates work, and a read does not show them.
+ */
+function readContent(message: ConversationMessage | undefined): string {
+  return JSON.stringify(
+    message?.exchange ? { ...message, exchange: { ...message.exchange, deliveries: [] } } : message,
+  );
+}
 
 /** Whether a `history_search` call lists conversations: no arguments, or no query and no taskId. */
 export function isHistoryBrowse(tool: string, args: unknown): boolean {
@@ -470,24 +485,19 @@ export class HistoryTools {
         ? readCursor(read.before)
         : null;
     const beforeMessageId = read?.before !== undefined && cursor === null ? read.before : null;
+    // The read resolves a teammate request's Message ID too. Other errors are not argument errors.
+    const inChat = (messageId: string) => {
+      try {
+        store.database.readAgentHistory(agentId, threadId, { messageId, outgoing: true, limit: 1 });
+        return true;
+      } catch (error) {
+        if (error instanceof HistoryReferenceUnavailable) return false;
+        throw error;
+      }
+    };
     const readMessageId = read?.messageId;
-    if (readMessageId !== undefined)
-      yield* toolStep(() =>
-        messageIdSchema((messageId) => {
-          try {
-            store.database.readAgentHistory(agentId, threadId, { messageId, outgoing: true, limit: 1 });
-            return true;
-          } catch {
-            return false;
-          }
-        }).parse({ messageId: readMessageId }),
-      );
-    if (beforeMessageId !== null)
-      yield* toolStep(() =>
-        beforeMessageSchema(
-          (messageId) => store.database.readConversationMessages(agentId, threadId, [messageId]).length === 1,
-        ).parse({ before: beforeMessageId }),
-      );
+    if (readMessageId !== undefined) yield* toolStep(() => messageIdSchema(inChat).parse({ messageId: readMessageId }));
+    if (beforeMessageId !== null) yield* toolStep(() => beforeMessageSchema(inChat).parse({ before: beforeMessageId }));
     if (cursor && (cursor.threadId !== threadId || cursor.query !== (query ?? null)))
       throw new Error(sourceText("error.agent.historyUnavailable"));
     // Search matches redacted text in fixed scan batches. A SQL match on stored text would let
@@ -631,8 +641,8 @@ export class HistoryTools {
       if (
         checked.resetMessageId !== page.resetMessageId ||
         checked.messages.length !== 1 ||
-        JSON.stringify(checked.messages[0]?.message) !==
-          JSON.stringify(page.messages.find((row) => row.message.id === entry.messageId)?.message)
+        readContent(checked.messages[0]?.message) !==
+          readContent(page.messages.find((row) => row.message.id === entry.messageId)?.message)
       )
         throw new Error(sourceText("error.agent.historyUnavailable"));
     }

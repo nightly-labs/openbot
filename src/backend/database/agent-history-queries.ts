@@ -27,6 +27,13 @@ export interface AgentHistorySelection {
   limit: number;
 }
 
+/** A `messageId` or `before` that names no message of the chat after its latest reset. */
+export class HistoryReferenceUnavailable extends Error {
+  constructor() {
+    super("History reference is unavailable. Read recent history again.");
+  }
+}
+
 /** Model history reads use a thread and reset boundary; UI history remains unchanged. */
 export class AgentHistoryQueries {
   readonly #core: DatabaseCore;
@@ -67,7 +74,7 @@ export class AgentHistoryQueries {
             .get(...bindings, anchorId, anchorId, anchorId),
         )
       : null;
-    if (anchorId && !anchor) throw new Error("History reference is unavailable. Read recent history again.");
+    if (anchorId && !anchor) throw new HistoryReferenceUnavailable();
     const anchorMessageId = anchor ? requiredStringColumn(anchor, "message_id") : null;
     const messageId = selection.messageId === undefined ? null : anchorMessageId;
     const before = selection.before === undefined ? null : anchorMessageId;
