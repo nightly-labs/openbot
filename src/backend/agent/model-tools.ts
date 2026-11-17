@@ -309,7 +309,8 @@ export function listModelsPayload(
       providers.some((listed) => listed.provider === row.id)
     )
       return [];
-    const ready = !row.off && row.state === "available";
+    // A ready row with a message holds a connection failure, and that message stays the reason.
+    const ready = !row.off && row.state === "available" && !row.message;
     const message = ready ? emptyCatalogMessage(row.id) : row.message;
     return [
       {
