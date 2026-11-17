@@ -547,6 +547,27 @@ export function useLiveActivity({
     };
   }, [serverIds, publish]);
 
+  // The agent levels that the user chose for all of their devices hide single agents on the island,
+  // while the server stays shown. A mute or unmute on this phone or on another device republishes.
+  useEffect(() => {
+    if (!live) return;
+    const apply = () => {
+      const { servers: levels } = useSyncedNotificationLevels.getState();
+      for (const [serverId, snapshot] of Object.entries(levels)) {
+        const mutedAgentIds = snapshot.agents
+          .filter((entry) => entry.level === "nothing")
+          .map((entry) => entry.agentId);
+        live.coordinator.setMemberMutedAgentIds(serverId, mutedAgentIds);
+      }
+      schedule();
+    };
+    apply();
+    const unsubscribe = useSyncedNotificationLevels.subscribe((state, previous) => {
+      if (state.servers !== previous.servers) apply();
+    });
+    return unsubscribe;
+  }, [live, schedule]);
+
   // The app can be suspended at any moment after it leaves the foreground: publish the stale date now.
   useEffect(() => {
     staleDate.current = foreground ? undefined : new Date(Date.now() + STALE_AFTER_BACKGROUND_MS);
