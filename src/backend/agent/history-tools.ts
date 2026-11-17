@@ -276,8 +276,9 @@ interface HistoryEntry {
   /** Set for a visual reply in a list: its text is only the page title. */
   page?: string;
   /**
-   * Set for the answer of a turn that ended with nothing to report. The user got no notification,
-   * and the chat shows it only when they open its run, so a model must not say that the user saw it (#11174).
+   * Set for the answer of a turn that ended with nothing to report. The user got no notification, the
+   * chat shows it only when they open its run or update, and the phone app does not show it, so a model
+   * must not say that the user saw it (#11174).
    */
   quiet?: string;
 }
@@ -575,7 +576,8 @@ export class HistoryTools {
           : {}),
         ...(message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE
           ? {
-              quiet: "Ended with nothing to report: no notification, and the chat shows it only inside its closed run.",
+              quiet:
+                "Ended with nothing to report: no notification. The chat folds it under its run or update; the phone app does not show it.",
             }
           : {}),
       };
