@@ -3608,7 +3608,7 @@ export class ProviderRuntime implements ProviderPort {
             // token, and a refresh at each start made processes that start together spend it twice:
             // OpenAI then ends the sign-in with "refresh token was already used" (#10372). Codex
             // refreshes by itself when the token expires, and reads the folder again first. Codex
-            // 0.160.1 also ignores the result of a forced refresh in its answer.
+            // 0.160.1 to 0.169.0 also ignore the result of a forced refresh in their answer.
             const response = yield* client
               .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
               .pipe(toProviderOperationFailed);
