@@ -2800,9 +2800,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const cancelledUnstarted = () =>
         response.stopReason === "cancelled" && !turn.stopped && !turn.answered && turn.failureCause === null;
       if (cancelledUnstarted()) {
+        this.#reportPromptUsage(thread, turn, response);
+        // The stall watch measures the new prompt from its send.
+        turn.lastActivityAt = Date.now();
         response = providerResult(yield* send());
         if (thread.activeTurn !== turn || turn.completing) return;
-        if (cancelledUnstarted()) {
+        // A turn told not to answer ends quietly, as interrupted, below.
+        if (cancelledUnstarted() && !turn.answerOptional) {
+          this.#reportPromptUsage(thread, turn, response);
           turn.failureCause = "cancelled";
           yield* this.#completeTurn(
             thread,
@@ -3719,9 +3724,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (count !== ACP_REPEATED_TOOL_FAILURES || turn.stopped) return;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
-        yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
         // The model chose to repeat the call; the provider did not fail. So no backup model starts.
+        // Set before the cancel, as in `#watchStall`.
         turn.failureCause = "turn_limit";
+        yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
         yield* this.#abandonTurn(
           thread,
           turn,
