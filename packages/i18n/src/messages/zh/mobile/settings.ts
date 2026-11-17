@@ -239,7 +239,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "在助手聊天中向右滑动",
   "mobile.settings.conversations.swipeThreads": "话题",
   "mobile.settings.conversations.swipeBrowser": "浏览器",
-  "mobile.settings.conversations.swipeFooter": "在助手聊天中朝返回的反方向滑动会打开此项。在消息上滑动仍会回复该消息。",
+  "mobile.settings.conversations.swipeOff": "关闭",
+  "mobile.settings.conversations.swipeFooter":
+    "在助手聊天中朝返回的反方向滑动会打开此项。在消息上同样滑动会显示消息的时间。",
   "mobile.settings.conversations.pullInfo": "上拉查看信息",
   "mobile.settings.conversations.pullInfoFooter": "在聊天、频道或话题中越过最新消息继续上拉并松开，即可打开其信息。",
   "mobile.settings.conversations.fullQualityPhotos": "以原始画质发送照片",

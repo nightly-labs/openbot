@@ -262,8 +262,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
   "mobile.settings.conversations.swipeThreads": "Wątki",
   "mobile.settings.conversations.swipeBrowser": "Przeglądarka",
+  "mobile.settings.conversations.swipeOff": "Wyłączone",
   "mobile.settings.conversations.swipeFooter":
-    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. Przesunięcie dymka wiadomości nadal na nią odpowiada.",
+    "Przesunięcie w stronę przeciwną do Wstecz w czacie agenta otwiera to. To samo przesunięcie na wiadomości pokazuje godziny wiadomości.",
   "mobile.settings.conversations.pullInfo": "Pociągnięcie w górę: informacje",
   "mobile.settings.conversations.pullInfoFooter":
     "Pociągnij w górę za ostatnią wiadomość w czacie, kanale lub wątku i puść, aby otworzyć informacje.",

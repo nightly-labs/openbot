@@ -255,8 +255,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
   "mobile.settings.conversations.swipeThreads": "スレッド",
   "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeOff": "オフ",
   "mobile.settings.conversations.swipeFooter":
-    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上のスワイプは引き続き返信です。",
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上で同じ方向にスワイプすると、メッセージの時刻が表示されます。",
   "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
   "mobile.settings.conversations.pullInfoFooter":
     "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
