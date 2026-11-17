@@ -892,13 +892,14 @@ export class ConversationWriter {
   }
 }
 
+/** The events that end a turn. Only their write closes the stored turn row. */
+export function isTurnEndEvent(eventType: string): boolean {
+  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType);
+}
+
 /** A turn-end event clears the active turn, so the turn it ends is only in its detail (#3722). */
 export function activityTurnId(eventType: string, detail: unknown, activeTurnId: string | null): string | null {
-  return ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-    isDynamicRecord(detail) &&
-    isString(detail.turnId)
-    ? detail.turnId
-    : activeTurnId;
+  return isTurnEndEvent(eventType) && isDynamicRecord(detail) && isString(detail.turnId) ? detail.turnId : activeTurnId;
 }
 
 /**
