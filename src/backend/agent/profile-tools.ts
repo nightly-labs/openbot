@@ -45,7 +45,7 @@ const profileFields = {
     .refine(isAvatarHue, "Invalid avatar hue.")
     .nullable()
     .describe(
-      `Face color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
+      `Color, only ${AVATAR_HUES.map((hue) => `${hue} ${AVATAR_HUE_NAMES[hue]}`).join(", ")}, or null for automatic. Else use the nearest.`,
     ),
 };
 
@@ -131,7 +131,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed.",
       )
       .optional(),
     provider: z
@@ -148,7 +148,7 @@ export const updateProfileToolSchema = z
     providerAccountId: providerAccountId
       .nullable()
       .describe(
-        "Account id from list_models, or null for the provider's own sign-in (also used after a provider change). A runtime change while the agent works waits as pendingRuntime for its next turn. With pooled accounts, a named account stays until it hits a limit; null gives it to the pool.",
+        "Account id from list_models ('default' is the provider's own sign-in), or null for it (also after a provider change). A runtime change during work waits as pendingRuntime for the next turn. With pooled accounts, a named account stays until a limit; null gives it to the pool.",
       )
       .optional(),
     backupModels: backupModelsToolSchema

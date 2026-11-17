@@ -449,7 +449,11 @@ import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
-import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
+import {
+  type BitwardenCliRunner,
+  BitwardenConnectorService,
+  BitwardenKeyIdBackfillError,
+} from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
@@ -1803,12 +1807,20 @@ const bitwardenFile = join(root, "openbot-bitwarden-connector-v1.json");
 const bitwardenCalls: { args: string[]; env: Record<string, string> }[] = [];
 /** While set, `unlock` reports that it started and waits for `released`. */
 let bitwardenUnlockGate: { started: () => void; released: Promise<void> } | null = null;
+/** While set, the server has no user key id route, as Vaultwarden before 1.37.4 (#10130). */
+let bitwardenServerRefusesBackfill = false;
+interface BitwardenCliState {
+  server: string | null;
+  signedIn: boolean;
+  /** `bw` pauses its user key id backfill after the server refuses it. */
+  backfillPaused?: boolean;
+}
 /** The CLI's own state lives in its data folder, so removing the folder signs it out. */
-function bitwardenCliState(): { server: string | null; signedIn: boolean } {
+function bitwardenCliState(): BitwardenCliState {
   const path = join(bitwardenData, "data.json");
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { server: null, signedIn: false };
 }
-function saveBitwardenCliState(change: Partial<{ server: string | null; signedIn: boolean }>): void {
+function saveBitwardenCliState(change: Partial<BitwardenCliState>): void {
   mkdirSync(bitwardenData, { recursive: true });
   writeFileSync(join(bitwardenData, "data.json"), JSON.stringify({ ...bitwardenCliState(), ...change }));
 }
@@ -1839,6 +1851,11 @@ const fakeBitwardenCli: BitwardenCliRunner = async (_executable, args, env) => {
       await bitwardenUnlockGate.released;
     }
     if (!state.signedIn || env.BW_PASSWORD !== BW_MASTER_PASSWORD) throw new Error("bad password");
+    // As `bw` 2026.9: the unlock runs the backfill, and a refusal pauses it, then fails the unlock.
+    if (bitwardenServerRefusesBackfill && !state.backfillPaused) {
+      saveBitwardenCliState({ backfillPaused: true });
+      throw new BitwardenKeyIdBackfillError("KeyIdBackfillError");
+    }
     return `${BW_SESSION_KEY}\n`;
   }
   if (env.BW_SESSION !== BW_SESSION_KEY) throw new Error("locked");
@@ -9086,6 +9103,7 @@ try {
         !wrongStatus.connected &&
         wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&
         !existsSync(bitwardenData),
       { wrong: summary(wrong), wrongStatus },
@@ -9182,6 +9200,20 @@ try {
         !bitwardenConnector.connected(),
       summary(disconnect),
     );
+    // `bw` fails the first unlock after a sign-in when the server refuses its user key id backfill.
+    bitwardenServerRefusesBackfill = true;
+    bitwardenCalls.length = 0;
+    const backfillSettled = bitwardenSettled(bitwardenConnector);
+    await connectAs(adaToken, input);
+    const backfill = await backfillSettled;
+    const unlocks = bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length;
+    check(
+      "a server that refuses the user key id backfill still connects: the host unlocks once more",
+      backfill.connected && backfill.error === null && unlocks === 2 && existsSync(bitwardenFile),
+      { backfill, unlocks },
+    );
+    bitwardenServerRefusesBackfill = false;
+    await runCauseEffect(bitwardenConnector.disconnect());
   }
 
   // ---- WhatsApp numbers on the host (whatsapp-connector-v1) ----

@@ -37,7 +37,7 @@ import { usageWindowResetSince } from "./account-usage";
 import { captureBrowser, signInPageByOpenBot } from "./browser-capture";
 import { type CliCodeLogin, type CliCodePrompt, pasteCodeLoginSupported, startCliCodeLogin } from "./cli-code-login";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { ProviderProcessFailed, waitForSuccessfulProcess } from "./provider-status";
+import { ProviderProcessFailed, waitForSignInProcess, waitForSuccessfulProcess } from "./provider-status";
 import { providerLabel } from "./thread-items";
 import { UsageReadGate } from "./usage-read-gate";
 
@@ -350,7 +350,7 @@ export class ProviderAccounts {
                 ...this.environment(account),
                 ...browser,
               },
-              stdio: "ignore",
+              stdio: command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
               shell: false,
               windowsHide: process.platform === "win32",
               windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -358,7 +358,10 @@ export class ProviderAccounts {
           ),
           (child) => stopProcessTree(child).pipe(Effect.ignore),
         );
-        yield* waitForSuccessfulProcess(child, command.timeoutMs);
+        // A known reason is a safe message, which the account row shows as it is.
+        yield* waitForSignInProcess(child, command).pipe(
+          Effect.mapError((error) => (error.cause instanceof ProviderSignInError ? error.cause : error)),
+        );
       }),
     ).pipe(
       Effect.andThen(this.#check(account, true)),

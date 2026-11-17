@@ -394,6 +394,14 @@ export function isImageUnreadableDiagnostic(message: string): boolean {
 export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
 
 /**
+ * Google's text for a request with an access token that is not valid: "UNAUTHENTICATED (code 401):
+ * Request had invalid authentication credentials. Expected OAuth 2 access token, ...". The Antigravity
+ * CLI 1.5.9 refreshes the token itself, and sent a request with the old token when it expired during
+ * a turn. The new token was ready less than a second later (#10367).
+ */
+export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
+
+/**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
@@ -415,9 +423,12 @@ export function isImageCountDiagnostic(message: string): boolean {
  * image of the session at a small fixed token cost, so a session with many images grows past this
  * byte limit before its token-based compaction starts, and each later turn fails the same way until
  * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ * Google's Gemini API writes FAILED_PRECONDITION "The message size exceeds 30.000MB limit". The
+ * Antigravity CLI compacts a session by tokens and keeps each image that the agent opened, so a
+ * session with many images grows past it in the same way, and `/compact` fails too (#10517).
  */
 export function isRequestBodyLimitDiagnostic(message: string): boolean {
-  return /\brequest body exceeds \d+ bytes\b/iu.test(message);
+  return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
 }
 
 /**
