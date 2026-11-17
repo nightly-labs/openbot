@@ -6,6 +6,7 @@ import { Effect } from "effect";
 import type { InboundMessage, MessagingTransport, TransportSink } from "../messaging-types";
 import {
   freshUpsert,
+  sentAt,
   userJid,
   type WhatsAppEvent,
   type WhatsAppIdentity,
@@ -180,18 +181,19 @@ export class WhatsAppTransport implements MessagingTransport {
     if (event.type === "pairing") return this.#pair(event);
     if (event.type === "otherOpenBot") {
       if (this.#toldOtherOpenBot) return;
-      this.#toldOtherOpenBot = true;
-      return this.#tell(event.chatJid, "status.messaging.whatsappOtherOpenBot");
+      this.#toldOtherOpenBot = await this.#tell(event.chatJid, "status.messaging.whatsappOtherOpenBot");
+      return;
     }
     if (event.type === "action") {
       this.#sink.action(event.action);
       return;
     }
     if (live && event.chatJid === userJid(this.#identity.number)) {
-      const limit = this.#selfChatLimit.check(Date.now());
+      const limit = this.#selfChatLimit.check(sentAt(message) || Date.now(), event.message.text);
       if (limit === "pause") {
         logger.warn("The owner's own WhatsApp chat got too many requests; it gets no answers for a while.");
-        return this.#tell(event.chatJid, "status.messaging.whatsappPaused");
+        await this.#tell(event.chatJid, "status.messaging.whatsappPaused");
+        return;
       }
       if (limit === "paused") return;
     }
@@ -275,13 +277,16 @@ export class WhatsAppTransport implements MessagingTransport {
     );
   }
 
-  /** Posts a notice in the owner's own chat. It is an own post, so this OpenBot does not read it as a request. */
-  async #tell(
-    chatJid: string,
-    key: "status.messaging.whatsappOtherOpenBot" | "status.messaging.whatsappPaused",
-  ): Promise<void> {
-    await Effect.runPromise(
-      this.#handle.session.send(chatJid, { text: sourceText(key) }).pipe(Effect.catch(() => Effect.void)),
+  /**
+   * Posts a notice in the owner's own chat, and tells whether it was sent. It is an own post, so this
+   * OpenBot does not read it as a request.
+   */
+  #tell(chatJid: string, key: "status.messaging.whatsappOtherOpenBot" | "status.messaging.whatsappPaused") {
+    return Effect.runPromise(
+      this.#handle.session.send(chatJid, { text: sourceText(key) }).pipe(
+        Effect.as(true),
+        Effect.catch(() => Effect.succeed(false)),
+      ),
     );
   }
 

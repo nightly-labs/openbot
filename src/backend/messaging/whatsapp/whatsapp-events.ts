@@ -434,7 +434,8 @@ function userOf(jid: string | null | undefined): string | null {
 }
 
 /** The send time in milliseconds. Baileys gives a number, or a protobuf Long after a decode. */
-function sentAt(message: WAMessage): number {
+/** When the message was sent, in milliseconds, or 0 when WhatsApp did not say. */
+export function sentAt(message: WAMessage): number {
   const value = message.messageTimestamp;
   const seconds = typeof value === "number" ? value : value ? value.toNumber() : 0;
   return seconds * 1_000;

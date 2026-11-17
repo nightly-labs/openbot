@@ -1375,37 +1375,59 @@ try {
       },
     );
 
-    await step("loop guard: the owner's own chat that gets requests too fast gets no answers for a while", async () => {
-      const paused = () =>
-        phone.textsTo(OWNER_JID).filter((text) => text.startsWith("OpenBot stopped answering here")).length;
-      // Two OpenBots that answer each other's posts send a request every few seconds, without end.
-      const loop = Array.from({ length: 31 }, (_, index) =>
-        message({ chat: OWNER_JID, fromMe: true, text: `loop ${index}` }),
-      );
-      phone.current().receive(loop);
-      await until(() => paused() === 1, "the pause notice");
-      const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
-      assert.ok(handle, "No open store.");
-      const journaled = (chat: string, id: string | null | undefined) =>
-        handle.store.unhandled().some((entry) => entry.dedupKey === `${chat}:${id}`);
-      const during = message({ chat: OWNER_JID, fromMe: true, text: "during the pause" });
-      const marker = message({
-        chat: GROUP,
-        participant: `${FRIEND}@s.whatsapp.net`,
-        text: "@48600100200 a mention during the pause",
-        mentions: [OWNER_JID],
-      });
-      phone.current().receive([during]);
-      phone.current().receive([marker]);
-      // Messages are read in order, so the owner's message above was read and dropped.
-      await until(() => journaled(GROUP, marker.key.id), "a group mention during the pause");
-      assert.equal(journaled(OWNER_JID, during.key.id), false, "The paused chat took a request.");
-      // The joined burst before the limit and the mention go on, so the next stop leaves nothing to replay.
-      await until(() => !journaled(OWNER_JID, loop[1]?.key.id), "the burst before the limit");
-      await until(() => phone.reactedTo(marker.key.id), "the mention");
-      assert.equal(paused(), 1, "The pause notice came more than once.");
-      return { pauseNotices: paused() };
-    });
+    await step(
+      "loop guard: a loop in the owner's own chat pauses it, a burst does not, and stop goes through",
+      async () => {
+        const paused = () =>
+          phone.textsTo(OWNER_JID).filter((text) => text.startsWith("OpenBot stopped answering here")).length;
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        const journaled = (chat: string, id: string | null | undefined) =>
+          handle.store.unhandled().some((entry) => entry.dedupKey === `${chat}:${id}`);
+        const mention = (text: string) =>
+          message({
+            chat: GROUP,
+            participant: `${FRIEND}@s.whatsapp.net`,
+            text: `@48600100200 ${text}`,
+            mentions: [OWNER_JID],
+          });
+        // A person who sends many messages at once, such as forwarded files, is not a loop.
+        const burst = Array.from({ length: 35 }, (_, index) =>
+          message({ chat: OWNER_JID, fromMe: true, text: `note ${index}` }),
+        );
+        phone.current().receive(burst);
+        const afterBurst = mention("after the burst");
+        phone.current().receive([afterBurst]);
+        // Messages are read in order, and the mention goes on after the joined burst.
+        await until(() => phone.reactedTo(afterBurst.key.id), "a group mention after the burst");
+        assert.equal(paused(), 0, "A burst of messages paused the owner's own chat.");
+        assert.equal(journaled(OWNER_JID, burst[0]?.key.id), true, "The burst did not go on as one request.");
+        // Two OpenBots that answer each other's posts send a request every few seconds, without end.
+        const start = Date.now() - 31 * 12_000;
+        const loop = Array.from({ length: 31 }, (_, index) => {
+          const sent = message({ chat: OWNER_JID, fromMe: true, text: `loop ${index}` });
+          sent.messageTimestamp = Math.floor((start + index * 12_000) / 1_000);
+          return sent;
+        });
+        phone.current().receive(loop);
+        await until(() => paused() === 1, "the pause notice");
+        // The requests before the limit go on as one joined burst first, so the next ones stand alone.
+        await until(() => !journaled(OWNER_JID, loop[1]?.key.id), "the loop requests before the limit");
+        const during = message({ chat: OWNER_JID, fromMe: true, text: "during the pause" });
+        const stop = message({ chat: OWNER_JID, fromMe: true, text: "stop" });
+        const marker = mention("during the pause");
+        phone.current().receive([during]);
+        phone.current().receive([stop]);
+        phone.current().receive([marker]);
+        // The mention goes on after the owner's messages above, so they were read.
+        await until(() => phone.reactedTo(marker.key.id), "a group mention during the pause");
+        assert.equal(journaled(OWNER_JID, during.key.id), false, "The paused chat took a request.");
+        assert.equal(journaled(OWNER_JID, stop.key.id), true, "A stop request did not go through the pause.");
+        assert.equal(journaled(OWNER_JID, loop.at(-1)?.key.id), false, "The loop went on past the limit.");
+        assert.equal(paused(), 1, "The pause notice came more than once.");
+        return { pauseNotices: paused() };
+      },
+    );
   });
 
   await step("normal stop: every message the service took is marked handled, so nothing replays", async () => {
