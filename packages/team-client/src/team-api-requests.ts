@@ -726,6 +726,8 @@ export function sha256Hex(bytes: Uint8Array): string {
 export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceTransferInParts")(function* (
   request: TeamApiRequest,
   file: TransferFileParts,
+  /** The bytes that the host has, after the start and after each part. Then the host reads the file. */
+  onProgress?: (sent: number, total: number) => void,
 ): Effect.fn.Return<InstanceTransferPreview, TeamRequestError> {
   const whole = sha256.create();
   for (let offset = 0; offset < file.size; offset += INSTANCE_TRANSFER_CHUNK_BYTES)
@@ -739,10 +741,15 @@ export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceT
     }),
   );
   const received = new Set(upload.received);
+  const partLength = (index: number) => Math.min(upload.chunkBytes, file.size - index * upload.chunkBytes);
+  // The parts that a failed upload left on the host count at once.
+  let sent = 0;
+  for (const index of received) if (index * upload.chunkBytes < file.size) sent += partLength(index);
+  onProgress?.(sent, file.size);
   for (let index = 0; index * upload.chunkBytes < file.size; index++) {
     if (received.has(index)) continue;
     const offset = index * upload.chunkBytes;
-    const bytes = yield* teamCall(() => file.readBytes(offset, Math.min(upload.chunkBytes, file.size - offset)));
+    const bytes = yield* teamCall(() => file.readBytes(offset, partLength(index)));
     const query = new URLSearchParams({ uploadId: upload.uploadId, index: String(index), sha256: sha256Hex(bytes) });
     yield* teamCall(() =>
       request("POST", `${INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadChunk}?${query}`, ignoreResponse, undefined, {
@@ -752,6 +759,8 @@ export const stageInstanceTransferInParts = Effect.fn("TeamClient.stageInstanceT
         maxBytes: upload.chunkBytes,
       }),
     );
+    sent += bytes.length;
+    onProgress?.(sent, file.size);
   }
   return yield* teamCall(() =>
     request("POST", INSTANCE_TRANSFER_CHUNKS_ROUTES.uploadFinish, decodeRemoteInstanceTransferPreview, {
