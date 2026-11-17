@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { expandAttachmentReferences } from "@openbot/contracts/attachment-references";
-import { expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
+import { chatTagReferences, expandChatTagReferences } from "@openbot/contracts/chat-tag-references";
 import type {
   AgentSummary,
   AgentWait,
@@ -458,6 +458,10 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
     const waits = wokenWaitsPromptText(sources.wokenWaits ?? []);
     if (waits) text += `\n\n${waits}`;
   }
+  if (delivery.sender.kind === "user" && sources.executionText === undefined) {
+    const note = taggedAgentsNote(delivery.text, delivery.recipientAgentId, agentNames);
+    if (note) text += `\n\n${note}`;
+  }
   const skillSuggestion = pendingSkillSuggestionNote(
     delivery,
     snapshot.messages,
@@ -503,6 +507,32 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
           : { type: "mention", name: attachment.name, path: attachment.path },
     ),
   ];
+}
+
+/**
+ * The agents that the user tags in a message to this agent's chat. A tag sends the message to the
+ * tagged agent only in a channel; here only this agent gets it. As the text "@Name" alone, the model
+ * often took the tag for a name and the tagged agent never got the request (#11305).
+ */
+function taggedAgentsNote(
+  text: string,
+  recipientAgentId: string,
+  agentNames: ReadonlyMap<string, string>,
+): string | null {
+  const ids = new Set(
+    chatTagReferences(text)
+      .filter((reference) => reference.kind === "agent" && reference.id !== recipientAgentId)
+      .map((reference) => reference.id),
+  );
+  const agents = [...ids].flatMap((id) => {
+    const name = agentNames.get(id);
+    return name === undefined ? [] : [`${name} (${id})`];
+  });
+  if (!agents.length) return null;
+  return [
+    `The user tagged these agents in this message: ${agents.join(", ")}. Only you received the message.`,
+    "When the user wants a tagged agent to do or know something, send that agent your own message with openbot.send_message, with its id in recipientAgentIds, and tell the user that you sent it. When the user only names the agent, send nothing.",
+  ].join(" ");
 }
 
 /**
