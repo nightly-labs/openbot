@@ -2028,15 +2028,20 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
       // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
       // stdio server of a Workspace only agent.
-      mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
-        // An agent that is not found gets only the http rows, as a Workspace only agent does.
-        const agent = this.#store.list().find((candidate) => candidate.id === agentId) ?? { access: "workspace" };
-        const saved = new Set(this.#mcp.list().map((config) => config.id));
-        return this.enabledMcpServers(agentId).filter(
-          (config) =>
-            saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
-        );
-      }),
+      mcpServers: mcpServersFromGateway(
+        this.#mcp,
+        options.prepareMcpTest,
+        (agentId) => {
+          // An agent that is not found gets only the http rows, as a Workspace only agent does.
+          const agent = this.#store.list().find((candidate) => candidate.id === agentId) ?? { access: "workspace" };
+          const saved = new Set(this.#mcp.list().map((config) => config.id));
+          return this.enabledMcpServers(agentId).filter(
+            (config) =>
+              saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
+          );
+        },
+        (mcpServerId, agentId) => this.#mcpAgentAccess?.(mcpServerId, agentId) ?? true,
+      ),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
       githubConnected: () => Boolean(githubConnector?.mcpServer()),
       feedbackFacts: options.feedbackFacts ?? null,

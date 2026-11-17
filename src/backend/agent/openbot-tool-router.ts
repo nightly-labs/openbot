@@ -3028,6 +3028,7 @@ export class OpenBotToolRouter {
     const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
     return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
+      agentId,
       arguments: params.arguments,
       approve: (reason, cwd) =>
         this.#attention
