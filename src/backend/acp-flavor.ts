@@ -216,9 +216,9 @@ export interface AcpFlavor {
     turnFailure(text: string): string;
     /**
      * The cause of a turn that failed in this way, from the same rules as `turnFailure`, or `null`.
-     * It counts when the generic text rules name no cause.
+     * It counts only when the generic text rules name no cause, so a cause that they name stays.
      */
-    failureCause?(text: string): CauseCode | null;
+    fallbackCause?(text: string): CauseCode | null;
     /**
      * The https link that the user must open to fix their account, from the failure text or, for a
      * text that names no link, from the agent's own log, or `null`. The turn fails as a sign-in

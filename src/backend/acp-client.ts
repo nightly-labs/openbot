@@ -2900,7 +2900,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               turn.accountLink || sdkHarness.accountVerification?.test(detail)
                 ? "authentication"
                 : rawCause === "unknown"
-                  ? (sdkHarness.failureCause?.(detail) ?? rawCause)
+                  ? (sdkHarness.fallbackCause?.(detail) ?? rawCause)
                   : rawCause;
             turn.providerError =
               this.#mcpLoadFailureMessage(thread, detail) ??

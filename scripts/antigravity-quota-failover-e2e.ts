@@ -81,9 +81,9 @@ function handle(message) {
     const model = current.get(params.sessionId) ?? MODELS[0];
     const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent") && text.includes("QUOTA-NOW");
     const rate = model === "gemini-rate" && text.includes("RATE-NOW");
-    log({ model, quota: quota || rate, text });
+    log({ model, quota, rate, text });
     if (rate) {
-      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\\u26A0 Agent execution error: request failed with code 429" } });
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Agent execution error: request failed with code 429" } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
     if (quota) {
@@ -114,6 +114,7 @@ setInterval(() => {}, 1000);
 interface Prompt {
   model: string;
   quota: boolean;
+  rate: boolean;
   text: string;
 }
 
@@ -121,7 +122,7 @@ interface CaseReport {
   name: string;
   status: string;
   model: string | undefined;
-  prompts: { model: string; quota: boolean; continuation: boolean; workSteps: boolean }[];
+  prompts: { model: string; quota: boolean; rate: boolean; continuation: boolean; workSteps: boolean }[];
   errors: number;
   passed: boolean;
 }
@@ -237,6 +238,7 @@ async function runCase(
       .map((prompt) => ({
         model: prompt.model,
         quota: prompt.quota,
+        rate: prompt.rate,
         continuation: prompt.text.includes(CONTINUATION),
         workSteps: prompt.text.includes("Read notes.txt"),
       })),
