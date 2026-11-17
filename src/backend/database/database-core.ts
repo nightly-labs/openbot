@@ -4,7 +4,11 @@ import { chmod, copyFile, mkdir, readFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { Effect, Result } from "effect";
-import { assertQuickCheckResult, migrateOpenBotDatabase } from "../openbot-database-schema";
+import {
+  assertQuickCheckResult,
+  migrateOpenBotDatabase,
+  openBotDatabaseNeedsMigration,
+} from "../openbot-database-schema";
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 
@@ -87,8 +91,12 @@ export class DatabaseCore {
             typeof value === "string" ? value.toLocaleLowerCase() : value,
           );
         });
-        // This connection stays open during the check, so the other process does not remove the log.
-        const problems = closedCleanly || !this.#checkIntegrity ? null : yield* this.#checkIntegrity(this.path);
+        // A migration checks the file on this thread after it runs, so a check before it would read it twice.
+        const checkIntegrity = this.#checkIntegrity;
+        const problems =
+          closedCleanly || !checkIntegrity || (yield* storedSync(() => openBotDatabaseNeedsMigration(db)))
+            ? null
+            : yield* checkIntegrity(this.path);
         if (problems) yield* storedSync(() => assertQuickCheckResult(problems));
         yield* storedSync(() => {
           this.#db = db;

@@ -1049,6 +1049,16 @@ const MIGRATIONS: readonly OpenBotMigration[] = [
 
 const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? BASELINE_SCHEMA_VERSION;
 
+/**
+ * True when `migrateOpenBotDatabase` will build a new database or run a migration. Both end with the
+ * full check on this connection, so a check elsewhere before them would only read the file twice.
+ */
+export function openBotDatabaseNeedsMigration(db: DatabaseSync): boolean {
+  if (!hasExistingSchema(db)) return true;
+  const currentVersion = latestAppliedVersion(readAppliedVersions(db));
+  return MIGRATIONS.some((migration) => migration.version > currentVersion);
+}
+
 export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrationOptions = {}): void {
   validateMigrationRegistry();
   const appliedAt = options.appliedAt ?? new Date().toISOString();
