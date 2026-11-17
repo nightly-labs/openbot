@@ -87,6 +87,7 @@ export function createTeamProtocolV8Event(
     usageTertiary?: boolean;
     agentPendingRuntime?: boolean;
     memoryChanges?: boolean;
+    promptDetached?: boolean;
   } = {},
 ): TeamProtocolV2EventFrame {
   const decoded = decodeTeamProtocolV8BaseCurrentEvent(value);

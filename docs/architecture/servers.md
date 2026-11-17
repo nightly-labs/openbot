@@ -654,6 +654,21 @@ closed. The WebRTC host peer encodes the local response and the events again wit
 The iPhone app advertises it through the shared team client, but it still shows the question as a
 single choice.
 
+### Detached questions
+
+`prompt-detached-v1` carries `detached: true` on an agent question that no turn waits for: the
+provider stopped waiting for the answer (Cursor stops a tool call after 60 seconds), so the host
+answered the call and keeps the card open, and the answer goes to the agent as a new message (see
+`team-protocol/prompt-detached-v1.ts`). It adds the flag beside the frozen keys of the `prompt` event
+and of each `pendingPrompts` item of the `runtime-snapshot` event. The host adds it only on protocol 9
+and only for a connection that advertises the capability. The desktop with a joined server and the
+web client keep such a card when its turn ends, so the user keeps what they typed in it (#11188). A
+released client removes the card at the end of the turn and shows it again from the next snapshot. A
+host without the capability never sends the flag, so a client keeps it whenever it is present, and a
+value that is not `true` fails closed. The WebRTC host peer encodes the events again with the same
+option. The iPhone app advertises it through the shared team client, but it shows a question only
+while its turn runs.
+
 ### Reasoning efforts
 
 `reasoning-efforts-v1` lets an agent `reasoningEffort`, a model `defaultReasoningEffort` and each of

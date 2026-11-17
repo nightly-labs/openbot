@@ -240,7 +240,7 @@ export interface AgentRuntimeSnapshot {
     threadId: string;
     turnId: string;
     questions: AgentRuntimePromptQuestion[];
-    /** As on the `prompt` event: no turn waits for it. Absent from a released Team API snapshot. */
+    /** As on the `prompt` event: no turn waits for it. The Team API carries it under `prompt-detached-v1`. */
     detached?: true;
   }>;
   pendingApprovals: AgentRuntimeApproval[];

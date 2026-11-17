@@ -675,9 +675,13 @@ export function createWebWorkspace(
         } else if (event.type === "turn-completed") {
           setState((draft) => {
             if (draft.progress[event.agentId]?.turnId === event.turnId) delete draft.progress[event.agentId];
+            // A detached question outlives its turn: the host keeps it until the user answers.
             draft.prompts = draft.prompts.filter(
               (item) =>
-                item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
+                item.detached ||
+                item.agentId !== event.agentId ||
+                item.threadId !== event.threadId ||
+                item.turnId !== event.turnId,
             );
             draft.approvals = draft.approvals.filter(
               (item) =>

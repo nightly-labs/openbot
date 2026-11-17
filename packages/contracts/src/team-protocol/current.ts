@@ -134,6 +134,7 @@ import { PASSWORD_MANAGERS_CAPABILITY } from "./password-managers-v1";
 import { PENDING_APPROVAL_CAPABILITY } from "./pending-approval-v1";
 import { PHONE_FEEDBACK_CAPABILITY } from "./phone-feedback-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "./prompt-cache-ttl-v1";
+import { TEAM_PROMPT_DETACHED_CAPABILITY } from "./prompt-detached-v1";
 import { TEAM_PROMPT_MULTI_SELECT_CAPABILITY } from "./prompt-multi-select-v1";
 import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "./provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "./provider-account-keys-v1";
@@ -443,6 +444,7 @@ export {
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
   TEAM_MESSAGE_CLIENT_ID_CAPABILITY,
+  TEAM_PROMPT_DETACHED_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_REASONING_EFFORTS_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
@@ -719,6 +721,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  TEAM_PROMPT_DETACHED_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -976,7 +979,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
     capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
     capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+    capability !== TEAM_PROMPT_DETACHED_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1110,6 +1114,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+  TEAM_PROMPT_DETACHED_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1326,6 +1331,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
       capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
       capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY &&
+      capability !== TEAM_PROMPT_DETACHED_CAPABILITY,
   );
 }

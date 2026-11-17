@@ -19,6 +19,8 @@
 //   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
 // - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
 //   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
+// - prompt-detached-v1: a protocol 9 client that asks for it gets the `detached` flag of a question on
+//   the event socket and a WebRTC event; any other client gets the released question (#11188).
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -69,6 +71,7 @@ import {
 import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-notification-levels-v1";
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
+  TEAM_PROMPT_DETACHED_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import {
@@ -814,6 +817,58 @@ try {
     assert.ok(without.type === "event" && !JSON.stringify(without.payload).includes("contextStates"));
     const snapshot = record(wire.snapshot, "snapshot");
     const malformed = { ...wire, snapshot: { ...snapshot, contextStates: [{ botId: source.id, threadId: "t" }] } };
+    assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
+    return { relayed: relayed.status, malformed: "invalid" };
+  });
+
+  // --- prompt-detached-v1 ---
+
+  // A question that the host keeps after Cursor stopped waiting for it (#11188).
+  const detachedPrompt = {
+    requestId: "request-detached",
+    agentId: source.id,
+    threadId: "thread-source",
+    turnId: "turn-detached",
+    questions: [{ id: "q1", header: "Plan", question: "Which plan?", isSecret: false, options: null }],
+    detached: true as const,
+  };
+  hostAgents.getRuntimeSnapshot = () => ({ ...runtimeSnapshot(), pendingPrompts: [detachedPrompt] });
+
+  await step("prompt-detached-v1: a v9 client gets the detached flag of a question", async () => {
+    const capabilities = teamCapabilitiesForProtocol(9);
+    assert.ok(capabilities.includes(TEAM_PROMPT_DETACHED_CAPABILITY), "A v9 client does not ask for it.");
+    assert.ok(!teamCapabilitiesForProtocol(8).includes(TEAM_PROMPT_DETACHED_CAPABILITY), "A v8 client asks for it.");
+    const decoded = decodeTeamProtocolV8BaseCurrentEvent(await currentRuntimeSnapshot(capabilities));
+    assert.ok(decoded.kind === "known" && decoded.event.type === "runtime-snapshot");
+    assert.deepEqual(decoded.event.snapshot.pendingPrompts, [detachedPrompt]);
+    return { pendingPrompts: decoded.event.snapshot.pendingPrompts };
+  });
+
+  await step("prompt-detached-v1: a client that does not ask for it gets the released question", async () => {
+    const wire = await currentRuntimeSnapshot(
+      teamCapabilitiesForProtocol(9).filter((capability) => capability !== TEAM_PROMPT_DETACHED_CAPABILITY),
+    );
+    const prompts = record(wire.snapshot, "snapshot").pendingPrompts;
+    const prompt = Array.isArray(prompts) ? prompts[0] : undefined;
+    assert.ok(isRecord(prompt) && prompt.requestId === detachedPrompt.requestId, "The question did not arrive.");
+    assert.ok(!Object.hasOwn(prompt, "detached"), "A client without prompt-detached-v1 got the flag.");
+    return { promptKeys: Object.keys(prompt).sort() };
+  });
+
+  await step("prompt-detached-v1: a WebRTC prompt event follows the capability; a bad value fails closed", async () => {
+    // The relay reads the wire spelling, as the host sends it.
+    const { requestId, agentId: botId, threadId, turnId, questions } = detachedPrompt;
+    const event = { type: "prompt", requestId, botId, threadId, turnId, questions, detached: true };
+    const relayed = decodeTeamProtocolV8CurrentEvent(createTeamProtocolV8Event(1, event, { promptDetached: true }));
+    assert.ok(
+      relayed.status === "known" && relayed.event.type === "prompt" && relayed.event.detached === true,
+      `The relayed question lost its flag: ${JSON.stringify(relayed)}.`,
+    );
+    const without = createTeamProtocolV8Event(2, event, {});
+    assert.ok(without.type === "event" && !Object.hasOwn(record(without.payload, "payload"), "detached"));
+    const sent = createTeamProtocolV8Event(3, event, { promptDetached: true });
+    assert.ok(sent.type === "event");
+    const malformed = { ...record(sent.payload, "payload"), detached: false };
     assert.equal(decodeTeamProtocolV8BaseCurrentEvent(malformed).kind, "invalid");
     return { relayed: relayed.status, malformed: "invalid" };
   });

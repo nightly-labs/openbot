@@ -213,7 +213,7 @@ export type AgentEvent =
        * The card stays after its turn ends. Either no turn waits for this question (the provider could
        * not wait longer, and the answer starts a new turn), or a Codex subagent asked it and still
        * waits after its parent's turn. A client sees it in the runtime snapshot's `pendingPrompts`.
-       * Local only: the released Team API adapters do not carry it.
+       * The Team API carries it only under `prompt-detached-v1`.
        */
       detached?: true;
     }

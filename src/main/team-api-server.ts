@@ -163,6 +163,7 @@ import {
   TEAM_CURRENT_CAPABILITIES,
   TEAM_HISTORY_EXTENT_CAPABILITY,
   TEAM_MEMORY_CHANGES_CAPABILITY,
+  TEAM_PROMPT_DETACHED_CAPABILITY,
   TEAM_PROMPT_MULTI_SELECT_CAPABILITY,
   TEAM_SUBAGENTS_CAPABILITY,
   TEAM_UI_BLOCKS_CAPABILITY,
@@ -1612,6 +1613,7 @@ export class TeamApiServer {
         contextUsage: capabilities.has(TEAM_CONTEXT_USAGE_CAPABILITY),
         usageTertiary: capabilities.has(TEAM_USAGE_TERTIARY_CAPABILITY),
         agentPendingRuntime: capabilities.has(AGENT_PENDING_RUNTIME_CAPABILITY),
+        promptDetached: capabilities.has(TEAM_PROMPT_DETACHED_CAPABILITY),
         // Only the V7 and V8 encoders read them.
         uiBlocks: capabilities.has(TEAM_UI_BLOCKS_CAPABILITY),
         subagents: capabilities.has(TEAM_SUBAGENTS_CAPABILITY),
