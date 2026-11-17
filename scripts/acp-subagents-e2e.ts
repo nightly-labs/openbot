@@ -18,7 +18,7 @@ import { SUBAGENTS_UPDATED_METHOD, subagentsFromNotification } from "../src/back
 import type { AgentClient } from "../src/backend/agent-client";
 import type { AgentCliInfo } from "../src/backend/cli";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { type AppServerNotification, getString } from "../src/backend/protocol";
+import { type AppServerNotification, getRecord, getString } from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { installFakeAgent, readJsonl, runTurn, startThread, stopClients } from "./provider-fakes/host";
 
@@ -43,6 +43,8 @@ interface Report {
   /** How many `turn/subagents/updated` notifications each case sent. */
   notifications: Record<string, number>;
   openCodeAskedForChildUpdates: boolean | null;
+  /** The context fills that the Kiro case showed. */
+  contextFills?: number;
 }
 
 const root = await mkdtemp(join(tmpdir(), "openbot-acp-subagents-e2e-"));
@@ -274,7 +276,27 @@ try {
     const client = await flavoredClient("kiro");
     const thread = await startThread(client, { cwd: workspace, model: "fake/model" });
     const work = watch(client, thread);
+    // `_kiro.dev/metadata` gives the context fill as a percentage, and the model description the size.
+    const fills: { threadId: string | null; tokens: unknown; window: unknown }[] = [];
+    client.on("notification", (notification: AppServerNotification) => {
+      if (notification.method !== "thread/tokenUsage/updated") return;
+      const usage = getRecord(notification.params, "tokenUsage");
+      fills.push({
+        threadId: getString(notification.params, "threadId") ?? null,
+        tokens: getRecord(usage, "last")?.totalTokens,
+        window: usage?.modelContextWindow,
+      });
+    });
     assert.equal((await runTurn(client, thread, { text: "work" })).status, "completed");
+    assert.deepEqual(
+      fills,
+      [
+        { threadId: thread, tokens: 15_000, window: 1_000_000 },
+        { threadId: thread, tokens: 25_000, window: 1_000_000 },
+      ],
+      "The context fill of the session shows, and the fill of a session that is not open is left out.",
+    );
+    report.contextFills = fills.length;
     await work.until("both subagents to end", (list) => list.length === 2 && list.every((s) => s.status !== "running"));
     assert.deepEqual(save("kiro/work", work.lists), [
       {

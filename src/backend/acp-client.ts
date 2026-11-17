@@ -1106,6 +1106,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     });
   }
 
+  /** The session's context fill: a large drop is a compaction, and the chat shows the fill when the size is known. */
+  #contextFill(thread: AcpThread, used: number, size: number): void {
+    if (thread.contextUsed !== null && used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
+      this.#compacted(thread);
+    thread.contextUsed = used;
+    if (Number.isFinite(used) && used >= 0 && Number.isFinite(size) && size > 0)
+      this.emit("notification", {
+        method: "thread/tokenUsage/updated",
+        params: {
+          threadId: thread.id,
+          tokenUsage: { last: { totalTokens: used }, modelContextWindow: size },
+        },
+      });
+  }
+
   /**
    * The agent compacted the session by itself. The summary replaced the prompt that carried the
    * instructions, and the channel messages that the session read, so the next turn sends both again.
@@ -3409,20 +3424,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // The update is also the context fill. Its cost is the session's total, which OpenCode sends
     // before the prompt result. Antigravity sends the last one after a turn that OpenBot already ended.
     if (update.sessionUpdate === "usage_update") {
-      if (thread.contextUsed !== null && update.used < thread.contextUsed * ACP_COMPACTION_CONTEXT_RATIO)
-        this.#compacted(thread);
-      thread.contextUsed = update.used;
       const cost = update.cost;
       if (thread.activeTurn && cost?.currency === "USD" && Number.isFinite(cost.amount) && cost.amount >= 0)
         thread.activeTurn.reportedCost = cost.amount;
-      if (Number.isFinite(update.used) && update.used >= 0 && Number.isFinite(update.size) && update.size > 0)
-        this.emit("notification", {
-          method: "thread/tokenUsage/updated",
-          params: {
-            threadId: thread.id,
-            tokenUsage: { last: { totalTokens: update.used }, modelContextWindow: update.size },
-          },
-        });
+      this.#contextFill(thread, update.used, update.size);
       return;
     }
     if (update.sessionUpdate === "compaction_update") {
@@ -4220,6 +4225,11 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       ].slice(-UNCLAIMED_MCP_FAILURE_LIMIT);
       return;
     }
+    const context = this.#flavor.contextPercentNotice;
+    if (context && method.replace(/^_/, "") === context.method) {
+      this.#applyContextPercent(context.window, params);
+      return;
+    }
     const roster = this.#flavor.subagentRoster;
     if (roster && method.replace(/^_/, "") === roster.method) {
       this.#applySubagentRoster(params);
@@ -4246,6 +4256,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         new Date().toISOString(),
       ),
     );
+  }
+
+  /**
+   * The context fill of a session that the agent reports as a percentage (`AcpFlavor.contextPercentNotice`).
+   * The size comes from the description of the session's model; with no size, the fill is not shown. A
+   * session that is not open here, such as a subagent's, is not this client's to show.
+   */
+  #applyContextPercent(window: (modelDescription: string) => number | null, params: DynamicRecord): void {
+    const thread = isString(params.sessionId) ? this.#threads.get(params.sessionId) : undefined;
+    const percent = params.contextUsagePercentage;
+    if (!thread || typeof percent !== "number" || !Number.isFinite(percent) || percent < 0) return;
+    const model = this.#models.find((candidate) => candidate.id === thread.currentModelId);
+    const size = model ? window(model.description) : null;
+    if (size === null) return;
+    this.#contextFill(thread, Math.round((Math.min(percent, 100) / 100) * size), size);
   }
 
   /**

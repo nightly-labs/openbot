@@ -628,8 +628,9 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     foldersInFullAccess: false,
   },
   // Kiro CLI (`kiro-cli acp`) from AWS, which the user installs, with the user's Kiro plan (credits).
-  // Sign-in is `kiro-cli login` in a terminal: a browser page that calls back on 127.0.0.1, or with
-  // `--use-device-flow`, a code that the user enters on any device. Kiro CLI 2.37.1 reads skills from
+  // Sign-in is `kiro-cli login`: a browser page that calls back on 127.0.0.1, or with `--use-device-flow`,
+  // a code that the user enters on any device. An IAM Identity Center sign-in takes a terminal. Kiro CLI
+  // 2.37.1 reads skills from
   // `.kiro/skills` only, so a skill in `.agents/skills` is not seen (checked with `session/new`); it
   // reads `AGENTS.md` as steering. One `kiro-cli acp` process runs the turns of several sessions at once.
   kiro: {
@@ -643,7 +644,7 @@ const AGENT_PROVIDER_DESCRIPTOR_TABLE = {
     legacyModelPrefix: null,
     authKind: "kiro",
     pickerOrder: 17,
-    localCodeSignIn: null,
+    localCodeSignIn: "device",
     signInPageEnd: "callback",
     skillFolders: [".kiro/skills"],
     homeSkills: "instructions",

@@ -488,6 +488,9 @@ export function kiroArgv(version: string): readonly string[] {
   return major > 2 || (major === 2 && minor >= 36) ? ["acp", "--agent-engine=v2"] : ["acp"];
 }
 
+/** The sign-in of Kiro CLI. With no `--license`, it signs in a Builder ID, Google or GitHub account. */
+const KIRO_LOGIN: readonly string[] = ["login"];
+
 /** `hermes acp` serves the Agent Client Protocol on stdio. */
 const HERMES_ARGV: readonly string[] = ["acp"];
 
@@ -1817,10 +1820,28 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
   },
   {
     id: "kiro",
-    // The user signs in with `kiro-cli login` (a browser page, or a code with `--use-device-flow`);
-    // OpenBot reads the account again afterwards. A sign-in that OpenBot starts needs the output of that
-    // command, which was not checked against a real sign-in.
-    signIn: { kind: "external" },
+    // `kiro-cli login` with no terminal opens the page of a Builder ID, Google or GitHub sign-in in the
+    // system browser ("Opening browser...") and waits for the page to call back on 127.0.0.1. An IAM
+    // Identity Center sign-in needs `--license pro`, the portal address and a region: the user runs it in a
+    // terminal, and Connect reads the account again.
+    signIn: {
+      kind: "cli-command",
+      command: { argv: KIRO_LOGIN, env: () => ({}), timeoutMs: CLI_LOGIN_TIMEOUT_MS },
+    },
+    // With `--use-device-flow`, the CLI prints the page and the code ("Code: ABCD-EFGH"), and waits until the
+    // user approves it on any device.
+    codeSignIn: {
+      kind: "cli",
+      flow: "device",
+      command: {
+        argv: [...KIRO_LOGIN, "--use-device-flow"],
+        env: () => ({}),
+        timeoutMs: CLI_LOGIN_TIMEOUT_MS,
+        closeInput: true,
+      },
+    },
+    // A signed-out Kiro CLI 2.37.1 writes "You are not logged in" and exits, so it has no client to list models.
+    catalog: { hiddenWhenSignedOut: true },
     // `kiro-cli logout` ends the CLI's own sign-in.
     signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     resolveCli: () => resolveKiroCli(),

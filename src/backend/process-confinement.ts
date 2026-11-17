@@ -351,7 +351,9 @@ export function kiroHomeDirectory(home = homedir()): string {
 
 /**
  * The folder where Kiro CLI keeps its sign-in and history (`data.sqlite3`) and the runtime that it
- * downloads. It is the data folder of the user on each system. Only the macOS folder was checked.
+ * downloads. macOS was read on a real install, and Linux is `~/.local/share/kiro-cli` in the Docker
+ * documentation of Kiro. For Windows, two sources disagree between `%APPDATA%` and `%LOCALAPPDATA%`, and
+ * no Windows computer was available: `%LOCALAPPDATA%` is the guess. The confinement runs on macOS only.
  */
 export function kiroDataDirectory(
   env: NodeJS.ProcessEnv = process.env,

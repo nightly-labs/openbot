@@ -1945,7 +1945,8 @@ Mistral's terms apply. Team members see the host's Mistral agents when their app
 
 OpenBot does not download Kiro CLI. It starts the `kiro-cli` that you installed, with `kiro-cli acp`,
 as a local process. Prompts, attachments, and tool results go to that process, and Kiro sends them
-to the Kiro service of AWS. Sign in runs in a terminal with `kiro-cli login`, outside OpenBot. Kiro
+to the Kiro service of AWS. Connect runs `kiro-cli login`, which opens the sign-in page of Kiro in your browser (or, on a joined
+server, prints a code that you confirm on any device). Kiro
 keeps its sign-in, history, settings, steering files, agents and sessions in `~/.kiro` and in its
 data folder (`~/Library/Application Support/kiro-cli` on macOS), and it can change them during a
 turn. OpenBot does not read, copy, or upload these files, and it does not change Kiro's own

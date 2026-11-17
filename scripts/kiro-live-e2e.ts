@@ -8,10 +8,17 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { ConversationSubagent } from "@openbot/contracts/ipc";
+import { homeSkillInstructions } from "../src/backend/agent/developer-instructions";
 import { SUBAGENTS_UPDATED_METHOD, subagentsFromNotification } from "../src/backend/agent/subagent-updates";
 import type { AgentClient } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
-import { decodeModelListResponse, getString, isRecord } from "../src/backend/protocol";
+import {
+  decodeAccountReadResult,
+  decodeModelListResponse,
+  getRecord,
+  getString,
+  isRecord,
+} from "../src/backend/protocol";
 import { NO_PROVIDER_CREDENTIALS, requireProviderDriver } from "../src/backend/provider-drivers";
 import { runTurn, startThread, stopClients } from "./provider-fakes/host";
 
@@ -36,6 +43,9 @@ interface Report {
   model: string;
   twoFolders?: { first: Span; second: Span; overlapMs: number; wallMs: number; sumMs: number };
   oneFolder?: { first: Span; second: Span; overlapMs: number };
+  signedOut?: { account: unknown };
+  skillByPath?: { reply: string };
+  context?: { updates: number; window: number | null; lastTokens: number | null };
   subagents?: { seen: number; final: Pick<ConversationSubagent, "agentType" | "status" | "title" | "steps">[] };
   approvals: { method: string; subagent: boolean; shape: string }[];
   failure?: string;
@@ -64,15 +74,32 @@ try {
   const driver = requireProviderDriver("kiro");
   const cli = await runCauseEffect(driver.resolveCli());
   report.version = cli.version;
+  // A Kiro CLI with an empty home folder has no sign-in (and never touches the user's own): the process writes
+  // "You are not logged in" and exits, so the account is null and no model is listed.
+  const emptyHome = join(root, "empty-home");
+  await mkdir(emptyHome);
+  const signedOutClient = driver.createClient(cli, 30_000, {
+    ...NO_PROVIDER_CREDENTIALS,
+    agentEnvironment: () => ({ HOME: emptyHome }),
+  });
+  clients.push(signedOutClient);
+  signedOutClient.start();
+  const signedOut = await runCauseEffect(signedOutClient.request("account/read", {}, decodeAccountReadResult));
+  report.signedOut = { account: signedOut.account };
+  assert.equal(signedOut.account, null, "A Kiro CLI with no sign-in reports an account.");
+  await runCauseEffect(signedOutClient.stop());
+
   const client = driver.createClient(cli, 60_000, NO_PROVIDER_CREDENTIALS);
   clients.push(client);
   client.on("request", (request) => {
     // Only the subagent tool may run. Anything else that asks is declined.
     const text = JSON.stringify(request.params ?? {});
     const subagent = /subagent|agent crew/iu.test(text);
+    // Reading the skill is the one other action that the skill case needs: a read of its SKILL.md.
+    const readsSkill = /secret-word/iu.test(text) && /read/iu.test(text);
     report.approvals.push({ method: request.method, subagent, shape: text.slice(0, 300) });
     if (request.method.endsWith("/requestApproval"))
-      client.respond(request.id, { decision: subagent ? "accept" : "decline" });
+      client.respond(request.id, { decision: subagent || readsSkill ? "accept" : "decline" });
     else client.respondError(request.id, { code: -32601, message: `The test does not answer ${request.method}.` });
   });
   client.start();
@@ -92,6 +119,16 @@ try {
     }),
   );
   const [folderA = root, folderB = root, shared = root] = folders;
+
+  // The context fill of a turn: `_kiro.dev/metadata` gives a percentage, and the model list the size.
+  const fills: { tokens: number; window: number }[] = [];
+  client.on("notification", (notification) => {
+    if (notification.method !== "thread/tokenUsage/updated" || !isRecord(notification.params)) return;
+    const usage = getRecord(notification.params, "tokenUsage");
+    const window = usage?.modelContextWindow;
+    const tokens = getRecord(usage, "last")?.totalTokens;
+    if (typeof window === "number" && typeof tokens === "number") fills.push({ tokens, window });
+  });
 
   // Two sessions in two folders, one process: the turns overlap.
   const [first, second] = await Promise.all([
@@ -129,6 +166,48 @@ try {
     assert.equal(span.status, "completed", "A turn in one folder does not complete.");
   }
   assert.ok(report.oneFolder.overlapMs > 1_000, "The turns of one folder do not overlap.");
+
+  // A skill in `.agents/skills`, which Kiro does not read, reaches the agent when its instructions name the
+  // path of the `SKILL.md`: the agent opens the file and follows it.
+  const skillFolder = join(root, "skill-folder");
+  const skillDir = join(skillFolder, ".agents", "skills", "secret-word");
+  await mkdir(skillDir, { recursive: true });
+  await writeFile(
+    join(skillDir, "SKILL.md"),
+    "---\nname: secret-word\ndescription: Gives the secret word of the test.\n---\nThe secret word is PINEAPPLE-42.\n",
+  );
+  const skillThread = await startThread(client, {
+    cwd: skillFolder,
+    model,
+    developerInstructions: homeSkillInstructions(
+      [
+        {
+          slug: "secret-word",
+          description: "Gives the secret word of the test.",
+          directory: skillDir,
+          file: join(skillDir, "SKILL.md"),
+        },
+      ],
+      "the .agents/skills folder of your workspace",
+    ).join("\n"),
+  });
+  const skillTurn = await runTurn(client, skillThread, {
+    model,
+    text: "What is the secret word of the test? Answer with the word only.",
+    timeoutMs: 120_000,
+  });
+  report.skillByPath = { reply: skillTurn.reply.trim().slice(-120) };
+  assert.equal(skillTurn.error, null, "The turn with a skill by path fails.");
+  assert.match(skillTurn.reply, /PINEAPPLE-42/u, "The agent did not read the skill that its instructions name.");
+
+  report.context = {
+    updates: fills.length,
+    window: fills.at(-1)?.window ?? null,
+    lastTokens: fills.at(-1)?.tokens ?? null,
+  };
+  assert.ok(fills.length > 0, "A turn shows no context fill.");
+  assert.equal(report.context.window, 1_000_000, "The context size is not the 1M of the model description.");
+  assert.ok((report.context.lastTokens ?? 0) > 0, "The context fill has no tokens.");
 
   // Subagents: the roster of the process becomes cards of the parent's turn.
   const lists: ConversationSubagent[][] = [];

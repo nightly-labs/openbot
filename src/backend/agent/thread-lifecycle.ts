@@ -22,7 +22,13 @@ import type { AgentClient, AgentProvider } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import type { ProviderSession } from "../database/provider-sessions";
 import { causeHelpers } from "../effect-boundary";
-import { type HomeSkill, listHomeSkills, skillFolderNames, userSkillFolderNames } from "../home-skills";
+import {
+  type HomeSkill,
+  listHomeSkills,
+  listWorkspaceSkills,
+  skillFolderNames,
+  userSkillFolderNames,
+} from "../home-skills";
 import type { MailboxStore } from "../mailbox-store";
 import type { McpOperationError } from "../mcp-effects";
 import {
@@ -841,6 +847,7 @@ export class ThreadLifecycle {
         mcpServers,
         instructionsFile,
         yield* this.#workspaceSkills(agent, client),
+        yield* this.#unreadWorkspaceSkills(agent, client),
       ),
       serviceName: "openbot",
       dynamicTools: visibleDynamicTools(client.provider),
@@ -1490,6 +1497,7 @@ export class ThreadLifecycle {
     mcpServers: readonly McpServerConfig[],
     instructionsFile: InstructionsFileInPrompt,
     workspaceSkills: readonly string[] = [],
+    unreadWorkspaceSkills: readonly HomeSkill[] = [],
   ): DynamicRecord {
     const memories = this.#memories.essentialFor(agent.id);
     const options = {
@@ -1518,6 +1526,7 @@ export class ThreadLifecycle {
       sectionTeammates: section,
       homeSkills,
       workspaceSkills,
+      unreadWorkspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
       deferredMcpServers:
         client.provider === "codex"
@@ -1588,6 +1597,24 @@ export class ThreadLifecycle {
   });
 
   /**
+   * The user's skills in the workspace's `.agents/skills`, for a CLI that does not read that folder, and
+   * that reads skills from a folder of its own. A skill of the same name in a folder that it reads wins.
+   */
+  readonly #unreadWorkspaceSkills = Effect.fn("ThreadLifecycle.unreadWorkspaceSkills")(function* (
+    agent: AgentSummary,
+    client: AgentClient,
+  ) {
+    const descriptor = agentProviderDescriptor(client.provider);
+    if (descriptor.homeSkills !== "instructions" || descriptor.skillFolders.includes(".agents/skills")) return [];
+    const read = new Set<string>();
+    for (const folder of descriptor.skillFolders)
+      for (const name of yield* skillFolderNames(join(agent.workspacePath, folder))) read.add(name);
+    return (yield* listWorkspaceSkills(join(agent.workspacePath, ".agents", "skills"))).filter(
+      (skill) => !read.has(skill.slug),
+    );
+  });
+
+  /**
    * The agent's instruction file, and its text when the CLI does not read that file by itself.
    * Claude in workspace-only mode reads user settings only, so it gets the text too.
    */
@@ -1648,6 +1675,7 @@ export class ThreadLifecycle {
         configs,
         yield* this.#instructionsFile(agent, client),
         yield* this.#workspaceSkills(agent, client),
+        yield* this.#unreadWorkspaceSkills(agent, client),
       ),
       ...(client.provider === "codex" ? {} : { dynamicTools: visibleDynamicTools(client.provider) }),
       ...(yield* this.codexConfigEffect(

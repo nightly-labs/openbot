@@ -328,6 +328,9 @@ function kiroWork(peer: AcpPeer, root: string): void {
     ],
     pendingStages: [],
   });
+  kiroMetadata(root, 1.5);
+  kiroMetadata(`${root}_other`, 80);
+  kiroMetadata(root, 2.5);
   // The work of a subagent is in the updates of its own session.
   peer.update(first, {
     sessionUpdate: "tool_call",
@@ -347,6 +350,18 @@ function kiroWork(peer: AcpPeer, root: string): void {
   });
   // Kiro takes a terminated subagent off the roster, and the second one with it.
   notify("_kiro.dev/subagent/list_update", { subagents: [], pendingStages: [] });
+}
+
+/**
+ * `_kiro.dev/metadata` of Kiro CLI 2.37.1: the context fill of a session as a percentage, sent while a turn
+ * runs and again at its end, also for the session of a subagent that the client does not know.
+ */
+function kiroMetadata(sessionId: string, percent: number) {
+  notify("_kiro.dev/metadata", {
+    sessionId,
+    contextUsagePercentage: percent,
+    reasoning: { support: "unavailable", effortLevels: ["low", "high"] },
+  });
 }
 
 function hermesWork(peer: AcpPeer, root: string): void {
@@ -391,7 +406,10 @@ serveFakeAcpAgent(
       count += 1;
       peer.reply(request, {
         sessionId: `ses_${process.pid}_${count}`,
-        models: { availableModels: [{ modelId: MODEL, name: "Fake" }], currentModelId: MODEL },
+        models: {
+          availableModels: [{ modelId: MODEL, name: "Fake", description: "A fake model with 1M context window" }],
+          currentModelId: MODEL,
+        },
       });
     },
     "session/prompt": (request, peer) => {

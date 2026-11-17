@@ -329,6 +329,13 @@ export interface AcpFlavor {
    */
   subagentRoster?: { readonly method: string; readonly tools: readonly string[] };
   /**
+   * The agent reports how full a session's context is as a percentage, in an extension notification
+   * (`method`, with no leading underscore) with `sessionId` and `contextUsagePercentage`. `window` reads the
+   * size in tokens from the description of the session's model, or gives null: the percentage then shows
+   * nothing, because OpenBot does not guess a size.
+   */
+  contextPercentNotice?: { readonly method: string; window(modelDescription: string): number | null };
+  /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
    */
@@ -866,11 +873,21 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
  */
 export const KIRO_ACP_FLAVOR: AcpFlavor = {
   authRequiredSignsOut: true,
+  // `_kiro.dev/metadata` carries `contextUsagePercentage`; the model list says "... with 1M context window".
+  contextPercentNotice: { method: "kiro.dev/metadata", window: kiroContextWindow },
   // Kiro CLI 2.37.1 sends the roster of its subagents (`agentName`, `initialQuery`, `status.type` of
   // `working` or `terminated`) in this notification, and a subagent's own tool calls in session updates.
   // The parent's call is `subagent` in `_kiro.dev/session/update`, and its approval is titled "Spawning agent crew".
   subagentRoster: { method: "kiro.dev/subagent/list_update", tools: ["subagent", "spawning agent"] },
 };
+
+/** The context size in tokens that a Kiro model description names, such as "Claude Sonnet 5.5 model with 1M context window". */
+export function kiroContextWindow(description: string): number | null {
+  const match = /\b(\d+(?:\.\d+)?)\s*([KM])\s+context window\b/iu.exec(description);
+  if (!match?.[1] || !match[2]) return null;
+  const size = Number(match[1]) * (match[2].toUpperCase() === "M" ? 1_000_000 : 1_000);
+  return Number.isFinite(size) && size > 0 ? Math.round(size) : null;
+}
 
 /**
  * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have

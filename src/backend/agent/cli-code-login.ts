@@ -207,10 +207,11 @@ function terminalCommand(platform: NodeJS.Platform, argv: readonly string[]): { 
  * null until all of it is there. The shapes are the pinned CLIs' (Grok 1.0.22, Claude 2.1.263,
  * Cursor 2026.10.01, Cline 3.0.68, Kimi 1.52.0); the tests hold samples of each but Kimi's. Codex
  * 0.167.0 prints "Enter this one-time code (expires in 15 minutes)" above the code of
- * `login --device-auth`. Hermes 0.21.5 prints its Nous Portal sign-in in the shape of `_print_device_code_instructions` in
+ * `login --device-auth`. Kiro CLI 2.37.1 prints "Confirm the following code in the browser", `Code: CODE`
+ * and "Open this URL: PAGE" for `login --use-device-flow`. Hermes 0.21.5 prints its Nous Portal sign-in in the shape of `_print_device_code_instructions` in
  * `hermes_cli/auth_device_flow.py`.
  */
-function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
+export function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCodePrompt | null {
   const text = stripTerminalCodes(output);
   if (flow === "device") {
     const event = deviceCodeEvent(text);
@@ -246,14 +247,18 @@ function parseCliCodePrompt(flow: CliCodePrompt["flow"], output: string): CliCod
 }
 
 /**
- * The first non-empty line after "Confirm this code" (Grok) or "Enter this one-time code" (Codex),
- * when it is a code. The last line has no newline yet, so a chunk can end in it with part of the code.
+ * The first non-empty line after "Confirm this code" (Grok), "Confirm the following code" (Kiro, which
+ * writes `Code: CODE`) or "Enter this one-time code" (Codex), when it is a code. The last line has no
+ * newline yet, so a chunk can end in it with part of the code.
  */
 function codeAfterConfirmLine(text: string): string | null {
   const lines = text.split("\n").map((line) => line.trim());
-  const confirm = lines.findIndex((line) => /confirm this code|enter this one-time code/i.test(line));
+  const confirm = lines.findIndex((line) => /confirm (?:this|the following) code|enter this one-time code/i.test(line));
   if (confirm < 0) return null;
-  const code = lines.slice(confirm + 1, -1).find(Boolean);
+  const code = lines
+    .slice(confirm + 1, -1)
+    .find(Boolean)
+    ?.replace(/^code:[ \t]*/i, "");
   return code && /^[A-Z0-9]{3,12}(?:-[A-Z0-9]{3,12})*$/.test(code) ? code : null;
 }
 

@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { agentProviderDescriptor, isLocalOnlyProvider } from "@openbot/contracts/agent-providers";
 import { Effect } from "effect";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { kiroContextWindow } from "./acp-flavor";
 import { resolveKiroCli } from "./cli";
 import { kiroDataDirectory, kiroHomeDirectory, kiroStatePaths } from "./process-confinement";
 import { BUILT_IN_PROVIDER_DRIVERS, kiroArgv, requireProviderDriver } from "./provider-drivers";
@@ -22,6 +23,20 @@ describe("kiroArgv", () => {
 
   it("starts without the flag when the version is not a number", () => {
     expect(kiroArgv("")).toEqual(["acp"]);
+  });
+});
+
+describe("kiroContextWindow", () => {
+  it("reads the size that a model description names", () => {
+    expect(kiroContextWindow("Claude Opus 5.5 model with 1M context window")).toBe(1_000_000);
+    expect(kiroContextWindow("OpenAI GPT 5.6 Sol with 1M context window")).toBe(1_000_000);
+    expect(kiroContextWindow("A small model with 200K context window")).toBe(200_000);
+    expect(kiroContextWindow("A model with 1.5M Context Window")).toBe(1_500_000);
+  });
+
+  it("gives null, not a guess, when the description names no size", () => {
+    for (const description of ["", "Claude Haiku", "with a large context", "0M context window"])
+      expect(kiroContextWindow(description)).toBeNull();
   });
 });
 
@@ -45,10 +60,11 @@ describe("Kiro state folders", () => {
 });
 
 describe("the Kiro provider", () => {
-  it("has one driver that signs in outside OpenBot and signs out with `kiro-cli logout`", () => {
+  it("has one driver that signs in with `kiro-cli login` and signs out with `kiro-cli logout`", () => {
     const driver = requireProviderDriver("kiro");
     expect(BUILT_IN_PROVIDER_DRIVERS.filter((candidate) => candidate.id === "kiro")).toHaveLength(1);
-    expect(driver.signIn).toEqual({ kind: "external" });
+    expect(driver.signIn).toMatchObject({ kind: "cli-command", command: { argv: ["login"] } });
+    expect(driver.codeSignIn).toMatchObject({ command: { argv: ["login", "--use-device-flow"], closeInput: true } });
     expect(driver.signOut?.argv).toEqual(["logout"]);
     expect(driver.authState({ type: "builder-id", email: "ada@example.com" })).toEqual({
       kind: "kiro",
@@ -61,9 +77,9 @@ describe("the Kiro provider", () => {
     const driver = requireProviderDriver("kiro");
     expect(descriptor.authKind).toBe("kiro");
     expect(descriptor.concurrentTurns).toBe(true);
-    // No code sign-in in the driver, so none in the descriptor.
-    expect(driver.codeSignIn).toBeUndefined();
-    expect(descriptor.localCodeSignIn).toBeNull();
+    // The code sign-in of the driver is a device code, so the descriptor says it too.
+    expect(driver.codeSignIn).toMatchObject({ kind: "cli", flow: "device" });
+    expect(descriptor.localCodeSignIn).toBe("device");
     // Kiro CLI 2.37.1 reads `.kiro/skills` only.
     expect(descriptor.skillFolders).toEqual([".kiro/skills"]);
     expect(isLocalOnlyProvider("kiro")).toBe(true);
