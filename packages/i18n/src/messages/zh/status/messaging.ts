@@ -56,6 +56,10 @@ export const messages = {
     "👋 *OpenBot 已连接*\n\n在这里写下内容即可向你的智能体提问。WhatsApp Orchestrator 会直接回答，或把工作交给合适的智能体。\n\n发送 *stop* 可停止请求。",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot 已连接*\n\n你在 OpenBot 中允许的人现在可以给这个号码发消息。新的联系人会收到一个代码：请在 OpenBot 的“请求”中批准。\n\n发送 *stop* 可停止请求。",
+  "status.messaging.whatsappOtherOpenBot":
+    "此 WhatsApp 号码还关联了另一个 OpenBot，所以你可能会收到两条回复。要解决此问题，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
+  "status.messaging.whatsappPaused":
+    "短时间内收到的消息太多，OpenBot 已在此暂停回复 10 分钟。如果此号码还关联了另一个 OpenBot，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

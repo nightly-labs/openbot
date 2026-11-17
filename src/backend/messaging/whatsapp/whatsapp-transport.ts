@@ -6,11 +6,13 @@ import { Effect } from "effect";
 import type { InboundMessage, MessagingTransport, TransportSink } from "../messaging-types";
 import {
   freshUpsert,
+  userJid,
   type WhatsAppEvent,
   type WhatsAppIdentity,
   whatsAppDedupKey,
   whatsAppInbound,
 } from "./whatsapp-events";
+import { WhatsAppSelfChatLimit } from "./whatsapp-loop-guard";
 import type { WhatsAppConnectionHandle, WhatsAppRuntime } from "./whatsapp-runtime";
 import type { WhatsAppSessionState } from "./whatsapp-session";
 
@@ -73,6 +75,9 @@ export class WhatsAppTransport implements MessagingTransport {
   #reading: Promise<void> = Promise.resolve();
   #unsubscribe: Array<() => void> = [];
   #prune: ReturnType<typeof setInterval> | null = null;
+  readonly #selfChatLimit = new WhatsAppSelfChatLimit();
+  /** The owner was told once that another OpenBot posts in their own chat. */
+  #toldOtherOpenBot = false;
 
   constructor(options: WhatsAppTransportOptions) {
     this.#runtime = options.runtime;
@@ -173,9 +178,22 @@ export class WhatsAppTransport implements MessagingTransport {
     }
     if (!event || !this.#sink) return;
     if (event.type === "pairing") return this.#pair(event);
+    if (event.type === "otherOpenBot") {
+      if (this.#toldOtherOpenBot) return;
+      this.#toldOtherOpenBot = true;
+      return this.#tell(event.chatJid, "status.messaging.whatsappOtherOpenBot");
+    }
     if (event.type === "action") {
       this.#sink.action(event.action);
       return;
+    }
+    if (live && event.chatJid === userJid(this.#identity.number)) {
+      const limit = this.#selfChatLimit.check(Date.now());
+      if (limit === "pause") {
+        logger.warn("The owner's own WhatsApp chat got too many requests; it gets no answers for a while.");
+        return this.#tell(event.chatJid, "status.messaging.whatsappPaused");
+      }
+      if (limit === "paused") return;
     }
     if (live) store.journal({ dedupKey, payload: encodeJournal(message), receivedAt: Date.now() });
     // The message continues its conversation: a reply to it names the same conversation.
@@ -254,6 +272,16 @@ export class WhatsAppTransport implements MessagingTransport {
       this.#handle.session
         .send(event.chatJid, { text: sourceText("status.messaging.whatsappPairingCode", { code: request.code }) })
         .pipe(Effect.catch(() => Effect.void)),
+    );
+  }
+
+  /** Posts a notice in the owner's own chat. It is an own post, so this OpenBot does not read it as a request. */
+  async #tell(
+    chatJid: string,
+    key: "status.messaging.whatsappOtherOpenBot" | "status.messaging.whatsappPaused",
+  ): Promise<void> {
+    await Effect.runPromise(
+      this.#handle.session.send(chatJid, { text: sourceText(key) }).pipe(Effect.catch(() => Effect.void)),
     );
   }
 
