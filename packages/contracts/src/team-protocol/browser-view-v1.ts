@@ -103,6 +103,20 @@ export function browserViewClientWantsContextMenu(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_CONTEXT_MENU_QUERY) === "1";
 }
 
+/**
+ * A host that sends a client the text that the page itself copies, such as with a "Copy code"
+ * button, as a `pageCopied` message. The page writes the clipboard of the host, which the member
+ * cannot reach. The host sends it only to a client that asked, and only shortly after that client's
+ * own click or key on the tab.
+ */
+export const TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY = "browser-view-page-copy-v1";
+/** Present on the view socket when this client puts the page's own copies on its clipboard. */
+export const BROWSER_VIEW_PAGE_COPY_QUERY = "pageCopy";
+
+export function browserViewClientWantsPageCopy(url: URL): boolean {
+  return url.searchParams.get(BROWSER_VIEW_PAGE_COPY_QUERY) === "1";
+}
+
 /** The items of a page's context menu. A client leaves out an item it does not know. */
 export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
   "copy-link",
@@ -157,12 +171,13 @@ export interface BrowserViewContextMenu {
 
 /**
  * What a host sends on the view socket as text, beside the binary frames: the answer to a copy, and
- * the cursor and the menus for a client that asked for them.
+ * the cursor, the menus and the page's own copies for a client that asked for them.
  */
 export type BrowserViewHostMessage =
   | BrowserViewCopied
   | { type: "cursor"; cursor: BrowserViewCursor }
-  | ({ type: "context-menu" } & BrowserViewContextMenu);
+  | ({ type: "context-menu" } & BrowserViewContextMenu)
+  | { type: "pageCopied"; text: string };
 
 export function encodeBrowserViewHostMessage(message: BrowserViewHostMessage): string {
   return JSON.stringify(message);
@@ -183,6 +198,11 @@ function decodeHostMessageValue(message: unknown): BrowserViewHostMessage | null
     if (!isString(message.cursor)) throw new Error("Invalid browser view message.");
     const cursor = BROWSER_VIEW_CURSORS.find((name) => name === message.cursor) ?? "default";
     return { type: "cursor", cursor };
+  }
+  if (message.type === "pageCopied") {
+    if (!isBoundedString(message.text, BROWSER_VIEW_MAX_CLIPBOARD_TEXT) || message.text.length === 0)
+      throw new Error("Invalid browser view message.");
+    return { type: "pageCopied", text: message.text };
   }
   if (message.type === "context-menu") {
     const listed = message.items;

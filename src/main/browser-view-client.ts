@@ -8,14 +8,17 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_PAGE_COPY_QUERY,
   type BrowserViewInput,
   browserViewInputForHost,
   decodeBrowserViewCopied,
   decodeBrowserViewFrame,
+  decodeBrowserViewHostMessage,
   encodeBrowserViewInput,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
+  TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { Deferred, Effect, Fiber } from "effect";
@@ -29,6 +32,8 @@ export interface BrowserViewClientOptions {
   >;
   /** `owner` is the id that `start` got, so the event goes to the window that started the view. */
   onEvent: (event: BrowserLiveViewEvent, owner: number) => void;
+  /** Puts the text that the host's page copied on this computer's clipboard. */
+  writeClipboard: (text: string) => void;
 }
 
 interface ActiveView {
@@ -66,16 +71,21 @@ export class BrowserViewClient {
       if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY)) {
         url.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
       }
+      if (this.#options.servers.supportsCapability(serverId, TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY)) {
+        url.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
+      }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
       const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket };
       this.#view = view;
       socket.addEventListener("message", (message) => {
         if (this.#view !== view) return;
-        // Text is the answer to a copy. A host that sends something else is not answering one.
+        // Text is the answer to a copy, or a copy the page made. Any other text is not an answer.
         if (typeof message.data === "string") {
           try {
-            this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId }, owner);
+            const hostMessage = decodeBrowserViewHostMessage(message.data);
+            if (hostMessage?.type === "pageCopied") this.#options.writeClipboard(hostMessage.text);
+            else this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId }, owner);
           } catch {
             socket.close(1000, "Invalid browser view message");
           }

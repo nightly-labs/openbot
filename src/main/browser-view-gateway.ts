@@ -26,6 +26,7 @@ import {
   browserViewClientViewport,
   browserViewClientWantsContextMenu,
   browserViewClientWantsCursor,
+  browserViewClientWantsPageCopy,
   browserViewStreamPath,
   browserViewStreamSessionId,
   decodeBrowserViewInput,
@@ -86,6 +87,12 @@ function framesInFlight(session: Pick<ManagedViewSession, "frameSizes" | "drawnS
   return count;
 }
 const MAX_SESSIONS = 4;
+/**
+ * How long after a member's own click or key the page's own copy goes to that member. It is the
+ * time Chromium lets a page use one user action, so a copy the page makes later on its own, or
+ * after an agent's click, stays on the host.
+ */
+const PAGE_COPY_AFTER_INPUT_MS = 5_000;
 /** A paste at its longest, with every character escaped, and the rest of the message around it. */
 const MAX_INPUT_MESSAGE_BYTES = 6 * BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 4 * 1024;
 
@@ -170,6 +177,10 @@ interface ManagedViewSession {
   reportContextMenu: boolean;
   /** The page size the client asked the page to keep while it watches. */
   viewport: BrowserViewViewport | null;
+  /** The client puts the page's own copies on its clipboard. */
+  reportPageCopy: boolean;
+  /** When this member last clicked or pressed a key in the view, as `Date.now()`. */
+  lastActionAt: number;
 }
 
 export class BrowserViewGateway {
@@ -211,6 +222,8 @@ export class BrowserViewGateway {
       reportCursor: false,
       reportContextMenu: false,
       viewport: null,
+      reportPageCopy: false,
+      lastActionAt: 0,
     });
     return { id, tabId: input.tabId, streamPath: browserViewStreamPath(id) };
   }
@@ -289,6 +302,7 @@ export class BrowserViewGateway {
     session.rememberFrames = browserViewClientAcksFrames(url);
     session.reportCursor = browserViewClientWantsCursor(url);
     session.reportContextMenu = browserViewClientWantsContextMenu(url);
+    session.reportPageCopy = browserViewClientWantsPageCopy(url);
     session.viewport = browserViewClientViewport(url);
     this.#webSockets.handleUpgrade(request, socket, head, (client) => this.#dispatch(this.#connect(session, client)));
   }
@@ -369,6 +383,16 @@ export class BrowserViewGateway {
             ? { onCursor: (cursor) => this.#send(session, client, { type: "cursor", cursor }) }
             : {}),
           ...(session.viewport ? { viewport: session.viewport } : {}),
+          // Page content, like a copy: nothing here logs it.
+          ...(session.reportPageCopy
+            ? {
+                onPageCopy: (text: string) => {
+                  if (Date.now() - session.lastActionAt > PAGE_COPY_AFTER_INPUT_MS) return;
+                  if (text.length > 0 && text.length <= BROWSER_VIEW_MAX_CLIPBOARD_TEXT)
+                    this.#send(session, client, { type: "pageCopied", text });
+                },
+              }
+            : {}),
         },
       );
       if (session.socket === client) session.stopView = stopView;
@@ -406,6 +430,8 @@ export class BrowserViewGateway {
       return;
     }
     this.#options.onInput?.();
+    if (input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up")))
+      session.lastActionAt = Date.now();
     // The selection goes back on the socket that asked for it, and only there. It is page content:
     // nothing here logs it. Every copy is answered, with no text when there is none to give, because
     // the client holds its clipboard write open until the answer arrives.

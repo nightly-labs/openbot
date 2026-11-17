@@ -3,6 +3,7 @@ import {
   BROWSER_VIEW_CONTEXT_MENU_QUERY,
   BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_PAGE_COPY_QUERY,
   BROWSER_VIEW_VIEWPORT_QUERY,
   type BrowserViewCopied,
   type BrowserViewFrame,
@@ -45,7 +46,7 @@ interface View {
   frame: (frame: BrowserViewFrame) => void;
   ended: (reason?: string) => void;
   copied: (message: BrowserViewCopied) => void;
-  /** Hears the cursor and the context menus, for a client that asked for them. */
+  /** Hears the cursor, the context menus and the page's own copies, for a client that asked for them. */
   message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void;
 }
 /** What else the host advertises and this client asks of it. Each one is read when a view opens. */
@@ -56,6 +57,8 @@ export interface RemoteBrowserViewFeatures {
   contextMenu: boolean;
   /** `browser-view-viewport`: the page size the client asks the host to hold while the view is open. */
   viewport: BrowserViewViewport | null;
+  /** `browser-view-page-copy-v1`: the client puts the text that the page itself copies on its clipboard. */
+  pageCopy?: boolean;
 }
 const NO_FEATURES: RemoteBrowserViewFeatures = { cursor: false, contextMenu: false, viewport: null };
 /** One browser tab view per client. All paths still pass the host's stream allowlist. */
@@ -111,7 +114,7 @@ export function createRemoteBrowserView(
     frame: (frame: BrowserViewFrame) => void,
     ended: (reason?: string) => void,
     copied: (message: BrowserViewCopied) => void,
-    /** Hears the cursor and the context menus. Without it, the client asks for neither. */
+    /** Hears the cursor, the context menus and the page's copies. Without it, the client asks for none. */
     message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void,
   ): Effect.fn.Return<RemoteBrowserView, BrowserViewError> {
     yield* close().pipe(Effect.catch(() => Effect.void));
@@ -140,6 +143,7 @@ export function createRemoteBrowserView(
     if (acksFrames) path.searchParams.set(BROWSER_VIEW_FRAME_ACK_QUERY, "1");
     if (asked.cursor && message) path.searchParams.set(BROWSER_VIEW_CURSOR_QUERY, "1");
     if (asked.contextMenu && message) path.searchParams.set(BROWSER_VIEW_CONTEXT_MENU_QUERY, "1");
+    if (asked.pageCopy && message) path.searchParams.set(BROWSER_VIEW_PAGE_COPY_QUERY, "1");
     if (asked.viewport) path.searchParams.set(BROWSER_VIEW_VIEWPORT_QUERY, browserViewViewportQuery(asked.viewport));
     yield* sendFrame(
       encodeRemoteDesktopSignalControl({

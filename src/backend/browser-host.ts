@@ -285,6 +285,8 @@ export interface BrowserViewOptions {
   onCursor?: (cursor: BrowserViewCursor) => void;
   /** The page size, in CSS pixels, that the page keeps while the view is open. */
   viewport?: BrowserViewViewport;
+  /** Hears the text that the page itself copies. Not called while a secret is on the page. */
+  onPageCopy?: (text: string) => void;
 }
 
 /** A web address a member may copy from a menu. Other schemes and long addresses are left out. */
@@ -2495,7 +2497,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport } = options;
+    const { onCursor, viewport, onPageCopy } = options;
     const tab = yield* this.#requireTab(tabId);
     // The local window shows a protected tab during a takeover. A live view goes to another computer,
     // so the page loads again first: the secret leaves it, and the person signs in by hand. Without
@@ -2537,6 +2539,19 @@ export class BrowserHost {
           maxWidth: VIEW_FRAME_MAX_WIDTH,
           maxHeight: VIEW_FRAME_MAX_HEIGHT,
           ...(viewport ? { viewport } : {}),
+          ...(onPageCopy
+            ? {
+                onPageCopy: (text: string) => {
+                  if (
+                    !tab.secret?.submitted &&
+                    !tab.filledCard &&
+                    !tab.secretShown &&
+                    tab.captureGeneration === generation
+                  )
+                    onPageCopy(text);
+                },
+              }
+            : {}),
         },
         (frame) => {
           if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)

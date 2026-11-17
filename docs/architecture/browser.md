@@ -687,7 +687,16 @@ no native menu: that menu would show on the host's screen. Only http and https a
 message. A host with `browser-view-viewport` holds the page at the size a socket asks for with
 `viewport=WxH` while that socket is open, through the same device metrics override as an agent's
 `set_environment`, so a resize of the host's window does not change the page. A tab with a custom
-size from `set_environment` keeps it. The phone asks for 1280x800. On the phone, the view runs in the
+size from `set_environment` keeps it. A host with `browser-view-page-copy-v1` sends the text that the
+page itself copies (a "Copy code" button: `navigator.clipboard.writeText` or `write`, or a trusted
+`copy` event) as a `pageCopied` message to a socket opened with `pageCopy=1`. While that view runs,
+the CDP engine keeps one `Runtime.evaluate` with `awaitPromise` open in the page's main world. It hooks
+those calls once a document and answers with the text of the next one made during a user action. It
+turns on no CDP domain: `Runtime.enable` is a sign of automation that bot checks look for. The host
+sends the text only within 5 seconds of that socket's own click or key, so a copy that follows an
+agent's click stays on the host. The desktop client writes it with Electron's clipboard, the web
+client with `navigator.clipboard` (a toast with a Copy button when the browser refuses), and the
+phone with `expo-clipboard`. The phone asks for 1280x800. On the phone, the view runs in the
 hidden page that holds the Team peer (`features/browser/model/browser-view-bridge.ts`). That page
 sends each frame to the screen as base64 and holds the newest frame until the screen has drawn the
 previous one. Back, forward, reload, new tab and close tab use the released `browser-control`
