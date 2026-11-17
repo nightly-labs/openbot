@@ -80,9 +80,21 @@ export const messages = {
   "error.workflow.githubNoWrite":
     "OpenBot GitHub App はこのリポジトリを変更できません。GitHub を開いてアクセスを許可してください。",
   "error.workflow.githubNoAccessRepository":
-    "OpenBot GitHub App はリポジトリ {repository} またはその項目を参照できません。GitHub を開いてアプリにアクセスを許可してください。",
+    "OpenBot GitHub App はリポジトリ {repository} を参照できません。GitHub を開いてアプリにアクセスを許可してください。",
   "error.workflow.githubNoWriteRepository":
     "OpenBot GitHub App はリポジトリ {repository} を変更できません。GitHub を開いてアプリにアクセスを許可してください。",
+  "error.workflow.githubNoReadRepository":
+    "OpenBot GitHub App はリポジトリ {repository} を読み取れません。GitHub を開いてアプリにアクセスを許可してください。",
+  "error.workflow.githubUserNoAccessRepository":
+    "あなたの GitHub アカウントはリポジトリ {repository} を参照できません。リポジトリが存在し、GitHub で開けることを確認してください。",
+  "error.workflow.githubUserNoReadRepository":
+    "あなたの GitHub アカウントはリポジトリ {repository} を読み取れません。GitHub で開けることを確認してください。",
+  "error.workflow.githubNoItem":
+    "{repository} に Issue またはプルリクエスト #{number} がないか、OpenBot GitHub App がそれを参照できません。",
+  "error.workflow.githubUserNoItem":
+    "{repository} に Issue またはプルリクエスト #{number} がないか、あなたの GitHub アカウントがそれを参照できません。",
+  "error.workflow.githubRateLimited":
+    "GitHub が OpenBot から多すぎるリクエストを受け取りました。数分待ってから、もう一度お試しください。",
   "error.workflow.githubLocked": "この会話は GitHub でロックされています。",
   "error.workflow.githubRefused": "GitHub が変更を拒否しました: {detail}",
   "error.workflow.githubUnreachable": "OpenBot は GitHub に接続できませんでした。ステップをもう一度実行してください。",

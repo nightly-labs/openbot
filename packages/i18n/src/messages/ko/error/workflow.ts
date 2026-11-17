@@ -73,9 +73,21 @@ export const messages = {
   "error.workflow.githubNoWrite":
     "OpenBot GitHub App이 이 저장소를 변경할 수 없어요. GitHub를 열고 액세스 권한을 주세요.",
   "error.workflow.githubNoAccessRepository":
-    "OpenBot GitHub 앱이 저장소 {repository} 또는 그 항목을 볼 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
+    "OpenBot GitHub 앱이 저장소 {repository}을(를) 볼 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
   "error.workflow.githubNoWriteRepository":
     "OpenBot GitHub 앱이 저장소 {repository}을(를) 변경할 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
+  "error.workflow.githubNoReadRepository":
+    "OpenBot GitHub 앱이 저장소 {repository}을(를) 읽을 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
+  "error.workflow.githubUserNoAccessRepository":
+    "내 GitHub 계정으로 저장소 {repository}을(를) 볼 수 없어요. 저장소가 있는지, GitHub에서 열 수 있는지 확인해 주세요.",
+  "error.workflow.githubUserNoReadRepository":
+    "내 GitHub 계정으로 저장소 {repository}을(를) 읽을 수 없어요. GitHub에서 열 수 있는지 확인해 주세요.",
+  "error.workflow.githubNoItem":
+    "{repository}에 이슈나 풀 리퀘스트 #{number}이(가) 없거나, OpenBot GitHub 앱이 볼 수 없어요.",
+  "error.workflow.githubUserNoItem":
+    "{repository}에 이슈나 풀 리퀘스트 #{number}이(가) 없거나, 내 GitHub 계정으로 볼 수 없어요.",
+  "error.workflow.githubRateLimited":
+    "GitHub가 OpenBot에서 너무 많은 요청을 받았어요. 몇 분 기다린 후 다시 시도해 주세요.",
   "error.workflow.githubLocked": "이 대화는 GitHub에서 잠겨 있어요.",
   "error.workflow.githubRefused": "GitHub가 변경을 거부했어요: {detail}",
   "error.workflow.githubUnreachable": "OpenBot이 GitHub에 연결하지 못했어요. 단계를 다시 실행해 주세요.",

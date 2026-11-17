@@ -62,9 +62,18 @@ export const messages = {
   "error.workflow.githubNoAccess": "OpenBot GitHub App 无法访问该仓库或项目。打开 GitHub 并为它授予访问权限。",
   "error.workflow.githubNoWrite": "OpenBot GitHub App 无法更改该仓库。打开 GitHub 并为它授予访问权限。",
   "error.workflow.githubNoAccessRepository":
-    "OpenBot GitHub 应用看不到仓库 {repository} 或其中的项目。请打开 GitHub 并授予该应用访问权限。",
+    "OpenBot GitHub 应用看不到仓库 {repository}。请打开 GitHub 并授予该应用访问权限。",
   "error.workflow.githubNoWriteRepository":
     "OpenBot GitHub 应用无法更改仓库 {repository}。请打开 GitHub 并授予该应用访问权限。",
+  "error.workflow.githubNoReadRepository":
+    "OpenBot GitHub 应用无法读取仓库 {repository}。请打开 GitHub 并授予该应用访问权限。",
+  "error.workflow.githubUserNoAccessRepository":
+    "你的 GitHub 账号看不到仓库 {repository}。请确认该仓库存在，并且你可以在 GitHub 上打开它。",
+  "error.workflow.githubUserNoReadRepository":
+    "你的 GitHub 账号无法读取仓库 {repository}。请确认你可以在 GitHub 上打开它。",
+  "error.workflow.githubNoItem": "{repository} 中没有议题或拉取请求 #{number}，或者 OpenBot GitHub 应用看不到它。",
+  "error.workflow.githubUserNoItem": "{repository} 中没有议题或拉取请求 #{number}，或者你的 GitHub 账号看不到它。",
+  "error.workflow.githubRateLimited": "GitHub 收到了来自 OpenBot 的过多请求。请等待几分钟，然后重试。",
   "error.workflow.githubLocked": "该对话已在 GitHub 上锁定。",
   "error.workflow.githubRefused": "GitHub 拒绝了该更改：{detail}",
   "error.workflow.githubUnreachable": "OpenBot 无法连接 GitHub。再次运行该步骤。",

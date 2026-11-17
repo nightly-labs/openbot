@@ -76,9 +76,21 @@ export const messages = {
   "error.workflow.githubNoWrite":
     "OpenBot GitHub Uygulaması bu depoyu değiştiremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
   "error.workflow.githubNoAccessRepository":
-    "OpenBot GitHub uygulaması {repository} deposunu veya öğesini göremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+    "OpenBot GitHub uygulaması {repository} deposunu göremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
   "error.workflow.githubNoWriteRepository":
     "OpenBot GitHub uygulaması {repository} deposunu değiştiremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubNoReadRepository":
+    "OpenBot GitHub uygulaması {repository} deposunu okuyamıyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubUserNoAccessRepository":
+    "GitHub hesabınız {repository} deposunu göremiyor. Deponun var olduğunu ve GitHub'da açabildiğinizi kontrol edin.",
+  "error.workflow.githubUserNoReadRepository":
+    "GitHub hesabınız {repository} deposunu okuyamıyor. Depoyu GitHub'da açabildiğinizi kontrol edin.",
+  "error.workflow.githubNoItem":
+    "GitHub'da {repository} içinde #{number} numaralı sorun veya çekme isteği yok ya da OpenBot GitHub uygulaması onu göremiyor.",
+  "error.workflow.githubUserNoItem":
+    "GitHub'da {repository} içinde #{number} numaralı sorun veya çekme isteği yok ya da GitHub hesabınız onu göremiyor.",
+  "error.workflow.githubRateLimited":
+    "GitHub, OpenBot'tan çok fazla istek aldı. Birkaç dakika bekleyin, sonra yeniden deneyin.",
   "error.workflow.githubLocked": "Bu konuşma GitHub'da kilitli.",
   "error.workflow.githubRefused": "GitHub değişikliği reddetti: {detail}",
   "error.workflow.githubUnreachable": "OpenBot GitHub'a ulaşamadı. Adımı yeniden çalıştırın.",

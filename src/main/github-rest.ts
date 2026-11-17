@@ -154,35 +154,94 @@ function createdAt(candidate: WorkflowGitHubRecentEvent): string {
 
 const failure = (code: Failure["code"], message: string): Failure => ({ code, message });
 
+/** What a call works on and with whose token, so that a refusal can say what needs access. */
+interface CallTarget {
+  readonly token: string;
+  /** `app`: the OpenBot GitHub App's token. `user`: the user's own GitHub sign-in. */
+  readonly owner: "app" | "user";
+  readonly repository: string;
+  /** True when the call changes GitHub. A refusal is then a refusal to change, not to read. */
+  readonly writes: boolean;
+  /** The issue or pull request of the call, or null when the call is on the repository. */
+  readonly item: number | null;
+}
+
+/** The target of a read with the app's token where the user can push, or else with the user's token. */
+const readTarget = (repository: string, found: GitHubRepositoryTokens): CallTarget => ({
+  token: found.bot ?? found.user,
+  owner: found.bot ? "app" : "user",
+  repository,
+  writes: false,
+  item: null,
+});
+
+/** The same target on one issue or pull request. A value that is not a number keeps the repository. */
+const onItem = (target: CallTarget, number: unknown): CallTarget => ({
+  ...target,
+  item: typeof number === "number" ? number : null,
+});
+
 /** The app cannot change the repository. The text names it, so the user knows where to give access. */
 const noWrite = (repository: string): Failure =>
   failure("noWrite", sourceText("error.workflow.githubNoWriteRepository", { repository }));
 
-/** The `owner/name` of a `/repos/owner/name/...` path, or null for another path. */
-function pathRepository(path: string): string | null {
-  return /^\/repos\/([^/?]+\/[^/?]+)/u.exec(path)?.[1] ?? null;
+/** GitHub refused a read. The text names the repository and whose access is missing. */
+function noRead({ owner, repository }: CallTarget): Failure {
+  return failure(
+    "noAccess",
+    owner === "app"
+      ? sourceText("error.workflow.githubNoReadRepository", { repository })
+      : sourceText("error.workflow.githubUserNoReadRepository", { repository }),
+  );
 }
 
 /**
- * A response that is not a success, as the step shows it. GitHub's own words go through redaction. An
- * access failure names the repository of the path, so the user knows which one needs access.
+ * GitHub does not show the repository or the item. For an item, it can also be deleted, so the text says
+ * both. The text names whose access is missing: the app's or the user's.
  */
-function httpFailure(status: number, body: unknown, rateLimited: boolean, path: string): Failure {
-  const repository = pathRepository(path);
+function notFound({ owner, repository, item }: CallTarget): Failure {
+  if (item !== null) {
+    const number = String(item);
+    return failure(
+      "noAccess",
+      owner === "app"
+        ? sourceText("error.workflow.githubNoItem", { repository, number })
+        : sourceText("error.workflow.githubUserNoItem", { repository, number }),
+    );
+  }
+  return failure(
+    "noAccess",
+    owner === "app"
+      ? sourceText("error.workflow.githubNoAccessRepository", { repository })
+      : sourceText("error.workflow.githubUserNoAccessRepository", { repository }),
+  );
+}
+
+/**
+ * True when GitHub refused the call because of its primary or secondary rate limit. A secondary limit
+ * keeps requests in `x-ratelimit-remaining`, but GitHub sends `retry-after` or says so in its message.
+ */
+function rateLimited(status: number, headers: Headers, message: string): boolean {
+  if (status === 429) return true;
+  if (status !== 403) return false;
+  return (
+    headers.get("x-ratelimit-remaining") === "0" ||
+    headers.has("retry-after") ||
+    /\brate limit\b|\babuse\b/iu.test(message)
+  );
+}
+
+/** A response that is not a success, as the step shows it. GitHub's own words go through redaction. */
+function httpFailure(status: number, headers: Headers, body: unknown, target: CallTarget): Failure {
   const parsed = messageSchema.safeParse(body);
   const message = parsed.success ? redactText(parsed.data.message).slice(0, DETAIL_LIMIT) : `HTTP ${status}`;
   if (status === 401) return failure("notConnected", sourceText("error.workflow.githubNotConnected"));
-  if (status === 403 && !rateLimited) {
+  if (rateLimited(status, headers, message)) return failure("invalid", sourceText("error.workflow.githubRateLimited"));
+  if (status === 403) {
     if (/\blocked\b/iu.test(message)) return failure("locked", sourceText("error.workflow.githubLocked"));
-    return repository ? noWrite(repository) : failure("noWrite", sourceText("error.workflow.githubNoWrite"));
+    return target.writes ? noWrite(target.repository) : noRead(target);
   }
-  if (status === 404 || status === 410)
-    return failure(
-      "noAccess",
-      repository
-        ? sourceText("error.workflow.githubNoAccessRepository", { repository })
-        : sourceText("error.workflow.githubNoAccess"),
-    );
+  if (status === 404 || status === 410) return notFound(target);
   // A server error can come after GitHub made the change.
   if (status >= 500) return failure("unreachable", sourceText("error.workflow.githubUnreachable"));
   return failure("invalid", sourceText("error.workflow.githubRefused", { detail: message }));
@@ -203,7 +262,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
 
   /** One call. Answers the parsed body, or null for an empty one. */
   const call = Effect.fn("GitHubRest.call")(function* (
-    token: string,
+    target: CallTarget,
     method: string,
     path: string,
     body?: DynamicRecord,
@@ -216,7 +275,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         signal: AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]),
         headers: {
           Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${target.token}`,
           "User-Agent": "OpenBot",
           "X-GitHub-Api-Version": "2022-11-28",
           ...(body ? { "Content-Type": "application/json" } : {}),
@@ -235,9 +294,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       Effect.mapError(() => failure("unreachable", sourceText("error.workflow.githubUnreachable"))),
     );
     if (response.ok || allowed.includes(response.status)) return json;
-    return yield* Effect.fail(
-      httpFailure(response.status, json, response.headers.get("x-ratelimit-remaining") === "0", path),
-    );
+    return yield* Effect.fail(httpFailure(response.status, response.headers, json, target));
   });
 
   const parse = <T>(schema: z.ZodType<T>, value: unknown) => {
@@ -259,6 +316,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     repository: string,
     files: WorkflowGitHubFiles,
   ): Effect.fn.Return<FileLink[], Failure> {
+    const target: CallTarget = { token, owner: "app", repository, writes: true, item: null };
     const repo = `/repos/${repository}`;
     const own = files.files.map(ownLink);
     const download = options.download;
@@ -273,7 +331,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       if (Option.isNone(bytes) || bytes.value.byteLength === 0 || bytes.value.byteLength > room) continue;
       // A file of 25 MB is about 33 MB of JSON, which a slow upload cannot send in the usual deadline.
       const blob = yield* call(
-        token,
+        target,
         "POST",
         `${repo}/git/blobs`,
         { content: Buffer.from(bytes.value).toString("base64"), encoding: "base64" },
@@ -294,26 +352,26 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     let commit: string | null = null;
     for (let attempt = 0; attempt < 2 && !commit; attempt += 1) {
       const head = refSchema.safeParse(
-        yield* call(token, "GET", `${repo}/git/ref/heads/${FILES_BRANCH}`, undefined, [404]),
+        yield* call(target, "GET", `${repo}/git/ref/heads/${FILES_BRANCH}`, undefined, [404]),
       );
       const parent = head.success ? head.data.object.sha : null;
       const base = parent
-        ? yield* call(token, "GET", `${repo}/git/commits/${parent}`).pipe(
+        ? yield* call(target, "GET", `${repo}/git/commits/${parent}`).pipe(
             Effect.flatMap((answer) => parse(commitSchema, answer)),
           )
         : null;
-      const tree = yield* call(token, "POST", `${repo}/git/trees`, {
+      const tree = yield* call(target, "POST", `${repo}/git/trees`, {
         ...(base ? { base_tree: base.tree.sha } : {}),
         tree: entries,
       }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
-      const made = yield* call(token, "POST", `${repo}/git/commits`, {
+      const made = yield* call(target, "POST", `${repo}/git/commits`, {
         message: FILES_COMMIT_MESSAGE,
         tree: tree.sha,
         parents: parent ? [parent] : [],
       }).pipe(Effect.flatMap((answer) => parse(shaSchema, answer)));
       const moved = parent
-        ? yield* call(token, "PATCH", `${repo}/git/refs/heads/${FILES_BRANCH}`, { sha: made.sha, force: false }, [422])
-        : yield* call(token, "POST", `${repo}/git/refs`, { ref: `refs/heads/${FILES_BRANCH}`, sha: made.sha }, [422]);
+        ? yield* call(target, "PATCH", `${repo}/git/refs/heads/${FILES_BRANCH}`, { sha: made.sha, force: false }, [422])
+        : yield* call(target, "POST", `${repo}/git/refs`, { ref: `refs/heads/${FILES_BRANCH}`, sha: made.sha }, [422]);
       if (refSchema.safeParse(moved).success) commit = made.sha;
     }
     if (!commit) return own.filter((link) => link !== null);
@@ -334,14 +392,16 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
   const attachFiles = (change: WorkflowGitHubChange): Effect.Effect<WorkflowGitHubChange> => {
     const files = change.files;
     if (!files) return Effect.succeed(change);
+    const own = files.files.flatMap((file) => ownLink(file) ?? []);
+    // Without the app's token, the files cannot go to the branch: they keep their own links.
     const links =
       files.files.length === 0
         ? Effect.succeed<FileLink[]>([])
         : tokens(change.repository).pipe(
             Effect.flatMap((found) =>
-              found.bot ? copyFiles(found.bot, change.repository, files) : Effect.fail(noWrite(change.repository)),
+              found.bot ? copyFiles(found.bot, change.repository, files) : Effect.succeed(own),
             ),
-            Effect.catch(() => Effect.succeed(files.files.flatMap((file) => ownLink(file) ?? []))),
+            Effect.catch(() => Effect.succeed(own)),
           );
     return links.pipe(Effect.map((found) => ({ ...change, body: withFiles(change.body, found), files: null })));
   };
@@ -352,7 +412,15 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     const found = yield* tokens(change.repository);
     // A change is the app's, so GitHub shows it as the app and the loop guard knows its events.
     if (!found.bot) return yield* Effect.fail(noWrite(change.repository));
-    const token = found.bot;
+    const target: CallTarget = {
+      token: found.bot,
+      owner: "app",
+      repository: change.repository,
+      writes: true,
+      item: null,
+    };
+    // A change without a number is refused before it comes here.
+    const itemTarget = onItem(target, change.number ?? 0);
     const repo = `/repos/${change.repository}`;
     const item = `${repo}/issues/${change.number ?? 0}`;
     const itemUrl = `https://github.com/${change.repository}/issues/${change.number ?? 0}`;
@@ -361,23 +429,23 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       case "comment": {
         const answer = yield* parse(
           createdSchema,
-          yield* call(token, "POST", `${item}/comments`, { body: change.body }),
+          yield* call(itemTarget, "POST", `${item}/comments`, { body: change.body }),
         );
         return { created: { kind: "comment", id: answer.id }, url: answer.html_url ?? itemUrl };
       }
       case "label.add":
-        yield* call(token, "POST", `${item}/labels`, { labels: change.labels });
+        yield* call(itemTarget, "POST", `${item}/labels`, { labels: change.labels });
         return done();
       case "label.remove":
         // A label that the item does not have is removed already.
         for (const label of change.labels)
-          yield* call(token, "DELETE", `${item}/labels/${encodeURIComponent(label)}`, undefined, [404]);
+          yield* call(itemTarget, "DELETE", `${item}/labels/${encodeURIComponent(label)}`, undefined, [404]);
         return done();
       case "assign":
-        yield* call(token, "POST", `${item}/assignees`, { assignees: change.people });
+        yield* call(itemTarget, "POST", `${item}/assignees`, { assignees: change.people });
         return done();
       case "review.request":
-        yield* call(token, "POST", `${repo}/pulls/${change.number ?? 0}/requested_reviewers`, {
+        yield* call(itemTarget, "POST", `${repo}/pulls/${change.number ?? 0}/requested_reviewers`, {
           reviewers: change.people,
         });
         return done();
@@ -385,7 +453,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       case "review.changes": {
         const answer = yield* parse(
           createdSchema,
-          yield* call(token, "POST", `${repo}/pulls/${change.number ?? 0}/reviews`, {
+          yield* call(itemTarget, "POST", `${repo}/pulls/${change.number ?? 0}/reviews`, {
             event: change.action === "review.approve" ? "APPROVE" : "REQUEST_CHANGES",
             ...(change.body ? { body: change.body } : {}),
           }),
@@ -393,15 +461,15 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         return { created: { kind: "review", id: answer.id }, url: answer.html_url ?? itemUrl };
       }
       case "close":
-        yield* call(token, "PATCH", item, { state: "closed", state_reason: GITHUB_STATE_REASONS[change.reason] });
+        yield* call(itemTarget, "PATCH", item, { state: "closed", state_reason: GITHUB_STATE_REASONS[change.reason] });
         return done();
       case "reopen":
-        yield* call(token, "PATCH", item, { state: "open" });
+        yield* call(itemTarget, "PATCH", item, { state: "open" });
         return done();
       case "issue.create": {
         const answer = yield* parse(
           issueSchema,
-          yield* call(token, "POST", `${repo}/issues`, {
+          yield* call(target, "POST", `${repo}/issues`, {
             title: change.title,
             body: change.body,
             ...(change.labels.length > 0 ? { labels: change.labels } : {}),
@@ -414,13 +482,13 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
 
   /** Every page of a list, up to the option limit. */
   const pages = Effect.fn("GitHubRest.pages")(function* <T>(
-    token: string,
+    target: CallTarget,
     path: string,
     schema: z.ZodType<T[]>,
   ): Effect.fn.Return<T[], Failure> {
     const all: T[] = [];
     for (let page = 1; all.length < WORKFLOW_GITHUB_OPTION_LIMIT; page += 1) {
-      const answer = yield* parse(schema, yield* call(token, "GET", `${path}?per_page=${PAGE_SIZE}&page=${page}`));
+      const answer = yield* parse(schema, yield* call(target, "GET", `${path}?per_page=${PAGE_SIZE}&page=${page}`));
       all.push(...answer);
       if (answer.length < PAGE_SIZE) break;
     }
@@ -430,12 +498,11 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
   const repositoryOptions = Effect.fn("GitHubRest.options")(function* (
     repository: string,
   ): Effect.fn.Return<WorkflowGitHubRepositoryOptions, Failure> {
-    const found = yield* tokens(repository);
-    const token = found.bot ?? found.user;
-    const labels: WorkflowGitHubLabel[] = (yield* pages(token, `/repos/${repository}/labels`, labelsSchema)).map(
+    const target = readTarget(repository, yield* tokens(repository));
+    const labels: WorkflowGitHubLabel[] = (yield* pages(target, `/repos/${repository}/labels`, labelsSchema)).map(
       (label) => ({ name: label.name, color: label.color }),
     );
-    const people = (yield* pages(token, `/repos/${repository}/assignees`, assigneesSchema)).map(
+    const people = (yield* pages(target, `/repos/${repository}/assignees`, assigneesSchema)).map(
       (person) => person.login,
     );
     return { labels, people };
@@ -447,11 +514,10 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     repository: string,
     event: WorkflowGitHubEvent,
   ): Effect.fn.Return<WorkflowGitHubRecentEvent[], Failure> {
-    const found = yield* tokens(repository);
-    const token = found.bot ?? found.user;
+    const target = readTarget(repository, yield* tokens(repository));
     const repo = `/repos/${repository}`;
     const list = (path: string, query: string) =>
-      call(token, "GET", `${repo}/${path}?per_page=${RECENT_LIMIT}&${query}`).pipe(Effect.map(records));
+      call(target, "GET", `${repo}/${path}?per_page=${RECENT_LIMIT}&${query}`).pipe(Effect.map(records));
     // The REST answers are close to the App's bodies: the item is the subject, and its author the sender.
     const shape = (name: string, action: string, subject: DynamicRecord, extra: DynamicRecord = {}) => {
       const pullRequest = name === "pull_request" || name === "pull_request_review";
@@ -508,7 +574,9 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         const found: WorkflowGitHubRecentEvent[] = [];
         const pulls = (yield* list("pulls", "state=all&sort=updated&direction=desc")).slice(0, RECENT_DETAIL_LIMIT);
         for (const pull of pulls) {
-          const reviews = records(yield* call(token, "GET", `${repo}/pulls/${String(pull.number)}/reviews`));
+          const reviews = records(
+            yield* call(onItem(target, pull.number), "GET", `${repo}/pulls/${String(pull.number)}/reviews`),
+          );
           const review = reviews.at(-1);
           // The reviewer is the sender of a review.
           if (review) found.push(shape("pull_request_review", "submitted", pull, { review, sender: review.user }));
@@ -521,7 +589,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         for (const pull of pulls) {
           const head = isDynamicRecord(pull.head) ? pull.head : null;
           if (typeof head?.sha !== "string") continue;
-          const answer = yield* call(token, "GET", `${repo}/commits/${head.sha}/check-suites`);
+          const answer = yield* call(onItem(target, pull.number), "GET", `${repo}/commits/${head.sha}/check-suites`);
           const suites = isDynamicRecord(answer) ? records(answer.check_suites) : [];
           const failed = suites.find((suite) => suite.conclusion === "failure" || suite.conclusion === "timed_out");
           if (!failed) continue;
@@ -545,16 +613,18 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
       case "mention": {
         const found: WorkflowGitHubRecentEvent[] = [];
         const comments = (yield* call(
-          token,
+          target,
           "GET",
           `${repo}/issues/comments?per_page=${RECENT_LIMIT}&sort=created&direction=desc`,
         ).pipe(Effect.map(records))).slice(0, RECENT_DETAIL_LIMIT);
         const issues = new Map<string, DynamicRecord | null>();
+        const itemPrefix = `${API}${repo}/issues/`;
         for (const comment of comments) {
           const url = typeof comment.issue_url === "string" ? comment.issue_url : null;
-          if (!url?.startsWith(`${API}${repo}/issues/`)) continue;
+          if (!url?.startsWith(itemPrefix)) continue;
           if (!issues.has(url)) {
-            const answer = yield* call(token, "GET", url.slice(API.length));
+            const issueTarget = onItem(target, Number(url.slice(itemPrefix.length)) || null);
+            const answer = yield* call(issueTarget, "GET", url.slice(API.length));
             issues.set(url, isDynamicRecord(answer) ? answer : null);
           }
           const issue = issues.get(url);
