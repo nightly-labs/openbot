@@ -28,6 +28,7 @@ import {
 import { useText } from "@openbot/ui/text";
 import { createSignal, For, onCleanup, onSettled, Show } from "solid-js";
 import { desktopAnalytics } from "../../analytics";
+import { idleRestartTarget } from "../updates/updates-port";
 import { computerUsePort } from "./computer-use-port";
 
 export interface ComputerUseSetupProps {
@@ -112,8 +113,7 @@ export function ComputerUseSetup(props: ComputerUseSetupProps) {
     setRestartError(null);
     try {
       const update = computerUsePort().update;
-      const status = await update.getStatus();
-      await update.restartWhenIdle(status.phase === "ready" && status.managedByHost !== true ? "update" : "relaunch");
+      await update.restartWhenIdle(idleRestartTarget(await update.getStatus()));
     } catch (cause) {
       if (!disposed) setRestartError(errorMessage(cause, t("update.idleRestart.requestFailed")));
     } finally {
