@@ -3887,9 +3887,23 @@ export class BrowserHost {
         item.cancel();
         stopped(DOWNLOAD_TOO_LARGE);
       });
-      item.once("done", () => {
+      item.once("done", (_doneEvent, state) => {
         this.#activeDownloads -= 1;
         this.#reservedDownloadPaths.delete(downloadPath);
+        // A cancelled download is one that the size limit stopped, which says so above, or one that the app
+        // stopped as it quit.
+        if (state === "interrupted") stopped("Download failed before the file was complete. Try again.");
+        if (state !== "completed") return;
+        // The click only starts the download, so the agent finds the saved file in its next snapshot.
+        // A network entry at info level does not show there, so this is a load entry. The path comes first and
+        // only once, so the length limit of an entry does not cut it.
+        if (!tab || tab.secret) return;
+        tab.diagnostics.add({
+          kind: "load",
+          level: "info",
+          message: `Download complete: saved at ${downloadPath} (${item.getReceivedBytes()} bytes)`,
+          ...diagnosticUrlField(item.getURL()),
+        });
       });
     });
   }
