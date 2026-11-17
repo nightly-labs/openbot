@@ -18,8 +18,9 @@ export interface UpdateRequiredScreenProps {
   /** Opens the download page, for an install that cannot update itself or whose update failed. */
   onOpenDownloadPage: () => void;
   /**
-   * Closes the screen until the next start. Shown only for an install that cannot update itself,
-   * such as a Linux package or Nix, because its user cannot install the update from here.
+   * Closes the screen until the next start. Shown for an install that cannot update itself, such as
+   * a Linux package or Nix, and after an update failed, such as on a read-only disk: in both cases
+   * the user cannot install the update from here.
    */
   onDismiss?: () => void;
 }
@@ -147,6 +148,13 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
             >
               {t("update.required.download")}
             </Button>
+            <Show when={failure() !== null && props.onDismiss}>
+              {(dismiss) => (
+                <Button variant="ghost" size="sm" type="button" class="update-required-secondary" onClick={dismiss()}>
+                  {t("update.required.continue")}
+                </Button>
+              )}
+            </Show>
           </Show>
         </section>
       </div>

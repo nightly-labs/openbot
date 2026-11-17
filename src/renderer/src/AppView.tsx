@@ -68,7 +68,7 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const updates = useUpdates();
-  // An install that cannot update itself can close the screen until the next start (plan 011, item 24).
+  // An install that cannot update itself, or whose update failed, can close the screen until the next start.
   const [requiredUpdateDismissed, setRequiredUpdateDismissed] = createSignal(false);
   // Main sets it only after a check confirms that this version is below the supported minimum.
   const updateRequired = () => updates.status().requiredVersion !== undefined && !requiredUpdateDismissed();
