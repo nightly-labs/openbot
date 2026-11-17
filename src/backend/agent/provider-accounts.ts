@@ -22,7 +22,7 @@ import { Cause, Deferred, Effect, Exit, Fiber, Schema, type Scope } from "effect
 import { googleSignInByOpenBot, startAcpAuthentication } from "./../acp-sign-in";
 import type { AgentClient } from "./../agent-client";
 import { type AgentCliInfo, cliPathEnvironment, cliSpawnTarget } from "./../cli";
-import type { AccountReadResult } from "./../protocol";
+import { type AccountReadResult, CLAUDE_CLI_API_KEY_ACCOUNT_TYPE } from "./../protocol";
 import { ProviderSignInError } from "../provider-client-effects";
 import {
   isKeyAccountSupport,
@@ -52,6 +52,14 @@ export class ProviderAccountFailed extends Schema.TaggedError<ProviderAccountFai
 
 function accountFailure(text: string): ProviderAccountFailed {
   return new ProviderAccountFailed({ cause: new Error(text) });
+}
+
+/**
+ * The message of a connected account whose CLI bills an API key of the user's own, not the plan
+ * (#10192). The account rows carry it to the provider settings of each client; null for other accounts.
+ */
+export function ownApiKeyNotice(account: AccountReadResult["account"] | undefined): string | null {
+  return account?.type === CLAUDE_CLI_API_KEY_ACCOUNT_TYPE ? sourceText("status.provider.claudeOwnApiKey") : null;
 }
 
 /** Who a client is signed in as. A team and a personal login can share an email in different organizations. */
@@ -195,7 +203,11 @@ export class ProviderAccounts {
   }
 
   /** The rows of a connected provider that can hold more than one account; its own sign-in first. */
-  rows(provider: AgentProviderId, defaultEmail: string | null): ProviderAccountStatus[] | undefined {
+  rows(
+    provider: AgentProviderId,
+    defaultEmail: string | null,
+    defaultMessage: string | null,
+  ): ProviderAccountStatus[] | undefined {
     if (!this.#support(provider)) return undefined;
     return [
       {
@@ -203,7 +215,7 @@ export class ProviderAccounts {
         label: this.#store.defaultLabel(provider),
         email: defaultEmail,
         state: "connected",
-        message: null,
+        message: defaultMessage,
       },
       // With no claude.ai account, the own sign-in runs on the key too: one row is enough.
       ...this.#store
@@ -919,7 +931,7 @@ export class ProviderAccounts {
                     )
                   : reading
               : null;
-          this.#setState(account.id, { state: "connected", email, organization, message: null });
+          this.#setState(account.id, { state: "connected", email, organization, message: ownApiKeyNotice(signedIn) });
           // The rail shows an account only with a reading, and no usage request follows a sign-in.
           if (limit) this.#host.usageChanged(limit);
           // After the connected state, so a slow list does not delay it; the end of the sign-in still

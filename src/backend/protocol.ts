@@ -95,6 +95,13 @@ export interface AppServerRequest {
 export const CLAUDE_API_KEY_ACCOUNT_TYPE = "claude-api-key";
 
 /**
+ * The account type of a Claude sign-in when the CLI uses an Anthropic API key that OpenBot did not give
+ * it: an `apiKeyHelper`, or a key in the user's environment or Claude settings. Anthropic bills the key,
+ * not the Claude plan, so the account row says so (#10192).
+ */
+export const CLAUDE_CLI_API_KEY_ACCOUNT_TYPE = "claude-cli-api-key";
+
+/**
  * The account of a Codex whose selected model provider does not use an OpenAI login
  * (`requires_openai_auth` is false, the default of a custom provider). Codex then reports no account
  * and skips its own login screen: the provider's key or gateway authenticates the turns.

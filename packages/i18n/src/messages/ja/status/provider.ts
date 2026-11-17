@@ -28,4 +28,6 @@ export const messages = {
     "Claude は標準の速度で応答しました。高速モードは Claude Code の設定または組織によってオフになっています。",
   "status.provider.claudeFastModeUnavailable":
     "Claude は標準の速度で応答しました。Claude Code はこのターンで高速モードを使えませんでした。",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code は Anthropic API キーを使うように設定されています。Anthropic は各リクエストを Claude プランではなく、キーの API クレジットに請求します。プランを使うには、Claude Code の設定または環境変数からキーを削除し、OpenBot を再起動してください。",
 } as const satisfies PartialTranslation<typeof source>;

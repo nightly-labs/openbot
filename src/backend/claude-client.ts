@@ -117,6 +117,7 @@ import {
   type AppServerNotification,
   type AppServerRequest,
   CLAUDE_API_KEY_ACCOUNT_TYPE,
+  CLAUDE_CLI_API_KEY_ACCOUNT_TYPE,
   getString,
   isRecord,
   type RequestId,
@@ -787,6 +788,8 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
   readonly #userSetup: () => boolean;
   /** Whether the last account read found no claude.ai account and signed in with the key. */
   #onApiKey = false;
+  /** Whether the last account read found an API key of the user's own: `CLAUDE_CLI_API_KEY_ACCOUNT_TYPE`. */
+  #cliApiKey = false;
   /** Whether this client read the account. A client for one generation without tools does not. */
   #accountRead = false;
   readonly readHistory: ReadProviderHistory;
@@ -1251,15 +1254,38 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     this.#onApiKey = onApiKey && status.loggedIn === true;
     this.#accountRead = true;
     if (status.loggedIn !== true) return { account: null, requiresOpenaiAuth: false };
+    this.#cliApiKey = !this.#onApiKey && (yield* this.#billsOwnApiKey(status));
     return {
       account: {
-        type: this.#onApiKey ? CLAUDE_API_KEY_ACCOUNT_TYPE : "claude",
+        type: this.#onApiKey
+          ? CLAUDE_API_KEY_ACCOUNT_TYPE
+          : this.#cliApiKey
+            ? CLAUDE_CLI_API_KEY_ACCOUNT_TYPE
+            : "claude",
         email: isString(status.email) ? status.email : null,
         planType: isString(status.subscriptionType) ? status.subscriptionType : null,
         organization: isString(status.orgId) ? status.orgId : null,
       },
       requiresOpenaiAuth: false,
     };
+  });
+
+  /**
+   * Whether `auth status` names an API key that OpenBot did not give the CLI: an `apiKeyHelper`, or a key
+   * in the user's environment or Claude settings. The status does not name a gateway that takes the key,
+   * so a base URL in the environment or the settings is not Anthropic billing.
+   */
+  readonly #billsOwnApiKey = Effect.fn("ClaudeAgentClient.billsOwnApiKey")(function* (
+    this: ClaudeAgentClient,
+    status: DynamicRecord,
+  ) {
+    if (!isString(status.apiKeySource) || status.apiKeySource === "none") return false;
+    const environment = { ...claudeEnvironment(this.#cli), ...this.#environment(false) };
+    if (this.#environment(false).ANTHROPIC_API_KEY || environment.ANTHROPIC_BASE_URL) return false;
+    const settings = yield* readClaudeSettingsFile(
+      join(environment.CLAUDE_CONFIG_DIR || join(homedir(), ".claude"), "settings.json"),
+    );
+    return !(isDynamicRecord(settings.env) && settings.env.ANTHROPIC_BASE_URL);
   });
 
   /**
@@ -1332,9 +1358,12 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     return yield* providerSync(() => (last?.loggedIn === true ? last : { loggedIn: true }));
   });
 
-  /** Whether the CLI uses an Anthropic API key: the saved key, a key account's key, or one that OpenBot inherited. */
+  /** Whether the CLI uses an Anthropic API key: the saved key, a key account's key, or one of the user's own. */
   #usesApiKey(): boolean {
-    return Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY);
+    return (
+      this.#cliApiKey ||
+      Boolean({ ...claudeEnvironment(this.#cli), ...this.#environment(this.#onApiKey) }.ANTHROPIC_API_KEY)
+    );
   }
 
   /** The agent environment, with the saved key when `withApiKey`. */
