@@ -447,6 +447,11 @@ interface PendingBrowserTakeover {
   resolve: (result: DynamicToolResult) => void;
   /** The provider's call got `browserTakeoverWaitingResult`, and the card waits for the next call (#9689). */
   detached?: true;
+  /**
+   * A subagent asked for it, in the chat and turn of its parent agent (`AppServerRequest.subagent`). The
+   * subagent can still wait after the parent's turn ends, so that normal end keeps the card (#10657).
+   */
+  subagent?: true;
 }
 
 /** The answer to a detached takeover, kept for the next call of its turn for the same tab (#9689). */
@@ -1406,6 +1411,7 @@ export class AttentionRegistry {
       turnId,
       tabId,
       ...(params.tool === "request_takeover" && isOneOf(BROWSER_TAKEOVER_REASONS, reason) ? { reason } : {}),
+      ...(request.subagent ? { subagent: true as const } : {}),
     };
     const call = takeoverCall();
     const pending: PendingBrowserTakeover = {
@@ -1414,6 +1420,7 @@ export class AttentionRegistry {
       params,
       request: takeover,
       resolve: call.resolve,
+      ...(request.subagent ? { subagent: true as const } : {}),
     };
     this.#takeovers.set(requestId, pending);
     const show = Effect.gen({ self: this }, function* () {
@@ -2209,8 +2216,8 @@ export class AttentionRegistry {
    * A turn ending expires its questions, drops its approvals and cancels its takeovers. Each removal
    * emits its resolved event: a compaction turn sends no `turn-completed`, so a client learns about
    * the removal only from that event. A detached question stays when the turn `completed`: its answer
-   * starts the next turn. A subagent's question stays too: its subagent still waits for the answer.
-   * A Stop or a failure expires both.
+   * starts the next turn. A subagent's question and takeover stay too: its subagent still waits for the
+   * answer. A Stop or a failure expires them all.
    */
   clearForTurn(threadId: string, turnId: string, completed: boolean): void {
     for (const [requestId, pending] of this.#prompts) {
@@ -2228,9 +2235,9 @@ export class AttentionRegistry {
       }
     }
     for (const [requestId, pending] of this.#takeovers) {
-      if (pending.params.threadId === threadId && pending.params.turnId === turnId) {
-        this.#resolveBrowserTakeover(requestId, pending, "cancel");
-      }
+      if (pending.params.threadId !== threadId || pending.params.turnId !== turnId) continue;
+      if (completed && pending.subagent) continue;
+      this.#resolveBrowserTakeover(requestId, pending, "cancel");
     }
     for (const [tabId, held] of this.#heldTakeoverResults) {
       if (held.threadId === threadId && held.turnId === turnId) this.#heldTakeoverResults.delete(tabId);

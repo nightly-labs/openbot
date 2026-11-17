@@ -344,14 +344,16 @@ export function AgentEventBridge() {
           return next === snapshot ? current : { ...current, [event.agentId]: next };
         });
         // Only the wait of this turn's thread: another thread of the agent can still wait for the user.
-        // A detached question outlives its turn: the host keeps it until the user answers.
+        // A detached question, and a subagent's takeover after a normal end, outlive the turn: the host
+        // keeps them until the user answers.
         setPendingPrompts((current) => {
           const key = attentionKey(event.agentId, event.threadId);
           const pending = current[key];
           const submittedRequestKey = submittedPromptRequests()[event.agentId];
           if (
-            pending?.type === "prompt" &&
-            (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)
+            (pending?.type === "prompt" &&
+              (pending.detached || promptRequestKey(pending.turnId, pending.requestId) === submittedRequestKey)) ||
+            (pending?.type === "browser-takeover-requested" && pending.request.subagent && event.status === "completed")
           ) {
             return current;
           }

@@ -134,6 +134,11 @@ export interface BrowserTakeoverRequest {
   reason?: BrowserTakeoverReason;
   /** Set on a secret card when OpenBot did not fill a saved login, or could not read a password manager. */
   vaultSkip?: BrowserVaultSkipReason;
+  /**
+   * A subagent asked for it, and can still wait after its parent's turn ends, so the card stays after
+   * that turn (#10657). Local only: the released Team API adapters do not carry it.
+   */
+  subagent?: true;
 }
 
 export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeoverRequest {
@@ -146,7 +151,8 @@ export function isBrowserTakeoverRequest(value: unknown): value is BrowserTakeov
     isIdentifier(value.tabId) &&
     (value.secret === undefined || isBrowserSecretRequest(value.secret)) &&
     (value.reason === undefined || isOneOf(BROWSER_TAKEOVER_REASONS, value.reason)) &&
-    (value.vaultSkip === undefined || isOneOf(BROWSER_VAULT_SKIP_REASONS, value.vaultSkip))
+    (value.vaultSkip === undefined || isOneOf(BROWSER_VAULT_SKIP_REASONS, value.vaultSkip)) &&
+    (value.subagent === undefined || value.subagent === true)
   );
 }
 
