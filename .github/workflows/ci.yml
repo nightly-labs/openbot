@@ -42,6 +42,7 @@ jobs:
       api: ${{ steps.lanes.outputs.api }}
       remote: ${{ steps.lanes.outputs.remote }}
       storybook: ${{ steps.lanes.outputs.storybook }}
+      schema: ${{ steps.lanes.outputs.schema }}
       surfaces: ${{ steps.lanes.outputs.surfaces }}
     steps:
       - name: Check out repository
@@ -97,6 +98,7 @@ jobs:
           lane api '^(apps/(auth-api|site-router)|src/renderer|resources)/|^(apps/mobile/)?CHANGELOG\.md$'
           lane remote '^(remote|scripts)/'
           lane storybook '^(src|apps/(auth-api|status)|\.storybook|resources|marketplace|build)/'
+          lane schema '^(src/backend/|scripts/released-schema-fixtures\.ts$)'
           lane surfaces '^(apps/(mobile|mobile-updates|site-router|status)|remote|scripts)/'
           cat "$GITHUB_OUTPUT"
 
@@ -156,10 +158,11 @@ jobs:
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts
 
-          # Fails after a release that changed the database schema until `releases.json` has it. The
-          # script runs the migrations of each release tag; `git archive` needs only the tag commits.
+          # Fails after a release that changed the database schema until `releases.json` has it. It
+          # takes about 50 s, so it runs only when the database code changes: a new migration must be
+          # tested from every released schema. `git archive` needs only the tag commits.
           - name: Check released database schemas
-            if: env.CODE == 'true'
+            if: needs.detect.result != 'success' || needs.detect.outputs.schema == 'true'
             run: |
               git fetch --no-tags --depth=1 origin '+refs/tags/v*:refs/tags/v*'
               bun scripts/released-schema-fixtures.ts --check
