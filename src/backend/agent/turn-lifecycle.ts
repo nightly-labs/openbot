@@ -2111,17 +2111,21 @@ export class TurnLifecycle {
       const model = this.#hooks.turnModel(agentId, turnId);
       // The same for a provider error, when the agent moves to a backup model. The agent's own chat
       // and a thread move it (#8406): a channel task fails as before, because its channel assigns it
-      // and a provider error holds no queue. A message runs again once for each provider account and
+      // and a provider error holds no queue. An external chat moves it too: its person waits for the
+      // answer (#11015). A message runs again once for each provider account and
       // model that failed it, so a move that does not happen cannot run it on the same one again. A
       // turn that a spent quota ended after work started continues on a backup, as after a plan
       // limit, also when the agent is set to ask: there is no moment to ask. A turn that a failed
       // sign-in or a provider that does not answer ended after work started continues there too.
       const failedKey = this.#usageLimits.failureKey(agentId, model);
+      const channelTask =
+        this.#conversation.channelForThread(snapshot.threadId) !== null ||
+        deliveries.some(({ channelId }) => channelId !== undefined);
       const failedOver =
         (mayRunAgain || mayContinue) &&
         failedKey !== null &&
         deliveries.length > 0 &&
-        !channelTurn &&
+        !channelTask &&
         deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
         (((mayRunAgain || failedAfterWork) && this.#hooks.mayFailOver(agentId)) ||
           (spentAfterWork && this.#hooks.mayContinueOnBackup(agentId)));
