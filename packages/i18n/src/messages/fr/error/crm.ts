@@ -24,7 +24,7 @@ export const messages = {
   "error.crm.badCursor": "Cette page n’est plus valide. Rechargez la liste.",
   "error.crm.invalidChange": "Cette modification n’est pas valide.",
   "error.crm.agentNotAllowed":
-    "Cet agent ne peut pas utiliser le CRM. Un propriétaire ou un admin peut l’autoriser sur la page CRM.",
+    "Cet agent ne peut pas utiliser le CRM. Un propriétaire ou un admin peut l’autoriser : ouvrez la page CRM, cliquez sur Suggestions, cliquez sur le bouton qui indique le nombre d’agents, puis activez cet agent.",
   "error.crm.tooManyProposals": "Trop de suggestions attendent une décision. Attendez qu’une personne les traite.",
   "error.crm.amountInvalid": "Saisissez le montant sous forme de nombre, par exemple 129.00.",
   "error.crm.amountDecimals": "Le montant a trop de décimales pour {currency}.",

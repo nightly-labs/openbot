@@ -22,7 +22,8 @@ export const messages = {
   "error.crm.currencyInUse": "已有套餐或付款的客户无法更改货币。",
   "error.crm.badCursor": "此页已失效，请重新加载列表。",
   "error.crm.invalidChange": "此更改无效。",
-  "error.crm.agentNotAllowed": "该助手无法使用 CRM。所有者或管理员可以在 CRM 页面允许它使用。",
+  "error.crm.agentNotAllowed":
+    "该助手无法使用 CRM。所有者或管理员可以允许它使用：打开 CRM 页面，点击“建议”，点击显示助手数量的按钮，然后打开此助手的开关。",
   "error.crm.tooManyProposals": "等待决定的建议过多，请等有人处理后再试。",
   "error.crm.amountInvalid": "请以数字形式输入金额，例如 129.00。",
   "error.crm.amountDecimals": "金额的小数位数超出 {currency} 允许的范围。",
