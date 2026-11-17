@@ -1,5 +1,5 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Clock3, Split, X } from "@openbot/ui";
+import { Clock3, Hourglass, Split, X } from "@openbot/ui";
 import { TypingDots } from "@openbot/ui/components/TypingDots";
 import { SidebarWaitIcon } from "@openbot/ui/features/sidebar/SidebarAgentIndicator";
 import type { SidebarWaitReason } from "@openbot/ui/features/sidebar/sidebar-types";
@@ -24,6 +24,8 @@ function threadStatusLabel(status: ThreadStatus, t: TextValue["t"]): string {
       return t(WAIT_TEXT[status.reason]);
     case "failed":
       return t("conversation.threads.state.failed");
+    case "awaiting":
+      return t("chat.awaiting.title");
     default:
       return "";
   }
@@ -68,6 +70,11 @@ function StatusBadge(props: { status: ThreadMark }) {
       <Show when={props.status.kind === "queued"}>
         <span class="agent-threads-state agent-threads-state-icon">
           <Clock3 />
+        </span>
+      </Show>
+      <Show when={props.status.kind === "awaiting"}>
+        <span class="agent-threads-state agent-threads-state-icon">
+          <Hourglass />
         </span>
       </Show>
       <Show when={props.status.kind === "failed"}>

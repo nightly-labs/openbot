@@ -548,6 +548,17 @@ released `agent-tasks-changed` event. That event has no full queue, so a client 
 when the waiting messages of a thread change. `src/main/team-api/route-agent-thread-queue.ts` owns
 them. Without the capability a client shows the waiting messages of a thread without their actions.
 
+The optional `agent-thread-requests-v1` capability (protocol 9 only) adds
+`POST /v1/agent-thread-requests/list` (`agentId`). It gives, for each side thread of the agent that has
+one, the requests that the agent sent from that thread to other agents and whose answer has not come
+back yet: the message id, the agent it went to, and its state (`queued`, `starting` or `running`). The
+thread shows them as "Waiting for replies", as the agent's own chat does. A member who can send the
+agent a message can use it: a visible agent (else 404) and `chat` on it (else 403). The released
+`agent-tasks-changed` event has no requests, so a client reads the list again when the state of a
+thread changes: a thread sends a request in a turn, and an answer or a note for a failed request
+starts the thread again. `src/main/team-api/route-agent-thread-requests.ts` owns it. Without the
+capability a thread shows no requests.
+
 The optional `agent-usage-limit-v1` capability (protocol 9 only) adds `POST /v1/agent-usage-limit/list`
 (empty body) and `POST /v1/agent-usage-limit/switch` (`agentId`, `provider`, `model`,
 `reasoningEffort`, optional `providerAccountId`). The released `runtime-snapshot` event does not carry

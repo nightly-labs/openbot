@@ -75,6 +75,8 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "이 연결에서는 한 번 실행되는 루틴을 저장할 수 없어요.",
   "error.team.routineRunCommandUnsupported": "이 연결에서는 루틴 실행 명령을 가져올 수 없어요.",
   "error.team.threadQueueUnsupported": "이 연결에서는 사이드 스레드의 대기열을 표시할 수 없어요.",
+  "error.team.threadRequestsUnsupported":
+    "이 연결에서는 사이드 스레드가 다른 에이전트에게 보낸 요청을 표시할 수 없어요.",
   "error.team.hostTurnLimitsUnsupported": "이 연결에서는 서버의 스레드 제한을 표시하거나 변경할 수 없습니다.",
   "error.team.usageLimitUnsupported": "이 연결에서는 에이전트의 사용 한도를 표시하거나 변경할 수 없어요.",
   "error.team.hermesImportUnsupported": "이 연결에서는 서버의 Hermes 프로필을 가져올 수 없어요.",

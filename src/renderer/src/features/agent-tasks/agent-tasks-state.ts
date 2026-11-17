@@ -223,8 +223,11 @@ export function createAgentTasks(options: AgentTasksOptions) {
    * Stores a thread list. A conversation of a thread that the list no longer has goes with it. A task
    * without `branch` keeps the link that the stored list has: an `agent-tasks-changed` event of a joined
    * server does not carry it, and a link does not change. A task without `queue` keeps the stored queue
-   * in the same way, but only the messages that still wait. Returns true when a waiting message changed
-   * and the stored list had a queue: then only a new read of the list gives the full queue.
+   * in the same way, but only the messages that still wait. A task without `awaitedReplies` keeps the
+   * stored requests while its state stays: a thread sends a request in a turn, and an answer or a note for
+   * a failed request starts the thread again. Returns true when a waiting message changed and the stored
+   * list had a queue, or when the state of a thread with stored requests changed: then only a new read
+   * of the list gives the full queue and the current requests.
    */
   function setSnapshot(snapshot: AgentTasksSnapshot): boolean {
     const ids = new Set(snapshot.tasks.map((task) => task.id));
@@ -244,6 +247,10 @@ export function createAgentTasks(options: AgentTasksOptions) {
         const waiting = new Set(task.queuedMessages.map((message) => message.deliveryId));
         next.queue = held.queue.filter((delivery) => waiting.has(delivery.id)).map((delivery) => ({ ...delivery }));
         if (queuedKey(task) !== queuedKey(held)) staleQueue = true;
+      }
+      if (task.awaitedReplies === undefined && held.awaitedReplies) {
+        next.awaitedReplies = held.awaitedReplies.map((reply) => ({ ...reply }));
+        if (task.state !== held.state) staleQueue = true;
       }
       return next;
     });

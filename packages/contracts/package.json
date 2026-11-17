@@ -290,6 +290,7 @@
     "./team-protocol/claude-compact-window-v1": "./src/team-protocol/claude-compact-window-v1.ts",
     "./team-protocol/provider-environment-v1": "./src/team-protocol/provider-environment-v1.ts",
     "./team-protocol/agent-thread-queue-v1": "./src/team-protocol/agent-thread-queue-v1.ts",
+    "./team-protocol/agent-thread-requests-v1": "./src/team-protocol/agent-thread-requests-v1.ts",
     "./team-protocol/agent-usage-limit-v1": "./src/team-protocol/agent-usage-limit-v1.ts",
     "./team-protocol/hermes-import-v1": "./src/team-protocol/hermes-import-v1.ts",
     "./team-protocol/provider-detection-v1": "./src/team-protocol/provider-detection-v1.ts",

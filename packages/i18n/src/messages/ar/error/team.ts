@@ -76,6 +76,7 @@ export const messages = {
   "error.team.routinesOnceUnsupported": "لا يمكن لهذا الاتصال حفظ المهام الدورية التي تعمل مرة واحدة.",
   "error.team.routineRunCommandUnsupported": "لا يمكن لهذا الاتصال إعطاء أمر تشغيل المهمة الدورية.",
   "error.team.threadQueueUnsupported": "لا يمكن لهذا الاتصال عرض قائمة انتظار محادثة جانبية.",
+  "error.team.threadRequestsUnsupported": "لا يمكن لهذا الاتصال عرض طلبات محادثة جانبية إلى الوكلاء الآخرين.",
   "error.team.hostTurnLimitsUnsupported": "لا يمكن لهذا الاتصال عرض حدود السلاسل للخادم أو تغييرها.",
   "error.team.usageLimitUnsupported": "لا يمكن لهذا الاتصال عرض حدود استخدام الوكلاء أو تغييرها.",
   "error.team.hermesImportUnsupported": "لا يمكن لهذا الاتصال استيراد ملفات تعريف Hermes من الخادم.",

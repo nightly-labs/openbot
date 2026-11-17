@@ -6,6 +6,7 @@ import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-refer
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentRuntimeWorkItem,
+  AgentTaskAwaitedReply,
   AttachmentDataInput,
   AttachmentSummary,
   ConversationMessage,
@@ -26,6 +27,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  AGENT_TASK_AWAITED_STATES,
   AGENT_WELCOME_ITEM_TYPE,
   isConversationMessageSender,
   isMessageReaction,
@@ -971,6 +973,33 @@ export class MailboxStore {
     for (const message of this.#state.messages)
       if (message.channelId || message.messaging || message.taskId || message.welcome) ids.add(message.id);
     return ids;
+  }
+
+  /**
+   * The requests that agents sent from their side threads and that wait for an answer: the recipient
+   * has not ended the turn that runs them. An answer or a note for a failed request then goes back to
+   * the thread.
+   */
+  awaitedThreadRequests(): Array<
+    AgentTaskAwaitedReply & { deliveryId: string; senderAgentId: string; taskId: string }
+  > {
+    let messages: Map<string, StoredMessage> | undefined;
+    return this.#state.deliveries.flatMap((delivery) => {
+      if (!isOneOf(AGENT_TASK_AWAITED_STATES, delivery.status)) return [];
+      messages ??= this.#messagesById();
+      const message = messages.get(delivery.messageId);
+      if (!message?.senderTaskId || message.sender.kind !== "agent" || message.expectsReply === false) return [];
+      return [
+        {
+          deliveryId: delivery.id,
+          senderAgentId: message.sender.agentId,
+          taskId: message.senderTaskId,
+          messageId: message.id,
+          recipientAgentId: delivery.recipientAgentId,
+          status: delivery.status,
+        },
+      ];
+    });
   }
 
   /** Indexed once for a whole read, so a read over many deliveries does not scan the messages for each one. */
