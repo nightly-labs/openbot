@@ -218,7 +218,7 @@ import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
+import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
@@ -2022,13 +2022,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      // The saved http rows that the agent gets. The built-in servers are left out: OpenBot gives their
-      // tools another way, and their bearer is the main process's. A stdio server is left out too: a
-      // Workspace only provider starts it in its sandbox, and OpenBot would start it outside.
+      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
+      // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
+      // stdio server of a Workspace only agent.
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        // An agent that is not found gets only the http rows, as a Workspace only agent does.
+        const agent = this.#store.list().find((candidate) => candidate.id === agentId) ?? { access: "workspace" };
         const saved = new Set(this.#mcp.list().map((config) => config.id));
         return this.enabledMcpServers(agentId).filter(
-          (config) => saved.has(config.id) && config.transport === "http" && !isReservedMcpServerName(config.name),
+          (config) =>
+            saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
         );
       }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),

@@ -21,6 +21,7 @@ import {
   type MarketplaceAppServer,
   type McpServerToolName,
   marketplaceAppStatus,
+  mcpFallbackRunsServer,
   mcpServersFromGateway,
   mcpToolCallResponse,
 } from "../src/backend/agent/mcp-tools";
@@ -507,6 +508,52 @@ try {
   const offline = store.save({ ...calendar, id: "", name: "offline", url: await closedUrl() });
   const unreachable = await runCauseEffect(agentTools.callTool(offline, "get_leaderboard", {}));
   assert.ok("error" in unreachable, "a server that is down is a sentence");
+
+  // A stdio row runs for a Full access agent, with its environment, as the Test button starts it
+  // (#10146). A Workspace only agent keeps it out: its provider starts the row in its sandbox.
+  const stdioProgram = join(root, "stdio-mcp-server.js");
+  await writeFile(
+    stdioProgram,
+    `let buffer = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  buffer += chunk;
+  for (let end = buffer.indexOf("\\n"); end >= 0; end = buffer.indexOf("\\n")) {
+    const message = JSON.parse(buffer.slice(0, end));
+    buffer = buffer.slice(end + 1);
+    if (message.id === undefined) continue;
+    const result =
+      message.method === "initialize"
+        ? { protocolVersion: message.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "local", version: "1" } }
+        : message.method === "tools/call"
+          ? { content: [{ type: "text", text: message.params.name + " key=" + (process.env.LOCAL_KEY === "set") }] }
+          : {};
+    process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: message.id, result }) + "\\n");
+  }
+});
+`,
+  );
+  const stdioRow = store.save({
+    ...calendar,
+    id: "",
+    name: "local_stdio",
+    transport: "stdio",
+    command: process.execPath,
+    args: [stdioProgram],
+    env: [{ key: "LOCAL_KEY", value: "set" }],
+    headers: [],
+    url: "",
+  });
+  assert.equal(mcpFallbackRunsServer(stdioRow, { access: "full" }), true, "stdio for Full access");
+  assert.equal(mcpFallbackRunsServer(stdioRow, { access: "workspace" }), false, "no stdio for Workspace only");
+  assert.equal(mcpFallbackRunsServer(fallback, { access: "workspace" }), true, "http for Workspace only");
+  const stdioRan = await runCauseEffect(agentTools.callTool(stdioRow, "get_messages", {}));
+  assert.ok("result" in stdioRan, "the stdio tool runs on the saved row");
+  assert.deepEqual(mcpToolCallResponse(stdioRan.result), {
+    success: true,
+    contentItems: [{ type: "inputText", text: "get_messages key=true" }],
+  });
+  store.remove(stdioRow.id);
 
   // Nothing an agent reads names a key: not the query of an address, not a header value.
   const everything = JSON.stringify(calls.map(({ result, approvals }) => ({ result, approvals })));
