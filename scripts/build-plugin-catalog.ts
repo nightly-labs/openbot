@@ -331,6 +331,8 @@ function parseServer(slug: string, value: unknown): PluginServer {
   if (!isString(value.name) || value.name.trim().length === 0) throw new Error(`Plugin ${slug} server needs a name.`);
   const auth = parseAuth(slug, value.auth, value.transport);
   if (value.transport === "http") {
+    // Only a command reads environment values, so an http listing that sets one would lose it.
+    if (value.env !== undefined) throw new Error(`Plugin ${slug} env needs a stdio server.`);
     /* Plain http leaves this computer in the clear, so only a server another app runs on this
        computer may use it, and a local flow is how a listing says so. A local flow on a remote
        address would tell the user to turn on a server that is not theirs. */
