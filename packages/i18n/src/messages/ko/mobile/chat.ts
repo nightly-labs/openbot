@@ -363,7 +363,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "내 컴퓨터에서 로그인해 주세요",
   "mobile.chat.browserSecret.signInBlockedBody":
     "이 사이트는 서버에서의 로그인을 받지 않아요. 내 컴퓨터의 OpenBot 데스크톱 앱에서 이 채팅을 열고 그곳에서 로그인해 주세요.",
-  "mobile.chat.browserSecret.takeoverReload": "그런 다음 ‘완료’를 누르기 전에 페이지를 새로 고쳐 주세요.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot이 비밀번호 또는 코드를 끝까지 입력하지 못했어요. 페이지에서 빠진 부분을 입력해 주세요. 그런 다음 ‘완료’를 누르기 전에 페이지를 새로 고쳐 주세요.",
   "mobile.chat.browserSecret.takeoverFailed": "요청을 완료할 수 없어요.",
   "mobile.chat.browserSecret.done": "완료",
   "mobile.chat.browserSecret.submitOnce": "{origin}에 한 번만 제출해요. 이 값은 채팅에 추가되지 않아요.",

@@ -436,7 +436,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Войдите на своём компьютере",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Этот сайт не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там.",
-  "mobile.chat.browserSecret.takeoverReload": "Затем обновите страницу и только потом нажмите «Готово».",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot не смог до конца ввести пароль или код. Введите на странице недостающее. Затем обновите страницу и только потом нажмите «Готово».",
   "mobile.chat.browserSecret.takeoverFailed": "Не удалось выполнить запрос.",
   "mobile.chat.browserSecret.done": "Готово",
   "mobile.chat.browserSecret.submitOnce": "Однократная отправка на {origin}. Это значение не попадёт в чат.",

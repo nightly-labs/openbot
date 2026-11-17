@@ -337,7 +337,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Log in op je computer",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Deze site accepteert geen aanmelding vanaf de server. Open deze chat in de OpenBot-desktopapp op je computer en log daar in.",
-  "mobile.chat.browserSecret.takeoverReload": "Laad daarna de pagina opnieuw voordat je Ik ben klaar kiest.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot kon het wachtwoord of de code niet helemaal invullen. Vul op de pagina in wat ontbreekt. Laad daarna de pagina opnieuw voordat je Ik ben klaar kiest.",
   "mobile.chat.browserSecret.takeoverFailed": "Het verzoek kan niet worden voltooid.",
   "mobile.chat.browserSecret.done": "Ik ben klaar",
   "mobile.chat.browserSecret.submitOnce":

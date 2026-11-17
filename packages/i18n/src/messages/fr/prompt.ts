@@ -45,7 +45,7 @@ export const messages = {
   "prompt.browser.title.pending": "Terminez l’étape sur {host}",
   "prompt.browser.cancelled": "Annulée",
   "prompt.browser.reload":
-    "Terminez la connexion, puis rechargez la page du navigateur avant de choisir « J’ai terminé ». L’inspection de la page reste bloquée jusqu’au rechargement.",
+    "OpenBot n’a pas pu finir de saisir le mot de passe ou le code. Vérifiez la page et saisissez ce qui manque. Terminez la connexion, puis rechargez la page du navigateur avant de choisir « J’ai terminé ». L’inspection de la page reste bloquée jusqu’au rechargement.",
   "prompt.browser.continuing": "{name} continue.",
   "prompt.browser.cancelledBody": "L’étape du navigateur a été annulée.",
   "prompt.browser.pendingBody":

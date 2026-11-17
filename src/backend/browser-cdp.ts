@@ -78,7 +78,13 @@ import {
   stringValue,
 } from "./browser-cdp-values";
 import { type DetectedChallenge, detectChallenge } from "./browser-challenge";
-import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
+import {
+  type BrowserOperationError,
+  browserCall,
+  browserFailure,
+  browserSync,
+  secureInputFailure,
+} from "./browser-effects";
 import {
   type BrowserFillFieldsProgress,
   type BrowserPreparedField,
@@ -677,13 +683,17 @@ export class BrowserCdpEngine {
             }),
           );
         }).pipe(
-          Effect.catch(() =>
-            Effect.gen({ self: this }, function* () {
-              return yield* browserFailure(
-                new Error("Secure authentication could not be completed. Take over to check the page."),
-              );
-            }),
-          ),
+          Effect.catch((error) => {
+            // Keep a known reason, so the agent and the log learn why the fill stopped (#10536).
+            const reason = secureInputFailure(error);
+            return Effect.fail(
+              browserFailure(
+                new Error(
+                  `Secure authentication could not be completed.${reason ? ` ${reason}` : ""} Take over to check the page.`,
+                ),
+              ),
+            );
+          }),
         );
       });
     /**

@@ -45,7 +45,7 @@ export const messages = {
   "prompt.browser.title.pending": "{host} üzerinde adımı tamamlayın",
   "prompt.browser.cancelled": "İptal edildi",
   "prompt.browser.reload":
-    "Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
+    "OpenBot parolayı veya kodu girmeyi tamamlayamadı. Sayfayı kontrol edin ve eksik olanı girin. Oturum açma işlemini tamamlayın, ardından “Tamamladım” seçeneğini seçmeden önce tarayıcı sayfasını yenileyin. Sayfa incelemesi, sayfa yeniden yüklenene kadar engellenir.",
   "prompt.browser.continuing": "{name} devam ediyor.",
   "prompt.browser.cancelledBody": "Tarayıcı adımı iptal edildi.",
   "prompt.browser.pendingBody":

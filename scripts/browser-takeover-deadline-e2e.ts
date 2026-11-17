@@ -1,7 +1,8 @@
 // Runs a takeover card past the provider's tool-call deadline (#9689) on the real `AttentionRegistry`.
 // Antigravity 1.5.9 stops each MCP tool call after 180 s, also with progress. The call must get an
 // answer before then, the card must stay open, and the next call for the same tab must wait on the
-// same card. The browser host is a stub: no page, provider or account is used.
+// same card. A secure fill that fails gives the page to the user and tells the agent only a fixed reason
+// (#10536). The browser host is a stub: no page, provider or account is used.
 // `bun scripts/browser-takeover-deadline-e2e.ts`. Writes .openbot-build/browser-takeover-deadline-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
@@ -10,6 +11,7 @@ import type { AgentEvent, BrowserTab, ConversationSnapshot } from "@openbot/cont
 import { Effect } from "effect";
 import { AttentionRegistry } from "../src/backend/agent/attention-registry";
 import { CodexAppServerClient } from "../src/backend/app-server-client";
+import { browserFailure } from "../src/backend/browser-effects";
 import type { PreparedBrowserSecret } from "../src/backend/browser-host";
 import { runCauseEffect } from "../src/backend/effect-boundary";
 import type { RequestId } from "../src/backend/protocol";
@@ -26,6 +28,7 @@ const DEADLINE_MS = 50;
 interface AgentAnswer {
   status?: string;
   next?: string;
+  secureInput?: string;
 }
 
 /** Records what OpenBot answers to the agent. The process never starts. */
@@ -71,6 +74,8 @@ const tabs: BrowserTab[] = [
 const events: AgentEvent[] = [];
 const browserLog: string[] = [];
 const submitted: string[] = [];
+/** When set, the fill fails with this error, as a page that the fill cannot complete. */
+let fillFailure: Error | undefined;
 
 function preparedSecret(): PreparedBrowserSecret {
   return {
@@ -79,10 +84,12 @@ function preparedSecret(): PreparedBrowserSecret {
     vaultFillable: false,
     withCode: false,
     submit: (secret) =>
-      Effect.sync(() => {
-        submitted.push(secret);
-        return "submitted" as const;
-      }),
+      fillFailure
+        ? Effect.fail(browserFailure(fillFailure))
+        : Effect.sync(() => {
+            submitted.push(secret);
+            return "submitted" as const;
+          }),
     cancel: () => {
       browserLog.push("secret-cancelled");
     },
@@ -295,6 +302,50 @@ try {
     assert.equal(answer.status, "waiting");
     assert.equal(registry.runtimeAttention().pendingPrompts[0]?.detached, true);
     registry.clearForTurn(THREAD, "turn-7", false);
+    return answer;
+  });
+
+  /** Submits the card while the fill fails, then the user selects Done; returns the agent's answer. */
+  const failedFill = async (turnId: string, failure: Error) => {
+    fillFailure = failure;
+    const shown = count("browser-takeover-requested");
+    const pending = call("submit_secret", turnId);
+    await cardShown(shown);
+    const requestId = openCards()[0]?.requestId;
+    assert(requestId !== undefined);
+    await runCauseEffect(
+      registry.respondToBrowserSecret({ requestId, agentId: AGENT, decision: "submit", secret: SECRET }),
+    );
+    fillFailure = undefined;
+    assert.equal(count("browser-takeover-requested"), shown + 2, "the page did not go to the user");
+    assert.equal(openCards()[0]?.secret?.requiresReload, true, "the card does not say that the fill stopped");
+    await runCauseEffect(registry.respondToBrowserTakeover({ requestId, decision: "complete" }));
+    const answer = answerOf(await pending);
+    assert.equal(answer.status, "completed");
+    assert(!JSON.stringify(answer).includes(SECRET), "the agent got the secret");
+    return answer;
+  };
+
+  await step("a failed fill gives the page to the user and tells the agent the fixed reason", async () => {
+    const answer = await failedFill(
+      "turn-8",
+      new Error(
+        "Secure authentication could not be completed. Authentication submit button is not ready. Take over to check the page.",
+      ),
+    );
+    assert.equal(
+      answer.secureInput,
+      "OpenBot could not finish entering the value. Authentication submit button is not ready. The user got the page to finish the step.",
+    );
+    return answer;
+  });
+
+  await step("a failed fill with another error tells the agent no page text", async () => {
+    const answer = await failedFill("turn-9", new Error(`ERR_ABORTED loading https://example.test/?code=${SECRET}`));
+    assert.equal(
+      answer.secureInput,
+      "OpenBot could not finish entering the value. The user got the page to finish the step.",
+    );
     return answer;
   });
 

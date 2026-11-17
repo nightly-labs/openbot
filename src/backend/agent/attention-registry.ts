@@ -46,7 +46,7 @@ import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
-import { type BrowserOperationError, browserFailure } from "../browser-effects";
+import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
 import { repairBrowserToolInput } from "../browser-tool-input";
@@ -441,6 +441,8 @@ interface PendingBrowserTakeover {
   personCancelled?: true;
   /** The user asked to save the typed password, but the secure input failed, so nothing was saved (#10462). */
   vaultNotSaved?: true;
+  /** OpenBot could not finish the secure fill, so the user got the page: the fixed reason, or "" (#10536). */
+  secureInputFailed?: string;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -1085,7 +1087,15 @@ export class AttentionRegistry {
     } else {
       pending.submitting = true;
       const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined, vaultCode).pipe(
-        Effect.catch(() => Effect.succeed("takeover")),
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            // Only a fixed reason is kept: a page error can hold page text (#10536).
+            const reason = secureInputFailure(error) ?? "";
+            logger.warn("Unable to complete the secure browser input", { reason: reason || "unknown" });
+            pending.secureInputFailed = reason;
+            return "takeover" as const;
+          }),
+        ),
         Effect.ensuring(
           Effect.sync(() => {
             pending.submitting = false;
@@ -2653,6 +2663,7 @@ export class AttentionRegistry {
         pending.vaultSkipped,
         signInMissing,
         pending.personCancelled === true,
+        pending.secureInputFailed,
       ),
     );
   }
