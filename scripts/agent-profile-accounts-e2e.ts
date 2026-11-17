@@ -11,10 +11,12 @@
 // second account lists is listed and accepted for that account only (#6109), that a delete stops the
 // process that the agent runs on with the second account, and that list_models names a saved custom
 // endpoint, where the user changes it and why it lists no model, without its base URL or key (#6471).
+// It also asserts that update_profile with avatarHue keeps the agent's photo and its file, and that only
+// avatarSeed removes them (#10431).
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AGENT_PROVIDERS, type AgentSummary } from "@openbot/contracts/ipc";
@@ -667,6 +669,38 @@ try {
   pass(
     "The delete removes the workspace and the record",
     report.deletedAgent.workspaceRemoved && !store.list().some((candidate) => candidate.id === worker.id),
+  );
+
+  // 9. A color keeps the agent's photo and its file. Only a generated face removes them (#10431).
+  const photoSource = join(root, "photo.png");
+  await copyFile(resolve(import.meta.dirname, "../apps/auth-api/public/apple-touch-icon.png"), photoSource);
+  const photo = await callTool("set photo", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarPath: photoSource,
+  });
+  const photoUrl = storedAgent(coordinator.id).avatarUrl;
+  const photoFile = store.resolveAvatar(coordinator.id)?.path ?? "";
+  pass("update_profile sets a photo", photo.success && photoUrl !== null && existsSync(photoFile), photo.text);
+  const color = await callTool("set color", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarHue: 0,
+  });
+  pass(
+    "update_profile with avatarHue keeps the photo and its file",
+    color.success &&
+      storedAgent(coordinator.id).avatarHue === 0 &&
+      storedAgent(coordinator.id).avatarUrl === photoUrl &&
+      existsSync(photoFile),
+    color.text,
+  );
+  const face = await callTool("set generated face", coordinator.id, "update_profile", {
+    agentId: coordinator.id,
+    avatarSeed: storedAgent(coordinator.id).avatarSeed,
+  });
+  pass(
+    "update_profile with avatarSeed removes the photo and its file",
+    face.success && storedAgent(coordinator.id).avatarUrl === null && !existsSync(photoFile),
+    face.text,
   );
   report.passed = true;
 } catch (error) {
