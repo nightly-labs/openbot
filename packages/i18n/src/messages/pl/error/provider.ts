@@ -12,6 +12,8 @@ export const messages = {
     "{provider} utracił logowanie, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} odrzucił wiadomość, więc OpenBot zakończył jego proces. Wyślij wiadomość ponownie.",
+  "error.provider.acpServerLost": "{provider} utracił połączenie. Wyślij wiadomość ponownie.",
+  "error.provider.acpServerLostEnded": "{provider} utracił połączenie, więc OpenBot zakończył jego proces.",
   "error.provider.acpSettingsTimedOut": "{provider} nie odpowiedział na czas. Spróbuj ponownie za chwilę.",
   "error.provider.acpPlanUsedUp":
     "{provider} zgłasza, że limit Twojego planu się wyczerpał. Wybierz inny model lub przejdź na wyższy plan {provider}.",
@@ -186,6 +188,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Dostawca nie przyjął kodu. Rozpocznij logowanie ponownie.",
   "error.provider.codeLoginUnsupported":
     "Ten serwer nie obsługuje logowania wklejonym kodem. Zaloguj się na komputerze serwera, w jego przeglądarce.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude nie mógł zapisać logowania na Macu. Uruchom ponownie Maca, na którym działa OpenBot, a potem połącz Claude jeszcze raz.",
   "error.provider.cliBusyRetry": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, i spróbuj ponownie.",
   "error.provider.cliSigningIn": "{provider} CLI się loguje. Dokończ lub anuluj logowanie, a potem zaktualizuj.",
   "error.provider.cliBusyUpdate": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, a potem zaktualizuj.",
@@ -205,6 +209,8 @@ export const messages = {
     "OpenCode nie jest zalogowany u dostawcy modelu „{provider}”. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode nie jest zalogowany u dostawcy tego modelu. Wybierz model z etykietą Darmowy albo połącz dostawcę: wklej klucz OpenCode Go w ustawieniach OpenCode albo uruchom `opencode auth login` w terminalu. Potem spróbuj ponownie.",
+  "error.provider.opencodeProviderRefused":
+    "Dostawca modelu „{provider}” odrzucił żądanie. OpenCode ma klucz do tego dostawcy, więc przyczyną może być Twoja sieć: niektórzy dostawcy blokują VPN, serwery proxy lub niektóre kraje. Wyłącz VPN albo użyj innej sieci, a potem spróbuj ponownie. Jeśli błąd się powtarza, klucz może być nieprawidłowy: uruchom `opencode auth login` w terminalu i wpisz klucz ponownie.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode odrzucił ten darmowy model. Niektóre darmowe modele nie są dostępne w każdym kraju. Wybierz inny model z etykietą Darmowy albo wklej klucz OpenCode Go w ustawieniach OpenCode i wybierz model OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
@@ -278,10 +284,14 @@ export const messages = {
     "Gemini nie może teraz użyć tego modelu. Wybierz inny model i spróbuj ponownie.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Usługa Gemini od Google nie ukończyła żądania. Spróbuj ponownie za kilka minut.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google nie zaakceptował logowania do Gemini dla tego żądania. Wyślij wiadomość ponownie. Jeśli błąd się powtarza, połącz ponownie Gemini w Ustawieniach.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini odrzucił to żądanie. Wybierz inny model i wyślij wiadomość ponownie. Jeśli znów się nie uda, rozpocznij nowy czat.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini odrzucił to żądanie i nie podał przyczyny. Może to powodować element historii czatu, na przykład obraz otwarty przez agenta. OpenBot rozpoczął nową sesję Gemini z historią czatu. Spróbuj ponownie. Jeśli błąd się powtarza, wybierz inny model.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini nie mógł odczytać zapisanej historii tego czatu. OpenBot uruchomił nową sesję Gemini z historią czatu. Wyślij wiadomość ponownie.",
   "error.provider.antigravityLocationUnsupported":
     "Google nie pozwala Gemini działać z lokalizacji sieciowej komputera, na którym działa ten agent. Użyj Gemini na innym komputerze albo wybierz innego dostawcę dla tego agenta.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -328,6 +338,8 @@ export const messages = {
     "Hermes nie mógł dokończyć tej tury. Jeśli odpowiedź podaje powód, postępuj zgodnie z nią. Jeśli nie, serwer MCP tego agenta może być niedostępny: sprawdź go w Marketplace, Aplikacje, a potem wyślij wiadomość ponownie.",
   "error.provider.hermesRefused":
     "Hermes odrzucił tę wiadomość, zanim się zaczęła. Wyślij ją ponownie. Jeśli Hermes odrzuca każdą wiadomość, uruchom ponownie OpenBot na komputerze, na którym działa ten agent.",
+  "error.provider.hermesConnectionLost":
+    "Hermes utracił połączenie podczas tej wiadomości, więc nie wie, czy praca się zakończyła. Sprawdź, co zrobił agent, zanim wyślesz wiadomość ponownie.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot nie mógł użyć tego modelu: model nie przyjął jego ustawienia myślenia. Wybierz inny model dla tego agenta, a potem wyślij wiadomość ponownie.",
   "error.provider.usageLimitReached": "Konto osiągnęło limit użycia.",

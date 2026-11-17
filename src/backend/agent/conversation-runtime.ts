@@ -12,7 +12,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
-import { withoutQueuePositions } from "../database/conversation-writer";
+import { isTurnEndEvent, withoutQueuePositions } from "../database/conversation-writer";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -697,7 +697,11 @@ export class ConversationRuntime {
     this.#dropDeletedMessages(snapshot);
     sortConversationMessages(snapshot.messages);
     const signature = conversationContentSignature(snapshot);
-    if (this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature) {
+    const unchanged = this.#conversationSignatures.get(snapshot.threadId ?? snapshot.agentId) === signature;
+    // A turn end is stored also when an earlier write already saved this chat, such as the failure
+    // note to an agent that asked: only the turn-end write closes the stored turn (#10698).
+    const turnEnd = isTurnEndEvent(eventType);
+    if (unchanged && !turnEnd) {
       this.#retainPublishedSnapshot(snapshot);
       return;
     }
@@ -724,7 +728,8 @@ export class ConversationRuntime {
         !cached ||
         changedMessages.length > 0 ||
         removedMessageIds.length > 0 ||
-        cached.activeTurnId !== snapshot.activeTurnId
+        cached.activeTurnId !== snapshot.activeTurnId ||
+        turnEnd
       ) {
         snapshot.revision = this.#store.database.persistConversationChanges({
           agentId: snapshot.agentId,

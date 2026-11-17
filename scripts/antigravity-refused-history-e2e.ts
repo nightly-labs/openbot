@@ -10,6 +10,10 @@
 //   2. A refusal after a tool step: the message fails with the refused-history text, and does not
 //      run again, so the tool step does not run two times.
 //   3. The next message: a new session, which gets the conversation so far, and it answers.
+// A prompt with `OVERSIZE` makes its session refuse each later prompt with Google's FAILED_PRECONDITION
+// "The message size exceeds 30.000MB limit", as a session with many images does (#10517):
+//   4. Before any work: the message runs again one time on a new session, and answers.
+//   5. After a tool step: the message fails with the too-large-chat text, not Google's text.
 // `bun run test:antigravity-refused-history`. Writes .openbot-build/antigravity-refused-history-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -39,14 +43,15 @@ mkdirSync(home, { recursive: true });
 
 const { AgentService } = await import("../src/backend/agent-service");
 const { AgentStore } = await import("../src/backend/agent-store");
+const { providerLabel } = await import("../src/backend/agent/thread-items");
 const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
 /**
- * An Antigravity CLI that logs the session of each prompt. A prompt with `POISON` (and not a new
- * session's first prompt) poisons its session, and a poisoned session answers each prompt with
- * Google's refusal. A prompt with `TOOL` runs a tool step first.
+ * An Antigravity CLI that logs the session of each prompt. A prompt with `POISON` or `OVERSIZE` (and
+ * not a new session's first prompt) poisons its session, and a poisoned session answers each prompt
+ * with Google's refusal for it. A prompt with `TOOL` runs a tool step first.
  */
 const FAKE_AGY = `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -60,7 +65,9 @@ const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0",
 const models = { availableModels: [{ modelId: "gemini-flash", name: "gemini-flash" }], currentModelId: "gemini-flash" };
 const update = (sessionId, value) => write({ method: "session/update", params: { sessionId, update: value } });
 const text = (sessionId, value) => update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: value } });
-const poisoned = new Set();
+const poisoned = new Map();
+const INVALID = "INVALID_ARGUMENT (code 400): Request contains an invalid argument.";
+const OVERSIZED = "FAILED_PRECONDITION (code 400): The message size exceeds 30.000MB limit";
 let sessions = 0;
 let tools = 0;
 function handle(message) {
@@ -72,7 +79,8 @@ function handle(message) {
   if (message.method === "session/resume" || message.method === "session/load") return write({ id: message.id, result: { sessionId: params.sessionId, models } });
   if (message.method === "session/prompt") {
     const prompt = params.prompt.map((block) => block.text ?? "").join("");
-    if (prompt.includes("POISON") && !prompt.includes("PELICAN")) poisoned.add(params.sessionId);
+    if (prompt.includes("POISON") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, INVALID);
+    if (prompt.includes("OVERSIZE") && !prompt.includes("PELICAN")) poisoned.set(params.sessionId, OVERSIZED);
     const refused = poisoned.has(params.sessionId);
     const tool = refused && prompt.includes("TOOL") && !prompt.includes("PELICAN");
     log({ sessionId: params.sessionId, refused, tool, text: prompt });
@@ -81,7 +89,7 @@ function handle(message) {
       update(params.sessionId, { sessionUpdate: "tool_call", toolCallId, title: "Read broken.png", kind: "read", status: "in_progress" });
       update(params.sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed" });
     }
-    text(params.sessionId, refused ? NL + "\\u26A0 INVALID_ARGUMENT (code 400): Request contains an invalid argument." : "Done.");
+    text(params.sessionId, refused ? NL + "\\u26A0 " + poisoned.get(params.sessionId) : "Done.");
     return write({ id: message.id, result: { stopReason: "end_turn" } });
   }
   write({ id: message.id, result: {} });
@@ -248,6 +256,25 @@ try {
   assert.ok(next && next !== first && next !== second, "The next message runs on a new session.");
   const handoff = prompts().find((prompt) => prompt.sessionId === next)?.text ?? "";
   assert.ok(handoff.includes("PELICAN"), "The new session gets the conversation so far.");
+
+  const oversized = await send(agent.id, "OVERSIZE this session.");
+  assert.equal(oversized.status, "completed", `A too large chat runs again and answers: ${oversized.error ?? ""}`);
+  assert.deepEqual(
+    oversized.prompts.map(({ refused }) => refused),
+    [true, false],
+    "The message ran two times: refused on the old session, then answered.",
+  );
+  assert.equal(oversized.prompts[0]?.sessionId, next, "The refusal came on the old session.");
+  const fresh = oversized.prompts[1]?.sessionId;
+  assert.ok(fresh && fresh !== next, "The message ran again on a new session.");
+
+  const oversizedTool = await send(agent.id, "OVERSIZE with a TOOL step.");
+  assert.equal(oversizedTool.status, "failed", "A too large chat after a tool step fails the message.");
+  assert.equal(
+    oversizedTool.error,
+    sourceText("error.provider.requestTooLarge", { provider: providerLabel("antigravity") }),
+    "The message shows the too-large-chat text.",
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

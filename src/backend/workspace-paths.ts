@@ -1,6 +1,6 @@
 import { readdir, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, dirname, isAbsolute, join, relative, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentSummary,
@@ -110,12 +110,17 @@ function decodePath(value: string): string {
 export const resolveSharedFile = Effect.fn("Workspace.resolveSharedFile")(function* (
   sharedRootPath: string,
   inputPath: string,
-  options: { allowDirectory?: boolean } = {},
+  options: { allowDirectory?: boolean; followLinks?: boolean } = {},
 ): Effect.fn.Return<ResolvedSharedFile, AttachmentOperationError> {
   const sharedRoot = yield* attachmentCall(() => realpath(sharedRootPath));
-  const candidatePath = sharedPathFromInput(sharedRootPath, inputPath);
+  // `resolve` removes `..` before `realpath`, so `..` after a link cannot go up from the link target.
+  const candidatePath = resolve(sharedPathFromInput(sharedRootPath, inputPath));
   const resolvedPath = yield* attachmentCall(() => realpath(candidatePath));
-  if (!isWithin(sharedRoot, resolvedPath)) {
+  // A folder in Shared can be a link (a junction on Windows) to another disk. For the local user, the path as
+  // written decides. A remote member does not get `followLinks`: a link must not take a member out of Shared.
+  const writtenInside =
+    options.followLinks === true && [sharedRootPath, sharedRoot].some((root) => isWithin(resolve(root), candidatePath));
+  if (!writtenInside && !isWithin(sharedRoot, resolvedPath)) {
     return yield* attachmentFailure(new Error(sourceText("error.backend.sharedFileOutside")));
   }
   const metadata = yield* attachmentCall(() => stat(resolvedPath));

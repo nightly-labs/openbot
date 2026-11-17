@@ -10,6 +10,8 @@ export const messages = {
   "error.provider.acpUnresponsive": "لم يستجب {provider} في الوقت المحدد، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
   "error.provider.acpRefusedUntilRestart": "رفض {provider} رسالة، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLost": "فقد {provider} اتصاله. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLostEnded": "فقد {provider} اتصاله، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSettingsTimedOut": "لم يستجب {provider} في الوقت المحدد. حاول مرة أخرى بعد قليل.",
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -172,6 +174,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "لم يقبل المزوّد الرمز. ابدأ تسجيل الدخول مرة أخرى.",
   "error.provider.codeLoginUnsupported":
     "لا يمكن لهذا الخادم تسجيل الدخول برمز ملصوق. سجّل الدخول على حاسوب الخادم، في متصفحه.",
+  "error.provider.claudeLoginNotSaved":
+    "تعذّر على Claude حفظ تسجيل الدخول على جهاز Mac. أعد تشغيل جهاز Mac الذي يشغّل OpenBot، ثم اربط Claude مرة أخرى.",
   "error.provider.cliBusyRetry": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم أعد المحاولة.",
   "error.provider.cliSigningIn": "تُجري واجهة {provider} CLI تسجيل الدخول. أكمل تسجيل الدخول أو ألغه، ثم حدّث.",
   "error.provider.cliBusyUpdate": "تعمل واجهة {provider} CLI على دور. انتظر حتى ينتهي، ثم حدّث.",
@@ -191,6 +195,8 @@ export const messages = {
     "لا يملك OpenCode تسجيل دخول لمزوّد النموذج «{provider}». اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
   "error.provider.opencodeAuthRequiredUnknown":
     "لا يملك OpenCode تسجيل دخول لمزوّد هذا النموذج. اختر نموذجًا يحمل التسمية Free، أو اربط المزوّد: الصق مفتاح OpenCode Go في إعدادات OpenCode، أو شغّل `opencode auth login` في نافذة طرفية. ثم أعد المحاولة.",
+  "error.provider.opencodeProviderRefused":
+    'رفض مزوّد النموذج "{provider}" الطلب. لدى OpenCode مفتاح لهذا المزوّد، لذا قد تكون الشبكة هي السبب: بعض المزوّدين يحظرون شبكات VPN أو الوكلاء أو بعض الدول. أوقف VPN أو استخدم شبكة أخرى، ثم أعد المحاولة. إذا استمر الخطأ، فقد يكون المفتاح غير صحيح: شغّل `opencode auth login` في نافذة طرفية وأدخل المفتاح مرة أخرى.',
   "error.provider.opencodeFreeModelRefused":
     "رفض OpenCode هذا النموذج المجاني. بعض النماذج المجانية غير متاحة في كل البلدان. اختر نموذجًا آخر يحمل التسمية Free، أو الصق مفتاح OpenCode Go في إعدادات OpenCode واختر نموذج OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
@@ -260,10 +266,14 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "رفض Gemini هذا الطلب ولم يذكر السبب. قد يسبب هذا عنصر في سجل الدردشة، مثل صورة فتحها الوكيل. بدأ OpenBot جلسة Gemini جديدة بسجل الدردشة. أعد المحاولة. إذا استمر الخطأ، اختر نموذجًا آخر.",
+  "error.provider.antigravityHistoryUnreadable":
+    "تعذّر على Gemini قراءة السجل المحفوظ لهذه الدردشة. بدأ OpenBot جلسة Gemini جديدة مع سجل الدردشة. أرسل رسالتك مرة أخرى.",
   "error.provider.antigravityLocationUnsupported":
     "لا تسمح Google بتشغيل Gemini من الموقع الشبكي للكمبيوتر الذي يشغّل هذا الوكيل. استخدم Gemini على كمبيوتر آخر، أو اختر مزوّدًا آخر لهذا الوكيل.\n{detail}",
   "error.provider.antigravityConnectionLost": "فقد Gemini الاتصال بوكيله وتوقف. أرسل رسالة للمتابعة.",
@@ -308,6 +318,8 @@ export const messages = {
     "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في المتجر، التطبيقات، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.hermesRefused":
     "رفض Hermes هذه الرسالة قبل أن تبدأ. أرسلها مرة أخرى. إذا رفض Hermes كل رسالة، فأعد تشغيل OpenBot على الكمبيوتر الذي يشغّل هذا الوكيل.",
+  "error.provider.hermesConnectionLost":
+    "فقد Hermes اتصاله أثناء هذه الرسالة، لذا لا يعرف ما إذا كان العمل قد اكتمل. تحقق مما فعله الوكيل قبل أن ترسل الرسالة مرة أخرى.",
   "error.provider.copilotThinkingRejected":
     "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",
