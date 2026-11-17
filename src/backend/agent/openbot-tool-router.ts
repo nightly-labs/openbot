@@ -3431,8 +3431,8 @@ export class OpenBotToolRouter {
         computerUse,
         ...fields
       } = args;
-      if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
-        throw new Error("Use avatarPath or generated avatar settings, not both.");
+      if (avatarPath !== undefined && args.avatarSeed !== undefined) {
+        throw new Error("Use avatarPath or avatarSeed, not both.");
       }
       const runtimeRequest = { provider, model, reasoningEffort };
       if (

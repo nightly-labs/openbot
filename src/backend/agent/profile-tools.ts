@@ -131,7 +131,7 @@ export const updateProfileToolSchema = z
       .min(1)
       .max(INPUT_LIMITS.path)
       .describe(
-        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed or avatarHue.",
+        "Local PNG, JPEG, or WebP image up to 512 KB, absolute or relative to your workspace. It replaces the generated face; never use it for a color. Not with avatarSeed.",
       )
       .optional(),
     provider: z
