@@ -10,6 +10,7 @@ import type {
   BrowserTarget,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { BROWSER_VIEW_MAX_CLIPBOARD_TEXT } from "@openbot/contracts/team-protocol/browser-view-v1";
 import { sourceText } from "@openbot/i18n/source";
 import { redactText } from "@openbot/logging";
 import { Deferred, Effect, Exit, Fiber, Option, Scope } from "effect";
@@ -193,6 +194,8 @@ export interface BrowserScreencastOptions {
    * keeps that size.
    */
   viewport?: { width: number; height: number };
+  /** Hears the text that the page itself copies while the screencast runs. */
+  onPageCopy?: (text: string) => void;
 }
 
 export interface BrowserScreencastFrame {
@@ -388,6 +391,76 @@ const PASTE_EVENT_SCRIPT = `(text) => {${FOCUSED_SELECTION}
   const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true, composed: true });
   return (active ?? doc.body).dispatchEvent(event);
 }`;
+
+/** A page copy that failed to arm, such as during a navigation, is armed again after this. */
+const PAGE_COPY_RETRY_MS = 500;
+/**
+ * Waits for the text that the page puts on the clipboard during a user action: its own "Copy"
+ * button writes the clipboard of the host, which a member watching from another computer cannot
+ * reach. It runs in the page's world, because only there are the page's clipboard calls, and it adds
+ * its hooks once a document. The original calls still run, unchanged. A copy wakes every wait, one
+ * for each view of the tab; a wait whose view ended is woken for nothing.
+ */
+const PAGE_COPY_SCRIPT = `(() => {
+  const key = Symbol.for("openbot.pageCopy");
+  let state = globalThis[key];
+  if (!state) {
+    state = { waits: [] };
+    Object.defineProperty(globalThis, key, { value: state });
+    const active = () => navigator.userActivation?.isActive === true;
+    const report = (text) => {
+      if (typeof text !== "string" || text.length === 0 || text.length > ${BROWSER_VIEW_MAX_CLIPBOARD_TEXT}) return;
+      const waits = state.waits;
+      state.waits = [];
+      for (const wake of waits) wake(text);
+    };
+    const proto = globalThis.Clipboard?.prototype;
+    const writeText = proto?.writeText;
+    if (writeText) proto.writeText = { writeText(text) { if (active()) report(String(text)); return writeText.apply(this, arguments); } }.writeText;
+    const write = proto?.write;
+    if (write) proto.write = { write(items) {
+      if (active()) Promise.resolve().then(async () => {
+        for (const item of items) if (item.types.includes("text/plain")) return report(await (await item.getType("text/plain")).text());
+      }).catch(() => {});
+      return write.apply(this, arguments);
+    } }.write;
+    // Capture: a copy library often stops the event at its own element. The text the page sets is
+    // read after the whole dispatch, when every handler has run.
+    addEventListener("copy", (event) => {
+      if (!event.isTrusted || !active()) return;
+      const selection = String(getSelection() ?? "");
+      const data = event.clipboardData;
+      let set = null;
+      if (data) {
+        const setData = data.setData;
+        data.setData = function (type, value) {
+          const kind = String(type).toLowerCase();
+          if (kind === "text" || kind === "text/plain") set = String(value);
+          return setData.apply(this, arguments);
+        };
+      }
+      setTimeout(() => report(event.defaultPrevented ? set : selection));
+    }, true);
+  }
+  return new Promise((resolve) => { state.waits.push(resolve); });
+})()`;
+
+/**
+ * The page's own copies, one at a time, for as long as the view runs. A wait ends with the document:
+ * the next one arms the page that loaded. It needs no CDP domain turned on, which a page could notice.
+ */
+function pageCopies(send: SendCommand, onPageCopy: (text: string) => void): Effect.Effect<never> {
+  return Effect.forever(
+    send("Runtime.evaluate", { expression: PAGE_COPY_SCRIPT, awaitPromise: true, returnByValue: true }).pipe(
+      Effect.flatMap((answer) => {
+        const text = answer.exceptionDetails === undefined ? recordValue(answer.result)?.value : undefined;
+        if (!isString(text)) return Effect.sleep(PAGE_COPY_RETRY_MS);
+        return Effect.sync(() => onPageCopy(text));
+      }),
+      Effect.catch(() => Effect.sleep(PAGE_COPY_RETRY_MS)),
+    ),
+  );
+}
 
 /** The letter of a shortcut. On a layout whose letters are not Latin, it is the key's place. */
 function shortcutLetter(key: string, code: string): string {
@@ -2623,7 +2696,9 @@ export class BrowserCdpEngine {
                     });
                     live = true;
                     started();
-                    yield* Effect.raceFirst(Deferred.await(stopped), Deferred.await(detached));
+                    const ended = Effect.raceFirst(Deferred.await(stopped), Deferred.await(detached));
+                    const onPageCopy = options.onPageCopy;
+                    yield* onPageCopy ? Effect.raceFirst(ended, pageCopies(send, onPageCopy)) : ended;
                   }).pipe(
                     Effect.ensuring(
                       Effect.gen({ self: this }, function* () {

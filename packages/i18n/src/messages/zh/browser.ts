@@ -67,6 +67,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "文本过长，无法粘贴。请粘贴少于 100,000 个字符。",
   "browser.liveView.copyTooLarge": "选中内容过长，无法复制。请少选一些文字。",
   "browser.liveView.copyFailed": "无法复制文本，请点击页面后重试。",
+  "browser.liveView.pageCopied": "页面复制了文本。选择“复制”即可将其放入剪贴板。",
   "browser.previews.label": "浏览器预览",
   "browser.previews.resize": "调整右侧面板宽度",
   "browser.previews.empty": "没有浏览器标签页",
