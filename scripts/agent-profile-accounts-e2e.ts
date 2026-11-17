@@ -12,7 +12,8 @@
 // process that the agent runs on with the second account, and that list_models names a saved custom
 // endpoint, where the user changes it and why it lists no model, without its base URL or key (#6471).
 // It also asserts that update_profile with avatarHue keeps the agent's photo and its file, and that only
-// avatarSeed removes them (#10431).
+// avatarSeed removes them (#10431), and that with Pool accounts on an agent that names an account, also
+// "default", keeps it while null gives it to the pool (#10661).
 // `bun scripts/agent-profile-accounts-e2e.ts`. Writes .openbot-build/agent-profile-accounts-e2e/report.json.
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -219,6 +220,8 @@ const report: {
   calls: { name: string; turnId: string; success: boolean | null; text: string }[];
   stored?: Pick<AgentSummary, "providerAccountId" | "backupModels">;
   deletedAgent?: { ownProcessStopped: boolean; workspaceRemoved: boolean };
+  /** The agent's pin after it names the second account, "default" and null with Pool accounts on. */
+  pool?: { second: string | null; default: string | null; null: string | null };
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -670,6 +673,47 @@ try {
     "The delete removes the workspace and the record",
     report.deletedAgent.workspaceRemoved && !store.list().some((candidate) => candidate.id === worker.id),
   );
+
+  // 8b. With Pool accounts on, an account that an agent names stays: also the provider's own sign-in
+  // as "default". Only null gives the agent back to the pool (#10661).
+  await runCauseEffect(accounts.setPool("codex", { leftOut: [] }));
+  const pooled = await create("Pooled");
+  await waitFor("the pooled agent's first turn to end", () => idle(pooled.id));
+  const pinnedSecond = await callTool("pin the second account", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: second.id,
+  });
+  const pinSecond = storedAgent(pooled.id).pinnedAccountId;
+  const pinnedDefault = await callTool("pin the own sign-in", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: "default",
+  });
+  const afterDefault = storedAgent(pooled.id);
+  const pooledAgain = await callTool("give the account to the pool", coordinator.id, "update_profile", {
+    agentId: pooled.id,
+    providerAccountId: null,
+  });
+  const afterNull = storedAgent(pooled.id);
+  report.pool = {
+    second: pinSecond ?? null,
+    default: afterDefault.pinnedAccountId ?? null,
+    null: afterNull.pinnedAccountId ?? null,
+  };
+  pass(
+    "With Pool accounts on, an agent that names an account keeps it, also the own sign-in",
+    pinnedSecond.success &&
+      pinSecond === second.id &&
+      pinnedDefault.success &&
+      afterDefault.providerAccountId === undefined &&
+      afterDefault.pinnedAccountId === "default",
+    `${pinnedSecond.text}\n${pinnedDefault.text}`,
+  );
+  pass(
+    "With Pool accounts on, a null account gives the agent to the pool",
+    pooledAgain.success && afterNull.providerAccountId === undefined && afterNull.pinnedAccountId === undefined,
+    pooledAgain.text,
+  );
+  await runCauseEffect(accounts.setPool("codex", null));
 
   // 9. A color keeps the agent's photo and its file. Only a generated face removes them (#10431).
   const photoSource = join(root, "photo.png");
