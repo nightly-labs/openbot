@@ -279,6 +279,8 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google не принял вход в Gemini для этого запроса. Отправьте сообщение ещё раз. Если ошибка повторяется, подключите Gemini заново в настройках.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravitySessionRejected":

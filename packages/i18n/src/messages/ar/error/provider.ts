@@ -262,6 +262,8 @@ export const messages = {
     "لا يستطيع Gemini استخدام هذا النموذج الآن. اختر نموذجًا آخر، ثم أعد المحاولة.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "لم تُكمل خدمة Gemini من Google الطلب. أعد المحاولة بعد بضع دقائق.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "لم تقبل Google تسجيل الدخول إلى Gemini لهذا الطلب. أرسل رسالتك مرة أخرى. إذا استمر الخطأ، أعد ربط Gemini في الإعدادات.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "رفض Gemini هذا الطلب. اختر نموذجًا آخر، ثم أرسل رسالتك مرة أخرى. إذا فشل مرة أخرى، فابدأ دردشة جديدة.\n{detail}",
   "error.provider.antigravitySessionRejected":
