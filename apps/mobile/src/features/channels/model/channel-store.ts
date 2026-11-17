@@ -413,7 +413,16 @@ export class MobileChannelStore {
         !item.message.questionPrompt.resolution,
     );
     const prompt = message?.message.questionPrompt;
-    if (!prompt || page?.channel.archived) throw new Error(sourceText("error.remote.formUnavailable"));
+    // A question with no row in the page shows from the host's request, and the host refuses an
+    // answer when it no longer waits (#10178). A row that has its answer is closed.
+    const saved = page?.messages.some(
+      (item) =>
+        item.author.kind === "agent" &&
+        item.author.id === agentId &&
+        item.message.questionPrompt?.requestId === input.requestId,
+    );
+    if (!page || page.channel.archived || (saved && !prompt))
+      throw new Error(sourceText("error.remote.formUnavailable"));
     await this.request(
       "POST",
       TEAM_API_ROUTES.respond.prompt,
@@ -426,7 +435,7 @@ export class MobileChannelStore {
     );
     // A successful answer stays resolved even if the history refresh loses connection.
     const current = entry.state.pages.get(channelId);
-    if (entry.valid && current) {
+    if (entry.valid && current && message && prompt) {
       const pages = new Map(entry.state.pages);
       pages.set(channelId, {
         ...current,
