@@ -4,8 +4,9 @@
 // in the 1.5 failure form ("\n⚠ <text>"), and the stop reason `end_turn`; with `ACT-FIRST` it runs a
 // tool step before that. `gemini-spent` gets the quota text before any step. `gemini-flash` always
 // answers. A prompt with `RATE-NOW` on `gemini-rate` gets a rate-limit text that only the Gemini
-// rules know, with no Google status name (#11099). Each case has its own primary model: a spent
-// quota holds its model for all agents.
+// rules know, with no Google status name (#11099). A prompt with `CREDITS-NOW` on a `gemini-credits-*`
+// model gets the text of a spent AI credits balance (#11332). Each case has its own primary model: a
+// spent quota holds its model for all agents.
 // Checks:
 //   1. Quota before work, set to switch without asking: the message runs again on the backup.
 //   2. Quota after a tool step, set to switch without asking: the backup continues the work, with
@@ -13,6 +14,9 @@
 //   3. Quota after a tool step, set to ask: the backup continues the work too, as after a plan limit.
 //   4. As 3, but the first backup's quota is spent too: the next backup continues the same work.
 //   5. A rate limit before work, set to switch without asking: the message runs again on the backup.
+//   6. A spent AI credits balance before work, set to switch without asking: the message runs again
+//      on the backup.
+//   7. A spent AI credits balance after a tool step, set to ask: the backup continues the work.
 // `bun run test:antigravity-quota-failover`. Writes .openbot-build/antigravity-quota-failover-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -59,7 +63,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-rate", "gemini-credits-a", "gemini-credits-b", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -81,7 +85,14 @@ function handle(message) {
     const model = current.get(params.sessionId) ?? MODELS[0];
     const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent") && text.includes("QUOTA-NOW");
     const rate = model === "gemini-rate" && text.includes("RATE-NOW");
-    log({ model, quota, rate, text });
+    const credits = model.startsWith("gemini-credits-") && text.includes("CREDITS-NOW");
+    log({ model, quota: quota || credits, rate, text });
+    if (credits) {
+      if (text.includes("ACT-FIRST"))
+        update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Your AI credits balance is too low to continue." } });
+      return write({ id: message.id, result: { stopReason: "end_turn" } });
+    }
     if (rate) {
       update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Agent execution error: request failed with code 429" } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
@@ -310,6 +321,28 @@ try {
     "The message runs again on the backup after a rate limit.",
   );
   rate.passed = true;
+
+  for (const [name, model, automatic, text, continuation] of [
+    ["spent credits balance before work", "gemini-credits-a", true, "CREDITS-NOW", false],
+    [
+      "spent credits balance after work, ask before switching",
+      "gemini-credits-b",
+      false,
+      "ACT-FIRST CREDITS-NOW",
+      true,
+    ],
+  ] as const) {
+    const credits = await runCase(name, model, automatic, text);
+    assert.deepEqual(
+      credits.prompts.map((prompt) => [prompt.model, prompt.continuation]),
+      [
+        [model, false],
+        [BACKUP, continuation],
+      ],
+      `${name}: the message moves to the backup.`,
+    );
+    credits.passed = true;
+  }
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
