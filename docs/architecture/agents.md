@@ -88,7 +88,9 @@ the agent sent its result to that teammate with `send_message` (`quietTeammateTu
 The turn does not need `routine_no_update`, and the prompt does not name it: Claude often does not
 load the tool, which waits behind its tool search. When only answered requests started the turn and
 its answers are text alone, that text repeats the reply, so it becomes quiet answers as after the tool
-call. A file, an image or a question keeps the whole turn in the chat. The tool still accepts a
+call. A file, an image or a question keeps the whole turn in the chat. So the request prompt tells the
+agent that the user does not see its written answer, and to ask the user with `ask_user`, whose
+question card keeps the turn shown (#11012). The tool still accepts a
 request: before the reply it answers that the agent must send the result first, but only when the
 missing reply is all that keeps the turn from a quiet end. When the agent sends no reply, OpenBot
 sends the turn's answer to the teammate as its result when the turn ends (`#relayAgentResult`). The

@@ -400,6 +400,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
             "When something fails, find the cause and try other ways first. Status: blocked only when the sender or the user must act.",
             `${RESULT_FORMAT} When blocked, add Unblock: <the one action that unblocks the task>; when OpenBot has a plugin for the service and it is not in your tools, call openbot.suggest_marketplace_app, and that action is the next field of its result.`,
             "Never acknowledge without a Status line.",
+            // The turn ends quiet after the reply, so a question in the written answer is folded (#11012).
+            "The user does not see your written answer to this request. When only the user can give what you need, call openbot.ask_user (Claude: AskUserQuestion) and wait; never ask the user in a written answer.",
           ];
     text = [
       `${TEAMMATE_HEADER} ${senderName} (${senderAgentId}).`,
