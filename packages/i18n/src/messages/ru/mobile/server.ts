@@ -1084,7 +1084,8 @@ export const messages = {
     "Необязательно. Если пусто, в списке будет номер телефона.",
   "mobile.server.connectors.whatsapp.add": "Добавить",
   "mobile.server.connectors.whatsapp.groupTitle": "Добавить группу",
-  "mobile.server.connectors.whatsapp.groupDescription": "Участники этой группы могут поручать работу вашим агентам.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "Участники этой группы могут поручать работу вашим агентам, когда упоминают этот номер или отвечают на его сообщения.",
   "mobile.server.connectors.whatsapp.groupSearch": "Поиск групп",
   "mobile.server.connectors.whatsapp.groupsLoading": "Загрузка групп…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "OpenBot не смог прочитать группы",

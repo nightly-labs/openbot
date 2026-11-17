@@ -1276,7 +1276,8 @@ export const messages = {
   "mobile.server.connectors.whatsapp.contactNameDescription": "اختياري. إذا تُرك فارغًا، تعرض القائمة رقم الهاتف.",
   "mobile.server.connectors.whatsapp.add": "إضافة",
   "mobile.server.connectors.whatsapp.groupTitle": "إضافة مجموعة",
-  "mobile.server.connectors.whatsapp.groupDescription": "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك.",
+  "mobile.server.connectors.whatsapp.groupDescription":
+    "يمكن للأشخاص في هذه المجموعة إسناد أعمال إلى وكلائك عندما يذكرون الرقم أو يردّون على رسائله.",
   "mobile.server.connectors.whatsapp.groupSearch": "بحث في المجموعات",
   "mobile.server.connectors.whatsapp.groupsLoading": "جارٍ قراءة المجموعات…",
   "mobile.server.connectors.whatsapp.groupsLoadFailed": "تعذّرت قراءة المجموعات على OpenBot",

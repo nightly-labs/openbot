@@ -477,7 +477,8 @@ export const messages = {
   "connector.whatsapp.contactNameDescription": "Opcional. Si lo dejas vacío, la lista muestra el número de teléfono.",
   "connector.whatsapp.add": "Añadir",
   "connector.whatsapp.groupTitle": "Añadir un grupo",
-  "connector.whatsapp.groupDescription": "Las personas de este grupo pueden asignar trabajo a tus agentes.",
+  "connector.whatsapp.groupDescription":
+    "Las personas de este grupo pueden asignar trabajo a tus agentes cuando mencionan el número o responden a sus mensajes.",
   "connector.whatsapp.groupSearch": "Buscar grupos",
   "connector.whatsapp.groupsLoading": "Leyendo los grupos…",
   "connector.whatsapp.groupsLoadFailed": "OpenBot no pudo leer los grupos",
