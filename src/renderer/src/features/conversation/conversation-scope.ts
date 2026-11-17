@@ -1175,11 +1175,19 @@ export function createConversationViewScope(props: ConversationProps) {
   const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string | null>(null);
   let lastOpenPrompt: { chat: string; key: string | null } | undefined;
   createEffect(
-    () => ({
-      chat: agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
-      key: openPromptKey(),
-      hasText: untrack(composerHasText),
-    }),
+    () => {
+      // The question is the one of the shown thread: the agent's own chat (`undefined`), a side
+      // thread, or a new thread (`null`). A return to the same chat is not a new question.
+      const open = props.threads?.open;
+      return {
+        chat: JSON.stringify([
+          agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
+          open === undefined ? null : (open?.id ?? ""),
+        ]),
+        key: openPromptKey(),
+        hasText: untrack(composerHasText),
+      };
+    },
     ({ chat, key, hasText }) => {
       const arrived = lastOpenPrompt?.chat === chat && lastOpenPrompt.key !== key;
       lastOpenPrompt = { chat, key };
