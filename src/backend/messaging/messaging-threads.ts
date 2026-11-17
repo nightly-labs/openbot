@@ -1,4 +1,4 @@
-import type { AgentProviderRef } from "@openbot/contracts/agent-providers";
+import { AGENT_PROVIDERS, type AgentProviderRef, agentProviderName } from "@openbot/contracts/agent-providers";
 import { isNarrationItemId, showsNarration } from "@openbot/contracts/conversation-narration";
 import type {
   AgentEvent,
@@ -13,7 +13,7 @@ import {
   MESSAGING_LIMITS,
 } from "@openbot/contracts/ipc";
 import type { DiscordEmbed } from "@openbot/contracts/signal-protocol/discord-api";
-import { sourceText } from "@openbot/i18n/source";
+import { isFixedSourceText, matchingSourceKeys, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Deferred, Effect, Result, Schema, type Scope } from "effect";
 import { type OpenBotToolResponse, openBotToolFailure, openBotToolResult } from "../agent/routine-tools";
@@ -54,7 +54,10 @@ export type MessagingActivity =
       followUp: boolean;
       answer: string | null;
       files: MessagingAnswerFile[];
-      /** The catalog text of a start that failed, such as a provider that is not downloaded. */
+      /**
+       * The catalog text of a start or a turn that failed, such as a provider that is not downloaded
+       * or an expired sign-in. Null gives the general text.
+       */
       reason?: string | null;
     }
   | { type: "cancelled"; link: MessagingLink; origin: MessagingOrigin }
@@ -961,8 +964,15 @@ export class MessagingThreads {
           }
         }
         this.store.touch(link.linkId);
+        // The turn's end stored the failure on its deliveries before this event.
+        const reason =
+          event.status === "failed"
+            ? chatFailureReason(
+                started.deliveryIds.map((id) => this.#mailbox.getDelivery(id)?.delivery.error).find(Boolean),
+              )
+            : null;
         Effect.runFork(
-          this.#finished(link, event.turnId, event.status, started.origin, started.followUp).pipe(
+          this.#finished(link, event.turnId, event.status, started.origin, started.followUp, reason).pipe(
             Effect.uninterruptible,
             Effect.forkIn(scope, { startImmediately: true }),
           ),
@@ -1143,6 +1153,7 @@ export class MessagingThreads {
     status: string,
     origin: MessagingOrigin | null,
     followUp: boolean,
+    reason: string | null,
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     const messages = yield* threadsStep(() => this.#turnMessages(link, turnId));
     const answer = [...messages].reverse().find(isAnswer)?.text ?? null;
@@ -1163,6 +1174,7 @@ export class MessagingThreads {
       followUp,
       answer,
       files,
+      reason,
     });
   });
 
@@ -1187,6 +1199,21 @@ export function isAnswer(message: ConversationMessage): boolean {
     message.itemType !== CONVERSATION_SUBAGENTS_ITEM_TYPE &&
     Boolean(message.text.trim())
   );
+}
+
+/**
+ * The chat text for the stored failure of a turn, or null for the general text. The platform is
+ * outside this computer, and a provider's own text can hold paths or keys, so only an error from the
+ * catalog goes there: one with no placeholder, such as a spent usage limit, or an expired sign-in that
+ * names a provider (#11303).
+ */
+function chatFailureReason(error: string | null | undefined): string | null {
+  if (!error) return null;
+  if (isFixedSourceText(error)) return matchingSourceKeys(error).some((key) => key.startsWith("error.")) ? error : null;
+  const signInExpired = AGENT_PROVIDERS.some(
+    (provider) => error === sourceText("error.provider.signInExpired", { provider: agentProviderName(provider) }),
+  );
+  return signInExpired ? error : null;
 }
 
 export class MessagingThreadFailed extends Schema.TaggedError<MessagingThreadFailed>()("MessagingThreadFailed", {
