@@ -18,7 +18,8 @@ const LOWER_QUALITY = { bitrate: 3_000, fps: 30 };
  * connection loses again: the picture stays black or frozen with no message (#11271).
  *
  * The script counts the frames that the browser decodes. When none comes for `STALL_MS` while the
- * page shows, it reports an error with a clear text, and "connected" again when frames come back.
+ * page shows, and Moonlight reported no error of its own, it reports an error with a clear text, and
+ * "connected" again when frames come back.
  * In the desktop app and the browser, a stall also makes the next streams of this viewer use the
  * phone app's Data saver rate for a day, so Retry shows a picture. The phone app chooses its own
  * quality in its menu, so the script does not change it there.
@@ -45,10 +46,20 @@ if (!phone) {
     if (until) localStorage.setItem("mlSettings", JSON.stringify(settings));
   } catch {}
 }
+// Moonlight posts its own errors here, such as a host that stopped. The watcher then stays quiet, so
+// that error keeps its text and does not lower the quality.
+const nativeFetch = window.fetch.bind(window);
+let moonlightFailed = false;
+window.fetch = (input, init) => {
+  try {
+    if (typeof input === "string" && input.endsWith("/viewer-state") && JSON.parse(init?.body ?? "{}").state === "error") moonlightFailed = true;
+  } catch {}
+  return nativeFetch(input, init);
+};
 const report = (state, message) => {
   const payload = { source: "openbot-moonlight", type: "viewer-state", sessionId, state, ...(message ? { message } : {}) };
   window.parent.postMessage(payload, "*");
-  fetch("../viewer-state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
+  nativeFetch("../viewer-state", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).catch(() => {});
 };
 const peers = new Set();
 let timer = 0;
@@ -86,7 +97,7 @@ const check = async () => {
     }
     return;
   }
-  if (now - progress < ${STALL_MS}) return;
+  if (moonlightFailed || now - progress < ${STALL_MS}) return;
   stalled = true;
   stalledAt = decoded;
   let lower = false;

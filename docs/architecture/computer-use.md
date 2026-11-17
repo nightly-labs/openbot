@@ -185,7 +185,8 @@ which the connection loses again, so the picture stays black or frozen (#11271).
 the frames that the browser decodes (`framesDecoded` of Moonlight's peer connection). Sunshine
 sends at least half the frame rate, also for a still screen, so no frame for 20 s while the page
 shows is a stall: the script reports `error` with a text that says the connection is too slow, and
-`connected` again when frames come back. In the desktop app and the browser, a stall also sets
+`connected` again when frames come back. When Moonlight already reported its own error, such as for
+a host that stopped, the script stays quiet, so that text stays and the quality does not change. In the desktop app and the browser, a stall also sets
 Moonlight's `bitrate` and `fps` to the phone app's Data saver values (3 Mbit/s, 30 fps) for the
 streams of that viewer origin in the next 24 hours, so Retry shows a picture. The phone app keeps
 the quality from its menu. The host serves this script also when it has no clipboard writer, but
