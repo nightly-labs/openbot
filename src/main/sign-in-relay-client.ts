@@ -238,11 +238,8 @@ export class SignInRelayClient {
     const waiting = this.#waiting.get(key);
     if (!waiting) return Effect.void;
     const open = () => this.#dependencies.openExternal(waiting.url);
-    if (chosen !== null) {
-      chosen.onWaiting(waiting.page);
-      return Effect.promise(open);
-    }
-    // The dialog shows the page, so the user can open it again when the browser did not open.
+    chosen?.onWaiting(waiting.page);
+    // The dialog or the chat shows the page, so the user can open it again when the browser did not open.
     return Effect.tryPromise(open).pipe(
       Effect.catch((error) =>
         Effect.sync(() => logger.warn("OpenBot could not open a relayed sign-in page:", toLogValue(error.cause))),
