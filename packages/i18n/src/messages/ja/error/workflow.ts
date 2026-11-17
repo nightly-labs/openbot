@@ -79,6 +79,10 @@ export const messages = {
     "OpenBot GitHub App はこのリポジトリまたは項目を参照できません。GitHub を開いてアクセスを許可してください。",
   "error.workflow.githubNoWrite":
     "OpenBot GitHub App はこのリポジトリを変更できません。GitHub を開いてアクセスを許可してください。",
+  "error.workflow.githubNoAccessRepository":
+    "OpenBot GitHub App はリポジトリ {repository} またはその項目を参照できません。GitHub を開いてアプリにアクセスを許可してください。",
+  "error.workflow.githubNoWriteRepository":
+    "OpenBot GitHub App はリポジトリ {repository} を変更できません。GitHub を開いてアプリにアクセスを許可してください。",
   "error.workflow.githubLocked": "この会話は GitHub でロックされています。",
   "error.workflow.githubRefused": "GitHub が変更を拒否しました: {detail}",
   "error.workflow.githubUnreachable": "OpenBot は GitHub に接続できませんでした。ステップをもう一度実行してください。",

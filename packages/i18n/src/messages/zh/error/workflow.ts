@@ -61,6 +61,10 @@ export const messages = {
   "error.workflow.githubNotConnected": "在运行该工作流的电脑上连接 GitHub。",
   "error.workflow.githubNoAccess": "OpenBot GitHub App 无法访问该仓库或项目。打开 GitHub 并为它授予访问权限。",
   "error.workflow.githubNoWrite": "OpenBot GitHub App 无法更改该仓库。打开 GitHub 并为它授予访问权限。",
+  "error.workflow.githubNoAccessRepository":
+    "OpenBot GitHub 应用看不到仓库 {repository} 或其中的项目。请打开 GitHub 并授予该应用访问权限。",
+  "error.workflow.githubNoWriteRepository":
+    "OpenBot GitHub 应用无法更改仓库 {repository}。请打开 GitHub 并授予该应用访问权限。",
   "error.workflow.githubLocked": "该对话已在 GitHub 上锁定。",
   "error.workflow.githubRefused": "GitHub 拒绝了该更改：{detail}",
   "error.workflow.githubUnreachable": "OpenBot 无法连接 GitHub。再次运行该步骤。",

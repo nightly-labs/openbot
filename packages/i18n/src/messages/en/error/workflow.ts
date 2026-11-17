@@ -73,6 +73,10 @@ export const messages = defineMessages("error.workflow", {
     "The OpenBot GitHub App cannot see this repository or item. Open GitHub and give it access.",
   "error.workflow.githubNoWrite":
     "The OpenBot GitHub App cannot change this repository. Open GitHub and give it access.",
+  "error.workflow.githubNoAccessRepository":
+    "The OpenBot GitHub App cannot see the repository {repository} or its item. Open GitHub and give the app access to it.",
+  "error.workflow.githubNoWriteRepository":
+    "The OpenBot GitHub App cannot change the repository {repository}. Open GitHub and give the app access to it.",
   "error.workflow.githubLocked": "This conversation is locked on GitHub.",
   "error.workflow.githubRefused": "GitHub refused the change: {detail}",
   "error.workflow.githubUnreachable": "OpenBot could not reach GitHub. Run the step again.",

@@ -80,6 +80,10 @@ export const messages = {
     "De OpenBot GitHub App kan deze repository of dit item niet zien. Open GitHub en geef de app toegang.",
   "error.workflow.githubNoWrite":
     "De OpenBot GitHub App kan deze repository niet wijzigen. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoAccessRepository":
+    "De OpenBot GitHub-app kan de repository {repository} of het item ervan niet zien. Open GitHub en geef de app toegang.",
+  "error.workflow.githubNoWriteRepository":
+    "De OpenBot GitHub-app kan de repository {repository} niet wijzigen. Open GitHub en geef de app toegang.",
   "error.workflow.githubLocked": "Dit gesprek is vergrendeld op GitHub.",
   "error.workflow.githubRefused": "GitHub heeft de wijziging geweigerd: {detail}",
   "error.workflow.githubUnreachable": "OpenBot kon GitHub niet bereiken. Voer de stap opnieuw uit.",

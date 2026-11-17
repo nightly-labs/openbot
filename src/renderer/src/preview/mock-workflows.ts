@@ -496,7 +496,7 @@ export function mockWorkflows(
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))
-        throw new Error(sourceText("error.workflow.githubNoAccess"));
+        throw new Error(sourceText("error.workflow.githubNoAccessRepository", { repository: input.repository }));
       return structuredClone(PREVIEW_GITHUB_OPTIONS);
     },
     // Two events of each GitHub trigger: one that started a run of the preview, and one that a filter skipped.

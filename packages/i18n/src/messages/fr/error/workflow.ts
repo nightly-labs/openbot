@@ -79,6 +79,10 @@ export const messages = {
     "L’application GitHub d’OpenBot ne peut pas voir ce dépôt ou cet élément. Ouvrez GitHub et donnez-lui l’accès.",
   "error.workflow.githubNoWrite":
     "L’application GitHub d’OpenBot ne peut pas modifier ce dépôt. Ouvrez GitHub et donnez-lui l’accès.",
+  "error.workflow.githubNoAccessRepository":
+    "L’app GitHub OpenBot ne voit pas le dépôt {repository} ni son élément. Ouvrez GitHub et donnez-lui l’accès.",
+  "error.workflow.githubNoWriteRepository":
+    "L’app GitHub OpenBot ne peut pas modifier le dépôt {repository}. Ouvrez GitHub et donnez-lui l’accès.",
   "error.workflow.githubLocked": "Cette conversation est verrouillée sur GitHub.",
   "error.workflow.githubRefused": "GitHub a refusé la modification : {detail}",
   "error.workflow.githubUnreachable": "OpenBot n’a pas pu joindre GitHub. Relancez l’étape.",

@@ -65,6 +65,10 @@ export const messages = {
   "error.workflow.githubNotConnected": "יש לחבר את GitHub במחשב שמפעיל את תהליך העבודה הזה.",
   "error.workflow.githubNoAccess": "ל-OpenBot GitHub App אין גישה למאגר או לפריט הזה. יש לפתוח את GitHub ולתת לו גישה.",
   "error.workflow.githubNoWrite": "OpenBot GitHub App לא יכול לשנות את המאגר הזה. יש לפתוח את GitHub ולתת לו גישה.",
+  "error.workflow.githubNoAccessRepository":
+    "אפליקציית OpenBot ב-GitHub לא רואה את המאגר {repository} או את הפריט שלו. פתחו את GitHub ותנו לאפליקציה גישה.",
+  "error.workflow.githubNoWriteRepository":
+    "אפליקציית OpenBot ב-GitHub לא יכולה לשנות את המאגר {repository}. פתחו את GitHub ותנו לאפליקציה גישה.",
   "error.workflow.githubLocked": "השיחה הזו נעולה ב-GitHub.",
   "error.workflow.githubRefused": "GitHub דחה את השינוי: {detail}",
   "error.workflow.githubUnreachable": "OpenBot לא הצליח להגיע ל-GitHub. יש להריץ את השלב שוב.",

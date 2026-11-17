@@ -154,16 +154,35 @@ function createdAt(candidate: WorkflowGitHubRecentEvent): string {
 
 const failure = (code: Failure["code"], message: string): Failure => ({ code, message });
 
-/** A response that is not a success, as the step shows it. GitHub's own words go through redaction. */
-function httpFailure(status: number, body: unknown, rateLimited: boolean): Failure {
+/** The app cannot change the repository. The text names it, so the user knows where to give access. */
+const noWrite = (repository: string): Failure =>
+  failure("noWrite", sourceText("error.workflow.githubNoWriteRepository", { repository }));
+
+/** The `owner/name` of a `/repos/owner/name/...` path, or null for another path. */
+function pathRepository(path: string): string | null {
+  return /^\/repos\/([^/?]+\/[^/?]+)/u.exec(path)?.[1] ?? null;
+}
+
+/**
+ * A response that is not a success, as the step shows it. GitHub's own words go through redaction. An
+ * access failure names the repository of the path, so the user knows which one needs access.
+ */
+function httpFailure(status: number, body: unknown, rateLimited: boolean, path: string): Failure {
+  const repository = pathRepository(path);
   const parsed = messageSchema.safeParse(body);
   const message = parsed.success ? redactText(parsed.data.message).slice(0, DETAIL_LIMIT) : `HTTP ${status}`;
   if (status === 401) return failure("notConnected", sourceText("error.workflow.githubNotConnected"));
   if (status === 403 && !rateLimited) {
     if (/\blocked\b/iu.test(message)) return failure("locked", sourceText("error.workflow.githubLocked"));
-    return failure("noWrite", sourceText("error.workflow.githubNoWrite"));
+    return repository ? noWrite(repository) : failure("noWrite", sourceText("error.workflow.githubNoWrite"));
   }
-  if (status === 404 || status === 410) return failure("noAccess", sourceText("error.workflow.githubNoAccess"));
+  if (status === 404 || status === 410)
+    return failure(
+      "noAccess",
+      repository
+        ? sourceText("error.workflow.githubNoAccessRepository", { repository })
+        : sourceText("error.workflow.githubNoAccess"),
+    );
   // A server error can come after GitHub made the change.
   if (status >= 500) return failure("unreachable", sourceText("error.workflow.githubUnreachable"));
   return failure("invalid", sourceText("error.workflow.githubRefused", { detail: message }));
@@ -217,7 +236,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
     );
     if (response.ok || allowed.includes(response.status)) return json;
     return yield* Effect.fail(
-      httpFailure(response.status, json, response.headers.get("x-ratelimit-remaining") === "0"),
+      httpFailure(response.status, json, response.headers.get("x-ratelimit-remaining") === "0", path),
     );
   });
 
@@ -320,9 +339,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
         ? Effect.succeed<FileLink[]>([])
         : tokens(change.repository).pipe(
             Effect.flatMap((found) =>
-              found.bot
-                ? copyFiles(found.bot, change.repository, files)
-                : Effect.fail(failure("noWrite", sourceText("error.workflow.githubNoWrite"))),
+              found.bot ? copyFiles(found.bot, change.repository, files) : Effect.fail(noWrite(change.repository)),
             ),
             Effect.catch(() => Effect.succeed(files.files.flatMap((file) => ownLink(file) ?? []))),
           );
@@ -334,7 +351,7 @@ export function createGitHubRest(options: GitHubRestOptions): WorkflowGitHubApi 
   ): Effect.fn.Return<WorkflowGitHubChangeResult, Failure> {
     const found = yield* tokens(change.repository);
     // A change is the app's, so GitHub shows it as the app and the loop guard knows its events.
-    if (!found.bot) return yield* Effect.fail(failure("noWrite", sourceText("error.workflow.githubNoWrite")));
+    if (!found.bot) return yield* Effect.fail(noWrite(change.repository));
     const token = found.bot;
     const repo = `/repos/${change.repository}`;
     const item = `${repo}/issues/${change.number ?? 0}`;

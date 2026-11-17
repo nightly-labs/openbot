@@ -67,6 +67,10 @@ export const messages = {
   "error.workflow.githubNoAccess":
     "لا يستطيع تطبيق OpenBot على GitHub رؤية هذا المستودع أو العنصر. افتح GitHub وامنحه الوصول.",
   "error.workflow.githubNoWrite": "لا يستطيع تطبيق OpenBot على GitHub تغيير هذا المستودع. افتح GitHub وامنحه الوصول.",
+  "error.workflow.githubNoAccessRepository":
+    "لا يستطيع تطبيق OpenBot على GitHub رؤية المستودع {repository} أو عنصره. افتح GitHub وامنح التطبيق الوصول.",
+  "error.workflow.githubNoWriteRepository":
+    "لا يستطيع تطبيق OpenBot على GitHub تغيير المستودع {repository}. افتح GitHub وامنح التطبيق الوصول.",
   "error.workflow.githubLocked": "هذه المحادثة مقفلة على GitHub.",
   "error.workflow.githubRefused": "رفض GitHub التغيير: {detail}",
   "error.workflow.githubUnreachable": "تعذّر على OpenBot الوصول إلى GitHub. شغّل الخطوة مرة أخرى.",

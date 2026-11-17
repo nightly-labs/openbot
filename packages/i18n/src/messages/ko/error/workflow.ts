@@ -72,6 +72,10 @@ export const messages = {
     "OpenBot GitHub App이 이 저장소나 항목을 볼 수 없어요. GitHub를 열고 액세스 권한을 주세요.",
   "error.workflow.githubNoWrite":
     "OpenBot GitHub App이 이 저장소를 변경할 수 없어요. GitHub를 열고 액세스 권한을 주세요.",
+  "error.workflow.githubNoAccessRepository":
+    "OpenBot GitHub 앱이 저장소 {repository} 또는 그 항목을 볼 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
+  "error.workflow.githubNoWriteRepository":
+    "OpenBot GitHub 앱이 저장소 {repository}을(를) 변경할 수 없어요. GitHub를 열고 앱에 접근 권한을 주세요.",
   "error.workflow.githubLocked": "이 대화는 GitHub에서 잠겨 있어요.",
   "error.workflow.githubRefused": "GitHub가 변경을 거부했어요: {detail}",
   "error.workflow.githubUnreachable": "OpenBot이 GitHub에 연결하지 못했어요. 단계를 다시 실행해 주세요.",

@@ -75,6 +75,10 @@ export const messages = {
     "OpenBot GitHub Uygulaması bu depoyu veya öğeyi göremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
   "error.workflow.githubNoWrite":
     "OpenBot GitHub Uygulaması bu depoyu değiştiremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubNoAccessRepository":
+    "OpenBot GitHub uygulaması {repository} deposunu veya öğesini göremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
+  "error.workflow.githubNoWriteRepository":
+    "OpenBot GitHub uygulaması {repository} deposunu değiştiremiyor. GitHub'ı açın ve uygulamaya erişim verin.",
   "error.workflow.githubLocked": "Bu konuşma GitHub'da kilitli.",
   "error.workflow.githubRefused": "GitHub değişikliği reddetti: {detail}",
   "error.workflow.githubUnreachable": "OpenBot GitHub'a ulaşamadı. Adımı yeniden çalıştırın.",
