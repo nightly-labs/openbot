@@ -2875,8 +2875,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           ? (yield* this.#explainSessionEnd(transport, error)).cause
           : error;
       // The process exited after it lost its server, and the runtime took the turn at that exit: the
-      // recovery continues an answer that the exit cut, or ends the turn (#10310).
-      if (serverLost && failure instanceof AgentProcessExitError) return;
+      // recovery continues an answer that the exit cut, or ends the turn (#10310). A turn that the user
+      // stopped during the wait ends as stopped.
+      if (serverLost && !turn.stopped && failure instanceof AgentProcessExitError) return;
       // A prompt that failed because the model gave no answer ends as a turn with no answer does:
       // quietly when the turn needs no answer, and else with a plain message (#6073).
       if (!turn.stopped && this.#flavor.emptyAnswerError?.test(failureText(failure))) {

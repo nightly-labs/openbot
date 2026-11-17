@@ -1,10 +1,12 @@
 // Checks that an OpenCode turn whose server stops in the middle of the answer continues (#10310).
-// OpenCode 2.2.7 fails each open prompt with "OpenCode server is unavailable" (`data.errorName`
+// OpenCode 2.2.7 and 2.3.0 fail each open prompt with "OpenCode server is unavailable" (`data.errorName`
 // `ServerUnavailable`) when its own server stops, and its process exits a moment later. The turn
 // failed at the prompt's error, so the recovery after the exit found no turn to continue.
 // Runs the real agent service on a temporary profile with a fake OpenCode. The second message gets a
 // part of an answer, then that error, then the exit. The runtime starts OpenCode again, and the agent's
 // chat must continue the answer once on the new process, not end the message as failed.
+// The third message gets the same error, but the process stays: the message fails after the wait for
+// an exit, with a plain message and not the RequestError text.
 // `bun scripts/opencode-server-lost-e2e.ts`. Writes .openbot-build/opencode-server-lost-e2e/report.json.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -34,7 +36,8 @@ const { runCauseEffect } = await import("../src/backend/effect-boundary");
 const { MailboxStore } = await import("../src/backend/mailbox-store");
 const { OpenBotDatabase } = await import("../src/backend/openbot-database");
 
-// The first prompt that names "Second message" loses the server one time, as OpenCode 2.3.0 does.
+// The first prompt that names "Second message" loses the server one time, as OpenCode 2.3.0 does, and
+// the process exits. The first prompt that names "Third message" loses it with no exit.
 const FAKE_OPENCODE = `#!/usr/bin/env node
 const fs = require("node:fs");
 const NL = String.fromCharCode(10);
@@ -56,12 +59,14 @@ function handle(message) {
   if (message.method === "session/resume" || message.method === "session/load") return write({ id: message.id, result: setup(params.sessionId) });
   if (message.method === "session/list") return write({ id: message.id, result: { sessions: [] } });
   if (message.method === "session/prompt") {
-    if (text.includes("Second message") && !fs.existsSync(process.env.OPENBOT_FAKE_OPENCODE_LOST)) {
-      fs.writeFileSync(process.env.OPENBOT_FAKE_OPENCODE_LOST, "");
+    const lost = text.includes("Second message") ? "exit" : text.includes("Third message") ? "stay" : null;
+    const marker = process.env.OPENBOT_FAKE_OPENCODE_LOST + "-" + lost;
+    if (lost && !fs.existsSync(marker)) {
+      fs.writeFileSync(marker, "");
       chunk(params.sessionId, "Here is the first part");
       setTimeout(() => {
         write({ id: message.id, error: { code: -32603, message: "Internal error: OpenCode server is unavailable", data: { errorName: "ServerUnavailable" } } });
-        setTimeout(() => process.exit(1), 300);
+        if (lost === "exit") setTimeout(() => process.exit(1), 300);
       }, 200);
       return;
     }
@@ -98,6 +103,7 @@ interface Report {
   restartedPid?: number;
   continuationPrompt?: string | null;
   secondDelivery?: { status: string; error: string | null } | null;
+  thirdDelivery?: { status: string; shownError: string | null; startsAfter: number } | null;
   error?: string;
 }
 
@@ -157,6 +163,11 @@ const agents = new AgentService({
   offProviders: AGENT_PROVIDERS.filter((provider) => provider !== "opencode"),
 });
 
+const errors: string[] = [];
+agents.on("event", (event) => {
+  if (event.type === "error") errors.push(event.message);
+});
+
 const idle = (agentId: string) =>
   !agents.listQueue(agentId).deliveries.some((delivery) => ["queued", "starting", "running"].includes(delivery.status));
 
@@ -201,7 +212,29 @@ try {
     protocol().find((line) => line.pid === restarted.pid && line.method === "session/prompt")?.text ?? null;
   const second = agents.listQueue(agent.id).deliveries.find((delivery) => delivery.text === "Second message.");
   report.secondDelivery = second ? { status: second.status, error: second.error ?? null } : null;
-  report.passed = report.continuationPrompt !== null && report.secondDelivery?.status === "completed";
+
+  // The process stays after it loses its server: the turn fails with the plain text, and nothing restarts.
+  const starts = protocol().filter((line) => line.start).length;
+  const errorsBefore = errors.length;
+  await runCauseEffect(agents.sendMessage({ agentId: agent.id, text: "Third message." }));
+  const third = await waitFor(
+    "the third message to fail",
+    () =>
+      agents
+        .listQueue(agent.id)
+        .deliveries.find((delivery) => delivery.text === "Third message." && delivery.status === "failed"),
+    30_000,
+  );
+  report.thirdDelivery = {
+    status: third.status,
+    shownError: errors.slice(errorsBefore).find((message) => message.includes("OpenCode")) ?? null,
+    startsAfter: protocol().filter((line) => line.start).length - starts,
+  };
+  report.passed =
+    report.continuationPrompt !== null &&
+    report.secondDelivery?.status === "completed" &&
+    report.thirdDelivery.startsAfter === 0 &&
+    report.thirdDelivery.shownError?.startsWith("OpenCode could not complete this turn") === true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);
 } finally {

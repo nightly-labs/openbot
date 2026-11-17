@@ -80,8 +80,9 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
 }
 
 /**
- * OpenCode 2.2.7's error for each open prompt when its event stream from its own server ends: "OpenCode
- * server is unavailable", with `data.errorName` `ServerUnavailable`. Its process can exit a moment later.
+ * OpenCode 2.2.7 and 2.3.0's error for each open prompt when its event stream from its own server ends:
+ * "OpenCode server is unavailable", with `data.errorName` `ServerUnavailable`. Its process can exit a
+ * moment later.
  */
 function isOpenCodeServerLost(error: unknown): boolean {
   return (
