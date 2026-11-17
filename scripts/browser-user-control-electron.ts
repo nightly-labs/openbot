@@ -540,7 +540,12 @@ async function main(): Promise<void> {
       const frameButton = nextClick();
       sendPress(125);
       assert.deepEqual(await frameButton, framesClick("Import in frame"));
-      // A live view's press reaches the frame in the frame's own pixels and gives no input event.
+      // A live view's press reaches the frame in the frame's own pixels and gives no input event. Its
+      // moves do not change `:hover` in the page, which still names the shadow host here.
+      contents.sendInputEvent({ type: "mouseMove", x: 50, y: 25 });
+      await contents.executeJavaScript(
+        `new Promise((resolve) => { const hovered = () => (document.getElementById("host").matches(":hover") ? resolve() : requestAnimationFrame(hovered)); hovered(); })`,
+      );
       const viewButton = nextClick();
       for (const action of ["move", "down", "up"] as const)
         await runCauseEffect(

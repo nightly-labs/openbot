@@ -4890,11 +4890,13 @@ export class BrowserHost {
     });
     // Each press gives this event, also a press in a frame of another process. The input event that
     // follows in the same call comes only from the page's own view, so a press without it is in the
-    // pixels of that frame (#10912).
+    // pixels of that frame (#10912). A live view's press gives its point in the page's pixels.
     let press: { x: number; y: number; inPage: boolean } | null = null;
     contents.on("before-mouse-event", (_event, input) => {
       if (input.type !== "mouseDown" || !records()) return;
-      const current = { x: input.x, y: input.y, inPage: false };
+      const zoom = contents.getZoomFactor() || 1;
+      const viewed = tab.engine.viewPress();
+      const current = viewed ? { ...viewed, inPage: true } : { x: input.x / zoom, y: input.y / zoom, inPage: false };
       press = current;
       setImmediate(() => {
         if (press === current) press = null;
@@ -4906,14 +4908,13 @@ export class BrowserHost {
     });
   }
 
-  /** Records the control under a press, as `#bindUserBrowsing` reads it. */
+  /** Records the control under a press, in CSS pixels, as `#bindUserBrowsing` reads it. */
   #recordClick(tab: BrowserHostTab, press: { x: number; y: number; inPage: boolean }): void {
     const contents = tab.contents;
     if (tab.closing || contents.isDestroyed()) return;
     const place = stepPlace(tab.engine.scrubText(contents.getURL()));
     if (!place) return;
-    const zoom = contents.getZoomFactor() || 1;
-    const record = Effect.map(tab.engine.clickTargetAt(press.x / zoom, press.y / zoom, press.inPage), (target) => {
+    const record = Effect.map(tab.engine.clickTargetAt(press.x, press.y, press.inPage), (target) => {
       // The tab can change hands while the page answers.
       if (target)
         this.#recordUserStep(tab, {

@@ -434,6 +434,8 @@ export class BrowserCdpEngine {
   #viewButton: "left" | "middle" | "right" | null = null;
   /** Where the last mouse event put the pointer, so the next agent move starts there. */
   #pointer: { point: PointerPoint; sessionId: string | undefined } | null = null;
+  /** A live view's press while the page gets it, in the page's CSS pixels. */
+  #viewPress: PointerPoint | null = null;
   #targets = new Map<string, TargetRecord>();
   #lastSnapshot: BrowserSnapshot | null = null;
   #environment: BrowserEnvironment | null = null;
@@ -2752,6 +2754,7 @@ export class BrowserCdpEngine {
           this.#pointer = { point: { x: input.x, y: input.y }, sessionId: undefined };
           if (input.action === "down") this.#viewButton = input.button;
           if (input.action === "up") this.#viewButton = null;
+          if (input.action === "down") this.#viewPress = { x: input.x, y: input.y };
           yield* send("Input.dispatchMouseEvent", {
             type: input.action === "move" ? "mouseMoved" : input.action === "down" ? "mousePressed" : "mouseReleased",
             x: input.x,
@@ -2765,12 +2768,26 @@ export class BrowserCdpEngine {
                   : 0,
             clickCount: input.action === "move" ? 0 : input.clickCount,
             modifiers: input.modifiers,
-          });
+          }).pipe(
+            Effect.ensuring(
+              Effect.sync(() => {
+                this.#viewPress = null;
+              }),
+            ),
+          );
         }),
       // A paste or a cut works in the focused frame, which can be a frame in another process.
       input.type === "paste" || input.type === "cut",
     );
   });
+
+  /**
+   * The point of the live view's press that the page gets now, or null. A press of the live view in a
+   * frame of another process does not move `:hover` in the page, so the host reads the press here.
+   */
+  viewPress(): PointerPoint | null {
+    return this.#viewPress;
+  }
 
   /**
    * The text a member's copy takes from the page, or null when it is longer than `max`. It goes back
