@@ -6362,6 +6362,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     return this.#mailboxSync.queueSnapshot(agentId);
   }
 
+  /**
+   * The open work of the queue of each named agent, without the finished history: what the agent rows
+   * show. One read for all agents, for `agent-active-queues-v1`, which leaves out `hold`.
+   */
+  listActiveQueues(agentIds: readonly string[]): QueueSnapshot[] {
+    return this.#mailbox
+      .listActiveQueues(agentIds, this.#turn.failedTurns())
+      .map((queue) => this.#mailboxSync.withHold(queue));
+  }
+
   listWaits(agentId: string): AgentWaitsSnapshot {
     return this.#waits.list(agentId);
   }

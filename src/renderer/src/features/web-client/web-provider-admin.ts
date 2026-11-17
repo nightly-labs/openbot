@@ -458,8 +458,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
     editsCustomProviders();
     if (!id) return undefined;
     const store = createCustomProvidersStore(() => hostCustomProvidersApi(() => admin, id));
-    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here.
-    void store.refreshCustomProviders().catch(() => undefined);
+    // As in the desktop app: a failure leaves the list empty, and nothing retries it from here. The read
+    // picks its routes from the server summary; untracked, so a summary update does not read it again.
+    void untrack(() => store.refreshCustomProviders()).catch(() => undefined);
     return store;
   });
   // A boolean, so that a server-list update that keeps the capability does not rebuild the keys.

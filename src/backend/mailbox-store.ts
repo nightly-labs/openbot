@@ -936,6 +936,42 @@ export class MailboxStore {
   }
 
   /**
+   * The open work of the queue of each agent, as `listQueue` shows it, in one pass over the mailbox: the
+   * deliveries that are queued, starting or running, and the failed deliveries of the turn that
+   * `failedTurns` names for the agent. A sidebar reads it for many agents at once (`agent-active-queues-v1`),
+   * and the finished history was most of a full queue.
+   */
+  listActiveQueues(agentIds: readonly string[], failedTurns: ReadonlyMap<string, string>): QueueSnapshot[] {
+    const targets = new Set(agentIds);
+    const executionMessageIds = this.#executionMessageIds();
+    const messages = this.#messagesById();
+    const welcomes = new Set<string>();
+    const open = new Map<string, StoredDelivery[]>();
+    for (const delivery of this.#state.deliveries) {
+      const agentId = delivery.recipientAgentId;
+      if (!targets.has(agentId)) continue;
+      if (WELCOME_PENDING_STATUSES.has(delivery.status) && messages.get(delivery.messageId)?.welcome === true)
+        welcomes.add(agentId);
+      if (executionMessageIds.has(delivery.messageId)) continue;
+      const failed = delivery.status === "failed" && delivery.turnId === failedTurns.get(agentId);
+      if (!isActiveDelivery(delivery) && !failed) continue;
+      const list = open.get(agentId);
+      if (list) list.push(delivery);
+      else open.set(agentId, [delivery]);
+    }
+    const positions = open.size > 0 ? this.#queuedPositions() : new Map<string, number>();
+    return [...targets].map((agentId) => ({
+      agentId,
+      ...(welcomes.has(agentId) ? { welcome: true as const } : {}),
+      deliveries: (open.get(agentId) ?? [])
+        .sort(compareQueueOrder)
+        .map((delivery) =>
+          this.#publicDelivery(delivery, positions, this.#requireMessage(delivery.messageId, messages)),
+        ),
+    }));
+  }
+
+  /**
    * The queued channel, messaging, task and welcome work of this agent, in queue order. `listQueue` hides it, so a
    * caller that reorders the queue the user sees has to put these ids back before the mailbox reads
    * the order.
