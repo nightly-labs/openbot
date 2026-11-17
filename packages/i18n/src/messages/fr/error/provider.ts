@@ -511,7 +511,7 @@ export const messages = {
   "error.provider.nativeNotStarted":
     "OpenBot a trouvé le {provider} que vous avez installé, mais il n’a pas démarré. Mettez à jour ou réinstallez {provider}, puis réessayez.",
   "error.provider.nativeManagedNotStarted":
-    "{provider} n’a pas démarré sur cet ordinateur. Redémarrez OpenBot. S’il ne démarre toujours pas, choisissez Aide > Signaler un problème.",
+    "{provider} n’a pas démarré sur l’ordinateur qui exécute ce serveur. Redémarrez OpenBot sur cet ordinateur. S’il ne démarre toujours pas, choisissez Aide > Signaler un problème.",
   "error.provider.nativeVersionUnreadable": "Impossible de lire la version de la CLI {provider}.",
   "error.provider.piSessionBusy": "Attendez la fin du tour Pi en cours.",
   "error.provider.acpSessionBusy": "{provider} termine encore un tour arrêté. Réessayez dans un instant.",

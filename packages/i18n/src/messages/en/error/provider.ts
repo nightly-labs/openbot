@@ -474,7 +474,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeNotStarted":
     "OpenBot found the {provider} that you installed, but it did not start. Update or reinstall your {provider}, then try again.",
   "error.provider.nativeManagedNotStarted":
-    "{provider} did not start on this computer. Restart OpenBot. If it still does not start, choose Help > Report a problem.",
+    "{provider} did not start on the computer that runs this server. Restart OpenBot on that computer. If it still does not start, choose Help > Report a problem.",
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
   "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",

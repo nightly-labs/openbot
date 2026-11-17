@@ -544,7 +544,12 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
   #cliInUse(runtime: ManagedRuntimeId): boolean {
     if (isManagedToolRuntime(runtime)) return true;
     if (this.#isProviderOn(runtime) && !this.#systemVersions.has(runtime)) return true;
-    return runtime === "pi" && KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
+    return runtime === "pi" && this.#keyProviderOn();
+  }
+
+  /** Whether a key-only provider, which runs on Pi, is on. */
+  #keyProviderOn(): boolean {
+    return KEY_ONLY_PROVIDERS.some((provider) => this.#isProviderOn(provider));
   }
 
   /**
@@ -553,8 +558,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
    * was installed and kept as ready without a start, and failed only when OpenRouter used it (#11520).
    */
   readonly #runsHere = (provider: ManagedProviderId): boolean =>
-    this.#isProviderOn(provider) ||
-    (provider === "pi" && KEY_ONLY_PROVIDERS.some((keyProvider) => this.#isProviderOn(keyProvider)));
+    this.#isProviderOn(provider) || (provider === "pi" && this.#keyProviderOn());
 
   /**
    * The last check's window while that check is less than one interval old. After that the

@@ -428,7 +428,7 @@ export const messages = {
   "error.provider.nativeNotStarted":
     "OpenBot 找到了你安装的 {provider}，但它没有启动。请更新或重新安装 {provider}，然后重试。",
   "error.provider.nativeManagedNotStarted":
-    "{provider} 未能在这台电脑上启动。请重新启动 OpenBot。如果仍然无法启动，请选择 帮助 > 反馈问题。",
+    "{provider} 未能在运行该服务器的那台电脑上启动。请在那台电脑上重新启动 OpenBot。如果仍然无法启动，请选择 帮助 > 反馈问题。",
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
   "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",

@@ -493,7 +493,7 @@ export const messages = {
   "error.provider.nativeNotStarted":
     "OpenBot yüklediğiniz {provider} uygulamasını buldu, ancak başlamadı. {provider} uygulamasını güncelleyin veya yeniden yükleyin, sonra tekrar deneyin.",
   "error.provider.nativeManagedNotStarted":
-    "{provider} bu bilgisayarda başlamadı. OpenBot'u yeniden başlatın. Yine başlamazsa Yardım > Sorun bildir'i seçin.",
+    "{provider} bu sunucuyu çalıştıran bilgisayarda başlamadı. OpenBot'u o bilgisayarda yeniden başlatın. Yine başlamazsa Yardım > Sorun bildir'i seçin.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
   "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
