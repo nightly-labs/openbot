@@ -1095,6 +1095,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Yüklü",
   "mobile.server.providers.status.notInstalled": "Yüklü değil",
   "mobile.server.providers.status.checking": "Denetleniyor",
+  "mobile.server.providers.addAccountWithCode": "Kodla hesap ekle",
+  "mobile.server.providers.accountSignInWithCode": "Kodla oturum aç",
   "mobile.server.providers.accountsKeyHint":
     "Her ajan bir hesap kullanır. Hesabı ajanın ayarlarından seçin. Yeni bir hesap için o hesabın API anahtarı gerekir.",
   "mobile.server.providers.accountChangeKey": "Anahtarı değiştir",

@@ -1200,6 +1200,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Установлено",
   "mobile.server.providers.status.notInstalled": "Не установлено",
   "mobile.server.providers.status.checking": "Проверка",
+  "mobile.server.providers.addAccountWithCode": "Добавить аккаунт по коду",
+  "mobile.server.providers.accountSignInWithCode": "Войти по коду",
   "mobile.server.providers.accountsKeyHint":
     "Каждый агент использует один аккаунт. Выберите его в настройках агента. Новому аккаунту нужен API-ключ этого аккаунта.",
   "mobile.server.providers.accountChangeKey": "Сменить ключ",

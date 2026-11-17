@@ -1071,6 +1071,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "インストール済み",
   "mobile.server.providers.status.notInstalled": "未インストール",
   "mobile.server.providers.status.checking": "確認中",
+  "mobile.server.providers.addAccountWithCode": "コードでアカウントを追加",
+  "mobile.server.providers.accountSignInWithCode": "コードでログイン",
   "mobile.server.providers.accountsKeyHint":
     "各エージェントは1つのアカウントを使います。エージェントの設定で選んでください。新しいアカウントには、そのアカウントの API キーが必要です。",
   "mobile.server.providers.accountChangeKey": "キーを変更",
