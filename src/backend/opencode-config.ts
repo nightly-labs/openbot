@@ -321,8 +321,9 @@ function isGroqApi(baseUrl: string): boolean {
  * The `provider` entry in OpenCode's `providers` format, with `requireReasoning` off. On Mistral's API
  * it uses Mistral's own adapter when the endpoint has a key. Only the OpenAI-compatible adapter reads
  * `requireReasoning`, so it still protects a keyless endpoint from #10094. On Groq's API it keeps the
- * OpenAI-compatible adapter and sends earlier thinking as `reasoning` (see {@link isGroqApi}). OpenCode 2.2.5 and 2.3.0 use a `providers` entry
- * in place of the `provider` entry of the same id, as a whole, so this one carries every field of
+ * OpenAI-compatible adapter and sends earlier thinking as `reasoning` (see {@link isGroqApi}).
+ * OpenCode 2.2.5 and 2.3.0 use a `providers` entry in place of the `provider` entry of the same id, as
+ * a whole, so this one carries every field of
  * {@link providerEntry}, moved as OpenCode moves them (`migrateStandardProvider` in
  * `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores `providers`, so the `provider`
  * entry stays for a user's own OpenCode 1. Checked with `scripts/opencode-mistral-reasoning-e2e.ts`.
@@ -370,9 +371,9 @@ function nativeProviderEntries(
 
 /**
  * Merges the custom providers and the stored key into a base layer. Providers only ever land under
- * the `provider` key, and also `providers` for an endpoint on Mistral's or Groq's API, so no provider id can
- * reach a sibling setting: an endpoint named `permission` is a provider named `permission`, not a
- * permission rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that
+ * the `provider` key, and also `providers` for an endpoint on Mistral's or Groq's API, so no provider
+ * id can reach a sibling setting: an endpoint named `permission` is a provider named `permission`, not
+ * a permission rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that
  * built-in provider, so the stored key must not drop its URL and models.
  */
 function mergeOpenCodeConfig(
