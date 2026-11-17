@@ -14,8 +14,6 @@ export interface ComposerVoice {
   available: boolean;
   open: boolean;
   exit: "send" | "cancel" | null;
-  /** The microphone listens: the round button takes the agent's colour. */
-  hearing: boolean;
   level: SharedValue<number>;
   presence: SharedValue<number>;
   /** The mic of the composer opens the voice mode. */
@@ -70,7 +68,6 @@ export function liveVoice(live: LiveVoiceSource, name: string, t: MobileTranslat
     available: live.available,
     open: live.open,
     exit: live.exit,
-    hearing,
     level: live.level,
     presence: live.presence,
     start: live.start,

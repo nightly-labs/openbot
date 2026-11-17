@@ -585,7 +585,7 @@ export const ChatComposer = memo(function ChatComposer({
       opacity: interpolate(morph.get(), [0, 0.4], [1, 0], Extrapolation.CLAMP),
     };
   });
-  // The round button has room for one control: the dictation mic leaves in the first part of the morph.
+  // The call bar has its own controls: the dictation mic leaves in the first part of the morph.
   const dictationMicStyle = useAnimatedStyle(() => ({
     opacity: interpolate(morph.get(), [0, 0.3], [1, 0], Extrapolation.CLAMP),
   }));
@@ -637,7 +637,7 @@ export const ChatComposer = memo(function ChatComposer({
     return {
       // The text and the placeholder leave in the first part of the morph.
       opacity: interpolate(voiced, [0, 0.4], [1, 0], Extrapolation.CLAMP),
-      // The voice mode closes the card to the round button's height.
+      // The call bar closes the card to its own height.
       height: height + (VOICE_BUTTON_SIZE - height) * voiced,
       // The controls hold the bottom of the card. In a single row they overlay
       // the field, so the text clears their width instead.
