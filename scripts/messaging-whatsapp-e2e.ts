@@ -632,6 +632,26 @@ try {
       return { workspaceName: live.workspaceName, state: live.state };
     });
 
+    await step("no orchestrator: an allowed contact gets no setup text from the owner's number (#11438)", async () => {
+      const input = parseWhatsAppSenderInput({
+        workspaceId: OWNER,
+        sender: { id: FRIEND, kind: "contact", name: "Ewa" },
+      });
+      await runCauseEffect(messaging.addWhatsAppSender(input.workspaceId, input.sender));
+      const friendJid = `${FRIEND}@s.whatsapp.net`;
+      const ownBefore = phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length;
+      phone.current().receive([message({ chat: friendJid, text: "Is the meeting still on?" })]);
+      // The owner's own chat still gets the notice, and it comes after the contact's message.
+      phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "marker 0" })]);
+      await until(
+        () => phone.textsTo(OWNER_JID).filter((text) => text.includes("No agent can answer")).length > ownBefore,
+        "the notice in the owner's own chat",
+      );
+      assert.equal(phone.textsTo(friendJid).length, 0, "OpenBot wrote setup text to an allowed contact.");
+      await runCauseEffect(messaging.removeWhatsAppSender(OWNER, input.sender.id));
+      return { contactPosts: 0 };
+    });
+
     await step("orchestrator: one WhatsApp Orchestrator answers new conversations", async () => {
       const added = await runCauseEffect(messaging.addWhatsAppOrchestrator({}));
       const agent = agents.listAgents().find((candidate) => candidate.id === added.agentId);
