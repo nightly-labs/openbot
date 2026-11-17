@@ -1101,13 +1101,12 @@ export class ChannelService {
           const blocked = (yield* channelSync(() => this.store.assignments(current.id))).filter(
             (item) => item.state === "running" && queuedFor.has(item.agentId),
           );
-          if (!blocked.length) return;
-          const requests = yield* channelSync(() => this.store.messages(current.id));
           for (const { agentId, turnId, requestMessageId } of blocked) {
-            const request = requests.find((entry) => entry.id === requestMessageId);
-            if (!turnId || request?.author.kind !== "member" || request.author.id !== actor.id) continue;
+            if (!turnId || !requestMessageId) continue;
+            const request = yield* channelSync(() => this.store.message(current.id, requestMessageId));
+            if (request?.author.kind !== "member" || request.author.id !== actor.id) continue;
             const { threadId } = yield* channelSync(() => this.store.context(current.id, agentId));
-            releaseQuestions(agentId, threadId, turnId);
+            yield* channelSync(() => releaseQuestions(agentId, threadId, turnId));
           }
         }).pipe(Effect.catch((failure) => Effect.sync(() => this.hooks.error(failure.cause))));
       yield* this.interruptTasks(
