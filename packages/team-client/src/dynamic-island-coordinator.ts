@@ -29,6 +29,8 @@ type ServerRuntime = DynamicIslandPresentationInput & {
   /** The failed turn of each agent that the user dismissed from the island. The agent keeps its failed mark. */
   dismissedFailures: Map<string, string>;
   rawMessageBodies: Map<string, string>;
+  /** The agent ids that this member muted. The island does not show them, also when their notifications are on. */
+  memberMutedAgentIds: Set<string>;
   receivedRuntimeSnapshot: boolean;
 };
 
@@ -80,6 +82,8 @@ export class DynamicIslandCoordinator {
       if (input.failedTurns[agentId] !== turnId) dismissedFailures.delete(agentId);
     }
     const agentIds = new Set(input.agents.map((agent) => agent.id));
+    const memberMutedAgentIds = new Set(previous?.memberMutedAgentIds);
+    for (const agentId of memberMutedAgentIds) if (!agentIds.has(agentId)) memberMutedAgentIds.delete(agentId);
     const incomingMessageAnchors = activeMessageAnchors(input.liveMessages, previous?.incomingMessageAnchors);
     const completedAgents = new Set(previous?.completedAgents);
     const lastRecordedMessageIds = new Map(previous?.lastRecordedMessageIds);
@@ -120,6 +124,7 @@ export class DynamicIslandCoordinator {
       resolvedPrompts,
       dismissedFailures,
       rawMessageBodies,
+      memberMutedAgentIds,
       receivedRuntimeSnapshot: previous?.receivedRuntimeSnapshot ?? false,
     });
   }
@@ -136,10 +141,21 @@ export class DynamicIslandCoordinator {
     );
   }
 
-  /** The agents whose notifications are off. The island does not show them. */
+  /** Sets the agents that this member muted. The island does not show them. */
+  setMemberMutedAgentIds(serverId: string, agentIds: Iterable<string>): void {
+    this.#runtime(serverId).memberMutedAgentIds = new Set(agentIds);
+  }
+
+  /**
+   * The agents whose notifications are off, or that this member muted. The island does not show
+   * them.
+   */
   mutedAgentIds(serverId: string): ReadonlySet<string> {
-    const agents = this.#servers.get(serverId)?.agents ?? [];
-    return new Set(agents.filter((agent) => !agent.notifications).map((agent) => agent.id));
+    const runtime = this.#servers.get(serverId);
+    const agents = runtime?.agents ?? [];
+    const set = new Set(agents.filter((agent) => !agent.notifications).map((agent) => agent.id));
+    for (const agentId of runtime?.memberMutedAgentIds ?? []) set.add(agentId);
+    return set;
   }
 
   retainServers(serverIds: readonly string[]): void {
@@ -359,7 +375,12 @@ export class DynamicIslandCoordinator {
     const ordered = serverOrder.flatMap((serverId) => {
       const stored = this.#servers.get(serverId);
       if (!stored) return [];
-      const runtime = { ...stored, failedTurns: undismissedFailures(stored) };
+      const muted = this.mutedAgentIds(serverId);
+      const runtime = {
+        ...stored,
+        agents: stored.agents.filter((agent) => !muted.has(agent.id)),
+        failedTurns: undismissedFailures(stored),
+      };
       attentionCount += countDynamicIslandAttention(runtime, text);
       return [createDynamicIslandPresentation(runtime, text)];
     });
@@ -388,6 +409,7 @@ export class DynamicIslandCoordinator {
       receivedConversations: new Set(),
       resolvedPrompts: new Map(),
       dismissedFailures: new Map(),
+      memberMutedAgentIds: new Set(),
       rawMessageBodies: new Map(),
       receivedRuntimeSnapshot: false,
     };
