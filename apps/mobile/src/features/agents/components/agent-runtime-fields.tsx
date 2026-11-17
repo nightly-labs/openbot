@@ -18,9 +18,9 @@ import { Button, Typography } from "heroui-native";
 import { useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { useUniwind } from "uniwind";
-  import { type AgentHostFieldsProps, AgentSpeedField } from "@/features/agents/components/agent-host-fields";
-  import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
-  import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
+import { type AgentHostFieldsProps, AgentSpeedField } from "@/features/agents/components/agent-host-fields";
+import { useAgentModelPicker, withAccountModels } from "@/features/agents/model/agent-model-picker";
+import { cursorModelSelected, cursorModelSpeedLabel } from "@/features/agents/model/cursor-model-speed";
 import { useQueryScope } from "@/features/auth/context/mobile-session-context";
 import {
   PLAN_LIMIT_RESET_FORMAT,
@@ -256,14 +256,19 @@ export function AgentRuntimeFields({
         {showsModel ? (
           // A page, not a menu: a menu does not filter, and OpenRouter lists hundreds of models.
           <SettingsRow
-              disabled={!enabled}
-              value={shortLabel(selected ? modelLabel(selected.id, selected.name) : model ? pickerLabel(model, true) : t("mobile.agent.runtime.unavailable"))}
-              onPress={() => {
-                if (!provider) return;
-                openModelPicker({ serverId, provider, model, accountModels, choose: chooseModel });
-                router.push(modelPickerRoute);
-              }}
->>>>>>> ff5acc942 (Frontend: show Cursor fast and standard speeds on the phone)
+            disabled={!enabled}
+            value={shortLabel(
+              selected
+                ? modelLabel(selected.id, selected.name)
+                : model
+                  ? pickerLabel(model, true)
+                  : t("mobile.agent.runtime.unavailable"),
+            )}
+            onPress={() => {
+              if (!provider) return;
+              openModelPicker({ serverId, provider, model, accountModels, choose: chooseModel });
+              router.push(modelPickerRoute);
+            }}
           >
             <Typography.Paragraph>{t("mobile.agent.runtime.model")}</Typography.Paragraph>
           </SettingsRow>

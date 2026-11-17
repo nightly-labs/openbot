@@ -276,17 +276,16 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
     return id && railAccounts(props.provider).some((account) => account.id === id) ? id : null;
   };
   const customIds = createMemo(() => customProviderIds(props.customProviders ?? []));
-<<<<<<< HEAD
   const modelOption = (provider: string, id: string) =>
     findModelOption(props.modelOptions, props.agentStatus?.providers, provider, id);
-  const selectedModel = createMemo(() => modelOption(props.provider, props.value));
-=======
-  const selectedModel = createMemo(() =>
-    props.modelOptions.find(
-      (option) => option.provider === props.provider && cursorModelSelected(option.id, props.value),
-    ),
+  // A saved Cursor id can carry reasoning, and the listed row does not, so they match by the base id.
+  const selectedModel = createMemo(
+    () =>
+      modelOption(props.provider, props.value) ??
+      props.modelOptions.find(
+        (option) => option.provider === props.provider && cursorModelSelected(option.id, props.value),
+      ),
   );
->>>>>>> 6646a9dba (Backend: list Cursor fast and standard model speeds)
   const selectedFixed = createMemo(() => fixedModelSettings(selectedModel()));
   /** The tab the current selection lives on: the Custom one for the user's endpoints and agents. */
   const activeProvider = (): RailId =>
