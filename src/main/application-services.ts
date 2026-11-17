@@ -2074,6 +2074,11 @@ export async function createApplicationServices({
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
       onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
+        logger.warn(
+          `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
+          output.length > 0 ? `Its last output: ${output}` : "It wrote no output.",
+        ),
     }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
