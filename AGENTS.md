@@ -28,9 +28,11 @@ and state which default you set aside. Do not argue by citing this file.
 - **Migrations are irreversible.** No backup of `openbot.db` is made before an upgrade. Preserve all
   user data and support every shipped source schema. Never assume a backup exists.
 - **Team API support window.** Hosts and clients support the releases of the last 2 months (60 days);
-  mobile has a window of at least 2 months in the minimum-version policy. Do not change the meaning of a wire protocol that
-  a release in the window speaks. A peer outside the window gets "update required", and its adapter,
-  capabilities and fixtures can be deleted. Decided by the developer on 2026-11-17 (plan 011).
+  mobile has at least 2 months. Do not change the meaning of a wire protocol that a release in the
+  window speaks. A peer outside the window gets "update required", and its adapter, capabilities and
+  fixtures can be deleted. The minimum app version does not move by itself: the PR that needs it raises
+  it, and CI refuses a minimum that is less than 60 days old. Decided by the developer on 2026-11-17
+  (plan 011).
 - **Keep the renderer-to-main trust boundary:** Electron sandboxing, context isolation, navigation
   policy, IPC sender validation, and their tests. Coding agents already have `danger-full-access`.
 - **Redact secrets** on every log, export, and send path, including diagnostics and analytics.

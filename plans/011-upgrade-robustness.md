@@ -34,7 +34,10 @@
 - **Migrations**: not in the window. A database from any shipped release still upgrades with no
   data loss. Every migration and its fixtures stay.
 - **Forced update**: the account service publishes a minimum version for each surface. An older app
-  shows a blocking "Update required" screen and installs the update (item 24).
+  shows a blocking "Update required" screen and installs the update (item 24). The minimum does not
+  move by itself (developer decision, the same day): the PR that deletes old code or needs it raises
+  the minimum, and CI refuses a minimum that is less than 60 days old. The window is a floor, not a
+  daily trigger.
 - **Pre-migration copy**: dropped (developer decision, the same day, after the hosted size check). The
   rule "No backup of `openbot.db` is made before an upgrade" stays. Migrations must be safe by
   themselves: items 7 to 10 and 12 come first.
@@ -97,7 +100,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | TODO |
 | 15 | Copy `openbot.db` before a migration (PR #7150) | DROPPED: not practical for large databases (#7150 closed) |
-| 24 | Minimum app version for each surface; blocking "Update required" screen | IN REVIEW (#10803; minimum from changelog dates, no deploy per day) |
+| 24 | Minimum app version for each surface; blocking "Update required" screen | IN REVIEW (#10803; reworked to a manual minimum with a 60-day floor) |
 
 ### 1. Bootstrap list stays at 64
 
@@ -112,7 +115,7 @@ make a contract test fail when a list is larger than the limit of its protocol.
 
 STOP: if a bootstrap capability is necessary for a released client, report before you remove it.
 
-### 2. Minimum protocol 9, then protocol 10 with a fixed baseline
+### 2. Minimum protocol follows the window, then protocol 10 with a fixed baseline
 
 Step 1: for each protocol, find the last release of each surface (desktop, host, web client, mobile)
 that speaks it, and the date it leaves the 60-day window. Raise the minimum and delete the codecs,
@@ -175,7 +178,7 @@ Evidence: `src/main/start-recovery-window.ts` `previousVersionUrl` links to `las
 without a schema check; `src/main/newer-database-recovery.ts` installs the latest release.
 
 Change: the recovery window offers a previous release only when that release can open the
-database, or when a pre-migration copy for it exists (item 15).
+database.
 
 ### 5. Versioned JSON stores and agent-data database version
 
@@ -207,9 +210,10 @@ new copy PR.
 
 ### 24. Minimum app version for each surface
 
-The account service publishes a minimum version for desktop, host and mobile. Desktop and hosts use
-the 60-day window; mobile uses at least 60 days. An app below its minimum shows a blocking "Update
-required" screen and starts the update. A server installs the staged release. The check must not
+The account service publishes a minimum version for desktop, host and mobile: one constant per
+surface, `null` at the start. A PR raises a constant only when it needs it, and a CI check refuses a
+release that is less than 60 days old (mobile: its store date). An app below its minimum shows a
+blocking "Update required" screen and starts the update. A server installs the staged release. The check must not
 send new user data (`PRIVACY.md` if outbound data changes).
 
 ## Phase 2: make migrations and capabilities hard to break
