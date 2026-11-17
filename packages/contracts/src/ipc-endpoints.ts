@@ -658,7 +658,10 @@ import type {
   StartWorkflowRunInput,
   WorkflowDetail,
   WorkflowGraph,
+  WorkflowMediaCatalog,
   WorkflowMediaCredits,
+  WorkflowMediaPrice,
+  WorkflowMediaPriceRequest,
   WorkflowMediaProviders,
   WorkflowRunDetail,
   WorkflowRunPage,
@@ -2035,6 +2038,17 @@ export const IPC_ENDPOINTS = {
      * `workflows-sunra-v1`; an older one has none.
      */
     mediaCredits: scopedQuery<WorkflowMediaCredits>()("workflows:media-credits"),
+    /**
+     * The live models of the host's signed-in Sunra and Higgsfield accounts. A joined server answers
+     * through `workflows-media-catalog-v1`; an older one answers no models, and the client shows the
+     * fixed models of `WORKFLOW_MEDIA_MODELS`.
+     */
+    mediaCatalog: scopedQuery<WorkflowMediaCatalog>()("workflows:media-catalog"),
+    /**
+     * What one file of a catalog model costs with the choices of a step, as the service quotes it.
+     * A joined server answers through `workflows-media-catalog-v1`; an older one gives no quote.
+     */
+    mediaPrice: scopedRequest<WorkflowMediaPriceRequest, WorkflowMediaPrice>()("workflows:media-price"),
   },
   /**
    * CRM: leads and customers, their plans and payments, and the changes that agents propose. Only an

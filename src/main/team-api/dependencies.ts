@@ -477,6 +477,8 @@ export type TeamApiWorkflows = Pick<
   | "keepPicture"
   | "mediaProviders"
   | "mediaCredits"
+  | "mediaCatalog"
+  | "mediaPrice"
 > &
   Pick<HostEventsService, "rotateWorkflowSecret"> & {
     /**

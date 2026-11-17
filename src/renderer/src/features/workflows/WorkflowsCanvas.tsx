@@ -1,4 +1,9 @@
-import { WORKFLOW_MEDIA_MODELS } from "@openbot/contracts/ipc";
+import {
+  WORKFLOW_MEDIA_MODELS,
+  type WorkflowMediaCatalogModel,
+  type WorkflowMediaModel,
+  workflowCatalogMediaModel,
+} from "@openbot/contracts/ipc";
 import { providerAvailability, providerTurnedOff } from "@openbot/ui/components/provider-model-options";
 import { WorkflowCanvas } from "@openbot/ui/features/workflows/WorkflowCanvas";
 import {
@@ -37,10 +42,11 @@ export function WorkflowsCanvas(props: {
     untrack(() => props.serverId),
   );
   // Sunra and Higgsfield make files on the host's sign-in of that service, which the person makes in
-  // Apps and finishes in the browser. The canvas reads them again when the window comes back to the
-  // front. A failed read keeps the last answer.
+  // Apps and finishes in the browser. The canvas reads them, and the live models of both, again when
+  // the window comes back to the front. A failed read keeps the last answer.
   const [sunra, setSunra] = createSignal(false);
   const [higgsfield, setHiggsfield] = createSignal(false);
+  const [catalog, setCatalog] = createSignal<readonly WorkflowMediaCatalogModel[]>([]);
   let disposed = false;
   const readMediaProviders = () => {
     if (!props.host.mediaSupported()) return;
@@ -52,6 +58,22 @@ export function WorkflowsCanvas(props: {
         setHiggsfield(providers.higgsfield);
       })
       .catch(() => undefined);
+    void props.host.workflows
+      .mediaCatalog()
+      .then((answer) => {
+        if (!disposed) setCatalog(answer.models);
+      })
+      .catch(() => undefined);
+  };
+  /**
+   * The models of Sunra and Higgsfield: the live list of the host, else the fixed models, as an older
+   * host or a service that did not answer gives them.
+   */
+  const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
+    const live = catalog()
+      .filter((entry) => entry.provider === provider)
+      .flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
+    return live.length > 0 ? live : WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider);
   };
   readMediaProviders();
   window.addEventListener("focus", readMediaProviders);
@@ -89,9 +111,9 @@ export function WorkflowsCanvas(props: {
     // the host's sign-in of that service, and its credits pay for each file.
     get imageModels() {
       if (!props.host.mediaSupported()) return [];
-      return WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-        if (model.provider === "sunra") return sunra() ? [model] : [];
-        if (model.provider === "higgsfield") return higgsfield() ? [model] : [];
+      const fixed = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+        // Sunra and Higgsfield models come after, from the live list.
+        if (model.provider === "sunra" || model.provider === "higgsfield") return [];
         if (providerTurnedOff(props.status, model.provider)) return [];
         const status = providerAvailability(props.status, props.models, model.provider, currentText().t);
         if (status.state !== "available") return [];
@@ -111,6 +133,17 @@ export function WorkflowsCanvas(props: {
           },
         ];
       });
+      // An older host ignores the background of a step, so its models make no transparent image.
+      const service = (provider: "sunra" | "higgsfield", on: boolean) =>
+        on
+          ? serviceModels(provider).map(({ transparent, ...rest }) =>
+              transparent && props.host.mediaTransparentSupported() ? { ...rest, transparent } : rest,
+            )
+          : [];
+      return [...fixed, ...service("sunra", sunra()), ...service("higgsfield", higgsfield())];
+    },
+    get mediaPrice() {
+      return props.host.mediaSupported() ? props.host.workflows.mediaPrice : undefined;
     },
     get mediaSize() {
       return props.host.mediaSizeSupported();

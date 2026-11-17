@@ -10,12 +10,14 @@ import {
   type StartWorkflowRunInput,
   WORKFLOW_AUTO_VERSION_INTERVAL_MS,
   WORKFLOW_MAX_VERSIONS,
+  WORKFLOW_MEDIA_MODELS,
   type WorkflowDetail,
   type WorkflowGitHubCatalog,
   type WorkflowGitHubDelivery,
   type WorkflowGitHubItem,
   type WorkflowGitHubRepositoryOptions,
   type WorkflowGraph,
+  type WorkflowMediaCatalogModel,
   type WorkflowNode,
   type WorkflowRun,
   type WorkflowRunDetail,
@@ -25,6 +27,9 @@ import {
   type WorkflowTriggerState,
   type WorkflowVersion,
   workflowGitHubTriggerRepositories,
+  workflowMediaAspects,
+  workflowMediaResolutions,
+  workflowVideoDurations,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
@@ -109,6 +114,26 @@ function mockAnswer(node: WorkflowNode, input: string): string {
       return input;
   }
 }
+
+/** The preview catalog: the fixed Sunra and Higgsfield models, as a host with a live catalog sends them. */
+const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
+  const kind = model.kinds[0];
+  if ((model.provider !== "sunra" && model.provider !== "higgsfield") || kind === undefined) return [];
+  return [
+    {
+      id: model.id,
+      provider: model.provider,
+      providerModel: model.providerModel ?? model.id,
+      name: model.name,
+      maker: model.maker,
+      kinds: [kind],
+      aspects: workflowMediaAspects(model, kind),
+      durations: kind === "video" ? workflowVideoDurations(model) : [],
+      resolutions: workflowMediaResolutions(model, kind),
+      transparent: model.transparent === true,
+    },
+  ];
+});
 
 /** `emit` sends the agent event `workflows-changed` for one workflow that changed. */
 export function mockWorkflows(
@@ -493,6 +518,12 @@ export function mockWorkflows(
       sunra: { available: 1240, quota: 2000 },
       higgsfield: { available: 860, quota: null },
     }),
+    mediaCatalog: async () => ({ models: PREVIEW_MEDIA_CATALOG }),
+    // A fixed quote: a video costs per second, and a larger resolution costs more.
+    mediaPrice: async (input) => {
+      const scale = input.resolution?.startsWith("4") || input.resolution === "1080p" ? 2 : 1;
+      return { credits: (input.kind === "video" ? input.duration * 2.5 : 1.5) * scale };
+    },
     githubCatalog: async () => structuredClone(PREVIEW_GITHUB_CATALOG),
     githubOptions: async (input) => {
       if (!PREVIEW_GITHUB_CATALOG.repositories.some((repository) => repository.fullName === input.repository))

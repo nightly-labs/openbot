@@ -480,6 +480,22 @@ image: the host asks the model for that ratio, and a client offers them only on 
 advertises the capability, for the same reason. A video model without its own list of aspect ratios
 does not make them.
 
+`workflows-media-catalog-v1` shows all the models of Sunra and Higgsfield that the canvas can run, not
+only the models of `WORKFLOW_MEDIA_MODELS`. The host reads Sunra's `list_models` and Higgsfield's
+`models_explore` with the sign-ins of its Apps, and keeps each list for ten minutes
+(`src/backend/workflows/media-catalog.ts`). It drops the models that need a source video and the
+models that are only tools. For each model, the host keeps a plan that stays on the host: which input
+pictures it sends and how it names the choices (`sunra-catalog.ts`, `higgsfield-catalog.ts`). A
+service that does not answer gives its fixed models. `POST /v1/workflows/media/catalog {}` answers
+`{ models }`. `POST /v1/workflows/media/price` takes the model and the choices of a step and answers
+`{ credits }`: the price of one file, from Higgsfield's `get_cost` or Sunra's `estimate_cost`. Both
+only quote: they start no job and spend no credits, and the quote sends no picture. Sunra quotes a
+Personal account only, so a Sunra Team sign-in gets null. The host keeps a quote for ten minutes.
+Each member who can use workflows can call both routes. A step keeps its `model` field; a model id of
+the live list has the same `sunra-` or `higgsfield-` form as a fixed id. A client of a host without
+the capability shows the fixed models and no price. The Run button of an image step shows the price,
+and the page rail shows the number of credits under the logo when the account has no quota.
+
 The optional event `workflows-changed { workflowId }` names the workflow that changed, so the
 client reads it again. A client without the capability shows `serverTooOld` on the Workflows page.
 

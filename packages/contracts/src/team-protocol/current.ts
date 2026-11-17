@@ -210,6 +210,7 @@ import { WORKFLOWS_CHATS_CAPABILITY } from "./workflows-chats-v1";
 import { WORKFLOWS_GITHUB_CAPABILITY } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CAPABILITY } from "./workflows-higgsfield-v1";
 import { WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY } from "./workflows-media-account-v1";
+import { WORKFLOWS_MEDIA_CATALOG_CAPABILITY } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_SIZE_CAPABILITY } from "./workflows-media-size-v1";
 import { WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY } from "./workflows-media-transparent-v1";
 import { WORKFLOWS_MEDIA_CAPABILITY } from "./workflows-media-v1";
@@ -470,6 +471,7 @@ export {
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_ACCOUNT_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   WORKFLOWS_MEDIA_TRANSPARENT_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
@@ -716,6 +718,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   AGENT_THREAD_REQUESTS_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -972,7 +975,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
     capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
     capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
-    capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+    capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+    capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1105,6 +1109,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   AGENT_THREAD_REQUESTS_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
   UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1320,6 +1325,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
       capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
       capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
-      capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
+      capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY &&
+      capability !== WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   );
 }
