@@ -154,6 +154,12 @@ export interface AcpFlavor {
    */
   refusesUntilRestart?(error: unknown): boolean;
   /**
+   * Whether a failed request says that the agent lost the connection to its own server, after which
+   * its process can fail each request until it ends. OpenBot then ends the process as for
+   * `refusesUntilRestart`, also when the session open or a settings change of a turn fails.
+   */
+  lostServerUntilRestart?(error: unknown): boolean;
+  /**
    * Whether a failed prompt says that the agent lost its own server, which can come a moment before
    * its process exits. The turn then waits for that exit, as for a closed connection, so it ends as
    * at a process exit: the recovery continues an answer that the exit cut (#10310).
@@ -620,7 +626,24 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
 function hermesTurnFailure(error: unknown, detail: string): string {
   if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
     return sourceText("error.provider.hermesTurnFailed");
+  if (hermesGatewayLost(error)) return sourceText("error.provider.hermesConnectionLost");
   return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
+}
+
+/**
+ * Hermes Agent fails a request with an internal error and "Gateway disconnected…" in `data.details`
+ * when its gateway restarts. Hermes Agent 0.22.0 and before keep the closed connection, so each later
+ * request of that process failed the same way, also after the gateway started again, until OpenBot
+ * started again (#10624).
+ */
+function hermesGatewayLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    /^Gateway disconnected\b/u.test(error.data.details)
+  );
 }
 
 /**
@@ -717,6 +740,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
+  lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
@@ -873,14 +897,15 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, its
-  // failed turn is explained, a process that starts to refuse each prompt ends, an unchanged model or
-  // effort is not sent again, it gets the catalog as MCP tools, and it gets no more MCP servers than
-  // it takes, as for the Hermes provider (#9718, #9738, #9312, #10023).
+  // failed turn is explained, a process that starts to refuse each prompt or lost its gateway ends, an
+  // unchanged model or effort is not sent again, it gets the catalog as MCP tools, and it gets no more
+  // MCP servers than it takes, as for the Hermes provider (#9718, #9738, #9312, #10023, #10624).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
+    lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,

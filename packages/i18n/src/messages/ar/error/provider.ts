@@ -10,6 +10,7 @@ export const messages = {
   "error.provider.acpUnresponsive": "لم يستجب {provider} في الوقت المحدد، لذا أنهى OpenBot عمليته.",
   "error.provider.acpSignInLost": "فقد {provider} تسجيل دخوله، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
   "error.provider.acpRefusedUntilRestart": "رفض {provider} رسالة، لذا أنهى OpenBot عمليته. أرسل رسالتك مرة أخرى.",
+  "error.provider.acpServerLost": "فقد {provider} اتصاله. أرسل رسالتك مرة أخرى.",
   "error.provider.acpSettingsTimedOut": "لم يستجب {provider} في الوقت المحدد. حاول مرة أخرى بعد قليل.",
   "error.provider.acpPlanUsedUp": "يقول {provider} إن خطتك استُنفدت. اختر نموذجًا آخر، أو قم بترقية خطة {provider}.",
   "error.provider.acpMcpNotLoaded":
@@ -316,6 +317,8 @@ export const messages = {
     "لم يتمكن Hermes من إنهاء هذا الدور. إذا ذكر ردّه سببًا، فاتبع ما يقوله. وإلا فقد يكون أحد خوادم MCP لهذا الوكيل غير متاح: تحقق منه في المتجر، التطبيقات، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.hermesRefused":
     "رفض Hermes هذه الرسالة قبل أن تبدأ. أرسلها مرة أخرى. إذا رفض Hermes كل رسالة، فأعد تشغيل OpenBot على الكمبيوتر الذي يشغّل هذا الوكيل.",
+  "error.provider.hermesConnectionLost":
+    "فقد Hermes اتصاله أثناء هذه الرسالة، لذا لا يعرف ما إذا كان العمل قد اكتمل. تحقق مما فعله الوكيل قبل أن ترسل الرسالة مرة أخرى.",
   "error.provider.copilotThinkingRejected":
     "تعذّر على GitHub Copilot استخدام هذا النموذج: لم يقبل النموذج إعداد التفكير. اختر نموذجًا آخر لهذا الوكيل، ثم أرسل رسالتك مرة أخرى.",
   "error.provider.usageLimitReached": "بلغ الحساب حد الاستخدام.",

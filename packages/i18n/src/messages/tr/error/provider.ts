@@ -13,6 +13,7 @@ export const messages = {
     "{provider} oturumunu kaybetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} bir mesajı reddetti, bu yüzden OpenBot işlemini sonlandırdı. Mesajınızı yeniden gönderin.",
+  "error.provider.acpServerLost": "{provider} bağlantısını kaybetti. Mesajınızı yeniden gönderin.",
   "error.provider.acpSettingsTimedOut": "{provider} zamanında yanıt vermedi. Biraz sonra yeniden deneyin.",
   "error.provider.acpPlanUsedUp":
     "{provider}, planınızın kullanım hakkının bittiğini bildiriyor. Başka bir model seçin veya {provider} planınızı yükseltin.",
@@ -347,6 +348,8 @@ export const messages = {
     "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Pazaryeri, Uygulamalar bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
   "error.provider.hermesRefused":
     "Hermes bu mesajı başlamadan önce reddetti. Yeniden gönderin. Hermes her mesajı reddediyorsa bu ajanı çalıştıran bilgisayarda OpenBot'u yeniden başlatın.",
+  "error.provider.hermesConnectionLost":
+    "Hermes bu mesaj sırasında bağlantısını kaybetti, bu yüzden işin bitip bitmediğini bilmiyor. Mesajı yeniden göndermeden önce ajanın ne yaptığını kontrol edin.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot bu modeli kullanamadı: model, düşünme ayarını kabul etmedi. Bu ajan için başka bir model seçin, sonra mesajınızı yeniden gönderin.",
   "error.provider.usageLimitReached": "Hesap kullanım sınırına ulaştı.",

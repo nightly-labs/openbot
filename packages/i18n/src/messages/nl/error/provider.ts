@@ -12,6 +12,7 @@ export const messages = {
     "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} heeft een bericht geweigerd, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLost": "{provider} heeft de verbinding verloren. Stuur je bericht opnieuw.",
   "error.provider.acpSettingsTimedOut": "{provider} reageerde niet op tijd. Probeer het zo opnieuw.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
@@ -342,6 +343,8 @@ export const messages = {
     "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
   "error.provider.hermesRefused":
     "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
+  "error.provider.hermesConnectionLost":
+    "Hermes heeft tijdens dit bericht de verbinding verloren en weet dus niet of het werk klaar is. Controleer wat de agent heeft gedaan voordat je het bericht opnieuw stuurt.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",

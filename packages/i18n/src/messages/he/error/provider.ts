@@ -12,6 +12,7 @@ export const messages = {
     "ההתחברות של {provider} אבדה, ולכן OpenBot סיים את התהליך שלו. יש לשלוח את ההודעה שוב.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} דחה הודעה, ולכן OpenBot סיים את התהליך שלו. יש לשלוח את ההודעה שוב.",
+  "error.provider.acpServerLost": "{provider} איבד את החיבור שלו. יש לשלוח את ההודעה שוב.",
   "error.provider.acpSettingsTimedOut": "{provider} לא הגיב בזמן. יש לנסות שוב בעוד רגע.",
   "error.provider.acpPlanUsedUp":
     "{provider} מדווח שהתוכנית שלך נוצלה במלואה. יש לבחור מודל אחר או לשדרג את התוכנית של {provider}.",
@@ -318,6 +319,8 @@ export const messages = {
     "Hermes לא הצליח לסיים את התור הזה. אם התשובה שלו מציינת סיבה, פעל לפיה. אם לא, ייתכן ששרת MCP של הסוכן הזה אינו זמין: בדוק אותו בחנות, אפליקציות, ואז שלח את ההודעה שוב.",
   "error.provider.hermesRefused":
     "Hermes דחה את ההודעה הזו לפני שהתחילה. שלח אותה שוב. אם Hermes דוחה כל הודעה, הפעל מחדש את OpenBot במחשב שמריץ את הסוכן הזה.",
+  "error.provider.hermesConnectionLost":
+    "Hermes איבד את החיבור שלו במהלך ההודעה הזו, ולכן הוא לא יודע אם העבודה הסתיימה. יש לבדוק מה הסוכן עשה לפני שליחת ההודעה שוב.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot לא הצליח להשתמש במודל הזה: המודל לא קיבל את הגדרת החשיבה שלו. בחרו מודל אחר לסוכן הזה ושלחו שוב את ההודעה.",
   "error.provider.usageLimitReached": "החשבון הגיע למגבלת השימוש שלו.",
