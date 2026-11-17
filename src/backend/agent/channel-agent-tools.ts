@@ -8,6 +8,7 @@ import {
   type ChannelDraft,
   isAvatarHue,
 } from "@openbot/contracts/ipc";
+import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
 import { z } from "zod";
 import type { ChannelService } from "../channel-service";
@@ -293,6 +294,10 @@ export const handleChannelAgentTool = Effect.fn("ChannelAgentTool.handle")(funct
   // takes the same changes as an open one and the archive stops the work they start. The changes
   // are checked first, so that a refused change does not leave the channel restored.
   const stored = channels.store.get(channelId);
+  // The archive comes last and the service refuses it while a task runs there, so this refuses first
+  // and the other changes are not saved without it.
+  if (archived === true && !stored.archived && channels.store.tasks(channelId).some((task) => task.state === "running"))
+    throw new Error(sourceText("error.backend.channelArchiveRunning"));
   if (archived === false && stored.archived) {
     if (changesDraft) updatedChannelDraft(stored, args, agents);
     yield* channels.command({ type: "restore", operationId: `${operationId}:restore`, channelId }, actor);
