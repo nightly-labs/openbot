@@ -580,6 +580,30 @@ export class MailboxStore {
   }
 
   /**
+   * Whether the side thread that sent this message still waits for `agentId`: the thread sent it a
+   * request that asked for an answer, and `agentId` has not answered that request. A linked question
+   * back is not an answer.
+   */
+  sideThreadWaitsFor(agentId: string, messageId: string): boolean {
+    const message = this.#state.messages.find((candidate) => candidate.id === messageId);
+    if (!message?.senderTaskId || message.sender.kind !== "agent") return false;
+    const { senderTaskId, sender } = message;
+    return this.#state.messages.some(
+      (request) =>
+        request.senderTaskId === senderTaskId &&
+        request.sender.kind === "agent" &&
+        request.sender.agentId === sender.agentId &&
+        request.expectsReply !== false &&
+        this.#state.deliveries.some(
+          (delivery) => delivery.messageId === request.id && delivery.recipientAgentId === agentId,
+        ) &&
+        !this.#state.messages.some(
+          (answer) => isAnswer(answer) && answer.sender.agentId === agentId && answer.replyToMessageId === request.id,
+        ),
+    );
+  }
+
+  /**
    * The deliveries of requests that an agent sent from one messaging link, whose answer goes back to
    * it, and that have not ended.
    */

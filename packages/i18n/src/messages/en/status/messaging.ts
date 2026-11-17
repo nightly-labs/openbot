@@ -58,6 +58,12 @@ export const messages = defineMessages("status.messaging", {
     "👋 *OpenBot is connected*\n\nWrite here to ask your agents. The WhatsApp Orchestrator answers, or gives the work to the right agent.\n\nSend *stop* to stop a request.",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot is connected*\n\nThe people you allow in OpenBot can now write to this number. A new person gets a code: approve it in OpenBot under Requests.\n\nSend *stop* to stop a request.",
+  // Notices in the owner's own chat when another OpenBot is linked to the same number, or when the
+  // chat gets requests too fast, as two OpenBots that answer each other do.
+  "status.messaging.whatsappOtherOpenBot":
+    "Another OpenBot is linked to this WhatsApp number, so you can get two answers. To fix this, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
+  "status.messaging.whatsappPaused":
+    "OpenBot stopped answering here for 10 minutes: too many messages came in a short time. If another OpenBot is linked to this number, open Linked devices in WhatsApp on your phone and log out the OpenBot that you do not use.",
   "status.messaging.whatsappOrchestratorName": "WhatsApp Orchestrator",
   "status.messaging.whatsappOrchestratorTitle": "Answers in WhatsApp and asks the team",
 });

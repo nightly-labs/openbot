@@ -218,7 +218,7 @@ import type { AgentLibraryFolders } from "./agent/library-folder-tools";
 import { LiveVoice, type LiveVoiceOwner, type LiveVoiceReply } from "./agent/live-voice";
 import { MailboxSync } from "./agent/mailbox-sync";
 import { type GitHubConnectorSource, McpGateway, type TestMcpServerOptions } from "./agent/mcp-gateway";
-import { type MarketplaceAppServer, mcpServersFromGateway } from "./agent/mcp-tools";
+import { type MarketplaceAppServer, mcpFallbackRunsServer, mcpServersFromGateway } from "./agent/mcp-tools";
 import { MemoryHold } from "./agent/memory-hold";
 import { MEMORY_REVIEW_MESSAGES, MemoryReview } from "./agent/memory-review";
 import { MemoryReviewCursors } from "./agent/memory-review-cursors";
@@ -1663,10 +1663,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       schedule: (agentId) => this.#drain.scheduleDrain(agentId),
       queueChanged: (agentId) => this.#mailboxSync.emitQueue(agentId),
       // A conversation in the messaging lane waits for that lane only. The others wait in the own chat's lane.
+      // A turn that the provider started itself has no delivery, but the lane still waits for it.
       busy: (agentId, linkId) =>
         this.#mailbox.inMessagingLane(agentId, linkId)
           ? this.#mailbox.laneActive(agentId, MESSAGING_LANE) ||
-            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0
+            this.#mailbox.laneQueuedIds(agentId, MESSAGING_LANE).length > 0 ||
+            this.#drain.messagingTurnActive(agentId)
           : Boolean(this.#conversation.workingSnapshot(agentId)?.activeTurnId || this.#mailbox.nextQueued(agentId)),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toMessagingThreadFailed),
       forgetThread: (threadId) => this.#forgetExecutionThread(threadId).pipe(toMessagingThreadFailed),
@@ -2022,13 +2024,16 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       ...(options.screenCapture === undefined ? {} : { screenCapture: options.screenCapture }),
       ...(options.videoReader === undefined ? {} : { videoReader: options.videoReader }),
       ...(options.fitImage === undefined ? {} : { fitImage: options.fitImage }),
-      // The saved http rows that the agent gets. The built-in servers are left out: OpenBot gives their
-      // tools another way, and their bearer is the main process's. A stdio server is left out too: a
-      // Workspace only provider starts it in its sandbox, and OpenBot would start it outside.
+      // The saved rows that the agent gets. The built-in servers are left out: OpenBot gives their
+      // tools another way, and their bearer is the main process's. `mcpFallbackRunsServer` leaves out a
+      // stdio server of a Workspace only agent.
       mcpServers: mcpServersFromGateway(this.#mcp, options.prepareMcpTest, (agentId) => {
+        // An agent that is not found gets only the http rows, as a Workspace only agent does.
+        const agent = this.#store.list().find((candidate) => candidate.id === agentId) ?? { access: "workspace" };
         const saved = new Set(this.#mcp.list().map((config) => config.id));
         return this.enabledMcpServers(agentId).filter(
-          (config) => saved.has(config.id) && config.transport === "http" && !isReservedMcpServerName(config.name),
+          (config) =>
+            saved.has(config.id) && mcpFallbackRunsServer(config, agent) && !isReservedMcpServerName(config.name),
         );
       }),
       ...(options.marketplaceAppServer === undefined ? {} : { marketplaceAppServer: options.marketplaceAppServer }),
@@ -3651,9 +3656,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The pin of an update, or undefined to keep it (#9116). An agent that names an account of a pooled
-   * provider pins it, and an agent that names the provider's own sign-in gives the account back to
-   * the pool. A person's change of the provider, model or account in the app, which shows the pool as
-   * one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
+   * provider pins it, also the provider's own sign-in as "default", and an agent that names null
+   * gives the account back to the pool. A person's change of the provider, model or account in the
+   * app, which shows the pool as one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
    * it when the agent moves to another account.
    */
   #accountPin(
@@ -3668,7 +3673,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? null
         : undefined;
     if (input.providerAccountId === undefined) return undefined;
-    return next?.providerAccountId && this.#pooled(next) ? next.providerAccountId : null;
+    if (!next || !this.#pooled(next)) return null;
+    // The provider's own sign-in is an account too: an agent that names "default" keeps it (#10661).
+    // Only null gives the agent to the pool.
+    if (next.providerAccountId) return next.providerAccountId;
+    return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
   }
 
   /** An update of the account alone also takes the new account's model when `#modelForAccount` gives one. */
@@ -4987,7 +4996,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   resolveSharedFile(
     inputPath: string,
-    options?: { allowDirectory?: boolean },
+    options?: { allowDirectory?: boolean; followLinks?: boolean },
   ): Effect.Effect<ResolvedSharedFile, AgentLifecycleFailed> {
     return resolveSharedFile(this.#store.sharedRoot, inputPath, options).pipe(
       Effect.mapError((failure) => new AgentLifecycleFailed({ operation: "resolveSharedFile", cause: failure.cause })),

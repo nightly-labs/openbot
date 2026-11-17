@@ -897,20 +897,49 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
     thread.turn = turn;
     this.#disarmIdle(thread);
     this.#notify("turn/started", thread, { turn: { id: turn.id, status: "inProgress" } });
+    const fail = (failure: ProviderClientOperationError) =>
+      thread.turn === turn
+        ? this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause))
+        : Effect.void;
+    let answered = false;
     // Subscribe before sending: a completed event can precede the prompt acknowledgement.
+    // Pi acknowledges only after it prepares the run, which can compact the session first. A late
+    // acknowledgement must not end a turn that Pi still runs (#10348), so the prompt has no limit.
     yield* Effect.forkIn(
-      thread.rpc.request({ type: "prompt", ...prompt, message }, this.options.requestTimeoutMs).pipe(
+      thread.rpc.request({ type: "prompt", ...prompt, message }, null).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            answered = true;
+          }),
+        ),
         Effect.flatMap((response) =>
           response.disposition === "handled" && thread.turn === turn ? this.#finish(thread, "completed") : Effect.void,
         ),
-        Effect.catch((failure) =>
-          thread.turn === turn
-            ? this.#finish(thread, "failed", this.#redact(String(failure.cause)), classifyFailure(failure.cause))
-            : Effect.void,
-        ),
+        Effect.catch(fail),
       ),
       this.#scope,
       { startImmediately: true },
+    );
+    // A Pi that has not acknowledged by the usual limit fails the turn only when it is idle or does not
+    // answer. While Pi works, the turn ends at `agent_settled`, or by the stall watch.
+    yield* Effect.forkIn(
+      Effect.sleep(this.options.requestTimeoutMs ?? PI_REQUEST_TIMEOUT_MS).pipe(
+        Effect.andThen(
+          Effect.suspend(() =>
+            answered || thread.turn !== turn
+              ? Effect.void
+              : thread.rpc.request({ type: "get_state" }, this.options.requestTimeoutMs).pipe(
+                  Effect.flatMap((state) =>
+                    answered || turn.waitingOnUser > 0 || state.isStreaming === true || state.isCompacting === true
+                      ? Effect.void
+                      : fail(providerFailure(new RequestTimeoutError("Pi", "prompt"))),
+                  ),
+                  Effect.catch((failure) => (answered ? Effect.void : fail(failure))),
+                ),
+          ),
+        ),
+      ),
+      this.#scope,
     );
     yield* Effect.forkIn(this.#watchStall(thread, turn), this.#scope);
     return { turn: { id: turn.id, status: "inProgress" }, turnId: turn.id };

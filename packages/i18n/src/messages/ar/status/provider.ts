@@ -9,6 +9,11 @@ export const messages = {
   "status.provider.confirmCancel": "إلغاء",
   "status.provider.retryUnreachable": "لا يستطيع {provider} الاتصال بخادمه. المحاولة {attempt} من {maxAttempts}.",
   "status.provider.retryServerError": "خادم {provider} مشغول أو به خطأ. المحاولة {attempt} من {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "لا يستطيع {provider} الاتصال بمزود النموذج. يحاول مرة أخرى: المحاولة {attempt}.",
+  "status.provider.modelRetryServerError":
+    "مزود النموذج مشغول أو به خطأ. يحاول {provider} مرة أخرى: المحاولة {attempt}.",
+  "status.provider.modelRetryRecovered": "يجيب مزود النموذج مجددًا.",
   "status.provider.retryRecovered": "يتلقى {provider} الإجابات من خادمه مجددًا.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "أجاب Claude بالسرعة العادية. مع اشتراك Claude، يستخدم الوضع السريع أرصدة الاستخدام. شغّلها في حسابك على Claude.",

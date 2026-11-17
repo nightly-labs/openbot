@@ -109,6 +109,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * new session, which writes the full conversation to the cache again.
    */
   readonly turnContext = true;
+  readonly modelAddressVariable?: string;
   /**
    * Kept by thread across process restarts: a resumed thread holds the blocks that it was sent.
    * Given by the provider context, so it also outlives this client: the idle release replaces the
@@ -152,6 +153,8 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     turnContext = new TurnContext(),
     /** `key=value` config overrides, each given to the app-server as one `-c`. */
     configOverrides: readonly string[] = [],
+    /** The variable whose address the overrides send the model requests to. */
+    modelAddressVariable?: string,
   ) {
     super();
     this.#turnContext = turnContext;
@@ -159,6 +162,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     this.#requestTimeoutMs = requestTimeoutMs;
     this.#extraEnv = extraEnv;
     this.#configOverrides = configOverrides;
+    if (modelAddressVariable) this.modelAddressVariable = modelAddressVariable;
   }
 
   get running(): boolean {

@@ -72,6 +72,7 @@ import { memoryChangesMessage } from "./memory-changes-message";
 import { type PlanContinuation, waitsForUser } from "./plan-continuation";
 import { PLAN_UPDATED_METHOD, planFromNotification } from "./plan-updates";
 import {
+  GEMINI_INVALID_CREDENTIALS,
   isBalanceDiagnostic,
   isPlanLimitDiagnostic,
   isUsageLimitDiagnostic,
@@ -171,6 +172,14 @@ const FAILOVER_CAUSES: ReadonlySet<CauseCode> = new Set([
   "timeout",
   "empty_answer",
 ]);
+
+/**
+ * Google refused the access token of the Antigravity CLI. The CLI refreshes the token itself, and
+ * the new one was ready less than a second later (#10367).
+ */
+function isRefusedGeminiToken(provider: string | undefined, message: string): boolean {
+  return provider === "antigravity" && GEMINI_INVALID_CREDENTIALS.test(message);
+}
 
 /**
  * The provider errors after which a backup model continues the work that the turn started, as after a
@@ -827,6 +836,7 @@ export class TurnLifecycle {
           severity: "error",
         },
         true,
+        client,
       );
       // As a Stop does, the turn ends with Codex's `turn/completed`. A request that times out starts the
       // probe that ends a process that does not answer (`CodexAppServerClient.#checkAnswering`).
@@ -856,6 +866,7 @@ export class TurnLifecycle {
         severity: "error",
       },
       false,
+      client,
       sourceText("error.agent.compactionLoopStopped", { provider: agentProviderName(client.provider) }),
     );
     Effect.runFork(client.request("turn/interrupt", { threadId, turnId }, decodeRecordResponse).pipe(Effect.ignore));
@@ -872,13 +883,24 @@ export class TurnLifecycle {
     turnId: string,
     context: FailureContext & { causeCode: CauseCode },
     stalled: boolean,
+    client: AgentClient,
     loopMessage?: string,
   ): void {
     const held = this.#compactionFailures.get(turnId);
     // An error that Codex sends for the compaction that the loop stop ended keeps the loop's reason.
     if (held?.loop) return;
     const loop = loopMessage !== undefined;
-    const message = loopMessage ?? sourceText("error.agent.compactionConnectionLost");
+    // A web page from a wrong model address also reads as a lost connection, so the text names the
+    // address that the user set too (#10165).
+    const variable = client.modelAddressVariable;
+    const message =
+      loopMessage ??
+      (variable
+        ? sourceText("error.agent.compactionConnectionLostAddress", {
+            provider: agentProviderName(client.provider),
+            variable,
+          })
+        : sourceText("error.agent.compactionConnectionLost"));
     // An error that Codex sends after the deadline stopped the turn keeps the turn stopped by it. A
     // loop stop is always OpenBot's, so its `interrupted` end is a failure too.
     const stopped = stalled || loop || held?.stalled === true;
@@ -907,9 +929,9 @@ export class TurnLifecycle {
   /**
    * Codex ends a turn with no answer as completed. A lead that got its teammates' results and ended
    * that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn with no
-   * answer does, and its end runs it again or shows the error. A turn that wants no answer, a turn
-   * that compacted, a plan, a turn that the user stopped and the first turn of an agent that another
-   * agent made can end empty.
+   * answer does, and its end runs it again or shows the error. A teammate update, a quiet routine run
+   * after its no-update call, a turn that compacted, a plan, a turn that the user stopped and the
+   * first turn of an agent that another agent made can end empty.
    *
    * Codex can also write its last words as narration and then send an empty answer. Codex itself
    * takes that narration as the turn's result, so the narration after the last tool step becomes the
@@ -935,7 +957,9 @@ export class TurnLifecycle {
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
       deliveries.every(({ delivery }) => this.#quietTeammateTurnDelivery(delivery)) ||
-      this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
+      // A quiet routine run ends empty only after the no-update call. With no call, no answer and no
+      // step, it did nothing, and its run showed as succeeded with no message (#10453).
+      (this.#noUpdateTurns.has(turnId) && this.#quietRoutineTurn(agentId, threadId, deliveries, true))
     )
       return false;
     // The agent's own chat is cached under its own thread id, not the provider's. With the provider's
@@ -1591,12 +1615,13 @@ export class TurnLifecycle {
             causeCode: context.causeCode,
             message: this.#hooks.redactMcp(message),
           });
-          this.#holdCompactionFailure(errorTurnId, context, false);
+          this.#holdCompactionFailure(errorTurnId, context, false, source);
           return;
         }
         // A provider error moves an agent set to switch without asking to its next backup model. The
         // error waits for the end of the turn: a turn that did nothing yet runs again there instead.
         // A turn with no answer waits also with no backup: teammate results can run again (#7225).
+        // So does a Gemini token that Google refused: the turn can run again on the same model (#10367).
         if (
           notification.method === "error" &&
           agentId &&
@@ -1605,6 +1630,7 @@ export class TurnLifecycle {
           FAILOVER_CAUSES.has(context.causeCode) &&
           ((context.causeCode === "empty_answer" &&
             !(threadId && this.#compaction.isCompactionTurn(threadId, errorTurnId))) ||
+            isRefusedGeminiToken(source.provider, message) ||
             this.#mayHoldError(agentId, errorTurnId, context.causeCode))
         ) {
           this.#failoverTurns.set(errorTurnId, { message, context, ...(link ? { link } : {}) });
@@ -2060,20 +2086,21 @@ export class TurnLifecycle {
       // answer (#7225). With no backup to take it, the turn runs once more on the same model, in a
       // thread too (#8503). So does the turn of an
       // external chat, whose person waits for the result (#8573); a channel task does not. It did no
-      // step, so it repeats nothing. A second empty run shows the error.
+      // step, so it repeats nothing. A second empty run shows the error. A turn that Google refused
+      // with an old Gemini token runs once more too, for each sender: the CLI had a new token less
+      // than a second later (#10367). A second refusal shows the error.
       const runsAgainHere =
         !failedOver &&
         mayRunAgain &&
-        failover.context.causeCode === "empty_answer" &&
         failedKey !== null &&
         deliveries.length > 0 &&
         this.#conversation.channelForThread(snapshot.threadId) === null &&
-        deliveries.every(
-          ({ delivery }) =>
-            delivery.sender.kind === "agent" &&
-            Boolean(delivery.replyToMessageId) &&
-            !this.#failoverRetries.get(delivery.id)?.has(failedKey),
-        );
+        deliveries.every(({ delivery }) => !this.#failoverRetries.get(delivery.id)?.has(failedKey)) &&
+        (isRefusedGeminiToken(failover.context.provider, failover.message) ||
+          (failover.context.causeCode === "empty_answer" &&
+            deliveries.every(
+              ({ delivery }) => delivery.sender.kind === "agent" && Boolean(delivery.replyToMessageId),
+            )));
       // The work that this turn did, so that the backup model continues it and does not do it again.
       const continuedWork = Effect.gen({ self: this }, function* () {
         const workSteps = running

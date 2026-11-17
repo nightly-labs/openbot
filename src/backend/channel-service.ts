@@ -280,6 +280,8 @@ export class ChannelService {
   readonly #preparedChanges = new Map<string, number>();
   /** By delivery: the channel facts and memories in its packet. */
   readonly #preparedFacts = new Map<string, DeliveredChannelText>();
+  /** The prepared deliveries that continue their request after sub-tasks (#8812). */
+  readonly #resumedDeliveries = new Set<string>();
 
   constructor(
     database: OpenBotDatabase,
@@ -1591,6 +1593,21 @@ export class ChannelService {
           const agents = this.hooks
             .agents()
             .filter((agent) => channel.members.some((member) => member.agentId === agent.id));
+          // The prompt names each agent by a short key, not by its long id: a model that miscopied one
+          // character of an id named no member, and the request stopped (#10158). An answer that gives
+          // a full id still counts. A key is never the id of a member, so it names one agent only.
+          const memberIds = new Set([...channel.members.map((member) => member.agentId), lead.id]);
+          const memberKeys = new Map<string, string>();
+          const agentOfKey = new Map<string, string>();
+          let keyNumber = 0;
+          for (const agentId of memberIds) {
+            keyNumber++;
+            while (memberIds.has(`m${keyNumber}`)) keyNumber++;
+            memberKeys.set(agentId, `m${keyNumber}`);
+            agentOfKey.set(`m${keyNumber}`, agentId);
+          }
+          const keyOf = (agentId: string) => memberKeys.get(agentId) ?? agentId;
+          const agentOf = (id: string) => agentOfKey.get(id) ?? id;
           const recent = channelResult(
             yield* Effect.result(
               channelSync(() => this.store.messages(channelId, undefined, ROUTING_RECENT_MESSAGES + 1)),
@@ -1605,7 +1622,7 @@ export class ChannelService {
             .slice(-ROUTING_RECENT_MESSAGES)
             .map((item) => ({
               id: item.id,
-              author: item.author,
+              author: item.author.kind === "agent" ? { ...item.author, id: keyOf(item.author.id) } : item.author,
               taskId: item.taskId,
               text: item.message.text.slice(-ROUTING_TEXT_CHARACTERS),
             }));
@@ -1613,7 +1630,7 @@ export class ChannelService {
             .filter((item) => !terminal(item))
             .map((item) => ({
               id: item.id,
-              ownerAgentId: item.ownerAgentId,
+              ownerAgentId: item.ownerAgentId && keyOf(item.ownerAgentId),
               state: item.state,
               instruction: item.instruction.slice(0, ROUTING_TEXT_CHARACTERS),
             }));
@@ -1623,10 +1640,10 @@ export class ChannelService {
               JSON.stringify({
                 title: channel.title,
                 instructions: channel.instructions,
-                lead: lead.id,
-                members: channel.members,
+                lead: keyOf(lead.id),
+                members: channel.members.map((member) => ({ ...member, agentId: keyOf(member.agentId) })),
                 agents: agents.map(({ id, name, title, description }) => ({
-                  id,
+                  id: keyOf(id),
                   name,
                   title,
                   description: description.slice(0, descriptionCharacters),
@@ -1798,13 +1815,24 @@ export class ChannelService {
                   : "question" in decision
                     ? [lead.id]
                     : "agentId" in decision
-                      ? [decision.agentId]
-                      : decision.agentIds,
+                      ? [agentOf(decision.agentId)]
+                      : decision.agentIds.map(agentOf),
             ),
           ];
-          // A member the model named that cannot take work is left out; with none left, the first
-          // one gives the reason.
-          const [owner, ...rest] = picked.filter((agentId) => eligible.includes(agentId));
+          // A member the model named that cannot take work is left out. With none left, the lead takes
+          // the request, as it takes an unreadable answer: the person gets an answer, not a stopped
+          // request (#10158). When the lead cannot take work either, the first one gives the reason.
+          const chosen = picked.filter((agentId) => eligible.includes(agentId));
+          if (!chosen.length && eligible.includes(lead.id)) {
+            logger.warn("A routing answer named no member who can take work, so the lead takes the request.", {
+              channelId,
+              provider: lead.provider,
+              model: lead.model,
+              named: picked.length,
+            });
+            chosen.push(lead.id);
+          }
+          const [owner, ...rest] = chosen;
           if (!owner) {
             const first = picked[0] ?? lead.id;
             channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, first))));
@@ -2250,6 +2278,7 @@ export class ChannelService {
       this.#deltas.delete(deliveryId);
       this.#preparedChanges.delete(deliveryId);
       this.#preparedFacts.delete(deliveryId);
+      this.#resumedDeliveries.delete(deliveryId);
       const assignment = yield* channelSync(() => this.store.assignmentForDelivery(deliveryId));
       if (!assignment || !activeAssignment(assignment)) return;
       const tasks = yield* channelSync(() => this.store.tasks(assignment.channelId));
@@ -2516,6 +2545,36 @@ export class ChannelService {
     yield* this.wake();
   }).bind(this);
 
+  /**
+   * Whether this channel delivery continues its request after the sub-tasks that it waited for ended.
+   * `prepare` decides it once, so the chat row and the packet agree.
+   */
+  resumesAfterSubtasks(deliveryId: string): boolean {
+    return this.#resumedDeliveries.has(deliveryId);
+  }
+
+  /**
+   * An earlier assignment of the same request to the same member waited for fewer tasks, so this one
+   * continues that request with the results of the new ones. Its delivery repeats the request, but the
+   * person did not send it again (#8812). A run again after a usage limit continues too when an earlier
+   * one waited for fewer tasks. A member that takes the task from another one, with a transfer or a
+   * reassign, gets the request for the first time.
+   */
+  #resumesAfterSubtasks(assignment: ChannelAssignment): boolean {
+    if (assignment.awaitedTaskIds.length === 0) return false;
+    return this.store
+      .assignments(assignment.channelId)
+      .some(
+        (item) =>
+          item.id !== assignment.id &&
+          item.taskId === assignment.taskId &&
+          item.agentId === assignment.agentId &&
+          item.requestMessageId === assignment.requestMessageId &&
+          item.taskRevision < assignment.taskRevision &&
+          assignment.awaitedTaskIds.some((id) => !item.awaitedTaskIds.includes(id)),
+      );
+  }
+
   readonly prepare = Effect.fn("ChannelService.prepare")(function* (
     this: ChannelService,
     delivery: DeliveryContext,
@@ -2536,6 +2595,9 @@ export class ChannelService {
     const delivered = this.#deliveredContext(channel.id, context, agent);
     const budget = this.hooks.contextCharacters?.(agent.id, context.threadId);
     yield* this.#awaitSummary(channel.id, budget);
+    const resumed = this.#resumesAfterSubtasks(assignment);
+    if (resumed) this.#resumedDeliveries.add(delivery.delivery.id);
+    else this.#resumedDeliveries.delete(delivery.delivery.id);
     const history = yield* this.#history.prepare(
       task,
       agent,
@@ -2543,6 +2605,7 @@ export class ChannelService {
       delivered,
       this.#peers(tasks, task),
       budget,
+      resumed,
     );
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
@@ -2650,6 +2713,7 @@ export class ChannelService {
       this.#preparedChanges.delete(deliveryId);
       const facts = this.#preparedFacts.get(deliveryId);
       this.#preparedFacts.delete(deliveryId);
+      this.#resumedDeliveries.delete(deliveryId);
       const cursor =
         prepared === undefined || prepared === this.store.completedMessageChanges(assignment.channelId)
           ? { throughSequence: assignment.throughSequence, summaryVersion: assignment.summaryVersion }

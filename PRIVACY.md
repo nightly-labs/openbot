@@ -465,6 +465,13 @@ server. The key never leaves this computer. Anyone who can read your files can r
 protect this computer as you protect your home folder. Delete the file to go back to the keyring;
 then sign in again and save the secrets again.
 
+On macOS, that protection is the Keychain. When the Keychain refuses OpenBot (for example after
+"Deny" at its prompt, or with no usable login keychain), OpenBot makes the same random key in
+`~/Library/Application Support/OpenBot/secret-storage.key` (mode `0600`) and encrypts new secrets
+with it while the Keychain cannot encrypt. Secrets that the Keychain keeps stay there, and when the
+Keychain works again, it keeps the new secrets. Delete the file only when no secret uses it; a
+secret that it encrypted then cannot be read, and you must sign in again or save it again.
+
 The desktop app also keeps, for each joined server, the ID of its logical remote session and the
 Signal address, so that the next start asks only for a new ticket. The file
 (`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
@@ -1015,7 +1022,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
   not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
-  start. API keys are redacted from logs, exports and diagnostics. A password that the
+  start. When an agent has a key folder from 0.69 or earlier, or from a save without a Vault, each key
+  for that agent only is also readable in that folder, `agent-api-keys/<agentId>/<NAME>`: a link to the
+  Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
+  and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
   joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
   to that server's Vault, not to the Vault of the computer where it was typed. The

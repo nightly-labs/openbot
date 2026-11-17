@@ -9,6 +9,9 @@
 //    `scripts/hosting/openbot-hosted-server` starts it. The upgrade keeps the keyring and makes no key
 //    file. One start without the keyring (a direct launch) makes the key file; after it, the secret of
 //    the keyring still opens, and new secrets use the key file.
+// 5. The macOS rules (#10281), on this Linux `safeStorage`: a Keychain that cannot encrypt gives the
+//    key file, as in case 1. A secret that does not open (here: a new keyring) makes no key file.
+//    A Keychain that works again keeps the new secrets, also when the key file exists.
 // No start makes the key file before `ready`, when `safeStorage` has no key yet.
 // Cases 2, 3 and 4 need `dbus-run-session` and `gnome-keyring-daemon`; without them the report marks
 // them as skipped.
@@ -69,6 +72,8 @@ interface Step {
   keyring?: string;
   /** Electron switches, such as the `--password-store` of a hosted server. */
   switches?: string[];
+  /** The rules of another platform in `createSecretStorage`. */
+  platform?: "darwin";
 }
 
 interface StepResult extends Step {
@@ -124,6 +129,21 @@ try {
     assert.equal(read?.madeKeyFile, false, "no keyring: a restart uses the same key file");
   }
 
+  // 5. The macOS rules, with no keyring: the Keychain refused OpenBot.
+  {
+    const steps = await runCase("macOS rules: no keyring", [
+      { name: "first start writes", step: "write", value: "secret-without-keychain", platform: "darwin" },
+      { name: "restart reads", step: "read", platform: "darwin" },
+    ]);
+    const [write, read] = steps;
+    assert.equal(write?.keyringAvailable, false, "macOS, no Keychain: safeStorage has no key");
+    assert.equal(write?.keyFileBeforeReady, false, "macOS, before ready: no key file is made");
+    assert.equal(write?.canPersist, true, "macOS, no Keychain: the secret can be kept");
+    assert.equal(write?.format, "obk1", "macOS, no Keychain: the key file encrypts");
+    assert.equal(write?.keyFileMode, "600", "macOS, no Keychain: only the user reads the key file");
+    assert.equal(read?.readValue, "secret-without-keychain", "macOS, no Keychain: the secret opens after a restart");
+  }
+
   if (hasKeyring) {
     // 2 and 3. One userData folder; the keyring is the same, then new at each start.
     const steps = await runCase("keyring, then a new keyring at each start", [
@@ -172,6 +192,33 @@ try {
     assert.equal(service?.madeKeyFile, false, "hosted: the service start makes no key file");
     assert.equal(serviceWrite?.format, "obk1", "hosted: new secrets use the key file");
     assert.equal(serviceRead?.readValue, "hosted-new-secret", "hosted: the new secret opens after a restart");
+
+    // 5. The macOS rules: a secret that does not open keeps the Keychain for new secrets.
+    const mac = await runCase("macOS rules: a secret that does not open", [
+      { name: "first start writes", step: "write", value: "secret-in-keychain", keyring: "mac-1", platform: "darwin" },
+      { name: "restart with another key reads", step: "read", keyring: "mac-2", platform: "darwin" },
+    ]);
+    const [macWrite, macRead] = mac;
+    assert.equal(macWrite?.format, "v11", "macOS: a Keychain that works encrypts");
+    assert.ok(macRead?.error, "macOS: the secret with another key does not open");
+    assert.equal(macRead?.madeKeyFile, false, "macOS: a failed read makes no key file");
+    assert.equal(macRead?.keyFileMode, null, "macOS: still no key file");
+
+    const macBack = await runCase("macOS rules: the Keychain works again", [
+      { name: "a start with no Keychain writes", step: "write", value: "secret-in-file", platform: "darwin" },
+      {
+        name: "the next start writes",
+        step: "write",
+        value: "secret-in-keychain",
+        keyring: "mac-3",
+        platform: "darwin",
+      },
+      { name: "restart reads", step: "read", keyring: "mac-3", platform: "darwin" },
+    ]);
+    const [refused, worksAgain, readAgain] = macBack;
+    assert.equal(refused?.format, "obk1", "macOS, no Keychain: the key file encrypts");
+    assert.equal(worksAgain?.format, "v11", "macOS: a Keychain that works again encrypts new secrets");
+    assert.equal(readAgain?.readValue, "secret-in-keychain", "macOS: the Keychain secret opens after a restart");
   } else {
     skipped.push("keyring cases: dbus-run-session or gnome-keyring-daemon is missing");
   }
@@ -210,6 +257,7 @@ async function launch(step: Step, userData: string, blob: string): Promise<StepR
     `--blob=${blob}`,
     `--step=${step.step}`,
     ...(step.switches ?? []),
+    ...(step.platform ? [`--platform=${step.platform}`] : []),
     ...(step.value ? [`--value=${step.value}`] : []),
   ];
   const log = openSync(join(OUT, `electron-${index}.log`), "w");

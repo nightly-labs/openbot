@@ -760,6 +760,15 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
 
+OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
+when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
+OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
+of OpenCode 2, an `auth.json` entry, or `OPENCODE_AUTH_CONTENT`. With a key for the provider, the
+flavor shows `error.provider.opencodeProviderRefused`: the provider refused the request, and a VPN,
+a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
+not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
+that text too, because it names the fix in OpenBot's settings for an expired Go key.
+
 #### Turns of a background subagent or shell command
 
 OpenCode 2.2.0 sends session updates only for the execution that a `session/prompt` starts. When a
@@ -803,6 +812,13 @@ the first timeout retry notice after other output or a steer counts as activity:
 does not answer the retry fails the turn after about 11 minutes, with the stall message, and not
 after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
 failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
+
+A provider failure, such as the 502 or 504 of an overloaded endpoint, gets 10 attempts in about 90 s.
+`retryUpdate` of `OPENCODE_ACP_FLAVOR` shows each retry after a provider failure (`provider.internal`),
+a timeout or a lost connection as the turn's status, with the attempt number: OpenCode does not say
+how many attempts it makes. The first output after it replaces the status. When OpenCode gives up, a
+`provider.internal` error shows `error.provider.opencodeProviderFailed`, also when its text matches
+no OpenCode 1 pattern (#10129).
 
 #### Text of two steps
 
