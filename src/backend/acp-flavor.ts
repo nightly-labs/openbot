@@ -154,6 +154,12 @@ export interface AcpFlavor {
    */
   refusesUntilRestart?(error: unknown): boolean;
   /**
+   * Whether a failed prompt says that the agent lost its own server, which can come a moment before
+   * its process exits. The turn then waits for that exit, as for a closed connection, so it ends as
+   * at a process exit: the recovery continues an answer that the exit cut (#10310).
+   */
+  serverLost?(error: unknown): boolean;
+  /**
    * Whether the agent refused to open a session again because a prompt still runs in it, such as a
    * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
    */
