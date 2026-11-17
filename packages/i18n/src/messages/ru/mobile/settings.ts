@@ -551,7 +551,6 @@ export const messages = {
     "Нажмите и удерживайте значок OpenBot, чтобы увидеть эти действия. Можно включить до {count}.",
   "mobile.settings.quickActions.latestChat": "Последний чат",
   "mobile.settings.quickActions.secondChat": "Предпоследний чат",
-  "mobile.settings.quickActions.support": "Попросить отзыв",
   "mobile.settings.shortcuts.title": "Быстрые команды",
   "mobile.settings.shortcuts.agent": "Агент",
   "mobile.settings.shortcuts.none": "Нет",

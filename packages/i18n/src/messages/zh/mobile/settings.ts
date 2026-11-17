@@ -495,7 +495,6 @@ export const messages = {
   "mobile.settings.quickActions.footer": "长按 OpenBot 图标即可看到这些操作。最多可以开启 {count} 个。",
   "mobile.settings.quickActions.latestChat": "最近的聊天",
   "mobile.settings.quickActions.secondChat": "第二近的聊天",
-  "mobile.settings.quickActions.support": "征求反馈",
   "mobile.settings.shortcuts.title": "快捷指令",
   "mobile.settings.shortcuts.agent": "智能体",
   "mobile.settings.shortcuts.none": "无",

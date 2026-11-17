@@ -514,7 +514,6 @@ export const messages = {
     "OpenBot 아이콘을 길게 누르면 이 동작이 표시됩니다. 최대 {count}개까지 켤 수 있습니다.",
   "mobile.settings.quickActions.latestChat": "최근 채팅",
   "mobile.settings.quickActions.secondChat": "두 번째 최근 채팅",
-  "mobile.settings.quickActions.support": "피드백 요청",
   "mobile.settings.shortcuts.title": "단축어",
   "mobile.settings.shortcuts.agent": "에이전트",
   "mobile.settings.shortcuts.none": "없음",

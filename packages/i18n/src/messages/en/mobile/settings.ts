@@ -523,7 +523,6 @@ export const messages = defineMessages("mobile.settings", {
     "Touch and hold the OpenBot icon to see these actions. You can turn on up to {count}.",
   "mobile.settings.quickActions.latestChat": "Latest chat",
   "mobile.settings.quickActions.secondChat": "Second latest chat",
-  "mobile.settings.quickActions.support": "Ask for feedback",
   "mobile.settings.shortcuts.title": "Shortcuts",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "None",

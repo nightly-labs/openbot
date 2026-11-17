@@ -549,7 +549,6 @@ export const messages = {
   "mobile.settings.quickActions.footer": "المس أيقونة OpenBot مطولًا لرؤية هذه الإجراءات. يمكنك تشغيل {count} كحد أقصى.",
   "mobile.settings.quickActions.latestChat": "آخر محادثة",
   "mobile.settings.quickActions.secondChat": "المحادثة قبل الأخيرة",
-  "mobile.settings.quickActions.support": "طلب الملاحظات",
   "mobile.settings.shortcuts.title": "الاختصارات",
   "mobile.settings.shortcuts.agent": "الوكيل",
   "mobile.settings.shortcuts.none": "بلا",

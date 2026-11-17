@@ -165,12 +165,16 @@ function AuthenticatedStack() {
         return;
       }
       whenUnlocked(() => {
+        // The share sheet opens over the current screen, so the user keeps their place.
+        if (target.type === "share") {
+          shareOpenBot();
+          return;
+        }
         closeDrawer();
         if (router.canDismiss()) router.dismissAll();
         if (target.type === "routines")
           router.push({ pathname: "/server-routines", params: { serverId: target.serverId } });
         else if (target.type === "support") router.push("/settings/support");
-        else if (target.type === "share") shareOpenBot();
         else requestHomeSearch();
       });
     },

@@ -522,7 +522,6 @@ export const messages = {
     "Bu eylemleri görmek için OpenBot simgesine dokunup basılı tut. En fazla {count} tanesini açabilirsin.",
   "mobile.settings.quickActions.latestChat": "Son sohbet",
   "mobile.settings.quickActions.secondChat": "Sondan ikinci sohbet",
-  "mobile.settings.quickActions.support": "Geri bildirim iste",
   "mobile.settings.shortcuts.title": "Kestirmeler",
   "mobile.settings.shortcuts.agent": "Ajan",
   "mobile.settings.shortcuts.none": "Yok",

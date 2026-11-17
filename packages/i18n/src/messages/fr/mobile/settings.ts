@@ -536,7 +536,6 @@ export const messages = {
     "Touchez longuement l’icône OpenBot pour voir ces actions. Vous pouvez en activer {count} au maximum.",
   "mobile.settings.quickActions.latestChat": "Dernier chat",
   "mobile.settings.quickActions.secondChat": "Avant-dernier chat",
-  "mobile.settings.quickActions.support": "Demander un avis",
   "mobile.settings.shortcuts.title": "Raccourcis",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Aucun",

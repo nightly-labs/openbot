@@ -1,5 +1,6 @@
 import type { RemoteWorkspacePreferences } from "@openbot/team-client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { supportLog, supportLogValue } from "@/features/support/model/support-log";
 import type { MobileAgent, MobileServer } from "@/features/workspace/model/workspace-types";
 import * as LockedKeychain from "@/shared/lib/locked-keychain";
@@ -53,6 +54,14 @@ export function QuickActionsSync({
     if (hiddenIds(opened.serverId).includes(opened.id)) return;
     setRecents((current) => current && withOpenedAgent(current, opened));
   }, [openedAgentId, agents, hiddenIds]);
+
+  useEffect(() => {
+    // A phone that started the app while locked could not read the choice. It reads it after the unlock.
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") loadQuickActionChoice();
+    });
+    return () => subscription.remove();
+  }, []);
 
   const current = useMemo(
     () => (recents && serversReady ? currentRecentAgents(recents, { servers, agents, hiddenIds }) : null),

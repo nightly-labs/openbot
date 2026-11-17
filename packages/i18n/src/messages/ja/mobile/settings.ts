@@ -524,7 +524,6 @@ export const messages = {
     "OpenBotのアイコンを長押しすると、これらの操作が表示されます。最大{count}個までオンにできます。",
   "mobile.settings.quickActions.latestChat": "最新のチャット",
   "mobile.settings.quickActions.secondChat": "2番目に新しいチャット",
-  "mobile.settings.quickActions.support": "フィードバックを求める",
   "mobile.settings.shortcuts.title": "ショートカット",
   "mobile.settings.shortcuts.agent": "エージェント",
   "mobile.settings.shortcuts.none": "なし",

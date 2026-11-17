@@ -102,10 +102,12 @@ interface ItemsInput {
   t: MobileTranslate;
 }
 
-/** The items that the user chose, in a fixed order. Schedule and Search use the server that the app shows. */
+/**
+ * The items that the user chose, in a fixed order. Chats, Schedule and Search need the server that the
+ * app shows; Share and Support show also with no server.
+ */
 export function quickActionItems({ kinds, recents, servers, activeServerId, t }: ItemsInput): QuickActionItem[] {
   const activeServer = servers.find((server) => server.id === activeServerId);
-  if (!activeServer) return [];
   // With one server, its name tells the user nothing.
   const serverName = (serverId: string) =>
     servers.length > 1 ? (servers.find((server) => server.id === serverId)?.name ?? null) : null;
@@ -123,24 +125,30 @@ export function quickActionItems({ kinds, recents, servers, activeServerId, t }:
         ]
       : [];
   const items: Record<QuickActionKind, () => QuickActionItem[]> = {
-    latestChat: () => chatItem(chats[0]),
-    secondChat: () => chatItem(chats[1]),
-    schedule: () => [
-      {
-        id: quickActionId({ type: "routines", serverId: activeServer.id }),
-        title: t("mobile.app.route.schedule"),
-        subtitle: serverName(activeServer.id),
-        icon: "routines",
-      },
-    ],
-    search: () => [
-      {
-        id: quickActionId({ type: "search" }),
-        title: t("mobile.app.quickAction.search"),
-        subtitle: serverName(activeServer.id),
-        icon: "search",
-      },
-    ],
+    latestChat: () => (activeServer ? chatItem(chats[0]) : []),
+    secondChat: () => (activeServer ? chatItem(chats[1]) : []),
+    schedule: () =>
+      activeServer
+        ? [
+            {
+              id: quickActionId({ type: "routines", serverId: activeServer.id }),
+              title: t("mobile.app.route.schedule"),
+              subtitle: serverName(activeServer.id),
+              icon: "routines",
+            },
+          ]
+        : [],
+    search: () =>
+      activeServer
+        ? [
+            {
+              id: quickActionId({ type: "search" }),
+              title: t("mobile.app.quickAction.search"),
+              subtitle: serverName(activeServer.id),
+              icon: "search",
+            },
+          ]
+        : [],
     share: () => [
       { id: quickActionId({ type: "share" }), title: t("mobile.app.quickAction.share"), subtitle: null, icon: "share" },
     ],

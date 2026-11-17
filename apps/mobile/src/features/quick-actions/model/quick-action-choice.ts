@@ -40,9 +40,6 @@ export function loadQuickActionChoice(): void {
   }
 }
 
-// Writes run in order, so the last change is the one that stays stored.
-let writes: Promise<void> = Promise.resolve();
-
 /** Turns one item on or off. The icon changes at once, also when the phone cannot save the choice. */
 export function saveQuickActionKind(kind: QuickActionKind, enabled: boolean): Promise<void> {
   const current = useQuickActionChoice.getState().kinds;
@@ -50,7 +47,6 @@ export function saveQuickActionKind(kind: QuickActionKind, enabled: boolean): Pr
   if (enabled && !current.includes(kind) && current.length >= QUICK_ACTION_LIMIT) return Promise.resolve();
   const kinds = QUICK_ACTION_KINDS.filter((item) => (item === kind ? enabled : current.includes(item)));
   useQuickActionChoice.setState({ kinds });
-  const write = writes.then(() => LockedKeychain.setItemAsync(key, JSON.stringify(kinds)));
-  writes = write.catch(() => undefined);
-  return write;
+  // The keychain writes of one key run in order, so the last change stays stored.
+  return LockedKeychain.setItemAsync(key, JSON.stringify(kinds));
 }

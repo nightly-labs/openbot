@@ -516,7 +516,6 @@ export const messages = {
     "לחצו לחיצה ארוכה על סמל OpenBot כדי לראות את הפעולות. אפשר להפעיל עד {count}.",
   "mobile.settings.quickActions.latestChat": "הצ׳אט האחרון",
   "mobile.settings.quickActions.secondChat": "הצ׳אט הלפני אחרון",
-  "mobile.settings.quickActions.support": "בקשת משוב",
   "mobile.settings.shortcuts.title": "קיצורים",
   "mobile.settings.shortcuts.agent": "סוכן",
   "mobile.settings.shortcuts.none": "ללא",
