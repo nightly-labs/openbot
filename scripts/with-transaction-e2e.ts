@@ -41,8 +41,7 @@ const rowsOf = (target: OpenBotDatabase) =>
   databaseRows(target.connection.prepare("SELECT label FROM probe ORDER BY id").all()).map((row) =>
     requiredStringColumn(row, "label"),
   );
-const pragmaNumber = (name: string) =>
-  requiredNumberColumn(databaseRows(db().prepare(`PRAGMA ${name}`).all())[0] ?? {}, name);
+const pragma = (name: string) => databaseRows(db().prepare(`PRAGMA ${name}`).all())[0] ?? {};
 
 /** Runs one case on an empty table and asserts its rows, its error, and that no transaction stays open. */
 async function check(name: string, run: () => unknown, rows: string[], error?: RegExp): Promise<CaseResult> {
@@ -79,17 +78,9 @@ try {
   await runCauseEffect(database.initialize());
   db().exec("CREATE TABLE probe(id INTEGER PRIMARY KEY, label TEXT NOT NULL)");
 
-  await check("nested writes commit together", () => nested(["outer", "inner", "innermost"], false), [
-    "outer",
-    "inner",
-    "innermost",
-  ]);
-  await check(
-    "uncaught nested error rolls back every level",
-    () => nested(["outer", "inner", "innermost"], true),
-    [],
-    /forced failure/,
-  );
+  const levels = ["outer", "inner", "innermost"];
+  await check("nested writes commit together", () => nested(levels, false), levels);
+  await check("uncaught nested error rolls back every level", () => nested(levels, true), [], /forced failure/);
   await check(
     "caught nested error rolls back only its level",
     () =>
@@ -105,7 +96,7 @@ try {
     ["outer-before", "outer-after"],
   );
 
-  const pageCount = pragmaNumber("page_count");
+  const pageCount = requiredNumberColumn(pragma("page_count"), "page_count");
   await check(
     "full disk inside a nested write keeps its own error",
     () => {
@@ -191,10 +182,7 @@ try {
   assert.deepEqual(effects, ["inner:rollback", "middle:rollback", "kept:commit", "outer:commit"]);
 
   await check("connection is usable after the failures", () => withTransaction(db(), () => write("after")), ["after"]);
-  assert.equal(
-    requiredStringColumn(databaseRows(db().prepare("PRAGMA integrity_check").all())[0] ?? {}, "integrity_check"),
-    "ok",
-  );
+  assert.equal(requiredStringColumn(pragma("integrity_check"), "integrity_check"), "ok");
   database.close();
 
   const reopened = new OpenBotDatabase(userData);
