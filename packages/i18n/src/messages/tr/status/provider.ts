@@ -10,6 +10,10 @@ export const messages = {
   "status.provider.retryUnreachable": "{provider} sunucusuna bağlanamıyor. Yeniden deneme {attempt}/{maxAttempts}.",
   "status.provider.retryServerError":
     "{provider} sunucusu meşgul veya bir hata verdi. Yeniden deneme {attempt}/{maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} model sağlayıcısına bağlanamıyor. Yeniden deniyor: deneme {attempt}.",
+  "status.provider.modelRetryServerError":
+    "Model sağlayıcısı meşgul veya bir hata verdi. {provider} yeniden deniyor: deneme {attempt}.",
   "status.provider.retryRecovered": "{provider} sunucusundan yeniden yanıt alıyor.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude standart hızda yanıt verdi. Claude aboneliğinde hızlı mod kullanım kredisi harcar. Bunu Claude hesabınızda açın.",
