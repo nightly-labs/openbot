@@ -926,6 +926,11 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                 };
                 const status = () => entryStatus(key);
                 const models = createMemo(() => pickerModels(entryModelOptions(key), props.customProviders));
+                // OpenCode or Pi can list only the models of the endpoints it runs, and those are on the
+                // Custom tab. Its own tab then points there, not to "no models" (#11231).
+                const endpointModelsElsewhere = () =>
+                  provider !== CUSTOM_RAIL &&
+                  railModelOptions(CUSTOM_RAIL).some((option) => option.provider === provider);
                 const [showOlder, setShowOlder] = createSignal(false);
                 const olderExpanded = () => (showOlder() ? "true" : "false");
                 // An endpoint and a custom agent can both list `goose/default`: match the provider too.
@@ -1243,12 +1248,32 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                               <Show
                                 when={provider === CUSTOM_RAIL && !search().trim()}
                                 fallback={
-                                  search().trim()
-                                    ? t("provider.picker.noMatches")
-                                    : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
-                                      provider === "muse"
-                                      ? t("provider.picker.museNoModels")
-                                      : t("provider.picker.noModels", { name: railName(provider, t) })
+                                  <Show
+                                    when={!search().trim() && endpointModelsElsewhere()}
+                                    fallback={
+                                      search().trim()
+                                        ? t("provider.picker.noMatches")
+                                        : // Meta sends a signed-in Muse account an empty list where Muse is not offered (#5983).
+                                          provider === "muse"
+                                          ? t("provider.picker.museNoModels")
+                                          : t("provider.picker.noModels", { name: railName(provider, t) })
+                                    }
+                                  >
+                                    <span>
+                                      {t("provider.picker.endpointModelsInCustom", { name: railName(provider, t) })}
+                                    </span>
+                                    <Button
+                                      type="button"
+                                      size="xs"
+                                      variant="outline"
+                                      onClick={() => {
+                                        selectRailProvider(CUSTOM_RAIL);
+                                        providerButtons.get(CUSTOM_RAIL)?.focus({ preventScroll: true });
+                                      }}
+                                    >
+                                      {t("provider.picker.showCustomModels")}
+                                    </Button>
+                                  </Show>
                                 }
                               >
                                 {/* A saved endpoint lists no model until its provider restarts and reads it. */}
