@@ -5,6 +5,7 @@ import type { BrowserEnvironment, BrowserRecordingArtifact } from "@openbot/cont
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import { BrowserWindow, type WebContents } from "electron";
 import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
+import { isRecorderTabCapture, RECORDER_ORIGIN } from "./browser-recorder-permission";
 import { runCauseEffect } from "./effect-boundary";
 
 const MAX_RECORDING_MS = 5 * 60 * 1_000;
@@ -54,6 +55,8 @@ export class BrowserRecorder {
   readonly #artifacts = new Map<string, BrowserRecordingArtifact>();
   readonly #errors = new Map<string, Error>();
   readonly #starting = new Set<string>();
+  /** The tabs whose capture the recorder starts now, by `WebContents` id. */
+  readonly #capturing = new Set<number>();
   readonly #onStateChanged: (tabId: string, recording: boolean) => void;
   readonly #maxRecordingMs: number;
   readonly #maxConcurrentRecordings: number;
@@ -77,6 +80,17 @@ export class BrowserRecorder {
 
   isRecording(tabId: string): boolean {
     return this.#sessions.get(tabId)?.stoppedReason === null;
+  }
+
+  /** Allows one tab-capture request of the recorder for a tab whose capture starts now. */
+  allowsTabCapture(
+    contents: WebContents,
+    permission: string,
+    request: Parameters<typeof isRecorderTabCapture>[1],
+  ): boolean {
+    if (!isRecorderTabCapture(permission, request, this.#capturing.has(contents.id))) return false;
+    this.#capturing.delete(contents.id);
+    return true;
   }
 
   readonly start = Effect.fn("BrowserRecorder.start")(function* (
@@ -200,14 +214,16 @@ export class BrowserRecorder {
                   },
                 });
               });
-              yield* browserCall(() => recorderWindow.loadURL("https://recorder.openbot.invalid/"));
+              yield* browserCall(() => recorderWindow.loadURL(`${RECORDER_ORIGIN}/`));
               const sourceId = contents.getMediaSourceId(recorderWindow.webContents);
+              const captured = contents.id;
+              if (frameSize) this.#capturing.add(captured);
               const startResult = yield* browserCall(() =>
                 recorderWindow.webContents.executeJavaScript(
                   startScript(sourceId, this.#maxRecordingMs, frameSize),
                   true,
                 ),
-              );
+              ).pipe(Effect.ensuring(Effect.sync(() => this.#capturing.delete(captured))));
               const started = Schema.decodeUnknownResult(recorderStartErrorSchema)(startResult);
               if (Result.isSuccess(started))
                 return yield* browserFailure(new Error(`${started.success.name}: ${started.success.message}`));
@@ -406,16 +422,21 @@ export class BrowserRecorder {
 }
 
 function startScript(sourceId: string, maxRecordingMs: number, frameSize: RecordingFrameSize): string {
-  // Without a size, tab capture follows the display's scale, so a 1920x1080 viewport at scale 1
-  // can record at 4480x2520 on a Retina screen. A fixed size letterboxes a later viewport change.
-  const tabSize = frameSize
+  // A custom page size records through tab capture at exactly that size. Without a size, capture
+  // follows the display's scale: 1920x1080 at scale 1 recorded at 4480x2520 on a Retina screen.
+  // A tab that fills its panel keeps the display capture of the panel, as before.
+  const tabVideo = frameSize
     ? {
-        minWidth: frameSize.width,
-        maxWidth: frameSize.width,
-        minHeight: frameSize.height,
-        maxHeight: frameSize.height,
+        mandatory: {
+          chromeMediaSource: "tab",
+          chromeMediaSourceId: sourceId,
+          minWidth: frameSize.width,
+          maxWidth: frameSize.width,
+          minHeight: frameSize.height,
+          maxHeight: frameSize.height,
+        },
       }
-    : {};
+    : null;
   const displayVideo = frameSize
     ? {
         width: { ideal: frameSize.width, max: frameSize.width },
@@ -427,15 +448,15 @@ function startScript(sourceId: string, maxRecordingMs: number, frameSize: Record
     try {
     const STOP_BYTES = ${RECORDING_STOP_BYTES};
     const MAX_MS = ${maxRecordingMs};
-    const sourceId = ${JSON.stringify(sourceId)};
-    stage = 'getUserMedia';
+    const tabVideo = ${JSON.stringify(tabVideo)};
     let stream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId, ...${JSON.stringify(tabSize)} } },
-      });
-    } catch {
+    if (tabVideo) {
+      stage = 'getUserMedia';
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: tabVideo });
+      } catch {}
+    }
+    if (!stream) {
       stage = 'getDisplayMedia';
       stream = await navigator.mediaDevices.getDisplayMedia({ video: ${JSON.stringify(displayVideo)}, audio: false });
     }
