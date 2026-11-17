@@ -288,6 +288,8 @@ export const messages = {
     "Gemini şu anda bu modeli kullanamıyor. Başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google bu istek için Gemini oturum açma bilgisini kabul etmedi. Mesajınızı yeniden gönderin. Hata devam ederse Ayarlar'dan Gemini'ye yeniden bağlanın.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
   "error.provider.antigravitySessionRejected":

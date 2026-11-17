@@ -289,6 +289,8 @@ export const messages = {
     "O Gemini não pode usar este modelo agora. Escolha outro modelo e tente novamente.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "O serviço Gemini do Google não concluiu a solicitação. Tente novamente em alguns minutos.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "O Google não aceitou o login do Gemini para esta solicitação. Envie sua mensagem novamente. Se o erro continuar, reconecte o Gemini em Configurações.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "O Gemini recusou esta solicitação. Escolha outro modelo e envie sua mensagem novamente. Se falhar de novo, inicie um novo chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
