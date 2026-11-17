@@ -3314,6 +3314,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const turn = thread.activeTurn;
     if (!turn || turn.completing) return;
     // The agent sends a failed model request again (`AcpFlavor.retryUpdate`). A stopped turn ends by its stop.
+    // The agent tries again, so the text names it, not a custom endpoint: that is the model provider.
     const retry = turn.stopped ? null : this.#flavor.retryUpdate?.(update);
     if (retry) {
       turn.retrying = true;
@@ -3322,7 +3323,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         turn,
         sourceText(
           retry.unreachable ? "status.provider.modelRetryUnreachable" : "status.provider.modelRetryServerError",
-          { provider: this.#providerName(thread), attempt: retry.attempt },
+          { provider: this.#label, attempt: retry.attempt },
         ),
       );
     }
