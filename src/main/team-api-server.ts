@@ -59,6 +59,7 @@ import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_QUEUE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
@@ -342,6 +343,7 @@ import { routeAgentQueueTask } from "./team-api/route-agent-queue-task";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
 import { agentTasksWireSnapshot, routeAgentTasks } from "./team-api/route-agent-tasks";
 import { routeAgentThreadQueue } from "./team-api/route-agent-thread-queue";
+import { routeAgentThreadRequests } from "./team-api/route-agent-thread-requests";
 import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
@@ -1318,6 +1320,7 @@ export class TeamApiServer {
       if ((await routeAgentQueueTask(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentThreadQueue(context, this.#options.agentTasks, this.#options.agents, hidden)) === "handled")
         return;
+      if ((await routeAgentThreadRequests(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentUsageLimit(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentPendingRuntime(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -2693,6 +2696,7 @@ export class TeamApiServer {
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_QUEUE_TASK_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_QUEUE_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_REQUESTS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_TASK_UI_BLOCKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_READS_CAPABILITY) return this.#options.agentTasks !== undefined;

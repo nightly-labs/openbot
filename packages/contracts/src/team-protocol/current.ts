@@ -35,6 +35,7 @@ import { AGENT_THREAD_PAGES_CAPABILITY } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_QUEUE_CAPABILITY } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "./agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CAPABILITY } from "./agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "./agent-threads-v1";
 import { AGENT_UPDATE_CAPABILITY } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CAPABILITY } from "./agent-usage-limit-v1";
@@ -308,6 +309,7 @@ export {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_READS_CAPABILITY,
   AGENT_THREAD_REPLIES_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
   AGENT_THREADS_CAPABILITY,
   AGENT_UPDATE_CAPABILITY,
   AGENT_WAITS_CAPABILITY,
@@ -707,6 +709,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -960,7 +963,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== MAC_APPS_LIMIT_CAPABILITY &&
     capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
     capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
-    capability !== ROUTINE_PAUSE_REASONS_CAPABILITY,
+    capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+    capability !== AGENT_THREAD_REQUESTS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1090,6 +1094,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
   ROUTINE_PAUSE_REASONS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1302,6 +1307,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== MAC_APPS_LIMIT_CAPABILITY &&
       capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
       capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
-      capability !== ROUTINE_PAUSE_REASONS_CAPABILITY,
+      capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
+      capability !== AGENT_THREAD_REQUESTS_CAPABILITY,
   );
 }

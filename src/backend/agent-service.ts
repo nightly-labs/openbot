@@ -1355,6 +1355,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         // Read late: `channels` is built after this. A channel turn runs beside the agent's own chat,
         // so it holds the chat's queue only on a provider that runs one turn at a time.
         queueHold: (agentId) => (this.#tasks.oneTurnAtATime(agentId) ? this.channels.queueHold(agentId) : null),
+        threadRequestsChanged: (agentId) => this.#tasks.changed(agentId),
       },
     });
     this.#reader = new ConversationReader({

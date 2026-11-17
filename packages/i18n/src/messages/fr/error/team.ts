@@ -84,6 +84,8 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Cette connexion ne peut pas fournir la commande d’exécution d’une routine.",
   "error.team.threadQueueUnsupported": "Cette connexion ne peut pas afficher la file d’attente d’un fil annexe.",
+  "error.team.threadRequestsUnsupported":
+    "Cette connexion ne peut pas afficher les demandes d’un fil annexe aux autres agents.",
   "error.team.hostTurnLimitsUnsupported":
     "Cette connexion ne peut pas afficher ni modifier les limites de fils du serveur.",
   "error.team.usageLimitUnsupported":
