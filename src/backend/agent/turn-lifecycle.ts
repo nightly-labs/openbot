@@ -929,9 +929,9 @@ export class TurnLifecycle {
   /**
    * Codex ends a turn with no answer as completed. A lead that got its teammates' results and ended
    * that way stopped the whole team, with no error (#7225). Such a turn fails as an ACP turn with no
-   * answer does, and its end runs it again or shows the error. A turn that wants no answer, a turn
-   * that compacted, a plan, a turn that the user stopped and the first turn of an agent that another
-   * agent made can end empty.
+   * answer does, and its end runs it again or shows the error. A teammate update, a quiet routine run
+   * after its no-update call, a turn that compacted, a plan, a turn that the user stopped and the
+   * first turn of an agent that another agent made can end empty.
    *
    * Codex can also write its last words as narration and then send an empty answer. Codex itself
    * takes that narration as the turn's result, so the narration after the last tool step becomes the
@@ -957,7 +957,9 @@ export class TurnLifecycle {
       // A plan continuation that ends empty goes to the plan's own end (`PlanContinuation.consider`).
       deliveries.some(({ planContinuation }) => planContinuation !== undefined) ||
       deliveries.every(({ delivery }) => this.#quietTeammateTurnDelivery(delivery)) ||
-      this.#quietRoutineTurn(agentId, threadId, deliveries, this.#noUpdateTurns.has(turnId))
+      // A quiet routine run ends empty only after the no-update call. With no call, no answer and no
+      // step, it did nothing, and its run showed as succeeded with no message (#10453).
+      (this.#noUpdateTurns.has(turnId) && this.#quietRoutineTurn(agentId, threadId, deliveries, true))
     )
       return false;
     // The agent's own chat is cached under its own thread id, not the provider's. With the provider's
