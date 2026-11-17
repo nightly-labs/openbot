@@ -561,7 +561,7 @@
     "@openbot/telemetry": "workspace:*"
   },
   "peerDependencies": {
-    "solid-js": "2.0.0-rc.18",
+    "solid-js": "2.0.0",
     "@solidjs/web": "catalog:"
   }
 }

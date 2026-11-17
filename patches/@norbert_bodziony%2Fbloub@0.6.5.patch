@@ -1,7 +1,7 @@
-diff --git a/dist/package/chunks/BloubBot-Bpb4WbeJ.js b/dist/package/chunks/BloubBot-Bpb4WbeJ.js
-index fbd2a5b0df7e5fc8a6283bb4cad189b927374db4..233757dd3d4553f881ae289e655ac313ff10f366 100644
---- a/dist/package/chunks/BloubBot-Bpb4WbeJ.js
-+++ b/dist/package/chunks/BloubBot-Bpb4WbeJ.js
+diff --git a/dist/package/chunks/BloubBot-KsuzYZcf.js b/dist/package/chunks/BloubBot-KsuzYZcf.js
+index b91f86f69c5403c2e060611154b8e9c47893b1db..94696f97db5d911ea72c8f3a9bfa571ea257fa3b 100644
+--- a/dist/package/chunks/BloubBot-KsuzYZcf.js
++++ b/dist/package/chunks/BloubBot-KsuzYZcf.js
 @@ -1975,10 +1975,10 @@ function pn(u) {
  		window.removeEventListener("pointermove", ke), document.removeEventListener("pointerleave", G);
  	}
