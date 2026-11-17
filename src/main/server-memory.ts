@@ -10,7 +10,10 @@ const GIB = 1024 * MIB;
 /** A turn that starts counts this much until its provider processes have grown. */
 const TURN_RESERVE_BYTES = 300 * MIB;
 const TURN_RESERVE_MS = 60_000;
-/** A low level goes back to "ok" only this far above the low threshold, so it does not flap. */
+/**
+ * A low level goes back to "ok" only this far above the low threshold, so it does not flap. A ceiling
+ * below 2.5 GiB uses a tenth of the ceiling (`lowBytes`).
+ */
 const RECOVER_MARGIN_BYTES = 256 * MIB;
 /**
  * `openbot.service` starts main at -500, and a container starts it at 0. Each process that main starts
