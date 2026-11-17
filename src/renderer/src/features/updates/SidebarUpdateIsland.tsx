@@ -1,4 +1,5 @@
 import { classifyFailure } from "@openbot/telemetry";
+import { toast } from "@openbot/ui";
 import { AccountUpdateIsland } from "@openbot/ui/features/account/AccountUpdateIsland";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createSignal } from "solid-js";
@@ -28,6 +29,7 @@ export function SidebarUpdateIsland() {
     () => updates.status().phase,
     (phase) => {
       setUpdateError(null);
+      toast.dismiss(UPDATE_FAILED_TOAST_ID);
       if (phase !== "available" && phase !== "downloading") downloadRingShown = false;
     },
   );
