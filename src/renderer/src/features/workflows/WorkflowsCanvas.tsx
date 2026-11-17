@@ -66,14 +66,16 @@ export function WorkflowsCanvas(props: {
       .catch(() => undefined);
   };
   /**
-   * The models of Sunra and Higgsfield: the live list of the host, else the fixed models, as an older
-   * host or a service that did not answer gives them.
+   * The models of Sunra and Higgsfield: the live list of the host, then each fixed model that the live
+   * list does not have. An older host gives no live list. The host still runs a fixed model, so a step
+   * saved with one keeps its model.
    */
   const serviceModels = (provider: "sunra" | "higgsfield"): readonly WorkflowMediaModel[] => {
     const live = catalog()
       .filter((entry) => entry.provider === provider)
       .flatMap((entry) => workflowCatalogMediaModel(entry) ?? []);
-    return live.length > 0 ? live : WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider);
+    const ids = new Set(live.map((model) => model.id));
+    return [...live, ...WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider && !ids.has(model.id))];
   };
   readMediaProviders();
   window.addEventListener("focus", readMediaProviders);

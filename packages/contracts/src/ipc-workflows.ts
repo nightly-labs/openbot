@@ -1210,6 +1210,26 @@ export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): Wor
   };
 }
 
+/** The catalog model of a fixed model of `WORKFLOW_MEDIA_MODELS`, with the choices that it has. */
+export function workflowFixedCatalogModel(
+  model: WorkflowMediaModel,
+  provider: WorkflowCatalogProvider,
+): WorkflowMediaCatalogModel {
+  const kind = model.kinds[0] ?? "image";
+  return {
+    id: model.id,
+    provider,
+    providerModel: model.providerModel ?? model.id,
+    name: model.name,
+    maker: model.maker,
+    kinds: [kind],
+    aspects: workflowMediaAspects(model, kind),
+    durations: kind === "video" ? workflowVideoDurations(model) : [],
+    resolutions: workflowMediaResolutions(model, kind),
+    transparent: kind === "image" && model.transparent === true,
+  };
+}
+
 /** The choices of a step whose price the host asks the media service for. */
 export interface WorkflowMediaPriceRequest {
   /** The `id` of a catalog model. */

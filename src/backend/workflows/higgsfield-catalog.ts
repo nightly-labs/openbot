@@ -182,7 +182,8 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
   const id = text(item.id);
   const kind: WorkflowMediaKind | null =
     item.output_type === "image" ? "image" : item.output_type === "video" ? "video" : null;
-  if (!/^[a-z0-9_.-]{1,120}$/iu.test(id) || !kind) return null;
+  // "higgsfield-" and the id fit the 128 characters of a wire identifier.
+  if (!/^[a-z0-9_.-]{1,117}$/iu.test(id) || !kind) return null;
   const aspects = canvasAspects(item.aspect_ratios);
   if (aspects.length === 0) return null;
   const parameters = records(item.parameters);
@@ -209,7 +210,11 @@ export function higgsfieldCatalogEntry(item: DynamicRecord): HiggsfieldCatalogEn
 
   const referenceRole = roles.has("image_references") ? "image_references" : roles.has("image") ? "image" : null;
   const referenceText = referenceRole ? texts.get(referenceRole) : undefined;
-  const listedMax = medias.map((media) => wholeNumber(media.max)).find((value) => value !== null) ?? null;
+  const listedMax =
+    medias
+      .filter((media) => referenceRole !== null && strings(media.roles).includes(referenceRole))
+      .map((media) => wholeNumber(media.max))
+      .find((value) => value !== null) ?? null;
   const known = KNOWN_LIMITS[id];
   const references = referenceRole
     ? (known?.references ?? listedMax ?? textLimit(referenceText) ?? DEFAULT_REFERENCES)

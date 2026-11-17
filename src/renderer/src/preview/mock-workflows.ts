@@ -26,10 +26,8 @@ import {
   type WorkflowSummary,
   type WorkflowTriggerState,
   type WorkflowVersion,
+  workflowFixedCatalogModel,
   workflowGitHubTriggerRepositories,
-  workflowMediaAspects,
-  workflowMediaResolutions,
-  workflowVideoDurations,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { nextValidRoutineOccurrence } from "@openbot/team-client/routine-schedule";
@@ -116,24 +114,11 @@ function mockAnswer(node: WorkflowNode, input: string): string {
 }
 
 /** The preview catalog: the fixed Sunra and Higgsfield models, as a host with a live catalog sends them. */
-const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) => {
-  const kind = model.kinds[0];
-  if ((model.provider !== "sunra" && model.provider !== "higgsfield") || kind === undefined) return [];
-  return [
-    {
-      id: model.id,
-      provider: model.provider,
-      providerModel: model.providerModel ?? model.id,
-      name: model.name,
-      maker: model.maker,
-      kinds: [kind],
-      aspects: workflowMediaAspects(model, kind),
-      durations: kind === "video" ? workflowVideoDurations(model) : [],
-      resolutions: workflowMediaResolutions(model, kind),
-      transparent: model.transparent === true,
-    },
-  ];
-});
+const PREVIEW_MEDIA_CATALOG: WorkflowMediaCatalogModel[] = WORKFLOW_MEDIA_MODELS.flatMap((model) =>
+  model.provider === "sunra" || model.provider === "higgsfield"
+    ? [workflowFixedCatalogModel(model, model.provider)]
+    : [],
+);
 
 /** `emit` sends the agent event `workflows-changed` for one workflow that changed. */
 export function mockWorkflows(

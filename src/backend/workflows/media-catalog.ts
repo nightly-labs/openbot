@@ -7,20 +7,18 @@
  */
 
 import {
+  WORKFLOW_MEDIA_CATALOG_MAX,
   WORKFLOW_MEDIA_MODELS,
   type WorkflowCatalogProvider,
   type WorkflowMediaCatalog,
   type WorkflowMediaCatalogModel,
   type WorkflowMediaKind,
-  type WorkflowMediaModel,
   type WorkflowMediaPrice,
   type WorkflowMediaPriceRequest,
   type WorkflowMediaSpecs,
   workflowCatalogMediaModel,
-  workflowMediaAspects,
-  workflowMediaResolutions,
+  workflowFixedCatalogModel,
   workflowMediaSpecs,
-  workflowVideoDurations,
 } from "@openbot/contracts/ipc";
 import { Effect, Semaphore } from "effect";
 import { type HiggsfieldPlan, higgsfieldFixedPlan } from "./higgsfield-catalog";
@@ -126,27 +124,20 @@ export interface WorkflowMediaCatalogCacheOptions {
   now?: () => number;
 }
 
-/** The catalog model of a fixed model of `WORKFLOW_MEDIA_MODELS`, with the choices that it has. */
-function fixedCatalogModel(model: WorkflowMediaModel, provider: WorkflowCatalogProvider): WorkflowMediaCatalogModel {
-  const kind = model.kinds[0] ?? "image";
-  return {
-    id: model.id,
-    provider,
-    providerModel: model.providerModel ?? model.id,
-    name: model.name,
-    maker: model.maker,
-    kinds: [kind],
-    aspects: workflowMediaAspects(model, kind),
-    durations: kind === "video" ? workflowVideoDurations(model) : [],
-    resolutions: workflowMediaResolutions(model, kind),
-    transparent: kind === "image" && model.transparent === true,
-  };
-}
-
 const fixedModels = (provider: WorkflowCatalogProvider) =>
   WORKFLOW_MEDIA_MODELS.filter((model) => model.provider === provider).map((model) =>
-    fixedCatalogModel(model, provider),
+    workflowFixedCatalogModel(model, provider),
   );
+
+/** The models of one service: its live list, else its fixed models, or none with no sign-in. */
+const serviceModels = (provider: WorkflowCatalogProvider, listed: Listed<unknown> | null) => {
+  if (!listed) return [];
+  return listed.entries ? [...listed.entries.values()].map((entry) => entry.model) : fixedModels(provider);
+};
+
+/** The service of a catalog id: its ids start with "sunra-" or "higgsfield-". */
+const catalogProvider = (id: string): WorkflowCatalogProvider | null =>
+  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
 
 export class WorkflowMediaCatalogCache {
   readonly #options: WorkflowMediaCatalogCacheOptions;
@@ -172,18 +163,10 @@ export class WorkflowMediaCatalogCache {
     const [sunra, higgsfield] = yield* Effect.all([this.#sunra.list(), this.#higgsfield.list()], {
       concurrency: "unbounded",
     });
-    const models = (provider: WorkflowCatalogProvider, listed: Listed<unknown> | null) => {
-      if (!listed) return [];
-      return listed.entries ? [...listed.entries.values()].map((entry) => entry.model) : fixedModels(provider);
-    };
     if (!sunra && !higgsfield) this.#prices.clear();
-    return { models: [...models("sunra", sunra), ...models("higgsfield", higgsfield)] } satisfies WorkflowMediaCatalog;
-  }).bind(this);
-
-  /** The canvas models of the catalog, for a host that runs a step or quotes a price. */
-  readonly models = Effect.fn("WorkflowMediaCatalogCache.models")(function* (this: WorkflowMediaCatalogCache) {
-    const { models } = yield* this.catalog();
-    return models.flatMap((model) => workflowCatalogMediaModel(model) ?? []);
+    // The wire and IPC answers take at most WORKFLOW_MEDIA_CATALOG_MAX models.
+    const models = [...serviceModels("sunra", sunra), ...serviceModels("higgsfield", higgsfield)];
+    return { models: models.slice(0, WORKFLOW_MEDIA_CATALOG_MAX) } satisfies WorkflowMediaCatalog;
   }).bind(this);
 
   /** The plan of a Sunra model: from the live list, else the plan of a fixed model. */
@@ -216,10 +199,14 @@ export class WorkflowMediaCatalogCache {
     request: WorkflowMediaPriceRequest,
   ) {
     const none = { credits: null } satisfies WorkflowMediaPrice;
-    const models = yield* this.models();
-    const model = models.find((entry) => entry.id === request.model && entry.kinds.includes(request.kind));
-    const provider = model?.provider;
-    if (!model || (provider !== "sunra" && provider !== "higgsfield")) return none;
+    // Only the list of the model's service: a slow service does not hold the price of the other one.
+    const provider = catalogProvider(request.model);
+    if (!provider) return none;
+    const listed = yield* (provider === "sunra" ? this.#sunra : this.#higgsfield).list();
+    const model = serviceModels(provider, listed)
+      .flatMap((entry) => workflowCatalogMediaModel(entry) ?? [])
+      .find((entry) => entry.id === request.model && entry.kinds.includes(request.kind));
+    if (!model) return none;
     const signIn = this.#options.signIn(provider);
     if (!signIn) return none;
     // The host reads the choices for the model again, as it does for a step.

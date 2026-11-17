@@ -89,11 +89,6 @@ export function PickerRow(props: { option: PickerOption<string>; checked?: boole
 }
 
 /**
- * The panel, the search field and the filter. With `search`, the field takes focus when the menu
- * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
- * With `loading`, a line under the rows tells that more rows come.
- */
-/**
  * The edge fades of a picker list: an edge with more rows behind it fades out. The list measures
  * again when it scrolls, when it changes size, and when a search changes its rows. One list at a
  * time: a list that binds replaces the list before it.
@@ -117,6 +112,11 @@ export function createPickerFades() {
   };
 }
 
+/**
+ * The panel, the search field and the filter. With `search`, the field takes focus when the menu
+ * opens, typing filters the rows by name and chip text, and the down arrow moves to the first row.
+ * With `loading`, a line under the rows tells that more rows come.
+ */
 function PickerShell<T extends string>(props: {
   label: string;
   groups: readonly PickerGroup<T>[];
