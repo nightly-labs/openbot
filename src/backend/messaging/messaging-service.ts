@@ -1765,14 +1765,15 @@ export class MessagingService {
   ) {
     const live = this.#live.get(link.connectionId);
     const workspaceName = live?.record.workspaceName ?? null;
-    if (!live) return { workspaceName, place: link.title, messages: [], cursor: null, skippedFiles: [] };
+    const postsAsOwner = this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true;
+    if (!live) return { workspaceName, place: link.title, messages: [], cursor: null, skippedFiles: [], postsAsOwner };
     const place = link.isDirect
       ? "direct message"
       : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
     const messages = yield* live.adapter
       .history(link.platformChannelId, link.threadKey, link.historyCursor, origin.platformMessageId)
       .pipe(Effect.catch(() => Effect.succeed([])));
-    return { workspaceName, place, messages, cursor: origin.platformMessageId, skippedFiles: [] };
+    return { workspaceName, place, messages, cursor: origin.platformMessageId, skippedFiles: [], postsAsOwner };
   });
 
   /** The newest messages of a link's own place, for the agent's `messaging_history` tool. */

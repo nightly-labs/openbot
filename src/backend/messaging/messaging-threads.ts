@@ -98,6 +98,8 @@ export interface MessagingPromptContext {
   /** The newest message the agent has now read, stored as the link's history cursor. */
   cursor: string | null;
   skippedFiles: string[];
+  /** Another person's chat on the owner's personal WhatsApp number, where an answer shows as the owner. */
+  postsAsOwner: boolean;
 }
 
 export type MessagingHistoryScope = "channel" | "conversation";
@@ -828,6 +830,7 @@ export class MessagingThreads {
       // Only the "Message yourself" chat has the linked number as the author of a direct message:
       // the owner's messages in other chats never reach OpenBot (`whatsapp-senders.ts`).
       fromOwner: connection?.platform === "whatsapp" && link.isDirect && origin.authorId === connection.workspaceId,
+      postsAsOwner: prompt.postsAsOwner,
       place: prompt.place,
       authorName: origin.authorName,
       authorId: origin.authorId,
@@ -892,6 +895,7 @@ export class MessagingThreads {
       messages: [],
       cursor: null,
       skippedFiles: [],
+      postsAsOwner: false,
     };
     const source = this.#contextSource;
     if (!source) return fallback;
