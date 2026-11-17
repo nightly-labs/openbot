@@ -116,6 +116,8 @@ export interface ChannelHooks {
   loadedSnapshot?(threadId: string): ConversationSnapshot | undefined;
   /** Removes live provider state for an execution thread before its durable rows are deleted. */
   forgetThread?(threadId: string): Effect.Effect<void, ChannelOperationError>;
+  /** Whether a person's message to this agent joins its running turn: its busy-message mode is `steer` and its provider steers. */
+  steersWhenBusy?(agentId: string): boolean;
   steer?(
     agentId: string,
     threadId: string,
@@ -917,7 +919,24 @@ export class ChannelService {
         const open = allTasks.filter((task) => !terminal(task));
         const eligible = this.eligibleMembers(current);
         const recipients = this.#recipients(eligible, text, command.recipientAgentId);
+        // A message to the member of the one task that runs joins that task, in any language, when the
+        // member takes messages into its running turn, as in its own chat. A message with files, a reply,
+        // a message to another member, or a task that a routine or a handoff asked for starts new work
+        // as before: their runs find the task by its request (#11037).
+        const runningRequest = open.length === 1 && open[0]?.state === "running" ? open[0].requestMessageId : null;
+        const personAsked = messages.some(
+          (message) =>
+            message.id === runningRequest &&
+            message.author.kind === "member" &&
+            !/^(?:routine|agent):/u.test(message.author.id),
+        );
+        const running = personAsked ? (open[0]?.ownerAgentId ?? null) : null;
         const continues =
+          (!referenced &&
+            !committed &&
+            running !== null &&
+            recipients.every((agentId) => agentId === running) &&
+            this.hooks.steersWhenBusy?.(running) === true) ||
           /^(?:also|instead|actually|please change|change that|correction|continue|resume|go on|keep going|yes|no|use that|make it)\b/iu.test(
             text.trim(),
           );
