@@ -52,7 +52,10 @@ function useApproveAll(crm: CrmViewModel, shown: () => CrmProposal[]) {
     setRunning(true);
     try {
       for (const proposal of batch().proposals) {
-        if (unmounted || !crm.view.agents || !(await crm.decide(proposal, true))) break;
+        if (unmounted || !crm.view.agents) break;
+        // Another person or device can decide a suggestion while the batch runs. The reload removes it, so skip it.
+        if (!crm.proposals().some((item) => item.id === proposal.id)) continue;
+        if (!(await crm.decide(proposal, true))) break;
       }
     } finally {
       setRunning(false);
