@@ -8,13 +8,14 @@
 import type { BrowserLiveViewEvent } from "@openbot/contracts/ipc";
 import {
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   BROWSER_VIEW_PAGE_COPY_QUERY,
   type BrowserViewInput,
   browserViewInputForHost,
-  decodeBrowserViewCopied,
   decodeBrowserViewFrame,
   decodeBrowserViewHostMessage,
   encodeBrowserViewInput,
+  isBrowserViewUserAction,
   TEAM_BROWSER_VIEW_CAPABILITY,
   TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY,
   TEAM_BROWSER_VIEW_FRAME_POINT_CAPABILITY,
@@ -42,6 +43,8 @@ interface ActiveView {
   tabId: string;
   owner: number;
   socket: WebSocket;
+  /** When the user last clicked or pressed a key in this view, as `Date.now()`. */
+  lastActionAt: number;
 }
 
 export class BrowserViewClient {
@@ -76,7 +79,7 @@ export class BrowserViewClient {
       }
       const socket = yield* remoteDecode(() => new WebSocket(url, stream.protocols));
       socket.binaryType = "arraybuffer";
-      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket };
+      const view: ActiveView = { serverId, sessionId: stream.sessionId, tabId, owner, socket, lastActionAt: 0 };
       this.#view = view;
       socket.addEventListener("message", (message) => {
         if (this.#view !== view) return;
@@ -84,8 +87,13 @@ export class BrowserViewClient {
         if (typeof message.data === "string") {
           try {
             const hostMessage = decodeBrowserViewHostMessage(message.data);
-            if (hostMessage?.type === "pageCopied") this.#options.writeClipboard(hostMessage.text);
-            else this.#options.onEvent({ ...decodeBrowserViewCopied(message.data), tabId }, owner);
+            if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge")
+              this.#options.onEvent({ ...hostMessage, tabId }, owner);
+            // The host also checks this. A host must not fill the clipboard when the user did nothing.
+            else if (hostMessage?.type === "pageCopied") {
+              if (Date.now() - view.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)
+                this.#options.writeClipboard(hostMessage.text);
+            } else throw new Error("Invalid browser view message.");
           } catch {
             socket.close(1000, "Invalid browser view message");
           }
@@ -142,6 +150,7 @@ export class BrowserViewClient {
     const clipboard = this.#options.servers.supportsCapability(view.serverId, TEAM_BROWSER_VIEW_CLIPBOARD_CAPABILITY);
     const wire = browserViewInputForHost(input, namesFrames, clipboard);
     if (!wire) return;
+    if (isBrowserViewUserAction(wire)) view.lastActionAt = Date.now();
     view.socket.send(encodeBrowserViewInput(wire));
   }
 

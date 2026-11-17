@@ -116,6 +116,12 @@ export const BROWSER_VIEW_PAGE_COPY_QUERY = "pageCopy";
 export function browserViewClientWantsPageCopy(url: URL): boolean {
   return url.searchParams.get(BROWSER_VIEW_PAGE_COPY_QUERY) === "1";
 }
+/**
+ * How long after a member's own click or key a page's copy may go to that member's clipboard. It is
+ * the time Chromium lets a page use one user action. The host and the client both check it, so a
+ * copy long after the member's last input stays on the host, and a host cannot fill the clipboard.
+ */
+export const BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS = 5_000;
 
 /** The items of a page's context menu. A client leaves out an item it does not know. */
 export const BROWSER_VIEW_CONTEXT_MENU_ITEMS = [
@@ -295,6 +301,11 @@ export type BrowserViewInput =
    * only when the selection is still `text` and in a field the user can edit.
    */
   | { type: "cut"; text: string };
+
+/** A click or a key, which gives the page a user action. A move, a scroll or an acknowledgement does not. */
+export function isBrowserViewUserAction(input: BrowserViewInput): boolean {
+  return input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up"));
+}
 
 /**
  * The text message a host sends on the view socket, only in answer to a `copy`: the selection, or

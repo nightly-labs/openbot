@@ -18,6 +18,7 @@ import { dirname, join } from "node:path";
 import type { Duplex } from "node:stream";
 import {
   BROWSER_VIEW_MAX_CLIPBOARD_TEXT,
+  BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   type BrowserViewContextMenu,
   type BrowserViewHostMessage,
   type BrowserViewSessionResponse,
@@ -33,6 +34,7 @@ import {
   encodeBrowserViewCopied,
   encodeBrowserViewFrame,
   encodeBrowserViewHostMessage,
+  isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import type * as Ws from "ws";
 import type { BrowserScreencastFrame } from "../backend/browser-cdp";
@@ -87,12 +89,6 @@ function framesInFlight(session: Pick<ManagedViewSession, "frameSizes" | "drawnS
   return count;
 }
 const MAX_SESSIONS = 4;
-/**
- * How long after a member's own click or key the page's own copy goes to that member. It is the
- * time Chromium lets a page use one user action, so a copy the page makes later on its own, or
- * after an agent's click, stays on the host.
- */
-const PAGE_COPY_AFTER_INPUT_MS = 5_000;
 /** A paste at its longest, with every character escaped, and the rest of the message around it. */
 const MAX_INPUT_MESSAGE_BYTES = 6 * BROWSER_VIEW_MAX_CLIPBOARD_TEXT + 4 * 1024;
 
@@ -387,7 +383,7 @@ export class BrowserViewGateway {
           ...(session.reportPageCopy
             ? {
                 onPageCopy: (text: string) => {
-                  if (Date.now() - session.lastActionAt > PAGE_COPY_AFTER_INPUT_MS) return;
+                  if (Date.now() - session.lastActionAt > BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS) return;
                   if (text.length > 0 && text.length <= BROWSER_VIEW_MAX_CLIPBOARD_TEXT)
                     this.#send(session, client, { type: "pageCopied", text });
                 },
@@ -430,8 +426,7 @@ export class BrowserViewGateway {
       return;
     }
     this.#options.onInput?.();
-    if (input.type === "key" || (input.type === "pointer" && (input.action === "down" || input.action === "up")))
-      session.lastActionAt = Date.now();
+    if (isBrowserViewUserAction(input)) session.lastActionAt = Date.now();
     // The selection goes back on the socket that asked for it, and only there. It is page content:
     // nothing here logs it. Every copy is answered, with no text when there is none to give, because
     // the client holds its clipboard write open until the answer arrives.

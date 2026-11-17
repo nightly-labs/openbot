@@ -589,7 +589,15 @@ const USAGE_LIMIT_MOVE_FIELDS: ReadonlySet<string> = new Set([
  * write this long after the click, such as Safari, gets a button: a click on it is a new action.
  */
 function writePageCopy(text: string): void {
-  const write = () => Promise.resolve().then(() => navigator.clipboard.writeText(text));
+  // Called in the click itself, which is the user action that Safari asks for. A page that is not
+  // secure has no clipboard, and the call throws at once.
+  const write = () => {
+    try {
+      return navigator.clipboard.writeText(text);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+  };
   void write().catch(() => {
     const { t } = currentText();
     toast(t("browser.liveView.pageCopied"), {

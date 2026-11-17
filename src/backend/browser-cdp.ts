@@ -391,21 +391,21 @@ const PAGE_COPY_RETRY_MS = 500;
  * Waits for the text that the page puts on the clipboard during a user action: its own "Copy"
  * button writes the clipboard of the host, which a member watching from another computer cannot
  * reach. It runs in the page's world, because only there are the page's clipboard calls, and it adds
- * its hooks once a document. The original calls still run, unchanged. Only the newest wait is woken:
- * a wait whose view ended is replaced by the next one.
+ * its hooks once a document. The original calls still run, unchanged. A copy wakes every wait, one
+ * for each view of the tab; a wait whose view ended is woken for nothing.
  */
 const PAGE_COPY_SCRIPT = `(() => {
   const key = Symbol.for("openbot.pageCopy");
   let state = globalThis[key];
   if (!state) {
-    state = { wake: null };
+    state = { waits: [] };
     Object.defineProperty(globalThis, key, { value: state });
     const active = () => navigator.userActivation?.isActive === true;
     const report = (text) => {
-      const wake = state.wake;
-      if (!wake || typeof text !== "string" || text.length === 0 || text.length > ${BROWSER_VIEW_MAX_CLIPBOARD_TEXT}) return;
-      state.wake = null;
-      wake(text);
+      if (typeof text !== "string" || text.length === 0 || text.length > ${BROWSER_VIEW_MAX_CLIPBOARD_TEXT}) return;
+      const waits = state.waits;
+      state.waits = [];
+      for (const wake of waits) wake(text);
     };
     const proto = globalThis.Clipboard?.prototype;
     const writeText = proto?.writeText;
@@ -417,12 +417,25 @@ const PAGE_COPY_SCRIPT = `(() => {
       }).catch(() => {});
       return write.apply(this, arguments);
     } }.write;
+    // Capture: a copy library often stops the event at its own element. The text the page sets is
+    // read after the whole dispatch, when every handler has run.
     addEventListener("copy", (event) => {
       if (!event.isTrusted || !active()) return;
-      report(event.defaultPrevented ? event.clipboardData?.getData("text/plain") : String(getSelection() ?? ""));
-    });
+      const selection = String(getSelection() ?? "");
+      const data = event.clipboardData;
+      let set = null;
+      if (data) {
+        const setData = data.setData;
+        data.setData = function (type, value) {
+          const kind = String(type).toLowerCase();
+          if (kind === "text" || kind === "text/plain") set = String(value);
+          return setData.apply(this, arguments);
+        };
+      }
+      setTimeout(() => report(event.defaultPrevented ? set : selection));
+    }, true);
   }
-  return new Promise((resolve) => { state.wake = resolve; });
+  return new Promise((resolve) => { state.waits.push(resolve); });
 })()`;
 
 /**

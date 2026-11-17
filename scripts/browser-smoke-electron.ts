@@ -3002,7 +3002,7 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
     const armedDeadline = Date.now() + 5_000;
     let armed = false;
     while (!armed && Date.now() < armedDeadline) {
-      armed = await contents.executeJavaScript("!!window[Symbol.for('openbot.pageCopy')]?.wake", false);
+      armed = await contents.executeJavaScript("window[Symbol.for('openbot.pageCopy')]?.waits?.length > 0", false);
       if (!armed) await new Promise((resolve) => setTimeout(resolve, 50));
     }
     // The earlier steps gave the page user actions, which stay active for a few seconds, also after
@@ -3020,11 +3020,11 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
       .catch(() => undefined);
     await contents.executeJavaScript(
       `(() => {
-      const make = (id, left, copy) => {
+      const make = (id, left, copy, top = 150) => {
         const button = document.createElement('button');
         button.id = id;
         button.textContent = id;
-        button.style.cssText = 'position:fixed;top:150px;width:200px;height:60px;z-index:2147483647;left:' + left + 'px';
+        button.style.cssText = 'position:fixed;width:200px;height:60px;z-index:2147483647;left:' + left + 'px;top:' + top + 'px';
         button.addEventListener('click', copy);
         document.body.append(button);
       };
@@ -3034,6 +3034,25 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
         document.addEventListener('copy', once, { once: true });
         document.execCommand('copy');
       });
+      // As the copy-to-clipboard library does: a selected element that stops its own copy event.
+      const library = (text, setData) => () => {
+        const mark = document.createElement('span');
+        mark.textContent = text;
+        document.body.append(mark);
+        const range = document.createRange();
+        range.selectNodeContents(mark);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        mark.addEventListener('copy', (event) => {
+          event.stopPropagation();
+          if (setData) { event.preventDefault(); event.clipboardData.clearData(); event.clipboardData.setData('text/plain', text); }
+        });
+        document.execCommand('copy');
+        getSelection().removeAllRanges();
+        mark.remove();
+      };
+      make('page-copy-library', 10, library('copied by a library selection', false), 230);
+      make('page-copy-library-data', 250, library('copied by a library format', true), 230);
     })()`,
       true,
     );
@@ -3063,6 +3082,8 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
     };
     await click("page-copy-api", "copied by the page button");
     await click("page-copy-command", "copied by the page command");
+    await click("page-copy-library", "copied by a library selection");
+    await click("page-copy-library-data", "copied by a library format");
     const report = { armed, copies };
     const reportDirectory = join(process.cwd(), ".openbot-build");
     await mkdir(reportDirectory, { recursive: true });
@@ -3070,7 +3091,12 @@ async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents
     if (!armed) throw new Error("The live view did not arm the page that loaded for page copies.");
     if (copies.includes("written without a click"))
       throw new Error("A page copy with no user action reached the member.");
-    for (const expected of ["copied by the page button", "copied by the page command"]) {
+    for (const expected of [
+      "copied by the page button",
+      "copied by the page command",
+      "copied by a library selection",
+      "copied by a library format",
+    ]) {
       if (!copies.includes(expected))
         throw new Error(`A page copy did not reach the member: ${JSON.stringify(copies)}`);
     }

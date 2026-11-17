@@ -3,6 +3,7 @@ import {
   BROWSER_VIEW_CONTEXT_MENU_QUERY,
   BROWSER_VIEW_CURSOR_QUERY,
   BROWSER_VIEW_FRAME_ACK_QUERY,
+  BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS,
   BROWSER_VIEW_PAGE_COPY_QUERY,
   BROWSER_VIEW_VIEWPORT_QUERY,
   type BrowserViewCopied,
@@ -16,6 +17,7 @@ import {
   decodeBrowserViewHostMessage,
   decodeBrowserViewSessionResponse,
   encodeBrowserViewInput,
+  isBrowserViewUserAction,
 } from "@openbot/contracts/team-protocol/browser-view-v1";
 import {
   decodeRemoteDesktopSignalBinary,
@@ -46,6 +48,8 @@ interface View {
   frame: (frame: BrowserViewFrame) => void;
   ended: (reason?: string) => void;
   copied: (message: BrowserViewCopied) => void;
+  /** When the user last clicked or pressed a key in this view, as `Date.now()`. */
+  lastActionAt: number;
   /** Hears the cursor, the context menus and the page's own copies, for a client that asked for them. */
   message?: (message: Exclude<BrowserViewHostMessage, BrowserViewCopied>) => void;
 }
@@ -134,6 +138,7 @@ export function createRemoteBrowserView(
       frame,
       ended,
       copied,
+      lastActionAt: 0,
       ...(message ? { message } : {}),
     };
     view = next;
@@ -163,6 +168,7 @@ export function createRemoteBrowserView(
         return yield* new BrowserViewError({ message: sourceText("error.remote.browserViewNotConnected") });
       const wire = browserViewInputForHost(value, acksFrames, clipboard());
       if (!wire) return;
+      if (isBrowserViewUserAction(wire)) next.lastActionAt = Date.now();
       yield* sendFrame(
         encodeRemoteDesktopSignalControl({ type: "text", streamId: next.streamId, data: encodeBrowserViewInput(wire) }),
       ).pipe(
@@ -198,7 +204,13 @@ export function createRemoteBrowserView(
           if (control.type === "text" && current.ready) {
             const hostMessage = decodeBrowserViewHostMessage(control.data);
             if (hostMessage?.type === "copied" || hostMessage?.type === "copyTooLarge") current.copied(hostMessage);
-            else if (hostMessage) current.message?.(hostMessage);
+            // The host also checks this. A host must not fill the clipboard when the user did nothing.
+            else if (
+              hostMessage &&
+              (hostMessage.type !== "pageCopied" ||
+                Date.now() - current.lastActionAt <= BROWSER_VIEW_PAGE_COPY_AFTER_INPUT_MS)
+            )
+              current.message?.(hostMessage);
           }
           if (control.type === "close" || control.type === "error") {
             current.released = true;
