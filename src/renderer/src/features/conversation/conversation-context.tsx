@@ -89,6 +89,18 @@ function trimToLatestPage(conversation: ConversationState): void {
   conversation.page = { hasOlder: true, olderCursor: null };
 }
 
+/** A chat with no cursor of its own for its older messages: it has no page yet, or it was trimmed. */
+function lacksOlderCursor(page: ConversationPageInfo | undefined): boolean {
+  return !page || (page.hasOlder && !page.olderCursor);
+}
+
+/** The originals that a page's replies quote, as the chat shows them. */
+function pageReferences(page: ConversationPage): Record<string, AgentMessage> {
+  return Object.fromEntries(
+    Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
+  );
+}
+
 interface ConversationState {
   messages: AgentMessage[];
   loaded?: boolean;
@@ -767,25 +779,19 @@ const Conversation = createSimpleContext({
      */
     function keepOlderHistoryPlace(page: ConversationPage): void {
       const conversation = conversations[page.agentId];
-      const own = conversation?.page;
-      if (!conversation || (own && !(own.hasOlder && !own.olderCursor))) return;
+      if (!conversation || !lacksOlderCursor(conversation.page)) return;
       const mapped = toAgentMessages(page.messages, page.agentId);
       const first = conversation.messages[0];
       const start = first ? mapped.findIndex((message) => message.id === first.id) : -1;
       // The chat must meet the page, or the place would leave a gap that the reader does not see.
       if (start === -1 && !conversation.messages.some((message) => message.id === mapped[0]?.id)) return;
-      const older = mapped.slice(0, Math.max(start, 0));
+      const older = mapped
+        .slice(0, Math.max(start, 0))
+        .map((message) => createStoredMessage({ ...message, animate: false }));
       updateConversation(page.agentId, (current) => {
-        current.messages = [
-          ...older.map((message) => createStoredMessage({ ...message, animate: false })),
-          ...current.messages,
-        ];
-        current.references = {
-          ...current.references,
-          ...Object.fromEntries(
-            Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
-          ),
-        };
+        current.messages = mergeConversationPage(current.messages, older, "older");
+        current.references = { ...current.references, ...pageReferences(page) };
+        current.missingReferences = { ...current.missingReferences, ...missingReplyOriginals(page) };
         current.page = page.pageInfo;
       });
     }
@@ -825,8 +831,7 @@ const Conversation = createSimpleContext({
         // its place, and loaded messages that the page does not meet give way to the page.
         const mappedIds = new Set(pageMessages.map((message) => message.id));
         // A chat with no page yet, or a trimmed one, has no cursor of its own, so it takes the page's.
-        const own = conversation.page;
-        const trimmed = !own || (own.hasOlder && !own.olderCursor);
+        const trimmed = lacksOlderCursor(conversation.page);
         const tail = merge === "latest" && page.pageInfo.hasOlder && !trimmed;
         const keepsWindow = tail && conversation.windowMode === "around";
         const apart = tail && !keepsWindow && !currentMessages.some((message) => mappedIds.has(message.id));
@@ -842,9 +847,7 @@ const Conversation = createSimpleContext({
         const keepsOlder = keepsWindow || (tail && first !== undefined && !mappedIds.has(first.id));
         conversation.references = {
           ...(merge === "replace" ? {} : conversation.references),
-          ...Object.fromEntries(
-            Object.entries(page.references).map(([id, message]) => [id, toAgentMessage(message, page.agentId)]),
-          ),
+          ...pageReferences(page),
         };
         conversation.missingReferences = {
           ...(merge === "replace" ? {} : conversation.missingReferences),
