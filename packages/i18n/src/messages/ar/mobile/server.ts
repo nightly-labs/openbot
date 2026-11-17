@@ -1207,7 +1207,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "ربط مرة أخرى",
   "mobile.server.connectors.whatsapp.ownNumber": "رقم شخصي",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. لا يتلقى الآخرون أي رد. عند إيقافه، يرد OpenBot على الأشخاص غير المعروفين برمز.",
   "mobile.server.connectors.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
@@ -1228,10 +1228,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "الرقم",
   "mobile.server.connectors.whatsapp.kindPersonal": "رقمي الشخصي",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم.",
+    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم. لا يتلقى الآخرون أي رد.",
   "mobile.server.connectors.whatsapp.kindDedicated": "رقم مخصص لـ OpenBot فقط",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "يحصل الأشخاص غير المعروفين على رمز ليعطوه لك. توافق عليهم هنا.",
+    "يرد OpenBot من هذا الرقم على كل شخص غير معروف برمز ليعطيه لك. توافق عليهم هنا.",
   "mobile.server.connectors.whatsapp.phoneLabel": "رقم الهاتف",
   "mobile.server.connectors.whatsapp.phoneDescription": "مع رمز الدولة، مثل ‎+44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "اكتب رقم الهاتف مع رمز الدولة.",

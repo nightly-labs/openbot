@@ -1014,7 +1014,7 @@ export const messages = {
   "mobile.server.connectors.whatsapp.linkAgain": "Połącz od nowa",
   "mobile.server.connectors.whatsapp.ownNumber": "Numer prywatny",
   "mobile.server.connectors.whatsapp.ownNumberDescription":
-    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Wyłącz dla numeru tylko dla OpenBot.",
+    "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "mobile.server.connectors.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
@@ -1037,10 +1037,10 @@ export const messages = {
   "mobile.server.connectors.whatsapp.kindLabel": "Numer",
   "mobile.server.connectors.whatsapp.kindPersonal": "Mój numer prywatny",
   "mobile.server.connectors.whatsapp.kindPersonalDescription":
-    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz.",
+    "OpenBot odpowiada tylko w twoim czacie „Wiadomość do siebie” i osobom, którym pozwolisz. Inne osoby nie dostają odpowiedzi.",
   "mobile.server.connectors.whatsapp.kindDedicated": "Numer tylko dla OpenBot",
   "mobile.server.connectors.whatsapp.kindDedicatedDescription":
-    "Nieznane osoby dostają kod, który mają ci przekazać. Zatwierdzasz je tutaj.",
+    "OpenBot odpowiada z tego numeru każdej nieznanej osobie kodem, który ma ci przekazać. Zatwierdzasz je tutaj.",
   "mobile.server.connectors.whatsapp.phoneLabel": "Numer telefonu",
   "mobile.server.connectors.whatsapp.phoneDescription": "Z kodem kraju, np. +44 7700 900123.",
   "mobile.server.connectors.whatsapp.phoneInvalid": "Wpisz numer telefonu z kodem kraju.",
