@@ -158,7 +158,7 @@ import {
   CONVERSATION_UNREAD_FROM_CAPABILITY,
   CONVERSATION_UNREAD_FROM_ROUTE,
 } from "@openbot/contracts/team-protocol/conversation-unread-from-v1";
-import { TEAM_BROWSER_NAVIGATION_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { TEAM_BROWSER_NAVIGATION_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import { FOCUS_USE_ROUTES } from "@openbot/contracts/team-protocol/focus-use-v1";
 import { MESSAGE_DELETE_CAPABILITY, MESSAGE_DELETE_ROUTES } from "@openbot/contracts/team-protocol/message-delete-v1";
 import {
@@ -198,9 +198,8 @@ import {
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
-import { type TeamProtocolSupportV1, teamProtocolUpdateDirection } from "@openbot/contracts/team-protocol/v1";
+import type { TeamProtocolSupportV1 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_FILE_BYTES, type TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import {
   WORKSPACE_DIRECTORY_CAPABILITY,
@@ -1178,12 +1177,9 @@ export function createWebWorkspaceRuntime(
       const knownProtocol = savedHostProtocol(accountId, host.hostId);
       if (knownProtocol !== undefined) early?.start();
       const support = decodeTeamProtocolSupportV9(await request("GET", TEAM_API_ROUTES.compatibility));
-      if (knownProtocol !== undefined && support.protocol.maximum !== knownProtocol) early?.drop();
-      const updateDirection = teamProtocolUpdateDirection(
-        { minimum: TEAM_PROTOCOL_V3, maximum: TEAM_PROTOCOL_V3 },
-        support.protocol,
-      );
-      if (updateDirection) throw new WebHostIncompatibleError(support, updateDirection);
+      const negotiated = teamWebRtcClientProtocol(support.protocol);
+      if (knownProtocol !== undefined && negotiated.protocol !== knownProtocol) early?.drop();
+      if (negotiated.update) throw new WebHostIncompatibleError(support, negotiated.update);
       capabilities = support.capabilities;
       if (retryDraftCleanup) await discardCompletedDrafts(host.hostId);
       return capabilities;

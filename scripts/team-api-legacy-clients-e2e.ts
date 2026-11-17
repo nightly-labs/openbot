@@ -19,6 +19,9 @@
 //   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
 // - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
 //   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
+// - WebRTC client range: mobile, the share sender and the web client compare the host range with the
+//   protocols that they speak, so a host that raises its minimum still connects, and the side that is
+//   too old is named.
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -70,6 +73,8 @@ import { AGENT_NOTIFICATION_LEVELS_CAPABILITY } from "@openbot/contracts/team-pr
 import {
   BROWSER_VAULT_SKIP_CAPABILITY,
   TEAM_USAGE_TERTIARY_CAPABILITY,
+  TEAM_WEBRTC_CLIENT_PROTOCOL,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol/current";
 import {
   TEAM_REASONING_EFFORTS,
@@ -1440,6 +1445,50 @@ try {
       "A protocol 8 peer got a protocol 9 capability.",
     );
     return { protocol9: first.capabilities.length, protocol8: v8.capabilities.length };
+  });
+
+  await step("WebRTC client range: the highest common protocol, or the side that must update", async () => {
+    // The compatibility read that mobile, the share sender and the web client make over WebRTC.
+    const requestId = randomUUID();
+    const from = v2.bridge.sent.length;
+    v2.bridge.emit(
+      "data",
+      "peer-v2",
+      "rpc",
+      encodeTeamProtocolV2Frame(
+        createTeamProtocolV2Request(requestId, "http.request", {
+          method: "GET",
+          path: "/v1/compatibility",
+          body: null,
+          capabilities: [...TEAM_BOOTSTRAP_CAPABILITIES],
+        }),
+      ),
+    );
+    const frame = await v2.bridge.rpcFrom(from, rpcResponse(requestId));
+    assert.ok("result" in frame, `The compatibility frame failed: ${JSON.stringify(frame)}.`);
+    const host = decodeTeamProtocolSupportV9(record(frame.result, "RPC result").body).protocol;
+    // This host is in the support window and advertises 1-9: it works as before, on protocol 9.
+    assert.deepEqual(host, { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V9 });
+    assert.deepEqual(teamWebRtcClientProtocol(host), { protocol: TEAM_PROTOCOL_V9, update: null });
+    // A host that raised its minimum to 9 still serves a client that speaks 9.
+    const raised = { minimum: TEAM_PROTOCOL_V9, maximum: TEAM_PROTOCOL_V9 };
+    assert.deepEqual(teamWebRtcClientProtocol(raised), { protocol: TEAM_PROTOCOL_V9, update: null });
+    // A protocol 3 host still works with the clients of today, which have always accepted it.
+    const oldest = { minimum: TEAM_PROTOCOL_V1, maximum: TEAM_PROTOCOL_V3 };
+    assert.deepEqual(teamWebRtcClientProtocol(oldest), { protocol: TEAM_PROTOCOL_V3, update: null });
+    // A client whose minimum is above 3 names the host as the side to update.
+    const laterClient = { minimum: TEAM_PROTOCOL_V3 + 1, maximum: TEAM_PROTOCOL_V9 };
+    assert.deepEqual(teamWebRtcClientProtocol(oldest, laterClient), {
+      protocol: null,
+      update: "host_update_required",
+    });
+    // A host whose minimum is above the client maximum names the client as the side to update.
+    const newer = {
+      minimum: TEAM_WEBRTC_CLIENT_PROTOCOL.maximum + 1,
+      maximum: TEAM_WEBRTC_CLIENT_PROTOCOL.maximum + 2,
+    };
+    assert.deepEqual(teamWebRtcClientProtocol(newer), { protocol: null, update: "client_update_required" });
+    return { client: TEAM_WEBRTC_CLIENT_PROTOCOL, host };
   });
 
   await step("usage-tertiary-v1 RPC: a WebRTC usage read follows the capability", async () => {

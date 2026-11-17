@@ -188,8 +188,10 @@ import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
 import { TEAM_USAGE_TERTIARY_CAPABILITY } from "./usage-tertiary-v1";
+import { highestCommonTeamProtocol, type TeamProtocolSupportV1 } from "./v1";
+import { TEAM_PROTOCOL_V3 } from "./v3";
 import { TEAM_OPEN_PROVIDERS_CAPABILITY } from "./v8";
-import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
+import { TEAM_LONG_CAPABILITY_LISTS_CAPABILITY, TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITIES } from "./v9";
 import { VAULT_IMPORT_CAPABILITY } from "./vault-import-v1";
 import { VAULT_CAPABILITY } from "./vault-v1";
 import { VAULT_V2_CAPABILITY } from "./vault-v2";
@@ -1098,6 +1100,31 @@ const TEAM_PROTOCOL_V7_CURRENT_CAPABILITIES = TEAM_PROTOCOL_V8_CURRENT_CAPABILIT
     capability !== PROVIDERS_V8_CAPABILITY &&
     capability !== TEAM_CONTEXT_USAGE_CAPABILITY,
 );
+/**
+ * The protocols that the WebRTC clients speak: mobile, the share sender and the web client, all through
+ * `packages/team-client`. They send protocol 9 requests, and an older host reads them with its own codec
+ * (the host selects the protocol from the marker capabilities). Protocol 3 is the oldest host that these
+ * clients ever accepted. Change the maximum only when the clients speak the new protocol.
+ */
+export const TEAM_WEBRTC_CLIENT_PROTOCOL: TeamProtocolSupportV1["protocol"] = {
+  minimum: TEAM_PROTOCOL_V3,
+  maximum: TEAM_PROTOCOL_V9,
+};
+
+/**
+ * The highest protocol that a WebRTC client and a host both speak, or which side must update. A host
+ * minimum above the client maximum needs a client update; a host maximum below the client minimum needs
+ * a host update.
+ */
+export function teamWebRtcClientProtocol(
+  host: TeamProtocolSupportV1["protocol"],
+  client: TeamProtocolSupportV1["protocol"] = TEAM_WEBRTC_CLIENT_PROTOCOL,
+): { protocol: number; update: null } | { protocol: null; update: "client_update_required" | "host_update_required" } {
+  const protocol = highestCommonTeamProtocol(client, host);
+  if (protocol !== null) return { protocol, update: null };
+  return { protocol: null, update: client.maximum < host.minimum ? "client_update_required" : "host_update_required" };
+}
+
 export function teamCapabilitiesForProtocol(protocol: number | null | undefined): readonly TeamCurrentCapability[] {
   if (protocol === null || protocol === undefined || protocol < 7) return TEAM_BOOTSTRAP_CAPABILITIES;
   if (protocol >= 9) return TEAM_CURRENT_CAPABILITIES;

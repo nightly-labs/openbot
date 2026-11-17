@@ -11,9 +11,8 @@
 import { isQueuedMessageReceipt } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
 import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
-import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY } from "@openbot/contracts/team-protocol/current";
+import { TEAM_MESSAGE_CLIENT_ID_CAPABILITY, teamWebRtcClientProtocol } from "@openbot/contracts/team-protocol/current";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
 import { runTeamEffect } from "@openbot/team-client";
 import { verifyEd25519Base64Url } from "@openbot/team-client/ed25519";
@@ -233,8 +232,7 @@ async function send(request: ShareSendRequest): Promise<void> {
           const compatibility = decodeTeamProtocolSupportV9(
             await teamRequest("compatibility", { method: "GET", path: TEAM_API_ROUTES.compatibility }),
           );
-          const { minimum, maximum } = compatibility.protocol;
-          if (minimum > TEAM_PROTOCOL_V3 || maximum < TEAM_PROTOCOL_V3) {
+          if (teamWebRtcClientProtocol(compatibility.protocol).update) {
             throw new ShareStageError("compatibility", "The server needs another OpenBot version.");
           }
           for (const [index, file] of request.files.entries()) {
