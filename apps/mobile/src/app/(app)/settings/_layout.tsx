@@ -53,6 +53,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="about" options={{ title: t("mobile.app.route.about") }} />
       <Stack.Screen name="support" options={{ title: t("mobile.app.route.support") }} />
       <Stack.Screen name="support-log" options={{ title: t("mobile.app.route.supportLog") }} />
+      <Stack.Screen name="conversations" options={{ title: t("mobile.settings.conversations.title") }} />
       <Stack.Screen name="hidden-chats" options={{ title: t("mobile.app.route.hiddenChats") }} />
       <Stack.Screen name="crop-photo" options={{ title: t("mobile.app.route.cropPhoto") }} />
     </Stack>

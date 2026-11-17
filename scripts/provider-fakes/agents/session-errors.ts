@@ -15,6 +15,13 @@ const LOAD_ERRORS: Readonly<Partial<Record<string, (sessionId: string) => AcpErr
     data: { details: "Unsupported ACP session: another-session" },
   }),
   "not-found": (sessionId) => ({ code: -32002, message: "Resource not found", data: { uri: sessionId } }),
+  // ACP SDK 2.x `RequestError.sessionNotFound`, as Claude Agent 0.107.2 sends it (#10317).
+  "session-not-found": (sessionId) => ({ code: -32002, message: "Resource not found", data: { sessionId } }),
+  "session-not-found-other": () => ({
+    code: -32002,
+    message: "Resource not found",
+    data: { sessionId: "another-session" },
+  }),
   internal: () => ({ code: -32603, message: "Internal error", data: { details: "database is locked" } }),
 };
 

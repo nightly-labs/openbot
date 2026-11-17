@@ -100,6 +100,8 @@ export const messages = {
   "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",
   "error.agent.compactionConnectionLost":
     "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin, ardından devam etmek için bir mesaj gönderin.",
+  "error.agent.compactionConnectionLostAddress":
+    "Ajan bağlamını sıkıştırırken bağlantı kesildi, bu yüzden görev durdu. İnternet bağlantınızı kontrol edin. {provider} ayarlarında Değişkenler altındaki {variable} değerinin model hizmetinizin API adresi olduğundan da emin olun (çoğu zaman /v1 ile biter). Ardından bir mesaj gönderin.",
   "error.agent.compactionLoopStopped":
     "{provider} bağlamı tekrar tekrar sıkıştırdı ve her seferinde devam edemeyecek kadar dolu kaldı, bu yüzden OpenBot bu turu durdurdu. Bu ajanın gerek duymadığı MCP sunucularını veya bilgisayar kullanımını kapatın, ardından bir mesaj gönderin. Siz veya ajan {provider} uygulamasının ne zaman sıkıştırdığını değiştirdiyseniz, bu değişikliği geri alın.",
   "error.agent.selectedGone": "Seçilen ajan artık mevcut değil.",
