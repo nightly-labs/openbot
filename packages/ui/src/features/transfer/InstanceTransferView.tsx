@@ -781,10 +781,7 @@ function BackButton(props: { onBack: () => void; disabled: boolean }) {
 }
 
 /** The label of a busy button while a file goes to a joined server, or `fallback` before the first part. */
-export function uploadLabel<Fallback extends string>(
-  progress: TransferUploadState | null | undefined,
-  fallback: Fallback,
-) {
+function uploadLabel<Fallback extends string>(progress: TransferUploadState | null | undefined, fallback: Fallback) {
   if (!progress) return fallback;
   return progress.sent < progress.total ? "settings.transfer.upload.sending" : "settings.transfer.upload.serverReading";
 }
@@ -796,23 +793,31 @@ const TIME_LEFT_FIRST_MS = 3_000;
 
 /**
  * The seconds until the server has the whole file, from the speed of the last 30 seconds, or null.
- * The clock moves the estimate between reports, so an upload that stops gets a longer time, and
- * after 30 seconds with no new bytes it has none. A resumed upload measures from its first report,
- * so the parts that the server already had do not count as speed.
+ * The last report before those 30 seconds stays, so a client that reports once for each 8 MB part
+ * on a slow connection also gets an estimate. The clock moves the estimate between reports, so an
+ * upload that stops gets a longer time. When no bytes arrive for 30 seconds, or for two times the
+ * usual time between reports, it has none. A resumed upload measures from its first report, so the
+ * parts that the server already had do not count as speed.
  */
 function createSecondsLeft(progress: () => TransferUploadState) {
   const samples: { at: number; sent: number }[] = [];
   const [now, setNow] = createSignal(Date.now());
-  const timer = setInterval(() => setNow(Date.now()), 1000);
+  const timer = setInterval(() => {
+    const { sent, total } = untrack(progress);
+    if (sent < total) setNow(Date.now());
+  }, 1000);
   onCleanup(() => clearInterval(timer));
   return createMemo(() => {
     const { sent, total } = progress();
     if (samples.at(-1)?.sent !== sent) samples.push({ at: Date.now(), sent });
     const time = Math.max(now(), samples.at(-1)?.at ?? 0);
-    while (samples.length > 1 && time - (samples[0]?.at ?? time) > TIME_LEFT_WINDOW_MS) samples.shift();
+    while (samples.length > 2 && time - (samples[1]?.at ?? time) >= TIME_LEFT_WINDOW_MS) samples.shift();
     const first = samples[0];
     const last = samples.at(-1);
-    if (!first || !last || sent >= total || time - last.at > TIME_LEFT_WINDOW_MS) return null;
+    const before = samples.at(-2);
+    if (!first || !last || sent >= total) return null;
+    const usualGap = before ? last.at - before.at : 0;
+    if (time - last.at > Math.max(TIME_LEFT_WINDOW_MS, 2 * usualGap)) return null;
     const elapsed = time - first.at;
     const bytesPerMs = (last.sent - first.sent) / elapsed;
     if (elapsed < TIME_LEFT_FIRST_MS || !(bytesPerMs > 0)) return null;

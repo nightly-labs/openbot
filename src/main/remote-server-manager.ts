@@ -2429,7 +2429,7 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
         true,
         INSTANCE_TRANSFER_PART_TIMEOUT_MS,
         undefined,
-        onProgress === undefined ? undefined : (sent) => onProgress(sent),
+        onProgress,
       );
       yield* this.#rejectHostError(response, url);
     },

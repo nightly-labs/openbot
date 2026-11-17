@@ -24,7 +24,6 @@ import {
   TransferNotes,
   TransferUploadProgress,
   type TransferUploadState,
-  uploadLabel,
 } from "./InstanceTransferView";
 
 export type CopyAgentsAgent = Pick<InstanceTransferAgent, "id" | "name" | "avatarSeed" | "avatarHue" | "avatarUrl">;
@@ -91,6 +90,11 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
   const takenNames = createMemo(() => new Set((props.toAgents ?? []).map((agent) => agent.name.toLowerCase())));
   const busy = () => props.phase === "copying";
   const uploading = () => (busy() ? props.progress : null);
+  // After the last byte the server reads the file and then adds the agents: both are the copy.
+  const sendingFile = () => {
+    const progress = uploading();
+    return progress ? progress.sent < progress.total : false;
+  };
   const done = () => props.phase === "done";
   const from = () => props.servers.find((server) => server.id === props.fromId) ?? null;
   const to = () => props.servers.find((server) => server.id === props.toId) ?? null;
@@ -262,7 +266,9 @@ export function CopyAgentsDialog(props: CopyAgentsDialogProps) {
                       type="button"
                       disabled={!to() || selected().length === 0}
                       loading={busy()}
-                      loadingLabel={t(uploadLabel(uploading(), "settings.transfer.copy.copying"))}
+                      loadingLabel={t(
+                        sendingFile() ? "settings.transfer.upload.sending" : "settings.transfer.copy.copying",
+                      )}
                       onClick={() => props.onCopy(selected().map((agent) => agent.id))}
                     >
                       {t("settings.transfer.copy.submit", { count: selected().length })}

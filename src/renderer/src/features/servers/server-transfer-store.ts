@@ -59,7 +59,8 @@ const INITIAL: ServerTransferState = {
 export function createServerTransferStore(serverId: string, calls: ServerTransferCalls) {
   const [state, setState] = createStore<ServerTransferState>({ ...INITIAL });
 
-  // Only the file that this screen sends: a copy to this server reports with the same server id.
+  // Only while this screen sends a file. The host keeps one upload for each member, so no other
+  // upload of this member to the same server runs at the same time.
   const stopProgress = calls.onUploadProgress?.(({ serverId: target, sent, total }) => {
     if (target !== serverId || state.importPhase !== "reading") return;
     setState((draft) => {
