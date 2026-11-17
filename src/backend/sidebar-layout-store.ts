@@ -61,7 +61,7 @@ const SIDEBAR_LAYOUT_FORMAT: VersionedJsonFormat<SidebarLayoutSnapshot> = {
 
 export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds a file that this build cannot read. */
+  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   #layout = structuredClone(DEFAULT_LAYOUT);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
@@ -73,9 +73,8 @@ export class SidebarLayoutStore extends EventEmitter<SidebarLayoutStoreEvents> {
   }
 
   /**
-   * Reads the layout. A file that this build cannot read, such as the file of a newer release, stays
-   * unchanged: the store starts from the default layout and writes `<path>.v2`. See
-   * `readVersionedJsonFile`.
+   * Reads the layout. The file of a newer release stays unchanged: the store starts from the default
+   * layout and writes `<path>.v2`. See `readVersionedJsonFile`.
    */
   initialize() {
     return Effect.gen({ self: this }, function* () {

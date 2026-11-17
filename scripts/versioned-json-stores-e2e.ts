@@ -3,7 +3,9 @@
 // - each released version loads, and a change writes the current version to the store's path;
 // - a file of a newer version (99) stays byte for byte the same: the store starts from its defaults,
 //   a change goes to `<path>.v<current>`, and a restart reads that change again;
-// - a file that is not JSON goes to `<path>.corrupt-<time>` with its bytes, and the store starts empty.
+// - a file that no released version can read (not JSON, not an object, no version, an unknown older
+//   version) goes to `<path>.corrupt-<time>` with its bytes, the store starts empty, and a change
+//   writes to the path again, so a later release reads it.
 // The browser state is read with `readBrowserState`: its writer is the Electron `BrowserHost`, which
 // writes to the `writePath` that this read returns.
 // `bun run test:versioned-json-stores`. Writes .openbot-build/versioned-json-stores-e2e/report.json.
@@ -41,7 +43,7 @@ interface StoreReport {
   store: string;
   released: { version: number; loaded: readonly string[]; writtenVersion: number | null }[];
   future: { bytesUnchanged: boolean; fallback: string; fallbackVersion: number | null; reloaded: readonly string[] };
-  notJson: { setAside: string; bytesKept: boolean; startedEmpty: boolean };
+  damaged: { contents: string; setAside: string; bytesKept: boolean; startedEmpty: boolean }[];
 }
 
 const run = <A, E>(effect: Effect.Effect<A, E>): Promise<A> => Effect.runPromise(effect);
@@ -183,7 +185,7 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
     store: store.name,
     released: [],
     future: { bytesUnchanged: false, fallback: "", fallbackVersion: null, reloaded: [] },
-    notJson: { setAside: "", bytesKept: false, startedEmpty: false },
+    damaged: [],
   };
 
   for (const released of store.released) {
@@ -218,22 +220,40 @@ async function caseFor(root: string, store: StoreCase): Promise<StoreReport> {
   assert.ok(bytesUnchanged, `${store.name}: the newer file changed`);
   report.future = { bytesUnchanged, fallback: basename(fallback), fallbackVersion, reloaded };
 
-  report.notJson = await notJsonCase(directory, async (path) => (await store.open(path)).marker().length === 0);
+  report.damaged = await damagedCases(directory, async (path) => {
+    const opened = await store.open(path);
+    const empty = opened.marker().length === 0;
+    await opened.change("After damage");
+    return empty;
+  });
   return report;
 }
 
-async function notJsonCase(directory: string, startsEmpty: (path: string) => Promise<boolean>) {
-  const path = join(directory, "not-json.json");
-  const damaged = Buffer.from('{"version": 1, "cut off');
-  await writeFile(path, damaged);
-  const startedEmpty = await startsEmpty(path);
-  const setAside = (await readdir(dirname(path))).find((name) => name.startsWith(`${basename(path)}.corrupt-`)) ?? "";
-  assert.ok(setAside, "the file that is not JSON was not set aside");
-  assert.equal(await bytes(path), null, "the file that is not JSON stayed at the path");
-  const bytesKept = (await bytes(join(directory, setAside)))?.equals(damaged) === true;
-  assert.ok(bytesKept, "the set-aside file lost bytes");
-  assert.ok(startedEmpty, "the store did not start empty");
-  return { setAside, bytesKept, startedEmpty };
+/** Files that no released version can read. None of them may move the saves to a fallback file. */
+const DAMAGED_FILES = ['{"version": 1, "cut off', "[1, 2]", '{"data": {}}', '{"version": 0}'];
+
+/**
+ * `startsEmpty` opens the store and, when it can change, changes it: the change must go to the path,
+ * where a later release reads it, and never to `<path>.v<current>`.
+ */
+async function damagedCases(directory: string, startsEmpty: (path: string) => Promise<boolean>) {
+  const results: StoreReport["damaged"] = [];
+  for (const [index, contents] of DAMAGED_FILES.entries()) {
+    const path = join(directory, `damaged-${index}.json`);
+    const damaged = Buffer.from(contents);
+    await writeFile(path, damaged);
+    const startedEmpty = await startsEmpty(path);
+    const setAside = (await readdir(dirname(path))).find((name) => name.startsWith(`${basename(path)}.corrupt-`)) ?? "";
+    assert.ok(setAside, `${contents}: the damaged file was not set aside`);
+    assert.ok(!(await bytes(path))?.equals(damaged), `${contents}: the damaged file stayed at the path`);
+    const fallbacks = (await readdir(dirname(path))).filter((name) => name.startsWith(`${basename(path)}.v`));
+    assert.deepEqual(fallbacks, [], `${contents}: the saves went to a fallback file`);
+    const bytesKept = (await bytes(join(directory, setAside)))?.equals(damaged) === true;
+    assert.ok(bytesKept, `${contents}: the set-aside file lost bytes`);
+    assert.ok(startedEmpty, `${contents}: the store did not start empty`);
+    results.push({ contents, setAside, bytesKept, startedEmpty });
+  }
+  return results;
 }
 
 async function browserCase(root: string): Promise<StoreReport> {
@@ -243,7 +263,7 @@ async function browserCase(root: string): Promise<StoreReport> {
     store: "browser state (read)",
     released: [],
     future: { bytesUnchanged: false, fallback: "", fallbackVersion: null, reloaded: [] },
-    notJson: { setAside: "", bytesKept: false, startedEmpty: false },
+    damaged: [],
   };
   for (const released of [1, 2]) {
     const path = join(directory, `released-v${released}.json`);
@@ -279,10 +299,11 @@ async function browserCase(root: string): Promise<StoreReport> {
   assert.ok(bytesUnchanged, "browser state: the newer file changed");
   report.future = { bytesUnchanged, fallback: basename(fallback), fallbackVersion: 2, reloaded };
 
-  report.notJson = await notJsonCase(
-    directory,
-    async (path) => (await run(readBrowserState(path))).state.tabs.length === 0,
-  );
+  report.damaged = await damagedCases(directory, async (path) => {
+    const { state, writePath } = await run(readBrowserState(path));
+    assert.equal(writePath, path, "browser state: a damaged file moved the saves to a fallback file");
+    return state.tabs.length === 0;
+  });
   return report;
 }
 

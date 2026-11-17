@@ -18,8 +18,9 @@ export interface VersionedJsonFormat<Value> {
  * What a read found at the store's path:
  * - `missing`: no file.
  * - `loaded`: a released version.
- * - `damaged`: not JSON. The file is now at `<path>.corrupt-<time>`.
- * - `kept`: JSON that this build cannot read, such as the file of a newer release. It stays unchanged.
+ * - `damaged`: not the file of a released version: not JSON, no version, or not valid for its version.
+ *   The file is now at `<path>.corrupt-<time>`.
+ * - `kept`: the file of a newer release, which has a version above `current`. It stays unchanged.
  * - `unreadable`: the read failed, for example on a permission error. It stays unchanged.
  */
 type VersionedJsonFileState = "missing" | "loaded" | "damaged" | "kept" | "unreadable";
@@ -41,10 +42,12 @@ export function versionedJsonFallbackPath(path: string, version: number): string
 }
 
 /**
- * Reads the versioned JSON file of a store, and never writes. A file that is not JSON goes to
- * `<path>.corrupt-<time>`. JSON that this build cannot read, such as the file of a newer release after
- * a downgrade, and a path that cannot be read stay unchanged: this build reads and writes
- * `<path>.v<current>` in their place. Stores must write to `writePath`, never to the path.
+ * Reads the versioned JSON file of a store, and never writes. A file that no released version can
+ * read goes to `<path>.corrupt-<time>`, as before this module. The file of a newer release after a
+ * downgrade, and a path that cannot be read, stay unchanged: this build reads and writes
+ * `<path>.v<current>` in their place. Only these two states use the fallback, so a damaged file
+ * cannot move the saves of every later release away from the path. Stores must write to `writePath`,
+ * never to the path.
  */
 export const readVersionedJsonFile = Effect.fn("VersionedJson.read")(function* <Value>(
   path: string,
@@ -57,8 +60,7 @@ export const readVersionedJsonFile = Effect.fn("VersionedJson.read")(function* <
   }
   const fallbackPath = versionedJsonFallbackPath(path, format.current);
   const fallback = yield* readOneFile(fallbackPath, format);
-  // The fallback is the file of this build. A fallback that this build cannot read is replaced at
-  // the next write, as the path of a store without a newer file is.
+  // The fallback is the file of this build. A damaged fallback is set aside, as a damaged path is.
   const load: VersionedJsonLoad<Value> = { value: fallback.value, writePath: fallbackPath, state: main.state };
   return load;
 });
@@ -81,22 +83,23 @@ const readOneFile = Effect.fn("VersionedJson.readOne")(function* <Value>(
     return missing;
   }
   const parsed = parseJson(read.success);
-  if (!parsed.ok) {
-    yield* setAsideDamagedFile(path);
-    const damaged: OneFile<Value> = { value: null, state: "damaged" };
-    return damaged;
+  const file = parsed.ok && isDynamicRecord(parsed.value) ? parsed.value : null;
+  const version = typeof file?.version === "number" ? file.version : null;
+  if (version !== null && version > format.current) {
+    const kept: OneFile<Value> = { value: null, state: "kept" };
+    return kept;
   }
-  const kept: OneFile<Value> = { value: null, state: "kept" };
-  const file = parsed.value;
-  if (!isDynamicRecord(file)) return kept;
-  const version = file.version;
-  if (typeof version !== "number") return kept;
-  const step = format.releases[version];
-  if (!step) return kept;
-  const decoded = yield* Effect.result(Effect.try(() => step(file)));
-  if (Result.isFailure(decoded)) return kept;
-  const loaded: OneFile<Value> = { value: decoded.success, state: "loaded" };
-  return loaded;
+  const step = version === null ? undefined : format.releases[version];
+  if (file && step) {
+    const decoded = yield* Effect.result(Effect.try(() => step(file)));
+    if (Result.isSuccess(decoded)) {
+      const loaded: OneFile<Value> = { value: decoded.success, state: "loaded" };
+      return loaded;
+    }
+  }
+  yield* setAsideDamagedFile(path);
+  const damaged: OneFile<Value> = { value: null, state: "damaged" };
+  return damaged;
 });
 
 /**

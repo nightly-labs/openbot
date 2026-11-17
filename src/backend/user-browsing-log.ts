@@ -90,7 +90,7 @@ export function stepPlace(url: string): { host: string; path: string } | null {
  */
 export class UserBrowsingLog {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds a file that this build cannot read. */
+  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   readonly #now: () => number;
   readonly #steps = new Map<string, UserBrowsingStep[]>();
@@ -121,8 +121,7 @@ export class UserBrowsingLog {
     this.#writePath = loaded.writePath;
     if (loaded.state === "damaged") logger.warn("The browsing steps are damaged. They start empty.");
     else if (loaded.state === "unreadable") logger.warn("Could not read the browsing steps.");
-    else if (loaded.state === "kept")
-      logger.warn("This version cannot read the browsing steps file. It stays unchanged.");
+    else if (loaded.state === "kept") logger.warn("A newer version wrote the browsing steps file. It stays unchanged.");
     for (const agent of loaded.value?.agents ?? []) this.#steps.set(agent.agentId, [...agent.steps]);
   }).bind(this);
 

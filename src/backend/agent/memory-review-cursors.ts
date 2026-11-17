@@ -33,7 +33,7 @@ interface Cursor {
  */
 export class MemoryReviewCursors {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds a file that this build cannot read. */
+  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   readonly #cursors = new Map<string, Cursor>();
   readonly #writes = Semaphore.makeUnsafe(1);
@@ -61,7 +61,7 @@ export class MemoryReviewCursors {
       logger.warn("The memory review cursors are damaged. The reviews read the latest messages.");
     else if (loaded.state === "unreadable") logger.warn("Could not read the memory review cursors.");
     else if (loaded.state === "kept")
-      logger.warn("This version cannot read the memory review cursors file. It stays unchanged.");
+      logger.warn("A newer version wrote the memory review cursors file. It stays unchanged.");
     for (const cursor of loaded.value?.cursors ?? [])
       this.#cursors.set(conversationKey(cursor.agentId, cursor.threadId), cursor);
   }).bind(this);

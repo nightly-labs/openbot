@@ -304,9 +304,8 @@ const BROWSER_STATE_FORMAT: VersionedJsonFormat<StoredBrowserStateV2> = {
 };
 
 /**
- * The saved tabs, and the file that the next save writes. A file that this build cannot read, such
- * as the file of a newer release, stays unchanged: no tab comes back, and the saves go to
- * `<path>.v2`. See `readVersionedJsonFile`.
+ * The saved tabs, and the file that the next save writes. The file of a newer release stays
+ * unchanged: no tab comes back, and the saves go to `<path>.v2`. See `readVersionedJsonFile`.
  */
 export const readBrowserState = Effect.fn("Browser.readState")(function* (path: string) {
   const loaded = yield* readVersionedJsonFile(path, BROWSER_STATE_FORMAT);

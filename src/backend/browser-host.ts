@@ -656,7 +656,7 @@ export class BrowserHost {
   readonly #userBrowsing: BrowserUserBrowsing | null;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
-  /** The state path, or the fallback file while the state path holds a file that this build cannot read. */
+  /** The state path, or the fallback file while the state path holds the file of a newer release. */
   #stateWritePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
   readonly #closingTabDrains = new Map<string, Fiber.Fiber<void, BrowserOperationError>>();

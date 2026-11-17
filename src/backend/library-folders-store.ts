@@ -96,7 +96,7 @@ function apply(
  */
 export class LibraryFoldersStore {
   readonly #path: string;
-  /** The path, or the fallback file while the path holds a file that this build cannot read. */
+  /** The path, or the fallback file while the path holds the file of a newer release. */
   #writePath: string;
   #snapshot = structuredClone(EMPTY_LIBRARY_FOLDERS);
   readonly #operationQueue = Semaphore.makeUnsafe(1);
@@ -108,9 +108,9 @@ export class LibraryFoldersStore {
   }
 
   /**
-   * Reads the folders. A file that this build cannot read, such as the file of a newer release, stays
-   * unchanged: the store starts with no folders and writes `<path>.v1`. See `readVersionedJsonFile`.
-   * The stored files are not in this file, so a file that is not JSON loses only the folders.
+   * Reads the folders. The file of a newer release stays unchanged: the store starts with no folders
+   * and writes `<path>.v1`. See `readVersionedJsonFile`. The stored files are not in this file, so a
+   * damaged file loses only the folders.
    */
   initialize() {
     return Effect.gen({ self: this }, function* () {
