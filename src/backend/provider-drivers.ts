@@ -698,8 +698,10 @@ export interface ProviderClientContext {
  * `OPENAI_API_KEY` as a bearer when that variable is there, and not the ChatGPT sign-in. A value that
  * is not TOML is a string, so no value needs quotes. An address that is not http or https is left out.
  */
+const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
+
 function codexVariableOverrides(variables: Readonly<Record<string, string>>): string[] {
-  const baseUrl = variables.OPENAI_BASE_URL?.trim().replace(/\/+$/, "");
+  const baseUrl = variables[CODEX_ADDRESS_VARIABLE]?.trim().replace(/\/+$/, "");
   if (!baseUrl || !/^https?:\/\/[^/\s]+/.test(baseUrl) || /\s/.test(baseUrl)) return [];
   return [
     `model_provider=${CODEX_VARIABLE_PROVIDER}`,
@@ -1065,7 +1067,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         },
         context.codexTurnContext,
         overrides,
-        overrides.length > 0 ? "OPENAI_BASE_URL" : undefined,
+        overrides.length > 0 ? CODEX_ADDRESS_VARIABLE : undefined,
       );
     },
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
