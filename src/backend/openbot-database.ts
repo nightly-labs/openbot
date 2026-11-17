@@ -74,6 +74,18 @@ export type {
 export type { ProviderSession } from "./database/provider-sessions";
 export type { StoredThreadSummary } from "./database/thread-summaries";
 
+/** One streamed message to write, for a caller that knows only that message changed. */
+export interface StreamingMessageWrite {
+  snapshot: ConversationSnapshot;
+  messageId: string;
+  eventType: string;
+  detail?: unknown;
+  commandId?: string;
+}
+
+/** The revision of a streamed write that is kept, or the error of one that failed. */
+export type StreamingMessageResult = { revision: number } | { error: unknown };
+
 /**
  * The local OpenBot event log and its read projections.
  *
@@ -309,14 +321,32 @@ export class OpenBotDatabase {
   }
 
   /** Writes one message of a thread, for a caller that knows only that message changed. */
-  persistStreamingMessage(input: {
-    snapshot: ConversationSnapshot;
-    messageId: string;
-    eventType: string;
-    detail?: unknown;
-    commandId?: string;
-  }): number {
+  persistStreamingMessage(input: StreamingMessageWrite): number {
     return this.#conversationWrites.persistStreamingMessage(input);
+  }
+
+  /**
+   * Writes the streamed messages of several threads in one transaction. Each write in its own
+   * transaction made each agent that streams commit ten times a second, and with many agents the
+   * commits took most of the main process. Each write keeps its own savepoint: a write that fails
+   * rolls back only itself, and its error takes its place in the result. A failed commit throws, and
+   * then no write is kept.
+   */
+  persistStreamingMessages(inputs: readonly StreamingMessageWrite[]): StreamingMessageResult[] {
+    const db = this.connection;
+    return withTransaction(db, () =>
+      inputs.map((input): StreamingMessageResult => {
+        try {
+          return { revision: this.#conversationWrites.persistStreamingMessage(input) };
+        } catch (error) {
+          // SQLite ends the whole transaction itself on some failures, such as a full disk. The
+          // writes before this one are then gone, and the next ones would commit alone, so the
+          // whole call fails with this error.
+          if (!db.isTransaction) throw error;
+          return { error };
+        }
+      }),
+    );
   }
 
   appendConversationMessage(input: {

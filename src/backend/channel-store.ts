@@ -31,6 +31,7 @@ import {
   requiredStringColumn,
 } from "./database/database-rows";
 import { withTransaction } from "./database/sqlite-transaction";
+import { cachedStatement } from "./database/statement-cache";
 import type { OpenBotDatabase } from "./openbot-database";
 import { revokeRoutineWebhooks } from "./webhook-route-store";
 
@@ -313,9 +314,10 @@ export class ChannelStore {
   /** One task by id, read through the primary key rather than every task of the channel. */
   task(channelId: string, taskId: string): ChannelTask | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare("SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?")
-        .get(channelId, taskId),
+      cachedStatement(
+        this.database.connection,
+        "SELECT task_json FROM projection_channel_tasks WHERE channel_id = ? AND task_id = ?",
+      ).get(channelId, taskId),
     );
     if (!row) return null;
     const value = JSON.parse(requiredStringColumn(row, "task_json"));
@@ -961,9 +963,10 @@ export class ChannelStore {
 
   channelForThread(threadId: string): string | null {
     const row = databaseRow(
-      this.database.connection
-        .prepare("SELECT channel_id FROM projection_channel_contexts WHERE thread_id = ?")
-        .get(threadId),
+      cachedStatement(
+        this.database.connection,
+        "SELECT channel_id FROM projection_channel_contexts WHERE thread_id = ?",
+      ).get(threadId),
     );
     return row ? requiredStringColumn(row, "channel_id") : null;
   }

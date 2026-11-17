@@ -60,6 +60,37 @@ function badgeSnapshot(state: SidebarAgentState | undefined): SidebarBadgeSnapsh
 /** The pill grows or shrinks to the width of the new count, with the digit roll. */
 const SIDEBAR_BADGE_RESIZE: KeyframeAnimationOptions = { duration: 280, easing: "cubic-bezier(0.22, 1, 0.36, 1)" };
 
+/** The steps of one badge resize. `runBadgeResizes` does each step for all badges before the next step. */
+interface BadgeResizeSteps {
+  readFrom(): void;
+  cancel(): void;
+  readTo(): void;
+  start(): void;
+}
+
+let queuedResizes: BadgeResizeSteps[] = [];
+
+/**
+ * A badge reads its width when its count changes, and its resize animation changes the style. When
+ * many agents work, the counts change in many flushes in each frame, and a read after each flush made
+ * the browser calculate the style of the page again each time. The badges therefore read and write
+ * together, in steps, in the next frame: the reads use the style calculation that the frame does
+ * anyway. The frame paints the new count and the start of its resize together.
+ */
+function queueBadgeResize(steps: BadgeResizeSteps): void {
+  queuedResizes.push(steps);
+  if (queuedResizes.length === 1) requestAnimationFrame(runBadgeResizes);
+}
+
+function runBadgeResizes(): void {
+  const batch = queuedResizes;
+  queuedResizes = [];
+  for (const steps of batch) steps.readFrom();
+  for (const steps of batch) steps.cancel();
+  for (const steps of batch) steps.readTo();
+  for (const steps of batch) steps.start();
+}
+
 /**
  * The badge on a sidebar avatar. The badge on screen follows `state` and moves with each change:
  * a badge lands, an unread count bounces and rolls its digits when it changes, and a felt badge
@@ -99,6 +130,39 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
      resizes, it is the width on screen, so a new change continues from there. */
   const measure = () => (badge?.isConnected ? Number.parseFloat(getComputedStyle(badge).width) : undefined);
 
+  /* What the queued resize does, as the last run of the effect before it sets. */
+  let resizeQueued = false;
+  let measureNext = false;
+  let animateNext = false;
+  let fromWidth: number | undefined;
+  const resizeSteps: BadgeResizeSteps = {
+    readFrom: () => {
+      fromWidth = resize?.playState === "running" ? measure() : pillWidth;
+    },
+    cancel: () => {
+      measureRun++;
+      resize?.cancel();
+      resize = undefined;
+    },
+    readTo: () => {
+      pillWidth = measureNext ? measure() : undefined;
+    },
+    start: () => {
+      resizeQueued = false;
+      /* A badge that has just appeared, or the first run, can come before the badge is in the
+         document; the next frame measures it. */
+      if (measureNext && pillWidth === undefined) {
+        const run = measureRun;
+        requestAnimationFrame(() => {
+          if (run === measureRun) pillWidth ??= measure();
+        });
+      }
+      if (animateNext && badge && fromWidth !== undefined && pillWidth !== undefined && fromWidth !== pillWidth) {
+        resize = badge.animate([{ width: `${fromWidth}px` }, { width: `${pillWidth}px` }], SIDEBAR_BADGE_RESIZE);
+      }
+    },
+  };
+
   createEffect(
     () => badgeSnapshot(props.state()),
     (next, previous) => {
@@ -106,18 +170,11 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
       const current = previous ?? leavingBadge;
       /* The host can send the same count again; that run must not stop the resize. */
       if (leavingBadge === undefined && current?.count !== undefined && current.count === next?.count) return;
-      const fromWidth = resize?.playState === "running" ? measure() : pillWidth;
-      measureRun++;
-      resize?.cancel();
-      resize = undefined;
-      pillWidth = next?.count !== undefined ? measure() : undefined;
-      /* A badge that has just appeared, or the first run, can come before the badge is in the
-         document; the next frame measures it. */
-      if (next?.count !== undefined && pillWidth === undefined) {
-        const run = ++measureRun;
-        requestAnimationFrame(() => {
-          if (run === measureRun) pillWidth ??= measure();
-        });
+      measureNext = next?.count !== undefined;
+      animateNext = false;
+      if (!resizeQueued) {
+        resizeQueued = true;
+        queueBadgeResize(resizeSteps);
       }
       if (!mounted) {
         mounted = true;
@@ -143,9 +200,7 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
           setPreviousCount(current.count);
           setPhase(untrack(phase) === "bump" ? "bump-b" : "bump");
         } else setPreviousCount(null);
-        if (badge && fromWidth !== undefined && pillWidth !== undefined && fromWidth !== pillWidth) {
-          resize = badge.animate([{ width: `${fromWidth}px` }, { width: `${pillWidth}px` }], SIDEBAR_BADGE_RESIZE);
-        }
+        animateNext = true;
         return;
       }
       setPreviousCount(null);

@@ -12,6 +12,7 @@ import {
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
 import { withTransaction } from "./sqlite-transaction";
+import { cachedStatement, forgetStatements } from "./statement-cache";
 
 export interface OrchestrationEventInput {
   aggregateType: string;
@@ -67,8 +68,6 @@ export class DatabaseCore {
   readonly #legacyBackupRoot: string;
   readonly #checkIntegrity: DatabaseCoreOptions["checkIntegrity"];
   #db: DatabaseSync | null = null;
-  readonly #statements = new Map<string, StatementSync>();
-  #statementsDb: DatabaseSync | null = null;
 
   constructor(options: DatabaseCoreOptions) {
     this.path = join(options.userDataPath, "openbot.db");
@@ -124,7 +123,7 @@ export class DatabaseCore {
   }, Effect.uninterruptible);
 
   close(): void {
-    this.#statements.clear();
+    if (this.#db) forgetStatements(this.#db);
     this.#db?.close();
     this.#db = null;
   }
@@ -134,23 +133,9 @@ export class DatabaseCore {
     return this.#db;
   }
 
-  /**
-   * A prepared statement for SQL that has no variable parts, kept for the open connection. Each
-   * streamed flush of each agent dispatches a command, and to prepare its statements again on each
-   * call parsed the same SQL hundreds of times per second with many agents.
-   */
+  /** A prepared statement of the open connection, kept as `cachedStatement` says. */
   statement(sql: string): StatementSync {
-    const db = this.connection;
-    if (this.#statementsDb !== db) {
-      this.#statements.clear();
-      this.#statementsDb = db;
-    }
-    let prepared = this.#statements.get(sql);
-    if (!prepared) {
-      prepared = db.prepare(sql);
-      this.#statements.set(sql, prepared);
-    }
-    return prepared;
+    return cachedStatement(this.connection, sql);
   }
 
   dispatch<T>(
@@ -261,7 +246,8 @@ function decodeReceiptRow(value: unknown): ReceiptRow | null {
  */
 export function deleteReceiptsOf(db: DatabaseSync, commandIds: readonly string[]): void {
   if (commandIds.length === 0) return;
-  const deleteReceipt = db.prepare(
+  const deleteReceipt = cachedStatement(
+    db,
     `DELETE FROM orchestration_command_receipts
      WHERE command_id = ?
        AND NOT EXISTS (SELECT 1 FROM orchestration_events WHERE command_id = ?)`,

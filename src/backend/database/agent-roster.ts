@@ -3,6 +3,7 @@ import type { AgentSummary } from "@openbot/contracts/ipc";
 import { revokeRoutineWebhooks } from "../webhook-route-store";
 import { type DatabaseCore, deleteReceiptsOf } from "./database-core";
 import { databaseRow, databaseRows, requiredStringColumn } from "./database-rows";
+import { cachedStatement } from "./statement-cache";
 
 type AgentRuntime = Pick<AgentSummary, "provider" | "model" | "reasoningEffort">;
 
@@ -281,7 +282,9 @@ export class AgentRoster {
 
   ensureThreadProjection(db: DatabaseSync, agent: AgentSummary, sequence: number): void {
     if (!agent.threadId) return;
-    db.prepare(`
+    cachedStatement(
+      db,
+      `
       INSERT INTO projection_threads
         (thread_id, agent_id, title, active_turn_id, created_at, updated_at, last_event_sequence)
       VALUES (?, ?, ?, NULL, ?, ?, ?)
@@ -290,7 +293,8 @@ export class AgentRoster {
         title = excluded.title,
         updated_at = excluded.updated_at,
         last_event_sequence = MAX(projection_threads.last_event_sequence, excluded.last_event_sequence)
-    `).run(
+    `,
+    ).run(
       agent.threadId,
       agent.id,
       agent.name,
