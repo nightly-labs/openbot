@@ -100,7 +100,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | DONE (#10776, `7190edc2a2`) |
 | 6 | No implicit `new OpenBotDatabase()`; one release version comparator | DONE (#10774, `af22902d8f`) |
 | 15 | Copy `openbot.db` before a migration (PR #7150) | DROPPED: not practical for large databases (#7150 closed) |
-| 24 | Minimum app version for each surface; blocking "Update required" screen | DONE (#10803; a manual minimum with a 60-day floor) |
+| 24 | Minimum app version for each surface; blocking "Update required" screen | DONE (#10803, `0428b8e694`; a manual minimum with a 60-day floor) |
 
 ### 1. Bootstrap list stays at 64
 
