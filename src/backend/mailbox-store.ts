@@ -581,7 +581,8 @@ export class MailboxStore {
 
   /**
    * Whether the side thread that sent this message still waits for `agentId`: the thread sent it a
-   * request that asked for an answer, and `agentId` has not replied to that request.
+   * request that asked for an answer, and `agentId` has not answered that request. A linked question
+   * back is not an answer.
    */
   sideThreadWaitsFor(agentId: string, messageId: string): boolean {
     const message = this.#state.messages.find((candidate) => candidate.id === messageId);
@@ -596,7 +597,9 @@ export class MailboxStore {
         this.#state.deliveries.some(
           (delivery) => delivery.messageId === request.id && delivery.recipientAgentId === agentId,
         ) &&
-        !this.hasReplyFrom(agentId, request.id),
+        !this.#state.messages.some(
+          (answer) => isAnswer(answer) && answer.sender.agentId === agentId && answer.replyToMessageId === request.id,
+        ),
     );
   }
 
