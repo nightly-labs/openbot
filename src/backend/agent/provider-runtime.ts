@@ -600,6 +600,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #saveProviderUse: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
   /** The managed CLIs that the user chose to run in their own install, also when OpenBot's copy is newer. */
   readonly #installedChosen: Set<AgentProvider>;
+  /**
+   * Providers whose newer copy from OpenBot failed each start, so the CLI that the user installed runs
+   * in its place until the app restarts, the copy changes, or the user chooses (#10174). Not saved.
+   */
+  readonly #installedFallback = new Set<AgentProvider>();
   readonly #saveInstalledChoice: (
     provider: AgentProvider,
     installed: boolean,
@@ -954,7 +959,7 @@ export class ProviderRuntime implements ProviderPort {
         (input) => driver.resolveCli(input),
         this.#bundledExecutables[cliProvider],
         preferInstalled,
-        this.#installedChosen.has(cliProvider),
+        this.#installedChosen.has(cliProvider) || this.#installedFallback.has(provider),
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
@@ -3143,6 +3148,7 @@ export class ProviderRuntime implements ProviderPort {
     installed: boolean,
   ) {
     yield* providerStep(() => this.requireProviderOn(provider));
+    this.#installedFallback.delete(provider);
     if (installed !== this.#installedChosen.has(provider)) {
       yield* this.#saveInstalledChoice(provider, installed);
       if (installed) this.#installedChosen.add(provider);
@@ -3849,6 +3855,7 @@ export class ProviderRuntime implements ProviderPort {
         this.#cli.delete(provider);
         // A new CLI gets new starts: the failures were of the one it replaces.
         this.#startFailures.delete(provider);
+        this.#installedFallback.delete(provider);
         this.#slowStarts.delete(provider);
         this.#resetRestarts(provider);
       });
@@ -4195,7 +4202,7 @@ export class ProviderRuntime implements ProviderPort {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
-                  return this.#showStartStopped(provider);
+                  return this.#fallBackToInstalledCli(provider, cli) ? message : this.#showStartStopped(provider);
               }
               // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
               // the provider stayed off until the user refreshed it (#4237).
@@ -4609,6 +4616,27 @@ export class ProviderRuntime implements ProviderPort {
     ];
     if (reason && kept.includes(reason)) return reason;
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
+  }
+
+  /**
+   * OpenBot's copy failed each start, and the CLI that the user installed was passed over because it
+   * is older. That CLI starts now, and the row offers the copy back. The copy showed its version but
+   * failed its first request, so the next refresh started it again and the provider stayed off (#10174).
+   */
+  #fallBackToInstalledCli(provider: AgentProvider, cli: AgentCliInfo | null): boolean {
+    const installed = this.#passedOverClis.get(provider);
+    if (cli?.source !== "managed" || installed?.source !== "system" || this.#installedFallback.has(provider))
+      return false;
+    logger.warn("OpenBot's provider CLI did not start, so the installed CLI runs.", {
+      provider,
+      version: cli.version,
+      installedVersion: installed.version,
+    });
+    this.#installedFallback.add(provider);
+    this.#startFailures.delete(provider);
+    this.#resetRestarts(provider);
+    this.#scheduleRestart(provider, 0, true);
+    return true;
   }
 
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
