@@ -1608,8 +1608,9 @@ export class ChannelService {
       if (!task.ownerAgentId) {
         const revision = this.routingState(channelId);
         const lead = this.hooks.agents().find((agent) => agent.id === channel.leadAgentId);
-        // The task waits queued while the lead's plan is spent; the reset wakes the channel again.
-        if (lead && this.hooks.usageLimited?.(lead.id)) {
+        // The task waits queued while the lead's plan is spent; the reset wakes the channel again. While a
+        // provider error passes over the lead's model, it waits for the move to the backup (#11389).
+        if (lead && (this.hooks.usageLimited?.(lead.id) || this.hooks.failedOver?.(lead.id))) {
           yield* channelSync(() => this.#heldByLimit(channelId, task, lead.id));
           continue;
         }

@@ -1562,15 +1562,23 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 if (resetsAt !== undefined) return this.#usageLimits.reached(selected.id, resetsAt, selected.model);
                 // A provider error that moves a member turn to a backup model, such as a spent Gemini quota,
                 // passes over the routing turn's model too. The channel keeps the task queued, and the move
-                // to the backup routes it again (#11389). With no ready backup, the error shows as before.
+                // to the backup routes it again (#11389). With no ready backup, the error shows as before. A
+                // member whose model ran the turn in place of the lead keeps its model: the channel waits for the lead.
                 const failed: { causeCode: CauseCode; message: string } | null = providerError;
                 if (
                   !background &&
+                  selected === lead &&
                   failed &&
                   FAILOVER_CAUSES.has(failed.causeCode) &&
-                  (this.#usageLimitBackup(selected.id) !== undefined || this.#poolBackup(selected.id))
-                )
-                  this.#usageLimits.failed(selected.id, selected.model, providerResetDelayMs(failed.message));
+                  (this.#usageLimitBackup(lead.id) !== undefined || this.#poolBackup(lead.id))
+                ) {
+                  logger.info("A provider error stopped a routing turn, so the lead moves to its backup model.", {
+                    provider: lead.provider,
+                    model: lead.model,
+                    cause: failed.causeCode,
+                  });
+                  this.#usageLimits.failed(lead.id, lead.model, providerResetDelayMs(failed.message));
+                }
                 return Effect.void;
               }),
             );
