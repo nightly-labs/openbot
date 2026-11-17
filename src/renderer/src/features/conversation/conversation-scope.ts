@@ -1851,7 +1851,8 @@ export function createConversationViewScope(props: ConversationProps) {
       request: props.messageFocusRequest,
       agentId: props.agent?.id,
       loaded: props.loaded,
-      messageIds: props.messages.map((message) => message.id).join("\u0000"),
+      // Without a request, the effect does nothing, so it does not read and join every message id.
+      messageIds: props.messageFocusRequest ? props.messages.map((message) => message.id).join("\u0000") : "",
       index: props.messageFocusRequest ? timelineIndexById().get(props.messageFocusRequest.messageId) : undefined,
     }),
     ({ request, agentId, loaded, index }) => {

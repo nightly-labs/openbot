@@ -232,13 +232,22 @@ export class ComputerUseHighlightController<W extends HighlightOverlayWindow = B
         this.#overlays.set(display.id, overlay);
       }
       if (!overlay.loaded) {
-        overlay.loaded = true;
         const window = overlay.window;
+        const displayId = display.id;
+        // A failed load closes the window, so the next tick makes a new one and loads it again. Marked
+        // before the load, a failed window would stay with no page until the overlay was idle for long.
         yield* Effect.tryPromise({
           try: () => this.#options.loadWindow(window),
           catch: (cause) => new HighlightOverlayLoadFailed({ cause }),
-        });
+        }).pipe(
+          Effect.tapError(() =>
+            Effect.sync(() => {
+              if (this.#overlays.get(displayId)?.window === window) this.#retire(displayId);
+            }),
+          ),
+        );
         if (stale() || overlay.window.isDestroyed()) return;
+        overlay.loaded = true;
       }
       // Only when the display is resized or moved. Every other tick leaves the window alone, which
       // is the whole point of an overlay the size of the display it sits on.

@@ -6240,9 +6240,8 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
     const ofTurn = (messages: readonly ConversationMessage[]) =>
       messages.filter((message) => message.turnId === turnId);
     const loaded = ofTurn(this.#conversation.loadedSnapshot(agentId)?.messages ?? []);
-    const threadId = this.#store.list().find((agent) => agent.id === agentId)?.threadId ?? null;
-    const messages =
-      loaded.length > 0 ? loaded : ofTurn(this.#store.database.readConversation(agentId, threadId).messages);
+    // An unloaded chat reads the rows of this turn only, not the whole history of the thread.
+    const messages = loaded.length > 0 ? loaded : this.#store.database.readTurnAssistantMessages(agentId, turnId);
     return messages.findLast(isAnswer)?.text ?? null;
   }
 
