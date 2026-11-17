@@ -748,7 +748,9 @@ Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
 `isFreeOpencodeModel` in `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `packages/ui/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
-about what costs money.
+about what costs money. A model of a custom endpoint that Pi runs gets the badge by the same name
+rule (`isFreeOpencodeModelName`). Pi gets cost 0 for each endpoint model, so its cost does not
+show that a model is free.
 
 A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.1.1 fails a turn on
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
