@@ -306,6 +306,11 @@ export class ProviderAccounts {
     }
     yield* this.#interrupt(account.id);
     if (added) this.#added.add(account.id);
+    else {
+      // A Reconnect can sign in to another login, or fail after a sign-out: the old reading is not its usage.
+      this.#usage.delete(account.id);
+      this.#usageGate(account.id).reset();
+    }
     if (code) {
       this.#codeResults.delete(account.id);
       this.#codeSignIns.add(account.id);
@@ -919,10 +924,13 @@ export class ProviderAccounts {
         Effect.gen({ self: this }, function* () {
           const email = signedIn.email ?? null;
           const organization = signedIn.organization ?? null;
-          if (email && this.#loginTaken(provider, account.id, { email, organization }))
+          if (email && this.#loginTaken(provider, account.id, { email, organization })) {
+            // The folder holds another login now, so the kept reading is not the account's.
+            this.#usage.delete(account.id);
             return yield* accountFailure(
               sourceText("error.provider.accountAlreadyAdded", { provider: providerLabel(provider) }),
             );
+          }
           // The reading comes first: a usage request for a connected account uses it and starts no client.
           const reading = this.#host
             .readUsage(client, defaultUsageModel(provider))
