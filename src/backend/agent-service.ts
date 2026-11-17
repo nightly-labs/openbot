@@ -1644,7 +1644,12 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
           const agent = this.#store.list().find((item) => item.id === agentId);
           const session = agent ? this.#store.database.activeProviderSession(threadId, agent.provider) : null;
           const client = agent ? this.#providers.clientForAgent(agent) : null;
-          if (!session || !client) return "rejected" as const;
+          if (!agent || !session || !client) return "rejected" as const;
+          // A turn that waits on a question reads no steer until the question is answered, as in the
+          // agent's own chat, so the question closes in the same order as there (#11467).
+          const releaseQuestions = Effect.sync(() => this.#attention.releaseForUserMessage(agentId, threadId, turnId));
+          const steerFirst = providerForAgent(agent) === "claude";
+          if (!steerFirst) yield* releaseQuestions;
           return yield* client
             .request(
               "turn/steer",
@@ -1662,8 +1667,10 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
                 onFailure: (failure) =>
                   isRequestTimeout(failure.cause, "turn/steer") ? ("uncertain" as const) : ("rejected" as const),
               }),
+              Effect.ensuring(steerFirst ? releaseQuestions : Effect.void),
             );
         }),
+      releaseQuestions: (agentId, threadId, turnId) => this.#attention.releaseForUserMessage(agentId, threadId, turnId),
       interrupt: (agentId, turnId, threadId) => this.interrupt(agentId, turnId, threadId).pipe(toChannelOperationError),
 
       // Every channel state change ends in `publish`, so this is the complete trigger surface for
