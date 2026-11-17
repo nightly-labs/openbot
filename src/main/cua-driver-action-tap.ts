@@ -289,12 +289,18 @@ function pointerWindow(tool: string, args: DynamicRecord): number | null | undef
   return windowId;
 }
 
+/** The tools whose answer can hold a window screenshot: a read, or a batch with its end read. */
+const SCREENSHOT_TOOLS = new Set(["get_window_state", RUN_STEPS_TOOL]);
+
 /** The window and the width of a `get_window_state` screenshot, from its structured result. */
 function screenshotOf(answer: DynamicRecord): { windowId: number; width: number } | null {
   const result = answer.ok === true && isDynamicRecord(answer.result) ? answer.result : null;
   const structured = result && isDynamicRecord(result.structuredContent) ? result.structuredContent : null;
-  const windowId = numberIn(structured?.window_id);
-  const width = numberIn(structured?.screenshot_width);
+  // A `run_steps` answer holds the `get_window_state` result of its end read as `observation.state`.
+  const observation = structured && isDynamicRecord(structured.observation) ? structured.observation : null;
+  const state = observation && isDynamicRecord(observation.state) ? observation.state : structured;
+  const windowId = numberIn(state?.window_id);
+  const width = numberIn(state?.screenshot_width);
   return windowId !== null && width !== null && width > 0 ? { windowId, width } : null;
 }
 
@@ -413,7 +419,8 @@ class CallAnswerLines extends Transform {
     this.#heldBytes = 0;
     if (!whole) this.push(line);
     else if (this.#answering === "list") this.push(withoutDriverCursorTools(line));
-    else this.push(withCopy(line, this.#answering?.tool === "get_window_state" ? this.#readScreenshot : undefined));
+    else
+      this.push(withCopy(line, SCREENSHOT_TOOLS.has(this.#answering?.tool ?? "") ? this.#readScreenshot : undefined));
   }
 
   /** Keeps the width of a window screenshot, which scales the pixels a later click names. */

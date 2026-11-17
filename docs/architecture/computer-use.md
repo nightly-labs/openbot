@@ -83,6 +83,8 @@ The driver tells agents to act through `run_steps`, which runs its steps inside 
 tap reads the steps of that call in order, each as its own call. A step without a window gets the
 window of the batch or of the last step that named one, as in the driver. A step that names its
 window only by `app` or `window` title removes the cursor, because only the driver resolves it.
+The driver skips the reads between the steps of a batch and does one read at the end. The tap keeps
+the `screenshot_width` of that end read (`observation.state` in the answer) as of a direct read.
 
 ### Agent display on a server
 
