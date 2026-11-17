@@ -1341,7 +1341,9 @@ export class TeamWebRtcClientTransport extends EventEmitter<TeamWebRtcClientTran
     // The handshake started on the channel that closed, and a new channel does not start it again.
     // Without this, the attempt and each caller that joined it waited for the 30 s timeout.
     if (!active.connected && active.authentication?.started)
-      active.cancelConnectionWait?.(new Error(sourceText("error.remote.hostDisconnected")));
+      active.cancelConnectionWait?.(
+        new TeamWebRtcConnectError("host_disconnected", sourceText("error.remote.hostDisconnected")),
+      );
     this.#files.setPeerAuthenticated(hostId, false);
     active.connected = false;
     this.#lastEventSequence.delete(hostId);
