@@ -64,7 +64,8 @@ export const messages = defineMessages("mobile.app", {
   "mobile.app.update.notesFailed": "The release notes could not load.",
   "mobile.app.update.notesEmpty": "There are no release notes for this version yet.",
   "mobile.app.update.fullChangelog": "Full changelog",
-  // The rating ask on home. 1 to 3 stars open a field whose text goes to a public GitHub issue form.
+  // The rating ask on home. 1 or 2 stars open a public GitHub issue form, 3 stars a prepared post on X,
+  // and 4 or 5 stars the store review page.
   "mobile.app.rate.title": "Enjoying OpenBot?",
   "mobile.app.rate.body": "A rating helps other teams find OpenBot.",
   "mobile.app.rate.ratingLabel": "Rating",

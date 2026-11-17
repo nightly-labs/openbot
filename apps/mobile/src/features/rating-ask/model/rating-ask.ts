@@ -4,7 +4,6 @@ import * as SecureStore from "expo-secure-store";
 import { Linking } from "react-native";
 import { create } from "zustand";
 
-import { phoneFeedback } from "@/features/support/model/support-log-capture";
 import { devShowRatingAsk } from "@/shared/lib/dev-feature-overrides";
 import { isIOS } from "@/shared/lib/platform";
 
@@ -65,14 +64,14 @@ function decodeRatingAsk(stored: string | null): RatingAskRecord {
   };
 }
 
+/**
+ * Reads the stored record. A failed read leaves the store not ready, so this launch neither asks nor
+ * writes: a write then would replace the stored answer with an empty record.
+ */
 export async function loadRatingAsk(): Promise<void> {
   if (useRatingAsk.getState().ready) return;
-  try {
-    const stored = await SecureStore.getItemAsync(key);
-    if (!useRatingAsk.getState().ready) useRatingAsk.setState(decodeRatingAsk(stored));
-  } finally {
-    useRatingAsk.setState({ ready: true });
-  }
+  const stored = await SecureStore.getItemAsync(key);
+  if (!useRatingAsk.getState().ready) useRatingAsk.setState({ ...decodeRatingAsk(stored), ready: true });
 }
 
 // Writes run in order, so the last change is the one that stays stored.
@@ -129,13 +128,13 @@ export async function openStoreReview(): Promise<void> {
 }
 
 /**
- * Opens the public mobile bug report form with this phone's facts filled in. The user writes the
- * feedback there and submits it in the browser, so nothing leaves the phone before that.
+ * Opens the public mobile bug report form, where the user writes the feedback and submits it. The
+ * link holds only the title: the page loads from GitHub before the user submits, so this phone's
+ * facts and log stay out of it. The form asks the user for them.
  */
 export async function openFeedbackForm(stars: number): Promise<void> {
-  // The form is in English for the maintainers.
-  const url = mobileBugReportFormUrl({ title: `Feedback from the rating ask (${stars} of 5 stars)` }, phoneFeedback());
-  await Linking.openURL(url);
+  // The title is in English for the maintainers, as the other issue forms are.
+  await Linking.openURL(mobileBugReportFormUrl({ title: `Feedback from the rating ask (${stars} of 5 stars)` }));
 }
 
 /** Opens a prepared post on X: in the X app when it is installed, else on the web. */

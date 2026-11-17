@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect } from "react";
+import { AppState } from "react-native";
 
 import {
   loadRatingAsk,
@@ -29,14 +30,25 @@ export function useRatingAskGate(ready: boolean): void {
   const shown = ready && isFocused && loaded;
   useEffect(() => {
     if (!shown) return;
-    recordRatingAskUse();
-    if (askedThisLaunch || !ratingAskDue()) return;
-    const timer = setTimeout(() => {
-      if (askedThisLaunch) return;
-      askedThisLaunch = true;
-      markRatingAskShown();
-      router.push("/rate-app");
-    }, ASK_DELAY_MS);
-    return () => clearTimeout(timer);
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    // Home counts a day when it shows, and again when the app comes back to it on a later day.
+    const visit = () => {
+      recordRatingAskUse();
+      if (timer || askedThisLaunch || !ratingAskDue()) return;
+      timer = setTimeout(() => {
+        if (askedThisLaunch) return;
+        askedThisLaunch = true;
+        markRatingAskShown();
+        router.push("/rate-app");
+      }, ASK_DELAY_MS);
+    };
+    visit();
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") visit();
+    });
+    return () => {
+      subscription.remove();
+      if (timer) clearTimeout(timer);
+    };
   }, [shown]);
 }

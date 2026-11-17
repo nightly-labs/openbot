@@ -3,7 +3,7 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { Button, Typography } from "heroui-native";
 import Star from "lucide-react-native/icons/star";
 import { useCallback, useEffect, useState } from "react";
-import { BackHandler, Pressable, ScrollView, View } from "react-native";
+import { AppState, BackHandler, Pressable, ScrollView, View } from "react-native";
 import Animated, {
   FadeIn,
   useAnimatedStyle,
@@ -174,8 +174,9 @@ export function RatingAskScreen() {
       return;
     }
     open.set(
-      withTiming(0, PANEL_CLOSE, (finished) => {
-        if (finished) scheduleOnRN(leave);
+      // The route leaves also when another animation interrupts this one, so a close never sticks.
+      withTiming(0, PANEL_CLOSE, () => {
+        scheduleOnRN(leave);
       }),
     );
   }, [closing, open, reduced]);
@@ -189,11 +190,18 @@ export function RatingAskScreen() {
     return () => subscription.remove();
   }, [close]);
 
+  // The store, X or the browser opens over the app. The thanks waits until the user is back, and
+  // then shows its full time.
+  const [appActive, setAppActive] = useState(AppState.currentState === "active");
   useEffect(() => {
-    if (!thanks) return;
+    const subscription = AppState.addEventListener("change", (state) => setAppActive(state === "active"));
+    return () => subscription.remove();
+  }, []);
+  useEffect(() => {
+    if (!thanks || !appActive) return;
     const timer = setTimeout(close, rating === 5 ? JOY_THANKS_MS : THANKS_MS);
     return () => clearTimeout(timer);
-  }, [close, rating, thanks]);
+  }, [appActive, close, rating, thanks]);
 
   const mood: BloubMood = thanks
     ? thanks === "rated" && rating === 5

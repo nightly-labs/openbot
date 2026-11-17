@@ -582,7 +582,8 @@ export function ConnectedScreen({ variant = "screen" }: { variant?: "screen" | "
   const appUpdate = useAppUpdate();
   const updateHeader = useAppUpdateHeader(searchShows ? appUpdate : null);
   // The rating ask waits for a home with nothing over its list.
-  useRatingAskGate(searchShows && !updateHeader.shown);
+  // A pane stays focused while a chat or a sheet is open beside it, so only the home screen asks.
+  useRatingAskGate(!pane && searchShows && !updateHeader.shown);
   const { open: searchOpen, closeSearch } = search;
   useEffect(() => {
     if (!searchShows && searchOpen) closeSearch();
