@@ -401,8 +401,8 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
  */
 export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
-/** The clause, up to a full stop, a semicolon or a line break, that names a count of images. */
-const IMAGE_COUNT_CLAUSE = /[^.;\n]*\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])[^.;\n]*/giu;
+/** A count of images in one clause, such as "at most 8 images". */
+const IMAGE_COUNT_LIMIT = /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])/iu;
 
 /** A limit over time, such as "at most 50 images per day", which a new session does not change. */
 const IMAGE_QUOTA_PERIOD =
@@ -425,7 +425,10 @@ export function isImageCountDiagnostic(message: string): boolean {
   return (
     /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
       message,
-    ) || Array.from(message.matchAll(IMAGE_COUNT_CLAUSE)).some(([clause]) => !IMAGE_QUOTA_PERIOD.test(clause))
+    ) ||
+    // Split first: a pattern that also reads the clause around the count takes quadratic time on a long
+    // error text with no full stop.
+    message.split(/[.;\n]/u).some((clause) => IMAGE_COUNT_LIMIT.test(clause) && !IMAGE_QUOTA_PERIOD.test(clause))
   );
 }
 
