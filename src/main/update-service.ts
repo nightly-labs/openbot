@@ -708,10 +708,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
               ),
             );
           }
-          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
-          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
-          // from `autoRunAppAfterInstall`, which is also `true`.
-          yield* updateSync(() => this.#updater.quitAndInstall(true, true));
+          // Visible, so the Windows installer shows its progress until the new version opens. In an
+          // update it shows only that page and opens the app again (`customFinishPage` in
+          // `build/installer.nsh`). Other updaters only relaunch, from `autoRunAppAfterInstall`.
+          yield* updateSync(() => this.#updater.quitAndInstall(false, true));
           this.#armPhaseTimer();
         }),
       );

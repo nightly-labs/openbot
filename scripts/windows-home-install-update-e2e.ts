@@ -14,6 +14,8 @@
 //   5. An installation in the default folder that lost its registry entry and was installed again
 //      in an OpenBot subfolder: the new installer removes the earlier, incomplete app from the
 //      default folder, keeps the other files there, and points the login item at the new copy.
+//   6. A visible update, as the app starts it, shows only the progress page and closes by itself.
+//      It runs without --force-run, so that it does not start the app on the runner.
 // Usage: bun scripts/windows-home-install-update-e2e.ts <earlier installer> <new installer>
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -87,6 +89,7 @@ const cases: {
   earlierUninstallerDeletesWorkspaces?: CaseResult;
   newInstallerMovesTheInstallation?: CaseResult;
   newInstallerRemovesTheCopyAbove?: CaseResult;
+  visibleUpdate?: CaseResult;
 } = {};
 const report: {
   earlierInstaller: string;
@@ -336,6 +339,25 @@ async function newInstallerRemovesTheCopyAbove(): Promise<void> {
   check(result.loginItem === `"${join(nestedFolder, "OpenBot.exe")}"`, "The login item does not name the new copy.");
 }
 
+// A page that waits for a click keeps the installer open, and `runInstaller` reports it after its limit.
+async function visibleUpdate(): Promise<void> {
+  await removeEverything();
+  check((await runInstaller(earlierInstaller, "/S")) === 0, "The earlier installer failed.");
+  await makeWorkspaces({ longPath: false });
+  const exitCode = await runInstaller(newInstaller, "--updated");
+  const result = {
+    exitCode,
+    registration: registration(),
+    appFilesInDefaultFolder: presentAppFiles(defaultFolder),
+    missingWorkspaceFiles: await workspacesIntact(null),
+  };
+  cases.visibleUpdate = result;
+  check(exitCode === 0, `The visible update exited with ${exitCode}.`);
+  check(result.registration.installLocation === defaultFolder, "The visible update moved the installation.");
+  check(result.appFilesInDefaultFolder.includes("OpenBot.exe"), "The visible update did not install OpenBot.exe.");
+  check(result.missingWorkspaceFiles.length === 0, "The visible update changed the workspaces.");
+}
+
 let failure: unknown = null;
 try {
   for (const step of [
@@ -344,6 +366,7 @@ try {
     earlierUninstallerDeletesWorkspaces,
     newInstallerMovesTheInstallation,
     newInstallerRemovesTheCopyAbove,
+    visibleUpdate,
   ]) {
     await step();
   }
