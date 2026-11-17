@@ -2717,7 +2717,7 @@ export class AttentionRegistry {
   /**
    * `uiBlockState` freezes the message's UI block, when it has one, in the same write. `vaultSaved`
    * names the item that the user saved from a Vault request. `preview` is the confirm preview that the
-   * user edited: the frozen block shows it, as the text that the agent got.
+   * user edited: the frozen block, its question and its text show it, as the text that the agent got.
    */
   #resolvePersistedPrompt(
     pending: PendingPrompt,
@@ -2730,6 +2730,17 @@ export class AttentionRegistry {
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
+    // Only a block that stays within the contract keeps the edit, so every reader still accepts it.
+    const edited =
+      preview && message.uiBlock?.spec.type === "confirm"
+        ? normalizeConversationUiBlock({ ...message.uiBlock, spec: { ...message.uiBlock.spec, preview } })
+        : null;
+    const editedQuestions = edited ? uiBlockFallbackQuestions(edited.spec) : null;
+    if (edited && message.uiBlock && editedQuestions && validPromptQuestions(editedQuestions)) {
+      message.uiBlock.spec = edited.spec;
+      // A thread and a client without the block show the question, so it holds the edit too.
+      message.questionPrompt.questions = editedQuestions;
+    }
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
     if (message.uiBlock && uiBlockState) {
       // The read drops a secret form value; storing the read result keeps it out of the database.
@@ -2743,12 +2754,6 @@ export class AttentionRegistry {
         status: uiBlockState.status === "answered" ? "closed" : uiBlockState.status,
       };
       if (frozen?.vault) message.uiBlock.vault = frozen.vault;
-      // Only a block that stays within the contract keeps the edit, so every reader still accepts it.
-      const edited =
-        preview && message.uiBlock.spec.type === "confirm"
-          ? normalizeConversationUiBlock({ ...message.uiBlock, spec: { ...message.uiBlock.spec, preview } })
-          : null;
-      if (edited) message.uiBlock.spec = edited.spec;
     }
     this.#conversation.emitConversation(snapshot, "prompt.resolved", {
       turnId: pending.turnId,

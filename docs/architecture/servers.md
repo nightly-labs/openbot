@@ -589,8 +589,8 @@ as questions. The desktop transports do not copy it yet.
 nothing to the wire of a block. A host with it reads one more key, `_preview`
 (`UI_CONFIRM_PREVIEW_ANSWER_ID`), beside the answers of a confirm that has a preview: the text that
 the person edited in the card after they pressed the `edit_preview` button. The host gives the text
-to the agent as `preview` and stores it as the block's preview, so the closed card shows what the agent
-got; the stored resolution leaves the key out. A host without it refuses the key, so the desktop, the
+to the agent as `preview` and stores it as the block's preview and in its fallback question and text,
+so the closed card shows what the agent got; the stored resolution leaves the key out. A host without it refuses the key, so the desktop, the
 web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
 `edit_preview` button answers as any other button, and the agent asks what to change.
 

@@ -333,6 +333,9 @@ try {
     assert.ok(sent?.next);
     assert.deepEqual(message.uiBlock?.state.response, { actionId: "send" });
     assert.equal(message.uiBlock?.spec.type === "confirm" && message.uiBlock.spec.preview, edited);
+    // The text of the closed card, which a thread and an older client show, holds the edit too.
+    assert.ok(message.text.includes(edited) && !message.text.includes("see you on Monday"), message.text);
+    assert.ok(message.questionPrompt?.questions[0]?.question.includes(edited));
     const resolution = message.questionPrompt?.resolution;
     assert.deepEqual(Object.keys(resolution?.status === "answered" ? resolution.responses : {}), ["action"]);
     return { agentGot: sent, stored: message.uiBlock };
