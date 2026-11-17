@@ -33,6 +33,7 @@ import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/compo
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
+import { type ComposerDictation, useComposerDictation } from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
@@ -57,12 +58,14 @@ import {
 } from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
+import { useAgentMentionSkills } from "@/features/chat/model/use-agent-mention-skills";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
+import { speechNative } from "@/features/voice/model/speech-native";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -465,8 +468,38 @@ function AgentTaskChat({
     [removeMessage, queryClient, queryScope, serverId, taskId],
   );
   const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
+  // As in the agent's chat: the mic beside the main control dictates into the draft, and only Send
+  // makes it a message. Leaving the thread or losing the server stops listening and keeps the words.
+  const dictation = useComposerDictation({
+    enabled: isFocused && online && canSend,
+    focused: isFocused,
+    draft,
+    onDraft: setDraft,
+  });
+  const dictating = dictation.active;
+  // A build without the speech module, such as Expo Go, still shows the mic. A tap opens Settings > Voice,
+  // which says that voice is not available.
+  const composerDictation = useMemo(
+    (): ComposerDictation =>
+      !speechNative && !dictation.available
+        ? {
+            ...dictation,
+            available: true,
+            start: () => {
+              Keyboard.dismiss();
+              router.push("/settings/voice");
+              return false;
+            },
+          }
+        : dictation,
+    [dictation],
+  );
+  // The skills and apps that the composer offers after `@` and in Use skill or app, as in the agent's chat.
+  const mentionSkills = useAgentMentionSkills(agentId, serverId, online);
+  const [skillPickerVersion, setSkillPickerVersion] = useState(0);
   const voice = useVoiceMode({
-    enabled: isFocused && canSend,
+    // One recognizer at a time: the voice mode waits while the mic dictates into the draft.
+    enabled: isFocused && canSend && !dictating,
     focused: isFocused,
     sendable: canSend,
     onSend: (text) => void send(text),
@@ -481,14 +514,16 @@ function AgentTaskChat({
   );
   const endPull = useChatEndPull({
     motion,
-    enabled: pullOn && !attachments.menuOpen && !voiceOpen,
+    enabled: pullOn && !attachments.menuOpen && !voiceOpen && !dictating,
     onOpen: openInfo,
   });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
-  const secretRequest = showBrowserRequests && !voiceOpen ? taskBrowserRequests.find(asksForSecret) : undefined;
+  // Dictation and the attachment card keep the composer until they close: replacing it would end them.
+  const keepsComposer = voiceOpen || dictating || attachments.menuOpen;
+  const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
   // A private answer to a form question is typed there too, never in a second field beside the composer.
-  const secretQuestion = !secretRequest && !voiceOpen && questionForm.question?.isSecret ? questionForm : undefined;
+  const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
   const dark = useColorScheme() === "dark";
   const palette = useMemo(
     () => voicePalette([avatarHeadColor(target.avatarSeed, target.avatarHue, target.avatarColor)], dark),
@@ -843,6 +878,8 @@ function AgentTaskChat({
               onCancelReply={() => {}}
               mentionAgents={serverAgents.filter((item) => item.id !== agentId)}
               mentionReferences={mentionReferences}
+              mentionSkills={mentionSkills}
+              skillPickerVersion={skillPickerVersion}
               action={action}
               actionForeground={actionForeground}
               agentName={target.name}
@@ -874,6 +911,7 @@ function AgentTaskChat({
               stopping={task ? threadActions.acting(task) : false}
               keyboardProgress={motion.keyboardProgress}
               voice={dictationVoice(voice, t)}
+              dictation={composerDictation}
               voiceAccent={accent}
               contextMeter={contextMeter}
             />
@@ -893,6 +931,7 @@ function AgentTaskChat({
           keyboardOffset={keyboardOffset}
           liquidGlassAvailable={liquidGlassAvailable}
           onClose={attachments.closeMenu}
+          onUseSkill={mentionSkills.length ? () => setSkillPickerVersion((version) => version + 1) : undefined}
           progress={menuProgress}
         />
       ) : null}
