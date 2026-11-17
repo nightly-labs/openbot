@@ -94,6 +94,8 @@ interface Reading {
   played: AudioBuffer[];
   /** For a reading: it asked for its last part, so the host is free for the next reading. */
   lastPartAsked: boolean;
+  /** For a reading: asks for the next part. A paused reading asks for no part until it resumes. */
+  askNext: (() => void) | undefined;
 }
 
 /** The audio of one part of a reading, and how long its synthesis took. */
@@ -234,6 +236,7 @@ export function resumeSpeech(): void {
   if (!own?.paused) return;
   own.paused = false;
   if (own.element) startElement(own, own.element);
+  own.askNext?.();
   setState((draft) => {
     if (draft.reading) draft.reading.paused = false;
   });
@@ -392,11 +395,13 @@ export async function readAloud(
     ready.catch(() => undefined);
     queue.push(ready);
   };
-  const askNext = () => {
-    if (own.stopped || own.lastPartAsked || asking || ahead >= SYNTHESIS_AHEAD_SECONDS) return;
+  /** `playing` is the audio of the part that plays now and is not in `ahead`, in seconds. */
+  const askNext = (playing = 0) => {
+    if (own.stopped || own.paused || own.lastPartAsked || asking || ahead >= SYNTHESIS_AHEAD_SECONDS) return;
     // The next part must be ready before the audio that waits to play ends, so its length fits the
     // speed of this computer.
-    const budget = lastSynthesisMs === undefined ? undefined : partBudget(lastPart, ahead, lastSynthesisMs, replyRate);
+    const budget =
+      lastSynthesisMs === undefined ? undefined : partBudget(lastPart, ahead + playing, lastSynthesisMs, replyRate);
     const following = parts.next(budget);
     if (following === undefined) {
       own.lastPartAsked = true;
@@ -405,6 +410,10 @@ export async function readAloud(
     }
     lastPart = following;
     enqueue(following, ask(following));
+  };
+  own.askNext = () => {
+    const element = own.element;
+    askNext(element ? element.duration - element.currentTime || 0 : 0);
   };
   // A prepared part that failed is asked for again, as it was before the reading started.
   enqueue(
@@ -418,7 +427,7 @@ export async function readAloud(
       const { audio, text: current, seconds } = await next;
       if (own.stopped) return result;
       ahead -= seconds;
-      askNext();
+      askNext(seconds);
       setState((draft) => {
         if (!draft.reading) return;
         draft.reading.part = current;
@@ -553,6 +562,7 @@ function newReading(reply: boolean, agent: SpeechAgent | null = null): Reading {
     before: 0,
     played: [],
     lastPartAsked: false,
+    askNext: undefined,
   };
   reading = own;
   return own;
