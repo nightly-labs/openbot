@@ -89,7 +89,7 @@ import {
   openCodeModelName,
   openCodeSignInMessage,
 } from "./opencode-config";
-import { readOpenCodeGoUsage } from "./opencode-usage";
+import { hasOpenCodeProviderKey, readOpenCodeGoUsage } from "./opencode-usage";
 import { PiAgentClient } from "./pi-client";
 import {
   antigravityStatePaths,
@@ -142,6 +142,11 @@ interface ProviderCliCommand {
    * when its own browser launch opens nothing.
    */
   readonly windowsPageByOpenBot?: true;
+  /**
+   * Reads the end of a failed sign-in's output, and gives a safe message for the user when it knows
+   * the reason, or null. Only for a sign-in: the process then writes to pipes (`waitForSignInProcess`).
+   */
+  readonly failureText?: (output: string) => string | null;
 }
 
 /**
@@ -242,11 +247,19 @@ const GROK_CODE_SIGN_IN: ProviderCliCommand = {
   env: () => ({ GROK_OAUTH2_REFERRER: "openbot" }),
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
 };
+/**
+ * On macOS, Claude Code can fail to save the sign-in in the keychain, also when the keychain is
+ * unlocked (anthropics/claude-code#104547). It then exits with code 1, and "Try again" does not help.
+ */
+function claudeSignInFailure(output: string): string | null {
+  return /couldn.t save your login/iu.test(output) ? sourceText("error.provider.claudeLoginNotSaved") : null;
+}
 const CLAUDE_SIGN_IN: ProviderCliCommand = {
   argv: ["auth", "login", "--claudeai"],
   env: CLAUDE_COMMAND_ENV,
   timeoutMs: CLI_LOGIN_TIMEOUT_MS,
   windowsPageByOpenBot: true,
+  failureText: claudeSignInFailure,
 };
 
 /**
@@ -689,6 +702,12 @@ export interface ProviderClientContext {
    * (`PROVIDER_ENVIRONMENT_RESERVED_NAMES`). Optional for the same reason as `reportMcpDrops`.
    */
   readonly providerEnvironment?: (provider: ProviderEnvironmentProvider) => Readonly<Record<string, string>>;
+  /**
+   * The HTTP requests that OpenBot itself sends to a provider's service, such as the Gemini quota
+   * read. The app gives Chromium's network stack, which uses the computer's proxy settings; Node
+   * `fetch` ignores them (#11278). Optional: without it the read uses Node `fetch`.
+   */
+  readonly systemProxyFetch?: (url: string, init: RequestInit) => Promise<Response>;
 }
 
 /**
@@ -698,8 +717,10 @@ export interface ProviderClientContext {
  * `OPENAI_API_KEY` as a bearer when that variable is there, and not the ChatGPT sign-in. A value that
  * is not TOML is a string, so no value needs quotes. An address that is not http or https is left out.
  */
+const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
+
 function codexVariableOverrides(variables: Readonly<Record<string, string>>): string[] {
-  const baseUrl = variables.OPENAI_BASE_URL?.trim().replace(/\/+$/, "");
+  const baseUrl = variables[CODEX_ADDRESS_VARIABLE]?.trim().replace(/\/+$/, "");
   if (!baseUrl || !/^https?:\/\/[^/\s]+/.test(baseUrl) || /\s/.test(baseUrl)) return [];
   return [
     `model_provider=${CODEX_VARIABLE_PROVIDER}`,
@@ -802,7 +823,8 @@ interface ProviderModelCatalog {
   /**
    * The user can change the list while the CLI runs, in the CLI's own settings. The idle check reads
    * the list again when it is old (`MODEL_LIST_REREAD_MS`), so a process that agents keep busy does
-   * not keep the list it had at its start (#8495).
+   * not keep the list it had at its start (#8495). For a CLI whose list never changes while it runs,
+   * such as Codex, the reread compares the settings of `source` and restarts the CLI when they change.
    */
   readonly relistWhileRunning?: true;
   /** The name to show for a model, before the name the CLI gives. Null keeps the CLI's name. */
@@ -820,8 +842,15 @@ interface ProviderModelCatalog {
    * Where the CLI's own settings say its models come from, when that is not the provider's own list,
    * such as a Codex model provider or model list file (#9956). Read with each list. A failed read
    * clears it, so the picker never shows a source that it could not check.
+   *
+   * `startSettings`: the settings, as they are now, that the CLI reads into its list only at its start.
+   * When they change while the process runs, the process restarts when its turns end (#10268). Null
+   * when they are not known this time, so nothing is compared.
    */
-  source?(client: AgentClient, timeoutMs: number): Effect.Effect<ProviderModelSource | null, unknown>;
+  source?(
+    client: AgentClient,
+    timeoutMs: number,
+  ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
 /**
@@ -1041,7 +1070,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       },
       signOut: { argv: ["logout"], env: () => ({}), timeoutMs: 30_000 },
     },
-    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource },
+    // Codex reads its list only at its start. The idle reread compares its start settings, so a model
+    // that the user adds in `config.toml` comes without a restart from the user (#10268).
+    catalog: { paged: true, modelFields: serviceTierFields, source: readCodexModelSource, relistWhileRunning: true },
     resolveCli: resolveCodexCli,
     createClient: (cli, requestTimeoutMs, context) => {
       // Codex reads the system roots itself and skips a root that it cannot parse. With
@@ -1052,6 +1083,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // The variables go in the spawn environment: the app-server is one process for every agent.
       // Codex leaves a name with KEY, SECRET or TOKEN out of the shells that its agents run.
       const variables = context.providerEnvironment?.("codex") ?? {};
+      const overrides = codexVariableOverrides(variables);
       return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
@@ -1063,7 +1095,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           ...variables,
         },
         context.codexTurnContext,
-        codexVariableOverrides(variables),
+        overrides,
+        overrides.length > 0 ? CODEX_ADDRESS_VARIABLE : undefined,
       );
     },
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
@@ -1210,7 +1243,11 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
             ...agentEnvironment,
             ...opencodeEnv(cli),
             // A file below the user's project config. `OPENCODE_AGENT_CONFIG` is above all of it.
-            ...openCodeAgentDefaultsEnv(context.providerStateDirectory, { ...process.env, ...agentEnvironment }),
+            ...openCodeAgentDefaultsEnv(
+              context.providerStateDirectory,
+              { ...process.env, ...agentEnvironment },
+              cli.version,
+            ),
             ...openCodeConfigEnv(OPENCODE_AGENT_CONFIG, openCodeEndpoints(context), context.apiKey("opencode")),
             ...(confinement ? OPENCODE_CONFINED_ENV : {}),
           };
@@ -1231,6 +1268,9 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         // `openCodeConfigEnv` sends the saved key only to OpenCode Go (#7550).
         savedKey: (modelId) =>
           Boolean(context.apiKey("opencode")) && (modelId?.toLowerCase().startsWith("opencode-go/") ?? false),
+        // OpenCode 2.3.0 sends a provider's 403 as a missing sign-in, also with a saved key (#10166).
+        providerKeyStored: (provider) =>
+          Effect.runSync(hasOpenCodeProviderKey(provider, { ...process.env, ...context.agentEnvironment?.() })),
         servesModel: context.servesModel,
         mcpServers: context.mcpServers,
         reportMcpDrops: context.reportMcpDrops,
@@ -1325,6 +1365,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
                   ANTIGRAVITY_TOKEN_FILE,
                 ),
                 model,
+                ...(context.systemProxyFetch ? { fetch: context.systemProxyFetch } : {}),
               }),
       }),
     // A profile-generation client asks one question and must not act: no MCP servers, and every

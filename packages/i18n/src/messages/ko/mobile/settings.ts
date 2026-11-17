@@ -129,19 +129,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
+  "mobile.settings.appearance.replyDetails": "답장 세부 정보",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "세부 정보를 끄면 채팅에서 해당 행이 숨겨집니다. 에이전트는 계속 생각하고, 하위 에이전트를 실행하고, 기억을 저장합니다.",
+  "mobile.settings.appearance.showThinking": "에이전트 생각 표시",
+  "mobile.settings.appearance.showSubagents": "하위 에이전트 표시",
+  "mobile.settings.appearance.showMemoryChanges": "저장된 기억 표시",
   "mobile.settings.appearance.fullVisuals": "시각 자료 미리보기 전체 표시",
   "mobile.settings.appearance.fullVisualsFooter":
     "에이전트의 시각 자료를 채팅에 전체 높이로 표시합니다. 끄면 긴 시각 자료가 잘리며, 탭하면 전체를 볼 수 있습니다.",
   "mobile.settings.animations.title": "애니메이션",
-  "mobile.settings.animations.footer":
-    "애니메이션을 끄면 앱 전체의 움직임이 줄어들어요. 휴대전화 설정에서 동작 줄이기가 켜져 있으면 앱도 움직임을 줄여요. 그러면 아래 애니메이션은 꺼진 상태로 유지돼요.",
-  "mobile.settings.animations.all": "애니메이션",
+  "mobile.settings.animations.fullMotion": "전체 동작",
+  "mobile.settings.animations.reduced": "줄임",
+  "mobile.settings.animations.motionFooter":
+    "줄임은 앱 전체의 동작을 줄이고 아래 애니메이션을 끈 상태로 유지합니다. 휴대폰 설정에서 동작 줄이기가 켜져 있으면 앱도 동작을 줄입니다.",
   "mobile.settings.animations.agentFaces": "에이전트 얼굴 애니메이션",
   "mobile.settings.animations.agentFacesFooter":
     "에이전트가 작업하거나 쉬는 동안 아바타의 얼굴이 움직여요. 끄면 얼굴이 가만히 있고, 환영 화면과 빈 홈 화면의 캐릭터도 더 이상 떠다니지 않아요.",
-  "mobile.settings.animations.composerResize": "작은 메시지 입력란",
-  "mobile.settings.animations.composerResizeFooter":
-    "키보드가 닫혀 있으면 메시지 입력란이 작은 바로 바뀌어요. 끄면 입력란이 원래 크기로 유지돼요.",
   "mobile.settings.animations.textReveal": "답변 애니메이션",
   "mobile.settings.animations.textRevealFooter":
     "답변이 단어 단위로 입력되고 말풍선이 부드럽게 커져요. 끄면 텍스트가 도착하는 대로 표시돼요.",
@@ -235,12 +239,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "큰 파일 자동 다운로드",
   "mobile.settings.conversations.largeFilesFooter":
     "{small}보다 큰 이미지, 동영상, 오디오는 탭할 때만 다운로드돼요. 켜면 {large}까지 바로 다운로드해요. 모바일 데이터를 많이 쓸 수 있어요.",
+  "mobile.settings.conversations.messageField": "메시지 입력란",
+  "mobile.settings.conversations.compact": "컴팩트",
+  "mobile.settings.conversations.fullSize": "전체 크기",
+  "mobile.settings.conversations.compactFooter":
+    "컴팩트는 키보드가 닫혀 있는 동안 메시지 입력란을 작은 막대로 만듭니다.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "애니메이션 또는 휴대폰 설정에서 동작 줄이기가 켜져 있어 메시지 입력란이 전체 크기로 유지됩니다.",
+  "mobile.settings.conversations.media": "사진 및 파일",
   "mobile.settings.conversations.swipeLeft": "에이전트 채팅에서 왼쪽으로 스와이프",
   "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
   "mobile.settings.conversations.swipeThreads": "스레드",
   "mobile.settings.conversations.swipeBrowser": "브라우저",
+  "mobile.settings.conversations.swipeOff": "끔",
   "mobile.settings.conversations.swipeFooter":
-    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지 위에서 스와이프하면 계속 답장합니다.",
+    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지에서 같은 방향으로 스와이프하면 메시지 시간이 표시됩니다.",
   "mobile.settings.conversations.pullInfo": "위로 당겨 정보 보기",
   "mobile.settings.conversations.pullInfoFooter":
     "채팅, 채널 또는 스레드에서 최신 메시지 너머로 위로 당긴 뒤 놓으면 정보가 열립니다.",
@@ -496,6 +509,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "프로세스를 중지할 수 없어요.",
   "mobile.settings.agents.processes.stopTitle": "이 프로그램을 중지할까요?",
   "mobile.settings.agents.processes.stopLabel": "프로세스 {pid} 중지",
+  "mobile.settings.quickActions.title": "앱 아이콘 메뉴",
+  "mobile.settings.quickActions.footer":
+    "OpenBot 아이콘을 길게 누르면 이 동작이 표시됩니다. 최대 {count}개까지 켤 수 있습니다.",
+  "mobile.settings.quickActions.latestChat": "최근 채팅",
+  "mobile.settings.quickActions.secondChat": "두 번째 최근 채팅",
   "mobile.settings.shortcuts.title": "단축어",
   "mobile.settings.shortcuts.agent": "에이전트",
   "mobile.settings.shortcuts.none": "없음",

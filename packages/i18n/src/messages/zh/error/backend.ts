@@ -81,6 +81,7 @@ export const messages = {
   "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
   "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
+  "error.backend.channelArchiveRunning": "请先停止该频道中正在运行的工作，再删除它。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
   "error.backend.channelTaskComplete": "该任务已完成。",
@@ -245,6 +246,7 @@ export const messages = {
   "error.backend.mcpSignInAnswerUnreadable":
     "登录服务器发送了 OpenBot 无法读取的响应。如果该服务为你提供了 API 密钥或令牌，请将其添加到该服务器的设置中，然后重新测试连接。",
   "error.backend.mcpServerExited": "服务器在响应之前就停止了。请在终端中运行该命令以查看错误。",
+  "error.backend.mcpServerExitedWithOutput": "服务器在响应之前就停止了。它输出了：{detail}",
   "error.backend.mcpServerFailedToStart": "服务器没有启动：{reason}",
   "error.backend.mcpServerStartAbandoned": "服务器启动前 {provider} 已停止等待，因此其智能体无法获得此服务器的工具。",
   "error.backend.mcpToolSchemaRefused":
@@ -259,6 +261,8 @@ export const messages = {
     "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot 暂时无法续期此 MCP 服务器的登录。登录信息已保留，下一次请求会重试。如果此错误持续出现，用户可以在 OpenBot 中退出该服务器的登录，然后重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
   "error.backend.mcpLocalServerOff":
     "该电脑上 {address} 没有服务器在响应。请启动服务器，或在运行它的应用中开启它，然后重试。",

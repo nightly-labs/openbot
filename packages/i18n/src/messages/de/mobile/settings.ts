@@ -135,19 +135,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
+  "mobile.settings.appearance.replyDetails": "Antwortdetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Schalte ein Detail aus, um seine Zeile in Chats auszublenden. Der Agent denkt weiter, startet Subagenten und speichert Erinnerungen.",
+  "mobile.settings.appearance.showThinking": "Denken des Agenten zeigen",
+  "mobile.settings.appearance.showSubagents": "Subagenten zeigen",
+  "mobile.settings.appearance.showMemoryChanges": "Gespeicherte Erinnerungen zeigen",
   "mobile.settings.appearance.fullVisuals": "Ganze visuelle Vorschauen zeigen",
   "mobile.settings.appearance.fullVisualsFooter":
     "Ein Visual eines Agenten erscheint im Chat in voller Höhe. Wenn dies aus ist, wird ein hohes Visual abgeschnitten. Tippe darauf, um alles zu sehen.",
   "mobile.settings.animations.title": "Animationen",
-  "mobile.settings.animations.footer":
-    "Schalte Animationen aus, um Bewegungen in der ganzen App zu reduzieren. Wenn „Bewegung reduzieren“ in den Einstellungen deines Telefons aktiviert ist, reduziert die App die Bewegungen ebenfalls. Die Animationen unten bleiben dann aus.",
-  "mobile.settings.animations.all": "Animationen",
+  "mobile.settings.animations.fullMotion": "Volle Bewegung",
+  "mobile.settings.animations.reduced": "Reduziert",
+  "mobile.settings.animations.motionFooter":
+    "Reduziert verringert die Bewegung in der ganzen App und hält die Animationen unten aus. Wenn „Bewegung reduzieren“ in den Telefoneinstellungen an ist, reduziert die App die Bewegung ebenfalls.",
   "mobile.settings.animations.agentFaces": "Animierte Agentengesichter",
   "mobile.settings.animations.agentFacesFooter":
     "Die Gesichter der Agenten-Avatare bewegen sich, während die Agenten arbeiten und ruhen. Wenn dies aus ist, bleiben die Gesichter still, und die Figuren auf dem Willkommensbildschirm und dem leeren Startbildschirm schweben nicht mehr.",
-  "mobile.settings.animations.composerResize": "Kompaktes Nachrichtenfeld",
-  "mobile.settings.animations.composerResizeFooter":
-    "Das Nachrichtenfeld wird zu einer kleinen Leiste, solange die Tastatur geschlossen ist. Wenn dies aus ist, bleibt das Feld in voller Größe.",
   "mobile.settings.animations.textReveal": "Antworten animieren",
   "mobile.settings.animations.textRevealFooter":
     "Eine Antwort erscheint Wort für Wort, und ihre Sprechblase wächst sanft mit. Wenn dies aus ist, wird der Text angezeigt, sobald er ankommt.",
@@ -243,12 +247,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Große Dateien automatisch laden",
   "mobile.settings.conversations.largeFilesFooter":
     "Bilder, Videos und Audio über {small} werden erst geladen, wenn du darauf tippst. Schalte dies ein, um sie bis {large} sofort zu laden. Das kann viele mobile Daten verbrauchen.",
+  "mobile.settings.conversations.messageField": "Nachrichtenfeld",
+  "mobile.settings.conversations.compact": "Kompakt",
+  "mobile.settings.conversations.fullSize": "Volle Größe",
+  "mobile.settings.conversations.compactFooter":
+    "Kompakt macht das Nachrichtenfeld zu einer kleinen Leiste, solange die Tastatur geschlossen ist.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Bewegung ist unter Animationen oder in den Telefoneinstellungen reduziert, daher bleibt das Nachrichtenfeld in voller Größe.",
+  "mobile.settings.conversations.media": "Fotos und Dateien",
   "mobile.settings.conversations.swipeLeft": "Wischen nach links im Agent-Chat",
   "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Aus",
   "mobile.settings.conversations.swipeFooter":
-    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Ein Wischen auf einer Nachricht antwortet weiter darauf.",
+    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Dasselbe Wischen auf einer Nachricht zeigt die Uhrzeiten der Nachrichten.",
   "mobile.settings.conversations.pullInfo": "Nach oben ziehen für Info",
   "mobile.settings.conversations.pullInfoFooter":
     "Ziehe in einem Chat, Kanal oder Thread über die letzte Nachricht hinaus nach oben und lass los, um die Info zu öffnen.",
@@ -522,6 +535,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Der Prozess konnte nicht gestoppt werden.",
   "mobile.settings.agents.processes.stopTitle": "Dieses Programm stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Prozess {pid} stoppen",
+  "mobile.settings.quickActions.title": "App-Symbol-Menü",
+  "mobile.settings.quickActions.footer":
+    "Halte das OpenBot-Symbol gedrückt, um diese Aktionen zu sehen. Du kannst bis zu {count} aktivieren.",
+  "mobile.settings.quickActions.latestChat": "Letzter Chat",
+  "mobile.settings.quickActions.secondChat": "Vorletzter Chat",
   "mobile.settings.shortcuts.title": "Kurzbefehle",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Keiner",

@@ -56,6 +56,8 @@ export const messages = {
   "workflow.node.locked": "잠김",
   "workflow.node.missingInput": "이 단계를 실행하려면 입력을 연결하세요.",
   "workflow.node.run": "실행",
+  "workflow.node.runPrice": "실행 · {credits}",
+  "workflow.node.runPriceLabel": "실행. 가격(크레딧): {credits}",
   "workflow.node.running": "실행 중",
   "workflow.node.stop": "중지",
   "workflow.node.retry": "다시 시도",
@@ -521,7 +523,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name}을(를) 삭제했어요",
   "workflow.canvas.deleteUndo.action": "실행 취소",
   "workflow.page.failed": "OpenBot이 이 작업을 할 수 없었어요. 다시 시도해 주세요.",
-  "workflow.page.conflict": "다른 기기에서 변경됐어요. 실행 취소하면 내 편집 내용이 돌아와요.",
   "workflow.page.needsNewerApp":
     "이 워크플로에는 최신 버전 OpenBot의 단계가 있어요. 변경하려면 OpenBot을 업데이트하세요.",
   "workflow.page.manageOnly": "이 워크플로를 변경하려면 각 에이전트에 대해 ‘관리 가능’ 권한이 있어야 해요.",

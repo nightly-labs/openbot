@@ -101,12 +101,15 @@ try {
       const result = await runTurn(client, thread, { model, text });
       steps.push({ text, instructions, status: result.status });
     };
+    // A slash command must start the prompt: the instructions wait for the next prompt (#11070).
+    await turn("/review", false);
     await turn("one", true);
     await turn("two", false);
     // A memory change reaches the held session through a resume, as `ThreadLifecycle` does.
     await runCauseEffect(
       client.request("thread/resume", { threadId: thread, ...threadParams(model, CHANGED) }, (v) => v),
     );
+    await turn("/swarm count the files", false);
     await turn("three", true);
     await turn("four", false);
     await turn("compact-now", false);
@@ -134,12 +137,13 @@ try {
       "failed",
       "context: the failing prompt fails.",
     );
-    assert.ok(prompts[0]?.instructionsText?.includes(INSTRUCTIONS), "context: the first prompt has the instructions.");
+    const one = prompts.find((prompt) => prompt.text === "one");
+    assert.ok(one?.instructionsText?.includes(INSTRUCTIONS), "context: the first prompt has the instructions.");
     assert.ok(
-      !prompts[0]?.instructionsText?.includes("Kraków"),
+      !one?.instructionsText?.includes("Kraków"),
       "context: the first prompt has the instructions before the change.",
     );
-    for (const prompt of prompts.slice(2).filter((entry) => entry.instructions))
+    for (const prompt of prompts.slice(3).filter((entry) => entry.instructions))
       assert.ok(prompt.instructionsText?.includes("Kraków"), `context: "${prompt.text}" has the changed instructions.`);
   }
 

@@ -109,6 +109,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "設定を検索…",
   "app.settingsPage.results": "設定の検索結果",
   "app.settingsPage.noResults": "一致する設定はありません。",
+  "app.settingsPage.marketplaceApps": "コネクタと MCP サーバー",
   "app.settingsPage.resultCount": {
     other: "一致する設定：{count} 件。",
   },

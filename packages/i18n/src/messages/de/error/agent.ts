@@ -70,6 +70,8 @@ export const messages = {
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":
     "Derzeit ist kein Modell von {provider} verfügbar. Rufe list_models auf, um die verfügbaren Modelle zu sehen.",
+  "error.agent.creatorModelNotListed":
+    "Dein Modell „{model}“ ist gerade nicht in der Modellliste, daher kann der neue Agent nicht damit starten. Versuche es in ein paar Sekunden erneut, oder setze provider und model auf ein Modell, das list_models zeigt.",
   "error.agent.reasoningEffortUnsupported":
     "Das Modell „{model}“ unterstützt den Denkaufwand „{effort}“ nicht. Unterstützte Stufen: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -107,12 +109,16 @@ export const messages = {
     "Der von diesem Agenten verwendete Endpunkt wurde entfernt. Wähle ein anderes Modell für ihn.",
   "error.agent.turnStalled":
     "{provider} reagiert nicht mehr, daher hat OpenBot diesen Durchlauf beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.promptCancelled":
+    "{provider} hat diese Nachricht abgebrochen, bevor sie begann. Sende die Nachricht erneut.",
   "error.agent.toolLoopStopped":
     "{provider} hat einen fehlgeschlagenen Schritt viele Male wiederholt, daher hat OpenBot diesen Durchgang beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
   "error.agent.answerCutOff":
     "Der Agent hat angehalten, bevor er seine Antwort beendet hat, daher ist die Antwort nicht vollständig. Sende die Nachricht erneut.",
   "error.agent.compactionConnectionLost":
     "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und sende dann eine Nachricht, um fortzufahren.",
+  "error.agent.compactionConnectionLostAddress":
+    "Die Verbindung brach ab, während der Agent seinen Kontext komprimierte. Daher wurde die Aufgabe angehalten. Prüfe deine Internetverbindung und ob {variable} unter Variablen in den {provider}-Einstellungen die API-Adresse deines Modelldienstes ist (oft mit /v1 am Ende). Sende dann eine Nachricht.",
   "error.agent.compactionLoopStopped":
     "{provider} hat den Kontext immer wieder komprimiert, und jedes Mal blieb er zu voll, um weiterzumachen. Daher hat OpenBot diesen Durchlauf angehalten. Schalte die MCP-Server oder die Computersteuerung aus, die dieser Agent nicht braucht, und sende dann eine Nachricht. Wenn du oder der Agent geändert habt, wann {provider} komprimiert, mach diese Änderung rückgängig.",
   "error.agent.selectedGone": "Der gewählte Agent existiert nicht mehr.",

@@ -135,19 +135,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",
+  "mobile.settings.appearance.replyDetails": "Detalles de las respuestas",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Desactiva un detalle para ocultar su fila en los chats. El agente sigue razonando, iniciando subagentes y guardando recuerdos.",
+  "mobile.settings.appearance.showThinking": "Mostrar el razonamiento del agente",
+  "mobile.settings.appearance.showSubagents": "Mostrar subagentes",
+  "mobile.settings.appearance.showMemoryChanges": "Mostrar recuerdos guardados",
   "mobile.settings.appearance.fullVisuals": "Mostrar vistas visuales completas",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un visual de un agente se muestra en el chat con toda su altura. Si está desactivado, un visual alto se recorta y puedes tocarlo para verlo entero.",
   "mobile.settings.animations.title": "Animaciones",
-  "mobile.settings.animations.footer":
-    "Desactiva «Animaciones» para reducir el movimiento en toda la aplicación. Cuando «Reducir movimiento» está activado en los ajustes de tu teléfono, la aplicación también reduce el movimiento. En ese caso, las animaciones de abajo se mantienen desactivadas.",
-  "mobile.settings.animations.all": "Animaciones",
+  "mobile.settings.animations.fullMotion": "Movimiento completo",
+  "mobile.settings.animations.reduced": "Reducido",
+  "mobile.settings.animations.motionFooter":
+    "Reducido disminuye el movimiento en toda la app y mantiene desactivadas las animaciones de abajo. Si Reducir movimiento está activado en los ajustes del teléfono, la app también reduce el movimiento.",
   "mobile.settings.animations.agentFaces": "Caras de agentes animadas",
   "mobile.settings.animations.agentFacesFooter":
     "Los avatares de los agentes mueven la cara mientras los agentes trabajan y descansan. Si esta opción está desactivada, las caras se quedan quietas y los personajes de la pantalla de bienvenida y de la pantalla de inicio vacía dejan de flotar.",
-  "mobile.settings.animations.composerResize": "Campo de mensaje compacto",
-  "mobile.settings.animations.composerResizeFooter":
-    "El campo de mensaje se convierte en una barra pequeña mientras el teclado está cerrado. Si esta opción está desactivada, el campo mantiene su tamaño completo.",
   "mobile.settings.animations.textReveal": "Animar respuestas",
   "mobile.settings.animations.textRevealFooter":
     "Una respuesta se escribe palabra por palabra y su burbuja crece de forma fluida. Si esta opción está desactivada, el texto aparece a medida que llega.",
@@ -242,12 +246,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Descargar archivos grandes automáticamente",
   "mobile.settings.conversations.largeFilesFooter":
     "Las imágenes, los vídeos y el audio de más de {small} solo se descargan cuando los tocas. Activa esto para descargarlos al momento, hasta {large}. Puede usar muchos datos móviles.",
+  "mobile.settings.conversations.messageField": "Campo de mensaje",
+  "mobile.settings.conversations.compact": "Compacto",
+  "mobile.settings.conversations.fullSize": "Tamaño completo",
+  "mobile.settings.conversations.compactFooter":
+    "Compacto convierte el campo de mensaje en una barra pequeña mientras el teclado está cerrado.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "El movimiento está reducido en Animaciones o en los ajustes del teléfono, así que el campo de mensaje mantiene su tamaño completo.",
+  "mobile.settings.conversations.media": "Fotos y archivos",
   "mobile.settings.conversations.swipeLeft": "Deslizar a la izquierda en un chat",
   "mobile.settings.conversations.swipeRight": "Deslizar a la derecha en un chat",
   "mobile.settings.conversations.swipeThreads": "Hilos",
   "mobile.settings.conversations.swipeBrowser": "Navegador",
+  "mobile.settings.conversations.swipeOff": "Desactivado",
   "mobile.settings.conversations.swipeFooter":
-    "Deslizar en sentido contrario a Atrás en el chat de un agente abre esto. Deslizar sobre un mensaje sigue respondiéndolo.",
+    "Deslizar en sentido contrario a Atrás en el chat de un agente abre esto. El mismo gesto sobre un mensaje muestra la hora de los mensajes.",
   "mobile.settings.conversations.pullInfo": "Deslizar arriba para ver info",
   "mobile.settings.conversations.pullInfoFooter":
     "Desliza hacia arriba más allá del último mensaje en un chat, canal o hilo y suelta para abrir su información.",
@@ -516,6 +529,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "No se pudo detener el proceso.",
   "mobile.settings.agents.processes.stopTitle": "¿Detener este programa?",
   "mobile.settings.agents.processes.stopLabel": "Detener el proceso {pid}",
+  "mobile.settings.quickActions.title": "Menú del icono de la app",
+  "mobile.settings.quickActions.footer":
+    "Mantén pulsado el icono de OpenBot para ver estas acciones. Puedes activar hasta {count}.",
+  "mobile.settings.quickActions.latestChat": "Último chat",
+  "mobile.settings.quickActions.secondChat": "Penúltimo chat",
   "mobile.settings.shortcuts.title": "Atajos",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Ninguno",

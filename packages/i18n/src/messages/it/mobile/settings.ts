@@ -131,19 +131,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",
+  "mobile.settings.appearance.replyDetails": "Dettagli delle risposte",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Disattiva un dettaglio per nascondere la sua riga nelle chat. L'agente continua a ragionare, avviare subagenti e salvare ricordi.",
+  "mobile.settings.appearance.showThinking": "Mostra il ragionamento dell'agente",
+  "mobile.settings.appearance.showSubagents": "Mostra i subagenti",
+  "mobile.settings.appearance.showMemoryChanges": "Mostra i ricordi salvati",
   "mobile.settings.appearance.fullVisuals": "Mostra anteprime visive complete",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un elemento visivo di un agente appare nella chat a piena altezza. Se è disattivato, un elemento alto viene tagliato: toccalo per vederlo tutto.",
   "mobile.settings.animations.title": "Animazioni",
-  "mobile.settings.animations.footer":
-    "Disattiva le animazioni per ridurre il movimento in tutta l'app. Se «Riduci movimento» è attivo nelle impostazioni del telefono, anche l'app riduce il movimento. Le animazioni qui sotto restano allora disattivate.",
-  "mobile.settings.animations.all": "Animazioni",
+  "mobile.settings.animations.fullMotion": "Movimento completo",
+  "mobile.settings.animations.reduced": "Ridotto",
+  "mobile.settings.animations.motionFooter":
+    "Ridotto diminuisce il movimento in tutta l’app e tiene disattivate le animazioni qui sotto. Se Riduci movimento è attivo nelle impostazioni del telefono, anche l’app riduce il movimento.",
   "mobile.settings.animations.agentFaces": "Volti degli agenti animati",
   "mobile.settings.animations.agentFacesFooter":
     "Gli avatar degli agenti muovono il volto mentre gli agenti lavorano e riposano. Se è disattivato, i volti restano fermi e i personaggi della schermata di benvenuto e della home vuota smettono di fluttuare.",
-  "mobile.settings.animations.composerResize": "Campo messaggio compatto",
-  "mobile.settings.animations.composerResizeFooter":
-    "Il campo messaggio diventa una piccola barra quando la tastiera è chiusa. Se è disattivato, il campo resta a dimensione piena.",
   "mobile.settings.animations.textReveal": "Anima le risposte",
   "mobile.settings.animations.textRevealFooter":
     "Una risposta viene scritta parola per parola e il suo fumetto cresce con fluidità. Se è disattivato, il testo appare man mano che arriva.",
@@ -238,12 +242,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Scarica automaticamente i file grandi",
   "mobile.settings.conversations.largeFilesFooter":
     "Immagini, video e audio oltre {small} si scaricano solo quando li tocchi. Attiva questa opzione per scaricarli subito, fino a {large}. Può usare molti dati mobili.",
+  "mobile.settings.conversations.messageField": "Campo messaggio",
+  "mobile.settings.conversations.compact": "Compatto",
+  "mobile.settings.conversations.fullSize": "Dimensione piena",
+  "mobile.settings.conversations.compactFooter":
+    "Compatto trasforma il campo messaggio in una piccola barra mentre la tastiera è chiusa.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Il movimento è ridotto in Animazioni o nelle impostazioni del telefono, quindi il campo del messaggio resta a grandezza piena.",
+  "mobile.settings.conversations.media": "Foto e file",
   "mobile.settings.conversations.swipeLeft": "Scorri a sinistra in una chat",
   "mobile.settings.conversations.swipeRight": "Scorri a destra in una chat",
   "mobile.settings.conversations.swipeThreads": "Thread",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Disattivato",
   "mobile.settings.conversations.swipeFooter":
-    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Uno scorrimento su un messaggio risponde ancora.",
+    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Lo stesso scorrimento su un messaggio mostra l’ora dei messaggi.",
   "mobile.settings.conversations.pullInfo": "Trascina in su per le info",
   "mobile.settings.conversations.pullInfoFooter":
     "In una chat, un canale o un thread trascina in su oltre l’ultimo messaggio e rilascia per aprirne le info.",
@@ -515,6 +528,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossibile arrestare il processo.",
   "mobile.settings.agents.processes.stopTitle": "Arrestare questo programma?",
   "mobile.settings.agents.processes.stopLabel": "Arresta il processo {pid}",
+  "mobile.settings.quickActions.title": "Menu dell’icona",
+  "mobile.settings.quickActions.footer":
+    "Tieni premuta l’icona di OpenBot per vedere queste azioni. Puoi attivarne fino a {count}.",
+  "mobile.settings.quickActions.latestChat": "Ultima chat",
+  "mobile.settings.quickActions.secondChat": "Penultima chat",
   "mobile.settings.shortcuts.title": "Comandi rapidi",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Nessuno",

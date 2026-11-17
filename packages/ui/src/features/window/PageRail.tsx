@@ -74,6 +74,8 @@ function RailButton(props: {
   class?: string;
   menu?: readonly RailMenuItem[] | undefined;
   onClick: (button: HTMLElement) => void;
+  /** Starts to load the page when the pointer or the focus comes to the button, before the click. */
+  onPreload?: (() => void) | undefined;
   children: JSX.Element;
 }) {
   // The open menu hides the tooltip, as the More menu does.
@@ -85,6 +87,8 @@ function RailButton(props: {
       class={props.class ? `window-rail-button ${props.class}` : "window-rail-button"}
       aria-label={props.label}
       aria-current={props.current ? "page" : undefined}
+      onPointerEnter={() => props.onPreload?.()}
+      onFocus={() => props.onPreload?.()}
       onClick={(event) => props.onClick(event.currentTarget)}
     >
       {props.children}
@@ -105,6 +109,8 @@ function RailButton(props: {
               class={`${buttonVariants({ variant: "ghost" })} window-rail-button`}
               aria-label={props.label}
               aria-current={props.current ? "page" : undefined}
+              onPointerEnter={() => props.onPreload?.()}
+              onFocus={() => props.onPreload?.()}
               onClick={(event: MouseEvent) => {
                 if (event.currentTarget instanceof HTMLElement) props.onClick(event.currentTarget);
               }}
@@ -318,8 +324,8 @@ export interface MediaCreditsRailRow {
 
 /**
  * The credits of one media service. A team quota draws a ring with the part that is left, as the
- * plan limits of a provider do. An account with no limit of its own shows the logo alone, as a custom
- * agent does. The hover card shows the number.
+ * plan limits of a provider do. An account with no limit of its own shows the logo with the number of
+ * credits under it. The hover card shows the full number.
  */
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
@@ -382,7 +388,10 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       <Show
         when={props.row.quota !== null}
         fallback={
-          <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo window-rail-agent-usage-logo" />
+          <span class="window-rail-credits" aria-hidden="true">
+            <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+            <span class="window-rail-credits-count">{format.compact(props.row.available)}</span>
+          </span>
         }
       >
         <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">
@@ -460,6 +469,8 @@ export interface PageRailProps {
   onRoutines?: (() => void) | undefined;
   /** Absent when the server has no workflows. */
   onWorkflows?: (() => void) | undefined;
+  /** Starts to load the code of the Workflows page before a click opens it. */
+  onPreloadWorkflows?: (() => void) | undefined;
   /** Absent where the server keeps no tasks. */
   onTasks?: ((button: HTMLElement) => void) | undefined;
   /** Absent where there is no schedule page. */
@@ -495,6 +506,8 @@ interface RailPage {
   label: string;
   icon: typeof Bot;
   open: (button: HTMLElement) => void;
+  /** Starts to load the page before a click opens it. */
+  preload?: (() => void) | undefined;
   /** The right-click menu of its rail button. */
   menu?: readonly RailMenuItem[] | undefined;
 }
@@ -547,7 +560,11 @@ function RailMoreMenu(props: {
             {(page) => (
               // The pin is its own menu item beside the page, so the keyboard reaches it.
               <div role="none" class="window-rail-more-row" data-pinned={pinned(page().id) ? "" : undefined}>
-                <DropdownMenu.Item onSelectAfterClose={() => trigger && page().open(trigger)}>
+                <DropdownMenu.Item
+                  onPointerEnter={() => page().preload?.()}
+                  onFocus={() => page().preload?.()}
+                  onSelectAfterClose={() => trigger && page().open(trigger)}
+                >
                   <Dynamic component={page().icon} class="agent-context-icon size-4" aria-hidden="true" />
                   <span>{page().label}</span>
                 </DropdownMenu.Item>
@@ -677,6 +694,7 @@ export function PageRail(props: PageRailProps) {
         label: t("app.rail.workflows"),
         icon: Waypoints,
         open: () => onWorkflows(),
+        preload: props.onPreloadWorkflows,
       });
     }
     if (onTasks) {
@@ -741,6 +759,7 @@ export function PageRail(props: PageRailProps) {
                 { label: t("sidebar.unpin"), icon: PinOff, open: () => props.onPinChange(page().id, false) },
               ]}
               onClick={page().open}
+              onPreload={page().preload}
             >
               <Dynamic component={page().icon} aria-hidden="true" />
             </RailButton>

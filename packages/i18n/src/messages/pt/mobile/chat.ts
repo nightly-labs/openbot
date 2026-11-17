@@ -197,9 +197,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Cancelar resposta",
   "mobile.chat.composer.messageAgent": "Enviar mensagem a {name}",
   "mobile.chat.composer.pasteFailed": "Não foi possível anexar o texto colado",
-  "mobile.chat.composer.cancelDictation": "Cancelar ditado",
   "mobile.chat.voice.listening": "Ouvindo…",
-  "mobile.chat.voice.continue": "Continuar ditado",
   "mobile.chat.liveVoice.start": "Iniciar conversa por voz",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Iniciando",
@@ -369,7 +367,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Entre no seu computador",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Este site não aceita um login a partir do servidor. Abra este chat no app OpenBot para computador e entre por lá.",
-  "mobile.chat.browserSecret.takeoverReload": "Depois, recarregue a página antes de escolher Concluí.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "O OpenBot não conseguiu terminar de inserir a senha ou o código. Insira na página o que falta. Depois, recarregue a página antes de escolher Concluí.",
   "mobile.chat.browserSecret.takeoverFailed": "Não foi possível concluir a solicitação.",
   "mobile.chat.browserSecret.done": "Concluí",
   "mobile.chat.browserSecret.submitOnce": "Envie uma vez para {origin}. Este valor não é adicionado ao chat.",
@@ -537,6 +536,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Parar o agente e enviar agora a próxima mensagem na fila",
   "mobile.chat.queue.deleteNext": "Excluir a próxima mensagem na fila",
   "mobile.chat.queue.moveFirst": "Mover para o início",
+  "mobile.chat.queue.runInNewThread": "Executar em novo tópico",
+  "mobile.chat.queue.runNextInNewThread": "Executar a próxima mensagem na fila em novo tópico",
   "mobile.chat.queue.deleteTitle": "Excluir mensagem da fila?",
   "mobile.chat.queue.deleteMessage": "O agente nunca a receberá.",
   "mobile.chat.queue.keep": "Manter",

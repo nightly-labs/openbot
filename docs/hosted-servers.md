@@ -205,7 +205,10 @@ when a server is idle or boat stops a sandbox; and `error` and `deleted`. The Wo
    **Check at a start.** `PRAGMA quick_check` reads every page of `openbot.db`: on a 15.7 GB file
    it stopped the main thread for 77 seconds to about 4 minutes. A clean close removes
    `openbot.db-wal`. Thus OpenBot runs the check at a start only when that file is there (a crash,
-   a kill, or a save while OpenBot ran) or when a migration ran.
+   a kill, or a save while OpenBot ran) or when a migration ran. After a stop that did not close the
+   file, the check runs in a separate database host process, so the main thread stays free. When that
+   process cannot start or run the check, the main thread runs it as before. The check after a
+   migration still runs on the main thread.
 6. **Start after a failure.** A client that cannot reach the host first calls
    `GET /v2/hosting/servers/:id/status` (owner or member; 404 for a host that is not a hosted
    server). It returns `{serverId, state, error, sleeping}` and writes nothing, so it does not count
@@ -580,7 +583,8 @@ On a server, root runs `openbot-hosted-update`:
    a complete disk, or when `.applying` shows an interrupted copy. `openbot.service` does not
    require it, so it starts after a failure too: with the old release, or with a partial copy after
    a failed copy, until the next start. On a self-installed server, the new release starts at the
-   next boot. A hosted server installs it itself: when the release is staged, OpenBot asks root to
+   next boot, or when idle if the automatic update switch is on (it is off by default). A hosted
+   server installs it itself: when the release is staged, OpenBot asks root to
    install it when idle, and when no connected client changed data or typed for 5 minutes and the
    start was 5 minutes ago. Reading is not use. Server Settings shows this wait as "other work",
    because `host-update-v1` has no reason for it. The automatic update switch of a hosted server
@@ -694,8 +698,8 @@ do not all pass the check before their processes grow. A start that fails counts
 
 | Level | When | What happens |
 | --- | --- | --- |
-| `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
+| `ok` | Other times. After `low`, only at 256 MB above the `low` limit (10% of the total when that is less). | Turns start. |
+| `low` | Free memory is less than 512 MB or 12% of the total. Below 2.5 GB of total memory, 20% of the total replaces 512 MB, so a small server does not stay `low`. It is always at least 64 MB above the `critical` limit. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
 | `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):

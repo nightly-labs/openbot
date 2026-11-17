@@ -71,6 +71,8 @@ export const messages = {
   "workflow.node.locked": "Zablokowany",
   "workflow.node.missingInput": "Połącz wejście, aby uruchomić ten krok.",
   "workflow.node.run": "Uruchom",
+  "workflow.node.runPrice": "Uruchom · {credits}",
+  "workflow.node.runPriceLabel": "Uruchom. Cena w kredytach: {credits}",
   "workflow.node.running": "Działa",
   "workflow.node.stop": "Zatrzymaj",
   "workflow.node.retry": "Ponów",
@@ -563,7 +565,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "Usunięto: {name}",
   "workflow.canvas.deleteUndo.action": "Cofnij",
   "workflow.page.failed": "OpenBot nie mógł tego zrobić. Spróbuj ponownie.",
-  "workflow.page.conflict": "Zmieniono na innym urządzeniu. Cofnij, aby odzyskać swoje zmiany.",
   "workflow.page.needsNewerApp": "Ten przepływ ma kroki z nowszej wersji OpenBot. Zaktualizuj OpenBot, aby go zmienić.",
   "workflow.page.manageOnly": "Aby zmienić ten przepływ, potrzebujesz dostępu do zarządzania każdym z jego agentów.",
 } as const satisfies PartialTranslation<typeof source>;

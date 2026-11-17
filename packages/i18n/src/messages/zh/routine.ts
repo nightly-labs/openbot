@@ -239,6 +239,7 @@ export const messages = {
   "routine.settings.loading": "正在加载自动化任务…",
   "routine.settings.empty": "还没有自动化任务。",
   "routine.settings.paused": "已暂停",
+  "routine.settings.pausedByRun": "已被 {time} 的运行暂停",
   "routine.settings.completed": "已结束 · {schedule}",
   "routine.settings.active": "启用中",
   "routine.settings.pauseFailed": "无法暂停该自动化任务。",

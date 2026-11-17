@@ -57,6 +57,8 @@ export const messages = {
   "workflow.node.locked": "Vergrendeld",
   "workflow.node.missingInput": "Verbind een invoer om deze stap uit te voeren.",
   "workflow.node.run": "Uitvoeren",
+  "workflow.node.runPrice": "Uitvoeren · {credits}",
+  "workflow.node.runPriceLabel": "Uitvoeren. Prijs in credits: {credits}",
   "workflow.node.running": "Bezig",
   "workflow.node.stop": "Stoppen",
   "workflow.node.retry": "Opnieuw",
@@ -508,7 +510,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} verwijderd",
   "workflow.canvas.deleteUndo.action": "Ongedaan maken",
   "workflow.page.failed": "OpenBot kan dit niet doen. Probeer het opnieuw.",
-  "workflow.page.conflict": "Gewijzigd op een ander apparaat. Maak ongedaan om je bewerkingen terug te krijgen.",
   "workflow.page.needsNewerApp":
     "Deze workflow heeft stappen uit een nieuwere OpenBot. Werk OpenBot bij om hem te wijzigen.",
   "workflow.page.manageOnly": "Om deze workflow te wijzigen, heb je “Kan beheren” nodig voor elk van de agents ervan.",

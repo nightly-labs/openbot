@@ -11,6 +11,7 @@ import type {
   UpdateStatus,
 } from "@openbot/contracts/ipc";
 import { isUpdateBusyPhase } from "@openbot/contracts/ipc";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Cause, Deferred, Effect, Fiber, Result, Schema, Scope, Semaphore } from "effect";
@@ -108,12 +109,6 @@ export function electronUpdaterCacheDirectory(): string {
         ? join(homedir(), "Library", "Caches")
         : process.env.XDG_CACHE_HOME || join(homedir(), ".cache");
   return join(root, "openbot-updater");
-}
-
-export function isValidSemver(version: string): boolean {
-  return /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/u.test(
-    version,
-  );
 }
 
 type UpdateOperation = "check" | "download" | "install";
@@ -708,10 +703,10 @@ export class UpdateService extends EventEmitter<UpdateServiceEvents> {
               ),
             );
           }
-          // Silent, so the assisted Windows installer shows no page and opens the app again: it ignores
-          // the force-run flag in a visible run. Other updaters only relaunch, now from `true` and not
-          // from `autoRunAppAfterInstall`, which is also `true`.
-          yield* updateSync(() => this.#updater.quitAndInstall(true, true));
+          // Visible, so the Windows installer shows its progress until the new version opens. In an
+          // update it shows only that page and opens the app again (`customFinishPage` in
+          // `build/installer.nsh`). Other updaters only relaunch, from `autoRunAppAfterInstall`.
+          yield* updateSync(() => this.#updater.quitAndInstall(false, true));
           this.#armPhaseTimer();
         }),
       );
@@ -1144,26 +1139,11 @@ function pruneInstalledUpdate(directory: string, currentVersion: string): Effect
   }).pipe(Effect.catch(() => Effect.void));
 }
 
-/**
- * Compares the release numbers only. The feed offers no prereleases (`allowPrerelease` is off), so
- * a candidate with the same numbers is not newer. A stale feed answer that names an older release
- * must not replace a newer download.
- */
 /** The rollout percentage as electron-updater reads it, or null when the release has no stage. */
 function stagingPercentage(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const percentage = Number.parseInt(String(value), 10);
   return Number.isNaN(percentage) ? null : percentage;
-}
-
-function isNewerRelease(candidate: string, current: string): boolean {
-  const parse = (version: string) => version.split(/[-+]/u, 1)[0]?.split(".").map(Number) ?? [];
-  const [left, right] = [parse(candidate), parse(current)];
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
 }
 
 /** A percent that is not a number means that the download runs but its progress is not known. */

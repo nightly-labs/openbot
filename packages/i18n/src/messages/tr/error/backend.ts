@@ -90,6 +90,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Bu kanalın hiçbir üyesi istek üzerine sıkıştıramaz. Bunu destekleyen üyeler, bağlamları neredeyse dolduğunda otomatik olarak sıkıştırır.",
   "error.backend.channelArchived": "Mesaj göndermeden veya görevleri değiştirmeden önce bu kanalı geri yükleyin.",
+  "error.backend.channelArchiveRunning": "Bu kanaldaki devam eden işi durdurun, ardından kanalı silin.",
   "error.backend.channelReferenceUnavailable": "Referans verilen kanal mesajı kullanılamıyor.",
   "error.backend.channelTaskNotFound": "Kanal görevi bulunamadı.",
   "error.backend.channelTaskComplete": "Bu görev zaten tamamlandı.",
@@ -269,6 +270,7 @@ export const messages = {
     "Oturum açma sunucusu OpenBot'un okuyamadığı bir yanıt gönderdi. Hizmet size bir API anahtarı veya belirteç veriyorsa bunu bu sunucunun ayarlarına ekleyin, ardından bağlantıyı yeniden test edin.",
   "error.backend.mcpServerExited":
     "Sunucu yanıt vermeden durdu. Hatasını görmek için komutu bir terminalde çalıştırın.",
+  "error.backend.mcpServerExitedWithOutput": "Sunucu yanıt vermeden durdu. Yazdığı: {detail}",
   "error.backend.mcpServerFailedToStart": "Sunucu başlamadı: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider}, sunucu başlamadan beklemeyi bıraktı. Bu yüzden ajanları bu sunucunun araçlarını almıyor.",
@@ -286,6 +288,8 @@ export const messages = {
     "OpenBot bu sunucu için yerel oturum açma bağlantısını başlatamadı. OpenBot'u yeniden başlatın ve tekrar deneyin.",
   "error.backend.mcpOAuthSignInNeeded":
     "Bu MCP sunucusundaki oturum sona erdi. Kullanıcının OpenBot'ta yeniden oturum açması gerekiyor.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot bu MCP sunucusundaki oturumu şu anda yenileyemedi. Oturum korunuyor ve sonraki istek yeniden deneyecek. Bu hata sürerse kullanıcı OpenBot'ta sunucudan çıkış yapıp yeniden giriş yapabilir.",
   "error.backend.mcpServerUnreachable": "OpenBot sunucuya ulaşamadı. URL'yi ve ağınızı kontrol edin.",
   "error.backend.mcpLocalServerOff":
     "Bu bilgisayarda {address} adresinde yanıt veren bir sunucu yok. Sunucuyu başlatın veya onu çalıştıran uygulamada açın, ardından tekrar deneyin.",

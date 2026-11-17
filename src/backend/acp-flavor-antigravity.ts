@@ -3,8 +3,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
+import type { CauseCode } from "@openbot/telemetry";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
-import { GEMINI_INVALID_ARGUMENT } from "./agent/provider-diagnostics";
+import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS } from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 /**
@@ -67,6 +68,18 @@ function geminiAccountLink(text: string): string | null {
  */
 const GEMINI_EMPTY_OUTPUT_FAILURE =
   /\bmodel output must contain either output text or tool calls, these cannot both be empty\b|\bModel produced invalid output\b/iu;
+/**
+ * A Gemini model can write its tool call as answer text, such as
+ * `call:default_api:run_command{...}`, or `print(default_api.run_command(...))` that can be in a
+ * `tool_code` code block. `default_api` is the name under which Gemini sees its tools. The CLI does
+ * not run such text, and the chat showed it as the agent's answer (#11087). Only an answer that is
+ * wholly calls is one: an answer that explains this syntax has other text.
+ */
+const GEMINI_TEXT_TOOL_CALL = {
+  starts: ["```tool_code", "call:default_api:", "print(default_api."],
+  whole:
+    /^\s*(?:```tool_code\s*)?(?:call:default_api:[\w-]+\s*\{[\s\S]*\}|print\(default_api\.[\w-]+\([\s\S]*\)\))\s*(?:```\s*)?$/u,
+};
 
 /**
  * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
@@ -126,15 +139,20 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityRateLimited",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
   ],
+  // The CLI refuses a model that the account cannot use now with "Unknown model ID: <id>", also for a
+  // model that worked before. The raw text gave the user no next step (#11129).
   [
     "error.provider.antigravityModelUnavailable",
-    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b/iu,
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b|\bunknown model\b/iu,
   ],
   ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [
     "error.provider.antigravityServiceFailure",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
+  // The CLI had a new token less than a second later, so a turn that did no work runs again once.
+  // This text shows when that retry does not run or fails too (#10367).
+  ["error.provider.antigravitySignInRefused", GEMINI_INVALID_CREDENTIALS],
   // The chat stopped with only this text, and another model let the user continue (#7116). The CLI
   // keeps the refused item in the session, so a turn that fails with it shows
   // `antigravitySessionRejected` instead, and OpenBot opens a new session (#9593). This text shows
@@ -142,18 +160,43 @@ const GEMINI_REQUEST_FAILURES = [
   ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
-/** The message of a Gemini turn that the server failed but reported as answer text. */
-function geminiTurnFailure(answer: string): string {
+type GeminiRequestFailureKey = (typeof GEMINI_REQUEST_FAILURES)[number][0];
+
+/** The cause of each Gemini request failure that a backup model can pass, as the message says. */
+const GEMINI_FAILURE_CAUSES: Partial<Record<GeminiRequestFailureKey, CauseCode>> = {
+  "error.provider.antigravityQuotaReached": "usage_limit",
+  "error.provider.antigravityRateLimited": "rate_limit",
+};
+
+/**
+ * The message of a Gemini turn that the server failed but reported as answer text, and the request
+ * failure that the message names, or `null` for a text with its own message.
+ */
+function geminiAnswerFailure(answer: string): { message: string; key: GeminiRequestFailureKey | null } {
   const text = answer.replace(GEMINI_WARNING_ANSWER, "");
   // The account, not the request, is the problem: no key or model change helps.
   if (geminiAccountLink(text) !== null || GEMINI_VERIFICATION_REQUIRED_ANSWER.test(text))
-    return sourceText("error.provider.geminiVerificationRequired");
+    return { message: sourceText("error.provider.geminiVerificationRequired"), key: null };
   // Google's API answer for a refused key. The key is the user's to fix, not the request.
-  if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text)) return sourceText("error.provider.geminiKeyRefused");
+  if (/\bAPI key not valid\b|\bAPI_KEY_INVALID\b/u.test(text))
+    return { message: sourceText("error.provider.geminiKeyRefused"), key: null };
   // The server's text names its harness and a WebSocket close code, which the user cannot act on.
-  if (GEMINI_CONNECTION_LOST_ANSWER.test(text)) return sourceText("error.provider.antigravityConnectionLost");
-  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0];
-  return key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text);
+  if (GEMINI_CONNECTION_LOST_ANSWER.test(text))
+    return { message: sourceText("error.provider.antigravityConnectionLost"), key: null };
+  const key = GEMINI_REQUEST_FAILURES.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+  return { message: key ? sourceText(key, { detail: shownFailureDetail(text) }) : shownFailureDetail(text), key };
+}
+
+/**
+ * The cause of a Gemini turn that the server failed but reported as answer text, from the same rules
+ * as its message, or `null`. A rate limit that names no Google status, such as "code 429", showed
+ * the rate-limit message but did not move the agent to its backup model (#11099). A failed MCP server
+ * is not a request failure: another model has the same server.
+ */
+function geminiTurnFailureCause(answer: string): CauseCode | null {
+  if (geminiMcpLoadFailure(answer.replace(GEMINI_WARNING_ANSWER, "")) !== null) return null;
+  const { key } = geminiAnswerFailure(answer);
+  return key ? (GEMINI_FAILURE_CAUSES[key] ?? null) : null;
 }
 
 /** The prefix that the ACP SDK puts before the server's text of a failed request. */
@@ -459,7 +502,9 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
-    turnFailure: geminiTurnFailure,
+    textToolCall: GEMINI_TEXT_TOOL_CALL,
+    turnFailure: (answer) => geminiAnswerFailure(answer).message,
+    fallbackCause: geminiTurnFailureCause,
     accountLink: antigravityAccountLink,
     accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
     // Antigravity reports an exhausted quota as answer text and ends the turn as a success. Google
@@ -505,4 +550,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // Also on Windows, where each process start unpacks about 310 MB (`antigravityTemp`) that a new or
   // reopened session waits for. One shared process kept a harness for each session it opened (#5497).
   sessionProcesses: true,
+  // `model/list` opens a second probe session after the start already listed the models. When it
+  // failed, timed out or listed none, a signed-in Gemini row showed no models until a restart (#11079).
+  keepModelsOnRefreshFailure: true,
 };

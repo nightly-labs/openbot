@@ -59,6 +59,8 @@ export const messages = {
   "workflow.node.locked": "Verrouillé",
   "workflow.node.missingInput": "Connectez une entrée pour exécuter cette étape.",
   "workflow.node.run": "Lancer",
+  "workflow.node.runPrice": "Lancer · {credits}",
+  "workflow.node.runPriceLabel": "Lancer. Prix en crédits : {credits}",
   "workflow.node.running": "En cours",
   "workflow.node.stop": "Arrêter",
   "workflow.node.retry": "Réessayer",
@@ -526,7 +528,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} supprimé",
   "workflow.canvas.deleteUndo.action": "Annuler",
   "workflow.page.failed": "OpenBot n’a pas pu effectuer cette action. Réessayez.",
-  "workflow.page.conflict": "Modifié sur un autre appareil. Annulez pour récupérer vos modifications.",
   "workflow.page.needsNewerApp":
     "Ce workflow contient des étapes d’une version plus récente d’OpenBot. Mettez OpenBot à jour pour le modifier.",
   "workflow.page.manageOnly": "Pour modifier ce workflow, il vous faut l’accès Gérer sur chacun de ses agents.",

@@ -12,6 +12,8 @@ export const messages = {
     "{provider} a perdu sa connexion, OpenBot a donc arrêté son processus. Renvoyez votre message.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} a refusé un message, OpenBot a donc arrêté son processus. Renvoyez votre message.",
+  "error.provider.acpServerLost": "{provider} a perdu sa connexion. Renvoyez votre message.",
+  "error.provider.acpServerLostEnded": "{provider} a perdu sa connexion, OpenBot a donc arrêté son processus.",
   "error.provider.acpSettingsTimedOut": "{provider} n’a pas répondu à temps. Réessayez dans un instant.",
   "error.provider.acpPlanUsedUp":
     "{provider} indique que votre forfait est épuisé. Choisissez un autre modèle ou passez à un forfait {provider} supérieur.",
@@ -205,6 +207,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Le fournisseur n’a pas accepté le code. Relancez la connexion.",
   "error.provider.codeLoginUnsupported":
     "Ce serveur ne peut pas se connecter avec un code collé. Connectez-vous sur l’ordinateur du serveur, dans son navigateur.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude n’a pas pu enregistrer la connexion sur le Mac. Redémarrez le Mac qui exécute OpenBot, puis reconnectez Claude.",
   "error.provider.cliBusyRetry": "La CLI {provider} traite un tour. Attendez la fin, puis réessayez.",
   "error.provider.cliSigningIn":
     "La CLI {provider} est en cours de connexion. Terminez ou annulez la connexion, puis mettez à jour.",
@@ -225,6 +229,8 @@ export const messages = {
     "OpenCode n’a pas de connexion pour le fournisseur de modèle « {provider} ». Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode n’a pas de connexion pour le fournisseur de ce modèle. Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
+  "error.provider.opencodeProviderRefused":
+    "Le fournisseur du modèle « {provider} » a refusé la requête. OpenCode a une clé pour ce fournisseur, la cause peut donc être votre réseau : certains fournisseurs bloquent les VPN, les proxys ou certains pays. Désactivez le VPN ou utilisez un autre réseau, puis réessayez. Si l’erreur continue, la clé est peut-être incorrecte : exécutez `opencode auth login` dans un terminal et saisissez à nouveau la clé.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode a refusé ce modèle gratuit. Certains modèles gratuits ne sont pas disponibles dans tous les pays. Choisissez un autre modèle avec l’étiquette Gratuit, ou collez une clé OpenCode Go dans les réglages d’OpenCode et choisissez un modèle OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
@@ -251,6 +257,8 @@ export const messages = {
     "Les modèles gratuits d’OpenCode ont atteint leur limite d’utilisation. Tous les modèles gratuits partagent cette limite. Pour continuer, collez une clé OpenCode Go dans les réglages d’OpenCode, ou choisissez un modèle d’un autre fournisseur.",
   "error.provider.opencodeProviderFailed":
     "Le fournisseur du modèle a échoué de son côté. Votre connexion n’en est pas la cause. Réessayez plus tard ou choisissez un autre modèle.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Ce modèle ne vous est pas disponible. Choisissez un autre modèle pour cet agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La réponse du modèle a été coupée ou n’était pas valide. Renvoyez votre message ou choisissez un autre modèle.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -300,10 +308,14 @@ export const messages = {
     "Gemini ne peut pas utiliser ce modèle pour le moment. Choisissez un autre modèle, puis réessayez.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Le service Gemini de Google n’a pas terminé la requête. Réessayez dans quelques minutes.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google n’a pas accepté la connexion Gemini pour cette requête. Renvoyez votre message. Si l’erreur continue, reconnectez Gemini dans les réglages.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini a refusé cette requête. Choisissez un autre modèle, puis renvoyez votre message. Si l’erreur revient, commencez une nouvelle discussion.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini a refusé cette requête sans en donner la cause. Un élément de l’historique de la conversation peut en être la cause, comme une image que l’agent a ouverte. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Réessayez. Si l’erreur continue, choisissez un autre modèle.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini n’a pas pu lire l’historique enregistré de cette conversation. OpenBot a démarré une nouvelle session Gemini avec l’historique de la conversation. Renvoyez votre message.",
   "error.provider.antigravityLocationUnsupported":
     "Google n’autorise pas Gemini depuis l’emplacement réseau de l’ordinateur qui exécute cet agent. Utilisez Gemini sur un autre ordinateur, ou choisissez un autre fournisseur pour cet agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -354,6 +366,8 @@ export const messages = {
     "Hermes n’a pas pu terminer ce tour. Si sa réponse donne une raison, suivez-la. Sinon, un serveur MCP de cet agent est peut-être indisponible : vérifiez-le dans Marketplace, Apps, puis renvoyez votre message.",
   "error.provider.hermesRefused":
     "Hermes a refusé ce message avant de commencer. Renvoyez-le. Si Hermes refuse chaque message, redémarrez OpenBot sur l’ordinateur qui exécute cet agent.",
+  "error.provider.hermesConnectionLost":
+    "Hermes a perdu sa connexion pendant ce message, il ne sait donc pas si le travail est terminé. Vérifiez ce que l’agent a fait avant de renvoyer le message.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot n’a pas pu utiliser ce modèle : le modèle n’a pas accepté son réglage de réflexion. Sélectionnez un autre modèle pour cet agent, puis renvoyez votre message.",
   "error.provider.usageLimitReached": "Le compte a atteint sa limite d’utilisation.",

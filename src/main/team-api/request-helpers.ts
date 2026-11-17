@@ -13,6 +13,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   agentAccessRank,
+  CHANNEL_RESUME_ITEM_TYPE,
   type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
@@ -39,6 +40,7 @@ import {
   type UpdateAgentInput,
 } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isDynamicRecord, isNumber, isString } from "@openbot/contracts/runtime-values";
+import { teamProtocolCapabilityLimit } from "@openbot/contracts/team-protocol/capability-limits";
 import {
   CHANNEL_BROWSER_CAPABILITY,
   CHANNEL_ISOLATION_CAPABILITY,
@@ -56,7 +58,7 @@ import {
   TEAM_PROTOCOL_VERSION_HEADER,
 } from "@openbot/contracts/team-protocol/v1";
 import { TEAM_PROTOCOL_V2_MAX_JSON_FRAME_BYTES } from "@openbot/contracts/team-protocol/v2";
-import { TEAM_PROTOCOL_V9, TEAM_PROTOCOL_V9_CAPABILITY_LIMIT } from "@openbot/contracts/team-protocol/v9";
+import { TEAM_PROTOCOL_V9 } from "@openbot/contracts/team-protocol/v9";
 import { sourceText } from "@openbot/i18n/source";
 import { readBodyWithin } from "../http-body";
 import { HttpError } from "./http-error";
@@ -138,10 +140,7 @@ export function requestCapabilities(request: IncomingMessage): Set<string> {
   // Protocol 9 lists up to 256 capabilities, which can pass 4 KB.
   if (!value || value.length > (protocol >= TEAM_PROTOCOL_V9 ? 8_192 : 4_096)) return new Set();
   const capabilities = value.split(",").map((capability) => capability.trim());
-  if (
-    capabilities.length > (protocol >= TEAM_PROTOCOL_V9 ? TEAM_PROTOCOL_V9_CAPABILITY_LIMIT : protocol >= 7 ? 128 : 64)
-  )
-    return new Set();
+  if (capabilities.length > teamProtocolCapabilityLimit(protocol)) return new Set();
   return new Set(capabilities.filter(isTeamCurrentCapability));
 }
 
@@ -208,10 +207,16 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
 /**
  * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
  * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
- * agent's setup message (`agent-welcome-v1`) is for the agent only, so it goes to none either.
+ * agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
+ * agent only, so they go to none either.
  */
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE || itemType === AGENT_WELCOME_ITEM_TYPE) return false;
+  if (
+    itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+    itemType === AGENT_WELCOME_ITEM_TYPE ||
+    itemType === CHANNEL_RESUME_ITEM_TYPE
+  )
+    return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");

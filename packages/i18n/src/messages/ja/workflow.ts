@@ -56,6 +56,8 @@ export const messages = {
   "workflow.node.locked": "ロック中",
   "workflow.node.missingInput": "このステップを実行するには入力を接続してください。",
   "workflow.node.run": "実行",
+  "workflow.node.runPrice": "実行 · {credits}",
+  "workflow.node.runPriceLabel": "実行。価格（クレジット）: {credits}",
   "workflow.node.running": "実行中",
   "workflow.node.stop": "停止",
   "workflow.node.retry": "再実行",
@@ -523,7 +525,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} を削除しました",
   "workflow.canvas.deleteUndo.action": "元に戻す",
   "workflow.page.failed": "OpenBot で実行できませんでした。もう一度お試しください。",
-  "workflow.page.conflict": "別のデバイスで変更されました。元に戻すと編集内容を復元できます。",
   "workflow.page.needsNewerApp":
     "このワークフローには新しいバージョンの OpenBot のステップがあります。変更するには OpenBot を更新してください。",
   "workflow.page.manageOnly": "このワークフローを変更するには、各エージェントの管理アクセスが必要です。",

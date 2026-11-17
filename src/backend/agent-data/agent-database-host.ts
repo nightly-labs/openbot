@@ -29,6 +29,9 @@ import type {
 /** Mirrors `AGENT_DATABASE_METADATA_TABLE`; inlined because the protocol module must stay type-only here. */
 const METADATA_TABLE = "openbot_metadata";
 
+/** Mirrors `AGENT_DATABASE_SCHEMA_VERSION`, for the same reason. */
+const SCHEMA_VERSION = 1;
+
 const MAX_OPEN_DATABASES = 8;
 
 /** Virtual table modules an agent may build on. Everything else reaches a file or the engine's internals. */
@@ -172,6 +175,7 @@ function openDatabase(request: AgentDatabaseStatement): DatabaseSync {
   });
   try {
     // Before the authorizer, which denies SQLITE_PRAGMA outright.
+    checkSchemaVersion(database, request.mode);
     database.exec("PRAGMA trusted_schema = OFF");
     database.exec(`PRAGMA max_page_count = ${request.limits.maxPageCount}`);
     if (typeof database.setAuthorizer !== "function") {
@@ -186,6 +190,23 @@ function openDatabase(request: AgentDatabaseStatement): DatabaseSync {
   evictOldest();
   open.set(key, { database, lastUsedAt: Date.now() });
   return database;
+}
+
+/**
+ * Refuses a file that a newer release made, before any statement can change it. A file of an
+ * earlier release has version 0, which is the schema of version 1; a write connection records 1.
+ * Agents cannot change the version: the authorizer refuses every PRAGMA that writes.
+ */
+function checkSchemaVersion(database: DatabaseSync, mode: AgentDatabaseMode): void {
+  const row = database.prepare("PRAGMA user_version").get();
+  const version = row === undefined ? 0 : Number(row.user_version);
+  if (version > SCHEMA_VERSION) {
+    throw new HostFailure(
+      "newer-schema",
+      `A newer version of OpenBot made the shared tables file (schema ${version}; this version reads ${SCHEMA_VERSION}). Nothing was read or changed. Install the newer version of OpenBot to use the shared tables.`,
+    );
+  }
+  if (mode === "write" && version < SCHEMA_VERSION) database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
 function evictOldest(): void {
@@ -220,7 +241,7 @@ function closePath(databasePath: string): void {
 
 /** A failure that already carries the sentence a model should read. */
 class HostFailure extends Schema.TaggedError<HostFailure>()("AgentDatabaseHostFailure", {
-  kind: Schema.Literals(["sqlite", "not-authorized", "size-limit", "busy", "missing", "internal"]),
+  kind: Schema.Literals(["sqlite", "not-authorized", "size-limit", "busy", "missing", "newer-schema", "internal"]),
   message: Schema.String,
   sqliteCode: Schema.optional(Schema.Number),
 }) {
@@ -338,6 +359,38 @@ function redactFailure(failure: AgentDatabaseFailure, databasePath: string): Age
   return { ...failure, message: failure.message.replaceAll(databasePath, basename(databasePath)) };
 }
 
+/**
+ * Runs `PRAGMA quick_check(20)` on `openbot.db` and returns one row for each line that it reports.
+ * The connection is its own and has no authorizer: the statement is fixed and the main process gives
+ * the path. It is read-only, so its close never checkpoints or removes the write-ahead log.
+ */
+function checkIntegrity(databasePath: string): Effect.Effect<AgentDatabaseRows, HostFailure> {
+  return Effect.try({
+    try: () => {
+      // The same busy timeout as the main connection of `openbot.db`.
+      const database = new DatabaseSync(databasePath, { readOnly: true, timeout: 5_000 });
+      try {
+        const rows = database
+          .prepare("PRAGMA quick_check(20)")
+          .all()
+          .map((row): AgentDatabaseValue[] => [String(row.quick_check)]);
+        return { columns: ["quick_check"], rows, truncated: false, changes: 0, lastInsertRowid: null };
+      } finally {
+        database.close();
+      }
+    },
+    catch: (error) => {
+      const code =
+        typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
+      const failure = redactFailure(
+        { kind: "sqlite", message: error instanceof Error ? error.message : String(error) },
+        databasePath,
+      );
+      return new HostFailure(failure.kind, failure.message, code);
+    },
+  });
+}
+
 function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): Effect.Effect<A, HostFailure> {
   return Effect.try({
     try: operation,
@@ -407,6 +460,7 @@ class AgentDatabaseHost extends Context.Service<
           yield* Effect.sync(() => closePath(request.databasePath));
           return { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null };
         }
+        if (request.kind === "integrity-check") return yield* checkIntegrity(request.databasePath);
         // These Effects are synchronous. Do not yield asynchronous work while authorizer state is set.
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {

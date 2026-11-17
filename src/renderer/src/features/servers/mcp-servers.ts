@@ -52,6 +52,7 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpServerNoAnswer": "timeout",
   "error.backend.mcpSignInResponseTimedOut": "timeout",
   "error.backend.mcpServerExited": "startup",
+  "error.backend.mcpServerExitedWithOutput": "startup",
   "error.backend.mcpCommandNotFound": "startup",
   "error.backend.mcpRemoteBridge": "startup",
   "error.backend.mcpServerUnreachable": "unreachable",

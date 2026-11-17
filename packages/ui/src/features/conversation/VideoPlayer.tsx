@@ -20,6 +20,8 @@ export interface VideoPlayerProps {
   /** Gets the file when the user presses Play before there is a `src`, as in the web client. */
   onLoad?: (() => void) | undefined;
   onMetadata?: ((video: HTMLVideoElement) => void) | undefined;
+  /** The video starts, from Play or from `autoplay`. */
+  onPlay?: (() => void) | undefined;
   onError?: (() => void) | undefined;
   ref?: ((video: HTMLVideoElement) => void) | undefined;
   /**
@@ -132,7 +134,10 @@ export function VideoPlayer(props: VideoPlayerProps) {
             preload={props.preload ?? "metadata"}
             autoplay={props.autoplay}
             aria-label={props.label}
-            onPlay={() => setPlaying(true)}
+            onPlay={() => {
+              setPlaying(true);
+              props.onPlay?.();
+            }}
             onPause={() => setPlaying(false)}
             onEnded={() => setPlaying(false)}
             onWaiting={() => setBuffering(true)}

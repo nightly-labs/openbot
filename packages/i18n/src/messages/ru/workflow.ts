@@ -71,6 +71,8 @@ export const messages = {
   "workflow.node.locked": "Заблокирован",
   "workflow.node.missingInput": "Подключите вход, чтобы запустить этот шаг.",
   "workflow.node.run": "Запустить",
+  "workflow.node.runPrice": "Запустить · {credits}",
+  "workflow.node.runPriceLabel": "Запустить. Цена в кредитах: {credits}",
   "workflow.node.running": "Выполняется",
   "workflow.node.stop": "Остановить",
   "workflow.node.retry": "Повторить",
@@ -563,7 +565,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "Удалено: {name}",
   "workflow.canvas.deleteUndo.action": "Отменить",
   "workflow.page.failed": "OpenBot не смог это сделать. Повторите попытку.",
-  "workflow.page.conflict": "Изменено на другом устройстве. Отмените, чтобы вернуть свои правки.",
   "workflow.page.needsNewerApp":
     "В этом рабочем процессе есть шаги из более новой версии OpenBot. Обновите OpenBot, чтобы изменить его.",
   "workflow.page.manageOnly": "Чтобы изменить этот рабочий процесс, нужен доступ на управление каждым из его агентов.",

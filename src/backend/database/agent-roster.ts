@@ -49,6 +49,14 @@ export class AgentRoster {
     ).map((row) => JSON.parse(requiredStringColumn(row, "agent_json")));
   }
 
+  /** One agent by its id. A conversation write reads its agent here rather than parse the whole roster. */
+  getAgent(agentId: string): AgentSummary | undefined {
+    const row = databaseRow(
+      this.#core.connection.prepare("SELECT agent_json FROM projection_agents WHERE agent_id = ?").get(agentId),
+    );
+    return row ? JSON.parse(requiredStringColumn(row, "agent_json")) : undefined;
+  }
+
   /**
    * Every thread row no agent claims as its own `thread_id`.
    *

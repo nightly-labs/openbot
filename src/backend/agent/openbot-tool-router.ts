@@ -122,6 +122,7 @@ import {
 } from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import { AgentSettingsRefused } from "./agent-settings-refused";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
@@ -215,7 +216,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -1149,7 +1150,7 @@ export class OpenBotToolRouter {
   }
 
   /**
-   * A `tool_call` that names a tool of one of the agent's saved http MCP servers. Antigravity 1.5 leaves the
+   * A `tool_call` that names a tool of one of the agent's saved MCP servers (`forAgent`). Antigravity 1.5 leaves the
    * tools over its schema budget out of the tool list, with no `call_mcp_tool` for them (#7427), so
    * OpenBot runs the tool itself, with the sign-in of the server's address. The user approves it as a
    * direct MCP call: an agent with Full access is answered for. `null` when the name is no such tool.
@@ -1559,8 +1560,8 @@ export class OpenBotToolRouter {
       return openBotToolResult({
         status: "declined",
         next: phoneReport
-          ? "The user selected Not now. Do not send it another way, and do not offer it again for this problem. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
-          : "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
+          ? "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
+          : "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. Continue to help the user.",
       });
     // The phone redacts its log when it writes each line. This is the last place before the text leaves.
     const phone = "phone" in answer && answer.phone ? redactedPhone(answer.phone) : undefined;
@@ -2300,7 +2301,7 @@ export class OpenBotToolRouter {
       this.#hooks.requestNewChat(senderAgentId);
       return openBotToolResult({
         status: "requested",
-        note: "The new chat starts when this turn ends and your queue is empty. A queued message that runs first ends the request. When only routine runs wait, the new chat starts before them. Finish your answer now.",
+        note: "The new chat starts when this turn ends, your background subagents and commands finish, and your queue is empty. A queued message that runs first ends the request. When only routine runs wait and no background work runs, the new chat starts before them; otherwise a routine run also ends the request. Finish your answer now.",
       });
     }
 
@@ -2394,11 +2395,15 @@ export class OpenBotToolRouter {
       runPause !== null && routineResult?.success
         ? this.#routines.listFor(runPause.agentId).find((routine) => routine.id === runPause.routineId)
         : undefined;
-    if (runPause !== null && pausedRoutine)
+    if (runPause !== null && pausedRoutine) {
+      const { scheduledFor, ...pause } = runPause;
       this.#noteRoutineRunTurn(params.turnId, {
         failed: false,
-        paused: [...(runTurn?.paused ?? []), { ...runPause, updatedAt: pausedRoutine.updatedAt }],
+        paused: [...(runTurn?.paused ?? []), { ...pause, updatedAt: pausedRoutine.updatedAt }],
       });
+      // Routines and the chat card say which run paused the routine (#10048).
+      if (!pausedRoutine.active) this.#routines.notePausedByRun(pause.agentId, pause.routineId, scheduledFor);
+    }
     if (routineResult) return routineResult;
 
     const flowResult = yield* handleRoutineFlowTool(
@@ -2593,7 +2598,7 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Server settings, Connectors, also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Marketplace > Apps > GitHub also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
             : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
       });
     }
@@ -2604,13 +2609,25 @@ export class OpenBotToolRouter {
       const setting = args.setting.trim();
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
+        const serverPlaces = searchServerPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0;
         return openBotToolResult({
-          status: matches.length > 0 ? "matches" : "not_found",
+          status: found ? "matches" : "not_found",
           matches,
-          next:
-            matches.length > 0
-              ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id. When none fits, try other words once, then say that OpenBot has no such setting."
-              : "No setting matches. Try other words once, such as the name of the feature. Otherwise say that OpenBot has no setting for it, and offer openbot.send_feedback with an idea.",
+          ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          next: found
+            ? [
+                matches.length > 0
+                  ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id."
+                  : "",
+                serverPlaces.length > 0
+                  ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                "When none fits, try other English words once, then say that you found no setting for it.",
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
         });
       }
       const shown = settingLinkSummary(setting);
@@ -3024,6 +3041,7 @@ export class OpenBotToolRouter {
     const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
     return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
+      agentId,
       arguments: params.arguments,
       approve: (reason, cwd) =>
         this.#attention
@@ -3105,17 +3123,19 @@ export class OpenBotToolRouter {
   #runRoutinePause(
     params: DynamicToolCallParams,
     senderAgentId: string,
-  ): { agentId: string; routineId: string } | null {
+  ): { agentId: string; routineId: string; scheduledFor: string } | null {
     if (params.tool !== "update_routine" || !isRecord(params.arguments) || params.arguments.active !== false)
       return null;
     const { agentId, routineId } = params.arguments;
     if ((agentId !== undefined && agentId !== senderAgentId) || !isString(routineId)) return null;
     const ownRun = this.#mailbox
       .findDeliveriesByTurn(senderAgentId, params.turnId)
-      .some(({ delivery }) => delivery.sender.kind === "routine" && delivery.sender.routineId === routineId);
+      .map(({ delivery }) => delivery.sender)
+      .find((sender) => sender.kind === "routine" && sender.routineId === routineId);
     const active =
-      ownRun && this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
-    return active ? { agentId: senderAgentId, routineId } : null;
+      ownRun?.kind === "routine" &&
+      this.#routines.listFor(senderAgentId).some((routine) => routine.id === routineId && routine.active);
+    return active ? { agentId: senderAgentId, routineId, scheduledFor: ownRun.scheduledFor } : null;
   }
 
   #noteRoutineRunTurn(turnId: string, state: RoutineRunTurn): void {
@@ -3334,6 +3354,15 @@ export class OpenBotToolRouter {
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
           : null;
+      // A provider that lists no model now, or a custom agent whose list is not loaded, is no proof that the
+      // caller's model is gone: the caller runs on it. Before, the new agent started on another provider (#11033).
+      if (
+        named === null &&
+        inherited === null &&
+        (caller.provider === "acp" || !listed.some((model) => model.provider === caller.provider))
+      ) {
+        throw new AgentSettingsRefused(sourceText("error.agent.creatorModelNotListed", { model: caller.model }));
+      }
       if (inherited && args.reasoningEffort !== undefined) requireReasoningEffort(inherited, args.reasoningEffort);
       const requested = named ?? inherited;
       const reasoningEffort = args.reasoningEffort ?? (inherited ? caller.reasoningEffort : undefined);
@@ -3431,8 +3460,8 @@ export class OpenBotToolRouter {
         computerUse,
         ...fields
       } = args;
-      if (avatarPath !== undefined && (args.avatarSeed !== undefined || avatarHue !== undefined)) {
-        throw new Error("Use avatarPath or generated avatar settings, not both.");
+      if (avatarPath !== undefined && args.avatarSeed !== undefined) {
+        throw new Error("Use avatarPath or avatarSeed, not both.");
       }
       const runtimeRequest = { provider, model, reasoningEffort };
       if (
@@ -3508,7 +3537,8 @@ export class OpenBotToolRouter {
       let updated = yield* this.#hooks.updateAgent(input, senderAgentId).pipe(toToolOperationFailed);
       if (image !== undefined) {
         updated = yield* this.#hooks.setAvatar(agentId, image).pipe(toToolOperationFailed);
-      } else if (args.avatarSeed !== undefined || args.avatarHue !== undefined) {
+      } else if (args.avatarSeed !== undefined) {
+        // Only a new generated face replaces an image. A color keeps it, as in the agent settings (#10431).
         updated = yield* this.#hooks.setAvatar(agentId, null).pipe(toToolOperationFailed);
       }
       return {
@@ -3729,8 +3759,18 @@ export class OpenBotToolRouter {
               ({ delivery }) => delivery.sender.kind === "agent" && delivery.sender.agentId === recipientValues[0],
             )
             .map(({ delivery }) => delivery.messageId);
+      // Without replyToMessageId, a message that needs no answer, such as the recipient's answer or
+      // notice, selects its side thread only while that thread waits for this agent. Otherwise the
+      // message is a new request: it goes to the recipient's own chat, where it can start a task
+      // (#10273). To continue the recipient's thread, the agent replies to the recipient's message.
+      const threadRequestIds = replyTo
+        ? answeredRequestIds
+        : answeredRequestIds.filter(
+            (requestId) =>
+              this.#mailbox.expectsReply(requestId) || this.#mailbox.sideThreadWaitsFor(senderAgentId, requestId),
+          );
       const answerTaskIds = new Set(
-        answeredRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
+        threadRequestIds.map((requestId) => this.#mailbox.answerTaskId(senderAgentId, requestId, recipientValues)),
       );
       const [answerTaskId = null] = answerTaskIds.size === 1 ? answerTaskIds : [];
       const taskId = answerTaskId && this.#tasks.threadId(answerTaskId) !== null ? answerTaskId : undefined;

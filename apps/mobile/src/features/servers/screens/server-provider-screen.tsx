@@ -29,6 +29,7 @@ import Minimize2 from "lucide-react-native/icons/minimize-2";
 import Package from "lucide-react-native/icons/package";
 import RefreshCw from "lucide-react-native/icons/refresh-cw";
 import RotateCcw from "lucide-react-native/icons/rotate-ccw";
+import Smartphone from "lucide-react-native/icons/smartphone";
 import Star from "lucide-react-native/icons/star";
 import UserPlus from "lucide-react-native/icons/user-plus";
 import UserRound from "lucide-react-native/icons/user-round";
@@ -173,7 +174,7 @@ export function ServerProviderScreen() {
 
   const state = row.status?.state;
   /** The sign-in runs on its own page, which closes when the sign-in ends. */
-  function openSignIn(method: "code" | "relay", extra: { add?: "1" } = {}) {
+  function openSignIn(method: "code" | "relay" | "account-code", extra: { add?: "1" } = {}) {
     if (provider) openSignInPage({ serverId, provider, method, ...extra });
   }
 
@@ -367,8 +368,11 @@ export function ServerProviderScreen() {
           // A new account is an API key where the host takes one (`provider-account-keys-v1`), and
           // never the browser sign-in for such a provider.
           canAdd={connectable && (keyAccounts ? connectKey !== null : admin.accounts?.canSignIn(provider) === true)}
+          // A host with `provider-account-code-v1` also adds an account with the code sign-in of its CLI.
+          canAddWithCode={connectable && !keyAccounts && admin.accounts?.code?.offered(provider) === true}
           keyAccounts={keyAccounts}
           busy={busy}
+          onAddWithCode={() => openSignIn("account-code", { add: "1" })}
           onAdd={() =>
             keyAccounts
               ? router.push({ pathname: "/server-settings/provider-key", params: { serverId, provider, add: "1" } })
@@ -732,9 +736,11 @@ function ProviderAccountsSection({
   provider,
   accounts,
   canAdd,
+  canAddWithCode,
   keyAccounts,
   busy,
   onAdd,
+  onAddWithCode,
   pool,
   onPoolChange,
 }: {
@@ -742,10 +748,12 @@ function ProviderAccountsSection({
   provider: AgentProviderId;
   accounts: readonly ProviderAccountStatus[];
   canAdd: boolean;
+  canAddWithCode: boolean;
   /** Each account after the first is an API key of the provider. */
   keyAccounts: boolean;
   busy: boolean;
   onAdd: () => void;
+  onAddWithCode: () => void;
   /** The pool of the accounts, while it is on. */
   pool: ProviderAccountPool | undefined;
   /** Null when the host does not have the pool. */
@@ -768,10 +776,10 @@ function ProviderAccountsSection({
         keyAccounts && canAdd
           ? "mobile.server.providers.accountsKeyHint"
           : pool
-            ? canAdd
+            ? canAdd || canAddWithCode
               ? "mobile.server.providers.accountsPooledHint"
               : "mobile.server.providers.accountsPooledOnComputer"
-            : canAdd
+            : canAdd || canAddWithCode
               ? "mobile.server.providers.accountsHint"
               : "mobile.server.providers.accountsOnComputer",
       )}
@@ -834,6 +842,18 @@ function ProviderAccountsSection({
           onPress={onAdd}
         >
           <Typography.Paragraph className="text-accent">{t("mobile.server.providers.addAccount")}</Typography.Paragraph>
+        </SettingsRow>
+      ) : null}
+      {canAddWithCode ? (
+        <SettingsRow
+          disclosure={false}
+          disabled={busy}
+          leading={<RowIcon icon={Smartphone} tone="accent" />}
+          onPress={onAddWithCode}
+        >
+          <Typography.Paragraph className="text-accent">
+            {t("mobile.server.providers.addAccountWithCode")}
+          </Typography.Paragraph>
         </SettingsRow>
       ) : null}
     </SettingsSection>

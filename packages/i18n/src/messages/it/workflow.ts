@@ -59,6 +59,8 @@ export const messages = {
   "workflow.node.locked": "Bloccato",
   "workflow.node.missingInput": "Collega un input per eseguire questo passo.",
   "workflow.node.run": "Esegui",
+  "workflow.node.runPrice": "Esegui · {credits}",
+  "workflow.node.runPriceLabel": "Esegui. Prezzo in crediti: {credits}",
   "workflow.node.running": "In esecuzione",
   "workflow.node.stop": "Ferma",
   "workflow.node.retry": "Riprova",
@@ -525,7 +527,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "Eliminato: {name}",
   "workflow.canvas.deleteUndo.action": "Annulla",
   "workflow.page.failed": "OpenBot non è riuscito a completare l'operazione. Riprova.",
-  "workflow.page.conflict": "Modificato su un altro dispositivo. Annulla per recuperare le tue modifiche.",
   "workflow.page.needsNewerApp":
     "Questo flusso di lavoro ha passaggi di una versione più recente di OpenBot. Aggiorna OpenBot per modificarlo.",
   "workflow.page.manageOnly":

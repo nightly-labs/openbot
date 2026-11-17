@@ -30,8 +30,8 @@ import { serverCanAdminister, serverRoleCanAdminister, serverSupportsCapability 
 
 type WorkflowsApi = OpenBotDesktopApi["workflows"];
 /** The methods that take only the server. */
-type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits";
-/** Each method with its input only; `list`, `githubCatalog`, `mediaProviders` and `mediaCredits` take none. */
+type NoInputMethod = "list" | "githubCatalog" | "mediaProviders" | "mediaCredits" | "mediaCatalog";
+/** Each method with its input only; the methods of `NoInputMethod` take none. */
 type BoundWorkflowsApi = {
   [Name in Exclude<keyof WorkflowsApi, NoInputMethod>]: (
     input: Parameters<WorkflowsApi[Name]>[0],
@@ -181,7 +181,17 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
   /** The host runs Telegram and Slack nodes, and their chats and workspaces come from its connections. */
   const chatsSupported = () => local() || (placesSupported() && serverCanAdminister(server(), "workflows-chats-v1"));
   const channelsSupported = () => local() || serverCanAdminister(server(), "workflows-channels-v1");
-  const options = () => window.openbot.routineResults.options(serverId);
+  /**
+   * The places, Discord servers, Telegram chats and Slack workspaces read the connections at the same
+   * time, so they share one call while it runs.
+   */
+  let optionsCall: ReturnType<OpenBotDesktopApi["routineResults"]["options"]> | undefined;
+  const options = () => {
+    optionsCall ??= window.openbot.routineResults.options(serverId).finally(() => {
+      optionsCall = undefined;
+    });
+    return optionsCall;
+  };
   const githubSupported = () => serverSupportsCapability(server(), "workflows-github-v1");
   const mediaSupported = () => local() || serverSupportsCapability(server(), "workflows-media-v1");
   const mediaAccountSupported = () =>
@@ -227,6 +237,9 @@ export function desktopWorkflowHost(serverId: string, server: () => ServerSummar
       mediaProviders: () => api().mediaProviders(serverId),
       // Main answers `sunra: null` or `higgsfield: null` for a joined server without that capability.
       mediaCredits: () => api().mediaCredits(serverId),
+      // Main answers no models and no quote for a joined server without `workflows-media-catalog-v1`.
+      mediaCatalog: () => api().mediaCatalog(serverId),
+      mediaPrice: (input) => api().mediaPrice(input, serverId),
     },
     onChanged(changed) {
       const unsubscribe = window.openbot.agent.onScopedEvent((scoped) => {

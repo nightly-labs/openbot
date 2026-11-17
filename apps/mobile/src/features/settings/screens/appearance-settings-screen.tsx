@@ -11,9 +11,20 @@ import { readableOn } from "@/features/onboarding/model/onboarding-colors";
 import { AppIconSection } from "@/features/settings/components/app-icon-row";
 import { MessageColorPicker } from "@/features/settings/components/message-color-picker";
 import { SettingsContent, SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
-import { SettingsPicker, SettingsSwitch } from "@/features/settings/components/settings-controls";
-import { saveAppearance, useAppearance } from "@/features/settings/model/appearance";
+import { SettingsSwitch } from "@/features/settings/components/settings-controls";
+import { SettingsPictureChoice } from "@/features/settings/components/settings-picture-choice";
+import { MessageColorPicture, ThemePicture } from "@/features/settings/components/settings-pictures";
+import { type Appearance, saveAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { saveChatBackground, useChatBackground } from "@/features/settings/model/chat-background";
+import {
+  type ChatDetailPreference,
+  saveMemoryChangesDisplayPreference,
+  saveSubagentsDisplayPreference,
+  saveThinkingDisplayPreference,
+  useMemoryChangesDisplayPreference,
+  useSubagentsDisplayPreference,
+  useThinkingDisplayPreference,
+} from "@/features/settings/model/chat-details";
 import {
   type MessageColorMode,
   type MessageColorValue,
@@ -47,13 +58,14 @@ const PRESET_LABELS = {
 export function AppearanceSettingsScreen() {
   const { t } = useText();
   const { theme } = useUniwind();
-  const { value, ready, saving } = useAppearance();
+  const { value, ready } = useAppearance();
   const [error, setError] = useState<string | null>(null);
   const messageColor = useMessageColor();
   const [messageColorError, setMessageColorError] = useState<string | null>(null);
-  const changeMessageColor = (change: Partial<MessageColorValue>) => {
+  // The picture choice plays its own selection haptic.
+  const changeMessageColor = (change: Partial<MessageColorValue>, { haptic = true } = {}) => {
     setMessageColorError(null);
-    void haptics.selection();
+    if (haptic) void haptics.selection();
     void saveMessageColor(change).catch(() => {
       setMessageColorError(t("mobile.settings.saveFailed"));
       void haptics.notification("error");
@@ -61,54 +73,60 @@ export function AppearanceSettingsScreen() {
   };
   return (
     <SettingsContent>
-      <SettingsSection footer={error || t("mobile.settings.appearance.footer")}>
-        <SettingsRow
-          trailing={
-            <SettingsPicker
-              value={value}
-              options={[
-                { value: "system", label: t("mobile.settings.appearance.system") },
-                { value: "light", label: t("mobile.settings.appearance.light") },
-                { value: "dark", label: t("mobile.settings.appearance.dark") },
-              ]}
-              enabled={ready && !saving}
-              dark={theme === "dark"}
-              label={t("mobile.settings.appearance.theme")}
-              onChange={(next) => {
-                setError(null);
-                void haptics.selection();
-                void saveAppearance(next).catch(() => {
-                  setError(t("mobile.settings.appearance.saveFailed"));
-                  void haptics.notification("error");
-                });
-              }}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.settings.appearance.theme")}</Typography.Paragraph>
-        </SettingsRow>
+      <SettingsSection
+        title={t("mobile.settings.appearance.theme")}
+        footer={error || t("mobile.settings.appearance.footer")}
+      >
+        <SettingsPictureChoice<Appearance>
+          label={t("mobile.settings.appearance.theme")}
+          value={value}
+          // saveAppearance ignores a choice while a save runs. Disabling here would dim the pictures at each tap.
+          disabled={!ready}
+          options={(
+            [
+              ["light", t("mobile.settings.appearance.light")],
+              ["dark", t("mobile.settings.appearance.dark")],
+              ["system", t("mobile.settings.appearance.system")],
+            ] as const
+          ).map(([mode, label]) => ({
+            value: mode,
+            label,
+            picture: (play: number) => <ThemePicture mode={mode} play={play} />,
+          }))}
+          onChange={(next) => {
+            setError(null);
+            void saveAppearance(next).catch(() => {
+              setError(t("mobile.settings.appearance.saveFailed"));
+              void haptics.notification("error");
+            });
+          }}
+        />
       </SettingsSection>
       <AppIconSection />
       <TextSizeSection />
-      <SettingsSection footer={messageColorError ?? t("mobile.settings.appearance.messageColorFooter")}>
-        <SettingsRow
-          trailing={
-            <SettingsPicker<MessageColorMode>
-              value={messageColor.mode}
-              options={[
-                { value: "none", label: t("mobile.settings.appearance.messageColorNone") },
-                { value: "agent", label: t("mobile.settings.appearance.messageColorAgent") },
-                { value: "custom", label: t("mobile.settings.appearance.messageColorCustom") },
-              ]}
-              enabled={messageColor.ready}
-              dark={theme === "dark"}
-              label={t("mobile.settings.appearance.messageColor")}
-              onChange={(mode) => changeMessageColor({ mode })}
-            />
-          }
-        >
-          <Typography.Paragraph>{t("mobile.settings.appearance.messageColor")}</Typography.Paragraph>
-        </SettingsRow>
+      <SettingsSection
+        title={t("mobile.settings.appearance.messageColor")}
+        footer={messageColorError ?? t("mobile.settings.appearance.messageColorFooter")}
+      >
+        <SettingsPictureChoice<MessageColorMode>
+          label={t("mobile.settings.appearance.messageColor")}
+          value={messageColor.mode}
+          disabled={!messageColor.ready}
+          options={(
+            [
+              ["none", t("mobile.settings.appearance.messageColorNone")],
+              ["agent", t("mobile.settings.appearance.messageColorAgent")],
+              ["custom", t("mobile.settings.appearance.messageColorCustom")],
+            ] as const
+          ).map(([mode, label]) => ({
+            value: mode,
+            label,
+            picture: (play: number) => (
+              <MessageColorPicture mode={mode} customColor={messageColor.customColor} play={play} />
+            ),
+          }))}
+          onChange={(mode) => changeMessageColor({ mode }, { haptic: false })}
+        />
         {messageColor.mode === "custom" ? (
           <View
             className="flex-row flex-wrap gap-3 px-4 py-3"
@@ -153,6 +171,7 @@ export function AppearanceSettingsScreen() {
       </SettingsSection>
       <ChatBackgroundSection dark={theme === "dark"} />
       <RoutineCollapseSection dark={theme === "dark"} />
+      <ChatDetailsSection dark={theme === "dark"} />
       <FullVisualSection dark={theme === "dark"} />
     </SettingsContent>
   );
@@ -259,6 +278,53 @@ function RoutineCollapseSection({ dark }: { dark: boolean }) {
           }}
         />
       </SettingsRow>
+    </SettingsSection>
+  );
+}
+
+/** The details of a reply that a chat shows: the agent's thinking, its subagents and its saved memories. */
+function ChatDetailsSection({ dark }: { dark: boolean }) {
+  const { t } = useText();
+  const [error, setError] = useState<string | null>(null);
+  const details = [
+    {
+      label: t("mobile.settings.appearance.showThinking"),
+      state: useThinkingDisplayPreference(),
+      save: saveThinkingDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showSubagents"),
+      state: useSubagentsDisplayPreference(),
+      save: saveSubagentsDisplayPreference,
+    },
+    {
+      label: t("mobile.settings.appearance.showMemoryChanges"),
+      state: useMemoryChangesDisplayPreference(),
+      save: saveMemoryChangesDisplayPreference,
+    },
+  ] satisfies { label: string; state: ChatDetailPreference; save: (enabled: boolean) => Promise<void> }[];
+  return (
+    <SettingsSection
+      title={t("mobile.settings.appearance.replyDetails")}
+      footer={error ?? t("mobile.settings.appearance.replyDetailsFooter")}
+    >
+      {details.map(({ label, state, save }) => (
+        <SettingsRow key={label}>
+          <SettingsSwitch
+            value={state.enabled}
+            disabled={!state.ready || state.saving}
+            label={label}
+            dark={dark}
+            onValueChange={(enabled) => {
+              setError(null);
+              void save(enabled).catch(() => {
+                setError(t("mobile.settings.saveFailed"));
+                void haptics.notification("error");
+              });
+            }}
+          />
+        </SettingsRow>
+      ))}
     </SettingsSection>
   );
 }

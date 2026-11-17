@@ -131,19 +131,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",
+  "mobile.settings.appearance.replyDetails": "返信の詳細",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "詳細をオフにすると、チャットでその行が非表示になります。エージェントは引き続き思考し、サブエージェントを実行し、記憶を保存します。",
+  "mobile.settings.appearance.showThinking": "エージェントの思考を表示",
+  "mobile.settings.appearance.showSubagents": "サブエージェントを表示",
+  "mobile.settings.appearance.showMemoryChanges": "保存した記憶を表示",
   "mobile.settings.appearance.fullVisuals": "ビジュアルのプレビューを全体表示",
   "mobile.settings.appearance.fullVisualsFooter":
     "エージェントのビジュアルをチャットに全体の高さで表示します。オフのときは高いビジュアルが途中で切れます。タップすると全体を表示します。",
   "mobile.settings.animations.title": "アニメーション",
-  "mobile.settings.animations.footer":
-    "アニメーションをオフにすると、アプリ全体の動きを減らします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。その場合、下のアニメーションはオフのままです。",
-  "mobile.settings.animations.all": "アニメーション",
+  "mobile.settings.animations.fullMotion": "フルモーション",
+  "mobile.settings.animations.reduced": "軽減",
+  "mobile.settings.animations.motionFooter":
+    "「軽減」はアプリ全体の動きを減らし、下のアニメーションをオフのままにします。スマートフォンの設定で「視差効果を減らす」がオンのときも、アプリは動きを減らします。",
   "mobile.settings.animations.agentFaces": "エージェントの表情アニメーション",
   "mobile.settings.animations.agentFacesFooter":
     "エージェントが作業中や待機中に、アバターの表情が動きます。オフにすると、表情は動かず、ようこそ画面と空のホーム画面のキャラクターも浮遊しなくなります。",
-  "mobile.settings.animations.composerResize": "コンパクトなメッセージ欄",
-  "mobile.settings.animations.composerResizeFooter":
-    "キーボードを閉じている間、メッセージ欄は小さなバーになります。オフにすると、メッセージ欄は常に元のサイズのままです。",
   "mobile.settings.animations.textReveal": "返信のアニメーション",
   "mobile.settings.animations.textRevealFooter":
     "返信が一語ずつ表示され、吹き出しがなめらかに大きくなります。オフにすると、テキストは届いた時点で表示されます。",
@@ -239,12 +243,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "大きなファイルを自動でダウンロード",
   "mobile.settings.conversations.largeFilesFooter":
     "{small} を超える画像、動画、音声は、タップしたときだけダウンロードされます。オンにすると、{large} まですぐにダウンロードします。モバイルデータを多く使う場合があります。",
+  "mobile.settings.conversations.messageField": "メッセージ欄",
+  "mobile.settings.conversations.compact": "コンパクト",
+  "mobile.settings.conversations.fullSize": "フルサイズ",
+  "mobile.settings.conversations.compactFooter":
+    "「コンパクト」では、キーボードが閉じている間メッセージ欄が小さなバーになります。",
+  "mobile.settings.conversations.compactComposerReduced":
+    "アニメーションまたはスマートフォンの設定で視差効果が減らされているため、メッセージ欄はフルサイズのままです。",
+  "mobile.settings.conversations.media": "写真とファイル",
   "mobile.settings.conversations.swipeLeft": "エージェントのチャットで左にスワイプ",
   "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
   "mobile.settings.conversations.swipeThreads": "スレッド",
   "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeOff": "オフ",
   "mobile.settings.conversations.swipeFooter":
-    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上のスワイプは引き続き返信です。",
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上で同じ方向にスワイプすると、メッセージの時刻が表示されます。",
   "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
   "mobile.settings.conversations.pullInfoFooter":
     "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
@@ -506,6 +519,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "プロセスを停止できませんでした。",
   "mobile.settings.agents.processes.stopTitle": "このプログラムを停止しますか？",
   "mobile.settings.agents.processes.stopLabel": "プロセス {pid} を停止",
+  "mobile.settings.quickActions.title": "アプリアイコンのメニュー",
+  "mobile.settings.quickActions.footer":
+    "OpenBotのアイコンを長押しすると、これらの操作が表示されます。最大{count}個までオンにできます。",
+  "mobile.settings.quickActions.latestChat": "最新のチャット",
+  "mobile.settings.quickActions.secondChat": "2番目に新しいチャット",
   "mobile.settings.shortcuts.title": "ショートカット",
   "mobile.settings.shortcuts.agent": "エージェント",
   "mobile.settings.shortcuts.none": "なし",

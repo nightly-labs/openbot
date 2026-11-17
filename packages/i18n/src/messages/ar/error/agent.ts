@@ -55,6 +55,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "النموذج المحدد لا ينتمي إلى هذا المزوّد.",
   "error.agent.modelNotListed": "النموذج «{model}» غير متاح. النماذج المتاحة: {models}.",
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
+  "error.agent.creatorModelNotListed":
+    "نموذجك «{model}» غير موجود في قائمة النماذج الآن، لذلك لا يمكن أن يبدأ الوكيل الجديد عليه. حاول مرة أخرى بعد بضع ثوانٍ، أو عيّن provider وmodel إلى نموذج يعرضه list_models.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -85,11 +87,14 @@ export const messages = {
   "error.agent.endpointRemoved": "أُزيلت نقطة النهاية التي استخدمها هذا الوكيل. اختر نموذجًا آخر له.",
   "error.agent.turnStalled":
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.promptCancelled": "ألغى {provider} هذه الرسالة قبل أن تبدأ. أرسل الرسالة مرة أخرى.",
   "error.agent.toolLoopStopped":
     "كرر {provider} خطوة فاشلة مرات كثيرة، لذلك أوقف OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
   "error.agent.answerCutOff": "توقف الوكيل قبل أن ينهي إجابته، لذلك الإجابة غير كاملة. أرسل الرسالة مرة أخرى.",
   "error.agent.compactionConnectionLost":
     "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت، ثم أرسل رسالة للمتابعة.",
+  "error.agent.compactionConnectionLostAddress":
+    "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت. وتأكد أيضًا أن {variable} ضمن المتغيرات في إعدادات {provider} هو عنوان API لخدمة النموذج لديك، وغالبًا ما ينتهي بـ /v1. ثم أرسل رسالة.",
   "error.agent.compactionLoopStopped":
     "ضغط {provider} السياق مرارًا، وبقي ممتلئًا جدًا في كل مرة فلم يستطع المتابعة، لذلك أوقف OpenBot هذا الدور. أوقف خوادم MCP أو استخدام الكمبيوتر التي لا يحتاجها هذا الوكيل، ثم أرسل رسالة. إذا غيّرت أنت أو الوكيل وقت ضغط {provider}، فتراجع عن هذا التغيير.",
   "error.agent.selectedGone": "لم يعد الوكيل المحدد موجودًا.",

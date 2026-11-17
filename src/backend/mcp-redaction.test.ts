@@ -11,13 +11,21 @@ import { mcpSecretValues, redactMcpRecord } from "./mcp-redaction";
 import { createPiMcpExtension } from "./pi-mcp";
 
 describe("redactMcpRecord", () => {
-  it("keeps JSON literals when a known value is `true` or `null`", () => {
-    const record = { path: "README.md", enabled: true, note: null, label: "true story" };
-    expect(redactMcpRecord(record, ["true", "null"])).toEqual({
+  // A setting word is never a credential. Masking it broke `QA_READY=true` in a workflow (#10680).
+  it("keeps JSON literals and setting words when a known value is `true` or `null`", () => {
+    const record = { path: "README.md", enabled: true, note: null, label: "true story", flag: "QA_READY=TRUE" };
+    expect(redactMcpRecord(record, ["true", "null", "TRUE", "false"])).toEqual({
       path: "README.md",
       enabled: true,
       note: null,
-      label: "••• story",
+      label: "true story",
+      flag: "QA_READY=TRUE",
+    });
+  });
+
+  it("still masks a known value next to a setting word", () => {
+    expect(redactMcpRecord({ line: "PIN=hunter22 DEBUG=true" }, ["true", "hunter22"])).toEqual({
+      line: "PIN=••• DEBUG=true",
     });
   });
 
@@ -95,7 +103,14 @@ describe("mcpSecretValues", () => {
   it("gives Pi each value but only the credentials as secrets", async () => {
     const directory = await mkdtemp(join(tmpdir(), "openbot-pi-mcp-test-"));
     try {
-      const local = { servers: [], setThreadId: () => {}, reached: () => false, close: () => {} };
+      const local = {
+        servers: [],
+        setThreadId: () => {},
+        reached: () => false,
+        dropped: () => false,
+        renew: () => [],
+        close: () => {},
+      };
       const extension = await Effect.runPromise(
         createPiMcpExtension(
           {

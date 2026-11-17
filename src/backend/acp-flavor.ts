@@ -25,6 +25,14 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
+interface AcpRetryUpdate {
+  /** The number of the retry: 1 for the first request after the failed one. */
+  readonly attempt: number;
+  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
+  readonly unreachable: boolean;
+}
+
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
   readonly name: string;
@@ -83,7 +91,8 @@ export interface AcpFlavor {
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
-   * API key for the provider of that model.
+   * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
+   * agent's own store has a key for a provider.
    */
   turnFailure?(
     error: unknown,
@@ -93,6 +102,7 @@ export interface AcpFlavor {
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
     savedKey: boolean,
+    providerKeyStored: (provider: string) => boolean,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name
@@ -144,11 +154,23 @@ export interface AcpFlavor {
    */
   refusesUntilRestart?(error: unknown): boolean;
   /**
+   * Whether a failed request says that the agent lost the connection to its own server, after which
+   * its process can fail each request until it ends. OpenBot then ends the process as for
+   * `refusesUntilRestart`, also when the session open or a settings change of a turn fails.
+   */
+  lostServerUntilRestart?(error: unknown): boolean;
+  /**
+   * Whether a failed prompt says that the agent lost its own server, which can come a moment before
+   * its process exits. The turn then waits for that exit, as for a closed connection, so it ends as
+   * at a process exit: the recovery continues an answer that the exit cut (#10310).
+   */
+  serverLost?(error: unknown): boolean;
+  /**
    * Whether the agent refused to open a session again because a prompt still runs in it, such as a
    * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
    */
   sessionBusy?(error: unknown): boolean;
-  /** A failed model refresh keeps the last list that the agent gave. */
+  /** A failed, timed-out or empty model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
    * The model belongs to the agent's process, not to one session: a model set moves every session
@@ -190,8 +212,19 @@ export interface AcpFlavor {
     answerIsFailure: RegExp;
     /** The failure text of a model step that ended with neither text nor tool calls. */
     emptyOutputFailure?: RegExp;
+    /**
+     * A tool call that the model wrote as answer text, which the agent does not run: the words that
+     * one starts with, and the whole text of one. The text is held back, and a turn that ends on it
+     * ends as a turn with no answer.
+     */
+    textToolCall?: { starts: readonly string[]; whole: RegExp };
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
+    /**
+     * The cause of a turn that failed in this way, from the same rules as `turnFailure`, or `null`.
+     * It counts only when the generic text rules name no cause, so a cause that they name stays.
+     */
+    fallbackCause?(text: string): CauseCode | null;
     /**
      * The https link that the user must open to fix their account, from the failure text or, for a
      * text that names no link, from the agent's own log, or `null`. The turn fails as a sign-in
@@ -286,6 +319,11 @@ export interface AcpFlavor {
    */
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
   /**
+   * A session update that says that the agent sends a failed model request again, else null. The agent
+   * does not say how many times it tries. The chat shows the retry until the agent's next output.
+   */
+  retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
+  /**
    * Whether a session update reports a retry of a model request that timed out: a retry that the agent
    * schedules, or the end of a retried attempt. The agent waits for a model as long as OpenBot's stall
    * limit, then retries, so OpenBot waited exactly as long and ended each such turn as the retry started (#9941).
@@ -309,6 +347,12 @@ export interface AcpFlavor {
    * servers did not reach then fails, as the agent cannot use OpenBot's tools.
    */
   mcpServersLoadWithSession?: true;
+  /**
+   * How long the agent waits for an MCP server of a session to connect. Then it continues without the
+   * server and does not connect again while the server's settings stay the same. A session that
+   * OpenBot's servers did not reach in time is restored once with new tokens.
+   */
+  mcpConnectLimitMs?: number;
   /**
    * The agent drops a stdio MCP server of `session/new` and `session/load` with no error, although
    * ACP requires stdio, or keeps it running after the session closes. OpenBot starts each one itself
@@ -357,6 +401,11 @@ export interface AcpFlavor {
   catalogAsMcpTools?: true;
   /** OpenBot compacts by replacing the session, for an agent that reports `usage_update` and has no compact request. */
   contextCompaction?: "handoff";
+  /**
+   * The agent compacts its own context, and OpenBot cannot ask it to. The context meter then says that
+   * the provider manages compaction. The ACP client sees each compaction when the context shrinks.
+   */
+  compactsItself?: true;
   /**
    * The agent opens a saved session again with all of its prompts. A session that an idle release
    * closed keeps the instructions that it got, so its next prompt does not send them again.
@@ -428,7 +477,14 @@ const PAYMENT_METHOD_WALL = /^\s*Add a payment method to continue\.?\s*$/u;
 const PAYMENT_METHOD_WALL_TEXT = /\bAdd a payment method to continue\b/u;
 
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
-export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
+export const CLINE_ACP_FLAVOR: AcpFlavor = {
+  subagentTools: ["spawn_agent"],
+  // Cline CLI 3.0.74 throws its `SessionNotFoundError` when its hub no longer has the session, and the
+  // ACP SDK sends it as "Internal error" with `data.details` "session not found: <id>". OpenBot kept
+  // the session, so each message failed, also after a restart (#11096). Only this session counts.
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
+};
 
 /**
  * GitHub Copilot CLI 1.0.105 advertises only http and sse MCP servers, and drops a stdio one, so its
@@ -441,6 +497,9 @@ export const COPILOT_ACP_FLAVOR: AcpFlavor = {
   // chat showed only "Add a payment method to continue", and no backup model took the turn (#9808).
   planUsedUpChunk: PAYMENT_METHOD_WALL,
   failureCause: (error) => (PAYMENT_METHOD_WALL_TEXT.test(errorText(error)) ? "usage_limit" : null),
+  // GitHub Copilot CLI 1.0.112 compacts its session by itself. The context meter said "This agent
+  // does not compact its context." (#10643).
+  compactsItself: true,
 };
 
 /**
@@ -599,7 +658,24 @@ const HERMES_LOST_TURNS: NonNullable<AcpFlavor["lostTurns"]> = {
 function hermesTurnFailure(error: unknown, detail: string): string {
   if (isRecord(error) && isRecord(error.data) && error.data.details === "admitted_turn_failed")
     return sourceText("error.provider.hermesTurnFailed");
+  if (hermesGatewayLost(error)) return sourceText("error.provider.hermesConnectionLost");
   return hermesRefusal(error) ? sourceText("error.provider.hermesRefused") : detail;
+}
+
+/**
+ * Hermes Agent fails a request with an internal error and "Gateway disconnected…" in `data.details`
+ * when its gateway restarts. Hermes Agent 0.22.0 and before keep the closed connection, so each later
+ * request of that process failed the same way, also after the gateway started again, until OpenBot
+ * started again (#10624).
+ */
+function hermesGatewayLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    typeof error.data.details === "string" &&
+    /^Gateway disconnected\b/u.test(error.data.details)
+  );
 }
 
 /**
@@ -696,6 +772,7 @@ export const HERMES_ACP_FLAVOR: AcpFlavor = {
   sessionNotFound: hermesSessionNotFound,
   lostTurns: HERMES_LOST_TURNS,
   refusesUntilRestart: hermesRefusal,
+  lostServerUntilRestart: hermesGatewayLost,
   sessionBusy: hermesSessionBusy,
   mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
   // Hermes Agent sends each set to its gateway, which reads the full session for it. A set before
@@ -852,14 +929,15 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   omp: OMP_ACP_FLAVOR,
   // Hermes Agent added as a custom agent (`hermes acp`) keeps the custom rules. Its missing session
   // is found, its lost turns are discarded, its answer sent again replaces the streamed one, its
-  // failed turn is explained, a process that starts to refuse each prompt ends, an unchanged model or
-  // effort is not sent again, it gets the catalog as MCP tools, and it gets no more MCP servers than
-  // it takes, as for the Hermes provider (#9718, #9738, #9312, #10023).
+  // failed turn is explained, a process that starts to refuse each prompt or lost its gateway ends, an
+  // unchanged model or effort is not sent again, it gets the catalog as MCP tools, and it gets no more
+  // MCP servers than it takes, as for the Hermes provider (#9718, #9738, #9312, #10023, #10624).
   hermes: {
     ...CUSTOM_ACP_FLAVOR,
     sessionNotFound: (error, sessionId) => hermesSessionNotFound(error) ?? ompSessionNotFound(error, sessionId),
     lostTurns: HERMES_LOST_TURNS,
     refusesUntilRestart: hermesRefusal,
+    lostServerUntilRestart: hermesGatewayLost,
     sessionBusy: hermesSessionBusy,
     mcpServerLimit: HERMES_MCP_SERVER_LIMIT,
     setsConfigOnlyOnChange: true,
@@ -872,6 +950,11 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
   // turn, as for the Kimi provider (#8931).
   kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  // Kiro CLI (`kiro-cli acp`) stops each request to an HTTP MCP server after 120 s: its `reqwest`
+  // client has a total timeout of the server's `timeout`, 120 s by default, and it ignores progress.
+  // A session server cannot set that timeout, so a question card closed with "Transport closed"
+  // before the user answered (#11049).
+  "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000 },
 };
 
 /**

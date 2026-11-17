@@ -30,6 +30,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction } from "./database/sqlite-transaction";
 import type { OpenBotDatabase } from "./openbot-database";
 import { revokeRoutineWebhooks } from "./webhook-route-store";
 
@@ -378,6 +379,10 @@ export class ChannelStore {
    * reads has to name the cause as well. The same reason keeps this to one query: reaching a
    * channel through `list` parses every stored message of every channel. States are tried in the
    * order given, so a running assignment is reported before one that is only queued.
+   *
+   * A deleted (archived) channel is never the cause the user reads. Its stopped turn can hold the
+   * agent until the provider ends it, but that channel shows no work, so the scheduler alone counts
+   * that hold (#10472).
    */
   agentAssignment(
     agentId: string,
@@ -394,6 +399,7 @@ export class ChannelStore {
              JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
             WHERE json_extract(assignments.assignment_json, '$.agentId') = ?
               AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+              AND COALESCE(json_extract(channels.channel_json, '$.archived'), 0) = 0
             ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
                      assignments.rowid
             LIMIT 1`,
@@ -417,18 +423,29 @@ export class ChannelStore {
   }
 
   page(channelId: string, before?: number, limit = 100): ChannelPage {
+    const page = this.pageWithoutExtent(channelId, before, limit);
+    return page.olderCursor === null ? page : { ...page, ...this.olderExtent(channelId, page.olderCursor) };
+  }
+
+  /**
+   * `page` without `olderCount` and `oldestAt`. `olderExtent` reads the whole older history, so a
+   * caller that cuts the page smaller asks for it once, for the cursor of the page that it sends.
+   */
+  pageWithoutExtent(channelId: string, before?: number, limit = 100): ChannelPage {
     const messages = this.messages(channelId, before, limit + 1);
     const hasOlder = messages.length > limit;
     if (hasOlder) messages.shift();
-    const olderCursor = hasOlder ? (messages[0]?.sequence ?? null) : null;
     return {
       channel: this.get(channelId),
       tasks: this.tasks(channelId),
       messages,
-      olderCursor,
-      throughSequence: this.messages(channelId, undefined, 1)[0]?.sequence ?? 0,
-      ...(olderCursor === null ? {} : this.olderExtent(channelId, olderCursor)),
+      olderCursor: hasOlder ? (messages[0]?.sequence ?? null) : null,
+      throughSequence: this.latestSequence(channelId),
     };
+  }
+
+  private latestSequence(channelId: string): number {
+    return this.messages(channelId, undefined, 1)[0]?.sequence ?? 0;
   }
 
   /**
@@ -463,7 +480,7 @@ export class ChannelStore {
    * How many messages are older than a page, and when the first one was written: the day rail draws
    * the unloaded part from it. The time is only in the message JSON, so only the oldest row is read.
    */
-  private olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
+  olderExtent(channelId: string, before: number): { olderCount: number; oldestAt?: string } {
     const row = databaseRow(
       this.database.connection
         .prepare(
@@ -1021,7 +1038,7 @@ export class ChannelStore {
   }
 
   markRead(channelId: string, memberId: string, throughSequence: number, operationId: string): Channel {
-    const maximum = this.page(channelId).throughSequence;
+    const maximum = this.latestSequence(channelId);
     if (throughSequence > maximum) throw new Error("The read position exceeds the channel history.");
     return this.database.dispatch(
       `channel-read:${memberId}:${operationId}`,
@@ -1045,8 +1062,7 @@ export class ChannelStore {
   /** Rebuilds channel projections from committed events without changing agent threads. */
   rebuild(channelId: string): void {
     const db = this.database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       const events = databaseRows(
         db
           .prepare(
@@ -1133,11 +1149,7 @@ export class ChannelStore {
             throw new Error("Unknown channel event.");
         }
       }
-      db.exec("COMMIT");
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** A stored cursor of zero is a reader that read nothing, not a reader with no cursor at all. */

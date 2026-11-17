@@ -74,8 +74,9 @@ windows, its OS dialogs or its native notifications.
   show an action that then fails. An older host keeps working without the feature.
 - Test the host route through the Team API (as `scripts/team-api-routes-e2e.ts` does), not only the
   local IPC path.
-- A server installs a staged release only at its next boot, or when an owner, an admin or a permitted
-  member installs it in Server Settings > Updates. When a feature needs the new host, the release
+- A server installs a staged release at its next boot, or when an owner, an admin or a permitted
+  member installs it in Server Settings > Updates. A hosted server, and a server with the automatic
+  update switch on, also installs it when idle. When a feature needs the new host, the release
   notes say that the server must also be on the new version.
 
 ## Effect

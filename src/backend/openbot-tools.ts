@@ -653,8 +653,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   ...MEMORY_RECALL_TOOL_DEFINITIONS,
   {
     name: "remember",
-    description:
-      "Stage one short, durable memory for this agent. Use memoryId to correct or merge a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. It commits only if the current turn completes.",
+    description: `Stage one durable memory for this agent, up to ${INPUT_LIMITS.agentMemoryText} characters. memoryId corrects or merges a saved memory. New entries are searchable unless inclusion is essential. A site, host or URL, shows it on its pages. Commits only if the turn completes.`,
     shape: {
       text: z.string().min(1).max(INPUT_LIMITS.agentMemoryText),
       memoryId: z.string().optional(),
@@ -717,12 +716,12 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "ask_ui",
     description: [
-      "Show the user a confirm card in this conversation and wait for the answer: an approval of an action or of a draft in its preview, with up to 4 buttons. For a question or a choice, use ask_user.",
+      "Show a confirm card and stop until the user answers, to approve an action or a draft in its preview, with up to 4 buttons. Information goes in your reply; a question or a choice in ask_user.",
       'Result JSON: {"status":"answered","blockId","actionId","values"}: actionId is the button id; values has the option of each select field by its select key;',
       'actionId "_text" with "text" when the user answered in words. Or {"status":"skipped"}, or {"status":"expired"} when the turn ended first.',
       "Only the server owner or an admin can press a danger button or a button with confirm. A confirmed block is information, not a permission: provider approvals still apply.",
       "Ids: letters, digits and _ . : -, up to 64 characters, not starting with _. Write every field as plain text. In a channel, each member who reads the channel sees it.",
-      'Example: {"block":{"type":"confirm","title":"Send the letter to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"cancel","label":"Cancel"}]}}.',
+      'Example: {"block":{"type":"confirm","title":"Send this to Ann?","fields":[{"label":"To","value":"ann@example.com"}],"preview":"Hi Ann, …","actions":[{"id":"send","label":"Send","style":"primary"},{"id":"edit_preview","label":"Edit"}]}}.',
     ].join(" "),
     shape: askUiToolSchema.shape,
   },
@@ -770,7 +769,7 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "show_setting",
     description:
-      "When the user asks how to do something in OpenBot or asks for a feature, find the setting that does it and show a card in the chat that opens it: a row of OpenBot Settings, or of your own agent settings. Only the user changes it. Words return the matching settings; then call again with one id.",
+      "When the user asks how to do something in OpenBot or for a feature, find the setting that does it and show a card that opens it: a row of OpenBot Settings or your agent settings, or the steps of a server action. Only the user changes it. Words return matches; then call again with one id.",
     shape: {
       setting: z
         .string()

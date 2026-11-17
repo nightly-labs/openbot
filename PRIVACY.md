@@ -465,6 +465,13 @@ server. The key never leaves this computer. Anyone who can read your files can r
 protect this computer as you protect your home folder. Delete the file to go back to the keyring;
 then sign in again and save the secrets again.
 
+On macOS, that protection is the Keychain. When the Keychain refuses OpenBot (for example after
+"Deny" at its prompt, or with no usable login keychain), OpenBot makes the same random key in
+`~/Library/Application Support/OpenBot/secret-storage.key` (mode `0600`) and encrypts new secrets
+with it while the Keychain cannot encrypt. Secrets that the Keychain keeps stay there, and when the
+Keychain works again, it keeps the new secrets. Delete the file only when no secret uses it; a
+secret that it encrypted then cannot be read, and you must sign in again or save it again.
+
 The desktop app also keeps, for each joined server, the ID of its logical remote session and the
 Signal address, so that the next start asks only for a new ticket. The file
 (`openbot-remote-sessions-v1.bin`) is encrypted with the same storage protection and is not written
@@ -1015,7 +1022,10 @@ no review reads are deleted after 30 days. Turning the setting off deletes all r
   or for "Only this agent". The choice of agents controls which agents OpenBot gives a key to; it does
   not keep a key from the other agents. A changed
   key is written again, and a deleted key or a Vault that cannot be read removes its file, also at
-  start. API keys are redacted from logs, exports and diagnostics. A password that the
+  start. When an agent has a key folder from 0.69 or earlier, or from a save without a Vault, each key
+  for that agent only is also readable in that folder, `agent-api-keys/<agentId>/<NAME>`: a link to the
+  Vault file, or, where Windows does not allow links, a copy of the key that is readable only by the user
+  and follows the same rules. API keys are redacted from logs, exports and diagnostics. A password that the
   user types into the secure sign-in card goes to the Vault only while Save to Vault is checked. On a
   joined server, only an owner or admin can check it, the box starts unchecked, and the password goes
   to that server's Vault, not to the Vault of the computer where it was typed. The
@@ -1465,6 +1475,12 @@ Higgsfield's `balance` tool, which spends no credits. It shows the number only i
 each member of a joined server who can use workflows can see it. Higgsfield's own privacy policy
 covers what Higgsfield keeps.
 
+While the Canvas page is open, the computer also asks Sunra and Higgsfield for their model lists, and
+for the price of the model and the settings of an image or video step. A price request sends the
+model, the size settings and a fixed sample prompt. It sends no prompt of the user and no picture,
+and it spends no credits. Each member of a joined server who can use workflows can see the models and
+the prices.
+
 Deleting an agent keeps the workflows and their step history without the agent. Deleting a
 workflow deletes its versions, runs, steps, and receipts.
 
@@ -1774,6 +1790,14 @@ OpenBot downloads the OpenCode CLI (the `@opencode/cli` packages) and its licens
 results go to that local process. OpenCode can send them to the model provider selected in its
 configuration. OpenCode's free models are the default, and they reach OpenCode Go with no account,
 so a first OpenCode turn leaves this computer without a sign-in.
+
+An OpenCode agent searches the web with OpenCode's own web search tool. OpenCode sends the search
+query, and no other part of the chat, to one of the web search services that it supports, such as
+Exa, Firecrawl, Parallel, Tavily or TinyFish. OpenCode 2 asks before its first search; OpenBot gives
+the answer "allow" for it, so that an agent in a Slack, Discord, Telegram or WhatsApp chat can search
+too. OpenBot does not give this answer when OpenCode already has an answer that you gave, or when
+your global OpenCode configuration file or the project's `opencode.json` sets `websearch`. Set
+`"websearch": false` in one of them to stop web search.
 
 An OpenCode Go key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
 system's secret storage, writes it to a file that only your user account can read, and passes it

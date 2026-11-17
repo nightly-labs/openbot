@@ -27,6 +27,7 @@ import { ThemeSweep } from "@/features/settings/components/theme-sweep";
 import { loadAppLanguage } from "@/features/settings/model/app-language";
 import { loadAppearance, useAppearance } from "@/features/settings/model/appearance";
 import { loadChatBackground } from "@/features/settings/model/chat-background";
+import { loadChatDetailPreferences } from "@/features/settings/model/chat-details";
 import { loadChatOrderPreference } from "@/features/settings/model/chat-order";
 import { loadChatPullPreference, loadChatSwipePreference } from "@/features/settings/model/chat-swipe";
 import { loadDictationLanguage } from "@/features/settings/model/dictation-language";
@@ -241,6 +242,7 @@ export default function RootLayout() {
       void loadMessageColor().catch(() => undefined);
       void loadChatBackground().catch(() => undefined);
       void loadRoutineCollapsePreference().catch(() => undefined);
+      void loadChatDetailPreferences().catch(() => undefined);
       void loadFullVisualPreference().catch(() => undefined);
       void loadChatOrderPreference().catch(() => undefined);
       void loadChatSwipePreference().catch(() => undefined);

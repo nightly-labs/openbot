@@ -18,7 +18,7 @@ import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
-import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
+import { DatabaseCore, type DatabaseCoreOptions, type OrchestrationEventInput } from "./database/database-core";
 import { deletedThreadMessageIds, threadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
@@ -50,6 +50,7 @@ import {
   type ProviderHistoryTurnCursor,
 } from "./database/provider-history-store";
 import { type ProviderSession, ProviderSessions } from "./database/provider-sessions";
+import { withTransaction } from "./database/sqlite-transaction";
 import { ThreadReplay } from "./database/thread-replay";
 import { type StoredThreadSummary, ThreadSummaries } from "./database/thread-summaries";
 
@@ -93,8 +94,11 @@ export class OpenBotDatabase {
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
 
-  constructor(readonly userDataPath: string) {
-    this.#core = new DatabaseCore({ userDataPath });
+  constructor(
+    readonly userDataPath: string,
+    checkIntegrity?: DatabaseCoreOptions["checkIntegrity"],
+  ) {
+    this.#core = new DatabaseCore({ userDataPath, checkIntegrity });
     this.usage = new AgentUsage(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });
@@ -412,10 +416,7 @@ export class OpenBotDatabase {
     complete: boolean;
     detail?: unknown;
   }): void {
-    const db = this.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(this.connection, () => {
       for (const message of input.messages) {
         this.upsertProviderHistoryMessage({
           agentId: input.agentId,
@@ -429,11 +430,7 @@ export class OpenBotDatabase {
         this.#providerHistory.markItemsImportedThrough(input.sessionId, input.turnId, input.throughItemIndex);
       }
       if (input.complete) this.#providerHistory.markTurnImported(input.sessionId, input.turnId);
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   persistConversationAndMailbox(
@@ -443,22 +440,15 @@ export class OpenBotDatabase {
     mailboxState: MailboxProjectionState,
     mailboxEventType: string,
   ): ConversationSnapshot {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.replaceMailboxState(`mailbox:${mailboxEventType}:${randomUUID()}`, mailboxState, mailboxEventType);
-      const persisted = this.#conversationWrites.persistConversation(
+      return this.#conversationWrites.persistConversation(
         snapshot,
         eventType,
         payload,
         `conversation:${eventType}:${randomUUID()}`,
       );
-      db.exec("COMMIT");
-      return persisted;
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   persistConversationChangesAndMailbox(
@@ -470,19 +460,14 @@ export class OpenBotDatabase {
     mailboxChanges: MailboxProjectionChanges,
     mailboxEventType: string,
   ): ConversationSnapshot {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.applyMailboxChanges(
         `mailbox:${mailboxEventType}:${randomUUID()}`,
         mailboxState,
         mailboxChanges,
         mailboxEventType,
       );
-      if (!snapshot.threadId) {
-        db.exec("COMMIT");
-        return structuredClone(snapshot);
-      }
+      if (!snapshot.threadId) return structuredClone(snapshot);
       const revision = this.#conversationWrites.persistConversationChanges({
         agentId: snapshot.agentId,
         threadId: snapshot.threadId,
@@ -492,12 +477,8 @@ export class OpenBotDatabase {
         detail: payload,
         commandId: `conversation:${eventType}:${randomUUID()}`,
       });
-      db.exec("COMMIT");
       return { ...structuredClone(snapshot), revision };
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /**
@@ -510,22 +491,15 @@ export class OpenBotDatabase {
     mailboxEventType: string,
     write: () => T,
   ): T {
-    const db = this.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(this.connection, () => {
       this.applyMailboxChanges(
         `mailbox:${mailboxEventType}:${randomUUID()}`,
         mailboxState,
         mailboxChanges,
         mailboxEventType,
       );
-      const result = write();
-      db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+      return write();
+    });
   }
 
   activeProviderSession(threadId: string, provider: AgentProviderId): ProviderSession | null {

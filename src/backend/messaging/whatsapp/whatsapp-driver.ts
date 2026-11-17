@@ -25,6 +25,7 @@ import {
   MessagingConnectionError,
   type MessagingDriver,
   type MessagingPlace,
+  type MessagingPlaces,
   type RecentMessages,
   type StatusReaction,
   WhatsAppAnswerPartlySent,
@@ -48,6 +49,12 @@ const WHATSAPP_FILE_BYTES_LIMIT = 64 * 1024 * 1024;
 /** WhatsApp clients show an edit only within 15 minutes; a later edit is lost without an error. */
 const EDIT_WINDOW_MS = 14 * 60_000;
 const PLACE_NAME_TIMEOUT_MS = 5_000;
+/**
+ * Why a history read has fewer messages than it asked for. Without it, an empty read looks like a
+ * broken connection. The rules are in `senderDecision` and `whatsAppInbound`.
+ */
+const SAVED_HISTORY_NOTE =
+  "WhatsApp sends no older messages to OpenBot. OpenBot has only the messages that it received after the number was linked and the chat was allowed, up to 1 day old on arrival, for 90 days. In a chat with a contact, the messages that the user sent from their phone are not saved. Fewer messages here does not mean that the connection has a problem: tell the user what OpenBot can read.";
 
 /** The reaction on the person's message: arrived, then done, failed or stopped. */
 const REACTIONS: Record<StatusReaction, string> = {
@@ -311,7 +318,10 @@ class WhatsAppAdapter implements MessagingAdapter {
     filter?: HistoryFilter,
   ): Effect.Effect<RecentMessages, MessagingAdapterError> {
     return Effect.try({
-      try: () => ({ messages: this.#handle.chats.recent(platformChannelId, threadKey, limit, filter) }),
+      try: () => {
+        const messages = this.#handle.chats.recent(platformChannelId, threadKey, limit, filter);
+        return messages.length < limit ? { messages, note: SAVED_HISTORY_NOTE } : { messages };
+      },
       catch: (cause) => new MessagingAdapterError({ cause }),
     });
   }
@@ -362,10 +372,10 @@ class WhatsAppAdapter implements MessagingAdapter {
   }
 
   /** The owner's own chat and the allowed chats. OpenBot posts nowhere else. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
     return Effect.gen({ self: this }, function* () {
       const identity = whatsAppIdentity(this.#handle);
-      if (!identity) return [];
+      if (!identity) return { places: [] };
       const rules = this.#runtime.policy.rules(identity.number);
       const places: MessagingPlace[] = [];
       if (rules.ownNumber)
@@ -374,14 +384,15 @@ class WhatsAppAdapter implements MessagingAdapter {
           name: sourceText("status.messaging.whatsappOwnChat"),
           kind: "chat",
         });
-      for (const contact of rules.contacts)
+      // The name that the user saved in the app settings comes first, so an agent finds the contact by it.
+      for (const [contact, savedName] of rules.contacts)
         places.push({
           id: userJid(contact),
-          name: this.#handle.chats.name(contact) ?? maskedNumber(contact),
+          name: savedName || (this.#handle.chats.name(contact) ?? maskedNumber(contact)),
           kind: "chat",
         });
       for (const group of rules.groups) places.push({ id: group, name: yield* this.placeName(group), kind: "channel" });
-      return places;
+      return { places };
     });
   }
 

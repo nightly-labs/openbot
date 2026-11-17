@@ -139,6 +139,8 @@ export const messages = {
   "provider.picker.olderModels": "Старые модели",
   "provider.picker.olderModelsList": "Старые модели {name}",
   "provider.picker.noModels": "У {name} нет доступных моделей.",
+  "provider.picker.endpointModelsInCustom": "{name} запускает ваши эндпоинты. Их модели — на вкладке «Свой».",
+  "provider.picker.showCustomModels": "Показать модели",
   "provider.picker.museNoModels":
     "Muse не прислал моделей для этой учётной записи. Возможно, Muse недоступен в стране, где работает этот агент. Выберите модель другого провайдера.",
   "provider.picker.customEmpty":

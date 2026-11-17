@@ -116,6 +116,9 @@ export const messages = {
   "provider.picker.olderModels": "Oudere modellen",
   "provider.picker.olderModelsList": "Oudere {name}-modellen",
   "provider.picker.noModels": "{name} heeft geen modellen beschikbaar.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} draait je eigen endpoints. Hun modellen staan op het tabblad Eigen.",
+  "provider.picker.showCustomModels": "Modellen tonen",
   "provider.picker.museNoModels":
     "Muse heeft geen modellen voor dit account gestuurd. Muse is mogelijk niet beschikbaar in het land waar deze agent draait. Kies een model van een andere provider.",
   "provider.picker.customEmpty":

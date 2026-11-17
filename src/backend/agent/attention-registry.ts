@@ -38,6 +38,7 @@ import {
   uiBlockHasPrivilegedAction,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
+  uiConfirmPreviewEdit,
   validateUiBlockResponse,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
@@ -46,7 +47,7 @@ import { Deferred, Effect, Option, Result, Schema } from "effect";
 import { getDomain } from "tldts";
 import type { AgentApiKeys, SavedApiKey } from "../agent-api-keys";
 import type { AgentClient } from "../agent-client";
-import { type BrowserOperationError, browserFailure } from "../browser-effects";
+import { type BrowserOperationError, browserFailure, secureInputFailure } from "../browser-effects";
 import type { PreparedBrowserSecret } from "../browser-host";
 import type { BrowserCardVault } from "../browser-tool-actions";
 import { repairBrowserToolInput } from "../browser-tool-input";
@@ -108,6 +109,7 @@ import {
   uiBlockPromptResult,
   userMessagePromptResult,
   validPromptQuestions,
+  vaultLateAnswerText,
   vaultPromptResult,
   vaultRequestFormSpec,
 } from "./prompts";
@@ -236,6 +238,8 @@ const TAKEOVER_TAB_OF_OTHER_CHAT =
   "Only the chat that opened this tab can hand it to the user. Open the page in this chat with open, then call this tool with the new tabId.";
 const TAKEOVER_ALREADY_WAITING = "A takeover of this tab already waits for the user. Wait for it to return.";
 const VAULT_UNAVAILABLE = "No Vault is available on this computer. Ask the user.";
+const NO_LOGIN_FOR_SITE =
+  "No saved login is for the site of this page. A login fits only the site of a website saved in it, with its subdomains, and a sign-in page can be on a different site than the service. When the user says that a login for this account is saved, tell them what to check. In a password manager: add the address of this sign-in page as a website of the login, and keep the login where they share logins with OpenBot; the page of each password manager in Marketplace shows where. In the OpenBot Vault, a login has one website: save a second login for the address of this sign-in page in Server settings > Vault, and let this agent use the login under Agents. Until then, continue as for a site with no saved login.";
 const VAULT_LOGIN_ADD_FIELDS =
   "A new login needs website and password. When you do not have the password, call request_vault_item kind=login.";
 const VAULT_PASSWORD_EXTERNAL_REFUSED =
@@ -417,6 +421,10 @@ function enteredVaultItem(
   }
 }
 
+/** The secure input failed and the tab went to the user, so the password typed in the card was not kept. */
+const TYPED_PASSWORD_NOT_SAVED =
+  "The password was not saved in the Vault: the secure input did not complete. Tell the user in one short sentence that the password was not saved.";
+
 interface PendingBrowserTakeover {
   client: AgentClient;
   /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
@@ -431,6 +439,12 @@ interface PendingBrowserTakeover {
   personCompleted?: true;
   /** A member selected Done on another device, not in the window of this computer. */
   memberCompleted?: true;
+  /** The person selected Cancel on the card, so the agent must not ask again (#10452). */
+  personCancelled?: true;
+  /** The user asked to save the typed password, but the secure input failed, so nothing was saved (#10462). */
+  vaultNotSaved?: true;
+  /** OpenBot could not finish the secure fill, so the user got the page: the fixed reason, or "" (#10536). */
+  secureInputFailed?: string;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -796,12 +810,20 @@ export class AttentionRegistry {
       if (saved && pending !== saved.pending) return;
       if (savedItem && pending !== savedItem.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
+      // An edited confirm preview comes beside the answers (`ui-block-preview-edit-v1`).
+      const edit = pending.uiBlock
+        ? uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers)
+        : { answers: input.answers };
+      if (!edit) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
+      const { answers } = edit;
       const questionIds = new Set(pending.questions.map((question) => question.id));
-      if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
+      if (Object.keys(answers).some((id) => !questionIds.has(id))) {
         throw new Error(sourceText("error.backend.promptAnswerMismatch"));
       }
       // A refused UI block answer leaves the block open for an answer that fits.
-      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, input.answers, responder) : null;
+      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, answers, responder) : null;
+      // A skip drops the edit with the answer.
+      const preview = uiBlockResponse ? edit.preview : undefined;
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
       // The forms of `request_api_key` and `request_vault_item` never give the agent their values.
@@ -812,16 +834,16 @@ export class AttentionRegistry {
           : pending.uiBlock
             ? uiBlockPromptResult(
                 uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
+                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
                   : { status: "skipped", blockId: pending.uiBlock.blockId },
               )
             : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(input.answers)
+              ? dynamicPromptResult(answers)
               : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, input.answers)
+                ? mcpElicitationResult(pending.params, answers)
                 : {
                     answers: Object.fromEntries(
-                      Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+                      Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
                     ),
                   };
       // A detached question has no call to answer: its answer goes to the chat as a message, below.
@@ -851,17 +873,23 @@ export class AttentionRegistry {
             }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
-            frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+            frozenResponse ? promptResolution(pending.questions, answers) : { status: "cancelled" },
             state,
             savedItem?.saved,
+            preview,
           );
         } else {
-          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
+          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, answers));
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
       }
-      const lateAnswer = pending.detached ? lateAnswerText(pending.questions, input.answers) : "";
+      // The form of a Vault request holds secrets, so its late answer names the saved item only.
+      const lateAnswer = !pending.detached
+        ? ""
+        : pending.uiBlock?.vault
+          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
+          : lateAnswerText(pending.questions, answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -1047,7 +1075,7 @@ export class AttentionRegistry {
         if (input.decision === "complete") {
           pending.personCompleted = true;
           if (fromMember) pending.memberCompleted = true;
-        }
+        } else pending.personCancelled = true;
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -1066,6 +1094,7 @@ export class AttentionRegistry {
     });
     if (input.decision === "cancel") {
       secret.cancel();
+      pending.personCancelled = true;
       this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
       return;
     }
@@ -1074,7 +1103,15 @@ export class AttentionRegistry {
     } else {
       pending.submitting = true;
       const outcome = yield* secret.submit(input.secret, pending.vaultLoginId !== undefined, vaultCode).pipe(
-        Effect.catch(() => Effect.succeed("takeover")),
+        Effect.catch((error) =>
+          Effect.sync(() => {
+            // Only a fixed reason is kept: a page error can hold page text (#10536).
+            const reason = secureInputFailure(error) ?? "";
+            logger.warn("Unable to complete the secure browser input", { reason: reason || "unknown" });
+            pending.secureInputFailed = reason;
+            return "takeover" as const;
+          }),
+        ),
         Effect.ensuring(
           Effect.sync(() => {
             pending.submitting = false;
@@ -1098,6 +1135,8 @@ export class AttentionRegistry {
     // The user finishes in the tab, so a later completion is theirs, and the card's vault reason ends.
     delete pending.vaultLoginId;
     delete pending.request.vaultSkip;
+    if (input.decision === "submit" && input.saveToVault && secret.request.method === "password")
+      pending.vaultNotSaved = true;
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
@@ -1880,7 +1919,10 @@ export class AttentionRegistry {
         }
       : logins === null
         ? { connected: false, logins: [], next: "No password vault is connected. Use submit_secret without loginId." }
-        : { connected: true, logins };
+        : logins.length === 0
+          ? // A login matches only pages of its own site, and a sign-in can be on another site (#10502).
+            { connected: true, logins, next: NO_LOGIN_FOR_SITE }
+          : { connected: true, logins };
     const result: DynamicToolResult = {
       success: true,
       contentItems: [{ type: "inputText", text: JSON.stringify(answer) }],
@@ -1939,17 +1981,7 @@ export class AttentionRegistry {
       ...(request.subagent ? { subagent: true as const } : {}),
     };
     // A secret answer must not show in a chat message, so a secret question waits in its call.
-    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
-    const detachAfterMs = deadlines.length > 0 ? Math.min(...deadlines) : undefined;
-    const target =
-      detachAfterMs === undefined || questions.some((question) => question.isSecret)
-        ? null
-        : this.#lateAnswerTarget(agentId, publicThreadId);
-    if (target)
-      pending.detach = {
-        target,
-        timer: setTimeout(() => this.#detachPrompt(request.id, pending), detachAfterMs),
-      };
+    if (!questions.some((question) => question.isSecret)) this.#scheduleDetach(request, pending);
     this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
@@ -2025,7 +2057,7 @@ export class AttentionRegistry {
       timer.unref?.();
       autoAnswerTimer = { state: auto, timer };
     }
-    this.#prompts.set(request.id, {
+    const pending: PendingPrompt = {
       client,
       id: request.id,
       responseKind: "ui-block",
@@ -2038,7 +2070,10 @@ export class AttentionRegistry {
       uiBlock: block,
       ...(autoAnswerTimer ? { autoAnswer: autoAnswerTimer } : {}),
       ...(request.subagent ? { subagent: true as const } : {}),
-    });
+    };
+    // The late answer of a Vault request names the saved item only, never a value of the form (#10577).
+    if (block.vault) this.#scheduleDetach(request, pending);
+    this.#prompts.set(request.id, pending);
     this.#routines.markNeedsAttention(turnId);
     this.#emit({
       type: "prompt",
@@ -2313,6 +2348,21 @@ export class AttentionRegistry {
       }
     }
     if (changed) this.#emitRuntimeSnapshot();
+  }
+
+  /**
+   * Starts the timer of `#detachPrompt` when the provider stops the call at a fixed time
+   * (`AppServerRequest.detachAfterMs` or `answerBeforeMs`, the smaller) and a chat can get the answer.
+   */
+  #scheduleDetach(request: AppServerRequest, pending: PendingPrompt): void {
+    const deadlines = [request.detachAfterMs, request.answerBeforeMs].filter((ms) => ms !== undefined);
+    if (deadlines.length === 0) return;
+    const target = this.#lateAnswerTarget(pending.agentId, pending.publicThreadId);
+    if (target)
+      pending.detach = {
+        target,
+        timer: setTimeout(() => this.#detachPrompt(request.id, pending), Math.min(...deadlines)),
+      };
   }
 
   /**
@@ -2630,7 +2680,16 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing));
+    pending.resolve(
+      browserTakeoverResult(
+        decision,
+        vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined),
+        pending.vaultSkipped,
+        signInMissing,
+        pending.personCancelled === true,
+        pending.secureInputFailed,
+      ),
+    );
   }
 
   #persistQuestionPrompt(
@@ -2668,18 +2727,31 @@ export class AttentionRegistry {
 
   /**
    * `uiBlockState` freezes the message's UI block, when it has one, in the same write. `vaultSaved`
-   * names the item that the user saved from a Vault request.
+   * names the item that the user saved from a Vault request. `preview` is the confirm preview that the
+   * user edited: the frozen block, its question and its text show it, as the text that the agent got.
    */
   #resolvePersistedPrompt(
     pending: PendingPrompt,
     resolution: AgentPromptResolution,
     uiBlockState?: UiBlockState,
     vaultSaved?: UiVaultSavedItem,
+    preview?: string,
   ): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
+    // Only a block that stays within the contract keeps the edit, so every reader still accepts it.
+    const edited =
+      preview && message.uiBlock?.spec.type === "confirm"
+        ? normalizeConversationUiBlock({ ...message.uiBlock, spec: { ...message.uiBlock.spec, preview } })
+        : null;
+    const editedQuestions = edited ? uiBlockFallbackQuestions(edited.spec) : null;
+    if (edited && message.uiBlock && editedQuestions && validPromptQuestions(editedQuestions)) {
+      message.uiBlock.spec = edited.spec;
+      // A thread and a client without the block show the question, so it holds the edit too.
+      message.questionPrompt.questions = editedQuestions;
+    }
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
     if (message.uiBlock && uiBlockState) {
       // The read drops a secret form value; storing the read result keeps it out of the database.

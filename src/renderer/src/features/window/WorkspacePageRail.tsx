@@ -8,6 +8,7 @@ import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { appPort } from "../../app-port";
 import { useLayout } from "../../layout";
+import { WorkflowsPage } from "../../lazy-views";
 import { usePlatform } from "../../platform";
 import { useChannels } from "../channels/channels-context";
 import { useCustomAgents } from "../custom-agents/custom-agents-context";
@@ -129,6 +130,7 @@ export function WorkspacePageRail(props: { hidden: boolean }) {
       onRoutines={() => showSidebarView("routines")}
       // A joined server without workflows shows its notice on the page.
       onWorkflows={() => windowPage.openWorkflows(null)}
+      onPreloadWorkflows={() => void WorkflowsPage.preload()}
       onSchedule={windowPage.openSchedule}
       onTasks={tasksAvailable() ? windowPage.openTasks : undefined}
       onUsage={windowPage.openUsage}

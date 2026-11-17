@@ -359,6 +359,7 @@
     "./features/workflows/WorkflowVersionBar": "./src/features/workflows/WorkflowVersionBar.tsx",
     "./features/workflows/WorkflowDeleteUndoToast": "./src/features/workflows/WorkflowDeleteUndoToast.tsx",
     "./features/workflows/workflow-history": "./src/features/workflows/workflow-history.ts",
+    "./features/workflows/workflow-merge": "./src/features/workflows/workflow-merge.ts",
     "./features/workflows/workflow-clipboard": "./src/features/workflows/workflow-clipboard.ts",
     "./features/workflows/workflow-ink": "./src/features/workflows/workflow-ink.ts",
     "./features/workflows/workflows.css": "./src/features/workflows/workflows.css",

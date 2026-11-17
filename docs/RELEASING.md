@@ -811,7 +811,11 @@ Servers do not use the stage. Hosted and self-installed Linux servers update wit
 `scripts/hosting/openbot-hosted-update` and `HostedUpdateAdapter`. They read `latest-linux.yml` or
 `latest-linux-arm64.yml`, check for an update 5 minutes after start and then every 6 hours, and
 install a downloaded release at the next boot or when an owner, an admin or a permitted member installs
-it in Server Settings > Updates. The `docker-publish` job moves the Docker `latest` tag when the
+it in Server Settings > Updates. A hosted server also installs it when it is idle and no client uses
+it, because its automatic update switch is always on. A self-installed server or a container
+installs it when idle only when an owner turns on the switch (it is off by default). The version check is
+`isNewerRelease` in `packages/contracts/src/release-version.ts`, and the `newer()` of the update
+script gives the same result for each X.Y.Z release (`scripts/release-version-comparator-e2e.ts`). The `docker-publish` job moves the Docker `latest` tag when the
 release is published, and the `hosted-release` job selects the release for new hosted servers. So
 all servers get a new release in about 6 hours, and a pause does not stop them.
 
@@ -925,6 +929,13 @@ starts it on the same profile, and checks the version, the schema version, every
 column, `PRAGMA integrity_check`, the foreign keys, and that the seeded data is still there. A failure
 stops the release before `publish`. The report is `.openbot-build/release-upgrade-e2e/report.json`,
 with counts only. The script does not use the real `electron-updater` download: its header says why.
+
+`Release upgrade history` (`.github/workflows/release-upgrade-history.yml`) runs the same script each
+week and on demand, outside the release time. It installs the newest public release over the oldest
+public release with a database (`v0.1.14`) and over the newest release that is at least 60 days old,
+on macOS ARM64. `--history` seeds only what the old release has, compares the row count of each table,
+and records a forced end of the old release as a warning. A red run means that an install that skipped
+releases cannot upgrade; fix it in the next release.
 
 The unsigned local macOS package is a development artifact. It does not prove Gatekeeper,
 notarization, or auto-update readiness. Those are proven only by the signed release workflow's

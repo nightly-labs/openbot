@@ -58,6 +58,8 @@ export const messages = defineMessages("workflow", {
   "workflow.node.locked": "Locked",
   "workflow.node.missingInput": "Connect an input to run this step.",
   "workflow.node.run": "Run",
+  "workflow.node.runPrice": "Run · {credits}",
+  "workflow.node.runPriceLabel": "Run for {credits} credits",
   "workflow.node.running": "Running",
   "workflow.node.stop": "Stop",
   "workflow.node.retry": "Retry",
@@ -526,7 +528,6 @@ export const messages = defineMessages("workflow", {
   "workflow.canvas.deleteUndo.title": "{name} deleted",
   "workflow.canvas.deleteUndo.action": "Undo",
   "workflow.page.failed": "OpenBot could not do this. Try again.",
-  "workflow.page.conflict": "Changed on another device. Undo to get your edits back.",
   "workflow.page.needsNewerApp": "This workflow has steps from a newer OpenBot. Update OpenBot to change it.",
   "workflow.page.manageOnly": "To change this workflow, you need “Can manage” on each of its agents.",
 });

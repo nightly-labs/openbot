@@ -184,12 +184,13 @@ export function redactText(value: string): string {
  * diagnostics, and text sent to other people or services, such as chat apps, keep `redactText`.
  */
 export function redactSecrets(value: string): string {
-  return redact(value, false);
+  return redact(value, false, true);
 }
 
-function redact(value: string, emails: boolean): string {
+function redact(value: string, emails: boolean, keepUnscanned = false): string {
   const marked = markRegisteredSecrets(value);
-  const redacted = redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails), emails);
+  const redacted =
+    redactSerializedJson(marked, emails) ?? applyTextRules(redactEmbeddedJson(marked, emails, keepUnscanned), emails);
   return marked === value ? redacted : redacted.replace(MARKERS, "[redacted]");
 }
 
@@ -277,7 +278,7 @@ const UNSCANNED = "[redacted-unscanned]";
  * `[…]` run that does parse gets the same treatment as a structured param: `headers` values go,
  * secret-named keys go, prose stays. A run that no rule changes stays as it was written.
  */
-function redactEmbeddedJson(value: string, emails: boolean): string {
+function redactEmbeddedJson(value: string, emails: boolean, keepUnscanned: boolean): string {
   let result = "";
   let index = 0;
   let scans = 0;
@@ -285,6 +286,11 @@ function redactEmbeddedJson(value: string, emails: boolean): string {
     const start = findPayloadStart(value, index);
     if (start < 0) break;
     if (scans >= MAX_EMBEDDED_SCANS) {
+      // `redactSecrets` text goes back to the agent that wrote or received it, and its provider
+      // already has it. Code or a list of links has far more than 16 bracket runs, and a cut reply
+      // made the agent send broken code again (#10122). The tail stays: registered secrets were
+      // already masked in it, and the text rules still run on it.
+      if (keepUnscanned) return result + value.slice(index);
       // The bound was reached with a payload still ahead. The tail cannot be read, so it cannot be
       // shown either: text before the bound is kept, and everything from the unread payload on is
       // dropped. A truncated line is a smaller loss than a credential that survived the limit.

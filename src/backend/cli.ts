@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { access, open, realpath, stat } from "node:fs/promises";
+import { access, lstat, open, realpath, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, delimiter, dirname, extname, isAbsolute, join, posix, resolve, win32 } from "node:path";
 import { promisify, stripVTControlCharacters } from "node:util";
@@ -985,7 +985,12 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
  */
 export interface InstalledFirstChoice<Cli> {
   readonly cli: Cli;
-  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+  readonly passedOver: {
+    readonly source: "system" | "managed";
+    readonly version: string;
+    /** The user's CLI lacks parts that it needs (`AgentCliInfo.incomplete`). */
+    readonly incomplete?: boolean;
+  } | null;
 }
 
 /**
@@ -1010,7 +1015,14 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
       const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
       return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
     }
-    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+    return {
+      cli: resolved,
+      passedOver: {
+        source: "system",
+        version: installed.version,
+        ...(installed.incomplete ? { incomplete: true } : {}),
+      },
+    };
   };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.
@@ -1482,6 +1494,15 @@ const readCliVersion = Effect.fn("Cli.readVersion")(function* (
 export const isExecutable = Effect.fn("Cli.isExecutable")((path: string) =>
   providerCall(async () => {
     await access(path, process.platform === "win32" ? constants.F_OK : constants.X_OK);
-    return (await stat(path)).isFile();
+    return await stat(path).then(
+      (info) => info.isFile(),
+      async (error: unknown) => {
+        // A Microsoft Store install puts only an app execution alias in WindowsApps on the `PATH`
+        // (#10985). It is a link that `stat` refuses with `EACCES`, but it starts as a program, so
+        // the version read decides.
+        if (process.platform !== "win32" || !isDynamicRecord(error) || error.code !== "EACCES") throw error;
+        return (await lstat(path)).isSymbolicLink();
+      },
+    );
   }).pipe(Effect.match({ onSuccess: (file) => file, onFailure: () => false })),
 );

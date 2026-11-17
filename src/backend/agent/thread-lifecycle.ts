@@ -71,6 +71,7 @@ import {
   unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
+import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
@@ -145,8 +146,13 @@ const CODEX_TOOLS_CONFIG = { update_plan: { enabled: true } } as const;
  * Codex declares `create_goal`, `get_goal` and `update_goal` in each request, about 3.5k characters.
  * A goal continues the turn by itself until the agent marks it done, and only the user can pause or
  * resume it. OpenBot has no control for a goal, so it turns the feature off.
+ *
+ * `request_permissions` lets the model ask for more reach in a card with a reason that it writes. A
+ * user's own Codex settings can turn it on. A Workspace only agent already has the network, and
+ * OpenBot's tools run outside its sandbox, so it asked again and again before work that needed nothing
+ * (#10855). A step outside the workspace still asks as a command or file-change approval.
  */
-export const CODEX_FEATURES_CONFIG = { "features.goals": false } as const;
+export const CODEX_FEATURES_CONFIG = { "features.goals": false, "features.request_permissions_tool": false } as const;
 
 /**
  * Codex gives each MCP server that is not `required` 1 second to start before a turn's first step,
@@ -1048,6 +1054,7 @@ export class ThreadLifecycle {
         project_doc_max_bytes: number;
         mcp_optional_startup_grace_ms: number;
         "features.goals": false;
+        "features.request_permissions_tool": false;
         "features.code_mode.direct_only_tool_namespaces": string[];
         [variable: `shell_environment_policy.set.${string}`]: string;
       } & CodexPromptSettings &
@@ -1208,6 +1215,8 @@ export class ThreadLifecycle {
             ...(excluded.length ? [["excluded", ...excluded]] : []),
             ...(agentAutomationAllowed(agent, this.#store.agentDefaults()) ? ["automation"] : []),
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
+            // Only "off" adds a value: on is the default, so its sessions keep their fingerprint (#10033).
+            ...(this.#store.agentDefaults().commitCoAuthor ? [] : ["no-commit-co-author"]),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
@@ -1510,16 +1519,23 @@ export class ThreadLifecycle {
       homeSkills,
       workspaceSkills,
       httpMcpServers: mcpServers.some((config) => config.transport === "http"),
+      mcpApps: mcpServers.some((config) => config.id !== COMPUTER_USE_MCP_SERVER_ID),
       deferredMcpServers:
         client.provider === "codex"
           ? codexDeferredMcpServers(mcpServers).map((config) => config.name)
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
-              // tools of the saved http rows through tool_call, so only those are listed.
+              // tools of the saved rows through tool_call, so only the rows that it can run are listed.
+              // The built-in servers are not saved rows.
               client.provider === "antigravity"
               ? mcpServers
-                  .filter((config) => config.transport === "http" && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID)
+                  .filter(
+                    (config) =>
+                      mcpFallbackRunsServer(config, agent) &&
+                      config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID &&
+                      config.id !== COMPUTER_USE_MCP_SERVER_ID,
+                  )
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,
@@ -1855,13 +1871,27 @@ export class ThreadLifecycle {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** Whether a loaded session of this thread runs background work. A failed check keeps the session. */
+  /**
+   * Whether a Claude session of the agent's own chat runs background subagents or commands. A new
+   * chat closes that session, and the work would end with it (#10743). A Codex background terminal,
+   * such as a dev server, can run without end, so it does not hold the new chat that the agent asked for.
+   */
+  mainRunsBackgroundWork(agent: AgentSummary): Effect.Effect<boolean> {
+    if (agent.threadId === null) return Effect.succeed(false);
+    return this.#runsBackgroundWork(agent.threadId, RUNTIME_RELOADED_ON_RESUME);
+  }
+
+  /**
+   * Whether a loaded session of this thread runs background work, of `providers` alone when given.
+   * A failed check keeps the session.
+   */
   readonly #runsBackgroundWork = Effect.fn("ThreadLifecycle.runsBackgroundWork")(function* (
     this: ThreadLifecycle,
     threadId: string,
+    providers?: ReadonlySet<AgentProvider>,
   ) {
     for (const session of this.#store.database.listProviderSessions(threadId)) {
-      if (session.state !== "active") continue;
+      if (session.state !== "active" || (providers && !providers.has(session.provider))) continue;
       const client = this.#conversation.openClientFor(session.externalSessionId);
       if (!client?.holdsBackgroundWork) continue;
       const background = yield* Effect.result(client.holdsBackgroundWork(session.externalSessionId));

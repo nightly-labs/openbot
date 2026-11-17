@@ -88,6 +88,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "이 채널의 어떤 멤버도 요청 시 압축할 수 없습니다. 지원하는 멤버는 컨텍스트가 거의 가득 차면 자동으로 압축합니다.",
   "error.backend.channelArchived": "메시지를 보내거나 작업을 변경하려면 먼저 이 채널을 복원하세요.",
+  "error.backend.channelArchiveRunning": "이 채널에서 실행 중인 작업을 중지한 다음 삭제하세요.",
   "error.backend.channelReferenceUnavailable": "참조한 채널 메시지를 사용할 수 없어요.",
   "error.backend.channelTaskNotFound": "채널 작업을 찾을 수 없어요.",
   "error.backend.channelTaskComplete": "이 작업은 이미 완료되었어요.",
@@ -264,6 +265,7 @@ export const messages = {
   "error.backend.mcpSignInAnswerUnreadable":
     "로그인 서버가 OpenBot이 읽을 수 없는 응답을 보냈어요. 서비스에서 API 키나 토큰을 제공한다면 이 서버의 설정에 추가한 후 다시 연결을 테스트해 주세요.",
   "error.backend.mcpServerExited": "서버가 응답하기 전에 중지되었어요. 터미널에서 명령을 실행해 오류를 확인하세요.",
+  "error.backend.mcpServerExitedWithOutput": "서버가 응답하기 전에 중지되었어요. 출력: {detail}",
   "error.backend.mcpServerFailedToStart": "서버가 시작되지 않았어요: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "서버가 시작되기 전에 {provider}가 기다리기를 멈췄어요. 그래서 {provider} 에이전트는 이 서버의 도구를 받지 못해요.",
@@ -281,6 +283,8 @@ export const messages = {
     "OpenBot이 이 서버용 로컬 로그인 연결을 시작할 수 없었어요. OpenBot을 다시 시작한 후 시도해 주세요.",
   "error.backend.mcpOAuthSignInNeeded":
     "이 MCP 서버의 로그인이 종료되었어요. 사용자가 OpenBot에서 다시 로그인해야 해요.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot이 지금 이 MCP 서버의 로그인을 갱신하지 못했어요. 로그인은 유지되며 다음 요청에서 다시 시도해요. 이 오류가 계속되면 사용자는 OpenBot에서 이 서버에서 로그아웃한 다음 다시 로그인할 수 있어요.",
   "error.backend.mcpServerUnreachable": "OpenBot이 서버에 연결할 수 없었어요. URL과 네트워크를 확인하세요.",
   "error.backend.mcpLocalServerOff":
     "이 컴퓨터의 {address}에서 응답하는 서버가 없어요. 서버를 시작하거나 서버를 실행하는 앱에서 켠 후 다시 시도해 주세요.",

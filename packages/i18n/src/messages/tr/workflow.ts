@@ -59,6 +59,8 @@ export const messages = {
   "workflow.node.locked": "Kilitli",
   "workflow.node.missingInput": "Bu adımı çalıştırmak için bir giriş bağlayın.",
   "workflow.node.run": "Çalıştır",
+  "workflow.node.runPrice": "Çalıştır · {credits}",
+  "workflow.node.runPriceLabel": "Çalıştır. Kredi cinsinden fiyat: {credits}",
   "workflow.node.running": "Çalışıyor",
   "workflow.node.stop": "Durdur",
   "workflow.node.retry": "Tekrar dene",
@@ -526,7 +528,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} silindi",
   "workflow.canvas.deleteUndo.action": "Geri al",
   "workflow.page.failed": "OpenBot bunu yapamadı. Tekrar deneyin.",
-  "workflow.page.conflict": "Başka bir cihazda değiştirildi. Düzenlemelerinizi geri almak için Geri Al'ı kullanın.",
   "workflow.page.needsNewerApp":
     "Bu iş akışında daha yeni bir OpenBot sürümünden adımlar var. Değiştirmek için OpenBot'u güncelleyin.",
   "workflow.page.manageOnly": "Bu iş akışını değiştirmek için her bir ajanı üzerinde Yönetme erişiminiz olmalı.",

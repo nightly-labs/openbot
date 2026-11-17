@@ -92,6 +92,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Żaden członek tego kanału nie może kompaktować na żądanie. Członkowie, którzy to obsługują, kompaktują kontekst automatycznie, gdy jest prawie pełny.",
   "error.backend.channelArchived": "Przywróć ten kanał, zanim wyślesz wiadomości lub zmienisz zadania.",
+  "error.backend.channelArchiveRunning": "Zatrzymaj trwającą pracę w tym kanale, a potem go usuń.",
   "error.backend.channelReferenceUnavailable": "Wskazana wiadomość kanału jest niedostępna.",
   "error.backend.channelTaskNotFound": "Nie znaleziono zadania kanału.",
   "error.backend.channelTaskComplete": "To zadanie jest już ukończone.",
@@ -275,6 +276,7 @@ export const messages = {
     "Serwer logowania wysłał odpowiedź, której OpenBot nie może odczytać. Jeśli usługa daje Ci klucz API lub token, dodaj go w ustawieniach tego serwera, a potem ponownie przetestuj połączenie.",
   "error.backend.mcpServerExited":
     "Serwer zatrzymał się przed odpowiedzią. Uruchom polecenie w terminalu, aby zobaczyć błąd.",
+  "error.backend.mcpServerExitedWithOutput": "Serwer zatrzymał się przed odpowiedzią. Napisał: {detail}",
   "error.backend.mcpServerFailedToStart": "Serwer się nie uruchomił: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} przestał czekać, zanim serwer się uruchomił, więc jego agenci nie dostają narzędzi tego serwera.",
@@ -292,6 +294,8 @@ export const messages = {
     "OpenBot nie mógł uruchomić lokalnego połączenia logowania dla tego serwera. Uruchom ponownie OpenBot i spróbuj jeszcze raz.",
   "error.backend.mcpOAuthSignInNeeded":
     "Logowanie do tego serwera MCP wygasło. Użytkownik musi zalogować się ponownie w OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot nie mógł teraz odnowić logowania do tego serwera MCP. Logowanie zostaje zachowane, a następne żądanie spróbuje ponownie. Jeśli błąd się powtarza, użytkownik może wylogować się z serwera w OpenBot i zalogować ponownie.",
   "error.backend.mcpServerUnreachable": "OpenBot nie mógł połączyć się z serwerem. Sprawdź URL i sieć.",
   "error.backend.mcpLocalServerOff":
     "Żaden serwer nie odpowiada pod adresem {address} na tym komputerze. Uruchom serwer lub włącz go w aplikacji, która go obsługuje, i spróbuj ponownie.",

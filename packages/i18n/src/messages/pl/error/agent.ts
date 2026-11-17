@@ -63,6 +63,8 @@ export const messages = {
   "error.agent.modelNotListed": "Model „{model}” jest niedostępny. Dostępne modele: {models}.",
   "error.agent.providerNotListed":
     "Żaden model {provider} nie jest teraz dostępny. Wywołaj list_models, aby zobaczyć dostępne modele.",
+  "error.agent.creatorModelNotListed":
+    "Twojego modelu „{model}” nie ma teraz na liście modeli, więc nowy agent nie może na nim wystartować. Spróbuj ponownie za kilka sekund albo ustaw provider i model na model, który pokazuje list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Model „{model}” nie obsługuje poziomu rozumowania „{effort}”. Obsługiwane poziomy: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -95,12 +97,15 @@ export const messages = {
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
   "error.agent.turnStalled":
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
+  "error.agent.promptCancelled": "{provider} anulował tę wiadomość, zanim się zaczęła. Wyślij wiadomość ponownie.",
   "error.agent.toolLoopStopped":
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
   "error.agent.answerCutOff":
     "Agent zatrzymał się przed ukończeniem odpowiedzi, więc odpowiedź jest niepełna. Wyślij wiadomość ponownie.",
   "error.agent.compactionConnectionLost":
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
+  "error.agent.compactionConnectionLostAddress":
+    "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem. Sprawdź też, czy {variable} w sekcji Zmienne w ustawieniach {provider} to adres API Twojej usługi modeli (często kończy się na /v1). Potem wyślij wiadomość.",
   "error.agent.compactionLoopStopped":
     "{provider} kompaktował kontekst raz za razem i za każdym razem był on zbyt pełny, aby kontynuować, więc OpenBot zatrzymał tę turę. Wyłącz serwery MCP lub użycie komputera, których ten agent nie potrzebuje, a potem wyślij wiadomość. Jeśli ty lub agent zmieniliście, kiedy {provider} kompaktuje, cofnij tę zmianę.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",

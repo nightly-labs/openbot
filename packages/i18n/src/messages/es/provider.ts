@@ -125,6 +125,9 @@ export const messages = {
   "provider.picker.olderModels": "Modelos anteriores",
   "provider.picker.olderModelsList": "Modelos anteriores de {name}",
   "provider.picker.noModels": "No hay modelos disponibles de {name}.",
+  "provider.picker.endpointModelsInCustom":
+    "{name} ejecuta tus endpoints personalizados. Sus modelos están en la pestaña Personalizado.",
+  "provider.picker.showCustomModels": "Ver modelos",
   "provider.picker.museNoModels":
     "Muse no envió modelos para esta cuenta. Es posible que Muse no esté disponible en el país donde se ejecuta este agente. Elige un modelo de otro proveedor.",
   "provider.picker.customEmpty":

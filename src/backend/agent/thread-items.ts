@@ -203,6 +203,17 @@ function isRejectedAntigravityRequest(provider: AgentProvider, message: string):
 }
 
 /**
+ * Antigravity summarizes a session's history before each prompt. When the saved history has no
+ * steps that it can read, the summary fails, and so does each later prompt of that session, before
+ * the model runs (#10237). A new session, given the OpenBot transcript, recovers.
+ */
+function isClearedAntigravityHistory(provider: AgentProvider, message: string): boolean {
+  return (
+    provider === "antigravity" && /\bno renderable messages\b|\ball steps in trajectory are cleared\b/i.test(message)
+  );
+}
+
+/**
  * OpenCode 2.2.5 to 2.3.0 compacts a chat near its model's window with a summary from the model. A
  * weak local model can answer with a tool call or with no summary headings, and OpenCode then fails
  * the turn. The session stays too long, so each later turn compacts and fails again (#6006). Only a
@@ -280,6 +291,7 @@ export function refusedSessionFailure(provider: AgentProvider, message: string):
     return sourceText("error.provider.opencodeUnreadableContent");
   if (isRejectedOpenCodeRequest(provider, message)) return sourceText("error.provider.opencodeSessionRejected");
   if (isRejectedAntigravityRequest(provider, message)) return sourceText("error.provider.antigravitySessionRejected");
+  if (isClearedAntigravityHistory(provider, message)) return sourceText("error.provider.antigravityHistoryUnreadable");
   if (isFailedOpenCodeCompaction(provider, message)) return sourceText("error.provider.opencodeCompactionFailed");
   if (isMuseMcpStartupFault(provider, message)) return sourceText("error.provider.museMcpStartupFault");
   if (isMissingClaudeSession(provider, message)) return sourceText("error.provider.claudeSessionMissing");
@@ -584,12 +596,13 @@ function resultText(value: unknown, depth = 0): string | null {
  */
 const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
 
-/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
+/**
+ * Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool, or
+ * its `powershell` tool on a Windows computer with no bash that runs (#11209).
+ */
 function isShellCommand(item: ThreadItem): boolean {
-  return (
-    toolUsage(item)?.kind === "command" ||
-    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
-  );
+  const tool = item.type === "dynamicToolCall" && !getString(item, "namespace") ? getString(item, "tool") : undefined;
+  return toolUsage(item)?.kind === "command" || tool === "bash" || tool === "powershell";
 }
 
 /**

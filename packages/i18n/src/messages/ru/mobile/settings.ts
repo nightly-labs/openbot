@@ -140,19 +140,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",
+  "mobile.settings.appearance.replyDetails": "Детали ответов",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Выключите деталь, чтобы скрыть её строку в чатах. Агент продолжает размышлять, запускать субагентов и сохранять воспоминания.",
+  "mobile.settings.appearance.showThinking": "Показывать размышления агента",
+  "mobile.settings.appearance.showSubagents": "Показывать субагентов",
+  "mobile.settings.appearance.showMemoryChanges": "Показывать сохранённые воспоминания",
   "mobile.settings.appearance.fullVisuals": "Показывать визуальные превью полностью",
   "mobile.settings.appearance.fullVisualsFooter":
     "Визуальный ответ агента показывается в чате на всю высоту. Если выключено, высокий ответ обрезается; нажмите на него, чтобы увидеть всё.",
   "mobile.settings.animations.title": "Анимации",
-  "mobile.settings.animations.footer":
-    "Выключите «Анимации», чтобы убрать движение во всём приложении. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение, и анимации ниже остаются выключенными.",
-  "mobile.settings.animations.all": "Анимации",
+  "mobile.settings.animations.fullMotion": "Полная анимация",
+  "mobile.settings.animations.reduced": "Меньше",
+  "mobile.settings.animations.motionFooter":
+    "«Меньше» уменьшает движение во всём приложении и оставляет анимации ниже выключенными. Если в настройках телефона включено «Уменьшение движения», приложение тоже уменьшает движение.",
   "mobile.settings.animations.agentFaces": "Живые лица агентов",
   "mobile.settings.animations.agentFacesFooter":
     "Аватары агентов двигаются, пока агенты работают и отдыхают. Если выключить, лица останутся неподвижными, а персонажи на экране приветствия и на пустом главном экране перестанут парить.",
-  "mobile.settings.animations.composerResize": "Компактное поле сообщения",
-  "mobile.settings.animations.composerResizeFooter":
-    "Пока клавиатура закрыта, поле сообщения превращается в узкую полоску. Если выключить, поле остаётся полного размера.",
   "mobile.settings.animations.textReveal": "Анимация ответов",
   "mobile.settings.animations.textRevealFooter":
     "Ответ появляется слово за словом, а его облачко плавно растёт. Если выключить, текст показывается сразу по мере поступления.",
@@ -246,12 +250,21 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Скачивать большие файлы автоматически",
   "mobile.settings.conversations.largeFilesFooter":
     "Изображения, видео и аудио больше {small} скачиваются только по нажатию. Включите, чтобы скачивать их сразу, до {large}. Это может расходовать много мобильного трафика.",
+  "mobile.settings.conversations.messageField": "Поле сообщения",
+  "mobile.settings.conversations.compact": "Компактное",
+  "mobile.settings.conversations.fullSize": "Полный размер",
+  "mobile.settings.conversations.compactFooter":
+    "«Компактное» превращает поле сообщения в небольшую полосу, пока клавиатура закрыта.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Движение уменьшено в разделе «Анимации» или в настройках телефона, поэтому поле сообщения остаётся полного размера.",
+  "mobile.settings.conversations.media": "Фото и файлы",
   "mobile.settings.conversations.swipeLeft": "Свайп влево в чате агента",
   "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
   "mobile.settings.conversations.swipeThreads": "Ветки",
   "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeOff": "Выкл.",
   "mobile.settings.conversations.swipeFooter":
-    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Свайп по сообщению по-прежнему отвечает на него.",
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Тот же свайп по сообщению показывает время сообщений.",
   "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
   "mobile.settings.conversations.pullInfoFooter":
     "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",
@@ -533,6 +546,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Не удалось остановить процесс.",
   "mobile.settings.agents.processes.stopTitle": "Остановить эту программу?",
   "mobile.settings.agents.processes.stopLabel": "Остановить процесс {pid}",
+  "mobile.settings.quickActions.title": "Меню значка приложения",
+  "mobile.settings.quickActions.footer":
+    "Нажмите и удерживайте значок OpenBot, чтобы увидеть эти действия. Можно включить до {count}.",
+  "mobile.settings.quickActions.latestChat": "Последний чат",
+  "mobile.settings.quickActions.secondChat": "Предпоследний чат",
   "mobile.settings.shortcuts.title": "Быстрые команды",
   "mobile.settings.shortcuts.agent": "Агент",
   "mobile.settings.shortcuts.none": "Нет",

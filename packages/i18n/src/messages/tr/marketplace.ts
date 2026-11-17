@@ -111,6 +111,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} tamamlanmadı",
   "marketplace.app.partialDescription": "Bazı uygulamaları veya becerileri yüklü değil. Yeniden bağlan bunları yükler.",
   "marketplace.app.notConnected": "Bağlı değil",
+  "marketplace.app.paused": "Duraklatıldı",
   "marketplace.app.custom": "MCP sunucusu",
   "marketplace.app.githubTagline": "Depolar, sorunlar ve çekme istekleri",
   "marketplace.app.onePasswordTagline": "Paylaştığınız oturum bilgileriyle sitelerde oturum açın",
@@ -414,7 +415,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "Bu kararı kasamda yeni bir not olarak kaydet.",
   "marketplace.plugin.obsidian.prompt.log": "Bugünkü çalışmanın özetini İş günlüğü notuma ekle.",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian\'da Settings > Local REST API bölümünü aç. API anahtarını kopyala ve "Enable non-encrypted (HTTP) server" seçeneğini aç.',
+    "Obsidian'da Settings > Local REST API bölümünü aç ve API anahtarını kopyala.",
   "marketplace.plugin.resend.tagline": "İşlemsel e-posta",
   "marketplace.plugin.resend.description":
     "Resend, ajanların tek bir API üzerinden işlemsel e-posta göndermesine ve teslimatı kontrol etmesine olanak tanır. Resend panosundaki API anahtarı yerel sunucuya tek bir ortam değişkeni olarak aktarılır.",

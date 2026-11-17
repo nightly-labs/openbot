@@ -394,17 +394,41 @@ export function isImageUnreadableDiagnostic(message: string): boolean {
 export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b/iu;
 
 /**
+ * Google's text for a request with an access token that is not valid: "UNAUTHENTICATED (code 401):
+ * Request had invalid authentication credentials. Expected OAuth 2 access token, ...". The Antigravity
+ * CLI 1.5.9 refreshes the token itself, and sent a request with the old token when it expired during
+ * a turn. The new token was ready less than a second later (#10367).
+ */
+export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
+
+/** A count of images in one clause, such as "at most 8 images". */
+const IMAGE_COUNT_LIMIT = /\b(?:at most|no more than|maximum of) \d+ image(?:s|\(s\))?(?![\w-])/iu;
+
+/** A limit over time, such as "at most 50 images per day", which a new session does not change. */
+const IMAGE_QUOTA_PERIOD =
+  /\b(?:per|a|each|every) (?:second|minute|hour|day|week|month)\b|\b(?:hourly|daily|weekly|monthly|quota)\b/iu;
+
+/**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
  * accepts in one request. The provider session sends each image of the chat again on each turn, so
  * each turn fails the same way until a new session (#6702). vLLM and Venice write "At most 10
  * image(s) may be provided in one request.", OpenCode's gateway "Too many images in request: 31 >
  * 30", other endpoints "Request contains 52 images, exceeding the maximum of 50 allowed per
  * request", and a custom endpoint behind OpenCode "This request has more images than the limit of 4."
- * (#9038). A daily quota of images is not a count in one request, so it does not match.
+ * (#9038). A local router behind OpenCode writes its own words, such as "a request may carry at most
+ * 8 images" (#10883), so a count limit also matches by its form: "at most", "no more than" or
+ * "maximum of", a number, and "images". A daily quota of images is not a count in one request, so a
+ * clause that names a period does not match. A period in a different clause, such as "try again in a
+ * minute", does not stop the match.
  */
 export function isImageCountDiagnostic(message: string): boolean {
-  return /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
-    message,
+  return (
+    /\b(?:at most|a maximum of) \d+ image(?:s|\(s\))? may be provided\b|\btoo many images in (?:the |this |one )?(?:request|prompt|message)\b|\b\d+ images\b[^.\n]{0,40}\bexceed\w* (?:the )?maximum of \d+(?! ?(?:[kmg]i?b|bytes?|px|pixels?)\b)(?: images| allowed)?\b|\b(?:request|prompt|message) (?:has|contains) more images than (?:the )?(?:limit|maximum) of \d+\b/iu.test(
+      message,
+    ) ||
+    // Split first: a pattern that also reads the clause around the count takes quadratic time on a long
+    // error text with no full stop.
+    message.split(/[.;\n]/u).some((clause) => IMAGE_COUNT_LIMIT.test(clause) && !IMAGE_QUOTA_PERIOD.test(clause))
   );
 }
 
@@ -415,9 +439,12 @@ export function isImageCountDiagnostic(message: string): boolean {
  * image of the session at a small fixed token cost, so a session with many images grows past this
  * byte limit before its token-based compaction starts, and each later turn fails the same way until
  * a new session (#9599). A response that is too large is not a refused request, so it does not match.
+ * Google's Gemini API writes FAILED_PRECONDITION "The message size exceeds 30.000MB limit". The
+ * Antigravity CLI compacts a session by tokens and keeps each image that the agent opened, so a
+ * session with many images grows past it in the same way, and `/compact` fails too (#10517).
  */
 export function isRequestBodyLimitDiagnostic(message: string): boolean {
-  return /\brequest body exceeds \d+ bytes\b/iu.test(message);
+  return /\brequest body exceeds \d+ bytes\b|\bmessage size exceeds [\d.,]+ ?MB limit\b/iu.test(message);
 }
 
 /**

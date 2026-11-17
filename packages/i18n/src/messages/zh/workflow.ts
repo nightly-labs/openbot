@@ -59,6 +59,8 @@ export const messages = {
   "workflow.node.locked": "已锁定",
   "workflow.node.missingInput": "连接一个输入后才能运行该步骤。",
   "workflow.node.run": "运行",
+  "workflow.node.runPrice": "运行 · {credits}",
+  "workflow.node.runPriceLabel": "运行。价格（积分）：{credits}",
   "workflow.node.running": "运行中",
   "workflow.node.stop": "停止",
   "workflow.node.retry": "重试",
@@ -524,7 +526,6 @@ export const messages = {
   "workflow.canvas.deleteUndo.title": "{name} 已删除",
   "workflow.canvas.deleteUndo.action": "撤销",
   "workflow.page.failed": "OpenBot 无法完成该操作，请重试。",
-  "workflow.page.conflict": "已在另一台设备上更改。撤销即可找回你的编辑。",
   "workflow.page.needsNewerApp": "该工作流包含来自更新版 OpenBot 的步骤。更新 OpenBot 后才能更改它。",
   "workflow.page.manageOnly": "要更改该工作流，你需要对其中每个助手拥有“可管理”权限。",
 } as const satisfies PartialTranslation<typeof source>;

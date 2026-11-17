@@ -129,19 +129,23 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
+  "mobile.settings.appearance.replyDetails": "Reply details",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Turn off a detail to hide its row in chats. The agent still reasons, runs subagents and saves memories.",
+  "mobile.settings.appearance.showThinking": "Show agent thinking",
+  "mobile.settings.appearance.showSubagents": "Show subagents",
+  "mobile.settings.appearance.showMemoryChanges": "Show saved memories",
   "mobile.settings.appearance.fullVisuals": "Show full visual previews",
   "mobile.settings.appearance.fullVisualsFooter":
     "A visual from an agent shows at its full height in the chat. When this is off, a tall visual is cut, and you tap it to see all of it.",
   "mobile.settings.animations.title": "Animations",
-  "mobile.settings.animations.footer":
-    "Turn off Animations to reduce motion in the whole app. When Reduce Motion is on in your phone settings, the app also reduces motion. The animations below then stay off.",
-  "mobile.settings.animations.all": "Animations",
+  "mobile.settings.animations.fullMotion": "Full motion",
+  "mobile.settings.animations.reduced": "Reduced",
+  "mobile.settings.animations.motionFooter":
+    "Reduced lowers motion in the whole app and keeps the animations below off. When Reduce Motion is on in your phone settings, the app also reduces motion.",
   "mobile.settings.animations.agentFaces": "Animated agent faces",
   "mobile.settings.animations.agentFacesFooter":
     "Agent avatars move their faces while the agents work and rest. When this is off, the faces stay still, and the characters on the welcome and empty home screens stop floating.",
-  "mobile.settings.animations.composerResize": "Compact message field",
-  "mobile.settings.animations.composerResizeFooter":
-    "The message field becomes a small bar while the keyboard is closed. When this is off, the field stays full size.",
   "mobile.settings.animations.textReveal": "Animate replies",
   "mobile.settings.animations.textRevealFooter":
     "A reply types out word by word, and its bubble grows smoothly. When this is off, the text shows as it arrives.",
@@ -234,12 +238,21 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.largeFiles": "Download large files automatically",
   "mobile.settings.conversations.largeFilesFooter":
     "Images, videos and audio larger than {small} download only when you tap them. Turn this on to download them at once, up to {large}. This can use a lot of mobile data.",
+  "mobile.settings.conversations.messageField": "Message field",
+  "mobile.settings.conversations.compact": "Compact",
+  "mobile.settings.conversations.fullSize": "Full size",
+  "mobile.settings.conversations.compactFooter":
+    "Compact makes the message field a small bar while the keyboard is closed.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Motion is reduced in Animations or in your phone settings, so the message field stays full size.",
+  "mobile.settings.conversations.media": "Photos and files",
   "mobile.settings.conversations.swipeLeft": "Swipe left in an agent chat",
   "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Off",
   "mobile.settings.conversations.swipeFooter":
-    "A swipe away from Back in an agent's chat opens this. A swipe on a message still replies to it.",
+    "A swipe away from Back in an agent's chat opens this. The same swipe on a message shows the times of the messages.",
   "mobile.settings.conversations.pullInfo": "Pull up for info",
   "mobile.settings.conversations.pullInfoFooter":
     "Pull up past the latest message in a chat, a channel or a thread, and release, to open its info.",
@@ -505,6 +518,11 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.agents.processes.stopFailed": "The process could not be stopped.",
   "mobile.settings.agents.processes.stopTitle": "Stop this program?",
   "mobile.settings.agents.processes.stopLabel": "Stop process {pid}",
+  "mobile.settings.quickActions.title": "App icon menu",
+  "mobile.settings.quickActions.footer":
+    "Touch and hold the OpenBot icon to see these actions. You can turn on up to {count}.",
+  "mobile.settings.quickActions.latestChat": "Latest chat",
+  "mobile.settings.quickActions.secondChat": "Second latest chat",
   "mobile.settings.shortcuts.title": "Shortcuts",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "None",

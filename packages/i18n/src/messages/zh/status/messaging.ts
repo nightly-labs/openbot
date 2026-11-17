@@ -5,7 +5,7 @@ export const messages = {
   // Text that OpenBot posts in a Slack conversation. Slack users read it. It names no agent: in
   // Slack, every answer comes from OpenBot.
   "status.messaging.working": "正在处理…",
-  "status.messaging.queued": "等待中：OpenBot 正在处理另一个请求，回答会发到这里。",
+  "status.messaging.queued": "等待中：之前的请求尚未完成，回答会发到这里。",
   "status.messaging.busy": "等待中的请求太多，请稍后再试。",
   "status.messaging.failed": "OpenBot 未能完成该请求，详情请见 OpenBot 主机。",
   "status.messaging.noAnswer": "OpenBot 已完成，但没有书面回答。",
@@ -56,6 +56,10 @@ export const messages = {
     "👋 *OpenBot 已连接*\n\n在这里写下内容即可向你的智能体提问。WhatsApp Orchestrator 会直接回答，或把工作交给合适的智能体。\n\n发送 *stop* 可停止请求。",
   "status.messaging.whatsappWelcomeDedicated":
     "👋 *OpenBot 已连接*\n\n你在 OpenBot 中允许的人现在可以给这个号码发消息。新的联系人会收到一个代码：请在 OpenBot 的“请求”中批准。\n\n发送 *stop* 可停止请求。",
+  "status.messaging.whatsappOtherOpenBot":
+    "此 WhatsApp 号码还关联了另一个 OpenBot，所以你可能会收到两条回复。要解决此问题，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
+  "status.messaging.whatsappPaused":
+    "短时间内收到的消息太多，OpenBot 已在此暂停回复 10 分钟。如果此号码还关联了另一个 OpenBot，请在手机上的 WhatsApp 中打开“已关联设备”，然后退出你不用的 OpenBot。",
   "status.messaging.whatsappOrchestratorName": "WhatsApp 调度助手",
   "status.messaging.whatsappOrchestratorTitle": "在 WhatsApp 中回答并调度团队",
 } as const satisfies PartialTranslation<typeof source>;

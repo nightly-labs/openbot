@@ -12,6 +12,8 @@ export const messages = {
     "{provider} потерял вход в аккаунт, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} отклонил сообщение, поэтому OpenBot завершил его процесс. Отправьте сообщение ещё раз.",
+  "error.provider.acpServerLost": "{provider} потерял соединение. Отправьте сообщение ещё раз.",
+  "error.provider.acpServerLostEnded": "{provider} потерял соединение, поэтому OpenBot завершил его процесс.",
   "error.provider.acpSettingsTimedOut": "{provider} не ответил вовремя. Повторите попытку чуть позже.",
   "error.provider.acpPlanUsedUp":
     "{provider} сообщает, что лимит вашего тарифа исчерпан. Выберите другую модель или перейдите на более высокий тариф {provider}.",
@@ -184,6 +186,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Провайдер не принял код. Начните вход заново.",
   "error.provider.codeLoginUnsupported":
     "Этот сервер не поддерживает вход по вставленному коду. Войдите на компьютере сервера в его браузере.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude не удалось сохранить вход на Mac. Перезапустите Mac, на котором работает OpenBot, и снова подключите Claude.",
   "error.provider.cliBusyRetry": "{provider} CLI обрабатывает ход. Дождитесь его завершения и повторите попытку.",
   "error.provider.cliSigningIn": "{provider} CLI выполняет вход. Завершите или отмените вход, затем обновите.",
   "error.provider.cliBusyUpdate": "{provider} CLI обрабатывает ход. Дождитесь его завершения, затем обновите.",
@@ -204,6 +208,8 @@ export const messages = {
     "OpenCode не выполнил вход у провайдера модели «{provider}». Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode не выполнил вход у провайдера этой модели. Выберите модель с меткой «Бесплатно» или подключите провайдера: вставьте ключ OpenCode Go в настройках OpenCode или выполните `opencode auth login` в терминале. Затем повторите попытку.",
+  "error.provider.opencodeProviderRefused":
+    "Провайдер модели «{provider}» отклонил запрос. У OpenCode есть ключ для этого провайдера, поэтому причина может быть в вашей сети: некоторые провайдеры блокируют VPN, прокси или некоторые страны. Отключите VPN или используйте другую сеть, затем повторите попытку. Если ошибка повторяется, ключ может быть неверным: выполните `opencode auth login` в терминале и введите ключ снова.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode отклонил эту бесплатную модель. Некоторые бесплатные модели доступны не во всех странах. Выберите другую модель с меткой «Бесплатно» или вставьте ключ OpenCode Go в настройках OpenCode и выберите модель OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
@@ -230,6 +236,8 @@ export const messages = {
     "Бесплатные модели OpenCode исчерпали лимит использования. Этот лимит общий для всех бесплатных моделей. Чтобы продолжить, вставьте ключ OpenCode Go в настройках OpenCode или выберите модель другого провайдера.",
   "error.provider.opencodeProviderFailed":
     "У провайдера моделей произошёл сбой на его стороне. Дело не в вашем соединении. Повторите попытку позже или выберите другую модель.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Эта модель вам недоступна. Выберите другую модель для этого агента.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Ответ модели оборвался или был некорректным. Отправьте сообщение ещё раз или выберите другую модель.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -277,10 +285,14 @@ export const messages = {
     "Gemini сейчас не может использовать эту модель. Выберите другую модель и повторите попытку.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Сервис Gemini от Google не выполнил запрос. Повторите попытку через несколько минут.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google не принял вход в Gemini для этого запроса. Отправьте сообщение ещё раз. Если ошибка повторяется, подключите Gemini заново в настройках.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini отклонил этот запрос. Выберите другую модель и отправьте сообщение снова. Если ошибка повторится, начните новый чат.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini отклонил этот запрос и не указал причину. Причиной может быть элемент истории чата, например изображение, которое открыл агент. OpenBot начал новый сеанс Gemini с историей чата. Повторите попытку. Если ошибка не исчезнет, выберите другую модель.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini не смог прочитать сохранённую историю этого чата. OpenBot начал новый сеанс Gemini с историей чата. Отправьте сообщение ещё раз.",
   "error.provider.antigravityLocationUnsupported":
     "Google не разрешает Gemini работать из сетевого местоположения компьютера, на котором работает этот агент. Используйте Gemini на другом компьютере или выберите другого провайдера для этого агента.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -328,6 +340,8 @@ export const messages = {
     "Hermes не смог завершить этот ход. Если в его ответе указана причина, следуйте ему. Если нет, возможно, MCP-сервер этого агента недоступен: проверьте его в разделе Каталог, Приложения и отправьте сообщение ещё раз.",
   "error.provider.hermesRefused":
     "Hermes отклонил это сообщение до начала работы. Отправьте его ещё раз. Если Hermes отклоняет каждое сообщение, перезапустите OpenBot на компьютере, где работает этот агент.",
+  "error.provider.hermesConnectionLost":
+    "Hermes потерял соединение во время этого сообщения, поэтому не знает, завершена ли работа. Проверьте, что сделал агент, прежде чем отправить сообщение ещё раз.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot не смог использовать эту модель: модель не приняла его настройку размышлений. Выберите другую модель для этого агента и отправьте сообщение ещё раз.",
   "error.provider.usageLimitReached": "Аккаунт достиг лимита использования.",

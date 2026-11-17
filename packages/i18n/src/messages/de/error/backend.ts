@@ -95,6 +95,7 @@ export const messages = {
     "Kein Mitglied dieses Kanals kann auf Anfrage komprimieren. Mitglieder, die es unterstützen, komprimieren ihren Kontext automatisch, wenn er fast voll ist.",
   "error.backend.channelArchived":
     "Stelle diesen Kanal wieder her, bevor du Nachrichten sendest oder Aufgaben änderst.",
+  "error.backend.channelArchiveRunning": "Stoppe die laufende Arbeit in diesem Kanal und lösche ihn dann.",
   "error.backend.channelReferenceUnavailable": "Die referenzierte Kanalnachricht ist nicht verfügbar.",
   "error.backend.channelTaskNotFound": "Kanalaufgabe nicht gefunden.",
   "error.backend.channelTaskComplete": "Diese Aufgabe ist bereits abgeschlossen.",
@@ -295,6 +296,7 @@ export const messages = {
     "Der Anmeldeserver hat eine Antwort gesendet, die OpenBot nicht lesen kann. Wenn der Dienst dir einen API-Schlüssel oder ein Token gibt, füge ihn in den Einstellungen dieses Servers hinzu und teste die Verbindung erneut.",
   "error.backend.mcpServerExited":
     "Der Server wurde beendet, bevor er geantwortet hat. Führe den Befehl in einem Terminal aus, um seinen Fehler zu sehen.",
+  "error.backend.mcpServerExitedWithOutput": "Der Server wurde beendet, bevor er geantwortet hat. Er schrieb: {detail}",
   "error.backend.mcpServerFailedToStart": "Der Server ist nicht gestartet: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} hat nicht mehr gewartet, bevor der Server gestartet ist. Seine Agenten erhalten die Tools dieses Servers daher nicht.",
@@ -312,6 +314,8 @@ export const messages = {
     "OpenBot konnte die lokale Anmeldeverbindung für diesen Server nicht starten. Starte OpenBot neu und versuche es dann erneut.",
   "error.backend.mcpOAuthSignInNeeded":
     "Die Anmeldung bei diesem MCP-Server ist beendet. Der Benutzer muss sich in OpenBot erneut anmelden.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot konnte die Anmeldung bei diesem MCP-Server gerade nicht erneuern. Die Anmeldung bleibt erhalten, und die nächste Anfrage versucht es erneut. Wenn dieser Fehler bleibt, kann sich der Nutzer in OpenBot vom Server abmelden und erneut anmelden.",
   "error.backend.mcpServerUnreachable": "OpenBot konnte den Server nicht erreichen. Prüfe die URL und dein Netzwerk.",
   "error.backend.mcpLocalServerOff":
     "Unter {address} antwortet auf diesem Computer kein Server. Starte den Server oder schalte ihn in der App ein, die ihn ausführt, und versuche es dann erneut.",

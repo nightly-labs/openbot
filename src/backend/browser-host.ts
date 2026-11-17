@@ -102,7 +102,7 @@ import {
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
-import { BrowserRecorder } from "./browser-recorder";
+import { BrowserRecorder, recordingFrameSize } from "./browser-recorder";
 import {
   BROWSER_PAGE_CRASH_KEPT,
   BROWSER_PAGE_CRASH_RELOADED,
@@ -179,7 +179,6 @@ import {
   parseBrowserToolArguments,
   parseBrowserToolCall,
 } from "./browser-tools";
-import { readClickTarget } from "./browser-user-click";
 import { runCauseEffect } from "./effect-boundary";
 import {
   BROWSER_STRING_MORE,
@@ -276,12 +275,17 @@ const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left"
  */
 const MAX_ACTIVE_DOWNLOADS = 4;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+/** The diagnostic for a download over `MAX_DOWNLOAD_BYTES`, so the agent can tell the user what to do. */
+const DOWNLOAD_TOO_LARGE =
+  "Download stopped: the file is larger than 2 GiB, the download limit of this browser. No file was saved. The user can download it in their own web browser.";
 
 export interface BrowserViewOptions {
   /** Hears the page's mouse cursor when it changes. Not called while a secret is on the page. */
   onCursor?: (cursor: BrowserViewCursor) => void;
   /** The page size, in CSS pixels, that the page keeps while the view is open. */
   viewport?: BrowserViewViewport;
+  /** Hears the text that the page itself copies. Not called while a secret is on the page. */
+  onPageCopy?: (text: string) => void;
 }
 
 /** A web address a member may copy from a menu. Other schemes and long addresses are left out. */
@@ -653,6 +657,8 @@ export class BrowserHost {
   readonly #userBrowsing: BrowserUserBrowsing | null;
   readonly #downloadsRoot: string;
   readonly #statePath: string;
+  /** The state path, or the fallback file while the state path holds the file of a newer release. */
+  #stateWritePath: string;
   readonly #tabs = new Map<string, BrowserHostTab>();
   readonly #closingTabDrains = new Map<string, Fiber.Fiber<void, BrowserOperationError>>();
   readonly #listeners = new Set<(...args: BrowserHostEvents["changed"]) => void>();
@@ -781,6 +787,7 @@ export class BrowserHost {
     this.#webPreferences = browserWebPreferences(options.pagePreload);
     this.#downloadsRoot = downloadsRoot;
     this.#statePath = statePath;
+    this.#stateWritePath = statePath;
     this.#session = session.fromPartition("persist:openbot-browser", { cache: true });
     this.#recorder = new BrowserRecorder(
       downloadsRoot,
@@ -816,7 +823,8 @@ export class BrowserHost {
     this: BrowserHost,
     agents: readonly BrowserTabOwner[] = [],
   ): Effect.fn.Return<void, BrowserOperationError> {
-    const state = yield* readBrowserState(this.#statePath);
+    const { state, writePath } = yield* readBrowserState(this.#statePath);
+    this.#stateWritePath = writePath;
     if (state.tabs.length === 0) return;
 
     const tabs: BrowserHostTab[] = [];
@@ -2492,7 +2500,7 @@ export class BrowserHost {
     onEnded?: (reason: string) => void,
     options: BrowserViewOptions = {},
   ): Effect.fn.Return<() => Effect.Effect<void>, BrowserOperationError> {
-    const { onCursor, viewport } = options;
+    const { onCursor, viewport, onPageCopy } = options;
     const tab = yield* this.#requireTab(tabId);
     // The local window shows a protected tab during a takeover. A live view goes to another computer,
     // so the page loads again first: the secret leaves it, and the person signs in by hand. Without
@@ -2534,6 +2542,19 @@ export class BrowserHost {
           maxWidth: VIEW_FRAME_MAX_WIDTH,
           maxHeight: VIEW_FRAME_MAX_HEIGHT,
           ...(viewport ? { viewport } : {}),
+          ...(onPageCopy
+            ? {
+                onPageCopy: (text: string) => {
+                  if (
+                    !tab.secret?.submitted &&
+                    !tab.filledCard &&
+                    !tab.secretShown &&
+                    tab.captureGeneration === generation
+                  )
+                    onPageCopy(text);
+                },
+              }
+            : {}),
         },
         (frame) => {
           if (!tab.secret?.submitted && !tab.filledCard && !tab.secretShown && tab.captureGeneration === generation)
@@ -2789,9 +2810,22 @@ export class BrowserHost {
       Effect.gen({ self: this }, function* () {
         const tabId = args.tabId;
         yield* browserSync(() => this.#requireToolTab(params, tabId));
-        yield* this.#enqueue(tabId, (tab) => {
+        yield* this.#enqueue(tabId, (tab, keepQueueBlocked) => {
           this.#requireNoSecretDocument(tab, "Recording");
-          return this.#recorder.start(tabId, tab.contents);
+          return Effect.gen({ self: this }, function* () {
+            const frameSize = recordingFrameSize(tab.environment);
+            yield* this.#recorder.start(tabId, tab.contents, frameSize);
+            if (!frameSize) return;
+            // The first capture of a tab shows only the part of the page that fits the panel until
+            // the page size is applied again. The recording runs either way, so a failure is ignored.
+            yield* boundEngineOperation(
+              tab,
+              tab.engine.setEnvironment(tab.environment),
+              10_000,
+              "Browser environment change timed out.",
+              keepQueueBlocked,
+            ).pipe(Effect.ignore);
+          });
         });
         return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
       }),
@@ -3839,17 +3873,35 @@ export class BrowserHost {
       });
       if (!cancelled) this.#emitChanged();
     });
-    target.setPermissionRequestHandler((_webContents, permission, callback) =>
-      callback(isAllowedBrowserPermission(permission)),
+    target.setPermissionRequestHandler((webContents, permission, callback, details) =>
+      callback(
+        isAllowedBrowserPermission(permission) || this.#recorder.allowsTabCapture(webContents, permission, details),
+      ),
     );
     target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     target.on("will-download", (event, item, contents) => {
-      if ([...this.#tabs.values()].some((tab) => tab.secret && tab.contents === contents)) {
+      const tab = [...this.#tabs.values()].find((candidate) => candidate.contents === contents);
+      if (tab?.secret) {
         event.preventDefault();
         return;
       }
-      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS || item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+      // A stopped download saves no file, so the tab's diagnostics tell the agent why. A download that
+      // started earlier can stop during secret entry, which keeps no diagnostics.
+      const stopped = (message: string) => {
+        if (!tab || tab.secret) return;
+        tab.diagnostics.add({ kind: "network", level: "error", message, ...diagnosticUrlField(item.getURL()) });
+        this.#emitChanged();
+      };
+      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS) {
         event.preventDefault();
+        stopped(
+          `Download refused: ${MAX_ACTIVE_DOWNLOADS} downloads are already in progress. No file was saved. Try again when one is done.`,
+        );
+        return;
+      }
+      if (item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+        event.preventDefault();
+        stopped(DOWNLOAD_TOO_LARGE);
         return;
       }
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
@@ -3866,10 +3918,25 @@ export class BrowserHost {
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
         item.cancel();
+        stopped(DOWNLOAD_TOO_LARGE);
       });
-      item.once("done", () => {
+      item.once("done", (_doneEvent, state) => {
         this.#activeDownloads -= 1;
         this.#reservedDownloadPaths.delete(downloadPath);
+        // A cancelled download is one that the size limit stopped, which says so above, or one that the app
+        // stopped as it quit.
+        if (state === "interrupted") stopped("Download failed before the file was complete. Try again.");
+        if (state !== "completed") return;
+        // The click only starts the download, so the agent finds the saved file in its next snapshot.
+        // A network entry at info level does not show there, so this is a load entry. The path comes first and
+        // only once, so the length limit of an entry does not cut it.
+        if (!tab || tab.secret) return;
+        tab.diagnostics.add({
+          kind: "load",
+          level: "info",
+          message: `Download complete: saved at ${downloadPath} (${item.getReceivedBytes()} bytes)`,
+          ...diagnosticUrlField(item.getURL()),
+        });
       });
     });
   }
@@ -4323,7 +4390,10 @@ export class BrowserHost {
           const body = document.body ? getComputedStyle(document.body).backgroundColor : transparent;
           if (body !== transparent) return body;
           const root = getComputedStyle(document.documentElement).backgroundColor;
-          return root !== transparent ? root : "#0b0b0b";
+          if (root !== transparent) return root;
+          // A page without its own background draws on white, as in other browsers. The blank page
+          // between loads stays dark. A dark color-scheme page still paints its own dark canvas.
+          return location.href === "about:blank" ? "#0b0b0b" : "#ffffff";
         })()`,
           true,
         ),
@@ -4837,23 +4907,47 @@ export class BrowserHost {
     contents.on("did-navigate-in-page", (_event, _url, isMainFrame) => {
       if (isMainFrame) recordPage();
     });
-    contents.on("input-event", (_event, input) => {
-      if (input.type !== "mouseDown" || !("x" in input) || !("y" in input)) return;
-      const { x, y } = input;
-      if (typeof x !== "number" || typeof y !== "number" || !records()) return;
+    // Each press gives this event, also a press in a frame of another process. The input event that
+    // follows in the same call comes only from the page's own view, so a press without it is in the
+    // pixels of that frame (#10912). A live view's press gives its point in the page's pixels.
+    let press: { x: number; y: number; inPage: boolean } | null = null;
+    contents.on("before-mouse-event", (_event, input) => {
+      if (input.type !== "mouseDown" || !records()) return;
+      // The place of the press, before the press can navigate the page.
       const place = stepPlace(tab.engine.scrubText(contents.getURL()));
       if (!place) return;
-      void readClickTarget(contents, x, y).then((target) => {
-        // The tab can change hands while the page answers.
-        if (target)
-          this.#recordUserStep(tab, {
-            kind: "click",
-            ...place,
-            ...target,
-            ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
-          });
+      const zoom = contents.getZoomFactor() || 1;
+      const viewed = tab.engine.viewPress();
+      const current = viewed ? { ...viewed, inPage: true } : { x: input.x / zoom, y: input.y / zoom, inPage: false };
+      press = current;
+      setImmediate(() => {
+        if (press === current) press = null;
+        this.#recordClick(tab, place, current);
       });
     });
+    contents.on("input-event", (_event, input) => {
+      if (input.type === "mouseDown" && press) press.inPage = true;
+    });
+  }
+
+  /** Records the control under a press, in CSS pixels, as `#bindUserBrowsing` reads it. */
+  #recordClick(
+    tab: BrowserHostTab,
+    place: { host: string; path: string },
+    press: { x: number; y: number; inPage: boolean },
+  ): void {
+    if (tab.closing || tab.contents.isDestroyed()) return;
+    const record = Effect.map(tab.engine.clickTargetAt(press.x, press.y, press.inPage), (target) => {
+      // The tab can change hands while the page answers.
+      if (target)
+        this.#recordUserStep(tab, {
+          kind: "click",
+          ...place,
+          ...target,
+          ...(target.name === undefined ? {} : { name: tab.engine.scrubText(target.name) }),
+        });
+    });
+    Effect.runFork(record.pipe(Effect.forkIn(tab.scope, { startImmediately: true })));
   }
 
   #noteSiteVisit(tab: BrowserHostTab, url: string): void {
@@ -4924,7 +5018,9 @@ export class BrowserHost {
       })),
     };
     yield* this.#persistLock.withPermit(
-      writeJsonFileAtomically(this.#statePath, state).pipe(Effect.mapError((error) => browserFailure(error.cause))),
+      writeJsonFileAtomically(this.#stateWritePath, state).pipe(
+        Effect.mapError((error) => browserFailure(error.cause)),
+      ),
     );
   });
 }

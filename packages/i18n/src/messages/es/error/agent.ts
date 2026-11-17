@@ -64,6 +64,8 @@ export const messages = {
   "error.agent.modelNotListed": "El modelo «{model}» no está disponible. Modelos disponibles: {models}.",
   "error.agent.providerNotListed":
     "No hay ningún modelo de {provider} disponible ahora. Llama a list_models para ver los modelos disponibles.",
+  "error.agent.creatorModelNotListed":
+    "Tu modelo «{model}» no está ahora en la lista de modelos, así que el nuevo agente no puede empezar con él. Inténtalo de nuevo en unos segundos, o indica en provider y model un modelo que muestre list_models.",
   "error.agent.reasoningEffortUnsupported":
     "El modelo «{model}» no admite el nivel de razonamiento «{effort}». Niveles admitidos: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -101,12 +103,15 @@ export const messages = {
   "error.agent.endpointRemoved": "Se eliminó el endpoint que usaba este agente. Elige otro modelo para él.",
   "error.agent.turnStalled":
     "{provider} dejó de responder, así que OpenBot terminó este turno. Envía el mensaje de nuevo o elige otro modelo.",
+  "error.agent.promptCancelled": "{provider} canceló este mensaje antes de que empezara. Envía el mensaje de nuevo.",
   "error.agent.toolLoopStopped":
     "{provider} repitió muchas veces un paso fallido, así que OpenBot detuvo este turno. Envía el mensaje de nuevo o elige otro modelo.",
   "error.agent.answerCutOff":
     "El agente se detuvo antes de terminar su respuesta, así que la respuesta no está completa. Envía el mensaje de nuevo.",
   "error.agent.compactionConnectionLost":
     "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y envía un mensaje para continuar.",
+  "error.agent.compactionConnectionLostAddress":
+    "La conexión se detuvo mientras el agente compactaba su contexto, así que la tarea se detuvo. Comprueba tu conexión a internet y que {variable}, en Variables de los ajustes de {provider}, sea la dirección API de tu servicio de modelos (suele terminar en /v1). Luego envía un mensaje.",
   "error.agent.compactionLoopStopped":
     "{provider} compactó el contexto una y otra vez, y cada vez quedó demasiado lleno para continuar, así que OpenBot detuvo este turno. Desactiva los servidores MCP o el uso del ordenador que este agente no necesita y luego envía un mensaje. Si tú o el agente cambiasteis cuándo compacta {provider}, deshaz ese cambio.",
   "error.agent.selectedGone": "El agente seleccionado ya no existe.",

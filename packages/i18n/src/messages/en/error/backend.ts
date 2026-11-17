@@ -89,6 +89,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.channelCompactNotSupported":
     "No member of this channel can compact on request. Members that support it compact their context automatically when it is almost full.",
   "error.backend.channelArchived": "Restore this channel before sending messages or changing tasks.",
+  "error.backend.channelArchiveRunning": "Stop the running work in this channel, then delete it.",
   "error.backend.channelReferenceUnavailable": "The referenced channel message is unavailable.",
   "error.backend.channelTaskNotFound": "Channel task not found.",
   "error.backend.channelTaskComplete": "This task is already complete.",
@@ -268,6 +269,7 @@ export const messages = defineMessages("error.backend", {
     "The sign-in server sent an answer that OpenBot cannot read. If the service gives you an API key or a token, add it to the settings of this server, then test the connection again.",
   "error.backend.mcpServerExited":
     "The server stopped before it answered. Run the command in a terminal to see its error.",
+  "error.backend.mcpServerExitedWithOutput": "The server stopped before it answered. It wrote: {detail}",
   "error.backend.mcpServerFailedToStart": "The server did not start: {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} stopped waiting before the server started, so its agents do not get the tools of this server.",
@@ -293,6 +295,8 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
     "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot could not renew the sign-in to this MCP server now. The sign-in is kept, and the next request tries again. If this error continues, the user can sign out of the server in OpenBot and sign in again.",
   "error.backend.mcpOAuthRequestRefused":
     "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",

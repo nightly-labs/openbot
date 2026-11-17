@@ -12,6 +12,9 @@ export const messages = {
     "{provider} is zijn aanmelding kwijt, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} heeft een bericht geweigerd, dus OpenBot heeft het proces beëindigd. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLost": "{provider} heeft de verbinding verloren. Stuur je bericht opnieuw.",
+  "error.provider.acpServerLostEnded":
+    "{provider} heeft de verbinding verloren, dus OpenBot heeft het proces beëindigd.",
   "error.provider.acpSettingsTimedOut": "{provider} reageerde niet op tijd. Probeer het zo opnieuw.",
   "error.provider.acpPlanUsedUp":
     "{provider} meldt dat je abonnement op is. Kies een ander model of upgrade je {provider}-abonnement.",
@@ -187,6 +190,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "De aanbieder heeft de code niet geaccepteerd. Start het inloggen opnieuw.",
   "error.provider.codeLoginUnsupported":
     "Deze server kan niet inloggen met een geplakte code. Log in op de servercomputer, in de browser daar.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude kan de aanmelding niet opslaan op de Mac. Start de Mac waarop OpenBot draait opnieuw op en verbind Claude daarna opnieuw.",
   "error.provider.cliBusyRetry":
     "De {provider} CLI werkt aan een beurt. Wacht tot die klaar is en probeer het opnieuw.",
   "error.provider.cliSigningIn":
@@ -210,6 +215,8 @@ export const messages = {
     "OpenCode heeft geen inlog voor de modelaanbieder “{provider}”. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
+  "error.provider.opencodeProviderRefused":
+    "De modelaanbieder \"{provider}\" heeft het verzoek geweigerd. OpenCode heeft een sleutel voor deze aanbieder, dus je netwerk kan de oorzaak zijn: sommige aanbieders blokkeren VPN's, proxy's of bepaalde landen. Zet de VPN uit of gebruik een ander netwerk en probeer het opnieuw. Als de fout blijft, is de sleutel mogelijk onjuist: voer `opencode auth login` uit in een terminal en voer de sleutel opnieuw in.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode heeft dit gratis model geweigerd. Sommige gratis modellen zijn niet in elk land beschikbaar. Kies een ander model met het label Gratis, of plak een OpenCode Go-sleutel in de OpenCode-instellingen en kies een OpenCode Go-model.",
   "error.provider.customEndpointKeyRefused":
@@ -236,6 +243,8 @@ export const messages = {
     "De gratis OpenCode-modellen hebben hun gebruikslimiet bereikt. Alle gratis modellen delen deze limiet. Plak een OpenCode Go-sleutel in de OpenCode-instellingen om door te gaan, of kies een model van een andere aanbieder.",
   "error.provider.opencodeProviderFailed":
     "De modelaanbieder had een storing aan zijn kant. Het ligt niet aan je verbinding. Probeer het later opnieuw of kies een ander model.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Dit model is niet beschikbaar voor je. Kies een ander model voor deze agent.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "Het antwoord van het model werd afgebroken of was ongeldig. Stuur je bericht opnieuw of kies een ander model.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -284,10 +293,14 @@ export const messages = {
     "Gemini kan dit model nu niet gebruiken. Kies een ander model en probeer het opnieuw.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "De Gemini-service van Google heeft het verzoek niet voltooid. Probeer het over een paar minuten opnieuw.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google heeft de Gemini-aanmelding voor dit verzoek niet geaccepteerd. Stuur je bericht opnieuw. Blijft de fout, verbind Gemini dan opnieuw in Instellingen.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini heeft dit verzoek geweigerd. Kies een ander model en stuur je bericht opnieuw. Mislukt het weer, start dan een nieuwe chat.\n{detail}",
   "error.provider.antigravitySessionRejected":
     "Gemini heeft dit verzoek geweigerd zonder de oorzaak te geven. Een item in de chatgeschiedenis kan de oorzaak zijn, zoals een afbeelding die de agent heeft geopend. OpenBot heeft een nieuwe Gemini-sessie gestart met de chatgeschiedenis. Probeer het opnieuw. Blijft de fout, kies dan een ander model.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini kon de opgeslagen geschiedenis van deze chat niet lezen. OpenBot heeft een nieuwe Gemini-sessie met de chatgeschiedenis gestart. Stuur je bericht opnieuw.",
   "error.provider.antigravityLocationUnsupported":
     "Google staat Gemini niet toe vanaf de netwerklocatie van de computer waarop deze agent draait. Gebruik Gemini op een andere computer, of kies een andere aanbieder voor deze agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -334,6 +347,8 @@ export const messages = {
     "Hermes kon deze beurt niet afmaken. Als het antwoord een reden geeft, volg die dan. Zo niet, dan is een MCP-server van deze agent misschien niet beschikbaar: controleer hem in Marktplaats, Apps, en stuur je bericht opnieuw.",
   "error.provider.hermesRefused":
     "Hermes heeft dit bericht geweigerd voordat het begon. Stuur het opnieuw. Als Hermes elk bericht weigert, start OpenBot dan opnieuw op de computer waarop deze agent draait.",
+  "error.provider.hermesConnectionLost":
+    "Hermes heeft tijdens dit bericht de verbinding verloren en weet dus niet of het werk klaar is. Controleer wat de agent heeft gedaan voordat je het bericht opnieuw stuurt.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot kon dit model niet gebruiken: het model accepteerde de denkinstelling niet. Selecteer een ander model voor deze agent en verstuur je bericht opnieuw.",
   "error.provider.usageLimitReached": "Het account heeft de gebruikslimiet bereikt.",

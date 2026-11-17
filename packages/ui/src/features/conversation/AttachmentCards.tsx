@@ -72,7 +72,17 @@ export function AttachmentCards(props: {
   const isMissing = (attachment: AttachmentSummary) => missing().has(attachment.id);
   const markMissing = (attachment: AttachmentSummary) => setMissing((current) => new Set(current).add(attachment.id));
   const [loadingMedia, setLoadingMedia] = createSignal<ReadonlySet<string>>(new Set());
+  // Set by the click that loads a file, until the file starts. A kept `autoplay` would start the file
+  // again each time its player is made again, as when the host sends the message again.
   const [playRequested, setPlayRequested] = createSignal<ReadonlySet<string>>(new Set());
+  const started = (attachment: AttachmentSummary) => {
+    if (!playRequested().has(attachment.id)) return;
+    setPlayRequested((current) => {
+      const next = new Set(current);
+      next.delete(attachment.id);
+      return next;
+    });
+  };
   // A video that cannot play or load goes back to its card, which has its name and its buttons.
   const [unplayable, setUnplayable] = createSignal<ReadonlySet<string>>(new Set());
   const markUnplayable = (attachment: AttachmentSummary) =>
@@ -175,6 +185,7 @@ export function AttachmentCards(props: {
               attachmentId={attachment.id}
               loading={loadingMedia().has(attachment.id)}
               onLoad={() => void loadMedia(attachment)}
+              onPlay={() => started(attachment)}
               onError={() => markUnplayable(attachment)}
               menu={videoMenu()}
             />

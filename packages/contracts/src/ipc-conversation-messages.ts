@@ -323,6 +323,11 @@ export interface ConversationMessage {
   /** Set on a `video_generation` message. Absent on a message from an older host. */
   videoGeneration?: VideoGenerationInfo | undefined;
   delivery?: Pick<QueueDelivery, "id" | "status" | "position"> | undefined;
+  /**
+   * Set on a message that joined a turn that was already running, a steer. The shared order puts it
+   * after the rows that the turn wrote before it (`conversation-order.ts`). The Team API drops it.
+   */
+  steered?: true | undefined;
   exchange?: AgentExchangeSummary | undefined;
   reaction?: MessageReaction | null | undefined;
   reactions?: ConversationReaction[] | undefined;
@@ -384,6 +389,7 @@ export function isConversationMessage(value: unknown): value is ConversationMess
         value.attachments.every(isAttachmentSummary))) &&
     (value.voiceRecording === undefined || isAttachmentSummary(value.voiceRecording)) &&
     (value.delivery === undefined || isConversationDelivery(value.delivery)) &&
+    (value.steered === undefined || value.steered === true) &&
     (value.exchange === undefined || isAgentExchangeSummary(value.exchange)) &&
     (value.reaction === undefined || value.reaction === null || isMessageReaction(value.reaction)) &&
     (value.reactions === undefined ||
@@ -431,6 +437,14 @@ export const ROUTINE_QUIET_ANSWER_ITEM_TYPE = "routine_quiet_answer";
  * does not go to a Team API client.
  */
 export const AGENT_WELCOME_ITEM_TYPE = "agent_welcome";
+
+/**
+ * The item type of the message that continues a channel request after the sub-tasks that it waited
+ * for ended. It repeats the person's request for the member, but the person did not send it again
+ * (#8812). No chat, history page, search, queue or preview shows it, and it does not go to a Team API
+ * client.
+ */
+export const CHANNEL_RESUME_ITEM_TYPE = "channel_resume";
 
 /**
  * An agent message that says something to the reader. Commentary, a question prompt, a plan, the

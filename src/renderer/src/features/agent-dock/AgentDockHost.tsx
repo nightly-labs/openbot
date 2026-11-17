@@ -186,7 +186,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
     waitedUsageLimits,
     setWaitedUsageLimits,
   } = useTurns();
-  const { currentTeamMember } = usePresence();
+  const { readerMemberId } = usePresence();
   const auth = useAuth();
   const { activeServer } = useServers();
   const { browserTabs } = useBrowserTabs();
@@ -307,7 +307,7 @@ function createServerDock(serverId: string, options: { readWhenHidden: boolean }
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });
