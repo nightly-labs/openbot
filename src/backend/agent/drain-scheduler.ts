@@ -5,6 +5,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentModelOption,
   type AgentSummary,
+  CHANNEL_RESUME_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { isFixedSourceText, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
@@ -1098,7 +1099,10 @@ export class DrainScheduler {
               }
             : this.#mailbox.isWelcomeDelivery(item.id)
               ? { itemType: AGENT_WELCOME_ITEM_TYPE }
-              : {}),
+              : // The continuation of a channel request is not a new message from the person (#8812).
+                channelDelivery && this.#channels?.resumesAfterSubtasks(item.id)
+                ? { itemType: CHANNEL_RESUME_ITEM_TYPE }
+                : {}),
         });
       }
       this.#conversation.emitConversation(snapshot);
