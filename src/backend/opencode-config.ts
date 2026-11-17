@@ -98,7 +98,7 @@ interface OpenCodeNativeModelEntry {
 interface OpenCodeNativeProviderEntry {
   readonly package: string;
   readonly name: string;
-  readonly compatibility: { readonly requireReasoning: false };
+  readonly compatibility: { readonly reasoningField?: "reasoning"; readonly requireReasoning: false };
   readonly settings: Omit<OpenCodeProviderOptions, "headers">;
   readonly headers?: Readonly<Record<string, string>>;
   readonly models: Readonly<Record<string, OpenCodeNativeModelEntry>>;
@@ -305,20 +305,37 @@ function isMistralApi(baseUrl: string): boolean {
 const OPENCODE_MISTRAL_PACKAGE = "aisdk:@ai-sdk/mistral";
 
 /**
- * The `provider` entry in OpenCode's `providers` format, with Mistral's own adapter when the endpoint
- * has a key, and `requireReasoning` off. Only the OpenAI-compatible adapter reads `requireReasoning`,
- * so it still protects a keyless endpoint from #10094. OpenCode 2.2.5 and 2.3.0 use a `providers` entry
+ * Groq's API refuses `reasoning_content` in an assistant message and reads the thinking text from
+ * `reasoning` (`ChatCompletionAssistantMessageParam` in Groq's SDK). OpenCode 2.3.0 sends the thinking
+ * of an earlier turn from another provider as `reasoning_content` when the model sets no field, so
+ * each Groq turn after a switch to a Groq model, such as a backup model, failed with HTTP 400 (#11480).
+ * These are the values of OpenCode's own Groq provider. `requireReasoning` stays off: with a field
+ * set, OpenCode would otherwise add an empty `reasoning` to each assistant message.
+ */
+function isGroqApi(baseUrl: string): boolean {
+  const url = URL.parse(baseUrl);
+  return url?.protocol === "https:" && (url.hostname === "groq.com" || url.hostname.endsWith(".groq.com"));
+}
+
+/**
+ * The `provider` entry in OpenCode's `providers` format, with `requireReasoning` off. On Mistral's API
+ * it uses Mistral's own adapter when the endpoint has a key. Only the OpenAI-compatible adapter reads
+ * `requireReasoning`, so it still protects a keyless endpoint from #10094. On Groq's API it keeps the
+ * OpenAI-compatible adapter and sends earlier thinking as `reasoning` (see {@link isGroqApi}). OpenCode 2.2.5 and 2.3.0 use a `providers` entry
  * in place of the `provider` entry of the same id, as a whole, so this one carries every field of
  * {@link providerEntry}, moved as OpenCode moves them (`migrateStandardProvider` in
  * `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores `providers`, so the `provider`
  * entry stays for a user's own OpenCode 1. Checked with `scripts/opencode-mistral-reasoning-e2e.ts`.
  */
-function nativeProviderEntry({ npm, name, options, models }: OpenCodeProviderEntry): OpenCodeNativeProviderEntry {
+function nativeProviderEntry(
+  { npm, name, options, models }: OpenCodeProviderEntry,
+  groq: boolean,
+): OpenCodeNativeProviderEntry {
   const { headers, ...settings } = options;
   return {
-    package: options.apiKey ? OPENCODE_MISTRAL_PACKAGE : `aisdk:${npm}`,
+    package: options.apiKey && !groq ? OPENCODE_MISTRAL_PACKAGE : `aisdk:${npm}`,
     name,
-    compatibility: { requireReasoning: false },
+    compatibility: groq ? { reasoningField: "reasoning", requireReasoning: false } : { requireReasoning: false },
     settings,
     ...(headers ? { headers } : {}),
     models: Object.fromEntries(Object.entries(models).map(([id, model]) => [id, nativeModelEntry(model)])),
@@ -336,20 +353,24 @@ function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEn
 }
 
 /**
- * The `providers` block: the endpoints on Mistral's API, or null when there is none. They also stay
- * in the `provider` block, for OpenCode 1 (see {@link nativeProviderEntry}).
+ * The `providers` block: the endpoints on Mistral's and Groq's APIs, or null when there is none. They
+ * also stay in the `provider` block, for OpenCode 1 (see {@link nativeProviderEntry}).
  */
 function nativeProviderEntries(
   providers: readonly CustomProviderConfig[],
 ): Readonly<Record<string, OpenCodeNativeProviderEntry>> | null {
-  const usable = providers.filter((provider) => provider.models.length > 0 && isMistralApi(provider.baseUrl));
+  const usable = providers.filter(
+    (provider) => provider.models.length > 0 && (isMistralApi(provider.baseUrl) || isGroqApi(provider.baseUrl)),
+  );
   if (usable.length === 0) return null;
-  return Object.fromEntries(usable.map((provider) => [provider.id, nativeProviderEntry(providerEntry(provider))]));
+  return Object.fromEntries(
+    usable.map((provider) => [provider.id, nativeProviderEntry(providerEntry(provider), isGroqApi(provider.baseUrl))]),
+  );
 }
 
 /**
  * Merges the custom providers and the stored key into a base layer. Providers only ever land under
- * the `provider` key, and also `providers` for an endpoint on Mistral's API, so no provider id can
+ * the `provider` key, and also `providers` for an endpoint on Mistral's or Groq's API, so no provider id can
  * reach a sibling setting: an endpoint named `permission` is a provider named `permission`, not a
  * permission rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that
  * built-in provider, so the stored key must not drop its URL and models.
