@@ -160,7 +160,6 @@ import { RunMarker, type UncleanExitProperties } from "./run-marker";
 import { memberAuditName } from "./server-audit-store";
 import { takeServerModeEnvironment } from "./server-mode";
 import {
-  haltsAtOnce,
   START_LOOP_EXIT_CODE,
   type StartHaltReason,
   type StartHaltRecord,
@@ -2075,7 +2074,7 @@ if (!hasSingleInstanceLock) {
       // A server stops its start loop when a restart cannot help, or when the failures reached the limit.
       if (serverStartGuard) {
         const reason = startHaltReason(error);
-        if (haltsAtOnce(reason) || startAttempts?.failureLimitReached) haltServerStart(reason);
+        if (reason !== "start_failed" || startAttempts?.failureLimitReached) haltServerStart(reason);
         app.quit();
         return;
       }

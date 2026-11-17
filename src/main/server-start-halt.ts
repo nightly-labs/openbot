@@ -4,22 +4,10 @@ import { Effect, Option, Schema } from "effect";
 import { DatabaseMigrationError, NewerDatabaseError } from "../backend/openbot-database-schema";
 
 /**
- * A server has no window, so it cannot show the recovery window of the desktop. Before, a server
- * whose start failed started again every 10 seconds, without an end (`openbot.service` has
- * `Restart=always`). Now a server stops its start loop: it writes the reason to a small file in the
- * user data folder and exits with `START_LOOP_EXIT_CODE`. `RestartPreventExitStatus=` of the unit
- * then does not start it again. These start it again, and the next start tries once more:
- * - a restart of the server (a boat wake works like a reboot), `openbot restart`, or `openbot start`,
- * - the update timer (`openbot-hosted-update check`, about each 6 hours), with a newer release when one
- *   is staged, or `openbot update`.
- *
- * A server stops the loop at once when a restart cannot help: data from a newer OpenBot, or a
- * failed migration. For each other failure, it stops after the failures in a row that start the
- * recovery window on the desktop (`start-attempts.ts`).
- *
- * The file has a fixed reason word, the app version and a time only: no path, no error text and
- * no secret. It is for the log of the next start and for a later safe mode that shows the reason
- * to the owner.
+ * A server has no recovery window, so it stops its start loop: it writes the reason file and exits
+ * with `START_LOOP_EXIT_CODE`, which `RestartPreventExitStatus=` of `openbot.service` does not
+ * restart. See "Start loop" in `docs/hosted-servers.md`. The file has a fixed reason word, the app
+ * version and a time only: no path, no error text and no secret.
  */
 
 /** EX_CONFIG of sysexits.h. `scripts/hosting/openbot.service` and `openbot-hosted-update` use the same number. */
@@ -54,11 +42,6 @@ export function startHaltReason(error: unknown): StartHaltReason {
     current = current.cause;
   }
   return "start_failed";
-}
-
-/** True when a restart cannot help, so the server stops the loop after the first failure. */
-export function haltsAtOnce(reason: StartHaltReason): boolean {
-  return reason !== "start_failed";
 }
 
 /**

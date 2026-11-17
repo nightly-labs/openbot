@@ -5,8 +5,7 @@
 #                                 the release manifest, copies it to /opt/OpenBot/staged, and installs
 #                                 the packages that it needs. OpenBot keeps running.
 #   openbot-hosted-update check   openbot-update.timer. Runs `stage`. When OpenBot stopped its start
-#                                 loop, it also starts OpenBot again, also when `stage` failed, after `apply` when a release is
-#                                 staged, so a new release or a temporary failure ends the loop.
+#                                 loop, it starts OpenBot again, after `apply` when a release is staged.
 #   openbot-hosted-update boot    openbot-update-apply.service, at boot before openbot.service. Runs
 #                                 `apply` when the disk of the server is complete. After a boat wake,
 #                                 boat restores the disk for some minutes, and OpenBot does not wait
@@ -220,14 +219,11 @@ start_loop_stopped() {
   [ "$(systemctl show --property=ExecMainStatus --value openbot.service 2>/dev/null)" = "$START_LOOP_STATUS" ]
 }
 
-# `stage`, and then a start when OpenBot stopped its start loop: with the staged release when there
-# is one (also one that an earlier `stage` made before the loop), else with the same release. A
-# hosted owner cannot run `openbot restart`, and a failure can be temporary (a full disk, no
-# network), so each run of the timer (about each 6 hours) tries once more. A failure that does not
-# go away costs one start in each run. `stage` runs in a subshell with errexit on: a failed stage (no
-# network, a full disk) must not stop the start, and `check` then exits with its status. Do not write
-# `(stage) || ...`: Bash ignores `set -e` on the left of `||`, also in the subshell, and a stage that
-# failed half way then writes `staged.ready`.
+# `stage`, and then a start when OpenBot stopped its start loop, with the staged release when there
+# is one. A hosted owner has no shell and a failure can be temporary, so each timer run tries once
+# more. `stage` runs in a subshell with errexit on, so a failed stage does not stop the start;
+# `check` then exits with its status. Do not write `(stage) || ...`: Bash ignores `set -e` on the
+# left of `||`, also in the subshell, and a stage that failed half way then writes `staged.ready`.
 check() {
   local staged
   set +e
