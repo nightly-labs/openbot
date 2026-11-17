@@ -2795,6 +2795,29 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
+      // An agent can cancel a new prompt for a stop that it already answered (CodeBuddy, #11008). With
+      // no update, the prompt did not run, so it is sent again once. OpenBot's own cancels set a cause first.
+      const cancelledUnstarted = () =>
+        response.stopReason === "cancelled" && !turn.stopped && !turn.answered && turn.failureCause === null;
+      if (cancelledUnstarted()) {
+        this.#reportPromptUsage(thread, turn, response);
+        // The stall watch measures the new prompt from its send.
+        turn.lastActivityAt = Date.now();
+        response = providerResult(yield* send());
+        if (thread.activeTurn !== turn || turn.completing) return;
+        // A turn told not to answer ends quietly, as interrupted, below.
+        if (cancelledUnstarted() && !turn.answerOptional) {
+          this.#reportPromptUsage(thread, turn, response);
+          turn.failureCause = "cancelled";
+          yield* this.#completeTurn(
+            thread,
+            turn,
+            "failed",
+            sourceText("error.agent.promptCancelled", { provider: this.#providerName(thread) }),
+          );
+          return;
+        }
+      }
       // A wake prompt left the same commands running: the wait ends.
       let staleWake = false;
       for (;;) {
@@ -3721,9 +3744,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     if (count !== ACP_REPEATED_TOOL_FAILURES || turn.stopped) return;
     Effect.runFork(
       Effect.gen({ self: this }, function* () {
-        yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
         // The model chose to repeat the call; the provider did not fail. So no backup model starts.
+        // Set before the cancel, as in `#watchStall`.
         turn.failureCause = "turn_limit";
+        yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
         yield* this.#abandonTurn(
           thread,
           turn,
@@ -3790,9 +3814,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
-      yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
-      // The agent can ignore the cancel, so a backup model must not start on this stall.
+      // The agent can ignore the cancel, so a backup model must not start on this stall. Set before the
+      // cancel: a `cancelled` reply to it must not send the prompt again (`#consumePrompt`).
       turn.failureCause = "stalled";
+      yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
       yield* this.#abandonTurn(
         thread,
         turn,

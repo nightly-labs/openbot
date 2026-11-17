@@ -80,6 +80,7 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.promptCancelled": "{provider} 在开始处理前取消了这条消息。请重新发送消息。",
   "error.agent.toolLoopStopped":
     "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.answerCutOff": "智能体在完成回答之前停止了，因此回答不完整。请重新发送消息。",

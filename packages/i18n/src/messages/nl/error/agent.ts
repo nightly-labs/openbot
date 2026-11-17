@@ -104,6 +104,8 @@ export const messages = {
     "Het endpoint dat deze agent gebruikte, is verwijderd. Kies een ander model voor de agent.",
   "error.agent.turnStalled":
     "{provider} reageerde niet meer, dus OpenBot heeft deze beurt beëindigd. Stuur het bericht opnieuw, of kies een ander model.",
+  "error.agent.promptCancelled":
+    "{provider} heeft dit bericht geannuleerd voordat het begon. Stuur het bericht opnieuw.",
   "error.agent.toolLoopStopped":
     "{provider} herhaalde een mislukte stap vele keren, dus OpenBot heeft deze beurt gestopt. Stuur het bericht opnieuw of kies een ander model.",
   "error.agent.answerCutOff":

@@ -102,6 +102,8 @@ export const messages = {
     "このエージェントが使用していたエンドポイントは削除されました。別のモデルを選択してください。",
   "error.agent.turnStalled":
     "{provider} が応答しなくなったため、OpenBot はこのターンを終了しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
+  "error.agent.promptCancelled":
+    "{provider} が開始前にこのメッセージをキャンセルしました。メッセージをもう一度送信してください。",
   "error.agent.toolLoopStopped":
     "{provider} が失敗した手順を何度も繰り返したため、OpenBot はこのターンを停止しました。メッセージをもう一度送信するか、別のモデルを選択してください。",
   "error.agent.answerCutOff":
