@@ -319,6 +319,11 @@ export class MessagingThreads {
     string,
     { deliveryIds: readonly string[]; origin: MessagingOrigin | null; followUp: boolean }
   >();
+  /**
+   * The requester of the last turn of each conversation, by link id. A turn that the provider starts
+   * itself continues that request. Kept in memory only: a restart also ends the provider's background work.
+   */
+  readonly #lastOrigins = new Map<string, MessagingOrigin>();
   /** The deliveries whose requester stopped them while they were starting, so their turn stops when it starts. */
   readonly #stopsBeforeStart = new Set<string>();
   /**
@@ -905,8 +910,16 @@ export class MessagingThreads {
           .unresolvedMessagingDeliveries(link.linkId)
           .filter((context) => context.delivery.status !== "queued");
         const running = active[0];
-        const origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
-        const followUp = running?.delivery.sender.kind === "agent";
+        let origin = running ? this.#mailbox.messagingOrigin(running.delivery.id) : null;
+        let followUp = running?.delivery.sender.kind === "agent";
+        if (origin) this.#lastOrigins.set(link.linkId, origin);
+        // The provider started this turn itself, as Claude does when a background command of the last
+        // request ends. It continues that request, so the conversation gets its status, Stop and answer.
+        // Before, the conversation got nothing, while the turn still held its queue (#10703).
+        else if (!running && event.origin === "unknown" && !this.#hooks.ownChat(event.threadId)) {
+          origin = this.#lastOrigins.get(link.linkId) ?? null;
+          followUp = origin !== null;
+        }
         const deliveryIds = active.map((context) => context.delivery.id);
         this.#turnOrigins.set(event.turnId, { deliveryIds, origin, followUp });
         this.#publish({ type: "started", link, turnId: event.turnId, origin, followUp });
@@ -1091,6 +1104,12 @@ export class MessagingThreads {
         stopped = true;
       }
     }
+    // A turn that the provider started itself has no delivery: it continues this author's last request.
+    for (const [turnId, turn] of this.#turnOrigins)
+      if (turn.deliveryIds.length === 0 && turn.origin?.linkId === linkId && turn.origin.authorId === authorId) {
+        yield* this.#hooks.interrupt(link.agentId, turnId, link.threadId).pipe(toMessagingThreadFailed);
+        stopped = true;
+      }
     if (stopped) this.#hooks.schedule(link.agentId);
     return stopped;
   });
@@ -1106,6 +1125,7 @@ export class MessagingThreads {
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
       yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
+    for (const link of this.store.links(agentId)) this.#lastOrigins.delete(link.linkId);
     yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 
