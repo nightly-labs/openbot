@@ -51,8 +51,18 @@ export function SettingsSection({
    */
   rowsDrawSeparators?: boolean;
 }>) {
+  // With `rowsDrawSeparators`, the section stays out of the layout until a row renders, so a title
+  // never shows over an empty group while the rows load or after their read fails.
+  const [rowsHeight, setRowsHeight] = useState(0);
+  const empty = rowsDrawSeparators && rowsHeight === 0;
   return (
-    <View className="gap-2">
+    <View
+      className="gap-2"
+      pointerEvents={empty ? "none" : undefined}
+      accessibilityElementsHidden={empty}
+      importantForAccessibility={empty ? "no-hide-descendants" : undefined}
+      style={empty ? { position: "absolute", left: 0, right: 0, opacity: 0 } : undefined}
+    >
       {title ? (
         <Typography type="body-xs" className="px-4 text-grouped-secondary">
           {title}
@@ -61,7 +71,9 @@ export function SettingsSection({
       <ListGroup variant="secondary" className="overflow-hidden rounded-grouped bg-grouped p-0 shadow-none">
         {rowsDrawSeparators ? (
           // The group clips the separator of the first row.
-          <View className="-mt-px">{children}</View>
+          <View className="-mt-px" onLayout={(event) => setRowsHeight(Math.round(event.nativeEvent.layout.height))}>
+            {children}
+          </View>
         ) : (
           Children.map(Children.toArray(children), (child, index) =>
             child ? (
