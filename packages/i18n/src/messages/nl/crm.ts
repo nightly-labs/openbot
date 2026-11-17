@@ -291,6 +291,10 @@ export const messages = {
   "crm.review.noMatch": "Geen suggesties gevonden",
   "crm.review.reject": "Afwijzen",
   "crm.review.approve": "Goedkeuren",
+  "crm.review.approveAll": "Alles goedkeuren",
+  "crm.review.approveAllTitle": { one: "{count} suggestie goedkeuren?", other: "{count} suggesties goedkeuren?" },
+  "crm.review.approveAllBody":
+    "Het CRM past ze één voor één toe, de oudste eerst. Het stopt bij een suggestie die het niet kan toepassen, en de andere blijven in de lijst.",
   "crm.review.suggests": "{agent} stelt voor: {change}",
   "crm.access.button": { one: "{count} agent", other: "{count} agents" },
   "crm.access.title": "Agents die het CRM kunnen lezen en wijzigingen kunnen voorstellen",

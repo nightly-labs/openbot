@@ -284,6 +284,10 @@ export const messages = defineMessages("crm", {
   "crm.review.noMatch": "No suggestions match",
   "crm.review.reject": "Reject",
   "crm.review.approve": "Approve",
+  "crm.review.approveAll": "Approve all",
+  "crm.review.approveAllTitle": { one: "Approve {count} suggestion?", other: "Approve {count} suggestions?" },
+  "crm.review.approveAllBody":
+    "The CRM applies them one at a time, oldest first. It stops at a suggestion that it cannot apply, and the others stay in the list.",
   "crm.review.suggests": "{agent} suggests: {change}",
   "crm.access.button": { one: "{count} agent", other: "{count} agents" },
   "crm.access.title": "Agents that can read the CRM and suggest changes",

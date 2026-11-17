@@ -276,6 +276,10 @@ export const messages = {
   "crm.review.noMatch": "一致する提案はありません",
   "crm.review.reject": "却下",
   "crm.review.approve": "承認",
+  "crm.review.approveAll": "すべて承認",
+  "crm.review.approveAllTitle": { other: "{count} 件の提案を承認しますか？" },
+  "crm.review.approveAllBody":
+    "CRM は古いものから 1 件ずつ適用します。適用できない提案で停止し、残りはリストに残ります。",
   "crm.review.suggests": "{agent} の提案：{change}",
   "crm.access.button": { other: "エージェント {count} 件" },
   "crm.access.title": "CRM を読み取り、変更を提案できるエージェント",

@@ -276,6 +276,10 @@ export const messages = {
   "crm.review.noMatch": "일치하는 제안 없음",
   "crm.review.reject": "거절",
   "crm.review.approve": "승인",
+  "crm.review.approveAll": "모두 승인",
+  "crm.review.approveAllTitle": { other: "제안 {count}건을 승인할까요?" },
+  "crm.review.approveAllBody":
+    "CRM이 오래된 것부터 하나씩 적용합니다. 적용할 수 없는 제안에서 멈추고, 나머지는 목록에 남습니다.",
   "crm.review.suggests": "{agent}의 제안: {change}",
   "crm.access.button": { other: "에이전트 {count}개" },
   "crm.access.title": "CRM을 읽고 변경을 제안할 수 있는 에이전트",

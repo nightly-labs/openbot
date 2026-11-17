@@ -296,6 +296,10 @@ export const messages = {
   "crm.review.noMatch": "אין הצעות תואמות",
   "crm.review.reject": "דחייה",
   "crm.review.approve": "אישור",
+  "crm.review.approveAll": "אישור הכול",
+  "crm.review.approveAllTitle": { one: "לאשר הצעה אחת?", two: "לאשר שתי הצעות?", other: "לאשר {count} הצעות?" },
+  "crm.review.approveAllBody":
+    "ה-CRM מחיל אותן אחת אחרי השנייה, מהישנה ביותר. הוא עוצר בהצעה שאי אפשר להחיל, והשאר נשארות ברשימה.",
   "crm.review.suggests": "{agent} מציע: {change}",
   "crm.access.button": { one: "סוכן אחד", two: "שני סוכנים", other: "{count} סוכנים" },
   "crm.access.title": "סוכנים שיכולים לקרוא את ה-CRM ולהציע שינויים",

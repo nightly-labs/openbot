@@ -331,6 +331,15 @@ export const messages = {
   "crm.review.noMatch": "Нет подходящих предложений",
   "crm.review.reject": "Отклонить",
   "crm.review.approve": "Одобрить",
+  "crm.review.approveAll": "Одобрить все",
+  "crm.review.approveAllTitle": {
+    one: "Одобрить {count} предложение?",
+    few: "Одобрить {count} предложения?",
+    many: "Одобрить {count} предложений?",
+    other: "Одобрить {count} предложения?",
+  },
+  "crm.review.approveAllBody":
+    "CRM применяет их по одному, начиная с самого старого. Он останавливается на предложении, которое не может применить, а остальные остаются в списке.",
   "crm.review.suggests": "{agent} предлагает: {change}",
   "crm.access.button": {
     one: "{count} агент",
