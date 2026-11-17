@@ -1484,10 +1484,11 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
-        // Only Discord's earlier messages have files, such as an image that a person posted without a
-        // mention just before this message. The agent gets them with this message. Slack is not asked:
-        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
-        adapter.platform === "discord" && !message.isDirect
+        // Only Discord's and Telegram's earlier messages have files, such as an image or a voice note
+        // that a person posted without a mention just before this message. The agent gets them with
+        // this message. Slack is not asked: before Marketplace approval it allows one thread read a
+        // minute, which the prompt needs.
+        (adapter.platform === "discord" || adapter.platform === "telegram") && !message.isDirect
           ? adapter
               .history(
                 message.platformChannelId,
