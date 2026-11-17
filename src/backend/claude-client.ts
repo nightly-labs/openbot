@@ -468,6 +468,12 @@ interface ActiveTurn {
    * message that only states the limit, so its text is held here and not published as the answer.
    */
   usageLimit: { resetsAt: number | null; text: string | null } | null;
+  /**
+   * The plan refused a request of a subagent for a spent window. The subagent runs on the same account,
+   * but the turn's own requests can still pass, as on a limit of another model. So it ends the turn on
+   * the limit only when the turn gave no answer (#11141).
+   */
+  subagentLimit: { resetsAt: number | null; text: string } | null;
   /** The CLI refused the turn with `authentication_failed`, so a backup model can take it (#7014). */
   authenticationFailed: boolean;
   /**
@@ -541,6 +547,8 @@ interface ThreadRuntime {
    * turn. The turn that the CLI then starts to answer the results continues them (#10847).
    */
   endedTaskTurns: (string | null)[];
+  /** The subagent limit refusal that came while no turn ran. The next turn that the CLI starts takes it. */
+  subagentLimit: { resetsAt: number | null; text: string } | null;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
   /** The uuids of the messages that this process took. The CLI does not run one of them again. */
@@ -1690,6 +1698,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       awaitsResultTurn: false,
       taskTurns: new Map(),
       endedTaskTurns: [],
+      subagentLimit: null,
       lastOutputAt: Date.now(),
       promptIds: (resume && this.#takenPrompts.get(threadId)) || new Set<string>(),
       nextTurnId: null,
@@ -1832,6 +1841,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       assistantMessages: new Map<string, string>(),
       toolCalls: new Map<string, { name: string; input: Record<string, string> }>(),
       usageLimit: null,
+      // A refusal that a reset ended since is old.
+      subagentLimit:
+        unprompted && runtime.subagentLimit && (runtime.subagentLimit.resetsAt ?? Infinity) * 1_000 > Date.now()
+          ? runtime.subagentLimit
+          : null,
       authenticationFailed: false,
       balanceSpent: false,
       billingFailed: false,
@@ -1847,6 +1861,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const continues =
       unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
     runtime.endedTaskTurns = [];
+    runtime.subagentLimit = null;
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
     runtime.awaitsResultTurn = false;
@@ -1864,6 +1879,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       },
     });
     return turn;
+  }
+
+  /**
+   * Holds the plan's refusal of a subagent's request. When all background subagents stop on the limit,
+   * the turn that Claude then starts can end with no refusal of its own, so nothing moved the agent to
+   * its backup (#11141). A spent balance does not reset and is left out.
+   */
+  #holdSubagentLimit(runtime: ThreadRuntime, message: ClaudeStreamMessage): void {
+    const text = messageText(message.message);
+    const refusal = claudeUsageLimitRefusal(message);
+    if (isBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
+    const limit = { resetsAt: refusal?.resetsAt ?? null, text: text || sourceText("error.provider.usageLimitReached") };
+    if (runtime.activeTurn) runtime.activeTurn.subagentLimit = limit;
+    else runtime.subagentLimit = limit;
   }
 
   /**
@@ -2195,6 +2224,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     }
 
     if (message.type === "assistant" && message.parent_tool_use_id && message.uuid) {
+      if (message.error === "rate_limit") this.#holdSubagentLimit(runtime, message);
       this.#emitSubagents(
         runtime,
         foldClaudeSubagentMessage(runtime.subagents, message.parent_tool_use_id, message.uuid, message.message),
@@ -2379,7 +2409,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // refusal message, or a request that then failed with a rate-limit error, ends the turn on the
       // limit. Another API error, such as a 529 overload, stays a provider error (#10486). An older CLI
       // sends no status, so its API error still counts.
-      const limit = turn.usageLimit;
+      // A subagent's refusal ends a turn on the limit when the turn has no answer and no refusal of its own.
+      const subagentLimit = turn.usageLimit?.text == null && !turn.seenText && !fallback ? turn.subagentLimit : null;
+      const limit = subagentLimit
+        ? { resetsAt: subagentLimit.resetsAt ?? turn.usageLimit?.resetsAt ?? null, text: subagentLimit.text }
+        : turn.usageLimit;
       const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
       if (
         limit &&
