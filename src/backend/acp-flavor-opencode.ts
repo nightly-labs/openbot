@@ -27,6 +27,29 @@ function isOpenCodeTimeoutRetry(update: SessionUpdate): boolean {
   return isRecord(retry) && isRecord(retry.error) && /\btimed out\b/iu.test(String(retry.error.message ?? ""));
 }
 
+/**
+ * The `error.type` of an OpenCode retry, with whether OpenCode could not connect. OpenCode 2.2.5 to
+ * 2.3.0 send a request that failed with a provider error, such as the 502 or 504 of an overloaded
+ * NVIDIA endpoint, 10 times in about 90 s, and tell of each try only in `_meta["opencode/retry"]`.
+ * The chat showed nothing meanwhile, and the agent looked slow (#10129).
+ */
+const OPENCODE_RETRY_TYPES: ReadonlyMap<string, boolean> = new Map([
+  ["provider.internal", false],
+  ["provider.timeout", false],
+  ["provider.transport", true],
+]);
+
+/** OpenCode counts the first request as attempt 1, so its first retry is attempt 2. */
+function openCodeRetryUpdate(update: SessionUpdate): { attempt: number; unreachable: boolean } | null {
+  if (update.sessionUpdate !== "session_info_update" || !isRecord(update._meta)) return null;
+  const retry = update._meta["opencode/retry"];
+  if (!isRecord(retry) || !isRecord(retry.error) || typeof retry.attempt !== "number") return null;
+  const type = retry.error.type;
+  const unreachable = typeof type === "string" ? OPENCODE_RETRY_TYPES.get(type) : undefined;
+  if (unreachable === undefined) return null;
+  return { attempt: Math.max(1, retry.attempt - 1), unreachable };
+}
+
 /** OpenCode 2's error for a request that its service cannot answer yet, such as at start (#57204). */
 function isOpenCodeStarting(error: unknown): boolean {
   return (
@@ -174,7 +197,13 @@ function openCodeRequestFailure(
     log(`OpenCode request does not fit the model's context window: ${reason}`);
     return sourceText("error.provider.opencodeContextTooSmall");
   }
-  const key = OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0];
+  // OpenCode 2 names a provider's 5xx `provider.internal`, with text such as "Provider request failed
+  // with HTTP 504" or the provider's own reason, which the OpenCode 1 texts above do not match (#10129).
+  const key =
+    OPENCODE_REQUEST_FAILURES.find(([, pattern]) => pattern.test(reason))?.[0] ??
+    (isRecord(error.data) && error.data.errorName === "provider.internal"
+      ? "error.provider.opencodeProviderFailed"
+      : undefined);
   if (!key) return detail;
   return sourceText(key, { detail: shownFailureDetail(redact(reason)) });
 }
@@ -268,6 +297,7 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // added one more copy of the instructions to a long chat (#7171).
   reopenKeepsPrompts: true,
   modelRetryUpdate: isOpenCodeTimeoutRetry,
+  retryUpdate: openCodeRetryUpdate,
   // OpenCode 2.2.0 gives each step's message its own ID. Text of two steps was joined into one line.
   messagePerId: true,
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A

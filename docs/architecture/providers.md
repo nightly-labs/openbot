@@ -804,6 +804,13 @@ does not answer the retry fails the turn after about 11 minutes, with the stall 
 after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
 failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
 
+A provider failure, such as the 502 or 504 of an overloaded endpoint, gets 10 attempts in about 90 s.
+`retryUpdate` of `OPENCODE_ACP_FLAVOR` shows each retry after a provider failure (`provider.internal`),
+a timeout or a lost connection as the turn's status, with the attempt number: OpenCode does not say
+how many attempts it makes. The first output after it replaces the status. When OpenCode gives up, a
+`provider.internal` error shows `error.provider.opencodeProviderFailed`, also when its text matches
+no OpenCode 1 pattern (#10129).
+
 #### Text of two steps
 
 OpenCode 2.2.0 gives the message of each step its own ACP `messageId`. With `messagePerId`, text of a

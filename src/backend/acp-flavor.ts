@@ -25,6 +25,14 @@ interface AcpRetryNotice {
   readonly unreachable: boolean;
 }
 
+/** A session update that says that the agent sends a failed model request again (`AcpFlavor.retryUpdate`). */
+interface AcpRetryUpdate {
+  /** The number of the retry: 1 for the first request after the failed one. */
+  readonly attempt: number;
+  /** The agent could not connect to the model provider. Else the provider answered with an error or stopped answering. */
+  readonly unreachable: boolean;
+}
+
 /** The custom endpoint that serves a model, as a turn's error names it. Never a credential itself. */
 export interface AcpCustomEndpoint {
   readonly name: string;
@@ -285,6 +293,11 @@ export interface AcpFlavor {
    * session update does, and the chat shows the retry.
    */
   retryNotice?: (method: string, params: DynamicRecord) => AcpRetryNotice | null;
+  /**
+   * A session update that says that the agent sends a failed model request again, else null. The agent
+   * does not say how many times it tries. The chat shows the retry until the agent's next output.
+   */
+  retryUpdate?: (update: SessionUpdate) => AcpRetryUpdate | null;
   /**
    * Whether a session update reports a retry of a model request that timed out: a retry that the agent
    * schedules, or the end of a retried attempt. The agent waits for a model as long as OpenBot's stall
