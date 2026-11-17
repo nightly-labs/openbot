@@ -797,7 +797,9 @@ export class DrainScheduler {
             })
           )
             yield* this.#hooks.startRequestedNewChat(agentId, queued);
-          this.#hooks.dropRequestedNewChat(agentId);
+          // A run in its own session does not end the request, so a new chat that still waits, such as
+          // for background work, starts after it.
+          if (!ownSession) this.#hooks.dropRequestedNewChat(agentId);
         }
         const session =
           agent && publicThreadId && !ownSession

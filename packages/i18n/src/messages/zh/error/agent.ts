@@ -64,8 +64,6 @@ export const messages = {
   "error.agent.waitBeforeProviderChange": "请等当前轮次和队列结束后再更改服务商。",
   "error.agent.waitForTasksBeforeProviderChange": "该助手的任务正在运行，请等它们结束或先停止它们，再更改服务商。",
   "error.agent.waitBeforeClearContext": "请等当前轮次和队列结束后再开始新对话。",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "此智能体的后台子智能体或命令正在运行。请等它们结束后再开始新对话。",
   "error.agent.waitBeforeCompactContext": "请等当前轮次和队列结束后再压缩上下文。",
   "error.agent.waitBeforeDeleteHistory": "请等当前轮次和队列结束后再删除历史记录。",
   "error.agent.compactContextUnavailable": "该助手现在无法压缩上下文。",

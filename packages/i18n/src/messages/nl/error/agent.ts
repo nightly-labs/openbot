@@ -81,8 +81,6 @@ export const messages = {
     "Er draaien taken van deze agent. Wacht tot ze klaar zijn, of stop ze, voordat je de aanbieder wijzigt.",
   "error.agent.waitBeforeClearContext":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je een nieuwe chat start.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Achtergrond-subagents of -opdrachten van deze agent zijn bezig. Wacht tot ze klaar zijn voordat je een nieuwe chat start.",
   "error.agent.waitBeforeCompactContext":
     "Wacht tot de actieve beurt en de wachtrij klaar zijn voordat je de context comprimeert.",
   "error.agent.waitBeforeDeleteHistory":

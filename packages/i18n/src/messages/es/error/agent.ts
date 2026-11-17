@@ -78,8 +78,6 @@ export const messages = {
     "Hay tareas de este agente en ejecución. Espera a que terminen o detenlas antes de cambiar de proveedor.",
   "error.agent.waitBeforeClearContext":
     "Espera a que terminen el turno activo y la cola antes de iniciar un nuevo chat.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Hay subagentes o comandos en segundo plano de este agente en ejecución. Espera a que terminen antes de iniciar un chat nuevo.",
   "error.agent.waitBeforeCompactContext":
     "Espera a que terminen el turno activo y la cola antes de compactar el contexto.",
   "error.agent.waitBeforeDeleteHistory":

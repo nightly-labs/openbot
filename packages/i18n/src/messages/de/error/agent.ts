@@ -84,8 +84,6 @@ export const messages = {
     "Aufgaben dieses Agenten laufen. Warte, bis sie abgeschlossen sind, oder stoppe sie, bevor du den Anbieter wechselst.",
   "error.agent.waitBeforeClearContext":
     "Warte, bis der aktive Durchlauf und die Warteschlange abgeschlossen sind, bevor du einen neuen Chat beginnst.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Hintergrund-Subagents oder -Befehle dieses Agenten laufen. Warte, bis sie fertig sind, bevor du einen neuen Chat startest.",
   "error.agent.waitBeforeCompactContext":
     "Warte, bis der aktive Durchlauf und die Warteschlange fertig sind, bevor du den Kontext komprimierst.",
   "error.agent.waitBeforeDeleteHistory":

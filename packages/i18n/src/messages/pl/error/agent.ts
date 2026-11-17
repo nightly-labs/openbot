@@ -76,8 +76,6 @@ export const messages = {
     "Zadania tego agenta są uruchomione. Przed zmianą dostawcy poczekaj, aż się zakończą, albo je zatrzymaj.",
   "error.agent.waitBeforeClearContext":
     "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim rozpoczniesz nowy czat.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Działają podagenci lub polecenia w tle tego agenta. Poczekaj, aż się zakończą, zanim zaczniesz nowy czat.",
   "error.agent.waitBeforeCompactContext": "Zanim skompaktujesz kontekst, poczekaj na koniec aktywnej tury i kolejki.",
   "error.agent.waitBeforeDeleteHistory": "Poczekaj, aż bieżąca tura i kolejka się zakończą, zanim usuniesz historię.",
   "error.agent.compactContextUnavailable": "Ten agent nie może teraz skompaktować kontekstu.",

@@ -1867,7 +1867,7 @@ export class ThreadLifecycle {
   /**
    * Whether a Claude session of the agent's own chat runs background subagents or commands. A new
    * chat closes that session, and the work would end with it (#10743). A Codex background terminal,
-   * such as a dev server, can run without end, so it does not hold a new chat.
+   * such as a dev server, can run without end, so it does not hold the new chat that the agent asked for.
    */
   mainRunsBackgroundWork(agent: AgentSummary): Effect.Effect<boolean> {
     if (agent.threadId === null) return Effect.succeed(false);

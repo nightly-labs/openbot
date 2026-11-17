@@ -4620,15 +4620,6 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
   ) {
     // A new chat ends the automatic plan continuation of the agent's own chat.
     yield* this.#drain.endPlanContinuation(agentId, null);
-    const known = yield* lifecycleStep("clear agent context", () => this.#conversation.requireKnownAgent(agentId));
-    // The new chat closes the Claude session, and its background subagents and commands end with it.
-    // A requested new chat waits: when the work ends, Claude answers its result in a turn of its own,
-    // and the drain after that turn starts the new chat.
-    if (yield* this.#threads.mainRunsBackgroundWork(known))
-      return yield* new AgentLifecycleFailed({
-        operation: "clear agent context",
-        cause: new ContextResetBusyError(sourceText("error.agent.waitForBackgroundBeforeClearContext")),
-      });
     const threadId = yield* lifecycleStep("clear agent context", () => {
       const agent = this.#conversation.requireKnownAgent(agentId);
       const activeTurn =
@@ -4967,6 +4958,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * waits for the next drain, unless a turn in the agent's own chat starts first. Queued routine runs in
    * their own session do not end it: it starts before them, and their answers stay above its marker.
    * The user can turn the setting off while the request waits.
+   *
+   * The new chat closes the Claude session, and the background subagents and commands of that session
+   * end with it (#10743). So the request also waits for them: when the work ends, Claude answers its
+   * result in a turn of its own, and the drain after that turn starts the new chat. "New chat" from
+   * the user does not wait: a background command such as a dev server can run without end.
    */
   #startRequestedNewChat(agentId: string, queuedRuns: readonly string[] = []): Effect.Effect<void> {
     if (!this.#requestedNewChats.has(agentId)) return Effect.void;
@@ -4975,7 +4971,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       this.#requestedNewChats.delete(agentId);
       return Effect.void;
     }
-    return this.clearAgentContext(agentId, queuedRuns).pipe(
+    const startNewChat = this.clearAgentContext(agentId, queuedRuns).pipe(
       Effect.tap(() =>
         Effect.sync(() => {
           this.#requestedNewChats.delete(agentId);
@@ -4990,6 +4986,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         }),
       ),
     );
+    return this.#threads
+      .mainRunsBackgroundWork(agent)
+      .pipe(Effect.flatMap((background) => (background ? Effect.void : startNewChat)));
   }
 
   resolveChannelImage(channelId: string): ChannelImageFile | null {

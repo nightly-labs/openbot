@@ -79,8 +79,6 @@ export const messages = {
     "Alcune attività di questo agente sono in corso. Attendi che finiscano, o interrompile, prima di cambiare provider.",
   "error.agent.waitBeforeClearContext":
     "Aspetta che il turno attivo e la coda finiscano prima di iniziare una nuova chat.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Sono in esecuzione subagenti o comandi in background di questo agente. Attendi che finiscano prima di iniziare una nuova chat.",
   "error.agent.waitBeforeCompactContext":
     "Attendi la fine del turno attivo e della coda prima di compattare il contesto.",
   "error.agent.waitBeforeDeleteHistory":

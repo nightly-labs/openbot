@@ -80,8 +80,6 @@ export const messages = {
     "このエージェントのタスクが実行中です。プロバイダーを変更する前に、タスクの完了を待つか、タスクを停止してください。",
   "error.agent.waitBeforeClearContext":
     "新しいチャットを始める前に、実行中のターンとキューが終わるまでお待ちください。",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "このエージェントのバックグラウンドのサブエージェントまたはコマンドが実行中です。終了してから新しいチャットを開始してください。",
   "error.agent.waitBeforeCompactContext":
     "コンテキストを圧縮する前に、実行中のターンとキューが終わるのを待ってください。",
   "error.agent.waitBeforeDeleteHistory": "履歴を削除する前に、実行中のターンとキューが終わるまでお待ちください。",

@@ -76,8 +76,6 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange":
     "Bu ajanın görevleri çalışıyor. Sağlayıcıyı değiştirmeden önce bitmelerini bekleyin veya onları durdurun.",
   "error.agent.waitBeforeClearContext": "Yeni bir sohbet başlatmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "Bu ajanın arka plan alt ajanları veya komutları çalışıyor. Yeni bir sohbet başlatmadan önce bitmelerini bekleyin.",
   "error.agent.waitBeforeCompactContext": "Bağlamı sıkıştırmadan önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.waitBeforeDeleteHistory": "Geçmişi silmeden önce etkin turun ve kuyruğun bitmesini bekleyin.",
   "error.agent.compactContextUnavailable": "Bu ajan bağlamını şu anda sıkıştıramaz.",

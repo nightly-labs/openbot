@@ -73,8 +73,6 @@ export const messages = {
   "error.agent.waitForTasksBeforeProviderChange":
     "이 에이전트의 작업이 실행 중이에요. 제공자를 변경하기 전에 작업이 끝날 때까지 기다리거나 작업을 중지해 주세요.",
   "error.agent.waitBeforeClearContext": "새 채팅을 시작하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
-  "error.agent.waitForBackgroundBeforeClearContext":
-    "이 에이전트의 백그라운드 하위 에이전트나 명령이 실행 중입니다. 끝날 때까지 기다린 후 새 채팅을 시작하세요.",
   "error.agent.waitBeforeCompactContext": "컨텍스트를 압축하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.waitBeforeDeleteHistory": "기록을 삭제하기 전에 진행 중인 턴과 대기열이 끝날 때까지 기다려 주세요.",
   "error.agent.compactContextUnavailable": "이 에이전트는 지금 컨텍스트를 압축할 수 없어요.",
