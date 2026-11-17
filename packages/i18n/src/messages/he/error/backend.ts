@@ -271,6 +271,8 @@ export const messages = {
   "error.backend.mcpOAuthProxyUnavailable":
     "OpenBot לא הצליח להפעיל את חיבור ההתחברות המקומי שלו עבור השרת הזה. יש להפעיל מחדש את OpenBot ולנסות שוב.",
   "error.backend.mcpOAuthSignInNeeded": "ההתחברות לשרת ה-MCP הזה הסתיימה. המשתמש צריך להתחבר אליו שוב ב-OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot לא הצליח לחדש עכשיו את ההתחברות לשרת ה-MCP הזה. ההתחברות נשמרת, והבקשה הבאה תנסה שוב. אם השגיאה נמשכת, המשתמש יכול להתנתק מהשרת ב-OpenBot ולהתחבר שוב.",
   "error.backend.mcpServerUnreachable": "OpenBot לא הצליח להגיע אל השרת. יש לבדוק את ה-URL ואת הרשת.",
   "error.backend.mcpLocalServerOff":
     "אין שרת שעונה בכתובת {address} במחשב הזה. יש להפעיל את השרת, או להדליק אותו באפליקציה שמריצה אותו, ולנסות שוב.",

@@ -24,7 +24,7 @@ any of them before an upgrade. A renamed constant means the old file is never re
 | `openbot-remote-servers-v1.json` | `REMOTE_SERVERS_FILE`, `src/main/application-services.ts` | `src/main/remote-server-stored-shape.ts` reads v1/v2 as v3, preserves unreadable entries, refuses unknown versions |
 | `openbot-central-auth-v1.bin` | `CENTRAL_AUTH_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/central-auth-manager.ts` **throws** on anything but `version === 2` and `#initialize` catches that into `#clearStoredSession()`, so a bad shape signs the user out; undecryptable if `appId` or the signing identity changes |
 | `openbot-remote-desktop-credential-v1.json` | `LEGACY_REMOTE_DESKTOP_CREDENTIAL_FILE`, `src/main/application-services.ts` | legacy, still read |
-| `openbot-remote-desktop-runtime-v1.json` | `REMOTE_DESKTOP_RUNTIME_SECRET_FILE`, `src/main/application-services.ts` | `safeStorage`-encrypted; `src/main/remote-desktop-secret-store.ts` accepts only `version: 1` |
+| `openbot-remote-desktop-runtime-v1.json` | no owner since #10248 | legacy, not read; the runtime login is made in memory for each process |
 | `remote/connection-<stack pid>.json` in the dev runtime directory | `developmentRemoteConnectionPath`, `src/main/development-runtime-directory.ts` | development only |
 | `bots.json` | `LEGACY_AGENTS_STATE_FILE`, `src/backend/agent-store.ts` | permanent name; imported once under command id `legacy-import:bots:v1` |
 | `mailbox.json` | `src/backend/mailbox-store.ts` | permanent name |

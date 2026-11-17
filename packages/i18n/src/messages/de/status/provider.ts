@@ -11,6 +11,11 @@ export const messages = {
     "{provider} kann keine Verbindung zu seinem Server herstellen. Versuch {attempt} von {maxAttempts}.",
   "status.provider.retryServerError":
     "Der {provider}-Server ist ausgelastet oder hat einen Fehler. Versuch {attempt} von {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} kann keine Verbindung zum Modellanbieter herstellen. Neuer Versuch: {attempt}.",
+  "status.provider.modelRetryServerError":
+    "Der Modellanbieter ist ausgelastet oder hat einen Fehler. {provider} versucht es erneut: Versuch {attempt}.",
+  "status.provider.modelRetryRecovered": "Der Modellanbieter antwortet wieder.",
   "status.provider.retryRecovered": "{provider} erhält wieder Antworten von seinem Server.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude hat mit normaler Geschwindigkeit geantwortet. Der Schnellmodus nutzt mit einem Claude-Abo Nutzungsguthaben. Schalte es in deinem Claude-Konto ein.",

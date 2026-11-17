@@ -84,7 +84,8 @@ export interface AppServerRequest {
   /**
    * In process only, never on the wire. The provider stops the call after a fixed time, also when
    * OpenBot sends progress, so OpenBot must answer before this time: Antigravity 1.5.9 stops each MCP
-   * tool call after 180 s. A question detaches as with `detachAfterMs`. A browser takeover answers
+   * tool call after 180 s. A call of the running turn also gets `detachAfterMs` here when it is smaller
+   * (#10577). A question detaches as with `detachAfterMs`. A browser takeover answers
    * that the user has not finished, keeps its card, and the next call for the same tab waits on it
    * again (#9689).
    */

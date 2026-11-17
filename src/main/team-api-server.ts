@@ -11,6 +11,7 @@ import {
   type AgentSummary,
   AnalyticsInputError,
   agentAccessRank,
+  CHANNEL_RESUME_ITEM_TYPE,
   type ChatColors,
   canAdministerServer,
   type DirectConversationPage,
@@ -1873,6 +1874,7 @@ export class TeamApiServer {
             (message) =>
               message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
               message.itemType === AGENT_WELCOME_ITEM_TYPE ||
+              message.itemType === CHANNEL_RESUME_ITEM_TYPE ||
               (message.itemType?.startsWith(SETTING_LINK_ITEM_TYPE_PREFIX) === true &&
                 !connection.capabilities.has(SETTING_LINK_MARKERS_CAPABILITY)),
           ))

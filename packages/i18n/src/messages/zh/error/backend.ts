@@ -259,6 +259,8 @@ export const messages = {
     "{provider} 无法启动 MCP 服务器 {name}，因为服务器没有及时响应。请开始新的聊天后再试一次。",
   "error.backend.mcpOAuthProxyUnavailable": "OpenBot 无法为这台服务器建立本地登录连接。请重启 OpenBot 后再试一次。",
   "error.backend.mcpOAuthSignInNeeded": "该 MCP 服务器的登录已结束。用户需要在 OpenBot 中重新登录。",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot 暂时无法续期此 MCP 服务器的登录。登录信息已保留，下一次请求会重试。如果此错误持续出现，用户可以在 OpenBot 中退出该服务器的登录，然后重新登录。",
   "error.backend.mcpServerUnreachable": "OpenBot 无法连接该服务器。请检查地址与网络。",
   "error.backend.mcpLocalServerOff":
     "该电脑上 {address} 没有服务器在响应。请启动服务器，或在运行它的应用中开启它，然后重试。",

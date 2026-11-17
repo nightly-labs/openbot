@@ -5,6 +5,7 @@
 // `packages/console/app/src/routes/zen/go/v1/usage.ts` in anomalyco/opencode; it answers
 // `{ usage: { rolling, weekly, monthly } }`, each with an integer `percent` and an ISO `resetsAt`.
 
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -86,6 +87,53 @@ const readOwnKeys = Effect.fn("OpenCode.readOwnKeys")(function* () {
   const consoleKey =
     inlineAuth || databaseFile === ":memory:" ? undefined : yield* readConsoleKey(resolve(dataDirectory, databaseFile));
   return [...new Set([consoleKey, goKey].filter((key): key is string => Boolean(key)))];
+});
+
+const AuthFileEntries = Schema.Record(Schema.String, Schema.Unknown);
+const AuthFileEntry = Schema.Struct({ type: Schema.String });
+
+/**
+ * Whether OpenCode has its own key for a model provider: an active `credential` row in OpenCode 2's
+ * database, or an entry in `auth.json` (OpenCode 1.x) or in `OPENCODE_AUTH_CONTENT`, which replaces
+ * both. A key in an environment variable or in a config file is not found. It reads only when a turn
+ * fails, so it reads synchronously.
+ */
+export const hasOpenCodeProviderKey = Effect.fn("OpenCode.hasProviderKey")(function* (
+  provider: string,
+  env: NodeJS.ProcessEnv,
+) {
+  const dataDirectory = openCodeDataDirectory(env);
+  const inlineAuth = env.OPENCODE_AUTH_CONTENT;
+  const authText =
+    inlineAuth ||
+    (yield* Effect.try({
+      try: () => readFileSync(join(dataDirectory, "auth.json"), "utf8"),
+      catch: (cause) => new OpenCodeUsageFailed({ cause }),
+    }).pipe(Effect.orElseSucceed(() => "")));
+  const entries = Schema.decodeUnknownOption(Schema.fromJsonString(AuthFileEntries))(authText);
+  if (
+    Option.isSome(entries) &&
+    Object.hasOwn(entries.value, provider) &&
+    Option.isSome(Schema.decodeUnknownOption(AuthFileEntry)(entries.value[provider]))
+  )
+    return true;
+  const databaseFile = env.OPENCODE_DB || "opencode.db";
+  if (inlineAuth || databaseFile === ":memory:") return false;
+  return yield* Effect.try({
+    try: () => {
+      const database = new DatabaseSync(resolve(dataDirectory, databaseFile), { readOnly: true });
+      try {
+        database.exec(`PRAGMA busy_timeout = ${OPENCODE_DB_BUSY_TIMEOUT_MS}`);
+        const row = database
+          .prepare("SELECT 1 FROM credential WHERE integration_id = ? AND active IS NOT 0 LIMIT 1")
+          .get(provider);
+        return row !== undefined;
+      } finally {
+        database.close();
+      }
+    },
+    catch: (cause) => new OpenCodeUsageFailed({ cause }),
+  }).pipe(Effect.orElseSucceed(() => false));
 });
 
 function authFileGoKey(text: string): string | undefined {

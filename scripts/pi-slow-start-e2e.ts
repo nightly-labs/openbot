@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { Effect } from "effect";
 import { ModelCatalog } from "../src/backend/agent/model-catalog";
 import type { AgentClient, AgentProvider } from "../src/backend/agent-client";
 import { runCauseEffect } from "../src/backend/effect-boundary";
@@ -62,6 +63,7 @@ async function readCatalog(client: AgentClient, requestTimeoutMs: number): Promi
     isSignedOut: () => false,
     requestTimeoutMs,
     recordProviderError: (_provider, error) => recorded.push(error instanceof Error ? error.message : String(error)),
+    startSettingsChanged: () => Effect.void,
   });
   const pass = await runCauseEffect(catalog.refresh());
   const recordedAfterPass = [...recorded];

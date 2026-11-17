@@ -42,7 +42,7 @@ import { createAttachmentImportSounds } from "./attachment-import-sounds";
 import { createChangeMarkerActions } from "./change-marker-actions";
 import type { ChatSearchMatch } from "./chat-search";
 import { useConversationController } from "./conversation-controller-context";
-import { agentConversationKey, composerDraftKey } from "./conversation-keys";
+import { agentConversationKey, composerDraftKey, promptRequestKey } from "./conversation-keys";
 import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
 import type {
@@ -1165,6 +1165,46 @@ export function createConversationViewScope(props: ConversationProps) {
     // A new form can arrive before the old one goes, so the old one takes back only its own answer.
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
+  /**
+   * A question that comes while the message box has text does not take that text: the user wrote it
+   * as a message. The composer answers the question again when that draft is sent or cleared. A
+   * question that is already open when the chat or the app opens does not hold the draft.
+   */
+  const openPromptKey = () => promptRequestKey(props.prompt?.turnId, props.prompt?.requestId);
+  const composerHasText = () => Boolean(currentDraft().text.trim() || voiceLiveText().trim());
+  const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string | null>(null);
+  let lastOpenPrompt: { chat: string; key: string | null } | undefined;
+  createEffect(
+    () => {
+      // The question is the one of the shown thread: the agent's own chat (`undefined`), a side
+      // thread, or a new thread (`null`). A return to the same chat is not a new question.
+      const open = props.threads?.open;
+      return {
+        chat: JSON.stringify([
+          agentConversationKey(props.server?.id ?? "local", conversationOwnerId(props) ?? ""),
+          open === undefined ? null : (open?.id ?? ""),
+        ]),
+        key: openPromptKey(),
+        hasText: untrack(composerHasText),
+      };
+    },
+    ({ chat, key, hasText }) => {
+      const arrived = lastOpenPrompt?.chat === chat && lastOpenPrompt.key !== key;
+      lastOpenPrompt = { chat, key };
+      if (arrived && key && hasText) setDraftHeldPromptKey(key);
+    },
+  );
+  // Only the chat of the held question releases it, so a visit to another chat keeps the hold.
+  createEffect(
+    () => draftHeldPromptKey() !== null && draftHeldPromptKey() === openPromptKey() && !composerHasText(),
+    (released) => {
+      if (released) setDraftHeldPromptKey(null);
+    },
+  );
+  const composerPromptAnswer = () => {
+    const key = draftHeldPromptKey();
+    return key !== null && key === openPromptKey() ? undefined : promptComposerAnswer();
+  };
   const actions = createComposerActions({
     props,
     attachmentBusy,
@@ -1245,7 +1285,7 @@ export function createConversationViewScope(props: ConversationProps) {
     followSentMessage,
     pendingSends,
     attachmentPicker: () => attachmentPicker,
-    promptComposerAnswer,
+    promptComposerAnswer: composerPromptAnswer,
   });
   const {
     updateTeamTyping,

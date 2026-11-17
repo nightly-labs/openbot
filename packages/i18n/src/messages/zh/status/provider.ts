@@ -10,6 +10,9 @@ export const messages = {
   "status.provider.confirmCancel": "取消",
   "status.provider.retryUnreachable": "{provider} 无法连接到其服务器。第 {attempt}/{maxAttempts} 次重试。",
   "status.provider.retryServerError": "{provider} 服务器繁忙或出错。第 {attempt}/{maxAttempts} 次重试。",
+  "status.provider.modelRetryUnreachable": "{provider} 无法连接到模型提供商。正在重试：第 {attempt} 次。",
+  "status.provider.modelRetryServerError": "模型提供商繁忙或出错。{provider} 正在重试：第 {attempt} 次。",
+  "status.provider.modelRetryRecovered": "模型提供商已恢复响应。",
   "status.provider.retryRecovered": "{provider} 已重新从其服务器收到响应。",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude 以标准速度回答。使用 Claude 订阅时，快速模式使用用量额度。请在你的 Claude 账户中开启。",
