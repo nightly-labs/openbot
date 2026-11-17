@@ -513,17 +513,11 @@ export class ProviderRuntime implements ProviderPort {
    * `isReplacingCli` meanwhile, so new turns do not keep the update waiting.
    */
   readonly #updatesWhenIdle = new Set<AgentProvider>();
-  /**
-   * Restarts that an update waiting for turns took over: the update starts a new process, so one wait
-   * holds the provider and one Cancel ends it (#10825). An update that ends before its install
-   * gives the restart to the idle check, which does not hold new turns.
-   */
-  readonly #restartsInUpdate = new Set<AgentProvider>();
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
   /**
-   * Providers that a turn kept on the old agent environment or OpenCode config, or whose restart an
-   * update took over and did not do. The idle check restarts each after its turn.
+   * Providers that a turn kept on the old agent environment or OpenCode config, or whose restart
+   * waited for an update that was cancelled. The idle check restarts each after its turn.
    */
   readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
@@ -2731,7 +2725,6 @@ export class ProviderRuntime implements ProviderPort {
       if (!this.#hooks.isProviderBusy(provider)) return;
       if (!this.#updatesWhenIdle.has(provider)) {
         this.#updatesWhenIdle.add(provider);
-        this.#restartInUpdate(provider);
         recordRestartActivity();
         onWait();
       }
@@ -2739,23 +2732,18 @@ export class ProviderRuntime implements ProviderPort {
     }
   });
 
-  /** Gives a restart that waits for turns, and can still be cancelled, to the update that waits now. */
-  #restartInUpdate(provider: AgentProvider): void {
-    const timer = this.#restartsWhenIdle.get(provider);
-    if (!timer) return;
-    clearTimeout(timer);
-    this.#restartsWhenIdle.delete(provider);
-    this.#restartsInUpdate.add(provider);
-    this.#setStatus({});
-  }
-
   /**
    * Ends a wait that did not reach the install, because it was cancelled or failed. A restart that
-   * the update took over then runs when the provider's turns end, and new turns do not wait for it.
+   * waits for the same turns then runs when they end, and new turns do not wait for it: one Cancel
+   * releases them (#10825).
    */
   #endUpdateWhenIdle(provider: AgentProvider): void {
-    if (this.#restartsInUpdate.delete(provider)) this.#environmentReloadPending.add(provider);
-    if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
+    if (!this.#updatesWhenIdle.delete(provider)) return;
+    if (this.#restartsWhenIdle.get(provider) && this.#hooks.isProviderBusy(provider)) {
+      this.cancelProviderRestart(provider);
+      this.#environmentReloadPending.add(provider);
+    }
+    this.#hooks.onProviderResumed(provider);
   }
 
   /** Answers null, and installs nothing, when a turn started on the provider after the wait. */
@@ -2806,8 +2794,8 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
-          // The new process does the restart that the update took over.
-          this.#restartsInUpdate.delete(provider);
+          // The new process does a restart that waited for the same turns.
+          this.cancelProviderRestart(provider);
           // The new copy runs from now on, also when a client of the user's CLI ran during the update.
           this.#installedFallback.delete(provider);
           // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
@@ -3136,11 +3124,6 @@ export class ProviderRuntime implements ProviderPort {
     provider: AgentProvider,
   ) {
     if (this.#restartsWhenIdle.has(provider)) return this.status();
-    // An update that waits for the turns starts a new process: it takes over the restart (#10825).
-    if (this.#updatesWhenIdle.has(provider)) {
-      this.#restartsInUpdate.add(provider);
-      return this.status();
-    }
     this.#startFailures.delete(provider);
     if (!this.#clients.has(provider)) {
       if (this.#released.has(provider)) {
@@ -3358,7 +3341,6 @@ export class ProviderRuntime implements ProviderPort {
     this.#restartTimers.clear();
     for (const timer of this.#restartsWhenIdle.values()) if (timer) clearTimeout(timer);
     this.#restartsWhenIdle.clear();
-    this.#restartsInUpdate.clear();
     if (this.#idleCheck) clearInterval(this.#idleCheck);
     this.#idleCheck = null;
     if (this.#signInCheck) clearInterval(this.#signInCheck);
