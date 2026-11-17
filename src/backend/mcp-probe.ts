@@ -1,11 +1,16 @@
 import { basename } from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import {
   Client as ModernClient,
   StreamableHTTPClientTransport as ModernHttpTransport,
 } from "@modelcontextprotocol/client";
 import { UnauthorizedError } from "@modelcontextprotocol/sdk/client/auth.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  getDefaultEnvironment,
+  StdioClientTransport,
+  type StdioServerParameters,
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport, StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {
   AccessDeniedError,
@@ -194,6 +199,7 @@ export const callMcpServerTool = Effect.fnUntraced(function* (
               client.callTool({ name, arguments: args }, undefined, { signal, timeout: MCP_TOOL_CALL_TIMEOUT_MS }),
             ),
           ),
+          Effect.catch((failure) => explainClosedEffect(failure, transport)),
         ),
       ({ client, transport }) => closeQuietlyEffect(client, transport),
     ),
@@ -512,7 +518,7 @@ interface ProbeConnection {
 const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: () => ProbeConnection) {
   return yield* Effect.acquireUseRelease(
     Effect.try({ try: open, catch: (cause) => new McpProbeFailure({ cause }) }),
-    ({ client, connect }) =>
+    ({ client, transport, connect }) =>
       Effect.gen(function* () {
         yield* probeIo(connect);
         return yield* countToolsEffect(client);
@@ -521,10 +527,70 @@ const countOverEffect = Effect.fnUntraced(function* (timeoutMs: number, open: ()
           duration: timeoutMs,
           orElse: () => Effect.fail(new McpProbeFailure({ cause: new McpTimeout(timeoutMs) })),
         }),
+        Effect.catch((failure) => explainClosedEffect(failure, transport)),
       ),
     ({ client, transport }) => closeQuietlyEffect(client, transport),
   );
 });
+
+/** A closed stdio connection fails with what the server wrote to stderr before it stopped. */
+const explainClosedEffect = Effect.fnUntraced(function* (
+  failure: McpProbeFailure,
+  transport: Pick<Transport, "close">,
+): Effect.fn.Return<never, McpProbeFailure> {
+  if (!(transport instanceof TailedStdioTransport) || !isConnectionClosed(failure.cause))
+    return yield* Effect.fail(failure);
+  const output = yield* transport.output();
+  return yield* Effect.fail(output ? new McpProbeFailure({ cause: new McpServerExit(output) }) : failure);
+});
+
+/** How much of the end of a stdio server's stderr is kept. */
+const MCP_STDERR_TAIL = 1_000;
+
+/** How long the last stderr lines can arrive after the connection closed. */
+const MCP_STDERR_SETTLE_MS = 250;
+
+/**
+ * `StdioClientTransport` that keeps the end of the server's stderr.
+ *
+ * The pipe is read all the time, so a server that writes much to stderr cannot fill the 64 KB
+ * buffer and stop before it answers. Only the end is kept: when the server stops, the end holds
+ * the reason, such as a variable that the terminal had and the launch did not (#10137).
+ */
+class TailedStdioTransport extends StdioClientTransport {
+  #output = "";
+  #cut = false;
+  readonly #ended: Promise<void>;
+
+  constructor(server: StdioServerParameters) {
+    super({ ...server, stderr: "pipe" });
+    // The SDK gives this stream before `start`, so no early line is lost.
+    const stream = this.stderr;
+    const decoder = new StringDecoder("utf8");
+    this.#ended = new Promise((resolve) => {
+      if (!stream) return resolve();
+      stream.on("data", (chunk: Buffer) => {
+        const output = this.#output + decoder.write(chunk);
+        this.#cut ||= output.length > MCP_STDERR_TAIL;
+        this.#output = output.slice(-MCP_STDERR_TAIL);
+      });
+      stream.once("end", () => resolve());
+      stream.once("close", () => resolve());
+      stream.on("error", () => resolve());
+    });
+  }
+
+  /** The kept stderr, after the stream ends or the short wait passes: a descendant can keep it open. */
+  output() {
+    return Effect.promise(() => this.#ended).pipe(
+      Effect.timeoutOption(MCP_STDERR_SETTLE_MS),
+      Effect.map(() => {
+        const output = this.#output.trim();
+        return output && this.#cut ? `…${output}` : output;
+      }),
+    );
+  }
+}
 
 interface ListedTools {
   count: number;
@@ -599,7 +665,7 @@ function createTransport(
       requestInit: { headers },
     });
   }
-  return new StdioClientTransport({
+  return new TailedStdioTransport({
     command: server.command ?? config.command,
     args: server.args,
     // The resolved directory, not the stored one: process creation does not expand a leading `~`,
@@ -613,10 +679,6 @@ function createTransport(
       ...getDefaultEnvironment(),
       ...mcpLaunchEnvironment(server),
     },
-    // Discarded, not piped. Nothing here reads that pipe, so a server that writes its startup log to
-    // stderr - which a Rust or Python server does with a blocking write - fills the 64 KB buffer and
-    // stops before it answers the handshake. The probe would report a timeout for a working server.
-    stderr: "ignore",
   });
 }
 
@@ -722,12 +784,23 @@ class McpTimeout extends Error {
   }
 }
 
+/** A stdio server that stopped before it answered, with the end of what it wrote to stderr. */
+class McpServerExit extends Error {
+  constructor(readonly output: string) {
+    super("The MCP server stopped before it answered.");
+  }
+}
+
 /** The failure, in the words the panel shows. Secrets are removed before the text leaves here. */
 function describeMcpError(error: unknown, config: McpServerConfig): string {
   const described = describeMcpErrorText(error, config);
   // A bridge that never answers is the case the native connection replaces: say where to go.
   const bridgeUrl = mcpRemoteBridgeUrl(config);
-  if (bridgeUrl === null || !(error instanceof McpTimeout || isConnectionClosed(error))) return described;
+  if (
+    bridgeUrl === null ||
+    !(error instanceof McpTimeout || error instanceof McpServerExit || isConnectionClosed(error))
+  )
+    return described;
   return sourceText("error.backend.mcpRemoteBridge", { reason: described, url: bridgeUrl });
 }
 
@@ -737,6 +810,10 @@ function describeMcpErrorText(error: unknown, config: McpServerConfig): string {
     return sourceText("error.backend.mcpServerNoAnswer", { seconds: Math.round(error.timeoutMs / 1000) });
   // Only a sign-in reaches this: without an `authProvider` the transport reports the raw 401 below.
   if (error instanceof UnauthorizedError) return sourceText("error.backend.mcpSignInNotAccepted");
+  // What the server wrote before it stopped says why, also when the command works in a terminal
+  // (#10137). The probe secrets do not hold the configured values, so they are removed here.
+  if (error instanceof McpServerExit)
+    return sourceText("error.backend.mcpServerExitedWithOutput", { detail: redactMcpSecrets(error.output, config) });
   // The child exited before the handshake: the process failed to start, not the network.
   if (config.transport === "stdio" && isConnectionClosed(error)) return sourceText("error.backend.mcpServerExited");
   if (config.transport === "http") {
