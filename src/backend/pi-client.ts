@@ -39,6 +39,7 @@ import { createPiKeyExtension } from "./pi-key-providers";
 import { createPiMcpExtension, type PiMcpExtension } from "./pi-mcp";
 import { piMessageItems, piPrompt, piText } from "./pi-messages";
 import { PI_REQUEST_TIMEOUT_MS, PiRpc } from "./pi-rpc";
+import { piWindowsShellArguments } from "./pi-windows-shell";
 import type { SpawnTarget } from "./process-confinement";
 import {
   type AppServerNotification,
@@ -750,6 +751,8 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
           ? ["--no-tools", ...(withExtensions ? [] : ["--no-extensions"]), "--no-mcp"]
           : ["--extension", extension.path]),
       );
+      if (!this.options.profileGeneration && process.platform === "win32")
+        args.push(...(yield* piWindowsShellArguments(cwd, this.#environment())));
       const instructions = getString(params, "developerInstructions");
       if (instructions) {
         // Pi reads the instructions from a file. The path keeps the launch line short: a `.cmd`
