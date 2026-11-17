@@ -549,11 +549,11 @@ export function createWorkflowsController(
       workflowId !== null &&
       agentId !== undefined &&
       hostKey !== undefined &&
-      agentAskedHere(hostKey, agentId) &&
       workflowId !== current &&
       writing === 0 &&
       pending === undefined &&
-      !summaries().some((summary) => summary.id === workflowId)
+      !summaries().some((summary) => summary.id === workflowId) &&
+      agentAskedHere(hostKey, agentId)
     ) {
       playBuild(workflowId, agentId, null);
       open(workflowId);

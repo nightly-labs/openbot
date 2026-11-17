@@ -68,7 +68,10 @@ export function agentTasksPort(server: string): AgentTasksPort {
       noteAgentRequest(server, input.agentId);
       return agent.sendMessage(input, server);
     },
-    runQueuedMessageAsTask: (input) => agent.runQueuedMessageAsTask(input, server),
+    runQueuedMessageAsTask: (input) => {
+      noteAgentRequest(server, input.agentId);
+      return agent.runQueuedMessageAsTask(input, server);
+    },
     branchTask: (input) => agent.branchTask(input, server),
     stopTask: (input) => agent.stopTask(input, server),
     closeTask: (input, serverId) => agent.closeTask(input, serverId ?? server),
