@@ -995,8 +995,9 @@ export class MessagingThreads {
       )
         update = message;
     }
+    if (!update) return;
     const progress = this.#progress.get(turnId) ?? { id: "", texts: new Set<string>() };
-    if (!update || progress.id === update.id) return;
+    if (progress.id === update.id) return;
     this.#progress.set(turnId, { ...progress, id: update.id });
     if (!showsNarration(update.text, progress.texts)) return;
     this.#publish({ type: "progress", link, turnId, origin, text: update.text.trim() });
