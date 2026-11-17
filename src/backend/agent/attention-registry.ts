@@ -38,6 +38,7 @@ import {
   uiBlockHasPrivilegedAction,
   uiBlockOutcomeText,
   uiBlockResponseFromAnswers,
+  uiConfirmPreviewEdit,
   validateUiBlockResponse,
 } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
@@ -809,12 +810,20 @@ export class AttentionRegistry {
       if (saved && pending !== saved.pending) return;
       if (savedItem && pending !== savedItem.pending) return;
       if (!pending) throw new InactiveAttentionRequest(sourceText("error.backend.promptInactive"));
+      // An edited confirm preview comes beside the answers (`ui-block-preview-edit-v1`).
+      const edit = pending.uiBlock
+        ? uiConfirmPreviewEdit(pending.uiBlock.spec, input.answers)
+        : { answers: input.answers };
+      if (!edit) throw new Error(sourceText("error.backend.uiBlockAnswerInvalid"));
+      const { answers } = edit;
       const questionIds = new Set(pending.questions.map((question) => question.id));
-      if (Object.keys(input.answers).some((id) => !questionIds.has(id))) {
+      if (Object.keys(answers).some((id) => !questionIds.has(id))) {
         throw new Error(sourceText("error.backend.promptAnswerMismatch"));
       }
       // A refused UI block answer leaves the block open for an answer that fits.
-      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, input.answers, responder) : null;
+      const uiBlockResponse = pending.uiBlock ? uiBlockAnswer(pending.uiBlock.spec, answers, responder) : null;
+      // A skip drops the edit with the answer.
+      const preview = uiBlockResponse ? edit.preview : undefined;
       this.#routines.markRunningForTurn(getString(pending.params, "turnId"));
 
       // The forms of `request_api_key` and `request_vault_item` never give the agent their values.
@@ -825,16 +834,16 @@ export class AttentionRegistry {
           : pending.uiBlock
             ? uiBlockPromptResult(
                 uiBlockResponse
-                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse }
+                  ? { status: "answered", blockId: pending.uiBlock.blockId, response: uiBlockResponse, preview }
                   : { status: "skipped", blockId: pending.uiBlock.blockId },
               )
             : pending.responseKind === "dynamic-tool"
-              ? dynamicPromptResult(input.answers)
+              ? dynamicPromptResult(answers)
               : pending.responseKind === "mcp-elicitation"
-                ? mcpElicitationResult(pending.params, input.answers)
+                ? mcpElicitationResult(pending.params, answers)
                 : {
                     answers: Object.fromEntries(
-                      Object.entries(input.answers).map(([id, values]) => [id, { answers: values }]),
+                      Object.entries(answers).map(([id, values]) => [id, { answers: values }]),
                     ),
                   };
       // A detached question has no call to answer: its answer goes to the chat as a message, below.
@@ -864,12 +873,13 @@ export class AttentionRegistry {
             }).slice(0, UI_BLOCK_LIMITS.outcome);
           this.#resolvePersistedPrompt(
             pending,
-            frozenResponse ? promptResolution(pending.questions, input.answers) : { status: "cancelled" },
+            frozenResponse ? promptResolution(pending.questions, answers) : { status: "cancelled" },
             state,
             savedItem?.saved,
+            preview,
           );
         } else {
-          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, input.answers));
+          this.#resolvePersistedPrompt(pending, promptResolution(pending.questions, answers));
         }
       } catch (error) {
         this.#emitError("prompt_persistence_failed", error, pending.agentId);
@@ -879,7 +889,7 @@ export class AttentionRegistry {
         ? ""
         : pending.uiBlock?.vault
           ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
-          : lateAnswerText(pending.questions, input.answers);
+          : lateAnswerText(pending.questions, answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
       this.#emitRuntimeSnapshot();
@@ -2717,18 +2727,31 @@ export class AttentionRegistry {
 
   /**
    * `uiBlockState` freezes the message's UI block, when it has one, in the same write. `vaultSaved`
-   * names the item that the user saved from a Vault request.
+   * names the item that the user saved from a Vault request. `preview` is the confirm preview that the
+   * user edited: the frozen block, its question and its text show it, as the text that the agent got.
    */
   #resolvePersistedPrompt(
     pending: PendingPrompt,
     resolution: AgentPromptResolution,
     uiBlockState?: UiBlockState,
     vaultSaved?: UiVaultSavedItem,
+    preview?: string,
   ): void {
     const snapshot = this.#conversation.ensureSnapshot(pending.agentId, pending.publicThreadId);
     const message = snapshot.messages.find((candidate) => candidate.id === pending.messageId);
     if (!message?.questionPrompt || message.questionPrompt.resolution !== null) return;
     message.questionPrompt.resolution = structuredClone(resolution);
+    // Only a block that stays within the contract keeps the edit, so every reader still accepts it.
+    const edited =
+      preview && message.uiBlock?.spec.type === "confirm"
+        ? normalizeConversationUiBlock({ ...message.uiBlock, spec: { ...message.uiBlock.spec, preview } })
+        : null;
+    const editedQuestions = edited ? uiBlockFallbackQuestions(edited.spec) : null;
+    if (edited && message.uiBlock && editedQuestions && validPromptQuestions(editedQuestions)) {
+      message.uiBlock.spec = edited.spec;
+      // A thread and a client without the block show the question, so it holds the edit too.
+      message.questionPrompt.questions = editedQuestions;
+    }
     message.text = questionPromptText(message.questionPrompt.questions, resolution);
     if (message.uiBlock && uiBlockState) {
       // The read drops a secret form value; storing the read result keeps it out of the database.

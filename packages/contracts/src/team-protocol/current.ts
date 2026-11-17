@@ -187,6 +187,7 @@ import { STORAGE_USER_FILES_CAPABILITY } from "./storage-user-files-v1";
 import { TEAM_SUBAGENTS_CAPABILITY } from "./subagents-v1";
 import { THREAD_MESSAGE_SEARCH_CAPABILITY } from "./thread-message-search-v1";
 import { TEAM_UI_BLOCK_AUTO_ANSWER_CAPABILITY } from "./ui-block-auto-answer-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "./ui-block-preview-edit-v1";
 import { TEAM_UI_BLOCK_VAULT_CAPABILITY } from "./ui-block-vault-v1";
 import { TEAM_UI_BLOCKS_CAPABILITY } from "./ui-blocks-v1";
 import { USAGE_CREDITS_CAPABILITY } from "./usage-credits-v1";
@@ -450,6 +451,7 @@ export {
   TEAM_USAGE_TERTIARY_CAPABILITY,
   TEAM_VIDEO_GENERATION_CAPABILITY,
   THREAD_MESSAGE_SEARCH_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   USAGE_CREDITS_CAPABILITY,
   VAULT_CAPABILITY,
   VAULT_IMPORT_CAPABILITY,
@@ -713,6 +715,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   AGENT_THREAD_REQUESTS_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -968,7 +971,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
     capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
     capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
-    capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+    capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+    capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1100,6 +1104,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   ROUTINE_PAUSE_REASONS_CAPABILITY,
   AGENT_THREAD_REQUESTS_CAPABILITY,
   TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+  UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1314,6 +1319,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
       capability !== ROUTINE_PAUSE_REASONS_CAPABILITY &&
       capability !== AGENT_THREAD_REQUESTS_CAPABILITY &&
-      capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY,
+      capability !== TEAM_BROWSER_VIEW_PAGE_COPY_CAPABILITY &&
+      capability !== UI_BLOCK_PREVIEW_EDIT_CAPABILITY,
   );
 }

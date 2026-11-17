@@ -238,6 +238,7 @@
     "./team-protocol/agent-defaults-v1": "./src/team-protocol/agent-defaults-v1.ts",
     "./team-protocol/agent-welcome-v1": "./src/team-protocol/agent-welcome-v1.ts",
     "./team-protocol/ui-block-auto-answer-v1": "./src/team-protocol/ui-block-auto-answer-v1.ts",
+    "./team-protocol/ui-block-preview-edit-v1": "./src/team-protocol/ui-block-preview-edit-v1.ts",
     "./team-protocol/ui-block-vault-v1": "./src/team-protocol/ui-block-vault-v1.ts",
     "./team-protocol/agent-task-ui-blocks-v1": "./src/team-protocol/agent-task-ui-blocks-v1.ts",
     "./team-protocol/agent-tasks-v1": "./src/team-protocol/agent-tasks-v1.ts",
