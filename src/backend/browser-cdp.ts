@@ -455,7 +455,9 @@ export class BrowserCdpEngine {
     },
     BrowserOperationError
   > {
-    const generation = this.#navigationGeneration;
+    // A new document stops the fill. A same-document navigation, as a sign-in page that sets its address
+    // for the password step, keeps the fields; the checks in the page below still refuse a changed field (#10462).
+    const generation = this.#documentGeneration;
     // A submitter that overrides the form to GET is part of it, so a page cannot add one while the
     // vault read waits.
     const fingerprintFields = `[this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method, [...(this.form?.elements ?? [])].some((element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post')]`;
@@ -567,14 +569,14 @@ export class BrowserCdpEngine {
         return { inputs, button, fingerprints, kinds, servedByWorker, origin: fieldOrigin };
       }),
     );
-    if (generation !== this.#navigationGeneration)
+    if (generation !== this.#documentGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
     const enter = (values: readonly string[]) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
             Effect.gen({ self: this }, function* () {
-              if (generation !== this.#navigationGeneration)
+              if (generation !== this.#documentGeneration)
                 return yield* browserFailure(new Error("Authentication page changed."));
               for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
                 if (
@@ -599,7 +601,7 @@ export class BrowserCdpEngine {
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
               for (const [index, node] of nodes.inputs.entries()) {
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 yield* send("DOM.focus", { backendNodeId: node.backendNodeId }, node.sessionId);
                 yield* this.#callOnNode(
@@ -613,7 +615,7 @@ export class BrowserCdpEngine {
                   node.sessionId,
                   node.contextId,
                 );
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
@@ -621,7 +623,7 @@ export class BrowserCdpEngine {
                 if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
                 yield* send("Input.insertText", { text }, node.sessionId);
               }
-              if (submission === "on_input" || generation !== this.#navigationGeneration) return;
+              if (submission === "on_input" || generation !== this.#documentGeneration) return;
               const { button } = nodes;
               if (submission === "click" && button) {
                 yield* this.#callOnNode(
@@ -651,7 +653,7 @@ export class BrowserCdpEngine {
                   true,
                   button.sessionId,
                 );
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
               } else if (submission === "enter") {

@@ -288,6 +288,46 @@ export async function runSecretHandoffScenario(browser: BrowserHost, localOrigin
         await runCauseEffect(browser.close(tab.id));
       }
     }
+    // A sign-in page that sets its address while the card is open keeps its fields, so the fill still
+    // goes through (#10462). Many mail sign-in pages do this for the password step.
+    {
+      const tab = await runCauseEffect(
+        browser.open("https://authentication.openbot.test/address-change", "secret-thread", "secret-agent"),
+      );
+      try {
+        const contents = webContents.getAllWebContents().find((candidate) => candidate.getURL() === tab.url);
+        if (!contents) throw new Error("Missing address change fixture.");
+        await waitForPresentedFrame(contents);
+        const handoff = await runCauseEffect(
+          browser.prepareSecret({
+            namespace: "openbot_browser",
+            tool: "submit_secret",
+            threadId: "secret-thread",
+            ownerAgentId: "secret-agent",
+            turnId: "secret-turn",
+            callId: "secret-address-change",
+            arguments: {
+              tabId: tab.id,
+              method: "password",
+              targets: [{ kind: "css", selector: "#password" }],
+              submission: "click",
+              submitTarget: { kind: "css", selector: "#submit" },
+            },
+          }),
+        );
+        await contents.executeJavaScript(
+          "history.replaceState({}, '', '/address-change?step=password'); history.pushState({}, '', '/address-change/password'); location.hash = 'password'",
+        );
+        const secret = "fixture-address-change-password-5531";
+        if ((await runCauseEffect(handoff.submit(secret, false))) !== "submitted")
+          throw new Error("A same-document address change stopped the secure password fill.");
+        const snapshot = await runCauseEffect(browser.snapshot(tab.id));
+        if (JSON.stringify(snapshot).includes(secret)) throw new Error("Authentication value reached a snapshot.");
+        if (!snapshot.url.endsWith("/complete")) throw new Error("The address change fixture did not complete.");
+      } finally {
+        await runCauseEffect(browser.close(tab.id));
+      }
+    }
     // A form that sends the password and the authenticator code in one submit gets both from one saved
     // login. The page goes on only when both fields hold a value at the click, so a fill that empties
     // the first field before the second one fails here.

@@ -417,6 +417,10 @@ function enteredVaultItem(
   }
 }
 
+/** The secure input failed and the tab went to the user, so the password typed in the card was not kept. */
+const TYPED_PASSWORD_NOT_SAVED =
+  "The password was not saved in the Vault: the secure input did not complete. Tell the user in one short sentence that the password was not saved.";
+
 interface PendingBrowserTakeover {
   client: AgentClient;
   /** The provider's request. `submit_secret` keys the entry by a new id, so it is kept here. */
@@ -433,6 +437,8 @@ interface PendingBrowserTakeover {
   memberCompleted?: true;
   /** The person selected Cancel on the card, so the agent must not ask again (#10452). */
   personCancelled?: true;
+  /** The user asked to save the typed password, but the secure input failed, so nothing was saved (#10462). */
+  vaultNotSaved?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -1101,6 +1107,8 @@ export class AttentionRegistry {
     // The user finishes in the tab, so a later completion is theirs, and the card's vault reason ends.
     delete pending.vaultLoginId;
     delete pending.request.vaultSkip;
+    if (input.decision === "submit" && input.saveToVault && secret.request.method === "password")
+      pending.vaultNotSaved = true;
     if (input.decision === "submit" && pending.request.secret)
       pending.request.secret = { ...pending.request.secret, requiresReload: true };
     else delete pending.request.secret;
@@ -2634,7 +2642,13 @@ export class AttentionRegistry {
     });
     this.#emitRuntimeSnapshot();
     pending.resolve(
-      browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing, pending.personCancelled === true),
+      browserTakeoverResult(
+        decision,
+        vault ?? (pending.vaultNotSaved ? TYPED_PASSWORD_NOT_SAVED : undefined),
+        pending.vaultSkipped,
+        signInMissing,
+        pending.personCancelled === true,
+      ),
     );
   }
 
