@@ -188,6 +188,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Sağlayıcı kodu kabul etmedi. Oturum açmayı tekrar başlatın.",
   "error.provider.codeLoginUnsupported":
     "Bu sunucu yapıştırılan bir kodla oturum açamaz. Sunucu bilgisayarında, onun tarayıcısında oturum açın.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude oturum açma bilgisini Mac'e kaydedemedi. OpenBot'un çalıştığı Mac'i yeniden başlatın, sonra Claude'u tekrar bağlayın.",
   "error.provider.cliBusyRetry":
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından tekrar deneyin.",
   "error.provider.cliSigningIn":

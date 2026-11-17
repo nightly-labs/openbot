@@ -186,6 +186,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Dostawca nie przyjął kodu. Rozpocznij logowanie ponownie.",
   "error.provider.codeLoginUnsupported":
     "Ten serwer nie obsługuje logowania wklejonym kodem. Zaloguj się na komputerze serwera, w jego przeglądarce.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude nie mógł zapisać logowania na Macu. Uruchom ponownie Maca, na którym działa OpenBot, a potem połącz Claude jeszcze raz.",
   "error.provider.cliBusyRetry": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, i spróbuj ponownie.",
   "error.provider.cliSigningIn": "{provider} CLI się loguje. Dokończ lub anuluj logowanie, a potem zaktualizuj.",
   "error.provider.cliBusyUpdate": "{provider} CLI pracuje nad turą. Zaczekaj, aż skończy, a potem zaktualizuj.",

@@ -163,6 +163,8 @@ export const messages = {
   "error.provider.codeLoginBadCode": "请粘贴登录页显示的验证码。",
   "error.provider.codeLoginRefused": "服务商未接受该验证码，请重新开始登录。",
   "error.provider.codeLoginUnsupported": "该服务器不支持用粘贴验证码的方式登录。请在服务器电脑的浏览器中登录。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude 无法在 Mac 上保存登录信息。请重启运行 OpenBot 的 Mac，然后重新连接 Claude。",
   "error.provider.cliBusyRetry": "{provider} CLI 正在处理对话，请等它结束后重试。",
   "error.provider.cliSigningIn": "{provider} CLI 正在登录，请完成或取消登录后再更新。",
   "error.provider.cliBusyUpdate": "{provider} CLI 正在处理对话，请等它结束后再更新。",

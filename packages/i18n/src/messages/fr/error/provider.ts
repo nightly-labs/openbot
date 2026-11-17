@@ -205,6 +205,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Le fournisseur n’a pas accepté le code. Relancez la connexion.",
   "error.provider.codeLoginUnsupported":
     "Ce serveur ne peut pas se connecter avec un code collé. Connectez-vous sur l’ordinateur du serveur, dans son navigateur.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude n’a pas pu enregistrer la connexion sur le Mac. Redémarrez le Mac qui exécute OpenBot, puis reconnectez Claude.",
   "error.provider.cliBusyRetry": "La CLI {provider} traite un tour. Attendez la fin, puis réessayez.",
   "error.provider.cliSigningIn":
     "La CLI {provider} est en cours de connexion. Terminez ou annulez la connexion, puis mettez à jour.",

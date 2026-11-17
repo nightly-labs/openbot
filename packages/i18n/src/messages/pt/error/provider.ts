@@ -193,6 +193,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "O provedor não aceitou o código. Inicie o login novamente.",
   "error.provider.codeLoginUnsupported":
     "Este servidor não permite entrar com um código colado. Entre pelo navegador no computador do servidor.",
+  "error.provider.claudeLoginNotSaved":
+    "O Claude não conseguiu salvar o login no Mac. Reinicie o Mac que executa o OpenBot e conecte o Claude novamente.",
   "error.provider.cliBusyRetry": "A CLI de {provider} está executando um turno. Aguarde o término e tente novamente.",
   "error.provider.cliSigningIn": "A CLI de {provider} está entrando na conta. Conclua ou cancele o login e atualize.",
   "error.provider.cliBusyUpdate": "A CLI de {provider} está executando um turno. Aguarde o término e atualize.",

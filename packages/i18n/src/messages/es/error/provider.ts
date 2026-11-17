@@ -193,6 +193,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "El proveedor no aceptó el código. Inicia sesión de nuevo.",
   "error.provider.codeLoginUnsupported":
     "Este servidor no permite iniciar sesión con un código pegado. Inicia sesión en el navegador del equipo del servidor.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude no pudo guardar el inicio de sesión en el Mac. Reinicia el Mac donde se ejecuta OpenBot y vuelve a conectar Claude.",
   "error.provider.cliBusyRetry":
     "La CLI de {provider} está procesando un turno. Espera a que termine e inténtalo de nuevo.",
   "error.provider.cliSigningIn":

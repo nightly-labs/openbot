@@ -191,6 +191,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Il provider non ha accettato il codice. Riavvia l'accesso.",
   "error.provider.codeLoginUnsupported":
     "Questo server non supporta l'accesso con un codice incollato. Accedi sul computer del server, nel suo browser.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude non è riuscito a salvare l’accesso sul Mac. Riavvia il Mac su cui è in esecuzione OpenBot, poi connetti di nuovo Claude.",
   "error.provider.cliBusyRetry": "La CLI di {provider} sta lavorando a un turno. Attendi che finisca, poi riprova.",
   "error.provider.cliSigningIn":
     "La CLI di {provider} sta effettuando l'accesso. Completa o annulla l'accesso, poi aggiorna.",

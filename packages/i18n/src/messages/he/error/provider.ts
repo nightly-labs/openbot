@@ -173,6 +173,8 @@ export const messages = {
   "error.provider.codeLoginBadCode": "יש להדביק את הקוד שדף ההתחברות מציג.",
   "error.provider.codeLoginRefused": "הספק לא קיבל את הקוד. יש להתחיל את ההתחברות מחדש.",
   "error.provider.codeLoginUnsupported": "השרת הזה לא יכול להתחבר עם קוד מודבק. יש להתחבר במחשב השרת, בדפדפן שלו.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude לא הצליח לשמור את ההתחברות ב-Mac. יש להפעיל מחדש את ה-Mac שמריץ את OpenBot, ואז לחבר שוב את Claude.",
   "error.provider.cliBusyRetry": "ה-CLI של {provider} עובד על פעולה. יש להמתין לסיומה ואז לנסות שוב.",
   "error.provider.cliSigningIn": "ה-CLI של {provider} מתחבר. יש לסיים או לבטל את ההתחברות ואז לעדכן.",
   "error.provider.cliBusyUpdate": "ה-CLI של {provider} עובד על פעולה. יש להמתין לסיומה ואז לעדכן.",
