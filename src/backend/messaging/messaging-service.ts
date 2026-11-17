@@ -326,6 +326,9 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
+    this.#threads.setOwnerPostSource(
+      (link) => this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true,
+    );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
@@ -360,6 +363,7 @@ export class MessagingService {
     // The kept deliveries that wait for a connection go now: nothing will start it.
     for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
+    this.#threads.setOwnerPostSource(null);
     this.#threads.setHistorySource(null);
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
