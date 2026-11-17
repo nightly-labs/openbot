@@ -62,7 +62,9 @@ it finds the marker by its text. When a turn that ran only quiet routine runs co
 answer is the marker, or the agent called the tool and the turn gave no file, image or question, the
 turn drops its markers, thinking and plan from the conversation. Each other text answer stays with the
 item type `routine_quiet_answer`. A quiet answer does not count as unread, does not change the agent
-preview, and no Team API client gets it; the desktop chat shows it under its run, which starts closed.
+preview, and only a Team API client with `routine-quiet-answers-v1` gets it; the desktop chat and the web
+client show it under its run, which starts closed. `history_read` marks it `quiet`, so the agent does not
+say that the user saw it.
 The turn puts back the agent preview from
 before the run (the run start shows the task there; memory only, so after a restart the task stays),
 and its `turn-completed`

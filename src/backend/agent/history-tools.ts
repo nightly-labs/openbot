@@ -3,6 +3,7 @@ import {
   CONVERSATION_TRACE_STEP_LIMIT,
   type ConversationMessage,
   type ConversationTurnTrace,
+  ROUTINE_QUIET_ANSWER_ITEM_TYPE,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { redactSecrets } from "@openbot/logging";
@@ -274,6 +275,11 @@ interface HistoryEntry {
   attachmentsOmitted?: number;
   /** Set for a visual reply in a list: its text is only the page title. */
   page?: string;
+  /**
+   * Set for the answer of a turn that ended with nothing to report. The user got no notification,
+   * and the chat shows it only when they open its run, so a model must not say that the user saw it (#11174).
+   */
+  quiet?: string;
 }
 
 /** Owns bounded model-facing history output. Scope is supplied by the authenticated router. */
@@ -565,6 +571,11 @@ export class HistoryTools {
         ...(visual && !read?.messageId
           ? {
               page: "history_read with this messageId, and the taskId of this entry if it has one, gives the page text.",
+            }
+          : {}),
+        ...(message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE
+          ? {
+              quiet: "Ended with nothing to report: no notification, and the chat shows it only inside its closed run.",
             }
           : {}),
       };
