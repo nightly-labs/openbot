@@ -126,7 +126,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Yanıtlarınız gönderilemedi. Lütfen tekrar deneyin.",
   "mobile.chat.question.confirmAction": "Onayla: {action}?",
   "mobile.chat.question.confirmAccept": "Onayla",
-  "mobile.chat.question.holdHint": "Onaylamak için düğmeyi basılı tutun.",
+  "mobile.chat.question.holdHint": "Onaylamak için düğmeyi basılı tutun veya ikinci adımda onaylamak için dokunun.",
   "mobile.chat.question.preview": "Önizleme",
   "mobile.chat.question.showAllPreview": "Tümünü göster",
   "mobile.chat.question.sendChoice": "Gönder",

@@ -321,10 +321,9 @@ function useSecondsLeft(at: string | undefined): number {
 
 /**
  * A confirm waiting for an answer. An action that needs a second step (`confirm: true`), and the
- * primary and danger buttons of a dangerous block, are only held to press, so a stray tap cannot
- * confirm. Desktop asks again in the card for `confirm: true`; on a phone the hold is that step.
- * With VoiceOver or TalkBack, which cannot hold a button easily, a tap asks again in the card instead. The action that the host
- * presses when nobody answers counts down.
+ * primary and danger buttons of a dangerous block, answer only when held, so a stray tap cannot
+ * confirm. A tap asks again in the card, as a click does on desktop: a tap that did nothing looked
+ * like a broken button (#9993). The action that the host presses when nobody answers counts down.
  * Only a host with `ui-block-auto-answer-v1` sends that time.
  */
 export function ChatConfirmPrompt({
@@ -466,8 +465,6 @@ export function ChatConfirmPrompt({
                       : undefined
                   }
                   onPress={() => {
-                    // A tap on a held button only says that it must be held; the hint under the buttons says how.
-                    if (held && !screenReader) return void haptics.notification("warning");
                     void haptics.selection();
                     if (held || action.confirm === true) setConfirming(action);
                     else respond(action);

@@ -125,7 +125,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.question.sendFailed": "Couldn’t send your answers. Please try again.",
   "mobile.chat.question.confirmAction": "Confirm: {action}?",
   "mobile.chat.question.confirmAccept": "Confirm",
-  "mobile.chat.question.holdHint": "Touch and hold the button to confirm.",
+  "mobile.chat.question.holdHint": "Touch and hold the button to confirm, or tap it to confirm in a second step.",
   "mobile.chat.question.preview": "Preview",
   "mobile.chat.question.showAllPreview": "Show all",
   "mobile.chat.question.sendChoice": "Send",

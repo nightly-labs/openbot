@@ -127,7 +127,8 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Deine Antworten konnten nicht gesendet werden. Versuche es erneut.",
   "mobile.chat.question.confirmAction": "Bestätigen: {action}?",
   "mobile.chat.question.confirmAccept": "Bestätigen",
-  "mobile.chat.question.holdHint": "Halte die Taste gedrückt, um zu bestätigen.",
+  "mobile.chat.question.holdHint":
+    "Halte die Taste gedrückt, um zu bestätigen, oder tippe darauf, um in einem zweiten Schritt zu bestätigen.",
   "mobile.chat.question.preview": "Vorschau",
   "mobile.chat.question.showAllPreview": "Alles anzeigen",
   "mobile.chat.question.sendChoice": "Senden",

@@ -126,7 +126,8 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Impossibile inviare le risposte. Riprova.",
   "mobile.chat.question.confirmAction": "Confermare: {action}?",
   "mobile.chat.question.confirmAccept": "Conferma",
-  "mobile.chat.question.holdHint": "Tieni premuto il pulsante per confermare.",
+  "mobile.chat.question.holdHint":
+    "Tieni premuto il pulsante per confermare, oppure toccalo per confermare in un secondo passaggio.",
   "mobile.chat.question.preview": "Anteprima",
   "mobile.chat.question.showAllPreview": "Mostra tutto",
   "mobile.chat.question.sendChoice": "Invia",

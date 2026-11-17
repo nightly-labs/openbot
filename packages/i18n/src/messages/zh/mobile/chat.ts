@@ -123,7 +123,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "无法发送你的回答，请重试。",
   "mobile.chat.question.confirmAction": "确认：{action}？",
   "mobile.chat.question.confirmAccept": "确认",
-  "mobile.chat.question.holdHint": "按住按钮确认。",
+  "mobile.chat.question.holdHint": "按住按钮确认，或轻点后在第二步确认。",
   "mobile.chat.question.preview": "预览",
   "mobile.chat.question.showAllPreview": "显示全部",
   "mobile.chat.question.sendChoice": "发送",

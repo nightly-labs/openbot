@@ -125,7 +125,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "답변을 보내지 못했어요. 다시 시도해 주세요.",
   "mobile.chat.question.confirmAction": "{action}을(를) 확인할까요?",
   "mobile.chat.question.confirmAccept": "확인",
-  "mobile.chat.question.holdHint": "버튼을 길게 눌러 확인하세요.",
+  "mobile.chat.question.holdHint": "버튼을 길게 눌러 확인하거나, 탭해서 두 번째 단계에서 확인하세요.",
   "mobile.chat.question.preview": "미리 보기",
   "mobile.chat.question.showAllPreview": "모두 보기",
   "mobile.chat.question.sendChoice": "보내기",

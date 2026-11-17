@@ -180,7 +180,8 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Не удалось отправить ответы. Повторите попытку.",
   "mobile.chat.question.confirmAction": "Подтвердить: {action}?",
   "mobile.chat.question.confirmAccept": "Подтвердить",
-  "mobile.chat.question.holdHint": "Удерживайте кнопку, чтобы подтвердить.",
+  "mobile.chat.question.holdHint":
+    "Удерживайте кнопку, чтобы подтвердить, или коснитесь её и подтвердите на следующем шаге.",
   "mobile.chat.question.preview": "Предпросмотр",
   "mobile.chat.question.showAllPreview": "Показать всё",
   "mobile.chat.question.sendChoice": "Отправить",

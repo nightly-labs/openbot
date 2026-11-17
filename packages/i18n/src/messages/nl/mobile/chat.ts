@@ -118,7 +118,8 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Kan je antwoorden niet versturen. Probeer het opnieuw.",
   "mobile.chat.question.confirmAction": "Bevestigen: {action}?",
   "mobile.chat.question.confirmAccept": "Bevestigen",
-  "mobile.chat.question.holdHint": "Houd de knop ingedrukt om te bevestigen.",
+  "mobile.chat.question.holdHint":
+    "Houd de knop ingedrukt om te bevestigen, of tik erop om in een tweede stap te bevestigen.",
   "mobile.chat.question.preview": "Voorvertoning",
   "mobile.chat.question.showAllPreview": "Alles tonen",
   "mobile.chat.question.sendChoice": "Sturen",

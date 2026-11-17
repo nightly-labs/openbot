@@ -131,7 +131,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "לא ניתן היה לשלוח את התשובות. יש לנסות שוב.",
   "mobile.chat.question.confirmAction": "לאשר: {action}?",
   "mobile.chat.question.confirmAccept": "אישור",
-  "mobile.chat.question.holdHint": "יש ללחוץ לחיצה ארוכה על הלחצן כדי לאשר.",
+  "mobile.chat.question.holdHint": "יש ללחוץ לחיצה ארוכה על הלחצן כדי לאשר, או להקיש עליו כדי לאשר בשלב שני.",
   "mobile.chat.question.preview": "תצוגה מקדימה",
   "mobile.chat.question.showAllPreview": "הצגת הכול",
   "mobile.chat.question.sendChoice": "שליחה",

@@ -126,7 +126,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "回答を送信できませんでした。もう一度お試しください。",
   "mobile.chat.question.confirmAction": "確認: {action}?",
   "mobile.chat.question.confirmAccept": "確認",
-  "mobile.chat.question.holdHint": "ボタンを長押しして確認します。",
+  "mobile.chat.question.holdHint": "ボタンを長押しして確認するか、タップして次のステップで確認します。",
   "mobile.chat.question.preview": "プレビュー",
   "mobile.chat.question.showAllPreview": "すべて表示",
   "mobile.chat.question.sendChoice": "送信",

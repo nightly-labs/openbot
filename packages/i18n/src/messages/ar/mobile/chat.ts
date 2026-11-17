@@ -201,7 +201,7 @@ export const messages = {
   "mobile.chat.question.sendFailed": "تعذّر إرسال إجاباتك. حاول مرة أخرى.",
   "mobile.chat.question.confirmAction": "تأكيد: {action}؟",
   "mobile.chat.question.confirmAccept": "تأكيد",
-  "mobile.chat.question.holdHint": "المس الزر مع الاستمرار للتأكيد.",
+  "mobile.chat.question.holdHint": "المس الزر مع الاستمرار للتأكيد، أو انقر عليه للتأكيد في خطوة ثانية.",
   "mobile.chat.question.preview": "معاينة",
   "mobile.chat.question.showAllPreview": "عرض الكل",
   "mobile.chat.question.sendChoice": "إرسال",

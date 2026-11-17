@@ -128,7 +128,8 @@ export const messages = {
   "mobile.chat.question.sendFailed": "Impossible d’envoyer vos réponses. Veuillez réessayer.",
   "mobile.chat.question.confirmAction": "Confirmer : {action} ?",
   "mobile.chat.question.confirmAccept": "Confirmer",
-  "mobile.chat.question.holdHint": "Maintenez le bouton enfoncé pour confirmer.",
+  "mobile.chat.question.holdHint":
+    "Maintenez le bouton enfoncé pour confirmer, ou touchez-le pour confirmer à une deuxième étape.",
   "mobile.chat.question.preview": "Aperçu",
   "mobile.chat.question.showAllPreview": "Tout afficher",
   "mobile.chat.question.sendChoice": "Envoyer",
