@@ -102,7 +102,7 @@ import {
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
-import { BrowserRecorder } from "./browser-recorder";
+import { BrowserRecorder, recordingFrameSize } from "./browser-recorder";
 import {
   BROWSER_PAGE_CRASH_KEPT,
   BROWSER_PAGE_CRASH_RELOADED,
@@ -2794,7 +2794,7 @@ export class BrowserHost {
         yield* browserSync(() => this.#requireToolTab(params, tabId));
         yield* this.#enqueue(tabId, (tab) => {
           this.#requireNoSecretDocument(tab, "Recording");
-          return this.#recorder.start(tabId, tab.contents);
+          return this.#recorder.start(tabId, tab.contents, recordingFrameSize(tab.environment));
         });
         return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
       }),

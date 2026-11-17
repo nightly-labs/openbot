@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { type FileHandle, mkdir, open, rm } from "node:fs/promises";
 import { join } from "node:path";
-import type { BrowserRecordingArtifact } from "@openbot/contracts/ipc";
+import type { BrowserEnvironment, BrowserRecordingArtifact } from "@openbot/contracts/ipc";
 import { Deferred, Effect, Result, Schema, Semaphore } from "effect";
 import { BrowserWindow, type WebContents } from "electron";
 import { type BrowserOperationError, browserCall, browserFailure, browserSync } from "./browser-effects";
@@ -23,6 +23,16 @@ const recorderStartErrorSchema = Schema.Struct({
   name: Schema.String,
   message: Schema.String,
 });
+
+/** The encoded video size in physical pixels, or null to keep the size that the capture gives. */
+export type RecordingFrameSize = { width: number; height: number } | null;
+
+/** A tab with a custom viewport records at that viewport times its scale, not at the display's size. */
+export function recordingFrameSize(environment: BrowserEnvironment): RecordingFrameSize {
+  const { mode, width, height, deviceScaleFactor } = environment.viewport;
+  if (mode !== "custom") return null;
+  return { width: Math.round(width * deviceScaleFactor), height: Math.round(height * deviceScaleFactor) };
+}
 
 interface RecorderSession {
   tabId: string;
@@ -73,6 +83,7 @@ export class BrowserRecorder {
     this: BrowserRecorder,
     tabId: string,
     contents: WebContents,
+    frameSize: RecordingFrameSize,
   ): Effect.fn.Return<void, BrowserOperationError> {
     const existing = this.#sessions.get(tabId);
     if (existing) {
@@ -192,7 +203,10 @@ export class BrowserRecorder {
               yield* browserCall(() => recorderWindow.loadURL("https://recorder.openbot.invalid/"));
               const sourceId = contents.getMediaSourceId(recorderWindow.webContents);
               const startResult = yield* browserCall(() =>
-                recorderWindow.webContents.executeJavaScript(startScript(sourceId, this.#maxRecordingMs), true),
+                recorderWindow.webContents.executeJavaScript(
+                  startScript(sourceId, this.#maxRecordingMs, frameSize),
+                  true,
+                ),
               );
               const started = Schema.decodeUnknownResult(recorderStartErrorSchema)(startResult);
               if (Result.isSuccess(started))
@@ -391,7 +405,23 @@ export class BrowserRecorder {
   });
 }
 
-function startScript(sourceId: string, maxRecordingMs: number): string {
+function startScript(sourceId: string, maxRecordingMs: number, frameSize: RecordingFrameSize): string {
+  // Without a size, tab capture follows the display's scale, so a 1920x1080 viewport at scale 1
+  // can record at 4480x2520 on a Retina screen. A fixed size letterboxes a later viewport change.
+  const tabSize = frameSize
+    ? {
+        minWidth: frameSize.width,
+        maxWidth: frameSize.width,
+        minHeight: frameSize.height,
+        maxHeight: frameSize.height,
+      }
+    : {};
+  const displayVideo = frameSize
+    ? {
+        width: { ideal: frameSize.width, max: frameSize.width },
+        height: { ideal: frameSize.height, max: frameSize.height },
+      }
+    : true;
   return `(async () => {
     let stage = 'initialization';
     try {
@@ -403,11 +433,11 @@ function startScript(sourceId: string, maxRecordingMs: number): string {
     try {
       stream = await navigator.mediaDevices.getUserMedia({
         audio: false,
-        video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId } },
+        video: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: sourceId, ...${JSON.stringify(tabSize)} } },
       });
     } catch {
       stage = 'getDisplayMedia';
-      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: ${JSON.stringify(displayVideo)}, audio: false });
     }
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'
