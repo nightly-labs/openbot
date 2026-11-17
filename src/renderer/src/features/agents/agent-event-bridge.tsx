@@ -1,5 +1,11 @@
 import { providerDisplayName } from "@openbot/contracts/agent-providers";
-import type { AgentEvent, AgentRuntimeSnapshot, AttachmentSummary, ConversationMessage } from "@openbot/contracts/ipc";
+import {
+  type AgentEvent,
+  type AgentRuntimeSnapshot,
+  type AttachmentSummary,
+  type ConversationMessage,
+  LOCAL_SERVER_ID,
+} from "@openbot/contracts/ipc";
 import { cleanAgentMessageText } from "@openbot/team-client/agent-message-text";
 import { agentNotificationLevel } from "@openbot/team-client/agent-notifications";
 import { reconcileQueuesWithRuntimeWork } from "@openbot/team-client/dynamic-island-coordinator";
@@ -168,6 +174,8 @@ export function AgentEventBridge() {
   );
   const retryNotices = createRetryNotices();
   let readRefresh = 0;
+  /** Whether main sent a runtime snapshot to this page, which it does only after the page loaded. */
+  let snapshotReceived = false;
   let modelRefresh = 0;
 
   function handleAgentEvent(event: AgentEvent) {
@@ -431,7 +439,11 @@ export function AgentEventBridge() {
         return;
       }
       case "runtime-snapshot":
-        void channels.resync();
+        // A joined server sends a snapshot after a reconnect, when channel events can be lost. This
+        // computer loses events only while the page loads: the start read and the first sent snapshot
+        // cover that. It sends a snapshot at each token count change of a working agent, and a full
+        // channel read each time stalls typing (#11103).
+        if (activeServerId() !== LOCAL_SERVER_ID || !snapshotReceived) void channels.resync();
         applyAgentRuntimeSnapshot(event.snapshot);
         return;
       case "browser-takeover-requested":
@@ -555,6 +567,7 @@ export function AgentEventBridge() {
         return;
       }
       flush(() => handleAgentEvent(event));
+      if (event.type === "runtime-snapshot") snapshotReceived = true;
       // The main window also gets each event, so a chat window does not play or read it a second time.
       if (platform.chatWindow) return;
       playAgentEventSound(event);
