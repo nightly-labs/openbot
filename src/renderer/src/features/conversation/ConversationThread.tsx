@@ -38,8 +38,7 @@ export function ConversationThread() {
     previewAttachment,
     attachmentAction,
     attachmentDownloads,
-    openSharedFile,
-    openWorkspaceFile,
+    openThreadFile,
     browserTakeoverResolution,
     installedSkills,
     installedSkillsLoadFailed,
@@ -314,18 +313,7 @@ export function ConversationThread() {
             }}
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
-            onOpenSharedFile={(path) => openSharedFile(path)}
-            // As in the chat, a file name that a chip joins to a folder opens as written when the folder has no such file.
-            onOpenWorkspaceFile={(agentId, path, asWritten) =>
-              openWorkspaceFile(
-                path,
-                undefined,
-                agentId,
-                "tab",
-                undefined,
-                asWritten ? () => openWorkspaceFile(asWritten, undefined, agentId) : undefined,
-              )
-            }
+            onOpenFile={openThreadFile}
             onSelectAgent={props.onSelectAgent}
             changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}

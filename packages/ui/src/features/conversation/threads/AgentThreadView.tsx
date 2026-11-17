@@ -214,13 +214,14 @@ export interface AgentThreadViewProps {
   onSend: (text: string) => Promise<boolean>;
   onStop: () => void;
   onOpenLink: (url: string) => void;
-  /** Opens a file of the shared folder that a message links to. Without it, the link shows as text. */
-  onOpenSharedFile?: ((path: string, asWritten?: string) => void) | undefined;
   /**
-   * Opens a file that a message links to, from the workspace of `agentId`: the agent that wrote the message.
-   * Without it, the link shows as text.
+   * Opens a file that a message links to: from the shared folder, or from the workspace of `agentId`, the
+   * agent that wrote the message. `asWritten` is the file name as the message wrote it, when the path joins
+   * it to a folder. Without it, a file link shows as text.
    */
-  onOpenWorkspaceFile?: ((agentId: string, path: string, asWritten?: string) => void) | undefined;
+  onOpenFile?:
+    | ((kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) => void)
+    | undefined;
   /**
    * Opens an agent's chat, or one of its threads by tab id. With it, a message to or from another agent
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
@@ -574,10 +575,17 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     const marker = message.actionMarker;
     return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
   };
-  /** Opens the files that a message of `agentId` links to, as in the agent's chat. */
+  /** Opens the shared files that a message of `agentId` links to, as in the agent's chat. */
+  const sharedFileOpener = (agentId: string | undefined) => {
+    const open = props.onOpenFile;
+    return open ? (path: string, asWritten?: string) => open("shared", agentId, path, asWritten) : undefined;
+  };
+  /** Opens the workspace files that a message of `agentId` links to, as in the agent's chat. */
   const workspaceFileOpener = (agentId: string | undefined) => {
-    const open = props.onOpenWorkspaceFile;
-    return open && agentId ? (path: string, asWritten?: string) => open(agentId, path, asWritten) : undefined;
+    const open = props.onOpenFile;
+    return open && agentId
+      ? (path: string, asWritten?: string) => open("workspace", agentId, path, asWritten)
+      : undefined;
   };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
@@ -609,8 +617,8 @@ export function AgentThreadView(props: AgentThreadViewProps) {
             onOpenLink={props.onOpenLink}
             onPreview={props.onPreview}
             onAttachmentAction={props.onAttachmentAction}
-            onOpenSharedFile={props.onOpenSharedFile}
-            // A workspace path is in the workspace of the agent that sent the message.
+            // A path is in the workspace of the agent that sent the message.
+            onOpenSharedFile={sharedFileOpener(current().exchange?.senderAgentId)}
             onOpenWorkspaceFile={workspaceFileOpener(current().exchange?.senderAgentId)}
             macWindowControls={props.macWindowControls}
           />
@@ -893,7 +901,7 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                           onOpenLink={props.onOpenLink}
                           onPreview={props.onPreview}
                           onAttachmentAction={props.onAttachmentAction}
-                          onOpenSharedFile={props.onOpenSharedFile}
+                          onOpenSharedFile={sharedFileOpener(props.agent.id)}
                           onOpenWorkspaceFile={workspaceFileOpener(props.agent.id)}
                           mediaSource={props.mediaSource}
                           downloads={props.downloads}

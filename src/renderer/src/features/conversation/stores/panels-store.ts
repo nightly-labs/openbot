@@ -427,6 +427,16 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
    * `attachment` is the file of the same turn that the chip names. It opens when the path does not.
    * `fallback` opens another target when the attachment does not open either, in place of the error.
    */
+  /**
+   * Opens a file that a message of a side thread links to, as the chat does. A file name that a chip joins
+   * to a folder opens as written, from the workspace of `agentId`, when the folder has no such file.
+   */
+  function openThreadFile(kind: "shared" | "workspace", agentId: string | undefined, path: string, asWritten?: string) {
+    const written = asWritten && agentId ? () => openWorkspaceFile(asWritten, undefined, agentId) : undefined;
+    if (kind === "shared") openSharedFile(path, "tab", written);
+    else if (agentId) openWorkspaceFile(path, undefined, agentId, "tab", undefined, written);
+  }
+
   function openWorkspaceFile(
     path: string,
     folder?: string,
@@ -767,6 +777,7 @@ export function createPanelsStore(deps: PanelsStoreDeps) {
     attachmentAction,
     attachmentDownloads,
     openSharedFile,
+    openThreadFile,
     openWorkspaceFile,
     openWorkspaceFolder,
     openWorkspaceFolderEntry,
