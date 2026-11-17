@@ -1113,6 +1113,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Instalado",
   "mobile.server.providers.status.notInstalled": "Sin instalar",
   "mobile.server.providers.status.checking": "Comprobando",
+  "mobile.server.providers.addAccountWithCode": "Añadir cuenta con código",
+  "mobile.server.providers.accountSignInWithCode": "Usar código",
   "mobile.server.providers.accountsKeyHint":
     "Cada agente usa una cuenta. Elígela en los ajustes del agente. Una cuenta nueva necesita una clave de API de esa cuenta.",
   "mobile.server.providers.accountChangeKey": "Cambiar clave",

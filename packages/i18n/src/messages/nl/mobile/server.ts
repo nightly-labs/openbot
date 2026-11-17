@@ -1068,6 +1068,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "Geïnstalleerd",
   "mobile.server.providers.status.notInstalled": "Niet geïnstalleerd",
   "mobile.server.providers.status.checking": "Controleren",
+  "mobile.server.providers.addAccountWithCode": "Account toevoegen met code",
+  "mobile.server.providers.accountSignInWithCode": "Inloggen met code",
   "mobile.server.providers.accountsKeyHint":
     "Elke agent gebruikt één account. Kies het in de instellingen van de agent. Een nieuw account heeft een API-sleutel van dat account nodig.",
   "mobile.server.providers.accountChangeKey": "Sleutel wijzigen",

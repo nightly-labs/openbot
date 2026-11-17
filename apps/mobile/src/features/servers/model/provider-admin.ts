@@ -28,6 +28,8 @@ import {
   MANAGED_RUNTIME_PROVIDERS,
   type PromptCacheTtl,
   type PromptCacheTtlSetting,
+  type ProviderAccountCodeLoginStart,
+  type ProviderAccountCodeLoginStatus,
   type ProviderApiKeyStatus,
   type ProviderCodeLoginStart,
   type ProviderEnvironment,
@@ -61,6 +63,7 @@ import {
 import { MISTRAL_CODE_SIGN_IN_CAPABILITY } from "@openbot/contracts/team-protocol/mistral-code-sign-in-v1";
 import { MODEL_VISIBILITY_CAPABILITY } from "@openbot/contracts/team-protocol/model-visibility-v1";
 import { PROMPT_CACHE_TTL_CAPABILITY } from "@openbot/contracts/team-protocol/prompt-cache-ttl-v1";
+import { PROVIDER_ACCOUNT_CODE_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-code-v1";
 import { PROVIDER_ACCOUNT_KEYS_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-keys-v1";
 import { PROVIDER_ACCOUNT_POOL_CAPABILITY } from "@openbot/contracts/team-protocol/provider-account-pool-v1";
 import { providerAccountRelay } from "@openbot/contracts/team-protocol/provider-account-relays";
@@ -97,6 +100,7 @@ import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts
 import { SIGN_IN_RELAY_CAPABILITY, SIGN_IN_RELAY_PROVIDERS } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import type { MobileTextKey } from "@openbot/i18n/mobile";
 import {
+  cancelProviderAccountCodeLogin,
   cancelProviderCodeLogin,
   cancelProviderRuntime,
   cancelProviderSignInRelay,
@@ -118,6 +122,7 @@ import {
   listCustomAgents,
   listCustomProviders,
   listProviderAccountsWithModels,
+  providerAccountCodeLoginStatus,
   providerUsageResets,
   removeProviderAccount,
   renameProviderAccount,
@@ -133,9 +138,11 @@ import {
   setProviderApiKey,
   signInRelayStatus,
   signOutProvider,
+  startProviderAccountCodeLogin,
   startProviderAccountSignInRelay,
   startProviderCodeLogin,
   startProviderSignInRelay,
+  submitProviderAccountCodeLogin,
   submitProviderCodeLogin,
   updateCustomProvider,
 } from "@openbot/team-client/team-admin-requests";
@@ -546,6 +553,33 @@ export function createProviderAdmin(request: TeamApiRequest, capabilities: reado
               await runTeamRequest(startProviderAccountSignInRelay(request, accountRelay, { provider, accountId }))
             ).flowId;
           },
+          /**
+           * The code sign-in of one account (`provider-account-code-v1`), or null on an older host. The
+           * host runs the provider's CLI for the account, and the phone opens the page that it gives.
+           * `accountId: null` adds an account; the start names it. A cancel removes a new account that
+           * did not sign in.
+           */
+          code: has(PROVIDER_ACCOUNT_CODE_CAPABILITY)
+            ? {
+                /**
+                 * As on desktop and the web: a `paste` sign-in needs a host that can type a pasted code
+                 * into the CLI, and only such a host has `providers-v3`.
+                 */
+                offered: (provider: AgentProviderId): boolean => {
+                  const codeSignIn = agentProviderDescriptor(provider).accountCodeSignIn;
+                  return codeSignIn === "device" || (codeSignIn === "paste" && has(PROVIDERS_SIGN_IN_V3_CAPABILITY));
+                },
+                start: (provider: AgentProviderId, accountId: string | null): Promise<ProviderAccountCodeLoginStart> =>
+                  runTeamRequest(startProviderAccountCodeLogin(request, { provider, accountId })),
+                /** The code is a credential: it goes to the host in the body, and no reply carries it. */
+                submit: (provider: AgentProviderId, accountId: string, code: string): Promise<void> =>
+                  runTeamRequest(submitProviderAccountCodeLogin(request, { provider, accountId, code })),
+                status: (provider: AgentProviderId, accountId: string): Promise<ProviderAccountCodeLoginStatus> =>
+                  runTeamRequest(providerAccountCodeLoginStatus(request, { provider, accountId })),
+                cancel: (provider: AgentProviderId, accountId: string): Promise<void> =>
+                  runTeamRequest(cancelProviderAccountCodeLogin(request, { provider, accountId })),
+              }
+            : null,
         }
       : null,
     /**

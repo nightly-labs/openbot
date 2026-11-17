@@ -1398,11 +1398,13 @@ export const messages = {
   "mobile.server.providers.accountsOnComputer":
     "يستخدم كل وكيل حسابًا واحدًا. اختره في إعدادات الوكيل. أضف حسابًا في OpenBot على حاسوب.",
   "mobile.server.providers.addAccount": "إضافة حساب",
+  "mobile.server.providers.addAccountWithCode": "إضافة حساب برمز",
   "mobile.server.providers.accountGone": "لم يعد هذا الحساب على هذا الخادم.",
   "mobile.server.providers.accountFailed": "تعذّر تغيير هذا الحساب. أعد المحاولة.",
   "mobile.server.providers.accountName": "الاسم",
   "mobile.server.providers.accountNameHint": "لك ولمسؤولي هذا الخادم فقط. اتركه فارغًا لعرض البريد الإلكتروني.",
   "mobile.server.providers.accountSignInAgain": "تسجيل الدخول مجددًا",
+  "mobile.server.providers.accountSignInWithCode": "تسجيل الدخول برمز",
   "mobile.server.providers.accountsKeyHint":
     "يستخدم كل وكيل حسابًا واحدًا. اختره في إعدادات الوكيل. يحتاج الحساب الجديد إلى مفتاح API خاص به.",
   "mobile.server.providers.accountChangeKey": "تغيير المفتاح",

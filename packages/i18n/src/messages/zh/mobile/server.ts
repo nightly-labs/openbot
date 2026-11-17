@@ -1014,6 +1014,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "已安装",
   "mobile.server.providers.status.notInstalled": "未安装",
   "mobile.server.providers.status.checking": "检查中",
+  "mobile.server.providers.addAccountWithCode": "用验证码添加账号",
+  "mobile.server.providers.accountSignInWithCode": "用验证码登录",
   "mobile.server.providers.accountsKeyHint": "每个助手使用一个账号，可在助手设置中选择。新账号需要该账号的 API 密钥。",
   "mobile.server.providers.accountChangeKey": "更换密钥",
   "mobile.server.providers.accountKeyHint": "粘贴 {provider} 账号的 API 密钥。密钥会发送到服务器，这台手机不保存。",

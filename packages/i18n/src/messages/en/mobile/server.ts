@@ -1370,12 +1370,14 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.accountsOnComputer":
     "Each agent uses one account. Choose it in the agent's settings. Add an account in OpenBot on a computer.",
   "mobile.server.providers.addAccount": "Add account",
+  "mobile.server.providers.addAccountWithCode": "Add account with code",
   "mobile.server.providers.accountGone": "This account is no longer on this server.",
   "mobile.server.providers.accountFailed": "Could not change this account. Try again.",
   "mobile.server.providers.accountName": "Name",
   "mobile.server.providers.accountNameHint":
     "Only for you and the admins of this server. Leave it empty to show the email.",
   "mobile.server.providers.accountSignInAgain": "Sign in again",
+  "mobile.server.providers.accountSignInWithCode": "Log in with code",
   // An account that is an API key of the provider (`provider-account-keys-v1`), such as a Cursor account after the first.
   "mobile.server.providers.accountsKeyHint":
     "Each agent uses one account. Choose it in the agent's settings. A new account needs an API key of that account.",

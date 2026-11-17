@@ -1047,6 +1047,8 @@ export const messages = {
   "mobile.server.providers.status.ready": "설치됨",
   "mobile.server.providers.status.notInstalled": "설치 안 됨",
   "mobile.server.providers.status.checking": "확인 중",
+  "mobile.server.providers.addAccountWithCode": "코드로 계정 추가",
+  "mobile.server.providers.accountSignInWithCode": "코드로 로그인",
   "mobile.server.providers.accountsKeyHint":
     "에이전트마다 계정 하나를 사용해요. 에이전트 설정에서 선택하세요. 새 계정에는 해당 계정의 API 키가 필요해요.",
   "mobile.server.providers.accountChangeKey": "키 변경",

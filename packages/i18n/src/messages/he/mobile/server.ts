@@ -1399,11 +1399,13 @@ export const messages = {
   "mobile.server.providers.accountsOnComputer":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון מוסיפים ב-OpenBot במחשב.",
   "mobile.server.providers.addAccount": "הוספת חשבון",
+  "mobile.server.providers.addAccountWithCode": "הוספת חשבון עם קוד",
   "mobile.server.providers.accountGone": "החשבון הזה כבר לא נמצא בשרת הזה.",
   "mobile.server.providers.accountFailed": "לא ניתן לשנות את החשבון הזה. אפשר לנסות שוב.",
   "mobile.server.providers.accountName": "שם",
   "mobile.server.providers.accountNameHint": "מוצג רק לך ולמנהלי השרת הזה. אם השדה ריק, יוצג האימייל.",
   "mobile.server.providers.accountSignInAgain": "התחברות מחדש",
+  "mobile.server.providers.accountSignInWithCode": "התחברות עם קוד",
   "mobile.server.providers.accountsKeyHint":
     "כל סוכן משתמש בחשבון אחד. את החשבון בוחרים בהגדרות הסוכן. חשבון חדש צריך מפתח API של אותו חשבון.",
   "mobile.server.providers.accountChangeKey": "החלפת מפתח",
