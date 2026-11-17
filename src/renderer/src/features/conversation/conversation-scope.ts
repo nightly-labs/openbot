@@ -1165,6 +1165,26 @@ export function createConversationViewScope(props: ConversationProps) {
     // A new form can arrive before the old one goes, so the old one takes back only its own answer.
     return () => setPromptComposerAnswer((current) => (current === answer ? undefined : current));
   };
+  /**
+   * A question that comes while the message box has text does not take that text: the user wrote it
+   * as a message. The composer answers the question again when that draft is sent or cleared.
+   */
+  const openPromptKey = () =>
+    props.prompt ? JSON.stringify([props.prompt.turnId, String(props.prompt.requestId)]) : undefined;
+  const [draftHeldPromptKey, setDraftHeldPromptKey] = createSignal<string>();
+  createEffect(openPromptKey, (key) => {
+    setDraftHeldPromptKey(key && untrack(() => currentDraft().text.trim()) ? key : undefined);
+  });
+  createEffect(
+    () => !currentDraft().text.trim(),
+    (emptied) => {
+      if (emptied) setDraftHeldPromptKey(undefined);
+    },
+  );
+  const composerPromptAnswer = () => {
+    const key = draftHeldPromptKey();
+    return key !== undefined && key === openPromptKey() ? undefined : promptComposerAnswer();
+  };
   const actions = createComposerActions({
     props,
     attachmentBusy,
@@ -1245,7 +1265,7 @@ export function createConversationViewScope(props: ConversationProps) {
     followSentMessage,
     pendingSends,
     attachmentPicker: () => attachmentPicker,
-    promptComposerAnswer,
+    promptComposerAnswer: composerPromptAnswer,
   });
   const {
     updateTeamTyping,
