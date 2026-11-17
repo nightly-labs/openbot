@@ -930,6 +930,13 @@ column, `PRAGMA integrity_check`, the foreign keys, and that the seeded data is 
 stops the release before `publish`. The report is `.openbot-build/release-upgrade-e2e/report.json`,
 with counts only. The script does not use the real `electron-updater` download: its header says why.
 
+`Release upgrade history` (`.github/workflows/release-upgrade-history.yml`) runs the same script each
+week and on demand, outside the release time. It installs the newest public release over the oldest
+public release with a database (`v0.1.14`) and over the newest release that is at least 60 days old,
+on macOS ARM64. `--history` seeds only what the old release has, compares the row count of each table,
+and records a forced end of the old release as a warning. A red run means that an install that skipped
+releases cannot upgrade; fix it in the next release.
+
 The unsigned local macOS package is a development artifact. It does not prove Gatekeeper,
 notarization, or auto-update readiness. Those are proven only by the signed release workflow's
 `codesign`, `spctl`, and `stapler` checks.
