@@ -2,7 +2,7 @@ import type { WorkflowStep } from "@openbot/contracts/ipc";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { Typography } from "heroui-native";
 import Square from "lucide-react-native/icons/square";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Alert, Linking, View } from "react-native";
 import { SettingsRow, SettingsSection } from "@/features/settings/components/settings-content";
 import { WorkflowFlowView } from "@/features/workflows/components/workflow-flow-view";
@@ -58,7 +58,8 @@ export function WorkflowRunScreen() {
   // The steps of the graph in reading order, then any step whose node the workflow no longer has.
   // The steps in the order that a run goes, each path of a split under its label, as the List of the
   // workflow page shows them.
-  const rows = graph ? flowRows(workflowFlowTree(graph)) : [];
+  // Built once for each graph: a running run updates the page each time a step changes.
+  const rows = useMemo(() => (graph ? flowRows(workflowFlowTree(graph)) : []), [graph]);
   const byId = new Map(graph?.nodes.map((node) => [node.id, node]) ?? []);
   const known = new Set(rows.flatMap((row) => (row.type === "step" ? [row.id] : [])));
   const labelOf = (id: string) => {

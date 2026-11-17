@@ -26,7 +26,8 @@ export type FlowItem =
   | { type: "step"; id: string }
   /** `joined`: the paths meet again and the flow goes on after them; else each path ends by itself. */
   | { type: "split"; from: string; paths: FlowPath[]; joined: boolean }
-  | { type: "jump"; to: string; loop: boolean }
+  /** `from`: the step that the way leaves, so two ways to one step have their own keys. */
+  | { type: "jump"; from: string; to: string; loop: boolean }
   | { type: "add"; place: GraphPlace };
 
 export interface FlowPath {
@@ -67,7 +68,10 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     position(left).x - position(right).x || position(left).y - position(right).y;
   const isLeaf = (id: string) => (out.get(id) ?? []).length === 0 && !loopEdges.has(id);
   /** A step with no way in that feeds the steps after it, such as a prompt. */
-  const isFeeder = (node: WorkflowNode) => node.kind !== "trigger" && (into.get(node.id) ?? []).length === 0;
+  // Only a prompt or a file feeds the step after it. Any other step with no way in does not run: it
+  // stays with the steps that no trigger reaches.
+  const isFeeder = (node: WorkflowNode) =>
+    (node.kind === "prompt" || node.kind === "asset") && (into.get(node.id) ?? []).length === 0;
 
   const placed = new Set<string>();
 
@@ -122,9 +126,10 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
     const items: FlowItem[] = [];
     if (via) items.push({ type: "add", place: { kind: "edge", edgeId: via.id } });
     let current = start;
+    let previous = via?.from ?? "";
     while (current && !stop.has(current)) {
       if (placed.has(current)) {
-        items.push({ type: "jump", to: current, loop: false });
+        items.push({ type: "jump", from: previous, to: current, loop: false });
         break;
       }
       place(current, items);
@@ -152,7 +157,7 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       for (const edge of back)
         items.push(
           { type: "add", place: { kind: "edge", edgeId: edge.id } },
-          { type: "jump", to: edge.to, loop: true },
+          { type: "jump", from, to: edge.to, loop: true },
         );
       const node = byId.get(from);
       const isCondition = node?.kind === "condition";
@@ -165,10 +170,13 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
       const next = rest[0];
       if (rest.length === 1 && next && !(isCondition && next.branch)) {
         items.push({ type: "add", place: { kind: "edge", edgeId: next.id } });
+        previous = from;
         current = next.to;
         continue;
       }
-      const join = joinOf(rest.map((edge) => edge.to));
+      // Paths join only when there are two or more: one connected path of a condition goes on alone,
+      // and its other answer ends the run.
+      const join = rest.length > 1 ? joinOf(rest.map((edge) => edge.to)) : undefined;
       const inner = new Set(stop);
       if (join) inner.add(join);
       const paths: FlowPath[] = rest.map((edge) => ({
@@ -187,6 +195,7 @@ export function workflowFlowTree(graph: WorkflowGraph): FlowTree {
             });
       paths.sort((left, right) => (left.branch === "no" ? 1 : 0) - (right.branch === "no" ? 1 : 0));
       items.push({ type: "split", from, paths, joined: Boolean(join) });
+      previous = from;
       current = join;
     }
     return items;
@@ -220,7 +229,13 @@ export function flowRows(tree: FlowTree): FlowRow[] {
     for (const item of items) {
       if (item.type === "step") rows.push({ type: "step", id: item.id, depth });
       else if (item.type === "jump")
-        rows.push({ type: "jump", key: `${path}/jump-${item.to}`, to: item.to, loop: item.loop, depth });
+        rows.push({
+          type: "jump",
+          key: `${path}/jump-${item.from}-${item.to}`,
+          to: item.to,
+          loop: item.loop,
+          depth,
+        });
       else if (item.type === "split")
         item.paths.forEach((child, index) => {
           const key = `${path}/${item.from}-${child.key}`;

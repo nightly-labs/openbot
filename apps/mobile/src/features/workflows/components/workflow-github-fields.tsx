@@ -146,7 +146,8 @@ export function GitHubTriggerFields({ node, draft }: { node: WorkflowNode; draft
           value={
             settings.repositories.length > 0
               ? settings.repositories.join(", ")
-              : t("mobile.workflow.github.chooseRepository")
+              : // A stored name that is not a valid repository still shows, as the summary shows it.
+                settings.repository || t("mobile.workflow.github.chooseRepository")
           }
           disabled={!editable}
           onPress={() => openGitHubPick(node.id, "repository")}

@@ -2,7 +2,7 @@ import type { WorkflowGraph, WorkflowNode, WorkflowStep } from "@openbot/contrac
 import { Typography } from "heroui-native";
 import CornerDownLeft from "lucide-react-native/icons/corner-down-left";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
-import { Fragment, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -209,7 +209,8 @@ export function WorkflowFlowView({
   };
 }) {
   const { t } = useText();
-  const tree = workflowFlowTree(graph);
+  // The tree walks the graph and searches each join; it changes only with the graph.
+  const tree = useMemo(() => workflowFlowTree(graph), [graph]);
   const byId = new Map(graph.nodes.map((node) => [node.id, node]));
   const press: StepPress | undefined = run
     ? { kind: "open", open: run.onSelect, canOpen: () => true }
@@ -242,7 +243,7 @@ export function WorkflowFlowView({
     item.type === "step"
       ? item.id
       : item.type === "jump"
-        ? `jump-${item.to}`
+        ? `jump-${item.from}-${item.to}`
         : item.type === "split"
           ? `split-${item.from}`
           : item.place.kind === "edge"

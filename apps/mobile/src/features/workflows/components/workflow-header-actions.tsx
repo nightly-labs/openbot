@@ -97,9 +97,13 @@ export function WorkflowEditorHeader({
   const saveLabel = save?.label ?? "";
   // The Android header reads the newest callbacks through a ref, so its options change only when the
   // header looks different: new options rebuild the toolbar, which a form did on every key press.
-  const latest = useRef({ onBack, onMenu, runSave });
+  // Back does nothing during a save, as on iOS: the editor stays until the save ends or fails.
+  const back = () => {
+    if (!backDisabled) onBack();
+  };
+  const latest = useRef({ onBack: back, onMenu, runSave });
   useLayoutEffect(() => {
-    latest.current = { onBack, onMenu, runSave };
+    latest.current = { onBack: back, onMenu, runSave };
   });
   const androidOptions = useMemo(
     () => ({
