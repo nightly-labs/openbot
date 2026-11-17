@@ -16,6 +16,7 @@ import {
   importProviderHistory,
   type ProviderHistoryCompactionResult,
   type ProviderHistoryImportResult,
+  retiredSessionNeedsHistoryRead,
 } from "../src/backend/provider-history-import";
 
 const REPORT_NAME = "provider-history-reimport-report.json";
@@ -93,6 +94,7 @@ interface Report {
   generatedAt: string;
   command: string;
   imports: Record<string, ProviderHistoryImportResult>;
+  retiredStarts: { turns: number; state: string | undefined }[];
   compaction: {
     belowMarker: ProviderHistoryCompactionResult;
     existingRows: ProviderHistoryCompactionResult;
@@ -294,6 +296,38 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       stagedRows("stale-session") === 2 &&
       compactedRows("stale-session") === 2;
 
+    // A retired session whose compacted turn changed in its second fragment. Each start reads a retired
+    // session only while `retiredSessionNeedsHistoryRead` (the rule of `boot-recovery.ts`) says so. The
+    // first changed read must not end the import, or no later start reads the session again.
+    const retiredSessionId = "retired-session";
+    const retiredTurnId = "retired-split-turn";
+    const retiredFirst = await runImport(retiredSessionId, "codex", splitTurn(retiredTurnId, 21));
+    // The provider changed the turn after the last complete read, then the session was retired.
+    const retiredAt = "2001-01-01T00:00:00.000Z";
+    database.connection
+      .prepare("UPDATE provider_history_imports SET updated_at = ? WHERE session_id = ?")
+      .run("2000-01-01T00:00:00.000Z", retiredSessionId);
+    const retiredEdited = splitTurn(retiredTurnId, 21, "edited", "b");
+    const retiredStarts: { turns: number; state: string | undefined }[] = [];
+    while (
+      retiredStarts.length < 5 &&
+      retiredSessionNeedsHistoryRead(database.providerHistoryImport(retiredSessionId), retiredAt)
+    ) {
+      const result = await runImport(retiredSessionId, "codex", retiredEdited);
+      retiredStarts.push({ turns: result.turns, state: database.providerHistoryImport(retiredSessionId)?.state });
+    }
+    const retiredTexts = messageTexts();
+    const retiredWaitingTurnImports =
+      retiredFirst.turns === 1 &&
+      JSON.stringify(retiredStarts) ===
+        JSON.stringify([
+          { turns: 0, state: "active" },
+          { turns: 1, state: "complete" },
+        ]) &&
+      retiredTexts.includes("Part B 21 edited") &&
+      !retiredTexts.includes("Part B 21") &&
+      compactedRows(retiredSessionId) === 2;
+
     // A database from before compaction: imported Codex rows in full, a Codex turn that is not
     // imported, and Grok rows. Only the imported Codex rows are compacted, in small batches.
     const legacyHistory = [turn("legacy-turn-1", 15), turn("legacy-turn-2", 16)];
@@ -458,10 +492,12 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         lateImported,
         staleFirst,
         staleEdited,
+        retiredFirst,
         legacyFirst,
         legacyRepeat,
         belowMarkerImport,
       },
+      retiredStarts,
       compaction: { belowMarker: belowMarkerRows, existingRows, repeat: repeatCompaction },
       acceptance: {
         firstImportsEveryTurn: first.turns === codexHistory.length && messagesAfterFirst.length === 6,
@@ -507,6 +543,7 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         lateSplitEditKeepsFirstHashUntilNextRead: lateWaitKeptFirstHash,
         lateSplitEditImportsFullTurnNextRead: lateImportedFullTurn,
         staleHashDroppedAfterFullRead: staleFirst.turns === 1 && staleCompacted && staleDropped,
+        retiredSessionWaitingTurnImportsOnNextStart: retiredWaitingTurnImports,
         existingRowsWereFull: legacyFirst.turns === 2 && legacyFullBefore,
         noCompactionBelowSchema64: belowMarkerKeptFull,
         // Four legacy rows, the two rows of the turn imported below schema 64, and the two rows of the

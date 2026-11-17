@@ -120,7 +120,8 @@ interface ProviderHistoryPartial {
  *
  * A Codex or Claude turn keeps only item hashes after its import. When one of its items changes, the
  * turn imports only after a read wrote each of its items in full again: in the same read when the
- * change is in its first fragment, else in the next read. It never imports from a hash.
+ * change is in its first fragment, else in the next read. Until then the import stays `active`, so
+ * the next start reads a retired session again. It never imports from a hash.
  */
 export function importProviderHistory(
   input: ProviderHistoryImportInput,
@@ -140,6 +141,8 @@ export function importProviderHistory(
     let turns = 0;
     let messages = 0;
     let providerCovered = false;
+    // A compacted turn that changed and waits for the next read to import it.
+    let turnWaits = false;
     const seenTurns = new Set<string>();
     // Compacted turns whose first fragment in this read wrote its items in full, so this read writes
     // each item of the turn that the provider still sends in full.
@@ -159,7 +162,10 @@ export function importProviderHistory(
         if (staged.turnImported) return true;
         if (staged.compactedItems) {
           // An earlier fragment of this read kept hashes; the next read writes them in full.
-          if (!rewrittenTurns.has(fragment.turnId)) return true;
+          if (!rewrittenTurns.has(fragment.turnId)) {
+            turnWaits = true;
+            return true;
+          }
           // This read wrote each item that the provider still sends, so these are gone from it.
           yield* providerSync(() => input.database.dropCompactedProviderHistoryItems(input.sessionId, fragment.turnId));
         }
@@ -211,10 +217,24 @@ export function importProviderHistory(
           }),
         ),
       );
+    // A waiting turn keeps the import `active`, so the next start reads a retired session again.
     if (providerCovered)
-      yield* providerSync(() => input.database.markProviderHistoryImportState(input.sessionId, "complete"));
+      yield* providerSync(() =>
+        input.database.markProviderHistoryImportState(input.sessionId, turnWaits ? "active" : "complete"),
+      );
     return { turns, messages };
   });
+}
+
+/**
+ * Whether a start reads the history of a retired session. It does not when the last read ended
+ * complete after the session was retired: the session has no new turns, and no turn waits.
+ */
+export function retiredSessionNeedsHistoryRead(
+  imported: { state: string; updatedAt: string } | null,
+  retiredAt: string,
+): boolean {
+  return imported?.state !== "complete" || imported.updatedAt < retiredAt;
 }
 
 /** The bound of one compaction batch is in the store; this pause lets other work run between them. */

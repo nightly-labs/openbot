@@ -13,7 +13,11 @@ import { causeHelpers, reportOriginalFailure } from "../effect-boundary";
 import { LineTooLongError } from "../jsonl";
 import type { DeliveryContext, MailboxStore } from "../mailbox-store";
 import { providerSync } from "../provider-client-effects";
-import { compactImportedProviderHistory, importProviderHistory } from "../provider-history-import";
+import {
+  compactImportedProviderHistory,
+  importProviderHistory,
+  retiredSessionNeedsHistoryRead,
+} from "../provider-history-import";
 import type { ConversationRuntime } from "./conversation-runtime";
 import { conversationContentSignature } from "./delivery-content";
 import { markIncompleteMediaGeneration } from "./image-generation";
@@ -438,10 +442,11 @@ export class BootRecovery {
       // was retired before its last complete import has no new turns, so it is not read again.
       const active = this.#store.database.activeProviderSession(publicThreadId, agent.provider);
       for (const session of this.#store.database.listProviderSessions(publicThreadId)) {
-        if (session.state === "inactive") {
-          const imported = this.#store.database.providerHistoryImport(session.id);
-          if (imported?.state === "complete" && imported.updatedAt >= session.updatedAt) continue;
-        }
+        if (
+          session.state === "inactive" &&
+          !retiredSessionNeedsHistoryRead(this.#store.database.providerHistoryImport(session.id), session.updatedAt)
+        )
+          continue;
         // The active session is in the folder of the agent's provider account. An account change
         // retires the sessions, so a retired one can be in the folder of an earlier account.
         const client =

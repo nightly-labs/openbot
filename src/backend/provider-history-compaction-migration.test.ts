@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
-import { afterEach, describe, expect, it } from "vitest";
-import { migrateOpenBotDatabase, NewerDatabaseError } from "./openbot-database-schema";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { releasedDatabaseCases } from "./migration-harness";
+import { migration as compactionMigration } from "./migrations/0064-provider-history-compaction";
+import type * as Registry from "./migrations/registry";
+import { LATEST_SCHEMA_VERSION, migrateOpenBotDatabase, NewerDatabaseError } from "./openbot-database-schema";
 
 // Failure modes: the marker changes or loses a row of any table; a failed upgrade leaves the marker;
 // a newer or incomplete history is accepted; a database at version 64 opens in a release that does not
@@ -9,6 +12,8 @@ import { migrateOpenBotDatabase, NewerDatabaseError } from "./openbot-database-s
 const databases: DatabaseSync[] = [];
 afterEach(() => {
   for (const db of databases.splice(0)) db.close();
+  vi.doUnmock("./migrations/registry");
+  vi.resetModules();
 });
 
 const NOW = "2026-11-18T10:00:00.000Z";
@@ -125,17 +130,34 @@ describe("provider history compaction marker migration", () => {
     expect(markers(db)).toEqual([]);
   });
 
-  // v0.72.0 knows versions up to 63 (`openbot-database-schema.ts:1043,1050` at that tag) and throws
-  // `NewerDatabaseError` for a newer one (`:1196`, `:1204-1205`) before it reads a row, so it never reads a
-  // compacted item. A version above this build's newest stands in for that older release here.
-  it("refuses to open a version 64 database in an older application", () => {
+  // A release before compaction knows only the migrations of its tag (`released-schemas/releases.json`):
+  // up to 63 for v0.72.0 (`openbot-database-schema.ts:1043,1050` at that tag). It throws
+  // `NewerDatabaseError` for a newer database before it reads a row (`:1196`, `:1204-1205`). Here the
+  // schema module of this build runs with only those migrations. Without migration 64 in the registry,
+  // the database stays at 63 and that build opens it.
+  it("makes a release before compaction refuse a database with a compacted item", async () => {
+    const olderNewest = Math.max(
+      ...releasedDatabaseCases()
+        .filter((release) => !release.migrations.includes(compactionMigration.version))
+        .flatMap((release) => release.migrations),
+    );
+    expect(compactionMigration.version).toBeGreaterThan(olderNewest);
+    expect(LATEST_SCHEMA_VERSION).toBeGreaterThanOrEqual(compactionMigration.version);
+
     const db = databaseAt(63);
     seed(db, 63);
     migrateOpenBotDatabase(db);
     db.prepare("UPDATE provider_history_staging SET item_json = ?").run(JSON.stringify(`sha256:${"0".repeat(64)}`));
     const after = contents(db);
-    db.exec("INSERT INTO schema_migrations VALUES(65,'now')");
-    expect(() => migrateOpenBotDatabase(db)).toThrow(NewerDatabaseError);
+
+    vi.resetModules();
+    vi.doMock("./migrations/registry", async (importOriginal) => {
+      const registry = await importOriginal<typeof Registry>();
+      return { ...registry, MIGRATIONS: registry.MIGRATIONS.filter((entry) => entry.version <= olderNewest) };
+    });
+    const older = await import("./openbot-database-schema");
+    expect(older.LATEST_SCHEMA_VERSION).toBe(olderNewest);
+    expect(() => older.migrateOpenBotDatabase(db)).toThrow(older.NewerDatabaseError);
     expect(contents(db)).toEqual(after);
   });
 
