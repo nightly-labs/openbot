@@ -22,24 +22,24 @@ import {
   QuestionSecretComposer,
 } from "@/features/chat/components/browser-secret-card";
 import { ChatAttachmentPanel } from "@/features/chat/components/chat-attachment-panel";
-import { ChatComposer, VOICE_BUTTON_SIZE } from "@/features/chat/components/chat-composer";
+import { ChatComposer } from "@/features/chat/components/chat-composer";
 import { ChatEndPullRing, useChatEndPull } from "@/features/chat/components/chat-end-pull";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatMessageList } from "@/features/chat/components/chat-message-list";
 import { DRAFT_THREAD_ID, useChatThreadMenu } from "@/features/chat/components/chat-thread-menu";
 import { useRowsAfterOpenTransition } from "@/features/chat/components/chat-view";
-import { dictationVoice } from "@/features/chat/components/composer-voice";
 import { useMarkThreadRead, useThreadOpeningUnread } from "@/features/chat/components/use-agent-thread-reads";
 import { useBranchThread } from "@/features/chat/components/use-branch-thread";
 import { useChatAttachments } from "@/features/chat/components/use-chat-attachments";
 import { useChatMotion } from "@/features/chat/components/use-chat-motion";
-import { type ComposerDictation, useComposerDictation } from "@/features/chat/components/use-composer-dictation";
+import {
+  useComposerDictation,
+  useComposerDictationWithSettings,
+} from "@/features/chat/components/use-composer-dictation";
 import { useComposerContextMeter } from "@/features/chat/components/use-context-usage";
 import { useMessageDelete } from "@/features/chat/components/use-message-delete";
 import { useMessagePins } from "@/features/chat/components/use-message-pins";
 import { useQuestionPrompt } from "@/features/chat/components/use-question-prompt";
-import { useVoiceMode } from "@/features/chat/components/use-voice-mode";
-import { VoiceOverlay } from "@/features/chat/components/voice-overlay";
 import { branchDividerRowId } from "@/features/chat/model/branch-points";
 import { mentionDraft } from "@/features/chat/model/chat-mentions";
 import {
@@ -65,7 +65,6 @@ import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
 import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
-import { speechNative } from "@/features/voice/model/speech-native";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
 import { useApprovalRequests, useBrowserRequests } from "@/features/workspace/components/use-live-workspace";
@@ -469,42 +468,19 @@ function AgentTaskChat({
   );
   const deleteMessage = removeMessage && !isDraft && !closed ? deleteTaskMessage : undefined;
   // As in the agent's chat: the mic beside the main control dictates into the draft, and only Send
-  // makes it a message. Leaving the thread or losing the server stops listening and keeps the words.
+  // makes it a message. Losing the server or a screen on top stops listening and keeps the words.
   const dictation = useComposerDictation({
-    enabled: isFocused && online && canSend,
+    enabled: isFocused && canSend,
     focused: isFocused,
     draft,
     onDraft: setDraft,
   });
   const dictating = dictation.active;
-  // A build without the speech module, such as Expo Go, still shows the mic. A tap opens Settings > Voice,
-  // which says that voice is not available.
-  const composerDictation = useMemo(
-    (): ComposerDictation =>
-      !speechNative && !dictation.available
-        ? {
-            ...dictation,
-            available: true,
-            start: () => {
-              Keyboard.dismiss();
-              router.push("/settings/voice");
-              return false;
-            },
-          }
-        : dictation,
-    [dictation],
-  );
-  // The skills and apps that the composer offers after `@` and in Use skill or app, as in the agent's chat.
-  const mentionSkills = useAgentMentionSkills(agentId, serverId, online);
+  const composerDictation = useComposerDictationWithSettings(dictation);
+  // The skills and apps that the composer offers after `@`, and in Use skill or app on a host that
+  // takes files in threads, as in the agent's chat.
+  const mentionSkills = useAgentMentionSkills(agentId, serverId, canSend);
   const [skillPickerVersion, setSkillPickerVersion] = useState(0);
-  const voice = useVoiceMode({
-    // One recognizer at a time: the voice mode waits while the mic dictates into the draft.
-    enabled: isFocused && canSend && !dictating,
-    focused: isFocused,
-    sendable: canSend,
-    onSend: (text) => void send(text),
-  });
-  const voiceOpen = voice.stage !== "closed";
   // As in the agent's chat: a pull past the latest message opens the agent's info sheet on top of
   // this thread, unless Settings turns the pull off.
   const pullOn = useChatPullPreference((state) => state.enabled);
@@ -514,13 +490,13 @@ function AgentTaskChat({
   );
   const endPull = useChatEndPull({
     motion,
-    enabled: pullOn && !attachments.menuOpen && !voiceOpen && !dictating,
+    enabled: pullOn && !attachments.menuOpen && !dictating,
     onOpen: openInfo,
   });
   // As in the agent's chat: a password or a code is typed where the composer is.
   const showBrowserRequests = online && foregroundVisit && isFocused;
   // Dictation and the attachment card keep the composer until they close: replacing it would end them.
-  const keepsComposer = voiceOpen || dictating || attachments.menuOpen;
+  const keepsComposer = dictating || attachments.menuOpen;
   const secretRequest = showBrowserRequests && !keepsComposer ? taskBrowserRequests.find(asksForSecret) : undefined;
   // A private answer to a form question is typed there too, never in a second field beside the composer.
   const secretQuestion = !secretRequest && !keepsComposer && questionForm.question?.isSecret ? questionForm : undefined;
@@ -708,7 +684,6 @@ function AgentTaskChat({
           liquidGlassAvailable={liquidGlassAvailable}
           topInset={insets.top}
           onBack={leaveTask}
-          accessibilityHidden={voiceOpen}
         />
         <ChatMessageList
           pullGesture={endPull.gesture}
@@ -716,7 +691,6 @@ function AgentTaskChat({
           agents={serverAgents}
           rowsShown={rowsShown}
           target={target}
-          accessibilityHidden={voiceOpen}
           motion={motion}
           sending={sending}
           awaitingTurn={awaitingTurn}
@@ -777,22 +751,8 @@ function AgentTaskChat({
           topInset={insets.top}
           onRetryHistory={() => void conversation.refetch()}
         />
-        {voiceOpen ? (
-          <VoiceOverlay
-            voice={voice}
-            hint={voice.phase === "listening" ? t("mobile.chat.voice.listening") : ""}
-            reply={null}
-            muted={muted}
-            topInset={insets.top}
-            controlsHeight={Math.max(insets.bottom, 10) + VOICE_BUTTON_SIZE + 48}
-            reducedTransparency={reducedTransparency}
-          />
-        ) : null}
         <Animated.View
-          style={[
-            { position: "absolute", left: 0, right: 0, bottom: 0, zIndex: voiceOpen ? 31 : undefined },
-            motion.composerStyle,
-          ]}
+          style={[{ position: "absolute", left: 0, right: 0, bottom: 0 }, motion.composerStyle]}
           pointerEvents="box-none"
           onLayout={motion.onComposerLayout}
         >
@@ -910,7 +870,6 @@ function AgentTaskChat({
               onStop={task?.state === "running" && !answersQuestion ? () => threadActions.run(task, "stop") : undefined}
               stopping={task ? threadActions.acting(task) : false}
               keyboardProgress={motion.keyboardProgress}
-              voice={dictationVoice(voice, t)}
               dictation={composerDictation}
               voiceAccent={accent}
               contextMeter={contextMeter}

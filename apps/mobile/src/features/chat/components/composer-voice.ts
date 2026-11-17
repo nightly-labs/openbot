@@ -2,7 +2,6 @@ import type { MobileTextKey, MobileTranslate } from "@openbot/i18n/mobile";
 import type { SharedValue } from "react-native-reanimated";
 import type { LiveConversationPhase } from "../model/live-conversation";
 import type { LiveConversation } from "./use-live-conversation";
-import type { VoiceMode } from "./use-voice-mode";
 
 /** What the round voice button draws: a spinner, bars that follow the voice, or a microphone. */
 type VoiceGlyph = "spinner" | "level" | "mic" | "micOff";
@@ -43,42 +42,6 @@ const LIVE_PHASES = {
   speaking: "mobile.chat.liveVoice.phase.speaking",
   offline: "mobile.chat.liveVoice.phase.offline",
 } as const satisfies Record<LiveConversationPhase, MobileTextKey>;
-
-/** Dictation with review: Stop, then Cancel, Continue and Send. Nothing is sent before Send. */
-export function dictationVoice(voice: VoiceMode, t: MobileTranslate): ComposerVoice {
-  const listening = voice.stage === "listening";
-  return {
-    available: voice.available,
-    open: voice.stage !== "closed",
-    exit: voice.exit,
-    hearing: listening && !voice.exit,
-    level: voice.level,
-    presence: voice.presence,
-    split: voice.split,
-    start: voice.open,
-    startLabel: t("mobile.chat.composer.dictate"),
-    // Stop is pressable while the recognizer starts too, and then closes the voice mode. Continue
-    // waits until the chat can listen again.
-    center: listening
-      ? {
-          label: t("mobile.chat.composer.stopDictation"),
-          glyph: voice.phase === "starting" ? "spinner" : "level",
-          pressable: !voice.exit,
-          busy: voice.phase === "starting",
-          onPress: voice.stop,
-        }
-      : {
-          label: t("mobile.chat.voice.continue"),
-          glyph: "mic",
-          pressable: !voice.exit && voice.canResume,
-          busy: false,
-          onPress: voice.resume,
-        },
-    sides: voice.stage === "review" && !voice.exit,
-    leading: { label: t("mobile.chat.composer.cancelDictation"), onPress: voice.cancel },
-    trailing: { label: t("mobile.chat.composer.send"), icon: "send", enabled: voice.canSend, onPress: voice.send },
-  };
-}
 
 /** What the call bar reads of a live conversation. */
 export type LiveVoiceSource = Pick<
