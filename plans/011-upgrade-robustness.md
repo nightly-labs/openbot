@@ -39,7 +39,7 @@
   rule "No backup of `openbot.db` is made before an upgrade" stays. Migrations must be safe by
   themselves: items 7 to 10 and 12 come first.
 
-Host protocol by release: V4 from v0.8.0 (2026-09-11), V5 v0.24.0 (09-28), V6 v0.31.0 (10-07), V7 v0.35.0
+Host protocol by release: V4 from v0.7.0, V5 v0.24.0 (09-28), V6 v0.31.0 (10-07), V7 v0.35.0
 (10-10), V8 v0.48.0 (10-22), V9 v0.55.0 (10-30). Mobile 1.4.3 (10-29 to 10-31) is the last protocol 8 mobile
 build, and mobile checks only that the host range includes protocol 3. With 60 days, hosts that read at
 most 64 capabilities (v0.20 to v0.34.1) stay in the window until about 2026-12-09, so item 1 is needed.
@@ -91,7 +91,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | IN REVIEW (#10777, reopened) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | TODO |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | BLOCKED: clients check only protocol 3 (3 prerequisite steps) |
 | 3 | A server stops a start loop and reports the reason through the Team API | TODO |
 | 4 | Desktop start recovery offers only a release that can open the database | TODO |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
@@ -124,6 +124,36 @@ then 4 and 5, then 6 and the bootstrap list after about 2026-12-09, then 7 and 8
 
 STOP: if a release in the window, or a mobile store build in the mobile window, speaks a protocol
 that the change deletes.
+
+Schedule result (delegate, checked on `origin/main`, 2026-11-17). Protocol 4 starts in v0.7.0, not
+v0.8.0. The last release of a protocol leaves the 60-day window on these dates:
+
+| Protocol | Out of the window |
+|---|---|
+| 4 | 2026-11-26 |
+| 5 | 2026-12-04 |
+| 6 | 2026-12-08 |
+| 7 | 2026-12-20 |
+| 8 | 2026-12-28 (desktop and hosts), 2026-12-30 (mobile 1.4.3) |
+
+No protocol can be deleted yet, because a raised minimum does not make an old peer show "update
+required":
+
+- Every release advertises minimum 1. Mobile 1.1.0 to 1.4.10 and the web client check only that the
+  host range includes protocol 3, so a host with minimum 9 is refused by all mobile builds.
+- The host WebRTC peer maps an unmarked request to protocol 3 or 1, and the v4 and v5 adapters use
+  the v3 request codec. All WebRTC frames use the protocol 2 framing.
+
+Prerequisite steps, in this order:
+
+1. Mobile (also the share sender) and the web client compare the host range with their real range.
+   This ships first, and the minimum moves only after these builds are in the window.
+2. Move the protocol 2 framing and the v3 GET codec into the current adapter, so that deleting the
+   old adapters does not delete code that the current protocol uses.
+3. The host refuses an unmarked WebRTC request with `client_update_required`.
+
+Not confirmed: mobile store release dates (the repo has only the prepare commits), the mobile window
+policy (no repo source), and whether the web client is served from the latest `main`.
 
 Step 2 (later): protocol 10 makes all capabilities shipped up to then implied by the version. Only
 new capabilities go in the list. When no release in the window speaks protocol 9, delete those
