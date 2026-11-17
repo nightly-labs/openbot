@@ -68,7 +68,7 @@ function toolModel(model: AgentModelOption): ToolModel {
 }
 
 /** A provider row of the settings page, as `list_models` reads it. */
-export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message">;
+export type ProviderStatusRow = Pick<AgentProviderStatus, "id" | "off" | "state" | "message" | "lastError">;
 
 /**
  * Whether an agent can run on the provider now or soon: it runs, OpenBot checks it, or it is not
@@ -309,9 +309,11 @@ export function listModelsPayload(
       providers.some((listed) => listed.provider === row.id)
     )
       return [];
-    // A ready row with a message holds a connection failure, and that message stays the reason.
-    const ready = !row.off && row.state === "available" && !row.message;
-    const message = ready ? emptyCatalogMessage(row.id) : row.message;
+    // A ready row with a message holds a connection failure, and a `lastError` holds a model list
+    // that failed. That text stays the reason, and the settings row shows it.
+    const available = !row.off && row.state === "available";
+    const ready = available && !row.message && !row.lastError;
+    const message = ready ? emptyCatalogMessage(row.id) : row.message || (available ? row.lastError : null);
     return [
       {
         provider: row.id,
