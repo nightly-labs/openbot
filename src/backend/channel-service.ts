@@ -97,6 +97,8 @@ export interface ChannelHooks {
   quietRoutineRequest?(requestMessageId: string): boolean;
   /** Whether this agent switches without asking and has a backup model that is ready now. */
   usageLimitBackup?(agentId: string): boolean;
+  /** Whether a provider error passes over this agent's model, and a backup model is ready now. */
+  failedOver?(agentId: string): boolean;
   contextCharacters?(agentId: string, threadId: string): number;
   /** Whether a background generation may start and still leave one for the user's own. */
   spareGeneration?(): boolean;
@@ -1911,7 +1913,13 @@ export class ChannelService {
           }
           // A spent plan refused the routing turn and now holds the lead. The task is not paused for
           // a human: it stays queued, and the reset wakes the channel again.
-          if (lead && this.hooks.usageLimited?.(lead.id)) {
+          // A provider error that a member turn moves to a backup model on, such as a spent Gemini quota,
+          // does the same: the task stays queued, and the move routes it again on the backup (#11389).
+          if (
+            lead &&
+            (this.hooks.usageLimited?.(lead.id) ||
+              (!(error instanceof ChannelRoutingError) && this.hooks.failedOver?.(lead.id)))
+          ) {
             yield* channelSync(() => this.#heldByLimit(channelId, task, lead.id));
             continue;
           }
