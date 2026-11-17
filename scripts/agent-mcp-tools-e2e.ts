@@ -38,7 +38,7 @@ const HEADER_SECRET = "header-secret-2c8d40";
 const HTML_LOGIN_TOKEN = "html-login-token-4b6e12";
 
 /** How each local server answers a request without a token. */
-  type Mode = "open" | "sign-in" | "key" | "guarded" | "html-login" | "html-direct";
+type Mode = "open" | "sign-in" | "key" | "guarded" | "html-login" | "html-direct";
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -190,9 +190,9 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   open: await mcpServer("open"),
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
-    guarded: await mcpServer("guarded"),
-    "html-login": await mcpServer("html-login"),
-    "html-direct": await mcpServer("html-direct"),
+  guarded: await mcpServer("guarded"),
+  "html-login": await mcpServer("html-login"),
+  "html-direct": await mcpServer("html-direct"),
 };
 const calls: Call[] = [];
 let refreshes = 0;
