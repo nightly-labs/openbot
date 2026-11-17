@@ -1,10 +1,11 @@
 import { execFile } from "node:child_process";
-import { access } from "node:fs/promises";
-import { win32 } from "node:path";
+import { access, readFile } from "node:fs/promises";
+import { join, win32 } from "node:path";
 import { promisify } from "node:util";
 import { isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { createOpenBotLogger } from "@openbot/logging";
 import { Effect } from "effect";
+import { piAgentDirectory } from "./process-confinement";
 
 const execFileAsync = promisify(execFile);
 const logger = createOpenBotLogger("provider-runtime");
@@ -21,7 +22,8 @@ const workingLaunchers = new Set<string>();
 /**
  * The `--tools` arguments that give Pi on Windows a shell that runs commands (#11209).
  *
- * Pi's `bash` tool uses Git Bash from Program Files, else the first `bash.exe` on PATH (`getShellConfig`,
+ * Pi's `bash` tool uses the `shellPath` of its settings, else Git Bash from Program Files, else the first
+ * `bash.exe` on PATH (`getShellConfig`,
  * the same from Pi 1.1.0 to 1.5.2). Without Git for Windows, that is the WSL launcher in System32. It
  * fails each command when WSL has no Linux, and with no `bash.exe` at all Pi fails each command too.
  * Pi then gets its `powershell` tool in place of `bash`. Git Bash, another bash, and a WSL with a Linux
@@ -32,10 +34,26 @@ export const piWindowsShellArguments = Effect.fn("PiWindowsShell.arguments")(fun
   cwd: string,
   environment: Record<string, string>,
 ) {
+  if (yield* hasShellSetting(cwd, environment)) return [];
   const bash = yield* piBashPath(cwd, environment);
   if (bash && (!isWslLauncher(bash) || (yield* launcherRuns(bash, cwd, environment)))) return [];
   logger.info("Pi has no bash that runs commands, so it uses PowerShell.", { wslLauncher: bash !== null });
   return ["--tools", "-bash,+powershell"];
+});
+
+/** Whether Pi's user or project settings name the shell (`shellPath`), which Pi uses before it looks. */
+const hasShellSetting = Effect.fn("PiWindowsShell.hasShellSetting")(function* (
+  cwd: string,
+  environment: Record<string, string>,
+) {
+  for (const file of [join(piAgentDirectory(environment), "settings.json"), join(cwd, ".pi", "settings.json")]) {
+    const settings = yield* Effect.tryPromise(() => readFile(file, "utf8")).pipe(
+      Effect.flatMap((text) => Effect.try((): unknown => JSON.parse(text))),
+      Effect.orElseSucceed(() => null),
+    );
+    if (isDynamicRecord(settings) && typeof settings.shellPath === "string" && settings.shellPath.trim()) return true;
+  }
+  return false;
 });
 
 /** The `bash.exe` that Pi runs, found in Pi's order, or null when it finds none. */
