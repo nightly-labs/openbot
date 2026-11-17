@@ -698,8 +698,10 @@ export interface ProviderClientContext {
  * `OPENAI_API_KEY` as a bearer when that variable is there, and not the ChatGPT sign-in. A value that
  * is not TOML is a string, so no value needs quotes. An address that is not http or https is left out.
  */
+const CODEX_ADDRESS_VARIABLE = "OPENAI_BASE_URL";
+
 function codexVariableOverrides(variables: Readonly<Record<string, string>>): string[] {
-  const baseUrl = variables.OPENAI_BASE_URL?.trim().replace(/\/+$/, "");
+  const baseUrl = variables[CODEX_ADDRESS_VARIABLE]?.trim().replace(/\/+$/, "");
   if (!baseUrl || !/^https?:\/\/[^/\s]+/.test(baseUrl) || /\s/.test(baseUrl)) return [];
   return [
     `model_provider=${CODEX_VARIABLE_PROVIDER}`,
@@ -1052,6 +1054,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
       // The variables go in the spawn environment: the app-server is one process for every agent.
       // Codex leaves a name with KEY, SECRET or TOKEN out of the shells that its agents run.
       const variables = context.providerEnvironment?.("codex") ?? {};
+      const overrides = codexVariableOverrides(variables);
       return new CodexAppServerClient(
         cli.executable,
         requestTimeoutMs,
@@ -1063,7 +1066,8 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
           ...variables,
         },
         context.codexTurnContext,
-        codexVariableOverrides(variables),
+        overrides,
+        overrides.length > 0 ? CODEX_ADDRESS_VARIABLE : undefined,
       );
     },
     authState: (account) => ({ kind: "chatgpt", email: account?.email ?? null }),
