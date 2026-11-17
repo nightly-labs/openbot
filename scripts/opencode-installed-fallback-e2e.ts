@@ -24,7 +24,12 @@ const INSTALLED = "1.19.5";
 
 interface Report {
   passed: boolean;
-  fallback?: { state?: string; version?: string | null; cliSource?: string; otherCliVersion?: string };
+  fallback?: {
+    state: string | undefined;
+    version: string | null | undefined;
+    cliSource: string | undefined;
+    otherCliVersion: string | undefined;
+  };
   starts?: string[];
   savedChoices?: number;
   copyChosen?: { copyStarts: number };
