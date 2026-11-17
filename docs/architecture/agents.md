@@ -106,8 +106,9 @@ no turn runs, Claude starts a turn of its own to answer it, and no delivery star
 Claude client keeps the turn that started each background task (`task_started`), and the turn that
 answers it names those turns (`continues` on `turn/started`). When each of them ended quiet, the
 turn can end quiet in the same way: the no-update tool accepts the call, and its text answers become
-quiet answers (#10847). Work of a person's request, or of an unknown turn, keeps the answer in the
-chat. The lifecycle keeps the newest quiet turns in memory only, so after a restart such a turn shows.
+quiet answers (#10847). Work that ends while that turn runs goes to it too
+(`openbot/turn-continues`). Work of a person's request, or of an unknown turn, keeps the answer in
+the chat. The lifecycle keeps the newest quiet turns in memory only, so after a restart such a turn shows.
 
 A completed turn that a teammate's message started (`origin: "agent"`: a request from another agent,
 or its answer) is work between agents. Its answer shows in the chat and counts as unread, but the

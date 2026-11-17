@@ -2065,13 +2065,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     // A task starts in the turn that called its tool. Its end with no turn running makes the CLI start a
-    // turn of its own, which then continues that turn (#10847). A task that ends in a turn is that turn's.
+    // turn of its own, which then continues that turn (#10847). A task that ends in a turn of the CLI's
+    // own also goes to that turn, which then continues its turn too. A person's turn decides by itself.
     if (message.type === "system" && message.subtype?.startsWith("task_") && isString(message.task_id)) {
-      if (message.subtype === "task_started" && runtime.activeTurn)
-        runtime.taskTurns.set(message.task_id, runtime.activeTurn.id);
+      const turn = runtime.activeTurn;
+      if (message.subtype === "task_started" && turn) runtime.taskTurns.set(message.task_id, turn.id);
       else if (message.subtype === "task_notification") {
-        if (!runtime.activeTurn) runtime.endedTaskTurns.push(runtime.taskTurns.get(message.task_id) ?? null);
+        const origin = runtime.taskTurns.get(message.task_id) ?? null;
         runtime.taskTurns.delete(message.task_id);
+        if (!turn) runtime.endedTaskTurns.push(origin);
+        else if (turn.unprompted && origin !== turn.id)
+          this.emit("notification", {
+            method: "openbot/turn-continues",
+            params: { threadId: runtime.id, turnId: turn.id, continues: origin },
+          });
       }
     }
     if (message.type === "system" && message.subtype?.startsWith("task_")) {

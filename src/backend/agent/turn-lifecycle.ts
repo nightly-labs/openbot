@@ -151,11 +151,6 @@ const QUIET_END_MS = 30_000;
 const QUIET_END_MAX_MS = 2 * 60_000;
 /** How often OpenBot checks again for the end of a quiet turn that called the no-update tool again. */
 const QUIET_REPEAT_POLL_MS = 1_000;
-/**
- * The quiet turns that OpenBot keeps for the turns that answer their background work (#10847). Claude
- * starts such a turn when the work ends, usually within minutes, and a chat has few quiet turns.
- */
-const QUIET_TURNS_KEPT = 200;
 /** How long before a turn's start its usage records can be, as in host analytics. */
 const TURN_USAGE_MARGIN_MS = 60 * 60 * 1_000;
 /** The time added to a reset that a provider's text names, which rounds down to the minute. */
@@ -498,7 +493,7 @@ export class TurnLifecycle {
   /** Running turns whose agent called the no-update tool. The completion of the turn takes the entry. */
   readonly #noUpdateTurns = new Set<string>();
   /**
-   * The newest turns that ended quiet, oldest first (`QUIET_TURNS_KEPT`). A turn that the provider
+   * The newest turns that ended quiet, oldest first (`ENDED_TURN_LIMIT`). A turn that the provider
    * starts itself to answer their background work can end quiet too (#10847).
    */
   readonly #quietTurns = new Set<string>();
@@ -1445,6 +1440,15 @@ export class TurnLifecycle {
           );
         return;
       }
+      case "openbot/turn-continues": {
+        // Background work ended in a turn that the provider started itself, so the turn answers it too.
+        // Work of an unknown turn, or such a turn that continued no turn before, cannot end quiet (#10847).
+        const running = this.#runningTurns.get(getString(params, "turnId") ?? "");
+        if (!running) return;
+        const origin = isRecord(params) && isString(params.continues) ? params.continues : null;
+        running.continues = origin !== null && running.continues.length > 0 ? [...running.continues, origin] : [];
+        return;
+      }
       case "openbot/context-compaction": {
         if (!threadId || !agentId || this.#conversation.openClientFor(threadId) !== source) return;
         const status = getString(params, "status");
@@ -1783,14 +1787,14 @@ export class TurnLifecycle {
 
   /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
   #quietAfterNoUpdate(agentId: string, threadId: string, turnId: string): boolean {
+    const running = this.#runningTurns.get(turnId);
+    if (!running || this.#reportedFailures.has(turnId)) return false;
+    if (this.#quietChannelTurns.has(turnId)) return true;
+    if (!this.#noUpdateTurns.has(turnId)) return false;
     const deliveries = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
     return (
-      this.#runningTurns.has(turnId) &&
-      !this.#reportedFailures.has(turnId) &&
-      (this.#quietChannelTurns.has(turnId) ||
-        (this.#noUpdateTurns.has(turnId) &&
-          (this.#continuesQuietTurns(this.#runningTurns.get(turnId)?.continues, deliveries) ||
-            this.#quietRoutineTurn(agentId, threadId, deliveries, true))))
+      this.#continuesQuietTurns(running.continues, deliveries) ||
+      this.#quietRoutineTurn(agentId, threadId, deliveries, true)
     );
   }
 
@@ -2314,9 +2318,9 @@ export class TurnLifecycle {
           : quietChannelRun && settleQuietChannelTurn(snapshot, turnId));
       if (quiet && quietTurn) {
         this.#quietTurns.add(turnId);
-        for (const oldest of this.#quietTurns) {
-          if (this.#quietTurns.size <= QUIET_TURNS_KEPT) break;
-          this.#quietTurns.delete(oldest);
+        if (this.#quietTurns.size > ENDED_TURN_LIMIT) {
+          const [oldest] = this.#quietTurns;
+          if (oldest !== undefined) this.#quietTurns.delete(oldest);
         }
       }
       // A turn that is not quiet after all, such as one with a file, shows its answers in the channel.
