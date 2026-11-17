@@ -91,6 +91,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Nessun membro di questo canale può compattare su richiesta. I membri che lo supportano compattano il contesto automaticamente quando è quasi pieno.",
   "error.backend.channelArchived": "Ripristina questo canale prima di inviare messaggi o modificare le attività.",
+  "error.backend.channelArchiveRunning": "Interrompi il lavoro in corso in questo canale, poi eliminalo.",
   "error.backend.channelReferenceUnavailable": "Il messaggio del canale a cui si fa riferimento non è disponibile.",
   "error.backend.channelTaskNotFound": "Attività del canale non trovata.",
   "error.backend.channelTaskComplete": "Questa attività è già completata.",

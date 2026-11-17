@@ -93,6 +93,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Geen lid van dit kanaal kan op verzoek comprimeren. Leden die het ondersteunen, comprimeren hun context automatisch als die bijna vol is.",
   "error.backend.channelArchived": "Herstel dit kanaal voordat je berichten stuurt of taken wijzigt.",
+  "error.backend.channelArchiveRunning": "Stop het lopende werk in dit kanaal en verwijder het daarna.",
   "error.backend.channelReferenceUnavailable": "Het genoemde kanaalbericht is niet beschikbaar.",
   "error.backend.channelTaskNotFound": "Kanaaltaak niet gevonden.",
   "error.backend.channelTaskComplete": "Deze taak is al voltooid.",

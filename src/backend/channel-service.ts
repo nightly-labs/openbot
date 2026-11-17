@@ -845,6 +845,12 @@ export class ChannelService {
     }
     if (command.type === "archive" || command.type === "restore") {
       const open = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => !terminal(task));
+      // A turn ends only when its provider stops it, so an archive with a running task left the agent
+      // working in a deleted channel, and its other chats named that channel as the cause (#10472).
+      // The clients turn the action off while `activeTasks` counts a running task; this refuses
+      // agents, older clients and a task that started after the menu opened.
+      if (command.type === "archive" && open.some((task) => task.state === "running"))
+        return yield* channelFailure(new Error(sourceText("error.backend.channelArchiveRunning")));
       const tasks = command.type === "archive" ? open : [];
       // The archive paused its work with no reason, so the restored channel would show no way to
       // continue it. The restore gives each of those tasks the reason that a stop gives.

@@ -81,6 +81,7 @@ export const messages = {
   "error.backend.channelCompactNoSession": "此频道的成员还没有可压缩的对话。请在成员于频道中回答后再压缩。",
   "error.backend.channelCompactNotSupported": "此频道没有成员可以按需压缩。支持的成员会在上下文快满时自动压缩。",
   "error.backend.channelArchived": "请先恢复该频道，再发送消息或更改任务。",
+  "error.backend.channelArchiveRunning": "请先停止该频道中正在运行的工作，再删除它。",
   "error.backend.channelReferenceUnavailable": "引用的频道消息不可用。",
   "error.backend.channelTaskNotFound": "未找到该频道任务。",
   "error.backend.channelTaskComplete": "该任务已完成。",
