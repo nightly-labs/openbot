@@ -370,7 +370,8 @@ function ChannelForm({
           {canManage ? (
             <SettingsRow
               leading={<RowIcon icon={Trash2} tone="danger" />}
-              disabled={disabled || dirty}
+              // The host refuses to delete a channel while a task runs there: the user stops it first.
+              disabled={disabled || dirty || (channel?.activeTasks ?? 0) > 0}
               disclosure={false}
               onPress={() => {
                 const text = currentText();

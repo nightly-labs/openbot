@@ -367,7 +367,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "お使いのコンピューターでサインインしてください",
   "mobile.chat.browserSecret.signInBlockedBody":
     "このサイトはサーバーからのサインインを受け付けません。お使いのコンピューターの OpenBot デスクトップアプリでこのチャットを開き、そこでサインインしてください。",
-  "mobile.chat.browserSecret.takeoverReload": "その後、ページを再読み込みしてから「完了しました」を選択してください。",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot はパスワードまたはコードの入力を完了できませんでした。ページで足りない部分を入力してください。その後、ページを再読み込みしてから「完了しました」を選択してください。",
   "mobile.chat.browserSecret.takeoverFailed": "リクエストを完了できませんでした。",
   "mobile.chat.browserSecret.done": "完了しました",
   "mobile.chat.browserSecret.submitOnce": "{origin} に一度だけ送信します。この値はチャットに追加されません。",

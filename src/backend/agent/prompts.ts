@@ -673,7 +673,8 @@ const TAKEOVER_USER_CANCELLED_NEXT =
 /**
  * `vault` says what happened to a password that the user asked to keep in the Vault. `signInMissing`:
  * the person selected Done on a sign-in-blocked takeover, but no sign-in came from their device.
- * `userCancelled`: the person selected Cancel, not a turn end or a closed tab.
+ * `userCancelled`: the person selected Cancel, not a turn end or a closed tab. `secureInputFailed`: OpenBot
+ * could not finish the secure fill, so the user got the page; the fixed reason, or "" when it is unknown.
  */
 export function browserTakeoverResult(
   decision: RespondToBrowserTakeoverInput["decision"],
@@ -681,6 +682,7 @@ export function browserTakeoverResult(
   vaultSkipped?: string,
   signInMissing = false,
   userCancelled = false,
+  secureInputFailed?: string,
 ): DynamicToolResult {
   return {
     success: true,
@@ -692,6 +694,11 @@ export function browserTakeoverResult(
           ...(vault ? { vault } : {}),
           ...(vaultSkipped ? { vaultSkipped } : {}),
           ...(signInMissing ? { signIn: "not-received" } : {}),
+          ...(secureInputFailed === undefined
+            ? {}
+            : {
+                secureInput: `OpenBot could not finish entering the value.${secureInputFailed ? ` ${secureInputFailed}` : ""} The page went to the user.`,
+              }),
           ...(decision === "complete"
             ? { next: signInMissing ? TAKEOVER_SIGN_IN_MISSING_NEXT : "Take a fresh snapshot and continue the task." }
             : userCancelled

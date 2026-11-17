@@ -368,7 +368,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "יש להתחבר במחשב שלך",
   "mobile.chat.browserSecret.signInBlockedBody":
     "האתר הזה לא מקבל התחברות מהשרת. יש לפתוח את הצ׳אט הזה באפליקציית OpenBot למחשב, ולהתחבר שם.",
-  "mobile.chat.browserSecret.takeoverReload": "לאחר מכן יש לטעון את הדף מחדש לפני שבוחרים ב״סיימתי״.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot לא הצליח להשלים את הזנת הסיסמה או הקוד. יש להזין בדף את מה שחסר. לאחר מכן יש לטעון את הדף מחדש לפני שבוחרים ב״סיימתי״.",
   "mobile.chat.browserSecret.takeoverFailed": "לא ניתן להשלים את הבקשה.",
   "mobile.chat.browserSecret.done": "סיימתי",
   "mobile.chat.browserSecret.submitOnce": "שליחה חד-פעמית אל {origin}. הערך הזה לא מתווסף לצ'אט.",

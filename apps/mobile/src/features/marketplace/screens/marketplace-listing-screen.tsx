@@ -433,6 +433,7 @@ function AppPage({
   const method = app ? pluginConnectMethod(app, canRelay) : null;
   const connect = usePluginConnect(serverId, app, method);
   const connected = connect.state.phase === "done" || installed.installed(listing);
+  const connectedServerId = connected ? pluginServerId(plugin, installed.mcpServers ?? []) : null;
   const working = connect.state.phase === "working";
   useEffect(() => onBusy(working), [onBusy, working]);
   const installable =
@@ -503,13 +504,16 @@ function AppPage({
       {connected ? (
         <SettingsSection footer={t("mobile.marketplace.app.connectedHint")}>
           <SettingsRow
-            onPress={() => {
-              // The app's own MCP page; the list when the row is not known yet, such as right after a connect.
-              const mcpServerId = pluginServerId(plugin, installed.mcpServers ?? []);
-              if (mcpServerId)
-                router.push({ pathname: "/server-settings/mcp-server", params: { serverId, mcpServerId } });
-              else router.push({ pathname: "/server-settings/mcp", params: { serverId } });
-            }}
+            // The app's own MCP page. Right after a connect, the row waits until the server list has the app.
+            onPress={
+              connectedServerId
+                ? () =>
+                    router.push({
+                      pathname: "/server-settings/mcp-server",
+                      params: { serverId, mcpServerId: connectedServerId },
+                    })
+                : undefined
+            }
           >
             <Typography.Paragraph>{t("mobile.marketplace.app.connected")}</Typography.Paragraph>
           </SettingsRow>

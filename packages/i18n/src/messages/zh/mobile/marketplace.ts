@@ -93,6 +93,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "帮我使用这个技能。",
   "mobile.marketplace.app.add": "添加应用",
+  "mobile.marketplace.app.addCustom": "添加自定义项",
   "mobile.marketplace.app.connect": "连接",
   "mobile.marketplace.app.connectTitle": "连接 {name}",
   "mobile.marketplace.app.keyIntro": "粘贴你账号中的密钥。服务器会先测试密钥，再保存该应用。",
