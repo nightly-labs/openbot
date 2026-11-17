@@ -342,6 +342,19 @@ export class McpOAuthProxy {
           : sourceText("error.backend.mcpOAuthRenewalFailed");
       return refuseRequests(response, method, body, message);
     }
+    // A notification has no answer, but the MCP Go SDK, which the Antigravity CLI uses, closes the
+    // whole connection when a server refuses one with a 400 that is not a JSON-RPC error. Executor
+    // refused `notifications/roots/list_changed`, and the agent lost all of its tools (#10322). A 400
+    // does not end the server's session (a 404 does), so the proxy accepts the notification, as the
+    // MCP TypeScript SDK server accepts each body of notifications only.
+    const refused = upstream.status === 400 && method === "POST" ? notificationMethods(body) : null;
+    if (refused) {
+      yield* discard(upstream);
+      logger.warn("The MCP server refused a notification. The sign-in proxy accepted it.", { methods: refused });
+      response.writeHead(202);
+      response.end();
+      return;
+    }
     const headers: Record<string, string> = {};
     for (const name of FORWARDED_RESPONSE_HEADERS) {
       const value = upstream.headers.get(name);
@@ -652,6 +665,27 @@ function refuseRequests(response: ServerResponse, method: string, body: Buffer |
   }
   response.writeHead(200, { "content-type": "application/json" });
   response.end(JSON.stringify(batch ? errors : errors[0]));
+}
+
+/**
+ * The methods of a body that holds only notifications, or `null`. `notifications/initialized`
+ * gives `null`: a server that refuses it did not start the session, and the provider must know.
+ */
+function notificationMethods(body: Buffer | null): string[] | null {
+  let parsed: unknown = null;
+  try {
+    parsed = body && body.length > 0 ? JSON.parse(body.toString("utf8")) : null;
+  } catch {
+    return null;
+  }
+  const messages = Array.isArray(parsed) ? parsed : [parsed];
+  const methods: string[] = [];
+  for (const item of messages) {
+    if (!isDynamicRecord(item) || !isString(item.method) || "id" in item) return null;
+    if (item.method === "notifications/initialized") return null;
+    methods.push(item.method);
+  }
+  return methods.length > 0 ? methods : null;
 }
 
 type JsonRpcId = string | number | null;
