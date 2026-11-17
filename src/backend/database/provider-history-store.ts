@@ -11,6 +11,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database-rows";
+import { withTransaction } from "./sqlite-transaction";
 
 export interface ProviderHistorySessionInput {
   sessionId: string;
@@ -396,16 +397,7 @@ export class ProviderHistoryStore {
 
   #transaction<T>(operation: (db: DatabaseSync) => T): T {
     const db = this.#core.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
-      const result = operation(db);
-      if (ownsTransaction) db.exec("COMMIT");
-      return result;
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    return withTransaction(db, () => operation(db));
   }
 }
 

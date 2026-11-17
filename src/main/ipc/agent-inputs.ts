@@ -92,6 +92,7 @@ import {
   type WithdrawFeedbackInput,
 } from "@openbot/contracts/ipc";
 import { isBoolean, isNumber, isOneOf, isString } from "@openbot/contracts/runtime-values";
+import { AGENT_ACTIVE_QUEUES_LIMIT } from "@openbot/contracts/team-protocol/agent-active-queues-v1";
 import { decodeQueueEditRequest } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import { sourceText } from "@openbot/i18n/source";
 import type { PayloadDecoder } from "../trusted-ipc";
@@ -121,6 +122,11 @@ export function agentScope(value: unknown): AgentIpcRequest<null> {
 
 export function parseAgentId(value: unknown): string {
   return requireString(value, "agentId", INPUT_LIMITS.identifier);
+}
+
+/** The agents of one `listActiveQueues` read. */
+export function parseAgentIdList(value: unknown): string[] {
+  return parseIdentifierList(value, "agent IDs", AGENT_ACTIVE_QUEUES_LIMIT);
 }
 
 export function parseChannelId(value: unknown): string {

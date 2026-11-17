@@ -378,6 +378,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.author === right.author &&
     left.body === right.body &&
     left.time === right.time &&
+    left.createdAt === right.createdAt &&
     left.kind === right.kind &&
     left.streaming === right.streaming &&
     left.itemType === right.itemType &&
@@ -398,8 +399,15 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
     JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
+    JSON.stringify(left.itemCreatedAt) === JSON.stringify(right.itemCreatedAt) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
+    JSON.stringify(left.subagents) === JSON.stringify(right.subagents) &&
+    JSON.stringify(left.voiceRecording) === JSON.stringify(right.voiceRecording) &&
+    JSON.stringify(left.imageGeneration) === JSON.stringify(right.imageGeneration) &&
+    JSON.stringify(left.videoGeneration) === JSON.stringify(right.videoGeneration) &&
+    JSON.stringify(left.uiBlock) === JSON.stringify(right.uiBlock) &&
+    JSON.stringify(left.memoryChanges) === JSON.stringify(right.memoryChanges) &&
+    JSON.stringify(left.trace) === JSON.stringify(right.trace)
   );
 }
 

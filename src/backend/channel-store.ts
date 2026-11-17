@@ -30,6 +30,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction } from "./database/sqlite-transaction";
 import type { OpenBotDatabase } from "./openbot-database";
 import { revokeRoutineWebhooks } from "./webhook-route-store";
 
@@ -1061,8 +1062,7 @@ export class ChannelStore {
   /** Rebuilds channel projections from committed events without changing agent threads. */
   rebuild(channelId: string): void {
     const db = this.database.connection;
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       const events = databaseRows(
         db
           .prepare(
@@ -1149,11 +1149,7 @@ export class ChannelStore {
             throw new Error("Unknown channel event.");
         }
       }
-      db.exec("COMMIT");
-    } catch (error) {
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** A stored cursor of zero is a reader that read nothing, not a reader with no cursor at all. */

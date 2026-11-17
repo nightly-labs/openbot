@@ -1579,6 +1579,9 @@ export class MessagingService {
     // teammates; without one, nothing answers.
     const agentId = existing?.agentId ?? this.#orchestrator(live.record);
     if (!agentId) {
+      // On WhatsApp, only the owner can add the orchestrator, and only in their own chat do they write
+      // as the number. A contact or a group that the owner allowed gets no setup text from their number.
+      if (live.record.platform === "whatsapp" && message.authorId !== live.identity.botUserId) return;
       const noAgent =
         live.record.platform === "discord"
           ? "status.messaging.discordNoAgent"

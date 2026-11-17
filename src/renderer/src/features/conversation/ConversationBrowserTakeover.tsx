@@ -4,6 +4,7 @@ import { useText } from "@openbot/ui/text";
 import { Loading, Show } from "solid-js";
 import { actionToast } from "../../action-toast";
 import { usePlatform } from "../../platform";
+import { serverSupportsCapability } from "../servers/server-capabilities";
 import { browserSecretVault } from "./browser-secret-vault";
 import { conversationPort } from "./conversation-port";
 import { conversationRuntime } from "./conversation-runtime";
@@ -51,6 +52,18 @@ export function ConversationBrowserTakeover() {
     }
     return canOpenBrowserTakeoverTab() ? () => openBrowserTakeoverTab() : undefined;
   };
+  /**
+   * A chat window shows no browser, so it cannot sign in for a page that refused the server's sign-in.
+   * Done there ended the step with no sign-in (#11400). The card then offers Open, and the main window
+   * asks for the sign-in on this computer.
+   */
+  const completeHere = () =>
+    !(
+      platform.chatWindow &&
+      props.browserTakeover?.reason === "sign-in-blocked" &&
+      props.server?.kind === "remote" &&
+      serverSupportsCapability(props.server, "browser-sign-in")
+    );
   /** The agent that asks in a card: in a channel, the working agent whose card shows. */
   const agentName = () =>
     (channel ? channel.interactionAgentName() : props.agent?.name) ?? t("chat.message.agentFallback");
@@ -65,7 +78,7 @@ export function ConversationBrowserTakeover() {
             preview={browserTakeoverPreview().preview}
             previewStatus={browserTakeoverPreview().status}
             onOpen={openPage()}
-            onComplete={() => respondToBrowserTakeover("complete")}
+            onComplete={completeHere() ? () => respondToBrowserTakeover("complete") : undefined}
             onCancel={() => respondToBrowserTakeover("cancel")}
             onSignInLocally={localSignIn.canStartForTakeover() ? localSignIn.startForTakeover : undefined}
             signInBlocked={localSignIn.blockedTakeover()}

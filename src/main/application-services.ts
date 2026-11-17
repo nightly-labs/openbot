@@ -120,6 +120,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -446,7 +447,6 @@ import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,

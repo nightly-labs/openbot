@@ -210,9 +210,13 @@ export class MailboxSync {
    * wait as the event below.
    */
   queueSnapshot(agentId: string): QueueSnapshot {
-    const queue = this.#mailbox.listQueue(agentId);
+    return this.withHold(this.#mailbox.listQueue(agentId));
+  }
+
+  /** Adds the reason that a queue waits, as `queueSnapshot` does, to a queue read in another way. */
+  withHold(queue: QueueSnapshot): QueueSnapshot {
     if (!queue.deliveries.some((delivery) => delivery.status === "queued")) return queue;
-    const hold = this.#hooks.queueHold(agentId);
+    const hold = this.#hooks.queueHold(queue.agentId);
     return hold ? { ...queue, hold } : queue;
   }
 
