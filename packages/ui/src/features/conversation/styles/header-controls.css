@@ -68,17 +68,26 @@
 
 /* With no thread row, the header has no narrow modes of its own (agent-threads.css has them for the
    row). When the model picker is only its icon and the header is still too narrow, the agent title
-   hides and the agent name shortens with an ellipsis, so it does not go under the header actions. */
+   hides and the agent name shortens with an ellipsis, down to the avatar. Then "+" goes past the end
+   of the group, which cuts it, so no part of the group goes under the header actions. */
 .conversation-header[data-model-fit="icon"] .conversation-heading-group:not(:has(> .agent-threads-header)) {
   min-width: 0;
   flex-shrink: 1000;
+  overflow-x: clip;
 }
 
 .conversation-header[data-model-fit="icon"]
   .conversation-heading-group:not(:has(> .agent-threads-header))
   .conversation-title {
-  min-width: 0;
+  min-width: auto;
   flex-shrink: 1;
+}
+
+/* The name column can close fully, so the name button is never narrower than the avatar. */
+.conversation-header[data-model-fit="icon"]
+  .conversation-heading-group:not(:has(> .agent-threads-header))
+  .conversation-agent-heading {
+  grid-template-columns: minmax(0, auto) minmax(0, max-content);
 }
 
 .conversation-header[data-model-fit="icon"]
