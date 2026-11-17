@@ -10,15 +10,16 @@ const OLD_SPACER = /\n⠀{8,}\s*$/u;
 const SELF_CHAT_SPAN_MS = 10_000;
 /**
  * A request in more spans than the limit of a window is not a person: it is a loop, such as two
- * OpenBots that answer each other's posts. A fast loop fills the short window; a loop of slow agent
- * turns, a request each half minute or more often, fills the long one. A person who writes a burst, or
- * forwards many files at once, fills only a few spans.
+ * OpenBots that answer each other's posts. A fast loop fills the short window, and slower loops of
+ * long agent turns fill the longer ones: a person does not write each minute for six hours. A person
+ * who writes a burst, or forwards many files at once, fills only a few spans.
  */
 const SELF_CHAT_LIMITS = [
   { windowMs: 10 * 60_000, maxSpans: 30 },
   { windowMs: 60 * 60_000, maxSpans: 120 },
+  { windowMs: 6 * 60 * 60_000, maxSpans: 360 },
 ] as const;
-const SELF_CHAT_KEPT_MS = 60 * 60_000;
+const SELF_CHAT_KEPT_MS = 6 * 60 * 60_000;
 /** How long the owner's own chat gets no answers after the limit. The other side of a loop stops in this time. */
 const SELF_CHAT_PAUSE_MS = 10 * 60_000;
 
