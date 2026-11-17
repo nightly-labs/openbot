@@ -12,8 +12,11 @@ import { join } from "node:path";
 import { utilityProcess } from "electron";
 import type { AgentDatabaseHostMessage, AgentDatabaseHostProcess } from "../backend/agent-data/agent-database-protocol";
 
-/** Enough for the error that stopped a start, such as a module that did not load. */
-const OUTPUT_TAIL_CHARS = 2_000;
+/**
+ * Enough for the error that stopped a start, such as a module that did not load. Below the 2,000
+ * characters that the logger keeps of one value, with its "Its last output: " prefix.
+ */
+const OUTPUT_TAIL_CHARS = 1_900;
 
 export function spawnAgentDatabaseHost(): AgentDatabaseHostProcess {
   const child = utilityProcess.fork(join(__dirname, "agent-database-host.js"), [], {
