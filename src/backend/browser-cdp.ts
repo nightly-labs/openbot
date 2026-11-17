@@ -110,6 +110,34 @@ const CHOOSER_WAIT_MS = 5_000;
  */
 const DROP_FRAME_WAIT_MS = 1_500;
 const DROP_FRAME_SCRIPT = "new Promise((resolve) => requestAnimationFrame(() => setTimeout(resolve, 0)))";
+/**
+ * Chromium can drop key events, with no error, that reach a new page before its first frame. That
+ * frame comes in less than 100 ms, so only a page younger than this waits for a frame before a key.
+ * An older page does not wait: a tab that draws one frame each second would make each key slow.
+ */
+const NEW_PAGE_MS = 1_500;
+const NEW_PAGE_FRAME_SCRIPT = `performance.now() < ${NEW_PAGE_MS} && ${DROP_FRAME_SCRIPT}`;
+
+/**
+ * Lets the page render one frame, as `DROP_FRAME_WAIT_MS` says. The wait only helps the page: the
+ * action continues, before the deadline, when no frame comes.
+ */
+const waitForFrame = Effect.fn("Browser.waitForFrame")(function* (
+  send: SendCommand,
+  sessionId: string | undefined,
+  deadline: number | undefined,
+  expression = DROP_FRAME_SCRIPT,
+) {
+  const frameWaitMs =
+    deadline === undefined
+      ? DROP_FRAME_WAIT_MS
+      : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
+  if (frameWaitMs <= 0) return;
+  yield* Effect.gen(function* () {
+    const contextId = yield* automationContextId(send, sessionId);
+    yield* send("Runtime.evaluate", { expression, contextId, awaitPromise: true }, sessionId);
+  }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
+});
 
 type ActionDispatch = () => void;
 
@@ -1479,6 +1507,8 @@ export class BrowserCdpEngine {
             yield* send("DOM.focus", { backendNodeId: resolved.backendNodeId }, sessionId);
           }
         }
+        // A click waits for frames when it moves the pointer. A press waits here, as `NEW_PAGE_MS` says.
+        yield* waitForFrame(send, sessionId, deadline, NEW_PAGE_FRAME_SCRIPT);
         yield* browserSync(() => assertBeforeDeadline(deadline));
         onDispatch?.();
         yield* dispatchShortcut(send, key, sessionId);
@@ -1919,21 +1949,7 @@ export class BrowserCdpEngine {
           if (dragData) {
             yield* send("Input.dispatchDragEvent", { type: "dragEnter", x: to.x, y: to.y, data: dragData }, sessionId);
             yield* send("Input.dispatchDragEvent", { type: "dragOver", x: to.x, y: to.y, data: dragData }, sessionId);
-            // The wait only helps the page. The drop still goes, before the deadline, when no frame comes.
-            const frameWaitMs =
-              deadline === undefined
-                ? DROP_FRAME_WAIT_MS
-                : Math.min(DROP_FRAME_WAIT_MS, deadline - Date.now() - SETTLE_RESERVE_MS);
-            if (frameWaitMs > 0) {
-              yield* Effect.gen(function* () {
-                const contextId = yield* automationContextId(send, sessionId);
-                yield* send(
-                  "Runtime.evaluate",
-                  { expression: DROP_FRAME_SCRIPT, contextId, awaitPromise: true },
-                  sessionId,
-                );
-              }).pipe(Effect.timeoutOrElse({ duration: frameWaitMs, orElse: () => Effect.void }), Effect.ignore);
-            }
+            yield* waitForFrame(send, sessionId, deadline);
             yield* send("Input.dispatchDragEvent", { type: "drop", x: to.x, y: to.y, data: dragData }, sessionId);
           }
           yield* send(
