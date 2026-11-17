@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { frozenMigrationProblems, type ReleasedMigrations } from "./frozen-migrations";
 
 const IMPORT_RULE =
-  "A frozen migration imports only node:*, @openbot/logging, ./migration, ./runtime-values and earlier migrations; copy other code into the file.";
+  "A frozen migration imports only node:*, @openbot/logging, ./runtime-values, earlier migrations and types from ./migration; copy other code into the file.";
 
 function migrationFile(version: number, name: string, imports = ""): string {
   return `${imports}import type { OpenBotMigration } from "./migration";
@@ -97,13 +97,14 @@ describe("frozen migrations", () => {
       "0010-workflows.ts": migrationFile(
         10,
         "workflows",
-        'import { isString } from "@openbot/contracts/runtime-values";\nimport { later } from "./0011-sessions";\nimport { baseline } from "./0008-baseline";\n',
+        'import { isString } from "@openbot/contracts/runtime-values";\nimport { later } from "./0011-sessions";\nimport { baseline } from "./0008-baseline";\nimport { helper } from "./migration";\n',
       ),
       "0011-sessions.ts": migrationFile(11, "sessions", 'import type { DatabaseSync } from "node:sqlite";\n'),
     });
     expect(frozenMigrationProblems(current, RELEASED)).toEqual([
       `0010-workflows.ts: imports "@openbot/contracts/runtime-values". ${IMPORT_RULE}`,
       `0010-workflows.ts: imports "./0011-sessions". ${IMPORT_RULE}`,
+      `0010-workflows.ts: imports "./migration". ${IMPORT_RULE}`,
     ]);
   });
 

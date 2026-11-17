@@ -33,9 +33,9 @@ Each migration is one file in `migrations/`: `<4-digit version>-<name>.ts`, whic
   type are the only exceptions. This includes helpers in a migration file and `runtime-values.ts`.
 - A new migration takes a version above the newest released one. Versions are contiguous from 8,
   and names are unique.
-- A migration file imports only `node:*`, `@openbot/logging`, `./migration`, `./runtime-values` and
-  earlier migrations. Copy any other code into the file, so a change to live code cannot change a
-  released migration.
+- A migration file imports only `node:*`, `@openbot/logging`, `./runtime-values`, earlier migrations,
+  and types (`import type`) from `./migration`. Copy any other code into the file, so a change to live
+  code cannot change a released migration.
 
 To fix a bug in a released migration, do not edit it. Add a new migration that repairs each
 database that the bad one made, and keep it safe for databases that the bad one did not touch. Give

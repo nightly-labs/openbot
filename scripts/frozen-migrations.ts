@@ -11,7 +11,9 @@ const FIRST_VERSION = 8;
 /** These change with each new migration. Every other released file is frozen. */
 const UNFROZEN_FILES: ReadonlySet<string> = new Set(["registry.ts", "migration.ts"]);
 const NOT_MIGRATIONS: ReadonlySet<string> = new Set([...UNFROZEN_FILES, "runtime-values.ts"]);
-const ALLOWED_IMPORTS: ReadonlySet<string> = new Set(["@openbot/logging", "./migration", "./runtime-values"]);
+const ALLOWED_IMPORTS: ReadonlySet<string> = new Set(["@openbot/logging", "./runtime-values"]);
+/** `migration.ts` is not frozen, so a migration takes only types from it: a value could change later. */
+const TYPE_ONLY_IMPORTS: ReadonlySet<string> = new Set(["./migration"]);
 
 const MIGRATION_FILE = /^(\d{4})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
 const MIGRATION_DECLARATION = "export const migration: OpenBotMigration = {";
@@ -68,18 +70,19 @@ export function frozenMigrationProblems(current: ReadonlyMap<string, string>, re
     if (version <= releasedNewest && !released.files.has(file)) {
       problems.push(`${file}: ${tag} released version ${version}. Use version ${releasedNewest + 1} or above.`);
     }
-    for (const [, from = "", bare = ""] of content.matchAll(
-      /^(?:import|export)\b[^;]*?\bfrom\s+"([^"]+)"|^import\s+"([^"]+)"/gm,
+    for (const [, keyword = "", from = "", bare = ""] of content.matchAll(
+      /^(import\s+type\b|import|export)\b[^;]*?\bfrom\s+"([^"]+)"|^import\s+"([^"]+)"/gm,
     )) {
       const source = from || bare;
       const earlier = `${source.slice(2)}.ts`;
       const allowed =
         source.startsWith("node:") ||
         ALLOWED_IMPORTS.has(source) ||
+        (TYPE_ONLY_IMPORTS.has(source) && /^import\s+type\b/.test(keyword)) ||
         (source.startsWith("./") && fileVersion(earlier) > 0 && fileVersion(earlier) < version && current.has(earlier));
       if (!allowed) {
         problems.push(
-          `${file}: imports "${source}". A frozen migration imports only node:*, @openbot/logging, ./migration, ./runtime-values and earlier migrations; copy other code into the file.`,
+          `${file}: imports "${source}". A frozen migration imports only node:*, @openbot/logging, ./runtime-values, earlier migrations and types from ./migration; copy other code into the file.`,
         );
       }
     }
