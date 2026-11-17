@@ -369,6 +369,20 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
     .join("\n\n");
 }
 
+/**
+ * The message for a detached `request_vault_item` card that the user saved: its title as a quote, and
+ * the name of the saved item below. No form value goes in it. Empty for a skip, which sends nothing.
+ */
+export function vaultLateAnswerText(title: string, savedName: string): string {
+  if (!savedName) return "";
+  const quote = title
+    .split("\n")
+    .filter((line) => line.trim())
+    .map((line) => `> ${line}`)
+    .join("\n");
+  return quote ? `${quote}\n\n${savedName}` : savedName;
+}
+
 /** The answer for a question that expired before the user answered it. Only the model reads it. */
 export function expiredPromptResult(
   responseKind: "dynamic-tool" | "mcp-elicitation" | "user-input" | "ui-block",
