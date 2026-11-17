@@ -31,7 +31,7 @@ import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
-import { Deferred, Effect, Exit, Fiber, Result, Scope, Semaphore } from "effect";
+import { Deferred, Effect, Exit, Fiber, Option, Result, Scope, Semaphore } from "effect";
 import {
   AcpConfiguration,
   type AcpModel,
@@ -930,9 +930,9 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       return;
     }
     // A replay takes all updates and tool calls of its session. A turn that runs or opens in the
-    // session owns them, so this read gives only the saved history (#11201).
-    const held = this.#threads.get(request.threadId);
-    if (held && (held.activeTurn || this.#openingTurns.has(request.threadId))) {
+    // session owns them, so this read gives only the saved history (#11201). A turn can open on a
+    // released session, which this client does not hold.
+    if (this.#openingTurns.has(request.threadId) || this.#threads.get(request.threadId)?.activeTurn) {
       if (stored && durableReplay) yield* readStored(request);
       return;
     }
@@ -2645,10 +2645,14 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     yield* this.#threads.wake(threadId).pipe(toProviderClientOperationError);
     // A history read of the session takes its updates and refuses its tools until it ends, so the
     // prompt waits for it. A read that starts later sees this opening turn and leaves the session (#11201).
+    // A read that does not end in the stall limit does not hold the prompt longer.
     for (;;) {
       const reading = this.#historyReplays.get(threadId);
       if (!reading) break;
-      yield* Effect.promise(() => reading.ended);
+      const ended = yield* Effect.promise(() => reading.ended).pipe(
+        Effect.timeoutOption(this.options.turnStallMs ?? ACP_TURN_STALL_MS),
+      );
+      if (Option.isNone(ended)) break;
     }
     let thread = yield* providerSync(() => this.#requireThread(threadId));
     // A background replay that runs can start a turn of the agent. The prompt waits for it before it
