@@ -99,6 +99,11 @@ const decodeBackgroundTerminals = Schema.decodeUnknownSync(Schema.Struct({ data:
  * (#11100).
  */
 const CODEX_STOP_GRACE_MS = 10_000;
+/**
+ * How long the background commands of other threads, such as a dev server, keep a process that still
+ * runs a stopped turn. An idle process keeps them as long (`PROVIDER_IDLE_RELEASE_MS`), not longer.
+ */
+const ABANDONED_PROCESS_BACKGROUND_HOLD_MS = 10 * 60_000;
 /** The requests that start or continue work on a thread. A process replaced during one would cut it. */
 const THREAD_WORK_METHODS: ReadonlySet<string> = new Set([
   "thread/start",
@@ -168,7 +173,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * The thread of each stopped turn that OpenBot ended after `CODEX_STOP_GRACE_MS`, by thread and turn.
    * This process still runs the turn, and Codex adds a new turn of that thread to it.
    */
-  readonly #abandonedTurns = new Map<string, string>();
+  readonly #abandonedTurns = new Map<string, { threadId: string; at: number }>();
   /** The `THREAD_WORK_METHODS` requests that wait for an answer. */
   #threadWork = 0;
   /** The turn of each thread that showed the sandbox warning, so that a turn shows it once. */
@@ -346,13 +351,16 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
    * True when this process still runs a stopped turn that OpenBot ended (#11100), and nothing else
    * uses it: no other turn, no session start, and no background command in `threadIds` other than in
    * the threads of those turns. The runtime then replaces the process before the next turn. A failed
-   * check keeps the process.
+   * check keeps the process, and background commands keep it for `ABANDONED_PROCESS_BACKGROUND_HOLD_MS`
+   * at most.
    */
   readonly replaceForNextTurn = Effect.fn("CodexAppServer.replaceForNextTurn")(function* (
     this: CodexAppServerClient,
     threadIds: readonly string[],
   ) {
     if (!this.#holdsOnlyAbandonedTurns()) return false;
+    const since = Math.min(...[...this.#abandonedTurns.values()].map(({ at }) => at));
+    if (Date.now() - since >= ABANDONED_PROCESS_BACKGROUND_HOLD_MS) return true;
     const stopped = this.#abandonedThreads();
     const checks = yield* Effect.forEach(
       threadIds.filter((threadId) => !stopped.has(threadId)),
@@ -364,7 +372,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   });
 
   #abandonedThreads(): ReadonlySet<string> {
-    return new Set(this.#abandonedTurns.values());
+    return new Set([...this.#abandonedTurns.values()].map(({ threadId }) => threadId));
   }
 
   #holdsOnlyAbandonedTurns(): boolean {
@@ -780,7 +788,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       method: "turn/completed",
       params: { threadId, turn: { id: turnId, status: "interrupted" } },
     });
-    this.#abandonedTurns.set(key, threadId);
+    this.#abandonedTurns.set(key, { threadId, at: Date.now() });
     // The process that runs the turn is replaced, and it may not have saved the turn's blocks.
     this.#turnContext.resend(threadId);
     for (const id of requests) {

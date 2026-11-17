@@ -1074,10 +1074,17 @@ export class ProviderRuntime implements ProviderPort {
     }
   }, Effect.uninterruptible);
 
-  /** True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's process. */
-  #providerInUse(provider: AgentProvider): boolean {
+  /**
+   * True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's
+   * process. `apartFrom` leaves out the turns of that agent.
+   */
+  #providerInUse(provider: AgentProvider, apartFrom?: string): boolean {
+    const busy =
+      apartFrom === undefined
+        ? this.#hooks.isProviderBusy(provider)
+        : (this.#hooks.isProviderBusyApartFrom?.(provider, apartFrom) ?? this.#hooks.isProviderBusy(provider));
     return (
-      this.#hooks.isProviderBusy(provider) ||
+      busy ||
       this.#providerStarts.has(provider) ||
       this.#providerConnectionCommands.has(provider) ||
       this.isReplacingCli(provider) ||
@@ -2961,10 +2968,10 @@ export class ProviderRuntime implements ProviderPort {
     // Checked again after the replacement check, which waits for the process.
     if (
       shared &&
-      !this.#othersUse(provider, agent.id) &&
+      !this.#providerInUse(provider, agent.id) &&
       (yield* this.#mustReplace(shared)) &&
       this.#clients.get(provider) === shared &&
-      !this.#othersUse(provider, agent.id)
+      !this.#providerInUse(provider, agent.id)
     ) {
       logger.info("Replaced a provider CLI that still runs a stopped turn.", { provider });
       yield* this.#releaseClient(provider, shared);
@@ -2998,21 +3005,6 @@ export class ProviderRuntime implements ProviderPort {
    */
   #mustReplace(client: AgentClient): Effect.Effect<boolean> {
     return client.replaceForNextTurn?.(this.#conversation.clientThreads(client)) ?? Effect.succeed(false);
-  }
-
-  /**
-   * True while something other than this agent's next turn uses the shared process: a turn or a
-   * start of another agent, a start of the process, a connection command, a CLI change or a sign-in.
-   */
-  #othersUse(provider: AgentProvider, agentId: string): boolean {
-    return (
-      (this.#hooks.isProviderBusyApartFrom?.(provider, agentId) ?? this.#hooks.isProviderBusy(provider)) ||
-      this.#providerStarts.has(provider) ||
-      this.#providerConnectionCommands.has(provider) ||
-      this.isReplacingCli(provider) ||
-      this.#cliLogin.has(provider) ||
-      (provider === "codex" && this.#codexLogin.pending)
-    );
   }
 
   #countActivation(provider: AgentProvider): void {
