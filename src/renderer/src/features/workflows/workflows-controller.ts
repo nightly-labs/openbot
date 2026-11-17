@@ -31,6 +31,7 @@ import type {
 import { EMPTY_WORKFLOW_RUN_VIEW } from "@openbot/ui/features/workflows/workflow-run-view";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, onSettled, untrack } from "solid-js";
+import { agentAskedHere } from "../../agent-requests";
 import type { DesktopAnalyticsScope, WorkflowAnalyticsAction } from "../../analytics";
 import { webhookFailureCode } from "../../webhook-failure-code";
 import { createGitHubConnector } from "../connectors/github-connector";
@@ -542,14 +543,17 @@ export function createWorkflowsController(
 
   const refresh = (workflowId: string | null, agentId?: string) => {
     // A workflow that an agent makes opens, so the person sees the agent build it. While the person's
-    // edit saves, the open workflow stays, and the new one only goes into the library.
+    // edit saves, the open workflow stays, and the new one only goes into the library. A request from
+    // another device does not change the workflow that this device shows (#11072).
     if (
       workflowId !== null &&
       agentId !== undefined &&
+      hostKey !== undefined &&
       workflowId !== current &&
       writing === 0 &&
       pending === undefined &&
-      !summaries().some((summary) => summary.id === workflowId)
+      !summaries().some((summary) => summary.id === workflowId) &&
+      agentAskedHere(hostKey, agentId)
     ) {
       playBuild(workflowId, agentId, null);
       open(workflowId);
