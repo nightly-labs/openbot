@@ -1054,7 +1054,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * client, because a secret on the user's computer is not secret, and PKCE protects the grant.
    * Some servers also issue a secret they never accept: Railway registers `client_secret_basic` and
    * then refuses that secret at the token endpoint (#3429). A server that does not list `none` still
-   * picks its own method, and the SDK uses the one it registered.
+   * picks its own method, and the SDK uses the one it registered. A server that registers `none` but
+   * issues a secret and wants it, as Enrich does (#11426), gets it back: see `withIssuedSecretMethod`.
    *
    * Except a server that lists only `client_secret_post`. A request with no method asks for the RFC
    * 7591 default, `client_secret_basic`, and Make refuses that registration with a 400: "No supported
