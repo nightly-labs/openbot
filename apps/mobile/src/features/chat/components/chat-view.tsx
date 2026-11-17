@@ -100,7 +100,7 @@ import { ChatQueueButton } from "./chat-queue-button";
 import { ChatSelectionBar } from "./chat-selection-bar";
 import { type ComposerVoice, liveVoice } from "./composer-voice";
 import type { ChatQueueController } from "./use-chat-queue";
-import { type ComposerDictation, useComposerDictation } from "./use-composer-dictation";
+import { useComposerDictation, useComposerDictationWithSettings } from "./use-composer-dictation";
 import { useGptLiveConversation } from "./use-gpt-live-conversation";
 import { type LiveChannel, useLiveConversation } from "./use-live-conversation";
 
@@ -727,25 +727,8 @@ export function ChatView({
     onDraft: setDraft,
   });
   const writable = canSend && !readOnly && !notice;
-  // A build without the speech module, such as Expo Go, still shows the mic and the waveform, as it
-  // shows Settings > Voice. A tap opens Settings > Voice, which says that voice is not available.
   const voiceMissing = !speechNative;
-  const composerDictation = useMemo(
-    (): ComposerDictation =>
-      voiceMissing && !dictation.available
-        ? {
-            ...dictation,
-            available: true,
-            start: () => {
-              // The keyboard has no place over Settings > Voice, as a long press on the mic closes it too.
-              Keyboard.dismiss();
-              router.push("/settings/voice");
-              return false;
-            },
-          }
-        : dictation,
-    [voiceMissing, dictation],
-  );
+  const composerDictation = useComposerDictationWithSettings(dictation);
   // Hands-free, as the voice pane on desktop: the agent hears a pause as the end of a turn, and its
   // reply is read aloud. In a channel the leader answers, or the member the words name.
   // GPT live voice takes the conversation of an agent chat when the user chose it, the server serves
