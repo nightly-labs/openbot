@@ -121,9 +121,9 @@ const requireModule = createRequire(import.meta.url);
 const webSockets: typeof Ws = requireModule(join(dirname(requireModule.resolve("ws/package.json")), "index.js"));
 const MAXIMUM_BUFFERED_EVENTS = 2_000;
 /**
- * The total length of the event frames that one device has not confirmed. One frame can be about
- * 1 MB, so the count limit alone let a device that stops confirming, such as a phone in the
- * background, keep about 2 GB in the main process (#11429). A healthy device confirms each event.
+ * The total length of the event frames that wait to be sent to one device. One frame can be about
+ * 1 MB, so the count limit alone let a device that does not take its events, such as one on a slow
+ * relay, keep about 2 GB in the main process (#11429).
  */
 const MAXIMUM_BUFFERED_EVENT_CHARACTERS = 32 * 1024 * 1024;
 /** A Moonlight session and a few browser views, which is more than a member watches at once. */
@@ -1001,12 +1001,7 @@ export class TeamWebRtcHostPeer {
       return yield* new RemoteWorkflowError({ cause: new Error("The event frame is not client control data.") });
     // Do not send `event-reset` here. The client can acknowledge an old event after the stream
     // already reset it, and a second reset would move it back before the newer events it has.
-    // The buffer keeps the sequences in increasing order, so the scan stops at the first newer event.
-    for (const [sequence, event] of this.#events) {
-      if (sequence > frame.throughSequence) break;
-      this.#events.delete(sequence);
-      this.#eventCharacters -= event.length;
-    }
+    // The sender already removed each event that it read, so the acknowledgement frees nothing.
   });
 
   readonly #sendEvents = Effect.fn("TeamHostPeer.sendEvents")(function* (
@@ -1023,6 +1018,9 @@ export class TeamWebRtcHostPeer {
       if (sequence >= this.#nextEventSequence) break;
       this.#eventsSentThrough = sequence;
       const frame = this.#events.get(sequence);
+      // No path sends an event again, so the buffer keeps only the events that are not sent yet.
+      this.#events.delete(sequence);
+      if (frame !== undefined) this.#eventCharacters -= frame.length;
       // The buffer limit removed this event before it was sent.
       if (frame === undefined) {
         this.#eventResetPending = true;
