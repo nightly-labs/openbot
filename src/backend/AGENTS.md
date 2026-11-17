@@ -39,6 +39,17 @@ The account service has a second, unrelated database — Cloudflare D1 — and i
 shape: those migrations are reversible but race a deploy. `apps/auth-api/AGENTS.md` owns it — nothing in this
 directory touches `apps/auth-api/migrations/`.
 
+## Transactions
+
+- Run each SQLite transaction through `withTransaction` (synchronous work) or `withTransactionAsync`
+  (work that awaits) in `database/sqlite-transaction.ts`. The Biome rule `no-raw-sqlite-transaction`
+  rejects hand-written `BEGIN`, `COMMIT`, `END`, `ROLLBACK`, `SAVEPOINT` and `RELEASE`.
+- A nested `withTransaction` runs in a savepoint. Its error rolls back only its level and is thrown
+  again. To keep the caller's writes, catch the error outside the nested call (see `CrmStore.#decide`).
+- `withTransactionAsync` never nests. Use it only on a connection with one user at a time, such as the
+  Claude history index.
+- A migration has no backup. Keep a schema change and its `schema_migrations` marker in one call.
+
 ## Size
 
 `mailbox-store.ts` owns mailbox state and database writes. `attachment-files.ts` owns draft and
@@ -57,12 +68,10 @@ and `dispatch`. The shape in both: one class per file, kebab-case, `<Name>Option
 Two rules those controllers depend on and a reader cannot infer. They hold the core object and read
 `.connection` at each use — a cached handle survives `initialize()` and then silently addresses a
 closed database after `close()`. And a projection controller does not open a transaction of its own.
-Four places do, and each is load-bearing: `dispatch` and `deleteEventsAndReceipt` open one only if
-they find none open, which is what lets a projector nest another dispatch inside the caller's, and
-`ThreadReplay.rebuildThreadProjection` and the facade's `persistConversationAndMailbox` open one
-unconditionally, which is what makes the dispatch inside each of them skip its own. Open an
-unconditional one anywhere else and a caller already in a transaction gets a nested `BEGIN` that
-SQLite rejects; remove one of these four and the replay or the mailbox write silently stops being
+Four places do, and each is load-bearing: `dispatch` and `deleteEventsAndReceipt` let a projector
+nest another dispatch inside the caller's transaction, and `ThreadReplay.rebuildThreadProjection` and
+the facade's `persistConversationAndMailbox` hold the dispatch inside each of them in one
+transaction. Remove one of these four and the replay or the mailbox write silently stops being
 atomic.
 
 Do not add a new concern to the biggest file you can see; extract one when a change gives you the

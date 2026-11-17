@@ -1,5 +1,6 @@
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
 import { databaseRow, databaseRows, requiredNumberColumn, requiredStringColumn } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 import type { ContextEntry, HistoryFilter, InboundFile } from "./messaging-types";
 
@@ -214,9 +215,7 @@ export class MessagingHistoryStore {
    */
   trimFiles(connectionId: string, maxBytes: number): string[] {
     const db = this.#database.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(db, () => {
       const rows = databaseRows(
         db
           .prepare(
@@ -237,13 +236,8 @@ export class MessagingHistoryStore {
         removed.push(...row.files.flatMap((file) => (file.path ? [file.path] : [])));
         update.run(JSON.stringify(row.files.map(({ path: _path, ...file }) => file)), row.seq);
       }
-      if (ownsTransaction) db.exec("COMMIT");
       return removed;
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** Deletes every message of a connection. Returns the paths of their files. */

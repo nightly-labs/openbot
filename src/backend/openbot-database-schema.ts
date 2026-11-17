@@ -22,6 +22,7 @@ import { AGENT_SKILL_LOADS_SCHEMA_SQL } from "./database/agent-skill-loads-schem
 import { DELETED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/deleted-thread-messages-schema";
 import { PINNED_THREAD_MESSAGES_SCHEMA_SQL } from "./database/pinned-thread-messages-schema";
 import { PROVIDER_HISTORY_SCHEMA_SQL } from "./database/provider-history-schema";
+import { withTransaction } from "./database/sqlite-transaction";
 import { MCP_SERVERS_SCHEMA_SQL } from "./mcp-schema";
 import {
   MESSAGING_ALLOWED_ROLES_SCHEMA_SQL,
@@ -1170,17 +1171,12 @@ function hasExistingSchema(db: DatabaseSync): boolean {
 }
 
 function createLatestDatabase(db: DatabaseSync, appliedAt: string): void {
-  db.exec("BEGIN IMMEDIATE");
-  try {
+  withTransaction(db, () => {
     db.exec(LATEST_SCHEMA_SQL);
     const insertMigration = db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)");
     for (const migration of MIGRATIONS) insertMigration.run(migration.version, appliedAt);
     assertForeignKeys(db, new Map());
-    db.exec("COMMIT");
-  } catch (error) {
-    if (db.isTransaction) db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 function readAppliedVersions(db: DatabaseSync): number[] {
@@ -1238,15 +1234,11 @@ function runMigration(
 ): Map<string, number> {
   if (migration.disableForeignKeys) db.exec("PRAGMA foreign_keys = OFF");
   try {
-    db.exec("BEGIN IMMEDIATE");
-    migration.up(db, appliedAt);
-    db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)").run(migration.version, appliedAt);
-    const violations = assertForeignKeys(db, violationsBefore);
-    db.exec("COMMIT");
-    return violations;
-  } catch (error) {
-    if (db.isTransaction) db.exec("ROLLBACK");
-    throw error;
+    return withTransaction(db, () => {
+      migration.up(db, appliedAt);
+      db.prepare("INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)").run(migration.version, appliedAt);
+      return assertForeignKeys(db, violationsBefore);
+    });
   } finally {
     if (migration.disableForeignKeys) db.exec("PRAGMA foreign_keys = ON");
   }
