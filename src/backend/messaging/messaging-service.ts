@@ -326,6 +326,9 @@ export class MessagingService {
         }),
       );
     this.#threads.setContextSource((link, origin) => this.#promptContext(link, origin));
+    this.#threads.setOwnerPostSource(
+      (link) => this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true,
+    );
     this.#threads.setHistorySource((link, scope, limit, filter) => this.#recentMessages(link, scope, limit, filter));
     this.#threads.setOutbound({
       places: (connectionId) => this.#outboundPlaces(connectionId),
@@ -360,6 +363,7 @@ export class MessagingService {
     // The kept deliveries that wait for a connection go now: nothing will start it.
     for (const waiters of [...this.#transportWaiters.values()]) for (const ready of [...waiters]) ready();
     this.#threads.setContextSource(null);
+    this.#threads.setOwnerPostSource(null);
     this.#threads.setHistorySource(null);
     this.#threads.setOutbound(null);
     this.#ingress?.handle(null);
@@ -1765,15 +1769,14 @@ export class MessagingService {
   ) {
     const live = this.#live.get(link.connectionId);
     const workspaceName = live?.record.workspaceName ?? null;
-    const postsAsOwner = this.#whatsapp?.postsAsOwner(link.connectionId, link.platformChannelId) === true;
-    if (!live) return { workspaceName, place: link.title, messages: [], cursor: null, skippedFiles: [], postsAsOwner };
+    if (!live) return { workspaceName, place: link.title, messages: [], cursor: null, skippedFiles: [] };
     const place = link.isDirect
       ? "direct message"
       : yield* live.adapter.placeName(link.platformChannelId).pipe(toMessagingOperationFailed);
     const messages = yield* live.adapter
       .history(link.platformChannelId, link.threadKey, link.historyCursor, origin.platformMessageId)
       .pipe(Effect.catch(() => Effect.succeed([])));
-    return { workspaceName, place, messages, cursor: origin.platformMessageId, skippedFiles: [], postsAsOwner };
+    return { workspaceName, place, messages, cursor: origin.platformMessageId, skippedFiles: [] };
   });
 
   /** The newest messages of a link's own place, for the agent's `messaging_history` tool. */
