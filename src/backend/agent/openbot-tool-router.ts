@@ -122,6 +122,7 @@ import {
 } from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import { AgentSettingsRefused } from "./agent-settings-refused";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
@@ -3340,6 +3341,15 @@ export class OpenBotToolRouter {
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
           : null;
+      // A provider that lists no model now, or a custom agent whose list is not loaded, is no proof that the
+      // caller's model is gone: the caller runs on it. Before, the new agent started on another provider (#11033).
+      if (
+        named === null &&
+        inherited === null &&
+        (caller.provider === "acp" || !listed.some((model) => model.provider === caller.provider))
+      ) {
+        throw new AgentSettingsRefused(sourceText("error.agent.creatorModelNotListed", { model: caller.model }));
+      }
       if (inherited && args.reasoningEffort !== undefined) requireReasoningEffort(inherited, args.reasoningEffort);
       const requested = named ?? inherited;
       const reasoningEffort = args.reasoningEffort ?? (inherited ? caller.reasoningEffort : undefined);

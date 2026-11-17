@@ -64,6 +64,8 @@ export const messages = {
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
+  "error.agent.creatorModelNotListed":
+    '"{model}" modeliniz şu anda model listesinde yok, bu yüzden yeni ajan bu modelle başlayamaz. Birkaç saniye sonra yeniden deneyin veya provider ve model alanlarına list_models\'in gösterdiği bir model yazın.',
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable":

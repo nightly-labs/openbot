@@ -55,6 +55,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "所选模型不属于该服务商。",
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
+  "error.agent.creatorModelNotListed":
+    "你的模型“{model}”当前不在模型列表中，因此新智能体无法使用它启动。请几秒后重试，或将 provider 和 model 设为 list_models 显示的模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
   "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":

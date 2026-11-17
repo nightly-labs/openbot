@@ -57,6 +57,8 @@ export const messages = {
   "error.agent.modelNotListed": 'המודל "{model}" אינו זמין. המודלים הזמינים: {models}.',
   "error.agent.providerNotListed":
     "אין עכשיו מודל זמין של {provider}. אפשר לקרוא ל-list_models כדי לראות את המודלים הזמינים.",
+  "error.agent.creatorModelNotListed":
+    'המודל שלך "{model}" לא נמצא עכשיו ברשימת המודלים, ולכן הסוכן החדש לא יכול להתחיל איתו. אפשר לנסות שוב בעוד כמה שניות, או להגדיר ב-provider וב-model מודל ש-list_models מציג.',
   "error.agent.reasoningEffortUnsupported":
     'המודל "{model}" אינו תומך ברמת החשיבה "{effort}". הרמות הנתמכות: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable": 'למודל "{model}" אין הגדרה של רמת חשיבה, ולכן אי אפשר לשנות אותה.',

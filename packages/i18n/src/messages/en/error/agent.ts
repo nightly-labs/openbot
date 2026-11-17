@@ -63,6 +63,8 @@ export const messages = defineMessages("error.agent", {
   "error.agent.modelNotListed": 'Model "{model}" is not available. Available models: {models}.',
   "error.agent.providerNotListed":
     "No {provider} model is available now. Call list_models to see the available models.",
+  "error.agent.creatorModelNotListed":
+    'Your model "{model}" is not in the model list now, so the new agent cannot start on it. Try again in a few seconds, or set provider and model to a model that list_models shows.',
   "error.agent.reasoningEffortUnsupported":
     'Model "{model}" does not support reasoning effort "{effort}". Supported efforts: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable":

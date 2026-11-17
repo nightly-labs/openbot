@@ -70,6 +70,8 @@ export const messages = {
   "error.agent.modelNotListed": "Das Modell „{model}“ ist nicht verfügbar. Verfügbare Modelle: {models}.",
   "error.agent.providerNotListed":
     "Derzeit ist kein Modell von {provider} verfügbar. Rufe list_models auf, um die verfügbaren Modelle zu sehen.",
+  "error.agent.creatorModelNotListed":
+    "Dein Modell „{model}“ ist gerade nicht in der Modellliste, daher kann der neue Agent nicht damit starten. Versuche es in ein paar Sekunden erneut, oder setze provider und model auf ein Modell, das list_models zeigt.",
   "error.agent.reasoningEffortUnsupported":
     "Das Modell „{model}“ unterstützt den Denkaufwand „{effort}“ nicht. Unterstützte Stufen: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
