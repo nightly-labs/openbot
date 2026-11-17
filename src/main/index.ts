@@ -174,6 +174,7 @@ import { macShipItDirectory, shipItInstallInProgress } from "./update-install-gu
 import { UPDATE_INSTALL_TIMEOUT_MS } from "./update-service";
 import { setInitialWindowGlass, setWindowAppearance } from "./window-appearance";
 import { placeWindowButtons } from "./window-buttons";
+import { restartOutsideWindowsPackage } from "./windows-package-restart";
 
 const logger = createOpenBotLogger("main");
 
@@ -327,6 +328,21 @@ const systemTimezone =
     : localTimezone;
 app.enableSandbox();
 if (process.platform === "win32") app.setAppUserModelId("app.openbot.desktop");
+// Windows #11233: a start from a Microsoft Store app kept the data in that app's folder. Start again
+// outside it, before the single-instance lock and before any file goes into `userData`. `process.exit`,
+// as for a second launch: the new process must be able to take the lock.
+if (
+  app.isPackaged &&
+  !(serverMode || hostedServer || localServerChildEnvironment) &&
+  (await Effect.runPromise(
+    restartOutsideWindowsPackage(
+      process.env,
+      process.argv,
+      (value) => parseDeepLink(value, inviteLinkOptions) !== null,
+    ),
+  ))
+)
+  process.exit(0);
 // Linux: on Wayland, Chromium waits until a monitor is on before it starts. With none, start again on
 // XWayland. Before the single-instance lock, so that the new process can take it. A parent process or
 // systemd watches the process, the output and the input of a headless server, so it does not restart.
