@@ -43,6 +43,12 @@ const VERTICAL_BAR_TITLE_INSET = 20;
 const DUO_BAR_ITEM_CENTER_FROM_BOTTOM = 35;
 /** The Material 3 small top app bar puts its title on the 72 dp line, after the navigation button. */
 const ANDROID_BAR_TITLE_INSET = 72;
+/**
+ * The room of each more bar button at one side: a 44 pt glass item next to the first one in its iOS
+ * capsule, or one more 48 dp Material icon button.
+ */
+const IOS_BAR_BUTTON_WIDTH = 46;
+const ANDROID_BAR_BUTTON_WIDTH = 48;
 /** The fade under the solid Android bar, where the content goes under it. */
 const ANDROID_FADE = 32;
 
@@ -312,8 +318,15 @@ export function LargeTitleScrollView({
   title,
   caption,
   contentContainerClassName,
+  barButtonsRight = 1,
   children,
-}: PropsWithChildren<{ title: string; caption?: string; contentContainerClassName?: string }>) {
+}: PropsWithChildren<{
+  title: string;
+  caption?: string;
+  contentContainerClassName?: string;
+  /** The number of bar buttons at the right: the small title stops before them. */
+  barButtonsRight?: number;
+}>) {
   const scroll = useLargeTitleScroll();
   const insets = useSafeAreaInsets();
   const blurTarget = useRef<ViewInstance>(null);
@@ -339,7 +352,16 @@ export function LargeTitleScrollView({
           <View className={contentContainerClassName}>{children}</View>
         </Animated.ScrollView>
       </AndroidBlurTarget>
-      <LargeTitleBar scroll={scroll} title={title} surface="sheet" blurTarget={blurTarget} />
+      <LargeTitleBar
+        scroll={scroll}
+        title={title}
+        surface="sheet"
+        blurTarget={blurTarget}
+        insetRight={
+          (isAndroid ? ANDROID_BAR_TITLE_INSET : BAR_TITLE_INSET) +
+          Math.max(0, barButtonsRight - 1) * (isAndroid ? ANDROID_BAR_BUTTON_WIDTH : IOS_BAR_BUTTON_WIDTH)
+        }
+      />
     </View>
   );
 }
