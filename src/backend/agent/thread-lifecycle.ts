@@ -1864,13 +1864,27 @@ export class ThreadLifecycle {
     }
   }, Effect.uninterruptible).bind(this);
 
-  /** Whether a loaded session of this thread runs background work. A failed check keeps the session. */
+  /**
+   * Whether a Claude session of the agent's own chat runs background subagents or commands. A new
+   * chat closes that session, and the work would end with it (#10743). A Codex background terminal,
+   * such as a dev server, can run without end, so it does not hold the new chat that the agent asked for.
+   */
+  mainRunsBackgroundWork(agent: AgentSummary): Effect.Effect<boolean> {
+    if (agent.threadId === null) return Effect.succeed(false);
+    return this.#runsBackgroundWork(agent.threadId, RUNTIME_RELOADED_ON_RESUME);
+  }
+
+  /**
+   * Whether a loaded session of this thread runs background work, of `providers` alone when given.
+   * A failed check keeps the session.
+   */
   readonly #runsBackgroundWork = Effect.fn("ThreadLifecycle.runsBackgroundWork")(function* (
     this: ThreadLifecycle,
     threadId: string,
+    providers?: ReadonlySet<AgentProvider>,
   ) {
     for (const session of this.#store.database.listProviderSessions(threadId)) {
-      if (session.state !== "active") continue;
+      if (session.state !== "active" || (providers && !providers.has(session.provider))) continue;
       const client = this.#conversation.openClientFor(session.externalSessionId);
       if (!client?.holdsBackgroundWork) continue;
       const background = yield* Effect.result(client.holdsBackgroundWork(session.externalSessionId));
