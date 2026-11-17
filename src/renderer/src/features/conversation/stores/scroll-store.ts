@@ -38,6 +38,10 @@ import {
 import { groupSkillInstallMarkers } from "../skill-install-timeline";
 import { isTurnAnswer } from "../turn-steps";
 import { conversationOwnerId } from "./composer-store";
+import { PENDING_SEND_ID_PREFIX } from "./pending-send-store";
+
+/** How long a message sent while a question card is open waits for the host to close the card. */
+const PROMPT_SEND_HOLD_MS = 2000;
 
 interface ScrollElements {
   scrollElement: () => HTMLDivElement | undefined;
@@ -202,11 +206,83 @@ export function createScrollStore(deps: ScrollStoreDeps) {
     return summarizeHostedSiteMessages(withQuestionContext(complete, deps.props.messages, questionTurnId));
   });
   const routineRunTurns = createMemo(() => routineRunTurnMessages(deps.props.messages, shownMessages()));
+  /*
+   * A message that the user sends while a question card is open shows when the question's row has
+   * its outcome, under that row. The card is drawn under all rows, so until the host closed it, the
+   * message showed above the question; and the host closes the card a moment before the row says
+   * "cancelled", so the message then stood where the card was. A card that stays open, such as an
+   * MCP sign-in, lets the message show after `PROMPT_SEND_HOLD_MS`. Each time is when this view first
+   * had the row, so an older message that loads late is not held, and the host's clock does not count.
+   */
+  const userRowSeenAt = new Map<string, number>();
+  let waitingQuestion:
+    | { key: string; turnId: string; requestId: string; at: number; closedAt: number | undefined }
+    | undefined;
+  const [promptHoldClock, setPromptHoldClock] = createSignal(0);
+  const promptHold = createMemo(() => {
+    promptHoldClock();
+    const now = Date.now();
+    const rows = [...shownMessages(), ...deps.pendingMessages()].filter((message) => message.author === "you");
+    const ids = new Set(rows.map((message) => message.id));
+    for (const id of userRowSeenAt.keys()) if (!ids.has(id)) userRowSeenAt.delete(id);
+    for (const id of ids) if (!userRowSeenAt.has(id)) userRowSeenAt.set(id, now);
+    const prompt = deps.props.channel ? undefined : deps.props.prompt;
+    if (prompt) {
+      const key = JSON.stringify([conversationOwnerId(deps.props), prompt.turnId, String(prompt.requestId)]);
+      if (waitingQuestion?.key !== key)
+        waitingQuestion = {
+          key,
+          turnId: prompt.turnId,
+          requestId: String(prompt.requestId),
+          at: now,
+          closedAt: undefined,
+        };
+    } else if (waitingQuestion) waitingQuestion.closedAt ??= now;
+    const held = new Set<string>();
+    let revealAt: number | undefined;
+    const waiting = waitingQuestion;
+    if (!waiting) return { held, revealAt };
+    const question = deps.props.messages.find(
+      (message) => message.turnId === waiting.turnId && String(message.questionPrompt?.requestId) === waiting.requestId,
+    );
+    // The chat can have the question's row only once it has its outcome.
+    const rowDone = Boolean(question?.questionPrompt?.resolution);
+    const closedLongAgo = waiting.closedAt !== undefined && now - waiting.closedAt >= PROMPT_SEND_HOLD_MS;
+    if (!prompt && (rowDone || closedLongAgo)) {
+      waitingQuestion = undefined;
+      return { held, revealAt };
+    }
+    for (const message of rows) {
+      const afterQuestion =
+        message.id.startsWith(PENDING_SEND_ID_PREFIX) ||
+        (question?.createdAt !== undefined &&
+          message.createdAt !== undefined &&
+          message.createdAt > question.createdAt);
+      const seenAt = userRowSeenAt.get(message.id) ?? now;
+      const until = seenAt + PROMPT_SEND_HOLD_MS;
+      if (!afterQuestion || seenAt <= waiting.at || until <= now) continue;
+      held.add(message.id);
+      revealAt = Math.min(revealAt ?? until, until);
+    }
+    return { held, revealAt };
+  });
+  createEffect(
+    () => promptHold().revealAt,
+    (revealAt) => {
+      if (revealAt === undefined) return;
+      const timer = setTimeout(() => setPromptHoldClock((tick) => tick + 1), Math.max(0, revealAt - Date.now()));
+      return () => clearTimeout(timer);
+    },
+  );
   /* The messages of a routine run follow its row and open and close with it. */
-  const drawnMessages = createMemo(() => [
-    ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
-    ...deps.pendingMessages(),
-  ]);
+  const drawnMessages = createMemo(() => {
+    const { held } = promptHold();
+    const drawn = [
+      ...placeRoutineRunTurns(summarizeRoutineRunMessages(shownMessages()), routineRunTurns(), openRoutineRuns()),
+      ...deps.pendingMessages(),
+    ];
+    return held.size === 0 ? drawn : drawn.filter((message) => !held.has(message.id));
+  });
   function toggleRoutineRun(marker: RoutineRunToggleMarkerModel): void {
     const key = routineRunToggleKey(marker);
     setOpenRoutineRuns((open) => new Map(open).set(key, marker.expanded !== true));
