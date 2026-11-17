@@ -622,6 +622,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Остановить агента и отправить сейчас следующее сообщение из очереди",
   "mobile.chat.queue.deleteNext": "Удалить следующее сообщение в очереди",
   "mobile.chat.queue.moveFirst": "Переместить в начало",
+  "mobile.chat.queue.runInNewThread": "Запустить в новой ветке",
+  "mobile.chat.queue.runNextInNewThread": "Запустить следующее сообщение из очереди в новой ветке",
   "mobile.chat.queue.deleteTitle": "Удалить сообщение из очереди?",
   "mobile.chat.queue.deleteMessage": "Агент его не получит.",
   "mobile.chat.queue.keep": "Оставить",

@@ -546,6 +546,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Agent stoppen und nächste Nachricht in der Warteschlange jetzt senden",
   "mobile.chat.queue.deleteNext": "Nächste Nachricht in der Warteschlange löschen",
   "mobile.chat.queue.moveFirst": "An erste Stelle verschieben",
+  "mobile.chat.queue.runInNewThread": "In neuem Thread ausführen",
+  "mobile.chat.queue.runNextInNewThread": "Nächste Nachricht in der Warteschlange in neuem Thread ausführen",
   "mobile.chat.queue.deleteTitle": "Nachricht aus der Warteschlange löschen?",
   "mobile.chat.queue.deleteMessage": "Der Agent erhält sie nie.",
   "mobile.chat.queue.keep": "Behalten",

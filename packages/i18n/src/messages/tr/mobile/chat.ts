@@ -533,6 +533,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Ajanı durdur ve kuyruktaki sonraki mesajı şimdi gönder",
   "mobile.chat.queue.deleteNext": "Kuyruktaki sonraki mesajı sil",
   "mobile.chat.queue.moveFirst": "En başa taşı",
+  "mobile.chat.queue.runInNewThread": "Yeni mesaj dizisinde çalıştır",
+  "mobile.chat.queue.runNextInNewThread": "Sıradaki mesajı yeni mesaj dizisinde çalıştır",
   "mobile.chat.queue.deleteTitle": "Kuyruktaki mesaj silinsin mi?",
   "mobile.chat.queue.deleteMessage": "Ajan bunu hiçbir zaman alamaz.",
   "mobile.chat.queue.keep": "Koru",

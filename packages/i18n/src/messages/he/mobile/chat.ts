@@ -535,6 +535,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "עצור את הסוכן ושלח עכשיו את ההודעה הבאה בתור",
   "mobile.chat.queue.deleteNext": "מחיקת ההודעה הבאה בתור",
   "mobile.chat.queue.moveFirst": "העברה לראש התור",
+  "mobile.chat.queue.runInNewThread": "הרצה בשרשור חדש",
+  "mobile.chat.queue.runNextInNewThread": "הרצת ההודעה הבאה בתור בשרשור חדש",
   "mobile.chat.queue.deleteTitle": "למחוק את ההודעה בתור?",
   "mobile.chat.queue.deleteMessage": "הסוכן לא יקבל אותה לעולם.",
   "mobile.chat.queue.keep": "שמירה",

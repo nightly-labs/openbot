@@ -524,6 +524,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "에이전트를 멈추고 다음 대기 메시지를 지금 보내기",
   "mobile.chat.queue.deleteNext": "다음 대기 메시지 삭제",
   "mobile.chat.queue.moveFirst": "맨 앞으로 이동",
+  "mobile.chat.queue.runInNewThread": "새 스레드에서 실행",
+  "mobile.chat.queue.runNextInNewThread": "대기 중인 다음 메시지를 새 스레드에서 실행",
   "mobile.chat.queue.deleteTitle": "대기 중인 메시지를 삭제할까요?",
   "mobile.chat.queue.deleteMessage": "에이전트는 이 메시지를 받지 못해요.",
   "mobile.chat.queue.keep": "유지",

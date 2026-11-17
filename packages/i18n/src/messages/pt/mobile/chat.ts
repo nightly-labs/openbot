@@ -535,6 +535,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Parar o agente e enviar agora a próxima mensagem na fila",
   "mobile.chat.queue.deleteNext": "Excluir a próxima mensagem na fila",
   "mobile.chat.queue.moveFirst": "Mover para o início",
+  "mobile.chat.queue.runInNewThread": "Executar em novo tópico",
+  "mobile.chat.queue.runNextInNewThread": "Executar a próxima mensagem na fila em novo tópico",
   "mobile.chat.queue.deleteTitle": "Excluir mensagem da fila?",
   "mobile.chat.queue.deleteMessage": "O agente nunca a receberá.",
   "mobile.chat.queue.keep": "Manter",

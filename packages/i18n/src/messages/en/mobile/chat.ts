@@ -526,6 +526,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.sendNowNext": "Stop the agent and send next queued message now",
   "mobile.chat.queue.deleteNext": "Delete next queued message",
   "mobile.chat.queue.moveFirst": "Move to first",
+  "mobile.chat.queue.runInNewThread": "Run in new thread",
+  "mobile.chat.queue.runNextInNewThread": "Run next queued message in a new thread",
   "mobile.chat.queue.deleteTitle": "Delete queued message?",
   "mobile.chat.queue.deleteMessage": "The agent never receives it.",
   "mobile.chat.queue.keep": "Keep",

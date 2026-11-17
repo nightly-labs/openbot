@@ -1,10 +1,12 @@
 import type { AttachmentSummary } from "@openbot/contracts/ipc";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
 import { useThemeColor } from "heroui-native/hooks";
 import ArrowUpToLine from "lucide-react-native/icons/arrow-up-to-line";
 import CornerDownRight from "lucide-react-native/icons/corner-down-right";
 import ExternalLink from "lucide-react-native/icons/external-link";
+import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
 import { Alert } from "react-native";
@@ -23,10 +25,15 @@ import { AttachmentThumbnail, showsAsImage, useAttachmentFile } from "../compone
 import { useQueuedChat } from "../context/queued-messages-context";
 import { queuedMessageLocks, queuedMessagePreview } from "../model/queued-message-view";
 
+/** The route name of a thread in the app stack, `app/(app)/task/[taskId].tsx`. */
+const TASK_ROUTE = "task/[taskId]";
+
 export function QueuedMessageActionsScreen() {
   const { t, format } = useText();
   const { chat, deliveryId } = useLocalSearchParams<{ chat: string; deliveryId: string }>();
   const { queue } = useQueuedChat(chat);
+  // The stack inside the queued messages sheet. Its parent is the app stack, where the thread opens.
+  const sheetStack = useNavigation().getParent();
   const foreground = useThemeColor("foreground");
   const danger = String(useCSSVariable("--openbot-danger-text"));
   const held = queue?.edit?.delivery ?? null;
@@ -51,6 +58,18 @@ export function QueuedMessageActionsScreen() {
     void action.then((done) => {
       void haptics.notification(done ? "success" : "error");
       if (done) router.back();
+    });
+  };
+
+  // As on desktop's "Run in new thread": the message leaves the queue, starts in a new thread, and the
+  // thread opens in place of this sheet.
+  const runAsThread = () => {
+    void queue.runAsThread(delivery).then((task) => {
+      void haptics.notification(task ? "success" : "error");
+      if (!task) return;
+      sheetStack?.dispatch(
+        StackActions.replace(TASK_ROUTE, { taskId: task.id, agentId: task.agentId, serverId: queue.serverId }),
+      );
     });
   };
 
@@ -110,6 +129,16 @@ export function QueuedMessageActionsScreen() {
             onPress={() => finish(queue.moveFirst(delivery))}
           >
             <Typography>{t("mobile.chat.queue.moveFirst")}</Typography>
+          </SettingsRow>
+        )}
+        {reply || !queue.canRunAsThread ? null : (
+          <SettingsRow
+            leading={<GitBranch color={foreground} size={22} />}
+            disclosure={false}
+            disabled={locked || editedElsewhere}
+            onPress={runAsThread}
+          >
+            <Typography>{t("mobile.chat.queue.runInNewThread")}</Typography>
           </SettingsRow>
         )}
       </SettingsSection>
