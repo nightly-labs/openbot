@@ -25,6 +25,11 @@ import {
 
 /* --------------------------------------------------------------- Agent */
 
+/** The name of the model that an agent runs on, or its id when the catalog does not have it. */
+function agentModelName(catalogs: WorkflowCatalogs, agent: AgentProfile): string {
+  return modelOption(catalogs.models, agent.model)?.name ?? agent.model;
+}
+
 /** Each agent with its title and the model that it runs on. */
 function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
   return catalogs.agents.map((agent) => ({
@@ -35,7 +40,7 @@ function agentOptions(catalogs: WorkflowCatalogs): PickerOption<string>[] {
       { text: agent.title },
       {
         icon: () => <ProviderLogo provider={wfProviderLogo(agent.provider)} class="wfn-model-logo" />,
-        text: modelOption(catalogs.models, agent.model)?.name ?? agent.model,
+        text: agentModelName(catalogs, agent),
       },
     ],
   }));
@@ -107,10 +112,13 @@ function AgentPill(props: {
  */
 function AgentModel(props: { agent: AgentProfile }) {
   const board = useBoard();
+  const { t } = useText();
+  const name = () => agentModelName(board.catalogs(), props.agent);
   return (
     <span class="wfn-pill wfn-model-pill" data-static="">
       <ProviderLogo provider={wfProviderLogo(props.agent.provider)} class="wfn-model-logo" />
-      <span>{modelOption(board.catalogs().models, props.agent.model)?.name ?? props.agent.model}</span>
+      <span class="sr-only">{t("workflow.model.label", { name: name() })}</span>
+      <span aria-hidden="true">{name()}</span>
     </span>
   );
 }

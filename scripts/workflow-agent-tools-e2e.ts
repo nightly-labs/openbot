@@ -5,7 +5,7 @@
 //
 // It builds a workflow with refs in one call (trigger, agent, condition, output), moves, changes and
 // removes nodes, reads it back, runs it with the input of one case and reads the run, and checks the failures that the model must
-// correct: an edge that a rule refuses, an unknown agent and a locked node. The report keeps the byte
+// correct: an edge that a rule refuses, an unknown agent, a model on an agent step and a locked node. The report keeps the byte
 // size of each tool result, so the context cost is visible. It also checks that a search says to run
 // the tools with tool_call, that tool_call accepts the name as `tool` and gives a number or boolean
 // sent as text the type of the tool's schema, that each delete asks the
@@ -467,6 +467,15 @@ try {
     "an unknown agent is refused",
     !badAgent.ok && JSON.stringify(badAgent.value).includes("agent-gone"),
     badAgent.value,
+  );
+  const badModel = await call("failure-model", "edit_workflow", {
+    workflowId,
+    ops: [{ op: "update", node: ids.news, fields: { provider: "grok", model: "grok-4.7" } }],
+  });
+  check(
+    "a model on an agent step is refused, with the llm step as the way",
+    !badModel.ok && JSON.stringify(badModel.value).includes("llm step"),
+    badModel.value,
   );
   const lockedDetail = await runCauseEffect(workflows.get(workflowId));
   const saved = await runCauseEffect(

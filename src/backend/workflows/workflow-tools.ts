@@ -155,8 +155,12 @@ const LABEL_FIELD: Partial<Record<WorkflowNodeKind, string>> = {
   image: "prompt",
 };
 const LABEL_CHARS = 40;
-/** The model fields of an LLM or condition step, which an agent step does not have (`WorkflowFields`). */
-const AGENT_MODEL_FIELDS = ["provider", "model", "effort"] as const;
+/**
+ * The model fields of an LLM or condition step (`WorkflowFields`). An agent step runs on its agent's
+ * model, so an op may not set them on it. The canvas keeps a copy of the agent's model in them, which
+ * no run reads.
+ */
+const STEP_MODEL_FIELDS = ["provider", "model", "effort"] as const;
 
 /**
  * The size of each card on the canvas: the widths of "Size" in
@@ -425,7 +429,7 @@ function applyWorkflowOps(
   /** An agent step runs on its agent's model, so a run would not use a model that an op gives it. */
   const checkAgentModel = (kind: WorkflowNodeKind, patch: WorkflowOp["fields"], op: number) => {
     if (kind !== "agent") return;
-    const given = AGENT_MODEL_FIELDS.filter((name) => patch?.[name] !== undefined && patch[name] !== null);
+    const given = STEP_MODEL_FIELDS.filter((name) => patch?.[name] !== undefined && patch[name] !== null);
     if (given.length > 0)
       refuse(
         `Op ${op}: an agent step uses its agent's model, not ${given.join(", ")}. For another model, add an llm step.`,
