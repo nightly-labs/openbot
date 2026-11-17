@@ -34,6 +34,10 @@ import {
 import {
   InvalidClientError,
   InvalidGrantError,
+  OAuthError,
+  ServerError,
+  TemporarilyUnavailableError,
+  TooManyRequestsError,
   UnauthorizedClientError,
 } from "@modelcontextprotocol/sdk/server/auth/errors.js";
 import {
@@ -1399,10 +1403,12 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *   next sign-in uses the same registration.
    * - `invalid_client` or `unauthorized_client`: the client is not accepted. The tokens and the
    *   registration go. A sign-in app stays, because the administrator typed it.
-   * - Any other failure (no network, a server error, a timeout) keeps the record as it is.
+   * - A failure that can pass later (no network, a timeout, `server_error`, `temporarily_unavailable`,
+   *   `too_many_requests`) keeps the record as it is.
    * - `unusable`: the record cannot make a refresh at all - no issuer, no client, or an issuer that
-   *   is not the one of the tokens or the client. The record stays; the caller that saw the server
-   *   refuse the token ends the sign-in (#10135).
+   *   is not the one of the tokens or the client - or the server answered another OAuth error, such
+   *   as `unsupported_grant_type`, which comes back on each refresh. The record stays; the caller
+   *   that saw the server refuse the token ends the sign-in (#10135).
    *
    * The first two set `lostAt`, so the row says that the user must sign in again.
    */
@@ -1459,7 +1465,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     }
     const cause = result.failure.cause;
     const clientRefused = cause instanceof InvalidClientError || cause instanceof UnauthorizedClientError;
-    if (!clientRefused && !(cause instanceof InvalidGrantError)) return "kept";
+    if (!clientRefused && !(cause instanceof InvalidGrantError)) return refreshCanPass(cause) ? "kept" : "unusable";
     const current = this.#record();
     // A sign-in that ended during the refresh stored a new grant: the refusal is about the old one.
     if (current.tokens?.refresh_token !== refreshToken) return "kept";
@@ -1759,6 +1765,19 @@ function hasUnboundCredentials(record: McpOAuthRecord | null): boolean {
 
 function credentialIssuer(credential: Pick<OAuthTokens, "issuer">, record: McpOAuthRecord): string | undefined {
   return typeof credential.issuer === "string" ? credential.issuer : legacyIssuer(record);
+}
+
+/**
+ * Whether a refresh that failed with `cause` can pass on a later try. The SDK reads an unknown error
+ * code, and a body that is not an OAuth error, as `ServerError`.
+ */
+function refreshCanPass(cause: unknown): boolean {
+  return (
+    !(cause instanceof OAuthError) ||
+    cause instanceof ServerError ||
+    cause instanceof TemporarilyUnavailableError ||
+    cause instanceof TooManyRequestsError
+  );
 }
 
 function issuersMatch(left: string, right: string): boolean {

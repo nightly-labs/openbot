@@ -48,7 +48,7 @@ const OUT = resolve(import.meta.dirname, "../.openbot-build/mcp-oauth-e2e");
 const REDIRECT_URL = "http://127.0.0.1:28417/mcp-auth";
 const DEADLINE_MS = 10_000;
 
-type TokenMode = "rotate" | "invalid_grant" | "invalid_client" | "drop";
+type TokenMode = "rotate" | "invalid_grant" | "invalid_client" | "unsupported_grant_type" | "server_error" | "drop";
 
 interface Hit {
   method: string;
@@ -107,6 +107,8 @@ async function startAuthorizationServer() {
       if (tokenMode === "drop") return request.socket.destroy();
       if (tokenMode === "invalid_grant") return json(response, 400, { error: "invalid_grant" });
       if (tokenMode === "invalid_client") return json(response, 401, { error: "invalid_client" });
+      if (tokenMode === "unsupported_grant_type") return json(response, 400, { error: "unsupported_grant_type" });
+      if (tokenMode === "server_error") return json(response, 503, { error: "temporarily_unavailable" });
       return json(response, 200, {
         access_token: "access-rotated",
         token_type: "Bearer",
@@ -342,6 +344,34 @@ async function main() {
     return { token: "access-on-file", tokensKept: true, needsSignIn: false };
   });
 
+  // An OAuth error that comes back on each refresh, such as `unsupported_grant_type`, cannot pass
+  // later: the server's refusal of the token ends the sign-in (#10135). A thread start alone does not.
+  auth.setTokenMode("unsupported_grant_type");
+  const refusedForGood = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
+    assert.equal(await runCauseEffect(oauth.accessToken(mcpUrl)), "access-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), true);
+    const token = await runCauseEffect(oauth.refreshAccessToken(mcpUrl, "access-on-file"));
+    const stored = records.get(mcpUrl);
+    assert.equal(token, null);
+    assert.equal(stored?.tokens, undefined);
+    assert.equal(stored?.client?.client_id, "client-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), false);
+    assert.equal(oauth.needsSignIn(mcpUrl), true);
+    return { token, signedIn: false, needsSignIn: true };
+  });
+
+  // `temporarily_unavailable` can pass later: the refused token keeps its sign-in.
+  auth.setTokenMode("server_error");
+  const unavailable = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
+    const token = await runCauseEffect(oauth.refreshAccessToken(mcpUrl, "access-on-file"));
+    assert.equal(token, null);
+    assert.equal(records.get(mcpUrl)?.tokens?.refresh_token, "refresh-on-file");
+    assert.equal(oauth.signedIn(mcpUrl), true);
+    assert.equal(oauth.needsSignIn(mcpUrl), false);
+    assert.ok(auth.hits.some((hit) => hit.path === "/token"));
+    return { token, tokensKept: true, needsSignIn: false };
+  });
+
   // Sign-out deletes the tokens first, then revokes the refresh token and the access token.
   auth.setRevokeStatus(200);
   const signOut = await withOAuth(expiredRecord(auth.base), async (oauth, records) => {
@@ -385,6 +415,8 @@ async function main() {
     signInDuringRefresh,
     invalidClient,
     networkError,
+    refusedForGood,
+    unavailable,
     signOut,
     revokeRefused,
     ...proxy,
