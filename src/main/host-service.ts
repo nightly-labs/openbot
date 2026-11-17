@@ -33,6 +33,7 @@ import type {
   RemoteDesktopIceServer,
   RemoteDesktopSetupAction,
   SendDirectMessageInput,
+  ServerNotificationLevel,
   SetTeamTypingInput,
   TeamMemberSummary,
   TeamPresenceSnapshot,
@@ -442,6 +443,7 @@ export class HostService extends EventEmitter<HostEvents> {
           },
           sideThreadOfTurn: (agentId, turnId) =>
             options.agentTasks?.listTasks(agentId).tasks.find((task) => task.activeTurnId === turnId)?.threadId ?? null,
+          memberLevels: (memberId) => this.#memberLevels(memberId),
           logger,
         })
       : undefined;
@@ -477,13 +479,7 @@ export class HostService extends EventEmitter<HostEvents> {
             // The desktop app of this computer runs as the owner.
             atHostComputer: (memberId, event) =>
               memberId === options.store.getOwnerMemberId() && (options.hostComputerInUse?.(event) ?? false),
-            memberLevels: (memberId) => {
-              const key = this.#notificationKey(memberId);
-              return {
-                server: options.agentNotificationLevels?.serverLevel(key) ?? null,
-                agents: options.agentNotificationLevels?.levels(key) ?? new Map(),
-              };
-            },
+            memberLevels: (memberId) => this.#memberLevels(memberId),
             liveActivityShows: (sessionId, subject, alert, startedAt) =>
               this.#liveActivityPush?.showsEvent(sessionId, subject, alert, startedAt) ?? false,
             channelForThread: (threadId) => this.channelForThread(threadId),
@@ -1762,6 +1758,18 @@ export class HostService extends EventEmitter<HostEvents> {
   /** The key of a member's agent notification levels. The owner shares them with the desktop app of this computer. */
   #notificationKey(memberId: string): string {
     return memberId === this.#options.store.getOwnerMemberId() ? OWNER_NOTIFICATION_KEY : memberId;
+  }
+
+  /** The levels that a member chose on this server for all of their devices. */
+  #memberLevels(memberId: string): {
+    server: ServerNotificationLevel | null;
+    agents: ReadonlyMap<string, ServerNotificationLevel>;
+  } {
+    const key = this.#notificationKey(memberId);
+    return {
+      server: this.#options.agentNotificationLevels?.serverLevel(key) ?? null,
+      agents: this.#options.agentNotificationLevels?.levels(key) ?? new Map(),
+    };
   }
 
   #agentNotificationLevels(store: AgentNotificationLevelStore): TeamApiAgentNotificationLevels {
