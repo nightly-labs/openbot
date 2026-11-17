@@ -140,16 +140,20 @@ export async function routeChannels(
         channel: peerChannel(newest.channel),
         messages: messages.filter((item) => !hiddenAuthor(item, hiddenAgentIds)),
       };
+      // The count only adds bytes, so it is read only for a page that fits without it, and once per page.
+      let extent: { olderCount: number; oldestAt?: string } | undefined;
+      const sized = <Page extends typeof base>(value: Page) => {
+        if (olderCursor !== null) extent ??= channels.store.olderExtent(input.channelId, olderCursor);
+        const page = extent ? { ...value, ...extent } : value;
+        return { body: page, bytes: Buffer.byteLength(JSON.stringify(page)) };
+      };
       let body = withWaits(base);
       let bytes = Buffer.byteLength(JSON.stringify(body));
+      if (bytes <= WEBRTC_FRAME_BODY_BUDGET) ({ body, bytes } = sized(body));
       if (bytes > WEBRTC_FRAME_BODY_BUDGET) {
         body = withWaits({ ...base, tasks: pageTasks(base.tasks, base.messages) });
         bytes = Buffer.byteLength(JSON.stringify(body));
-      }
-      if (bytes > WEBRTC_FRAME_BODY_BUDGET && limit > 1) continue;
-      if (olderCursor !== null) {
-        body = { ...body, ...channels.store.olderExtent(input.channelId, olderCursor) };
-        bytes = Buffer.byteLength(JSON.stringify(body));
+        if (bytes <= WEBRTC_FRAME_BODY_BUDGET || limit === 1) ({ body, bytes } = sized(body));
       }
       if (bytes <= WEBRTC_FRAME_BODY_BUDGET) return json(200, body);
       if (limit === 1) {
