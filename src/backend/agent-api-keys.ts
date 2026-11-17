@@ -114,15 +114,9 @@ export class AgentApiKeys {
       return { name, path } satisfies SavedApiKey;
     }
     yield* vault.saveApiKey({ name, key: value }, agent, true).pipe(Effect.mapError(failed));
-    // A plain file of this name from before would win over the new key. The link to the Vault copy, or
-    // the copy where the system refused the link, stays: `list` writes the new key there.
-    yield* this.#files.withPermit(
-      readWrittenKeys(folder).pipe(
-        Effect.flatMap((copies) =>
-          copies.has(name) ? Effect.void : removeOldKey(path, ownKeyLinkTarget(agent.id, name)),
-        ),
-      ),
-    );
+    // A plain file of this name from before would win over the new key. `list` writes the new key to the
+    // copy where the system refused the link.
+    yield* this.#files.withPermit(this.#removeOldKey(agent.id, name));
     const keys = yield* this.list(agent.id);
     const saved = keys.find((key) => key.name === name && key.source === undefined);
     return saved ?? (yield* failed());
@@ -182,11 +176,11 @@ export class AgentApiKeys {
 
   /** False when the agent has no key with that name for it only. */
   readonly remove = Effect.fn("AgentApiKeys.remove")(function* (this: AgentApiKeys, agentId: string, name: string) {
-    const path = yield* this.#keyPath(agentId, name);
+    yield* this.#keyPath(agentId, name);
     const folder = yield* this.#agentFolder(agentId);
     return yield* this.#files.withPermit(
       Effect.gen({ self: this }, function* () {
-        const plain = yield* removeOldKey(path, ownKeyLinkTarget(agentId, name));
+        const plain = yield* this.#removeOldKey(agentId, name);
         const vault = this.#readyVault();
         const own = vault ? yield* vault.removeAgentApiKey(agentId, name).pipe(Effect.mapError(failed)) : false;
         if (vault) yield* this.#writeAgent(folder, agentId);
@@ -372,6 +366,20 @@ export class AgentApiKeys {
       for (const [name, value] of own)
         if (kept.has(name)) yield* writeIfChanged(join(folder, name), value).pipe(Effect.ignore);
     }).pipe(Effect.ignore);
+  }
+
+  /**
+   * Removes the key file of 0.69 and earlier, but not the link to the agent's Vault copy and not a copy
+   * where the system refused the link: `#linkOwnKeys` keeps or removes those after the Vault changes.
+   * False when nothing was removed.
+   */
+  #removeOldKey(agentId: string, name: string): Effect.Effect<boolean, AgentApiKeyFailed> {
+    const folder = join(this.#root, agentId);
+    return readWrittenKeys(folder).pipe(
+      Effect.flatMap((copies) =>
+        copies.has(name) ? Effect.succeed(false) : removeOldKey(join(folder, name), ownKeyLinkTarget(agentId, name)),
+      ),
+    );
   }
 
   /**
