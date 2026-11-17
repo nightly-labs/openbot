@@ -208,6 +208,8 @@ export const messages = {
     'OpenCode에 모델 제공자 "{provider}"의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode에 이 모델 제공자의 로그인 정보가 없어요. 무료 라벨이 있는 모델을 선택하거나 제공자를 연결하세요. OpenCode 설정에 OpenCode Go 키를 붙여넣거나 터미널에서 `opencode auth login`을 실행하면 돼요. 그런 다음 다시 시도해 주세요.",
+  "error.provider.opencodeProviderRefused":
+    '모델 제공자 "{provider}"이(가) 요청을 거부했어요. OpenCode에 이 제공자의 키가 있으므로 네트워크가 원인일 수 있어요. 일부 제공자는 VPN, 프록시 또는 일부 국가를 차단해요. VPN을 끄거나 다른 네트워크를 사용한 다음 다시 시도해 주세요. 오류가 계속되면 키가 올바르지 않을 수 있어요. 터미널에서 `opencode auth login`을 실행하고 키를 다시 입력하세요.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode가 이 무료 모델을 거부했어요. 일부 무료 모델은 국가에 따라 사용할 수 없어요. 무료 라벨이 있는 다른 모델을 선택하거나, OpenCode 설정에 OpenCode Go 키를 붙여넣고 OpenCode Go 모델을 선택하세요.",
   "error.provider.customEndpointKeyRefused":

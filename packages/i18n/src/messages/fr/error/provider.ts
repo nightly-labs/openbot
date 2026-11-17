@@ -225,6 +225,8 @@ export const messages = {
     "OpenCode n’a pas de connexion pour le fournisseur de modèle « {provider} ». Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode n’a pas de connexion pour le fournisseur de ce modèle. Choisissez un modèle avec l’étiquette Gratuit, ou connectez le fournisseur : collez une clé OpenCode Go dans les réglages d’OpenCode, ou exécutez `opencode auth login` dans un terminal. Réessayez ensuite.",
+  "error.provider.opencodeProviderRefused":
+    "Le fournisseur du modèle « {provider} » a refusé la requête. OpenCode a une clé pour ce fournisseur, la cause peut donc être votre réseau : certains fournisseurs bloquent les VPN, les proxys ou certains pays. Désactivez le VPN ou utilisez un autre réseau, puis réessayez. Si l’erreur continue, la clé est peut-être incorrecte : exécutez `opencode auth login` dans un terminal et saisissez à nouveau la clé.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode a refusé ce modèle gratuit. Certains modèles gratuits ne sont pas disponibles dans tous les pays. Choisissez un autre modèle avec l’étiquette Gratuit, ou collez une clé OpenCode Go dans les réglages d’OpenCode et choisissez un modèle OpenCode Go.",
   "error.provider.customEndpointKeyRefused":

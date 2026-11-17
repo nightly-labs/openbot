@@ -217,6 +217,8 @@ export const messages = {
     "OpenCode no tiene una sesión para el proveedor del modelo «{provider}». Elige un modelo con la etiqueta Gratis o conecta el proveedor: pega una clave de OpenCode Go en los ajustes de OpenCode o ejecuta `opencode auth login` en un terminal. Luego inténtalo de nuevo.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode no tiene una sesión para el proveedor de este modelo. Elige un modelo con la etiqueta Gratis o conecta el proveedor: pega una clave de OpenCode Go en los ajustes de OpenCode o ejecuta `opencode auth login` en un terminal. Luego inténtalo de nuevo.",
+  "error.provider.opencodeProviderRefused":
+    'El proveedor del modelo "{provider}" rechazó la solicitud. OpenCode tiene una clave para este proveedor, así que la causa puede ser tu red: algunos proveedores bloquean VPN, proxies o algunos países. Desactiva la VPN o usa otra red y vuelve a intentarlo. Si el error continúa, la clave puede ser incorrecta: ejecuta `opencode auth login` en un terminal e introduce la clave de nuevo.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode rechazó este modelo gratuito. Algunos modelos gratuitos no están disponibles en todos los países. Elige otro modelo con la etiqueta Gratis o pega una clave de OpenCode Go en los ajustes de OpenCode y elige un modelo de OpenCode Go.",
   "error.provider.customEndpointKeyRefused":

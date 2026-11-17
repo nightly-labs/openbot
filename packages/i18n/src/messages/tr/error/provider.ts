@@ -212,6 +212,8 @@ export const messages = {
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.opencodeProviderRefused":
+    "\"{provider}\" model sağlayıcısı isteği reddetti. OpenCode'un bu sağlayıcı için bir anahtarı var, bu yüzden neden ağınız olabilir: bazı sağlayıcılar VPN'leri, proxy'leri veya bazı ülkeleri engeller. VPN'i kapatın veya farklı bir ağ kullanın, ardından tekrar deneyin. Hata devam ederse anahtar yanlış olabilir: bir terminalde `opencode auth login` komutunu çalıştırın ve anahtarı yeniden girin.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode bu ücretsiz modeli reddetti. Bazı ücretsiz modeller her ülkede kullanılamaz. Ücretsiz etiketli başka bir model seçin veya OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırıp bir OpenCode Go modeli seçin.",
   "error.provider.customEndpointKeyRefused":

@@ -202,6 +202,8 @@ export const messages = defineMessages("error.provider", {
     'OpenCode has no sign-in for the model provider "{provider}". Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode has no sign-in for the provider of this model. Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.",
+  "error.provider.opencodeProviderRefused":
+    'The model provider "{provider}" refused the request. OpenCode has a key for this provider, so the cause can be your network: some providers block VPNs, proxies or some countries. Turn off the VPN or use a different network, then try again. If the error continues, the key can be incorrect: run `opencode auth login` in a terminal and enter the key again.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode refused this free model. Some free models are not available in every country. Choose a different model with the Free label, or paste an OpenCode Go key in the OpenCode settings and choose an OpenCode Go model.",
   "error.provider.customEndpointKeyRefused":

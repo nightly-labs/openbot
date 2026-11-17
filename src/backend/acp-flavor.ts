@@ -91,7 +91,8 @@ export interface AcpFlavor {
    * The message of a failed turn, from the redacted failure text. `redact` masks more text, `log`
    * writes a diagnostic that it redacts first, and `model` is the session's model. `endpoint` is the
    * custom endpoint that serves that model, or null. `savedKey` tells whether OpenBot sent a saved
-   * API key for the provider of that model.
+   * API key for the provider of that model. `providerKeyStored` reads, at each call, whether the
+   * agent's own store has a key for a provider.
    */
   turnFailure?(
     error: unknown,
@@ -101,6 +102,7 @@ export interface AcpFlavor {
     model: string | null,
     endpoint: AcpCustomEndpoint | null,
     savedKey: boolean,
+    providerKeyStored: (provider: string) => boolean,
   ): string;
   /**
    * The cause of a turn's failure that the agent names in a structured field, such as an error name

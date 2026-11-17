@@ -210,6 +210,8 @@ export const messages = {
     "OpenCode heeft geen inlog voor de modelaanbieder “{provider}”. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode heeft geen inlog voor de aanbieder van dit model. Kies een model met het label Gratis, of verbind de aanbieder: plak een OpenCode Go-sleutel in de OpenCode-instellingen, of voer `opencode auth login` uit in een terminal. Probeer het daarna opnieuw.",
+  "error.provider.opencodeProviderRefused":
+    "De modelaanbieder \"{provider}\" heeft het verzoek geweigerd. OpenCode heeft een sleutel voor deze aanbieder, dus je netwerk kan de oorzaak zijn: sommige aanbieders blokkeren VPN's, proxy's of bepaalde landen. Zet de VPN uit of gebruik een ander netwerk en probeer het opnieuw. Als de fout blijft, is de sleutel mogelijk onjuist: voer `opencode auth login` uit in een terminal en voer de sleutel opnieuw in.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode heeft dit gratis model geweigerd. Sommige gratis modellen zijn niet in elk land beschikbaar. Kies een ander model met het label Gratis, of plak een OpenCode Go-sleutel in de OpenCode-instellingen en kies een OpenCode Go-model.",
   "error.provider.customEndpointKeyRefused":

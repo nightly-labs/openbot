@@ -182,6 +182,8 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.opencodeProviderRefused":
+    "模型服务商“{provider}”拒绝了请求。OpenCode 已有该服务商的密钥，因此原因可能是你的网络：部分服务商会屏蔽 VPN、代理或部分国家和地区。请关闭 VPN 或换用其他网络，然后重试。如果错误仍然出现，密钥可能不正确：在终端中运行 `opencode auth login` 并重新输入密钥。",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":

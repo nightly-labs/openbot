@@ -760,6 +760,15 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
 
+OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
+when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
+OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
+of OpenCode 2, an `auth.json` entry, or `OPENCODE_AUTH_CONTENT`. With a key for the provider, the
+flavor shows `error.provider.opencodeProviderRefused`: the provider refused the request, and a VPN,
+a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
+not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
+that text too, because it names the fix in OpenBot's settings for an expired Go key.
+
 #### Turns of a background subagent or shell command
 
 OpenCode 2.2.0 sends session updates only for the execution that a `session/prompt` starts. When a

@@ -192,6 +192,8 @@ export const messages = {
     "ל-OpenCode אין התחברות לספק המודלים ״{provider}״. יש לבחור מודל עם התווית Free, או לחבר את הספק: להדביק מפתח OpenCode Go בהגדרות OpenCode, או להריץ `opencode auth login` בטרמינל. לאחר מכן יש לנסות שוב.",
   "error.provider.opencodeAuthRequiredUnknown":
     "ל-OpenCode אין התחברות לספק של המודל הזה. יש לבחור מודל עם התווית Free, או לחבר את הספק: להדביק מפתח OpenCode Go בהגדרות OpenCode, או להריץ `opencode auth login` בטרמינל. לאחר מכן יש לנסות שוב.",
+  "error.provider.opencodeProviderRefused":
+    'ספק המודל "{provider}" דחה את הבקשה. ל-OpenCode יש מפתח לספק הזה, ולכן ייתכן שהרשת היא הסיבה: חלק מהספקים חוסמים VPN, שרתי proxy או מדינות מסוימות. יש לכבות את ה-VPN או להשתמש ברשת אחרת, ואז לנסות שוב. אם השגיאה נמשכת, ייתכן שהמפתח שגוי: יש להריץ `opencode auth login` בטרמינל ולהזין את המפתח שוב.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode דחה את המודל החינמי הזה. חלק מהמודלים החינמיים אינם זמינים בכל מדינה. יש לבחור מודל אחר עם התווית Free, או להדביק מפתח OpenCode Go בהגדרות OpenCode ולבחור מודל של OpenCode Go.",
   "error.provider.customEndpointKeyRefused":

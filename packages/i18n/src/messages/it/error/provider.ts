@@ -212,6 +212,8 @@ export const messages = {
     'OpenCode non ha un accesso per il provider del modello "{provider}". Scegli un modello con l\'etichetta Gratuito, oppure collega il provider: incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure esegui `opencode auth login` in un terminale. Poi riprova.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode non ha un accesso per il provider di questo modello. Scegli un modello con l'etichetta Gratuito, oppure collega il provider: incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure esegui `opencode auth login` in un terminale. Poi riprova.",
+  "error.provider.opencodeProviderRefused":
+    "Il provider del modello \"{provider}\" ha rifiutato la richiesta. OpenCode ha una chiave per questo provider, quindi la causa può essere la tua rete: alcuni provider bloccano VPN, proxy o alcuni paesi. Disattiva la VPN o usa un'altra rete, poi riprova. Se l'errore continua, la chiave potrebbe essere errata: esegui `opencode auth login` in un terminale e inserisci di nuovo la chiave.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode ha rifiutato questo modello gratuito. Alcuni modelli gratuiti non sono disponibili in tutti i paesi. Scegli un altro modello con l'etichetta Gratuito, oppure incolla una chiave OpenCode Go nelle impostazioni di OpenCode e scegli un modello OpenCode Go.",
   "error.provider.customEndpointKeyRefused":
