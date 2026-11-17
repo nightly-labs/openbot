@@ -16,7 +16,7 @@ const key = "openbot.mobile.quickActions.v1";
 export const useQuickActionChoice = create<{ kinds: readonly QuickActionKind[] | null }>(() => ({ kinds: null }));
 
 /** Reads the stored value. A missing or damaged value gives the default items. */
-export function decodeQuickActionKinds(stored: string | null): QuickActionKind[] {
+function decodeQuickActionKinds(stored: string | null): QuickActionKind[] {
   if (stored === null) return [...DEFAULT_KINDS];
   try {
     const value = JSON.parse(stored);
