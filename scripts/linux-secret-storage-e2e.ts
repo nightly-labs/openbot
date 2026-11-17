@@ -11,6 +11,7 @@
 //    the keyring still opens, and new secrets use the key file.
 // 5. The macOS rules (#10281), on this Linux `safeStorage`: a Keychain that cannot encrypt gives the
 //    key file, as in case 1. A secret that does not open (here: a new keyring) makes no key file.
+//    A Keychain that works again keeps the new secrets, also when the key file exists.
 // No start makes the key file before `ready`, when `safeStorage` has no key yet.
 // Cases 2, 3 and 4 need `dbus-run-session` and `gnome-keyring-daemon`; without them the report marks
 // them as skipped.
@@ -202,6 +203,22 @@ try {
     assert.ok(macRead?.error, "macOS: the secret with another key does not open");
     assert.equal(macRead?.madeKeyFile, false, "macOS: a failed read makes no key file");
     assert.equal(macRead?.keyFileMode, null, "macOS: still no key file");
+
+    const macBack = await runCase("macOS rules: the Keychain works again", [
+      { name: "a start with no Keychain writes", step: "write", value: "secret-in-file", platform: "darwin" },
+      {
+        name: "the next start writes",
+        step: "write",
+        value: "secret-in-keychain",
+        keyring: "mac-3",
+        platform: "darwin",
+      },
+      { name: "restart reads", step: "read", keyring: "mac-3", platform: "darwin" },
+    ]);
+    const [refused, worksAgain, readAgain] = macBack;
+    assert.equal(refused?.format, "obk1", "macOS, no Keychain: the key file encrypts");
+    assert.equal(worksAgain?.format, "v11", "macOS: a Keychain that works again encrypts new secrets");
+    assert.equal(readAgain?.readValue, "secret-in-keychain", "macOS: the Keychain secret opens after a restart");
   } else {
     skipped.push("keyring cases: dbus-run-session or gnome-keyring-daemon is missing");
   }

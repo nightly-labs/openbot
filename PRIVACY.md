@@ -468,8 +468,9 @@ then sign in again and save the secrets again.
 On macOS, that protection is the Keychain. When the Keychain refuses OpenBot (for example after
 "Deny" at its prompt, or with no usable login keychain), OpenBot makes the same random key in
 `~/Library/Application Support/OpenBot/secret-storage.key` (mode `0600`) and encrypts new secrets
-with it. Secrets that the Keychain already keeps stay there. Delete the file to go back to the
-Keychain; then sign in again and save the secrets again.
+with it while the Keychain cannot encrypt. Secrets that the Keychain keeps stay there, and when the
+Keychain works again, it keeps the new secrets. Delete the file only when no secret uses it; a
+secret that it encrypted then cannot be read, and you must sign in again or save it again.
 
 The desktop app also keeps, for each joined server, the ID of its logical remote session and the
 Signal address, so that the next start asks only for a new ticket. The file

@@ -6,7 +6,7 @@
 // that works keeps the secrets.
 // macOS: a Keychain that refuses OpenBot (a "Deny" at its prompt, or no usable login keychain) gives
 // `safeStorage` no key, so no secret could be saved (#10281). OpenBot then makes the same key file.
-// A Keychain that works keeps the secrets. A value that does not decrypt does not make the key file
+// A Keychain that works keeps the new secrets, also after a refusal made the key file. A value that does not decrypt does not make the key file
 // on macOS: there, that is not a keyring that changed its key. Windows always uses `safeStorage`.
 import { createCipheriv, createDecipheriv, randomBytes, randomUUID } from "node:crypto";
 import {
@@ -125,6 +125,8 @@ export function createSecretStorage(options: { keyPath: string; platform?: NodeJ
   /** The key file when the keyring cannot encrypt. Null when the keyring keeps the secrets. */
   function keyForWrite(): Buffer | null {
     if (!keyFileFallback) return null;
+    // macOS: a Keychain that refused once (still locked, a prompt) keeps the secrets when it works again.
+    if (!linux && safeStorage.isEncryptionAvailable()) return null;
     const existing = readKey();
     if (existing) return existing;
     // Before `ready`, `safeStorage` has no key on Linux even when the keyring works.
