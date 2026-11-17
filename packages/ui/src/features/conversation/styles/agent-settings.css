@@ -322,12 +322,14 @@
   margin-bottom: 0;
 }
 
+/* A narrow panel or longer labels move the buttons under the switch, so no button goes past the panel edge. */
 .agent-routine-editor-actions {
   display: flex;
   min-height: 34px;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px 12px;
   margin: 0;
   border: 0;
   padding: 0;
@@ -356,9 +358,10 @@
 
 .agent-routine-action-buttons {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 7px;
+  margin-inline-start: auto;
 }
 
 .agent-routine-action-buttons button {
