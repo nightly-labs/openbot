@@ -15,6 +15,8 @@ export const messages = {
     "{provider} no puede conectarse al proveedor del modelo. Lo intenta de nuevo: intento {attempt}.",
   "status.provider.modelRetryServerError":
     "El proveedor del modelo está ocupado o tiene un error. {provider} lo intenta de nuevo: intento {attempt}.",
+  "status.provider.modelRetryOutOfMemory":
+    "El servidor del modelo se quedó sin memoria para este chat. {provider} lo intenta de nuevo: intento {attempt}. Un chat nuevo necesita menos memoria.",
   "status.provider.modelRetryRecovered": "El proveedor del modelo vuelve a responder.",
   "status.provider.retryRecovered": "{provider} vuelve a recibir respuestas de su servidor.",
   "status.provider.claudeFastModeNeedsUsageCredits":

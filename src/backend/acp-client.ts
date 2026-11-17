@@ -27,7 +27,7 @@ import { agentProviderName } from "@openbot/contracts/agent-providers";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
 import type { AgentSessionSettingsSnapshot, AgentSessionSettingValue } from "@openbot/contracts/ipc";
 import { type DynamicRecord, isBoolean, isString } from "@openbot/contracts/runtime-values";
-import { sourceText } from "@openbot/i18n/source";
+import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger, redactText } from "@openbot/logging";
 import { type CauseCode, classifyFailure, httpStatusCause, structuredCause } from "@openbot/telemetry";
 import { classifyUserError } from "@openbot/user-errors";
@@ -39,7 +39,7 @@ import {
   sessionSettingsSnapshot,
 } from "./acp-configuration";
 import { AcpConnection, type AcpConnectionOptions } from "./acp-connection";
-import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure } from "./acp-flavor";
+import type { AcpCustomEndpoint, AcpFlavor, AcpMcpServerFailure, AcpRetryCause } from "./acp-flavor";
 import {
   foldAcpSubagentTool,
   foldOpenCodeChildUpdate,
@@ -192,6 +192,13 @@ const SESSION_STATE_UPDATES: ReadonlySet<SessionUpdate["sessionUpdate"]> = new S
   "session_info_update",
   "user_message_chunk",
 ]);
+
+/** The chat's text for a retry of a failed model request, by why it failed (`AcpFlavor.retryUpdate`). */
+const MODEL_RETRY_STATUS = {
+  unreachable: "status.provider.modelRetryUnreachable",
+  outOfMemory: "status.provider.modelRetryOutOfMemory",
+  serverError: "status.provider.modelRetryServerError",
+} as const satisfies Record<AcpRetryCause, keyof SourceMessages>;
 
 /** How long a stopped turn may take to end before OpenBot ends it itself. */
 const ACP_STOP_GRACE_MS = 10_000;
@@ -3555,10 +3562,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       this.#emitTurnProgress(
         thread,
         turn,
-        sourceText(
-          retry.unreachable ? "status.provider.modelRetryUnreachable" : "status.provider.modelRetryServerError",
-          { provider: this.#label, attempt: retry.attempt },
-        ),
+        sourceText(MODEL_RETRY_STATUS[retry.cause], { provider: this.#label, attempt: retry.attempt }),
       );
     }
     // The first output after a retry replaces the retry in the chat.

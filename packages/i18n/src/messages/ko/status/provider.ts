@@ -13,6 +13,8 @@ export const messages = {
     "{provider}이(가) 모델 제공자에 연결할 수 없습니다. 다시 시도하는 중: {attempt}번째.",
   "status.provider.modelRetryServerError":
     "모델 제공자가 혼잡하거나 오류가 있습니다. {provider}이(가) 다시 시도하는 중: {attempt}번째.",
+  "status.provider.modelRetryOutOfMemory":
+    "모델 서버의 메모리가 이 채팅에 부족합니다. {provider}이(가) 다시 시도하는 중: {attempt}번째. 새 채팅은 메모리가 덜 필요합니다.",
   "status.provider.modelRetryRecovered": "모델 제공자가 다시 응답합니다.",
   "status.provider.retryRecovered": "{provider}이(가) 서버에서 다시 응답을 받고 있습니다.",
   "status.provider.claudeFastModeNeedsUsageCredits":
