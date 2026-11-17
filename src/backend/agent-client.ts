@@ -72,6 +72,11 @@ export interface AgentClient {
   readonly catalogAsMcpTools?: (model: string) => boolean;
   /** False when stopping this client would lose a live provider session with no recovery path. */
   readonly canReleaseProcess?: () => boolean;
+  /**
+   * True when the process must be replaced before the next turn, and nothing that uses it is lost:
+   * it still runs a stopped turn that OpenBot ended. `threadIds` are the threads loaded on it.
+   */
+  readonly replaceForNextTurn?: (threadIds: readonly string[]) => Effect.Effect<boolean>;
   start(): void;
   stop(): Effect.Effect<void, ProviderClientOperationError>;
   /**

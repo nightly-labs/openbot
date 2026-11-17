@@ -2955,6 +2955,16 @@ export class ProviderRuntime implements ProviderPort {
     agent: AgentSummary,
   ) {
     const provider = providerForAgent(agent);
+    const shared = this.#clients.get(provider);
+    if (
+      shared &&
+      !this.#providerConnectionCommands.has(provider) &&
+      (yield* this.#mustReplace(shared)) &&
+      this.#clients.get(provider) === shared
+    ) {
+      logger.info("Replaced a provider CLI that still runs a stopped turn.", { provider });
+      yield* this.#releaseClient(provider, shared);
+    }
     yield* this.ensureProvider(provider);
     yield* this.#awaitConfinedStart(agent.id);
     if (provider === "acp" && this.#removingCustomRuntime)
@@ -2963,7 +2973,7 @@ export class ProviderRuntime implements ProviderPort {
     const own = this.#ownProcessFor(agent);
     const current = this.#confined.get(agent.id);
     const key = own ? this.#confinedKey(provider, own) : null;
-    if (current && current.key === key) {
+    if (current && current.key === key && !(yield* this.#mustReplace(current.client))) {
       current.lastUsed = Date.now();
       return current.client;
     }
@@ -2976,6 +2986,15 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#confinedStarts.get(agent.id) === completion) this.#confinedStarts.delete(agent.id);
     return yield* exit;
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Codex adds a new turn of a thread to the turn that runs there. A process that still runs a stopped
+   * turn, as when a command hangs (#11100), would hold each next turn of that thread too. It is
+   * replaced as an idle one is, so the next turn resumes the thread on a new process.
+   */
+  #mustReplace(client: AgentClient): Effect.Effect<boolean> {
+    return client.replaceForNextTurn?.(this.#conversation.clientThreads(client)) ?? Effect.succeed(false);
+  }
 
   #countActivation(provider: AgentProvider): void {
     this.#activations.set(provider, (this.#activations.get(provider) ?? 0) + 1);
