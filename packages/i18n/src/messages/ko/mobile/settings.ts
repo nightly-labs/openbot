@@ -251,8 +251,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "에이전트 채팅에서 오른쪽으로 스와이프",
   "mobile.settings.conversations.swipeThreads": "스레드",
   "mobile.settings.conversations.swipeBrowser": "브라우저",
+  "mobile.settings.conversations.swipeOff": "끔",
   "mobile.settings.conversations.swipeFooter":
-    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지 위에서 스와이프하면 계속 답장합니다.",
+    "에이전트 채팅에서 뒤로와 반대 방향으로 스와이프하면 이 항목이 열립니다. 메시지에서 같은 방향으로 스와이프하면 메시지 시간이 표시됩니다.",
   "mobile.settings.conversations.pullInfo": "위로 당겨 정보 보기",
   "mobile.settings.conversations.pullInfoFooter":
     "채팅, 채널 또는 스레드에서 최신 메시지 너머로 위로 당긴 뒤 놓으면 정보가 열립니다.",

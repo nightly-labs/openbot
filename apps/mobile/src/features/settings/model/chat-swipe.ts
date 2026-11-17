@@ -4,10 +4,11 @@ import { create } from "zustand";
 const key = "openbot.mobile.chatSwipe.v1";
 
 /**
- * What a swipe away from Back opens in an agent's chat: its threads or its browser. The pull past the
- * latest message opens the agent's info. A stored choice that is not here gets the default.
+ * What a swipe away from Back opens in an agent's chat: its threads, its browser, or nothing ("off").
+ * The pull past the latest message opens the agent's info. A stored choice that is not here gets the
+ * default.
  */
-const CHAT_SWIPE_ACTIONS = ["threads", "browser"] as const;
+const CHAT_SWIPE_ACTIONS = ["threads", "browser", "off"] as const;
 export type ChatSwipeAction = (typeof CHAT_SWIPE_ACTIONS)[number];
 
 /**

@@ -247,8 +247,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
   "mobile.settings.conversations.swipeThreads": "שרשורים",
   "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeOff": "כבוי",
   "mobile.settings.conversations.swipeFooter":
-    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. החלקה על הודעה עדיין עונה לה.",
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. אותה החלקה על הודעה מציגה את שעות ההודעות.",
   "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
   "mobile.settings.conversations.pullInfoFooter":
     "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
