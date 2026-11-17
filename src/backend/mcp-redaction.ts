@@ -57,9 +57,10 @@ export function redactMcpRecord(record: unknown, values: Iterable<string>): LogV
 /**
  * Setting words that are never a credential. A provider gets them as values, such as the GitHub
  * connection's `useHttpPath=true`, and masking them changed `QA_READY=true` in an agent's answer to
- * `QA_READY=•••`, so a workflow condition took the wrong branch (#10680).
+ * `QA_READY=•••`, so a workflow condition took the wrong branch (#10680). Shorter words, such as
+ * `yes`, `no`, `on` and `off`, are under the length limit already.
  */
-const CONFIG_LITERALS = new Set(["true", "false", "yes", "no", "on", "off", "null", "none"]);
+const CONFIG_LITERALS = new Set(["true", "false", "null", "none"]);
 
 function maskValues(text: string, values: Iterable<string>): string {
   let result = text;
