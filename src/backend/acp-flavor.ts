@@ -170,7 +170,7 @@ export interface AcpFlavor {
    * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
    */
   sessionBusy?(error: unknown): boolean;
-  /** A failed model refresh keeps the last list that the agent gave. */
+  /** A failed, timed-out or empty model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
    * The model belongs to the agent's process, not to one session: a model set moves every session

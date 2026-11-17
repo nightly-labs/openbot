@@ -1378,11 +1378,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         yield* this.#ensureInitializedEffect();
         if (this.#signedIn) {
           try {
-            this.#models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+            const models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+            // For a flavor that keeps its list, an empty refresh is a failed one: its start fails with none.
+            if (models.length === 0 && this.#flavor.keepModelsOnRefreshFailure && !this.options.allowNoModels)
+              throw new Error(sourceText("error.provider.acpNoModels"));
+            this.#models = models;
           } catch (error) {
-            // A flavor can keep the last successful list. Other agents report the failure.
-            if (!this.#flavor.keepModelsOnRefreshFailure || this.#models.length === 0)
+            // A flavor can keep the last successful list. Other agents report the failure, and so does
+            // a refused sign-in: the old list must not hide it.
+            if (!this.#flavor.keepModelsOnRefreshFailure || this.#models.length === 0 || isAuthenticationError(error))
               return yield* providerFailure(error);
+            logger.warn("An ACP agent kept its last model list after a failed refresh.", {
+              provider: this.provider,
+              models: this.#models.length,
+              reason: this.#redact(failureText(error)),
+            });
           }
         }
         return yield* providerSync(() =>
