@@ -4303,6 +4303,7 @@ export async function createApplicationServices({
       const contents = webContents.fromId(owner);
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
+    writeClipboard: (text) => clipboard.writeText(text),
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({

@@ -585,6 +585,15 @@ the item and the last four digits of a card; it never holds a secret value. The 
 Vault card with it and answers through the released prompt route. A client without it gets the form
 as questions. The desktop transports do not copy it yet.
 
+`ui-block-preview-edit-v1` (`team-protocol/ui-block-preview-edit-v1.ts`, protocol 9 only) adds
+nothing to the wire of a block. A host with it reads one more key, `_preview`
+(`UI_CONFIRM_PREVIEW_ANSWER_ID`), beside the answers of a confirm that has a preview: the text that
+the person edited in the card after they pressed the `edit_preview` button. The host gives the text
+to the agent as `preview` and stores it as the block's preview and in its fallback question and text,
+so the closed card shows what the agent got; the stored resolution leaves the key out. A host without it refuses the key, so the desktop, the
+web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
+`edit_preview` button answers as any other button, and the agent asks what to change.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see

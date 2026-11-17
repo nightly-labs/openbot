@@ -798,6 +798,8 @@ export interface MobileWorkspaceContextValue {
   canRelayMcpSignIn: (serverId: string) => boolean;
   /** The host is not a Mac (`mac-apps-limit-v1`), so an app that drives Apple apps does not run there. */
   macAppsUnavailable: (serverId: string) => boolean;
+  /** The host reads an edited confirm preview (`ui-block-preview-edit-v1`), so the card can edit it. */
+  canEditUiBlockPreview: (serverId: string) => boolean;
   /** The relayed browser sign-ins of MCP servers on one host. Refuses a host without `sign-in-relay-v1`. */
   mcpSignInRelay: (serverId: string) => McpSignInRelay;
   /** The http servers that the host holds a sign-in for. Empty for a host without `mcp-sign-in-v1`. */
@@ -1109,6 +1111,8 @@ export interface MobileWorkspaceContextValue {
   searchFiles: (query: string, serverId: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /** True when the host advertises `agent-tasks-v1`. A member who can message an agent can use its tasks. */
   canUseTasks: (serverId: string) => boolean;
+  /** True when the host advertises `agent-queue-task-v1`: a queued message of the agent's chat can run in a new thread. */
+  canRunQueuedMessageAsTask: (serverId: string) => boolean;
   /** True when the host advertises `agent-threads-v1`: a member who can message an agent can rename and delete its threads. */
   canEditThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-reads-v1`: the host keeps the person's read mark of each thread. */
@@ -1169,6 +1173,11 @@ export interface MobileWorkspaceContextValue {
     input: { agentId: string; text: string; attachmentDraftIds?: string[]; clientMessageId: string },
     serverId: string,
   ) => Promise<AgentTask>;
+  /**
+   * Moves a message that waits in the queue of the agent's own chat into a new thread, where it
+   * starts beside the chat. Needs `canRunQueuedMessageAsTask`.
+   */
+  runQueuedMessageAsTask: (input: { agentId: string; deliveryId: string }, serverId: string) => Promise<AgentTask>;
   /** Steers the running turn of the task, or queues the message in the task. */
   sendAgentTaskMessage: (
     input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
@@ -1293,6 +1302,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canInstallAgentTemplate"
   | "canSearchFiles"
   | "canUseTasks"
+  | "canRunQueuedMessageAsTask"
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"
@@ -1346,6 +1356,7 @@ type ServerCheckKey =
   | "canManageMcpServers"
   | "canRelayMcpSignIn"
   | "macAppsUnavailable"
+  | "canEditUiBlockPreview"
   | "canManageMcpAccess"
   | "canAddMarketplaceAgents"
   | "canUpdateMarketplaceAgents"

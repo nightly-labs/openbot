@@ -538,6 +538,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Ferma l’agente e invia ora il prossimo messaggio in coda",
   "mobile.chat.queue.deleteNext": "Elimina il prossimo messaggio in coda",
   "mobile.chat.queue.moveFirst": "Sposta al primo posto",
+  "mobile.chat.queue.runInNewThread": "Esegui in un nuovo thread",
+  "mobile.chat.queue.runNextInNewThread": "Esegui il prossimo messaggio in coda in un nuovo thread",
   "mobile.chat.queue.deleteTitle": "Eliminare il messaggio in coda?",
   "mobile.chat.queue.deleteMessage": "L'agente non lo riceverà mai.",
   "mobile.chat.queue.keep": "Mantieni",

@@ -658,6 +658,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "أوقف الوكيل وأرسل الرسالة التالية في قائمة الانتظار الآن",
   "mobile.chat.queue.deleteNext": "حذف الرسالة التالية في قائمة الانتظار",
   "mobile.chat.queue.moveFirst": "نقل إلى الأول",
+  "mobile.chat.queue.runInNewThread": "تشغيل في سلسلة جديدة",
+  "mobile.chat.queue.runNextInNewThread": "تشغيل الرسالة التالية في قائمة الانتظار في سلسلة جديدة",
   "mobile.chat.queue.deleteTitle": "حذف الرسالة من قائمة الانتظار؟",
   "mobile.chat.queue.deleteMessage": "لن يستلمها الوكيل أبدًا.",
   "mobile.chat.queue.keep": "إبقاء",

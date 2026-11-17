@@ -506,6 +506,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Stop de agent en verzend het volgende wachtrijbericht nu",
   "mobile.chat.queue.deleteNext": "Volgend bericht in wachtrij verwijderen",
   "mobile.chat.queue.moveFirst": "Zet bovenaan",
+  "mobile.chat.queue.runInNewThread": "Uitvoeren in nieuwe thread",
+  "mobile.chat.queue.runNextInNewThread": "Volgend bericht in de wachtrij uitvoeren in nieuwe thread",
   "mobile.chat.queue.deleteTitle": "Bericht in wachtrij verwijderen?",
   "mobile.chat.queue.deleteMessage": "De agent ontvangt het nooit.",
   "mobile.chat.queue.keep": "Behouden",

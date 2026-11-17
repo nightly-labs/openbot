@@ -515,6 +515,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "停止代理并立即发送下一条排队消息",
   "mobile.chat.queue.deleteNext": "删除下一条排队消息",
   "mobile.chat.queue.moveFirst": "移到最前",
+  "mobile.chat.queue.runInNewThread": "在新话题中运行",
+  "mobile.chat.queue.runNextInNewThread": "在新话题中运行下一条排队消息",
   "mobile.chat.queue.deleteTitle": "删除排队消息？",
   "mobile.chat.queue.deleteMessage": "助手将不会收到它。",
   "mobile.chat.queue.keep": "保留",
