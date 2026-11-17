@@ -110,6 +110,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Niektóre aplikacje lub umiejętności nie są zainstalowane. Ponowne połączenie je zainstaluje.",
   "marketplace.app.notConnected": "Nie połączono",
+  "marketplace.app.paused": "Wstrzymano",
   "marketplace.app.custom": "Serwer MCP",
   "marketplace.app.githubTagline": "Repozytoria, zgłoszenia i pull requesty",
   "marketplace.app.onePasswordTagline": "Loguj się do witryn danymi logowania, które udostępniasz",
@@ -407,8 +408,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.recall": "Co moje notatki mówią o decyzjach w tym projekcie?",
   "marketplace.plugin.obsidian.prompt.save": "Zapisz tę decyzję jako nową notatkę w moim sejfie.",
   "marketplace.plugin.obsidian.prompt.log": "Dodaj podsumowanie dzisiejszej pracy do mojej notatki Dziennik pracy.",
-  "marketplace.plugin.obsidian.hint.apiKey":
-    'W Obsidianie otwórz Settings > Local REST API. Skopiuj klucz API i włącz "Enable non-encrypted (HTTP) server".',
+  "marketplace.plugin.obsidian.hint.apiKey": "W Obsidianie otwórz Settings > Local REST API i skopiuj klucz API.",
   "marketplace.plugin.resend.tagline": "E-maile transakcyjne",
   "marketplace.plugin.resend.description":
     "Resend pozwala agentom wysyłać e-maile transakcyjne i sprawdzać ich dostarczenie przez jedno API. Klucz API z panelu Resend jest przekazywany do lokalnego serwera jako jedna zmienna środowiskowa.",

@@ -78,6 +78,7 @@ import { SIDEBAR_PINS_CAPABILITY } from "@openbot/contracts/team-protocol/sideba
 import { SIGN_IN_RELAY_CAPABILITY } from "@openbot/contracts/team-protocol/sign-in-relay-v1";
 import { SKILL_LEARNING_CAPABILITY } from "@openbot/contracts/team-protocol/skill-learning-v1";
 import { SKILLS_ADMIN_CAPABILITY } from "@openbot/contracts/team-protocol/skills-admin-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import type { TeamProtocolV2Json } from "@openbot/contracts/team-protocol/v2";
 import { TEAM_PROTOCOL_V3 } from "@openbot/contracts/team-protocol/v3";
 import { decodeTeamProtocolSupportV9 } from "@openbot/contracts/team-protocol/v9";
@@ -2641,6 +2642,7 @@ export function MobileWorkspaceProvider({ children }: PropsWithChildren) {
         canRelayMcpSignIn: (serverId) =>
           managesMcp(serverId) && hasCapability(capabilities, serverId, SIGN_IN_RELAY_CAPABILITY),
         macAppsUnavailable: (serverId) => hasCapability(capabilities, serverId, MAC_APPS_LIMIT_CAPABILITY),
+        canEditUiBlockPreview: (serverId) => hasCapability(capabilities, serverId, UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
         canManageMcpAccess: (serverId) => administers(serverId, MCP_ACCESS_CAPABILITY),
         canAddMarketplaceAgents: (serverId) => administers(serverId, AGENT_INSTALL_CAPABILITY),
         canUpdateMarketplaceAgents: (serverId) => administers(serverId, AGENT_UPDATE_CAPABILITY),

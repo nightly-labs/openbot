@@ -210,7 +210,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   // active agent's provider and model and cleared on a switch, because a second request would hit
   // the provider's rate-limit endpoint for a card the user may never see.
   const auth = useAuth();
-  const { teamPresence, currentTeamMember } = usePresence();
+  const { teamPresence, readerMemberId } = usePresence();
   const { selectAgent, openAgentMessage, messageFocusRequest, globalSearchOpen } = useNavigation();
   const channels = useChannels();
   const conversationController = useConversationController();
@@ -421,7 +421,7 @@ export function WorkspaceConversation(props: { account: () => CentralAuthUser })
   const isOwnSender = (senderId: string) => {
     const state = auth.centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });

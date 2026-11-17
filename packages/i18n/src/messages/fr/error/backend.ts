@@ -94,6 +94,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
+  "error.backend.channelArchiveRunning": "Arrêtez le travail en cours dans ce canal, puis supprimez-le.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
   "error.backend.channelTaskComplete": "Cette tâche est déjà terminée.",
@@ -289,6 +290,7 @@ export const messages = {
     "Le serveur de connexion a envoyé une réponse qu’OpenBot ne peut pas lire. Si le service vous donne une clé d’API ou un jeton, ajoutez-le dans les paramètres de ce serveur, puis testez de nouveau la connexion.",
   "error.backend.mcpServerExited":
     "Le serveur s’est arrêté avant de répondre. Exécutez la commande dans un terminal pour voir son erreur.",
+  "error.backend.mcpServerExitedWithOutput": "Le serveur s’est arrêté avant de répondre. Il a écrit : {detail}",
   "error.backend.mcpServerFailedToStart": "Le serveur n’a pas démarré : {reason}",
   "error.backend.mcpServerStartAbandoned":
     "{provider} a cessé d’attendre avant le démarrage du serveur : ses agents n’ont donc pas les outils de ce serveur.",

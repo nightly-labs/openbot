@@ -325,6 +325,9 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
   // OpenCode 2.1.4 adds each session's MCP servers to the session's directory under their names. A
   // second chat of the agent replaced the `openbot` token, and closing it left the first refused.
   mcpServersPerDirectory: true,
+  // OpenCode 2.3.0 gives an MCP server 30 s to connect, and then keeps the directory
+  // without it while its settings stay the same. A team agent then had no OpenBot tools for hours (#10749).
+  mcpConnectLimitMs: 30_000,
   // OpenCode 2.3.0 keeps a session's MCP servers for its directory after `session/close`. Each new
   // chat or subagent added more stdio servers that nothing stopped (#9254). OpenBot starts and ends them.
   relayStdioMcpServers: true,

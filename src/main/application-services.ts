@@ -30,7 +30,7 @@ import { WorkflowTriggers, workflowScheduleDueAt } from "../backend/workflows/wo
 import { createWorkflows, type WorkflowNotice, type WorkflowsHandle } from "../backend/workflows/workflows";
 import { type AcpRegistry, createAcpRegistry } from "./acp-registry";
 import { type AgentAdminSettingsService, createAgentAdminSettings } from "./agent-admin-settings";
-import { spawnAgentDatabaseHost } from "./agent-database-host-process";
+import { checkDatabaseIntegrityInHost, spawnAgentDatabaseHost } from "./agent-database-host-process";
 import { type AgentDefaultsSettingsService, createAgentDefaultsSettings } from "./agent-defaults-settings";
 import { agentDisplayEnvironment, hasSeparateAgentDisplay } from "./agent-display";
 import { type AgentFolders, createAgentFolders } from "./agent-folders";
@@ -314,7 +314,7 @@ import {
   startLocalServerChild,
 } from "./local-server-child";
 import { LOCAL_SERVERS_FILE } from "./local-servers/local-server-registry";
-import { LocalServers } from "./local-servers/local-servers";
+import { LocalServers, sandboxArguments } from "./local-servers/local-servers";
 import { createLoginItem } from "./login-item";
 import { LogoColorService } from "./logo-color-service";
 import type { MacHapticFeedback } from "./mac-haptic-feedback";
@@ -1362,7 +1362,7 @@ export async function createApplicationServices({
   const store = new AgentStore(
     app.getPath("userData"),
     homedir(),
-    new OpenBotDatabase(app.getPath("userData")),
+    new OpenBotDatabase(app.getPath("userData"), checkDatabaseIntegrityInHost),
     () => agentDefaults.get(),
     localServerChild?.agentRoot,
   );
@@ -2074,6 +2074,11 @@ export async function createApplicationServices({
     supervisor: new AgentDatabaseSupervisor({
       spawnHost: spawnAgentDatabaseHost,
       onStatementSettled: (durationMs) => statementTimings.record(durationMs),
+      onHostStartFailed: ({ reason, output, consecutiveFailures, retryAfterMs }) =>
+        logger.warn(
+          `The shared data process ${reason} (failed starts in a row: ${consecutiveFailures}, next start after ${retryAfterMs} ms).`,
+          output.length > 0 ? `Its last output: ${output}` : "It wrote no output.",
+        ),
     }),
   });
   // Looked up again on demand, because a user may install the driver while OpenBot runs, and the
@@ -3609,7 +3614,8 @@ export async function createApplicationServices({
     crm,
     // Present, so the host advertises `agent-hidden-v1`. Any member can hide or restore an agent that they can see.
     hiddenAgents: service,
-    // Present, so the host advertises `routine-run-place-v1`. Any member reads the places; a change needs manage access.
+    // Present, so the host advertises `routine-run-place-v1` and `routine-pause-reasons-v1`. Any member reads
+    // the places and the pause reasons; a change of place needs manage access.
     routineRunPlaces: service.routineRecords,
     // Present, so the host advertises `agent-notification-levels-v1`. Each member sets their own levels.
     agentNotificationLevels,
@@ -4164,7 +4170,11 @@ export async function createApplicationServices({
           remoteServers,
           command: {
             executable: process.execPath,
-            args: [...(app.isPackaged ? [] : [app.getAppPath()]), ...ozonePlatformArguments()],
+            args: [
+              ...(app.isPackaged ? [] : [app.getAppPath()]),
+              ...ozonePlatformArguments(),
+              ...sandboxArguments(process.argv.slice(1)),
+            ],
           },
           trash: (path) => shell.trashItem(path),
           account: {
@@ -4293,6 +4303,7 @@ export async function createApplicationServices({
       const contents = webContents.fromId(owner);
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
+    writeClipboard: (text) => clipboard.writeText(text),
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({

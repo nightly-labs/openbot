@@ -13,6 +13,7 @@ import type {
   BrowserDockAction,
   BrowserDockFrame,
   BrowserDockPresentation,
+  BrowserTakeoverPage,
   BusyMessageModePreference,
   ChatBackgroundColor,
   ChatWindowTarget,
@@ -78,6 +79,7 @@ import {
   isBrowserDockAction,
   isBrowserDockFrame,
   isBrowserDockPresentation,
+  isBrowserTakeoverPage,
   isBusyMessageMode,
   isChatBackgroundColor,
   isDynamicIslandAction,
@@ -328,6 +330,11 @@ export function parseDynamicIslandPresentation(input: unknown): DynamicIslandPre
 export function parseDynamicIslandAction(input: unknown): DynamicIslandAction {
   if (isDynamicIslandAction(input)) return input;
   throw new Error("Dynamic Island action is invalid.");
+}
+
+export function parseBrowserTakeoverPage(input: unknown): BrowserTakeoverPage {
+  if (isBrowserTakeoverPage(input)) return input;
+  throw new Error("Browser takeover page is invalid.");
 }
 
 export function parseBrowserDockPresentation(input: unknown): BrowserDockPresentation | null {

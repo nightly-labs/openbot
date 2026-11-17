@@ -150,6 +150,7 @@ import {
 import { ensureMacApplicationPresence, secondLaunchResponse } from "./main-window-state";
 import { MessageLinkRelay, openHttpLink } from "./message-link-relay";
 import { recoverFromNewerDatabase } from "./newer-database-recovery";
+import { removeOrcaPaneEnvironment } from "./orca-pane-environment";
 import { flushMainLog, startMainLog } from "./provider-log";
 import { notifyRemoteControlStarted } from "./remote-control-question";
 import { watchRemoteHostDirectory } from "./remote-server-host-directory";
@@ -262,6 +263,8 @@ const developmentRemoteRole =
 const developmentTestClientEnabled = !app.isPackaged && process.env.OPENBOT_DEV_TEST_CLIENT_ENABLED === "1";
 // Before any child process starts: agents must not run as part of a Claude Code session that started OpenBot.
 removeClaudeCodeSessionEnvironment(process.env);
+// Before any child process starts: agents must not report to the Orca pane that started OpenBot.
+removeOrcaPaneEnvironment(process.env);
 // Before any child process starts: this removes the single-use claim from the environment they inherit.
 const hostedServer = takeHostedServerEnvironment(process.env, app.isPackaged, process.platform);
 // Before the first provider check: a restored disk gives the provider CLIs a longer limit.
@@ -956,6 +959,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
+      chatRendererIds: () => new Set(windows.getChatWindows().map((window) => window.webContents.id)),
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
       keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
@@ -1538,7 +1542,8 @@ if (!hasSingleInstanceLock) {
         app.quit();
         return;
       }
-      if (!localServerChild) await presentApplication();
+      // A server has no desktop: invitation links open on the client, and a container has no xdg-settings (#10861).
+      if (!localServerChild && !serverMode && !hostedServer) await presentApplication();
       const recovery = await recoverFromStartLoop();
       if (recovery === "quit") {
         quitFor("quit");

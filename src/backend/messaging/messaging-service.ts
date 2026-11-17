@@ -60,6 +60,7 @@ import {
   type MessagingThreads,
 } from "./messaging-threads";
 import {
+  CANCEL_TEXT,
   type ConnectionIdentity,
   DiscordApiError,
   type HistoryFilter,
@@ -186,7 +187,6 @@ const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "remove
 const APPROVAL_TEXT_LIMIT = 2_500;
 /** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
 const PROGRESS_TEXT_LIMIT = 1_000;
-const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
 const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
@@ -1484,10 +1484,11 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
-        // Only Discord's earlier messages have files, such as an image that a person posted without a
-        // mention just before this message. The agent gets them with this message. Slack is not asked:
-        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
-        adapter.platform === "discord" && !message.isDirect
+        // Only Discord's and Telegram's earlier messages have files, such as an image or a voice note
+        // that a person posted without a mention just before this message. The agent gets them with
+        // this message. Slack is not asked: before Marketplace approval it allows one thread read a
+        // minute, which the prompt needs.
+        (adapter.platform === "discord" || adapter.platform === "telegram") && !message.isDirect
           ? adapter
               .history(
                 message.platformChannelId,
@@ -1803,7 +1804,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
+      Effect.map((list) => (whatsApp ? { ...list, note: WHATSAPP_ALLOWED_PLACES } : list)),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1823,7 +1824,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const platform = live.record.platform;
     return yield* Effect.gen(function* () {
-      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      const place = (yield* live.adapter.places()).places.find((candidate) => candidate.id === placeId);
       if (!place)
         return {
           error:
@@ -2667,11 +2668,12 @@ function finalPost(
       text: quiet || answerOnly ? "" : sourceText("status.messaging.stopped"),
       reaction: reacts ? "stopped" : null,
     };
-  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
+  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
+  // the catalog text of a start that failed, such as a provider that is not downloaded, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
-      text: quiet ? "" : sourceText("status.messaging.failed"),
+      text: quiet ? "" : (activity.reason ?? sourceText("status.messaging.failed")),
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;

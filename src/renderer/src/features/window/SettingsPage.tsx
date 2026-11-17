@@ -1,10 +1,13 @@
 import type { AppTextKey } from "@openbot/i18n";
-import { Button, Server } from "@openbot/ui";
+import { Button, Server, Store } from "@openbot/ui";
+import { CONNECTOR_LISTINGS } from "@openbot/ui/features/connectors/connector-catalog";
+import type { ConnectorId } from "@openbot/ui/features/connectors/connectors";
 import { waitForSettingRow } from "@openbot/ui/features/conversation/agent-setting-links";
 import { createEffect, createSignal, For, flush, onCleanup, Show } from "solid-js";
 import { useI18n } from "../../i18n-context";
 import { usePlatform } from "../../platform";
 import { useAuth } from "../account/account-context";
+import { useConnectors } from "../connectors/connectors-context";
 import { canManageStorage, serverHasBackgroundProcesses } from "../files/storage-usage";
 import type { ServerSettingsSection } from "../servers/ServerSettingsModal";
 import {
@@ -41,7 +44,13 @@ type PersonalRow = {
  */
 type ServerRow = { section: ServerSettingsSection; titleKey: AppTextKey; descriptionKey?: AppTextKey };
 
-type SearchRow = PersonalRow | ServerRow;
+/**
+ * A page of Marketplace > Apps: a connector, or the Apps tab when `app` is null. Connectors and MCP
+ * servers moved there from the server settings, and a user still looks for them here.
+ */
+type MarketplaceRow = { app: ConnectorId | null; titleKey: AppTextKey; descriptionKey?: AppTextKey };
+
+type SearchRow = PersonalRow | ServerRow | MarketplaceRow;
 
 /** Each personal tab, then its rows, in the order of the tab list. */
 const SEARCH_ROWS: ReadonlyArray<PersonalRow> = navItems.flatMap((item) => [
@@ -81,6 +90,8 @@ const BACKGROUND_PROCESSES_ROW: ServerRow = {
   descriptionKey: "settings.backgroundProcesses.description",
 };
 
+const MARKETPLACE_APPS_ROW: MarketplaceRow = { app: null, titleKey: "app.settingsPage.marketplaceApps" };
+
 /** A broad query shows a short list, not every row. */
 const SEARCH_LIMIT = 12;
 
@@ -114,6 +125,7 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   const settings = useSettings();
   const serverSettings = useServerSettings();
   const platform = usePlatform();
+  const connectors = useConnectors();
   const { activeServer } = useServers();
   const { signedInAccount } = useAuth();
   const [personalQuery, setPersonalQuery] = createSignal("");
@@ -124,7 +136,11 @@ export function SettingsPage(props: { kind: SettingsKind }) {
   onCleanup(() => windowPage.setServerSettingsQuery(""));
   const tabShown = (tab: SettingsTab) =>
     settingsTabShown(tab, { platform: platform.appInfo()?.platform, chatWindow: platform.chatWindow !== null });
-  /** The rows of the tabs shown on this computer, then the sections that the active server's settings show. */
+  /**
+   * The rows of the tabs shown on this computer, the sections that the active server's settings show,
+   * then the Marketplace apps of that server: its Apps tab, and each connector that this account can
+   * connect there, as the Marketplace lists them.
+   */
   const searchRows = (): SearchRow[] => {
     const server = activeServer();
     const personal = SEARCH_ROWS.filter(
@@ -141,6 +157,14 @@ export function SettingsPage(props: { kind: SettingsKind }) {
       (server.kind === "local" || server.state === "online")
         ? [BACKGROUND_PROCESSES_ROW]
         : []),
+      MARKETPLACE_APPS_ROW,
+      ...connectors.active.available().map(
+        ({ id }): MarketplaceRow => ({
+          app: id,
+          titleKey: CONNECTOR_LISTINGS[id].title,
+          descriptionKey: CONNECTOR_LISTINGS[id].tagline,
+        }),
+      ),
     ];
   };
   const results = () =>
@@ -159,10 +183,17 @@ export function SettingsPage(props: { kind: SettingsKind }) {
 
   /**
    * Opens the tab of the result. For a row, it then scrolls to the row, marks it and puts the focus on its
-   * control. A server row opens that section of the active server's settings.
+   * control. A server row opens that section of the active server's settings. A Marketplace row opens
+   * the Marketplace, which closes this page, on the connector's page or on Apps.
    */
   const openResult = (row: SearchRow) => {
     setQuery("");
+    if ("app" in row) {
+      settings.setPendingPluginConnect(false);
+      settings.setPendingPluginSlug(row.app);
+      settings.setSkillsMarketplaceOpen(true);
+      return;
+    }
     if ("section" in row) {
       const server = activeServer();
       if (server) serverSettings.openServerSettings(server.id, null, row.section);
@@ -287,12 +318,20 @@ export function SettingsPage(props: { kind: SettingsKind }) {
               <ul class="settings-page-results" aria-label={i18n.t("app.settingsPage.results")}>
                 <For each={rows()}>
                   {(row) => {
-                    // A server row names the server, as the server rows of the command palette do.
-                    const tab = "section" in row ? null : navItem(row.tab);
-                    const PlaceIcon = tab ? tab.icon : Server;
-                    const place = () => (tab ? i18n.t(tab.titleKey) : (activeServer()?.name ?? ""));
+                    // A server row names the server, as the server rows of the command palette do. A
+                    // Marketplace row names the Marketplace.
+                    const tab = "section" in row || "app" in row ? null : navItem(row.tab);
+                    const marketplace = "app" in row;
+                    const PlaceIcon = tab ? tab.icon : marketplace ? Store : Server;
+                    const place = () =>
+                      tab
+                        ? i18n.t(tab.titleKey)
+                        : marketplace
+                          ? i18n.t("marketplace.title")
+                          : (activeServer()?.name ?? "");
                     // A tab result shows the tab description, as its title is already on the line above.
-                    const titleKey = "section" in row || row.anchor ? row.titleKey : navItem(row.tab).descriptionKey;
+                    const titleKey =
+                      "section" in row || "app" in row || row.anchor ? row.titleKey : navItem(row.tab).descriptionKey;
                     return (
                       <li>
                         <Button

@@ -415,6 +415,7 @@ export function MobileChatView({
   const threadsShown = threadMenu !== undefined;
   const swipeForward = useMemo(() => {
     const params = { agentId: agent.id, serverId: agent.serverId };
+    if (swipeAction === "off") return null;
     if (swipeAction === "threads")
       return threadsShown ? () => router.push({ pathname: "/server-tasks", params }) : null;
     return browserShown ? () => router.push({ pathname: "/browser/[agentId]", params }) : null;

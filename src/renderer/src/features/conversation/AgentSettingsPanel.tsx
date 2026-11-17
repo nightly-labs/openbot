@@ -2,7 +2,6 @@ import {
   type AgentBrowserProfile,
   agentAutomationAllowed,
   agentNotificationLevelMap,
-  assignedSkillCount,
   type BrowserProfileSummary,
   type BrowserProxyComputer,
   type BrowserProxySummary,
@@ -10,6 +9,7 @@ import {
   type FilePreview,
   type ServerNotificationLevel,
   type TestRoutineInput,
+  userAssignedSkills,
 } from "@openbot/contracts/ipc";
 import { BookMarked, CalendarClock, FileText, Folder, Gauge, Puzzle, Table2, Upload } from "@openbot/ui";
 import { SettingsLinkGroup, SettingsLinkRow } from "@openbot/ui/components/SettingsPanel";
@@ -456,7 +456,8 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
           ? await skillsPort().agent.listInstalledSkills(agentId)
           : await skillCalls().listInstalled(agentId);
       setDraft((state) => {
-        state.skills.count = assignedSkillCount(items);
+        // The same list as the skills dialog, so the row and the dialog show the same number.
+        state.skills.count = userAssignedSkills(items).length;
       });
     } catch {
       setDraft((state) => {

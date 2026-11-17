@@ -444,6 +444,8 @@ export function deliveryPromptInput(context: DeliveryContext, sources: DeliveryP
         : ["Do not create, update, delete, or test routines during this run."]),
       "Perform the task below now. Do not answer only that the routine or monitoring is active.",
       "Nobody answers you during this run. Do all of the task in this turn: do not stop after a step to report progress or to ask whether to continue.",
+      // A run that waits for teammates reported a failure before their replies came (#10928).
+      `A request to a teammate is not a failure: finish the parts that do not need its reply, then end this turn. The reply starts a turn that continues this task. Do not call the ${ROUTINE_REPORT_FAILURE_TOOL} tool only because a reply has not come yet.`,
       "A task can tell you to remind the user or to send the user a message. When it names no other place, write that message as your final answer. OpenBot shows your final answer to the user in this chat. openbot.send_message sends to other agents, not to the user.",
       testRun
         ? "This is a manual Test run. Report the action and result even when a normal scheduled run would suppress a notification because there is no change."

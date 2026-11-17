@@ -1178,6 +1178,10 @@ function AccountRow(
         <Show when={keyReplacesOwn()}>
           <ItemDescription>{t("provider.settings.geminiKeyReplacesAccount")}</ItemDescription>
         </Show>
+        {/* A connected account has a message only when its CLI bills an API key in place of the plan. */}
+        <Show when={state() === "connected" && props.account.message}>
+          {(message) => <ItemDescription role="status">{sourceText(message())}</ItemDescription>}
+        </Show>
         <Show when={state() !== "connected"}>
           <ItemDescription class={{ "provider-settings-warning": needsSignIn() }}>
             {props.account.message ? sourceText(props.account.message) : t(ACCOUNT_STATE_TEXT[state()])}

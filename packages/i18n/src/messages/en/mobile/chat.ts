@@ -195,9 +195,7 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.composer.cancelReply": "Cancel reply",
   "mobile.chat.composer.messageAgent": "Message {name}",
   "mobile.chat.composer.pasteFailed": "Could not attach pasted text",
-  "mobile.chat.composer.cancelDictation": "Cancel dictation",
   "mobile.chat.voice.listening": "Listening…",
-  "mobile.chat.voice.continue": "Continue dictation",
   "mobile.chat.liveVoice.start": "Start a voice conversation",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Starting",
@@ -363,7 +361,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.browserSecret.signInBlockedTitle": "Sign in on your computer",
   "mobile.chat.browserSecret.signInBlockedBody":
     "This site does not accept a sign-in from the server. Open this chat in the OpenBot desktop app on your computer, and sign in there.",
-  "mobile.chat.browserSecret.takeoverReload": "Then reload the page before choosing I’m done.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot could not finish entering the password or code. Enter what is missing on the page. Then reload the page before choosing I’m done.",
   "mobile.chat.browserSecret.takeoverFailed": "The request could not be completed.",
   "mobile.chat.browserSecret.done": "I'm done",
   "mobile.chat.browserSecret.submitOnce": "Submit once to {origin}. This value is not added to chat.",
@@ -528,6 +527,8 @@ export const messages = defineMessages("mobile.chat", {
   "mobile.chat.queue.sendNowNext": "Stop the agent and send next queued message now",
   "mobile.chat.queue.deleteNext": "Delete next queued message",
   "mobile.chat.queue.moveFirst": "Move to first",
+  "mobile.chat.queue.runInNewThread": "Run in new thread",
+  "mobile.chat.queue.runNextInNewThread": "Run next queued message in a new thread",
   "mobile.chat.queue.deleteTitle": "Delete queued message?",
   "mobile.chat.queue.deleteMessage": "The agent never receives it.",
   "mobile.chat.queue.keep": "Keep",

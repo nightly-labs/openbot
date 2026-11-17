@@ -878,6 +878,7 @@ const openbotApi: OpenBotDesktopApi = {
     performAction: decodeVoid,
     performHaptic: decodeVoid,
     action: decodeDynamicIslandAction,
+    openBrowserTakeover: decodeVoid,
     setInteractive: decodeVoid,
     setInputRegion: decodeVoid,
     setXWayland: decodeVoid,

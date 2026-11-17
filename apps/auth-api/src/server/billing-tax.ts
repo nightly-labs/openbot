@@ -10,6 +10,7 @@ import {
 import { sourceText } from "@openbot/i18n/source";
 import { Effect, Option, Schema } from "effect";
 import { BillingError, type BillingOperationError, stripeFailure, stripeRequest } from "./billing-errors";
+import { requestCountry } from "./request-country";
 import {
   type StripeClient,
   type StripeCustomerTax,
@@ -79,7 +80,7 @@ export function billingDetailsOf(tax: StripeCustomerTax | null): BillingDetails 
  * Cloudflare sends XX for an unknown country and T1 for Tor; neither is a billing country.
  */
 export function withSuggestedCountry(details: BillingDetails, request: Request): BillingDetails {
-  const located = request.headers.get("cf-ipcountry");
+  const located = requestCountry(request);
   return details.country === null && isBillingCountry(located) ? { ...details, suggestedCountry: located } : details;
 }
 

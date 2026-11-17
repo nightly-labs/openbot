@@ -280,6 +280,8 @@ export class ChannelService {
   readonly #preparedChanges = new Map<string, number>();
   /** By delivery: the channel facts and memories in its packet. */
   readonly #preparedFacts = new Map<string, DeliveredChannelText>();
+  /** The prepared deliveries that continue their request after sub-tasks (#8812). */
+  readonly #resumedDeliveries = new Set<string>();
 
   constructor(
     database: OpenBotDatabase,
@@ -843,6 +845,12 @@ export class ChannelService {
     }
     if (command.type === "archive" || command.type === "restore") {
       const open = (yield* channelSync(() => this.store.tasks(channel.id))).filter((task) => !terminal(task));
+      // A turn ends only when its provider stops it, so an archive with a running task left the agent
+      // working in a deleted channel, and its other chats named that channel as the cause (#10472).
+      // The clients turn the action off while `activeTasks` counts a running task; this refuses
+      // agents, older clients and a task that started after the menu opened.
+      if (command.type === "archive" && open.some((task) => task.state === "running"))
+        return yield* channelFailure(new Error(sourceText("error.backend.channelArchiveRunning")));
       const tasks = command.type === "archive" ? open : [];
       // The archive paused its work with no reason, so the restored channel would show no way to
       // continue it. The restore gives each of those tasks the reason that a stop gives.
@@ -2276,6 +2284,7 @@ export class ChannelService {
       this.#deltas.delete(deliveryId);
       this.#preparedChanges.delete(deliveryId);
       this.#preparedFacts.delete(deliveryId);
+      this.#resumedDeliveries.delete(deliveryId);
       const assignment = yield* channelSync(() => this.store.assignmentForDelivery(deliveryId));
       if (!assignment || !activeAssignment(assignment)) return;
       const tasks = yield* channelSync(() => this.store.tasks(assignment.channelId));
@@ -2542,6 +2551,36 @@ export class ChannelService {
     yield* this.wake();
   }).bind(this);
 
+  /**
+   * Whether this channel delivery continues its request after the sub-tasks that it waited for ended.
+   * `prepare` decides it once, so the chat row and the packet agree.
+   */
+  resumesAfterSubtasks(deliveryId: string): boolean {
+    return this.#resumedDeliveries.has(deliveryId);
+  }
+
+  /**
+   * An earlier assignment of the same request to the same member waited for fewer tasks, so this one
+   * continues that request with the results of the new ones. Its delivery repeats the request, but the
+   * person did not send it again (#8812). A run again after a usage limit continues too when an earlier
+   * one waited for fewer tasks. A member that takes the task from another one, with a transfer or a
+   * reassign, gets the request for the first time.
+   */
+  #resumesAfterSubtasks(assignment: ChannelAssignment): boolean {
+    if (assignment.awaitedTaskIds.length === 0) return false;
+    return this.store
+      .assignments(assignment.channelId)
+      .some(
+        (item) =>
+          item.id !== assignment.id &&
+          item.taskId === assignment.taskId &&
+          item.agentId === assignment.agentId &&
+          item.requestMessageId === assignment.requestMessageId &&
+          item.taskRevision < assignment.taskRevision &&
+          assignment.awaitedTaskIds.some((id) => !item.awaitedTaskIds.includes(id)),
+      );
+  }
+
   readonly prepare = Effect.fn("ChannelService.prepare")(function* (
     this: ChannelService,
     delivery: DeliveryContext,
@@ -2562,6 +2601,9 @@ export class ChannelService {
     const delivered = this.#deliveredContext(channel.id, context, agent);
     const budget = this.hooks.contextCharacters?.(agent.id, context.threadId);
     yield* this.#awaitSummary(channel.id, budget);
+    const resumed = this.#resumesAfterSubtasks(assignment);
+    if (resumed) this.#resumedDeliveries.add(delivery.delivery.id);
+    else this.#resumedDeliveries.delete(delivery.delivery.id);
     const history = yield* this.#history.prepare(
       task,
       agent,
@@ -2569,6 +2611,7 @@ export class ChannelService {
       delivered,
       this.#peers(tasks, task),
       budget,
+      resumed,
     );
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
@@ -2676,6 +2719,7 @@ export class ChannelService {
       this.#preparedChanges.delete(deliveryId);
       const facts = this.#preparedFacts.get(deliveryId);
       this.#preparedFacts.delete(deliveryId);
+      this.#resumedDeliveries.delete(deliveryId);
       const cursor =
         prepared === undefined || prepared === this.store.completedMessageChanges(assignment.channelId)
           ? { throughSequence: assignment.throughSequence, summaryVersion: assignment.summaryVersion }

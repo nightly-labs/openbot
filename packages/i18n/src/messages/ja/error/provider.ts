@@ -12,6 +12,8 @@ export const messages = {
     "{provider} のサインインが失われたため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
   "error.provider.acpRefusedUntilRestart":
     "{provider} がメッセージを拒否したため、OpenBot がそのプロセスを終了しました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLost": "{provider} の接続が切れました。メッセージをもう一度送信してください。",
+  "error.provider.acpServerLostEnded": "{provider} の接続が切れたため、OpenBot がそのプロセスを終了しました。",
   "error.provider.acpSettingsTimedOut":
     "{provider} が時間内に応答しませんでした。しばらくしてからもう一度お試しください。",
   "error.provider.acpPlanUsedUp":
@@ -355,6 +357,8 @@ export const messages = {
     "Hermes はこのターンを完了できませんでした。返信に理由が書かれている場合は、その指示に従ってください。書かれていない場合は、このエージェントの MCP サーバーが利用できない可能性があります。マーケットプレイス、アプリで確認してから、メッセージをもう一度送信してください。",
   "error.provider.hermesRefused":
     "Hermes は開始前にこのメッセージを拒否しました。もう一度送信してください。Hermes がすべてのメッセージを拒否する場合は、このエージェントを実行しているコンピューターで OpenBot を再起動してください。",
+  "error.provider.hermesConnectionLost":
+    "このメッセージの処理中に Hermes の接続が切れたため、作業が完了したかどうかわかりません。メッセージをもう一度送信する前に、エージェントが行ったことを確認してください。",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot はこのモデルを使用できませんでした。モデルが思考の設定を受け付けませんでした。このエージェントに別のモデルを選択してから、メッセージをもう一度送信してください。",
   "error.provider.usageLimitReached": "アカウントが使用量の上限に達しました。",
