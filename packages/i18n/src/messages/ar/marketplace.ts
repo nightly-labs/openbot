@@ -124,6 +124,7 @@ export const messages = {
   "marketplace.app.partialTitle": "{name} غير مكتمل",
   "marketplace.app.partialDescription": "بعض تطبيقاته أو مهاراته غير مثبّتة. تثبّتها إعادة الربط.",
   "marketplace.app.notConnected": "غير متصل",
+  "marketplace.app.paused": "متوقف مؤقتًا",
   "marketplace.app.custom": "خادم MCP",
   "marketplace.app.githubTagline": "المستودعات والمشكلات وطلبات السحب",
   "marketplace.app.onePasswordTagline": "سجّل الدخول إلى المواقع ببيانات الدخول التي تشاركها",

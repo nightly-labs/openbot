@@ -35,6 +35,7 @@ import {
   type ChannelState,
   type ChannelText,
   channelRowKind,
+  pausedChannelState,
 } from "./ChannelParts";
 import {
   type IntegrationPageSlots,
@@ -290,7 +291,7 @@ export function slackIntegrationState(
   ).length;
   if (attention > 0) return { status: "attention", label: text.statusAttention, attention };
   if (connections.length === 0) return { status: "idle", label: "marketplace.app.notConnected", attention };
-  return { status: "connected", label: text.statusConnected, attention };
+  return pausedChannelState(connections) ?? { status: "connected", label: text.statusConnected, attention };
 }
 
 /**

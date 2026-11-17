@@ -85,6 +85,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Sommige apps of vaardigheden ervan zijn niet geïnstalleerd. “Opnieuw koppelen” installeert ze.",
   "marketplace.app.notConnected": "Niet gekoppeld",
+  "marketplace.app.paused": "Gepauzeerd",
   "marketplace.app.custom": "MCP-server",
   "marketplace.app.githubTagline": "Repository’s, issues en pull requests",
   "marketplace.app.onePasswordTagline": "Log in op sites met logins die je deelt",
