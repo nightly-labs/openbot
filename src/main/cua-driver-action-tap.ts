@@ -163,8 +163,8 @@ const POINTER_TOOLS = new Set(["click", "move_cursor", "scroll"]);
  * The protocol is one JSON object per line. A tool call is
  * `{"method":"call","name":"click","args":{…}}`; the target sits in the arguments either directly
  * as `pid` and `window_id` or inside a `target` object, and the point sits beside it as `x` and
- * `y`. A `run_steps` call holds such calls as its steps. A `list` asks for the tool list. Anything else - a `session_begin`, a call with neither -
- * reports nothing rather than a guess.
+ * `y`. A `run_steps` call holds such calls as its steps. A `list` asks for the tool list. Anything
+ * else - a `session_begin`, a call with neither - reports nothing rather than a guess.
  */
 function readRequest(line: string, at: number, screenshotWidth: (windowId: number) => number | null): ObservedRequest {
   let parsed: unknown;
