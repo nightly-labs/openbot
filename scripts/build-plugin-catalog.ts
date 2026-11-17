@@ -115,6 +115,8 @@ export interface PluginStdioServer {
   transport: "stdio";
   command: string;
   args: string[];
+  /** Settings the server always starts with, such as the address of a local app. Never a credential. */
+  env?: Record<string, string>;
   auth?: PluginAuthFlow[];
 }
 
@@ -361,11 +363,43 @@ function parseServer(slug: string, value: unknown): PluginServer {
       throw new Error(`Plugin ${slug} server args must all be strings: ${JSON.stringify(value.args)}.`);
     }
     const args = [...value.args];
-    return auth
-      ? { name: value.name, transport: "stdio", command: value.command, args, auth }
-      : { name: value.name, transport: "stdio", command: value.command, args };
+    const env = parseServerEnv(slug, value.env, auth);
+    return {
+      name: value.name,
+      transport: "stdio",
+      command: value.command,
+      args,
+      ...(env ? { env } : {}),
+      ...(auth ? { auth } : {}),
+    };
   }
   throw new Error(`Plugin ${slug} server needs a known transport.`);
+}
+
+/**
+ * The fixed settings of a stdio server. A value is listing data that every install gets, so it can
+ * be no credential: a variable that a field types stays the user's.
+ */
+function parseServerEnv(
+  slug: string,
+  value: unknown,
+  auth: PluginAuthFlow[] | undefined,
+): Record<string, string> | undefined {
+  if (value === undefined) return undefined;
+  if (!isDynamicRecord(value) || Object.keys(value).length === 0) {
+    throw new Error(`Plugin ${slug} env must name one or more settings.`);
+  }
+  const typed = new Set(
+    (auth ?? []).flatMap((flow) => (flow.kind === "key" ? flow.fields.map((field) => field.env) : [])),
+  );
+  const env: Record<string, string> = {};
+  for (const [key, setting] of Object.entries(value)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/u.test(key)) throw new Error(`Plugin ${slug} env has an invalid name.`);
+    if (typed.has(key)) throw new Error(`Plugin ${slug} env sets ${key}, which the user types.`);
+    if (!isString(setting) || !setting.trim()) throw new Error(`Plugin ${slug} env ${key} needs a value.`);
+    env[key] = setting;
+  }
+  return env;
 }
 
 function parseAuth(slug: string, value: unknown, transport: unknown): PluginAuthFlow[] | undefined {
@@ -496,7 +530,7 @@ function baseServerConfig(server: PluginServer): McpServerConfig {
     enabled: true,
     command: server.command,
     args: [...server.args],
-    env: [],
+    env: Object.entries(server.env ?? {}).map(([key, value]) => ({ key, value })),
     envPassthrough: [],
     workingDirectory: "",
     url: "",
@@ -656,8 +690,8 @@ import type { MarketplacePluginApp, MarketplacePluginDetail } from "@openbot/ui/
 
 /**
  * The configuration an app installs as. The catalog states the name and how the server is reached -
- * an address, or a command and its words; the rest of the record and \`enabled\` are made here rather
- * than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
+ * an address, or a command, its words and its fixed settings; the rest of the record and \`enabled\`
+ * are made here rather than stored as catalog data that could disagree with \`normalizeMcpConfig\`.
  *
  * A credential is never among them. What a server asks for is declared in \`server.auth\`, and the
  * value is typed by the user in the connect dialog, which hands back the configuration that
@@ -674,7 +708,10 @@ export function createPluginAppConfig(app: MarketplacePluginApp): McpServerConfi
     enabled: true,
     command: app.server.transport === "stdio" ? app.server.command : "",
     args: app.server.transport === "stdio" ? [...app.server.args] : [],
-    env: [],
+    env:
+      app.server.transport === "stdio"
+        ? Object.entries(app.server.env ?? {}).map(([key, value]) => ({ key, value }))
+        : [],
     envPassthrough: [],
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",
@@ -754,7 +791,14 @@ export type MobilePluginAuthFlow =
 
 type MobilePluginServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: MobilePluginAuthFlow[];
+    };
 
 export interface MobilePluginApp {
   id: string;
@@ -835,7 +879,14 @@ export interface PluginCatalogApp {
 
 export type PluginCatalogServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: unknown }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: unknown };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: unknown;
+    };
 
 export interface PluginCatalogDetail {
   slug: string;
