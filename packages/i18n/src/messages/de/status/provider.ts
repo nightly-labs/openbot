@@ -29,4 +29,6 @@ export const messages = {
     "Claude hat mit normaler Geschwindigkeit geantwortet. Der Schnellmodus ist in den Claude Code-Einstellungen oder von deiner Organisation ausgeschaltet.",
   "status.provider.claudeFastModeUnavailable":
     "Claude hat mit normaler Geschwindigkeit geantwortet. Claude Code konnte den Schnellmodus für diesen Turn nicht nutzen.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code ist so eingestellt, dass es einen Anthropic-API-Schlüssel nutzt. Anthropic rechnet jede Anfrage über das API-Guthaben des Schlüssels ab, nicht über deinen Claude-Plan. Um deinen Plan zu nutzen, entferne den Schlüssel aus den Claude Code-Einstellungen oder den Umgebungsvariablen und starte OpenBot dann neu.",
 } as const satisfies PartialTranslation<typeof source>;

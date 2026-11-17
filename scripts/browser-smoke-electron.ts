@@ -2980,6 +2980,129 @@ async function runLiveViewScenario(browser: BrowserHost, tabId: string, contents
   })()`,
     true,
   );
+  await runLiveViewPageCopy(browser, tabId, contents);
+}
+
+/**
+ * The page's own "Copy" button in a live view. The text it writes goes to the watching member when
+ * a member's click started it, also after the page loads again, and a write with no user action does
+ * not. The results go to `.openbot-build/browser-live-view-page-copy.json`.
+ */
+async function runLiveViewPageCopy(browser: BrowserHost, tabId: string, contents: WebContents): Promise<void> {
+  const copies: string[] = [];
+  const stopView = await runCauseEffect(
+    browser.startView(tabId, () => {}, undefined, { onPageCopy: (text) => copies.push(text) }),
+  );
+  try {
+    // The script must also run in a document that loads while the view is open.
+    const loaded = new Promise<void>((resolve) => contents.once("did-finish-load", () => resolve()));
+    contents.reload();
+    await loaded;
+    // The view arms the document that loaded. No user action is given to the page here.
+    const armedDeadline = Date.now() + 5_000;
+    let armed = false;
+    while (!armed && Date.now() < armedDeadline) {
+      armed = await contents.executeJavaScript("window[Symbol.for('openbot.pageCopy')]?.waits?.length > 0", false);
+      if (!armed) await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    // The earlier steps gave the page user actions, which stay active for a few seconds, also after
+    // a reload. The write below must come with none.
+    const idleDeadline = Date.now() + 12_000;
+    let idle = false;
+    while (!idle && Date.now() < idleDeadline) {
+      idle = !(await contents.executeJavaScript("navigator.userActivation.isActive", false));
+      if (!idle) await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (!idle) throw new Error("The page kept a user action, so a write with none cannot be checked.");
+    // No user action: the page writes on its own, and the member must not get it.
+    await contents
+      .executeJavaScript("navigator.clipboard.writeText('written without a click').catch(() => {})", false)
+      .catch(() => undefined);
+    await contents.executeJavaScript(
+      `(() => {
+      const make = (id, left, copy, top = 150) => {
+        const button = document.createElement('button');
+        button.id = id;
+        button.textContent = id;
+        button.style.cssText = 'position:fixed;width:200px;height:60px;z-index:2147483647;left:' + left + 'px;top:' + top + 'px';
+        button.addEventListener('click', copy);
+        document.body.append(button);
+      };
+      make('page-copy-api', 10, () => navigator.clipboard.writeText('copied by the page button'));
+      make('page-copy-command', 250, () => {
+        const once = (event) => { event.clipboardData.setData('text/plain', 'copied by the page command'); event.preventDefault(); };
+        document.addEventListener('copy', once, { once: true });
+        document.execCommand('copy');
+      });
+      // As the copy-to-clipboard library does: a selected element that stops its own copy event.
+      const library = (text, setData) => () => {
+        const mark = document.createElement('span');
+        mark.textContent = text;
+        document.body.append(mark);
+        const range = document.createRange();
+        range.selectNodeContents(mark);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+        mark.addEventListener('copy', (event) => {
+          event.stopPropagation();
+          if (setData) { event.preventDefault(); event.clipboardData.clearData(); event.clipboardData.setData('text/plain', text); }
+        });
+        document.execCommand('copy');
+        getSelection().removeAllRanges();
+        mark.remove();
+      };
+      make('page-copy-library', 10, library('copied by a library selection', false), 230);
+      make('page-copy-library-data', 250, library('copied by a library format', true), 230);
+    })()`,
+      true,
+    );
+    const click = async (id: string, expected: string) => {
+      const box = `document.getElementById('${id}').getBoundingClientRect()`;
+      const x = await contents.executeJavaScript(`(r => r.left + r.width / 2)(${box})`, true);
+      const y = await contents.executeJavaScript(`(r => r.top + r.height / 2)(${box})`, true);
+      if (!isNumber(x) || !isNumber(y)) throw new Error("A page copy button did not report a position.");
+      for (const action of ["move", "down", "up"] as const) {
+        await runCauseEffect(
+          browser.dispatchViewInput(tabId, {
+            type: "pointer",
+            action,
+            x,
+            y,
+            button: "left",
+            clickCount: action === "move" ? 0 : 1,
+            deltaX: 0,
+            deltaY: 0,
+            modifiers: 0,
+          }),
+        );
+      }
+      const deadline = Date.now() + 5_000;
+      while (!copies.includes(expected) && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50));
+    };
+    await click("page-copy-api", "copied by the page button");
+    await click("page-copy-command", "copied by the page command");
+    await click("page-copy-library", "copied by a library selection");
+    await click("page-copy-library-data", "copied by a library format");
+    const report = { armed, copies };
+    const reportDirectory = join(process.cwd(), ".openbot-build");
+    await mkdir(reportDirectory, { recursive: true });
+    await writeFile(join(reportDirectory, "browser-live-view-page-copy.json"), `${JSON.stringify(report, null, 2)}\n`);
+    if (!armed) throw new Error("The live view did not arm the page that loaded for page copies.");
+    if (copies.includes("written without a click"))
+      throw new Error("A page copy with no user action reached the member.");
+    for (const expected of [
+      "copied by the page button",
+      "copied by the page command",
+      "copied by a library selection",
+      "copied by a library format",
+    ]) {
+      if (!copies.includes(expected))
+        throw new Error(`A page copy did not reach the member: ${JSON.stringify(copies)}`);
+    }
+  } finally {
+    await Effect.runPromise(stopView());
+  }
 }
 
 /**

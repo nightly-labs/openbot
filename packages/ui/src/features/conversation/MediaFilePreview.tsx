@@ -16,6 +16,8 @@ export function MediaFilePreview(props: {
   preload?: "none" | "metadata";
   /** Plays at once: the user asked for it with the click that loaded the file. */
   autoplay?: boolean;
+  /** The file starts to play. */
+  onPlay?: (() => void) | undefined;
   /** Keeps the shape of a video that loaded before in this window. */
   attachmentId?: string | undefined;
   /** True while `onLoad` gets the video. */
@@ -52,6 +54,7 @@ export function MediaFilePreview(props: {
             preload={props.preload}
             src={url()}
             aria-label={props.name}
+            onPlay={() => props.onPlay?.()}
           >
             {/* Local files do not provide caption tracks. */}
             <track kind="captions" />
@@ -68,6 +71,7 @@ export function MediaFilePreview(props: {
             preload={props.preload}
             loading={props.loading}
             onLoad={props.onLoad}
+            onPlay={props.onPlay}
             onError={props.onError}
             fullControls
             onMetadata={(video) => {

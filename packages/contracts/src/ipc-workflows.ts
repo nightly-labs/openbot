@@ -440,11 +440,18 @@ export function workflowMediaSpecs(
   return { aspect, duration, resolution, transparent, size };
 }
 
-/** The model of an `image` node, or null when the node names a model the host does not know. */
-export function workflowMediaModel(fields: WorkflowFields): WorkflowMediaModel | null {
+/**
+ * The model of an `image` node, or null when the node names a model the host does not know. A model
+ * of `catalog`, the live models of the media services, comes before a fixed model with the same id.
+ */
+export function workflowMediaModel(
+  fields: WorkflowFields,
+  catalog: readonly WorkflowMediaModel[] = [],
+): WorkflowMediaModel | null {
   const kind = workflowMediaKind(fields);
   const id = typeof fields.model === "string" && fields.model !== "" ? fields.model : null;
-  return WORKFLOW_MEDIA_MODELS.find((model) => (id === null || model.id === id) && model.kinds.includes(kind)) ?? null;
+  const fits = (model: WorkflowMediaModel) => (id === null || model.id === id) && model.kinds.includes(kind);
+  return (id === null ? null : catalog.find(fits)) ?? WORKFLOW_MEDIA_MODELS.find(fits) ?? null;
 }
 
 export interface WorkflowPoint {
@@ -1123,5 +1130,145 @@ export function isWorkflowMediaCredits(value: unknown): value is WorkflowMediaCr
     isDynamicRecord(value) &&
     (value.sunra === null || isWorkflowMediaCreditBalance(value.sunra)) &&
     (value.higgsfield === null || isWorkflowMediaCreditBalance(value.higgsfield))
+  );
+}
+
+/** A media service whose model list the host reads live (`workflows-media-catalog-v1`). */
+export type WorkflowCatalogProvider = "sunra" | "higgsfield";
+export const WORKFLOW_CATALOG_PROVIDERS: readonly WorkflowCatalogProvider[] = ["sunra", "higgsfield"];
+export const WORKFLOW_MEDIA_CATALOG_MAX = 1000;
+
+/** The service of a catalog model id: its ids start with "sunra-" or "higgsfield-". */
+export const workflowCatalogProvider = (id: string): WorkflowCatalogProvider | null =>
+  id.startsWith("sunra-") ? "sunra" : id.startsWith("higgsfield-") ? "higgsfield" : null;
+const WORKFLOW_MEDIA_NAME_MAX = 160;
+const WORKFLOW_MEDIA_MAKER_MAX = 120;
+const WORKFLOW_MEDIA_RESOLUTION_MAX = 16;
+
+/**
+ * A model from the live model list of a media service. `durations` is empty for an image, and
+ * `resolutions` (the default first) is empty for a model with no resolution choice.
+ */
+export interface WorkflowMediaCatalogModel {
+  id: string;
+  provider: WorkflowCatalogProvider;
+  providerModel: string;
+  name: string;
+  maker: string;
+  kinds: readonly WorkflowMediaKind[];
+  aspects: readonly WorkflowMediaAspect[];
+  durations: readonly number[];
+  resolutions: readonly string[];
+  transparent: boolean;
+}
+
+/** The models of the signed-in media services. A service that did not answer gives its fixed models. */
+export interface WorkflowMediaCatalog {
+  models: readonly WorkflowMediaCatalogModel[];
+}
+
+const isListOf = <T>(value: unknown, max: number, item: (entry: unknown) => entry is T): value is readonly T[] =>
+  Array.isArray(value) && value.length <= max && value.every(item);
+
+export function isWorkflowMediaCatalogModel(value: unknown): value is WorkflowMediaCatalogModel {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.id) &&
+    isOneOf(WORKFLOW_CATALOG_PROVIDERS, value.provider) &&
+    isIdentifier(value.providerModel) &&
+    isBoundedString(value.name, WORKFLOW_MEDIA_NAME_MAX) &&
+    isBoundedString(value.maker, WORKFLOW_MEDIA_MAKER_MAX) &&
+    isListOf(value.kinds, 2, (entry): entry is WorkflowMediaKind => isOneOf(WORKFLOW_MEDIA_KINDS, entry)) &&
+    isListOf(value.aspects, 6, (entry): entry is WorkflowMediaAspect => isOneOf(WORKFLOW_MEDIA_ASPECTS, entry)) &&
+    isListOf(value.durations, 64, isCreditCount) &&
+    isListOf(value.resolutions, 16, (entry): entry is string =>
+      isBoundedString(entry, WORKFLOW_MEDIA_RESOLUTION_MAX),
+    ) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaCatalog(value: unknown): value is WorkflowMediaCatalog {
+  return isDynamicRecord(value) && isListOf(value.models, WORKFLOW_MEDIA_CATALOG_MAX, isWorkflowMediaCatalogModel);
+}
+
+/** The canvas model of a catalog entry. A model with no aspect ratio or no kind has no canvas model. */
+export function workflowCatalogMediaModel(entry: WorkflowMediaCatalogModel): WorkflowMediaModel | null {
+  const kind = entry.kinds[0];
+  if (kind === undefined || entry.aspects.length === 0) return null;
+  if (kind === "video" && entry.durations.length === 0) return null;
+  return {
+    id: entry.id,
+    provider: entry.provider,
+    providerModel: entry.providerModel,
+    name: entry.name,
+    maker: entry.maker,
+    subscription: entry.provider === "sunra" ? "Sunra" : "Higgsfield",
+    credits: true,
+    kinds: [kind],
+    voices: false,
+    aspects: entry.aspects,
+    ...(kind === "video" ? { durations: entry.durations } : {}),
+    resolutions: entry.resolutions,
+    transparent: kind === "image" && entry.transparent,
+  };
+}
+
+/** The catalog model of a fixed model of `WORKFLOW_MEDIA_MODELS`, with the choices that it has. */
+export function workflowFixedCatalogModel(
+  model: WorkflowMediaModel,
+  provider: WorkflowCatalogProvider,
+): WorkflowMediaCatalogModel {
+  const kind = model.kinds[0] ?? "image";
+  return {
+    id: model.id,
+    provider,
+    providerModel: model.providerModel ?? model.id,
+    name: model.name,
+    maker: model.maker,
+    kinds: [kind],
+    aspects: workflowMediaAspects(model, kind),
+    durations: kind === "video" ? workflowVideoDurations(model) : [],
+    resolutions: workflowMediaResolutions(model, kind),
+    transparent: kind === "image" && model.transparent === true,
+  };
+}
+
+/** The choices of a step whose price the host asks the media service for. */
+export interface WorkflowMediaPriceRequest {
+  /** The `id` of a catalog model. */
+  model: string;
+  kind: WorkflowMediaKind;
+  aspect: WorkflowMediaAspect;
+  /** Seconds. Only a video uses it. */
+  duration: number;
+  resolution: string | null;
+  transparent: boolean;
+}
+
+/** What one file costs, in the credits of the service, or null when the service gives no quote. */
+export interface WorkflowMediaPrice {
+  credits: number | null;
+}
+
+export const WORKFLOW_MEDIA_PRICE_MAX = 1_000_000_000;
+
+export function isWorkflowMediaPriceRequest(value: unknown): value is WorkflowMediaPriceRequest {
+  return (
+    isDynamicRecord(value) &&
+    isIdentifier(value.model) &&
+    isOneOf(WORKFLOW_MEDIA_KINDS, value.kind) &&
+    isOneOf(WORKFLOW_MEDIA_ASPECTS, value.aspect) &&
+    isCreditCount(value.duration) &&
+    (value.resolution === null || isBoundedString(value.resolution, WORKFLOW_MEDIA_RESOLUTION_MAX)) &&
+    isBoolean(value.transparent)
+  );
+}
+
+export function isWorkflowMediaPrice(value: unknown): value is WorkflowMediaPrice {
+  return (
+    isDynamicRecord(value) &&
+    (value.credits === null ||
+      (isFiniteNumber(value.credits) && value.credits >= 0 && value.credits <= WORKFLOW_MEDIA_PRICE_MAX))
   );
 }

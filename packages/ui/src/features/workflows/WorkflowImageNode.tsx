@@ -12,6 +12,7 @@ import {
   WORKFLOW_VIDEO_VOICES,
   type WorkflowMediaAspect,
   type WorkflowMediaKind,
+  type WorkflowMediaPriceRequest,
   type WorkflowMediaSize,
   workflowMediaAspects,
   workflowMediaResolutions,
@@ -230,6 +231,36 @@ function useElapsed(running: () => boolean) {
   return () => Math.max(0, Math.floor((now() - start) / 1000));
 }
 
+/**
+ * The price of one file with the choices of the step, in the credits of the service, or null while
+ * there is no quote. It asks again when a choice changes; an answer for older choices is dropped.
+ */
+function useMediaPrice(request: () => WorkflowMediaPriceRequest | null) {
+  const board = useBoard();
+  const [credits, setCredits] = createSignal<number | null>(null);
+  let asked = 0;
+  /** The choices as one string, so a new object with the same choices does not ask again. */
+  const key = () => {
+    const next = request();
+    return next && board.catalogs().mediaPrice ? JSON.stringify(next) : null;
+  };
+  createEffect(key, (choices) => {
+    asked += 1;
+    const sent = asked;
+    setCredits(null);
+    const next = untrack(request);
+    const quote = untrack(() => board.catalogs().mediaPrice);
+    if (!choices || !next || !quote) return;
+    quote(next).then(
+      (answer) => {
+        if (sent === asked) setCredits(answer.credits);
+      },
+      () => undefined,
+    );
+  });
+  return credits;
+}
+
 /** A glass chip on the media that opens a short list, as the aspect chip does. */
 function ChipMenu<T extends string>(props: {
   label: string;
@@ -316,7 +347,7 @@ function cardWidth(kind: WorkflowMediaKind, ratio: number): string | undefined {
  */
 export function ImageNode(props: { id: string; image?: string | undefined; prompt?: string; aspect?: Aspect }) {
   const board = useBoard();
-  const { t } = useText();
+  const { t, format } = useText();
   const [kind] = useField<WorkflowMediaKind>(() => props.id, "media", "image", oneOf(WORKFLOW_MEDIA_KINDS));
   const text = (key: keyof (typeof KIND_TEXT)["image"]) => t(KIND_TEXT[kind()][key]);
   const [prompt, setPrompt] = useTextField(
@@ -368,6 +399,21 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
       model(),
     );
   const resolutions = () => workflowMediaResolutions(model(), kind());
+  /** A Sunra or Higgsfield step shows what one file costs with its choices. */
+  const price = useMediaPrice(() => {
+    const chosen = model();
+    if (!chosen?.credits || (chosen.provider !== "sunra" && chosen.provider !== "higgsfield")) return null;
+    const { aspect, duration, resolution, transparent } = specs();
+    return { model: chosen.id, kind: kind(), aspect, duration, resolution, transparent };
+  });
+  const runText = () => {
+    const credits = price();
+    return credits === null ? t("workflow.node.run") : t("workflow.node.runPrice", { credits: format.number(credits) });
+  };
+  const runLabel = () => {
+    const credits = price();
+    return credits === null ? undefined : t("workflow.node.runPriceLabel", { credits: format.number(credits) });
+  };
   /**
    * The shape of the card: the custom size, else the aspect ratio that the model makes. A custom size
    * stays from 9:16 to 16:9, so the card holds its controls; the picture fills the card.
@@ -718,9 +764,10 @@ export function ImageNode(props: { id: string; image?: string | undefined; promp
                       loading={making()}
                       disabled={!runnable() || locked() || !model()}
                       onClick={run.start}
+                      aria-label={runLabel()}
                     >
                       <Play aria-hidden="true" />
-                      {t("workflow.node.run")}
+                      {runText()}
                     </Button>
                   }
                 >

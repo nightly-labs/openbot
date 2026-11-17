@@ -428,10 +428,10 @@ export const messages = {
   "connector.whatsapp.rowAction": "{action}: {name}",
   "connector.whatsapp.ownNumber": "رقم شخصي",
   "connector.whatsapp.ownNumberDescription":
-    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. أوقف هذا الخيار لرقم مخصص لـ OpenBot فقط.",
+    "يمكن فقط لدردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم المراسلة. لا يتلقى الآخرون أي رد. عند إيقافه، يرد OpenBot على الأشخاص غير المعروفين برمز.",
   "connector.whatsapp.workingMessage": "رسالة «جارٍ العمل على ذلك…»",
   "connector.whatsapp.workingMessageDescription":
-    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. أوقفها لإرسال الإجابة فقط.",
+    "يرسلها OpenBot أثناء عمل الوكيل، ثم يستبدلها بالإجابة. ويرسل أيضًا رسالة انتظار عندما ينتظر طلبٌ طلبًا سابقًا. أوقفها لإرسال الإجابة فقط.",
   "connector.whatsapp.statusReactions": "تفاعلات الحالة",
   "connector.whatsapp.statusReactionsDescription":
     "يتفاعل OpenBot بـ 👀 عند وصول رسالة، وبـ ✅ عندما تصبح الإجابة جاهزة. أوقفها لعدم إرسال أي تفاعلات.",
@@ -448,9 +448,11 @@ export const messages = {
   "connector.whatsapp.connectDescriptionHost": "اختر الرقم، ثم اربط هذا الخادم من WhatsApp على هاتفك.",
   "connector.whatsapp.kindLabel": "الرقم",
   "connector.whatsapp.kindPersonal": "رقمي الشخصي",
-  "connector.whatsapp.kindPersonalDescription": "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم.",
+  "connector.whatsapp.kindPersonalDescription":
+    "يجيب OpenBot فقط عن دردشة «مراسلة نفسك» والأشخاص الذين تسمح لهم. لا يتلقى الآخرون أي رد.",
   "connector.whatsapp.kindDedicated": "رقم مخصص لـ OpenBot فقط",
-  "connector.whatsapp.kindDedicatedDescription": "يحصل الأشخاص غير المعروفين على رمز ليعطوه لك. توافق عليهم هنا.",
+  "connector.whatsapp.kindDedicatedDescription":
+    "يرد OpenBot من هذا الرقم على كل شخص غير معروف برمز ليعطيه لك. توافق عليهم هنا.",
   "connector.whatsapp.methodLabel": "طريقة الربط",
   "connector.whatsapp.methodQr": "رمز QR",
   "connector.whatsapp.methodCode": "رمز الإقران",

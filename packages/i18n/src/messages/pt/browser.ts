@@ -67,6 +67,7 @@ export const messages = {
   "browser.liveView.pasteTooLong": "Este texto é longo demais para colar. Cole menos de 100.000 caracteres.",
   "browser.liveView.copyTooLarge": "A seleção é longa demais para copiar. Selecione menos texto.",
   "browser.liveView.copyFailed": "Não foi possível copiar o texto. Clique na página e tente de novo.",
+  "browser.liveView.pageCopied": "A página copiou texto. Escolha Copiar para colocá-lo na sua área de transferência.",
   "browser.previews.label": "Prévias do navegador",
   "browser.previews.resize": "Redimensionar painel direito",
   "browser.previews.empty": "Nenhuma aba do navegador",

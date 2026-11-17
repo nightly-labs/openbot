@@ -174,6 +174,7 @@ function BrowserView({
     tab?.id ?? null,
     allowed && online && support.view && appForeground,
     (menu) => contextMenu.current(menu),
+    (text) => void copyText(text),
   );
   const [mode, setMode] = useState<LiveViewMode>(rememberedMode);
   const stage = useRef<BrowserLiveStageHandle>(null);

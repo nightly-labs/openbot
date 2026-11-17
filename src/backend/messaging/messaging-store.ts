@@ -9,6 +9,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "../database/database-rows";
+import { withTransaction } from "../database/sqlite-transaction";
 import type { OpenBotDatabase } from "../openbot-database";
 
 /** One workspace of a platform, where every agent of this computer can answer. */
@@ -186,9 +187,7 @@ export class MessagingStore {
   /** Replaces the role list of a connection at once. A role kept from before keeps its place. */
   replaceAllowedRoles(connectionId: string, roles: readonly MessagingAllowedRole[]): void {
     const db = this.#database.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       const kept = new Set(roles.map((role) => role.id));
       for (const current of this.allowedRoles(connectionId))
         if (!kept.has(current.id))
@@ -203,12 +202,7 @@ export class MessagingStore {
          ON CONFLICT(connection_id, role_id) DO UPDATE SET role_name = excluded.role_name`,
       );
       for (const role of roles) upsert.run(connectionId, role.id, role.name, now);
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** The WhatsApp contacts and groups that can give work here, oldest first. */
@@ -247,9 +241,7 @@ export class MessagingStore {
   /** Records each person that a post pinged. A newer post in the thread replaces the text and the agent. */
   savePings(input: MessagingPingInput): void {
     const db = this.#database.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       const upsert = db.prepare(
         `INSERT INTO projection_messaging_pings
            (connection_id, platform_channel_id, thread_key, user_id, agent_id, text, created_at)
@@ -268,12 +260,7 @@ export class MessagingStore {
           input.text,
           now,
         );
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      // SQLite may have rolled back already, and a second ROLLBACK would replace the error that did it.
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   /** The people that agents' posts pinged in a thread. Empty for a thread that no ping opened. */

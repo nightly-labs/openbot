@@ -20,6 +20,7 @@ import {
   requiredNumberColumn,
   requiredStringColumn,
 } from "./database/database-rows";
+import { withTransaction, withTransactionAsync } from "./database/sqlite-transaction";
 import { LineTooLongError } from "./jsonl";
 import { getString, isRecord, type ThreadItem } from "./protocol";
 import { providerFailure } from "./provider-client-effects";
@@ -258,8 +259,7 @@ async function buildIndex(
   );
   let nextOffset = startOffset;
   let lineNumber = 0;
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  return withTransactionAsync(database, async () => {
     for await (const record of readTranscriptLines(filePath, signal, startOffset, fileSize)) {
       if (signal.aborted) throw signal.reason;
       const parsed = record.complete ? parseRecord(record.line.trim()) : null;
@@ -296,12 +296,8 @@ async function buildIndex(
       if (lineNumber % 256 === 0) await new Promise<void>((resume) => setImmediate(resume));
     }
     writeHistoryState(database, identity, nextOffset, await scanBoundaryHash(filePath, nextOffset));
-    database.exec("COMMIT");
     return nextOffset;
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function* readTranscriptLines(
@@ -403,25 +399,13 @@ function writeHistoryState(database: DatabaseSync, identity: FileIdentity, scanO
 }
 
 function resetIndex(database: DatabaseSync): void {
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  withTransaction(database, () => {
     database.exec("DELETE FROM entries; DELETE FROM selected; DELETE FROM turn_metadata; DELETE FROM history_meta;");
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function selectConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
-  database.exec("BEGIN IMMEDIATE");
-  try {
-    await writeSelectedConversation(database, signal);
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  await withTransactionAsync(database, () => writeSelectedConversation(database, signal));
 }
 
 async function writeSelectedConversation(database: DatabaseSync, signal: AbortSignal): Promise<void> {
@@ -536,8 +520,7 @@ async function populateTurnMetadata(
   const insert = database.prepare(
     "INSERT OR REPLACE INTO turn_metadata (turn_id, start_seq, end_seq, timestamp, final_answer_uuid) VALUES (?, ?, ?, ?, ?)",
   );
-  database.exec("BEGIN IMMEDIATE");
-  try {
+  await withTransactionAsync(database, async () => {
     database.exec("DELETE FROM turn_metadata");
     const file = includeAnswerMetadata ? await open(filePath, "r") : null;
     try {
@@ -553,11 +536,7 @@ async function populateTurnMetadata(
     } finally {
       if (file) await file.close();
     }
-    database.exec("COMMIT");
-  } catch (cause) {
-    database.exec("ROLLBACK");
-    throw cause;
-  }
+  });
 }
 
 async function findFinalAnswer(

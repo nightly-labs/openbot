@@ -1,5 +1,7 @@
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
+import { dirname } from "node:path";
 import { attachmentMimeTypeForName } from "@openbot/contracts/attachment-files";
+import { isChatVisualMimeType } from "@openbot/contracts/chat-visual";
 import { ATTACHMENT_LIMITS } from "@openbot/contracts/input-limits";
 import { type FilePreview, filePreviewKindForFile } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
@@ -29,7 +31,13 @@ export const localFilePreview = Effect.fn("FilePreview.local")(function* (
   // A file over the limit is not read. The panel still opens, reveals and saves it by its path.
   const kind = size > Math.min(maxBytes, ATTACHMENT_LIMITS.fileBytes) ? "none" : filePreviewKindForFile(name, mimeType);
   const bytes = kind === "none" ? null : new Uint8Array(yield* attachmentCall(() => readFile(path)));
-  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation) : undefined;
+  // A page can load the images next to its file, so it gets the real folder of the file. Without
+  // the folder, the page still shows, as before.
+  const folder =
+    bytes && isChatVisualMimeType(mimeType)
+      ? yield* attachmentCall(() => realpath(dirname(path))).pipe(Effect.orElseSucceed(() => undefined))
+      : undefined;
+  const pageUrl = bytes ? filePreviewPages.add(mimeType, bytes, generation, folder) : undefined;
   return {
     name,
     size,

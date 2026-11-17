@@ -1,11 +1,13 @@
 import { sourceText } from "@openbot/i18n/source";
-import { CANCEL_TEXT } from "../messaging-types";
+import { CANCEL_TEXT, chatFailureReason } from "../messaging-types";
 
 /**
  * OpenBot 0.70 and older ended each post in the owner's own chat with a line of blank braille
  * characters (U+2800). A person does not type this line, so a message with it is another OpenBot's post.
  */
 const OLD_SPACER = /\n⠀{8,}\s*$/u;
+/** The waiting post of OpenBot 0.72 and older, which another OpenBot on the same number still posts. */
+const OLD_QUEUED = "Waiting: OpenBot is working on another request. The answer comes here.";
 /** The limit counts spans of this length that have a request, so a burst of messages counts once. */
 const SELF_CHAT_SPAN_MS = 10_000;
 /**
@@ -29,6 +31,7 @@ let known: { posts: ReadonlySet<string>; menus: readonly string[] } | null = nul
 function openBotPosts(): { posts: ReadonlySet<string>; menus: readonly string[] } {
   known ??= {
     posts: new Set([
+      OLD_QUEUED,
       sourceText("status.messaging.queued"),
       sourceText("status.messaging.busy"),
       sourceText("status.messaging.failed"),
@@ -57,7 +60,13 @@ function openBotPosts(): { posts: ReadonlySet<string>; menus: readonly string[] 
 export function isOtherOpenBotPost(text: string): boolean {
   const { posts, menus } = openBotPosts();
   const trimmed = text.trim();
-  return OLD_SPACER.test(text) || posts.has(trimmed) || menus.some((menu) => trimmed.endsWith(menu));
+  return (
+    OLD_SPACER.test(text) ||
+    posts.has(trimmed) ||
+    // The reason of a failed request, which a chat gets in place of the general failure text.
+    chatFailureReason(trimmed) !== null ||
+    menus.some((menu) => trimmed.endsWith(menu))
+  );
 }
 
 /**

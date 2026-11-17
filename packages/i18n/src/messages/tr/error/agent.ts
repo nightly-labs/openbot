@@ -64,6 +64,8 @@ export const messages = {
   "error.agent.modelNotListed": '"{model}" modeli mevcut değil. Kullanılabilir modeller: {models}.',
   "error.agent.providerNotListed":
     "Şu anda hiçbir {provider} modeli mevcut değil. Kullanılabilir modelleri görmek için list_models çağrısı yapın.",
+  "error.agent.creatorModelNotListed":
+    '"{model}" modeliniz şu anda model listesinde yok, bu yüzden yeni ajan bu modelle başlayamaz. Birkaç saniye sonra yeniden deneyin veya provider ve model alanlarına list_models\'in gösterdiği bir model yazın.',
   "error.agent.reasoningEffortUnsupported":
     '"{model}" modeli "{effort}" akıl yürütme eforunu desteklemiyor. Desteklenen eforlar: {efforts}.',
   "error.agent.reasoningEffortNotConfigurable":
@@ -95,6 +97,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.promptCancelled": "{provider} bu mesajı başlamadan önce iptal etti. Mesajı yeniden gönderin.",
   "error.agent.toolLoopStopped":
     "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",

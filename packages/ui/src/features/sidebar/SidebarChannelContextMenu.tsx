@@ -38,8 +38,10 @@ export function SidebarChannelContextMenu(menuProps: { channel: ChannelSummary; 
         </ContextMenu.Item>
         <Show when={props.onDeleteChannel}>
           <ContextMenu.Separator />
+          {/* The host refuses to delete a channel while a task runs there: the user stops it first. */}
           <ContextMenu.Item
             class="ui-action-menu-danger agent-context-danger"
+            disabled={menuProps.channel.activeTasks > 0}
             onSelect={() => openDelete("channel", menuProps.channel.id)}
           >
             <DeleteIcon />

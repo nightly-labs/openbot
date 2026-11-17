@@ -135,6 +135,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Routine-Aktivität einklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Aufeinanderfolgende Routine-Ereignisse in einem Chat erscheinen als eine eingeklappte Zeile. Tippe auf die Zeile, um sie anzuzeigen.",
+  "mobile.settings.appearance.replyDetails": "Antwortdetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Schalte ein Detail aus, um seine Zeile in Chats auszublenden. Der Agent denkt weiter, startet Subagenten und speichert Erinnerungen.",
+  "mobile.settings.appearance.showThinking": "Denken des Agenten zeigen",
+  "mobile.settings.appearance.showSubagents": "Subagenten zeigen",
+  "mobile.settings.appearance.showMemoryChanges": "Gespeicherte Erinnerungen zeigen",
   "mobile.settings.appearance.fullVisuals": "Ganze visuelle Vorschauen zeigen",
   "mobile.settings.appearance.fullVisualsFooter":
     "Ein Visual eines Agenten erscheint im Chat in voller Höhe. Wenn dies aus ist, wird ein hohes Visual abgeschnitten. Tippe darauf, um alles zu sehen.",
@@ -253,8 +259,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Wischen nach rechts im Agent-Chat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Aus",
   "mobile.settings.conversations.swipeFooter":
-    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Ein Wischen auf einer Nachricht antwortet weiter darauf.",
+    "Ein Wischen weg von Zurück im Chat eines Agenten öffnet dies. Dasselbe Wischen auf einer Nachricht zeigt die Uhrzeiten der Nachrichten.",
   "mobile.settings.conversations.pullInfo": "Nach oben ziehen für Info",
   "mobile.settings.conversations.pullInfoFooter":
     "Ziehe in einem Chat, Kanal oder Thread über die letzte Nachricht hinaus nach oben und lass los, um die Info zu öffnen.",
@@ -528,6 +535,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Der Prozess konnte nicht gestoppt werden.",
   "mobile.settings.agents.processes.stopTitle": "Dieses Programm stoppen?",
   "mobile.settings.agents.processes.stopLabel": "Prozess {pid} stoppen",
+  "mobile.settings.quickActions.title": "App-Symbol-Menü",
+  "mobile.settings.quickActions.footer":
+    "Halte das OpenBot-Symbol gedrückt, um diese Aktionen zu sehen. Du kannst bis zu {count} aktivieren.",
+  "mobile.settings.quickActions.latestChat": "Letzter Chat",
+  "mobile.settings.quickActions.secondChat": "Vorletzter Chat",
   "mobile.settings.shortcuts.title": "Kurzbefehle",
   "mobile.settings.shortcuts.agent": "Agent",
   "mobile.settings.shortcuts.none": "Keiner",

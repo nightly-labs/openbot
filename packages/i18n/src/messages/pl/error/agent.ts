@@ -63,6 +63,8 @@ export const messages = {
   "error.agent.modelNotListed": "Model „{model}” jest niedostępny. Dostępne modele: {models}.",
   "error.agent.providerNotListed":
     "Żaden model {provider} nie jest teraz dostępny. Wywołaj list_models, aby zobaczyć dostępne modele.",
+  "error.agent.creatorModelNotListed":
+    "Twojego modelu „{model}” nie ma teraz na liście modeli, więc nowy agent nie może na nim wystartować. Spróbuj ponownie za kilka sekund albo ustaw provider i model na model, który pokazuje list_models.",
   "error.agent.reasoningEffortUnsupported":
     "Model „{model}” nie obsługuje poziomu rozumowania „{effort}”. Obsługiwane poziomy: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":
@@ -95,6 +97,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
   "error.agent.turnStalled":
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
+  "error.agent.promptCancelled": "{provider} anulował tę wiadomość, zanim się zaczęła. Wyślij wiadomość ponownie.",
   "error.agent.toolLoopStopped":
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
   "error.agent.answerCutOff":

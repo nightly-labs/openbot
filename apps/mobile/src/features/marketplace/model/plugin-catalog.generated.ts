@@ -45,7 +45,14 @@ export type MobilePluginAuthFlow =
 
 type MobilePluginServer =
   | { name: string; transport: "http"; url: string; earlierUrls?: string[]; auth?: MobilePluginAuthFlow[] }
-  | { name: string; transport: "stdio"; command: string; args: string[]; auth?: MobilePluginAuthFlow[] };
+  | {
+      name: string;
+      transport: "stdio";
+      command: string;
+      args: string[];
+      env?: Record<string, string>;
+      auth?: MobilePluginAuthFlow[];
+    };
 
 export interface MobilePluginApp {
   id: string;
@@ -211,7 +218,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
       "Obsidian lets agents search, read and write the notes in your vault, so the vault can be their memory. The local server connects to the Local REST API plugin in the Obsidian app on this computer. The plugin's API key is passed to the local server as one environment variable. Keep Obsidian open while agents use it.",
     category: "productivity",
     creatorName: "Obsidian",
-    version: "1.0.0",
+    version: "1.1.0",
     prompts: [
       { id: "prompt-recall", text: "What do my notes say about the decisions on this project?" },
       { id: "prompt-save", text: "Save this decision as a new note in my vault." },
@@ -231,6 +238,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
           transport: "stdio",
           command: "npx",
           args: ["-y", "obsidian-mcp-server@3.7.2"],
+          env: { OBSIDIAN_BASE_URL: "https://127.0.0.1:27124" },
           auth: [
             {
               id: "obsidian-key",
@@ -241,7 +249,7 @@ export const MOBILE_PLUGINS: readonly MobilePlugin[] = [
                   id: "token",
                   label: "API key",
                   env: "OBSIDIAN_API_KEY",
-                  hint: 'In Obsidian, open Settings > Local REST API. Copy the API key and turn on "Enable non-encrypted (HTTP) server".',
+                  hint: "In Obsidian, open Settings > Local REST API and copy the API key.",
                 },
               ],
               docsUrl: "https://github.com/coddingtonbear/obsidian-local-rest-api",

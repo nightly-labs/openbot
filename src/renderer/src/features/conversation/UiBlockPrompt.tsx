@@ -10,6 +10,7 @@ import {
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
+  uiConfirmAnswersWithPreview,
 } from "@openbot/contracts/ui-blocks";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -33,6 +34,8 @@ export interface UiBlockPromptProps {
    * in the history, which only shows its stored state.
    */
   onAnswer?: ((answers: Record<string, string[]>, options?: PromptAnswerOptions) => Promise<boolean>) | undefined;
+  /** The host reads an edited confirm preview (`ui-block-preview-edit-v1`), so the card can edit it. */
+  canEditPreview?: boolean | undefined;
   /** The answer went through and the card shows it. */
   onAnswered?: (() => void) | undefined;
   /** Gets the card's element, and undefined once the card is gone. */
@@ -134,10 +137,10 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
     props.onAnswered?.();
   }
 
-  function respond(response: UiBlockResponse): void {
+  function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    void send(uiBlockAnswersFromResponse(spec, response), {
+    void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
@@ -238,6 +241,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
+        canEditPreview={props.canEditPreview}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (

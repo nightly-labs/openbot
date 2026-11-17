@@ -181,6 +181,8 @@ function failure(reason: string) {
   return new VideoReadFailed({ reason: reason.slice(0, MAX_REASON_LENGTH) });
 }
 
+const YOUTUBE_BOT_CHECK = /^ERROR:\s*\[youtube[^\]]*\].*Sign in to confirm you/iu;
+
 /** The last `ERROR:` line of yt-dlp, without the site and video id in front of it. */
 function ytDlpReason(error: unknown): string {
   const stderr =
@@ -192,6 +194,11 @@ function ytDlpReason(error: unknown): string {
     .reverse()
     .find((entry) => entry.startsWith("ERROR:"));
   if (!line) return "OpenBot could not get the video from this link.";
+  // YouTube asks for a sign-in from many server and data center addresses. yt-dlp then gives
+  // cookie options that neither the agent nor the user can set here.
+  if (YOUTUBE_BOT_CHECK.test(line)) {
+    return "YouTube does not let this computer download its videos: it asks for a sign-in to show that this is not a bot. This often happens on a server. Open the video page with openbot_browser to read it.";
+  }
   const message = line.replace(/^ERROR:\s*(\[[^\]]*\]\s*)?([^:\s]+:\s+)?/u, "").trim();
   return `OpenBot could not get the video: ${message}`;
 }

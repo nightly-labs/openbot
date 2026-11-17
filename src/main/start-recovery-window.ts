@@ -2,6 +2,8 @@
 // in a row (`start-attempts.ts`). It must work when the normal start does not: it has no preload, no
 // IPC, no renderer bundle and no database. The main process writes the page as a `data:` URL, and
 // its buttons are links to fixed URLs that the main process stops and handles.
+
+import { isValidSemver } from "@openbot/contracts/release-version";
 import type { AppTranslate, TranslatedLocale } from "@openbot/i18n";
 import { localeDirection } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
@@ -10,7 +12,6 @@ import { runCauseEffect } from "../backend/effect-boundary";
 import { exportStartDiagnostics } from "./maintenance-service";
 import type { StartAttemptsSummary } from "./start-attempts";
 import { recoveryPlushSvg } from "./start-recovery-plush";
-import { isValidSemver } from "./update-service";
 
 const logger = createOpenBotLogger("start-recovery");
 const RELEASES_URL = "https://github.com/nightly-labs/openbot/releases";
