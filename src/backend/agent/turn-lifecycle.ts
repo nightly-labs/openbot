@@ -1755,7 +1755,7 @@ export class TurnLifecycle {
     }
     // Only when the reply is all that the turn misses: a turn that cannot end quiet for another
     // reason, such as a person's message or a task thread, shows its answer anyway.
-    return this.#quietRoutineTurn(agentId, threadId, deliveries, true, true) ? "unanswered" : "shown";
+    return this.#quietRoutineTurn(agentId, threadId, deliveries, true, () => true) ? "unanswered" : "shown";
   }
 
   /** Whether a running turn ends quiet after its no-update call (#6247), a channel routine turn too (#7166). */
@@ -1862,15 +1862,15 @@ export class TurnLifecycle {
    * Only a turn that runs nothing but quiet routine runs, teammate updates and answered teammate
    * requests, in the agent's own chat or in a routine's side thread: not in a channel, a messaging
    * thread or another task. After a call to the no-update tool (`noUpdateCalled`), a teammate's
-   * answer to a quiet routine run counts too (`#continuesQuietRun`). With `assumeAnswered`, a teammate
-   * request counts before its reply.
+   * answer to a quiet routine run counts too (`#continuesQuietRun`). A teammate request counts also
+   * when `answered` accepts it: before its reply, or when the turn end sends its result (#8021).
    */
   #quietRoutineTurn(
     agentId: string,
     threadId: string | null,
     deliveries: readonly DeliveryContext[],
     noUpdateCalled = false,
-    assumeAnswered = false,
+    answered: (delivery: QueueDelivery) => boolean = () => false,
   ): boolean {
     const publicThreadId = threadId === null ? null : this.#conversation.publicThreadId(agentId, threadId);
     return (
@@ -1879,7 +1879,7 @@ export class TurnLifecycle {
         (publicThreadId !== null && this.#hooks.isRoutineThread(publicThreadId))) &&
       deliveries.every(
         ({ delivery }) =>
-          (assumeAnswered && teammateRequest(delivery)) ||
+          (teammateRequest(delivery) && answered(delivery)) ||
           this.#quietTeammateTurnDelivery(delivery) ||
           (delivery.sender.kind === "routine" && this.#hooks.quietRoutineDelivery(delivery.id)) ||
           (noUpdateCalled && this.#continuesQuietRun(delivery)),
@@ -2247,6 +2247,13 @@ export class TurnLifecycle {
       if (deliveries.some((delivery) => delivery.delivery.sender.kind === "agent")) {
         dropPlaceholderAnswers(snapshot, turnId);
       }
+      // A quiet turn keeps no answer, so the result for a teammate's request is read before it settles.
+      const answerText = latestTurnAnswer(snapshot.messages, turnId)?.text;
+      // A teammate's request that the agent did not answer itself gets the turn's answer as its result
+      // below, so that answer is in the teammate's chat and nobody waits for it here (#8021).
+      const resultSent = (delivery: QueueDelivery) =>
+        !this.#conversation.isExecutionThread(snapshot.threadId) &&
+        this.#sendsResult(agentId, turnId, delivery, deliveries, answerText);
       // Only a turn that ran nothing but scheduled, script or webhook runs, teammate updates and
       // answered teammate requests: a person who wrote in the same turn, or who started a Test run,
       // waits for the answer. The owner
@@ -2255,7 +2262,7 @@ export class TurnLifecycle {
       const quiet =
         outcome === "completed" &&
         reportedFailure === undefined &&
-        (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled)
+        (this.#quietRoutineTurn(agentId, snapshot.threadId, deliveries, noUpdateCalled, resultSent)
           ? settleQuietRoutineTurn(
               snapshot,
               turnId,
@@ -2331,15 +2338,18 @@ export class TurnLifecycle {
         // A turn can start with the answers of several teammates. `#relayAgentResult` skips each one
         // that wants no answer, so only a teammate that asked for a result gets one.
         if (!continuation && !this.#conversation.isExecutionThread(snapshot.threadId) && terminal === "completed") {
+          // A quiet turn's answer is a quiet answer now, so the result is the answer from before it settled.
+          const resultText = quiet ? answerText : latestAssistant?.text;
           // A turn with no answer text can still have run tools and made files. The note says so, or
           // the agent that asked sends the same work again (#8214).
-          const noResult = latestAssistant
-            ? ""
-            : noResultNote(snapshot.messages, turnId, trace, subagents?.subagents, (text) =>
-                redactText(this.#hooks.redactMcp(text)),
-              );
+          const noResult =
+            resultText !== undefined
+              ? ""
+              : noResultNote(snapshot.messages, turnId, trace, subagents?.subagents, (text) =>
+                  redactText(this.#hooks.redactMcp(text)),
+                );
           for (const delivery of deliveries)
-            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, latestAssistant?.text, noResult);
+            yield* this.#relayAgentResult(agentId, turnId, delivery, deliveries, resultText, noResult);
         }
         // A failed turn sends no result, so the agent that asked gets the failure as its answer. A stop
         // ends a request steered into the turn too, so its sender gets a note and does not wait.
@@ -2738,21 +2748,24 @@ export class TurnLifecycle {
       );
   }
 
-  readonly #relayAgentResult = Effect.fn("TurnLifecycle.relayAgentResult")(function* (
-    this: TurnLifecycle,
+  /**
+   * Whether the end of this turn sends its answer (`text`) to the teammate who sent `delivery`, as the
+   * result of its request. The turn's lane must also allow it: a task or another side thread sends no
+   * result. The quiet decision of the turn uses the same check (#8021).
+   */
+  #sendsResult(
     agentId: string,
     turnId: string,
-    delivery: DeliveryContext,
+    delivery: QueueDelivery,
     turnDeliveries: readonly DeliveryContext[],
     text: string | undefined,
-    noResult: string,
-  ) {
-    if (delivery.delivery.sender.kind !== "agent") return;
-    const messageId = delivery.delivery.messageId;
+  ): boolean {
+    if (delivery.sender.kind !== "agent") return false;
+    const messageId = delivery.messageId;
     const originAgentId = this.#mailbox.chainOriginAgentId(messageId);
-    const recipientAgentId = delivery.delivery.sender.agentId;
+    const recipientAgentId = delivery.sender.agentId;
     // The user deleted the agent that asked. A result for it would make the agent again (#6106).
-    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) return;
+    if (!this.#store.list().some((agent) => agent.id === recipientAgentId)) return false;
     // The requests of this sender that the turn read. A reply to one of them answers only that one.
     const requestIds = new Set(
       turnDeliveries
@@ -2764,7 +2777,7 @@ export class TurnLifecycle {
         )
         .map(({ delivery: other }) => other.messageId),
     );
-    if (
+    return !(
       !originAgentId ||
       originAgentId === agentId ||
       // The sender said it wants no answer, so the turn's result stays with this agent. Without
@@ -2773,15 +2786,28 @@ export class TurnLifecycle {
       this.#mailbox.hasReplyFrom(agentId, messageId) ||
       this.#mailbox.hasAgentMessageFromTurnTo(agentId, turnId, recipientAgentId, requestIds) ||
       // A turn with no answer that passed work on to a teammate waits for that answer: its result comes later.
-      (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId))
-    )
-      return;
+      (text === undefined && this.#mailbox.hasRequestFromTurn(agentId, turnId)) ||
+      // A request steered into a turn for other work has no answer of its own: the turn's answer is for
+      // the person or another request, so it does not go to the sender. The request text asks for a
+      // `send_message` reply. No "no reply" note either: Claude can still answer a late steer in a turn
+      // of its own after this end (`moveSteerToTurn`).
+      this.#mailbox.steeredIntoOtherWork(delivery.id)
+    );
+  }
 
-    // A request steered into a turn for other work has no answer of its own: the turn's answer is for
-    // the person or another request, so it does not go to the sender. The request text asks for a
-    // `send_message` reply. No "no reply" note either: Claude can still answer a late steer in a turn
-    // of its own after this end (`moveSteerToTurn`).
-    if (this.#mailbox.steeredIntoOtherWork(delivery.delivery.id)) return;
+  readonly #relayAgentResult = Effect.fn("TurnLifecycle.relayAgentResult")(function* (
+    this: TurnLifecycle,
+    agentId: string,
+    turnId: string,
+    delivery: DeliveryContext,
+    turnDeliveries: readonly DeliveryContext[],
+    text: string | undefined,
+    noResult: string,
+  ) {
+    if (delivery.delivery.sender.kind !== "agent") return;
+    if (!this.#sendsResult(agentId, turnId, delivery.delivery, turnDeliveries, text)) return;
+    const messageId = delivery.delivery.messageId;
+    const recipientAgentId = delivery.delivery.sender.agentId;
     // A result for a request from a side thread runs in that thread, as an answer with send_message does.
     const answerTaskId = this.#mailbox.answerTaskId(agentId, messageId, [recipientAgentId]);
     const taskId = answerTaskId && this.#hooks.taskOpen(answerTaskId) ? answerTaskId : undefined;

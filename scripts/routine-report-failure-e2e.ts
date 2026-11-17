@@ -7,7 +7,8 @@
 // still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
 // a teammate's update that wants no answer can end quiet (#6821), that a teammate's answer to a
 // request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
-// teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
+// teammate's request can end quiet after the agent sent its result to that teammate (#7465) or after
+// OpenBot sent the turn's answer to it (#8021), that
 // a flow skips the agents after a failed owner or linked step, that a result destination gets the
 // answer of a reported failure but not of a provider failure, that a failed run does not pause its
 // own routine in either call order (#9856), and that a routine that its own run paused says which run
@@ -595,13 +596,35 @@ try {
       latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
     textRequest,
   );
+  // With no reply, OpenBot sends the turn's answer to the teammate as its result. The teammate has it,
+  // so the turn ends quiet too, and the history import decides the same (#8021).
   const unanswered = await requestTurnOf("Check the site build. TEAMMATE-REQUEST-NOREPLY");
+  const unansweredMessageId = /Message ID: (\S+)/.exec(unanswered.turn.text ?? "")?.[1];
+  const sentResults = await waitFor("the result for the unanswered request", () => {
+    const results = agents
+      .listQueue(relay.id)
+      .deliveries.filter(
+        (delivery) =>
+          delivery.sender.kind === "agent" &&
+          delivery.sender.agentId === checker.id &&
+          delivery.replyToMessageId === unansweredMessageId,
+      );
+    return results.length > 0 && results;
+  });
+  const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply keeps its answer in the chat",
+    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet !== true &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good.",
-    unanswered,
+      unanswered.event.quiet === true &&
+      unanswered.answers.some((message) => message.text === "All good.") &&
+      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      sentResults.length === 1 &&
+      sentResults[0]?.text.includes("All good.") === true &&
+      unansweredDelivery !== undefined &&
+      !mailbox.hasOwnReplyFrom(unansweredDelivery.id) &&
+      mailbox.hasSentResultFor(unansweredDelivery.id),
+    { unanswered, sentResults, unansweredDelivery },
   );
 
   // A Test run that reports a failure.

@@ -90,10 +90,14 @@ load the tool, which waits behind its tool search. When only answered requests s
 its answers are text alone, that text repeats the reply, so it becomes quiet answers as after the tool
 call. A file, an image or a question keeps the whole turn in the chat. The tool still accepts a
 request: before the reply it answers that the agent must send the result first, but only when the
-missing reply is all that keeps the turn from a quiet end. Only the agent's own reply from the turn
-that ran the request counts (`MailboxStore.hasOwnReplyFrom`): the result that OpenBot relays when the
-turn ends, the note for a failed request and a reply from a later turn do not count, so the turn
-completion and the history import decide the same. The import also reads the stored file and question
+missing reply is all that keeps the turn from a quiet end. When the agent sends no reply, OpenBot
+sends the turn's answer to the teammate as its result when the turn ends (`#relayAgentResult`). The
+teammate then has the answer, so the turn ends quiet too (#8021). The turn completion makes this
+decision with the same check as the relay (`#sendsResult`), and reads the answer before the quiet end
+changes it to a quiet answer. The history import runs after the relay. It counts the agent's own reply
+from the turn that ran the request (`MailboxStore.hasOwnReplyFrom`) or the stored idempotency key of
+the relayed result (`MailboxStore.hasSentResultFor`), so both decide the same. The note for a failed
+request and a reply from a later turn do not count. The import also reads the stored file and question
 messages of the turn, because the provider history does not hold them. A reply to a message of the
 agent can hold the result that the user asked for, so it is never quiet.
 
