@@ -278,6 +278,8 @@ interface AcpTurn {
    * server then sends the failure as answer text and ends the turn as a success.
    */
   sdkFailureAt: number | null;
+  /** Where the answer text stood when a tool call that the model wrote as text started (`AcpFlavor.sdkHarness.textToolCall`). */
+  textToolCallAt: number | null;
   /** The prompt told the model not to answer, so an empty turn is a success. */
   answerOptional: boolean;
   messages: ThreadItem[];
@@ -410,6 +412,12 @@ interface AcpThread {
    * session, or `ACP_WORK_HOLD_MAX_MS` after the turn. `changedAt` starts as the end of the turn.
    */
   workHold: { since: number; changedAt: number } | null;
+  /**
+   * The servers that OpenBot left out of this session (`#leaveOutFailedMcpServer`), with the turn
+   * that last left each one out. Antigravity 1.5.9 and 1.5.10 refuse the tool again from the second
+   * prompt after the resume without it, so the server is left out again, once in each turn (#11063).
+   */
+  leftOutMcpServers: Map<McpServer, string>;
 }
 
 /**
@@ -458,6 +466,9 @@ const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
 
 /** An agent that reports no context size gets the instructions again after this many prompts. */
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
+
+/** A prompt that starts with a slash command, such as `/swarm` or `/compact now`, and not with a path. */
+const SLASH_COMMAND = /^\/[^\s/]+(?:\s|$)/u;
 
 /** A context that shrinks below this share of its last size has been compacted. */
 const ACP_COMPACTION_CONTEXT_RATIO = 0.6;
@@ -1369,11 +1380,21 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         yield* this.#ensureInitializedEffect();
         if (this.#signedIn) {
           try {
-            this.#models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+            const models = providerResult(yield* Effect.result(this.#discoverModels(timeoutMs)));
+            // For a flavor that keeps its list, an empty refresh is a failed one: its start fails with none.
+            if (models.length === 0 && this.#flavor.keepModelsOnRefreshFailure && !this.options.allowNoModels)
+              throw new Error(sourceText("error.provider.acpNoModels"));
+            this.#models = models;
           } catch (error) {
-            // A flavor can keep the last successful list. Other agents report the failure.
-            if (!this.#flavor.keepModelsOnRefreshFailure || this.#models.length === 0)
+            // A flavor can keep the last successful list. Other agents report the failure, and so does
+            // a refused sign-in: the old list must not hide it.
+            if (!this.#flavor.keepModelsOnRefreshFailure || this.#models.length === 0 || isAuthenticationError(error))
               return yield* providerFailure(error);
+            logger.warn("An ACP agent kept its last model list after a failed refresh.", {
+              provider: this.provider,
+              models: this.#models.length,
+              reason: this.#redact(failureText(error)),
+            });
           }
         }
         return yield* providerSync(() =>
@@ -2071,6 +2092,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundSkipUntil: 0,
               backgroundReplay: null,
               workHold: null,
+              leftOutMcpServers: new Map(),
             };
             threadRef = thread;
             providerResult(
@@ -2614,15 +2636,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
     // gets them again after a number of prompts.
     thread.promptsSinceInstructions += 1;
+    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
+    // Antigravity joins the blocks, so instructions before `/swarm` made it plain text (#11070). The
+    // instructions stay due and go with the next prompt. A path such as `/Users/me` is not a command.
+    const first = blocks[0];
+    const command = first?.type === "text" && SLASH_COMMAND.test(first.text);
     const sendInstructions =
+      !command &&
       thread.developerInstructions &&
       (thread.instructionsSent !== thread.developerInstructions ||
         (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
     // With the instructions again, the memories and section-mates go in full too.
     if (sendInstructions) this.#turnContext.resend(thread.id);
-    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
-    const first = blocks[0];
-    const command = first?.type === "text" && first.text.startsWith("/");
     blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
     if (sendInstructions) {
       blocks.unshift({
@@ -2715,6 +2740,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       accountLink: null,
       sessionLost: false,
       sdkFailureAt: null,
+      textToolCallAt: null,
       answerOptional,
       messages: [],
       toolNames: new Map(),
@@ -2882,7 +2908,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       const sdkHarness = this.#flavor.sdkHarness;
-      if (sdkHarness && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
+      const textToolCallAt = turn.textToolCallAt;
+      if (
+        sdkHarness &&
+        !turn.providerError &&
+        !turn.stopped &&
+        response.stopReason === "end_turn" &&
+        // A failure that follows the call keeps its own cause, below.
+        turn.sdkFailureAt === null &&
+        textToolCallAt !== null &&
+        sdkHarness.textToolCall?.whole.test(turn.text.slice(textToolCallAt))
+      ) {
+        // The model ended the turn on a tool call that it wrote as text, which did not run (#11087).
+        // The turn ends as a turn with no answer does, and the answer does not show the call.
+        if (!turn.answerOptional) {
+          turn.failureCause = "empty_answer";
+          turn.providerError = sourceText("error.provider.acpNoAnswer", { provider: this.#label });
+        }
+      } else if (sdkHarness && !turn.providerError && !turn.stopped && response.stopReason === "end_turn") {
         // The server's SDK failed the prompt and sent its message as the answer (1.3.0). The text
         // before the failure is the partial answer; the rest is the message.
         const failureAt = turn.sdkFailureAt ?? (sdkHarness.answerIsFailure.test(turn.text) ? 0 : null);
@@ -3235,9 +3278,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       !this.#supportsSessionResume
     )
       return false;
-    const failed = this.#failedMcpServer(thread, turn.text);
+    const failed = this.#failedMcpServer(thread, turn, turn.text);
     if (!failed) return false;
     const { server, detail, started } = failed;
+    thread.leftOutMcpServers.set(server, turn.id);
     this.#reportFailedMcpServer(thread.cwd, server.name, detail);
     // Antigravity 1.5.6 keeps the servers that a session's process started, also after a resume
     // without them. A server that started leaves only with that process (#7228).
@@ -3259,6 +3303,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     );
     turn.text = "";
     turn.sdkFailureAt = null;
+    turn.textToolCallAt = null;
     turn.receivedOutput = false;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
@@ -3273,10 +3318,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * as the tool `mcp_<server>_<tool>`, in the agent's log (#7228) or, since CLI 1.5.9, in the
    * failure text (#9568). A server name can hold `_`, so the longest name wins, also against the
    * agent's own servers: a tool of the user's `github_enterprise` does not leave out OpenBot's
-   * `github`. `started`: the server started, as a server with tools did.
+   * `github`. `started`: the server started, as a server with tools did. A tool of a server that an
+   * earlier turn left out counts too: the agent can refuse it again (#11063).
    */
   #failedMcpServer(
     thread: AcpThread,
+    turn: AcpTurn,
     text: string,
   ): { server: McpServer; detail: string; started: boolean } | undefined {
     const harness = this.#flavor.sdkHarness;
@@ -3287,13 +3334,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = sourceText("error.backend.mcpServerFailedToStart", { reason: failure.reason });
       return server && { server, detail, started: false };
     }
-    if (given.length === 0 || !harness?.refusedMcpTools) return undefined;
-    const names = [...given.map((entry) => entry.name), ...this.#ownMcpServerNames(thread.cwd)];
+    // Not one that this turn left out: when it comes back at once, the retry ends with the failure.
+    const refusable = [...given];
+    for (const [server, turnId] of thread.leftOutMcpServers) if (turnId !== turn.id) refusable.push(server);
+    if (refusable.length === 0 || !harness?.refusedMcpTools) return undefined;
+    const names = [...refusable.map((entry) => entry.name), ...this.#ownMcpServerNames(thread.cwd)];
     for (const tool of harness.refusedMcpTools(text, this.options.argv, thread.id)) {
       const name = names
         .filter((candidate) => tool.startsWith(`mcp_${candidate}_`))
         .sort((a, b) => b.length - a.length)[0];
-      const server = given.find((entry) => entry.name === name);
+      const server = refusable.find((entry) => entry.name === name);
       if (server) {
         const shown = tool.slice(`mcp_${server.name}_`.length);
         return { server, detail: sourceText("error.backend.mcpToolSchemaRefused", { tool: shown }), started: true };
@@ -3539,12 +3589,32 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (!turn.text && this.#flavor.sdkHarness?.mcpLoadFailure(text)))
       )
         turn.sdkFailureAt = turn.text.length;
-      if (update.content.text.trim() && turn.sdkFailureAt === null) {
+      // A tool call that the model wrote as text is held back until its message ends (#11087). The CLI
+      // can split the call's first word, so the start of a message waits while it can still be one.
+      const textToolCall = turn.sdkFailureAt === null ? this.#flavor.sdkHarness?.textToolCall : undefined;
+      let released = "";
+      if (
+        textToolCall &&
+        turn.textToolCallAt === null &&
+        textToolCall.starts.some((start) => text.trimStart().startsWith(start))
+      )
+        turn.textToolCallAt = turn.text.length;
+      else if (textToolCall && (turn.textToolCallAt === 0 || (turn.textToolCallAt === null && !turn.text))) {
+        const message = (turn.text + text).trimStart();
+        if (textToolCall.starts.some((start) => message.startsWith(start) || start.startsWith(message)))
+          turn.textToolCallAt = 0;
+        else if (turn.textToolCallAt === 0) {
+          turn.textToolCallAt = null;
+          released = turn.text;
+        }
+      }
+      const held = turn.sdkFailureAt !== null || turn.textToolCallAt !== null;
+      if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
       }
-      if (this.#flavor.streamAnswerBeforePromptReturns && text && turn.sdkFailureAt === null) {
-        if (!turn.text)
+      if (this.#flavor.streamAnswerBeforePromptReturns && text && !held) {
+        if (!turn.text || released)
           this.emit("notification", {
             method: "item/started",
             params: {
@@ -3555,7 +3625,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           });
         this.emit("notification", {
           method: "item/agentMessage/delta",
-          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: text },
+          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: released + text },
         });
       }
       turn.text += text;
@@ -3641,6 +3711,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
     }
+    // A tool call that the model wrote as text did not run, so it is not shown (#11087). Held text
+    // that is not one is the answer.
+    const textToolCallAt = turn.textToolCallAt;
+    if (textToolCallAt !== null) {
+      const held = turn.text.slice(textToolCallAt);
+      if (this.#flavor.sdkHarness?.textToolCall?.whole.test(held)) {
+        turn.text = turn.text.slice(0, textToolCallAt);
+        if (!turn.text.trim()) {
+          this.#endMessage(turn);
+          return;
+        }
+      } else if (held.trim() && turn.sdkFailureAt === null) {
+        turn.receivedOutput = true;
+        if (phase === "commentary") turn.interruptedAnswer = null;
+      }
+    }
     // A later step follows the empty-step failure, so the model went on: the failure is not news, and
     // a quiet routine run that then succeeded showed it (#11010). The same rule as at the turn's end.
     const failureAt = turn.sdkFailureAt;
@@ -3675,6 +3761,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // An SDK failure ends the turn, so text that a later step follows was not one. A model's or the
     // CLI's warning line ("\n⚠ ...") made the next step's answer the error (#7479).
     turn.sdkFailureAt = null;
+    turn.textToolCallAt = null;
     turn.textMessageId = null;
     turn.textMessageStart = 0;
     turn.messageChunks = 0;

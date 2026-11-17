@@ -316,6 +316,21 @@ function AuthenticatedStack() {
       })}
     >
       <Stack.Screen name="connected" options={{ animation: "fade", gestureEnabled: false, title: "" }} />
+      {/* The ask shows over home: the bloub stage drops its header, and the screen slides its panel out
+          from under the edge. The route must stay inside the navigation container, below the stage:
+          a native `transparentModal` draws over the stage, covers its edge and takes the touches of
+          its close button. The close button, "Not now" and Back close the panel before the route
+          leaves, so a swipe is off. */}
+      <Stack.Screen
+        name="rate-app"
+        options={{
+          presentation: "containedTransparentModal",
+          animation: "none",
+          gestureEnabled: false,
+          headerShown: false,
+          contentStyle: { backgroundColor: "transparent" },
+        }}
+      />
       <Stack.Screen
         name="chat/[agentId]"
         options={{

@@ -170,7 +170,7 @@ export interface AcpFlavor {
    * stopped prompt whose command goes on. Nothing ran, so the message waits and is sent again.
    */
   sessionBusy?(error: unknown): boolean;
-  /** A failed model refresh keeps the last list that the agent gave. */
+  /** A failed, timed-out or empty model refresh keeps the last list that the agent gave. */
   keepModelsOnRefreshFailure?: true;
   /**
    * The model belongs to the agent's process, not to one session: a model set moves every session
@@ -212,6 +212,12 @@ export interface AcpFlavor {
     answerIsFailure: RegExp;
     /** The failure text of a model step that ended with neither text nor tool calls. */
     emptyOutputFailure?: RegExp;
+    /**
+     * A tool call that the model wrote as answer text, which the agent does not run: the words that
+     * one starts with, and the whole text of one. The text is held back, and a turn that ends on it
+     * ends as a turn with no answer.
+     */
+    textToolCall?: { starts: readonly string[]; whole: RegExp };
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
     /**
@@ -471,7 +477,14 @@ const PAYMENT_METHOD_WALL = /^\s*Add a payment method to continue\.?\s*$/u;
 const PAYMENT_METHOD_WALL_TEXT = /\bAdd a payment method to continue\b/u;
 
 /** Cline CLI 3.0.68 runs a subagent with its `spawn_agent` tool: `{ systemPrompt, task }`, result `{ text }`. */
-export const CLINE_ACP_FLAVOR: AcpFlavor = { subagentTools: ["spawn_agent"] };
+export const CLINE_ACP_FLAVOR: AcpFlavor = {
+  subagentTools: ["spawn_agent"],
+  // Cline CLI 3.0.74 throws its `SessionNotFoundError` when its hub no longer has the session, and the
+  // ACP SDK sends it as "Internal error" with `data.details` "session not found: <id>". OpenBot kept
+  // the session, so each message failed, also after a restart (#11096). Only this session counts.
+  sessionNotFound: (error, sessionId) =>
+    error.code === -32603 ? isRecord(error.data) && error.data.details === `session not found: ${sessionId}` : null,
+};
 
 /**
  * GitHub Copilot CLI 1.0.105 advertises only http and sse MCP servers, and drops a stdio one, so its
