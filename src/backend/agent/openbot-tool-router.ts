@@ -1559,8 +1559,8 @@ export class OpenBotToolRouter {
       return openBotToolResult({
         status: "declined",
         next: phoneReport
-          ? "The user selected Not now. Do not send it another way, and do not offer it again for this problem. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
-          : "The user selected Not now. Do not send it another way, and do not offer it again for this problem. Continue to help the user.",
+          ? "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. When the phone app cannot connect to this server, tell the user in one sentence that they can report it in the phone app, in Settings > Support > Report a problem on GitHub. Continue to help the user."
+          : "The user selected Not now. Do not send it another way, and do not offer it again unasked. When the user later asks to send it, call send_feedback again. Continue to help the user.",
       });
     // The phone redacts its log when it writes each line. This is the last place before the text leaves.
     const phone = "phone" in answer && answer.phone ? redactedPhone(answer.phone) : undefined;
