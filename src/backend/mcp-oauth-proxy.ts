@@ -344,8 +344,9 @@ export class McpOAuthProxy {
     }
     // A notification has no answer, but the MCP Go SDK, which the Antigravity CLI uses, closes the
     // whole connection when a server refuses one with a 400 that is not a JSON-RPC error. Executor
-    // refuses `notifications/roots/list_changed` so, and the agent lost all of its tools (#10322).
-    // The server keeps its session, so the proxy accepts the notification as a server would.
+    // refused `notifications/roots/list_changed`, and the agent lost all of its tools (#10322). A 400
+    // does not end the server's session (a 404 does), so the proxy accepts the notification, as the
+    // MCP TypeScript SDK server accepts each body of notifications only.
     const refused = upstream.status === 400 && method === "POST" ? notificationMethods(body) : null;
     if (refused) {
       yield* discard(upstream);
