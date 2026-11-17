@@ -27,6 +27,7 @@ import {
   type TeamProtocolV2Json,
   teamCapabilitiesForProtocol,
   teamProtocolV2AuthenticationTranscript,
+  teamWebRtcClientProtocol,
 } from "@openbot/contracts/team-protocol";
 import type { LiveVoiceEvent } from "@openbot/contracts/team-protocol/live-voice-v1";
 import { optionalTeamEvent, optionalTeamEventToCurrent } from "@openbot/contracts/team-protocol/optional-events";
@@ -1860,7 +1861,9 @@ export function createRemoteTeamPeer(
           const status = frame.result.status;
           const body = frame.result.body;
           if (pending.method === "GET" && pending.path === TEAM_API_ROUTES.compatibility && status === 200) {
-            state.hostProtocol = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol.maximum;
+            // The highest protocol that both sides speak. A host that this client refuses keeps its maximum.
+            const host = (yield* peerDecode(() => decodeTeamProtocolSupportV9(body))).protocol;
+            state.hostProtocol = teamWebRtcClientProtocol(host).protocol ?? host.maximum;
             hostProtocols.set(state.hostId, state.hostProtocol);
           }
           pending.resolve({

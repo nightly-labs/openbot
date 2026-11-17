@@ -176,6 +176,7 @@ export function toAgentMessage(message: ConversationMessage, ownerAgentId?: stri
     ...(exchangeSenderId === undefined ? {} : { senderAgentId: exchangeSenderId }),
     ...(senderMember === undefined ? {} : { senderMember }),
     ...(message.replyToMessageId === undefined ? {} : { replyToMessageId: message.replyToMessageId }),
+    ...(message.steered ? { steered: true as const } : {}),
     ...(message.attachments === undefined ? {} : { attachments: message.attachments }),
     ...(message.voiceRecording === undefined ? {} : { voiceRecording: message.voiceRecording }),
     ...(message.imageGeneration === undefined ? {} : { imageGeneration: message.imageGeneration }),
@@ -377,6 +378,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.author === right.author &&
     left.body === right.body &&
     left.time === right.time &&
+    left.createdAt === right.createdAt &&
     left.kind === right.kind &&
     left.streaming === right.streaming &&
     left.itemType === right.itemType &&
@@ -385,6 +387,7 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     left.senderMember?.id === right.senderMember?.id &&
     left.senderMember?.name === right.senderMember?.name &&
     left.replyToMessageId === right.replyToMessageId &&
+    left.steered === right.steered &&
     left.reaction === right.reaction &&
     JSON.stringify(left.reactions) === JSON.stringify(right.reactions) &&
     JSON.stringify(left.reactionSummary) === JSON.stringify(right.reactionSummary) &&
@@ -396,8 +399,15 @@ export function agentMessagesEqual(left: AgentMessage, right: AgentMessage): boo
     JSON.stringify(left.items) === JSON.stringify(right.items) &&
     JSON.stringify(left.itemIds) === JSON.stringify(right.itemIds) &&
     JSON.stringify(left.itemStreaming) === JSON.stringify(right.itemStreaming) &&
+    JSON.stringify(left.itemCreatedAt) === JSON.stringify(right.itemCreatedAt) &&
     JSON.stringify(left.plan) === JSON.stringify(right.plan) &&
-    JSON.stringify(left.subagents) === JSON.stringify(right.subagents)
+    JSON.stringify(left.subagents) === JSON.stringify(right.subagents) &&
+    JSON.stringify(left.voiceRecording) === JSON.stringify(right.voiceRecording) &&
+    JSON.stringify(left.imageGeneration) === JSON.stringify(right.imageGeneration) &&
+    JSON.stringify(left.videoGeneration) === JSON.stringify(right.videoGeneration) &&
+    JSON.stringify(left.uiBlock) === JSON.stringify(right.uiBlock) &&
+    JSON.stringify(left.memoryChanges) === JSON.stringify(right.memoryChanges) &&
+    JSON.stringify(left.trace) === JSON.stringify(right.trace)
   );
 }
 

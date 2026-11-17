@@ -324,8 +324,8 @@ export interface MediaCreditsRailRow {
 
 /**
  * The credits of one media service. A team quota draws a ring with the part that is left, as the
- * plan limits of a provider do. An account with no limit of its own shows the logo alone, as a custom
- * agent does. The hover card shows the number.
+ * plan limits of a provider do. An account with no limit of its own shows the logo with the number of
+ * credits under it. The hover card shows the full number.
  */
 function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: HTMLElement) => void }) {
   const { t, format } = useText();
@@ -388,7 +388,10 @@ function MediaCreditsButton(props: { row: MediaCreditsRailRow; onOpen: (button: 
       <Show
         when={props.row.quota !== null}
         fallback={
-          <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo window-rail-agent-usage-logo" />
+          <span class="window-rail-credits" aria-hidden="true">
+            <ProviderLogo provider={props.row.provider} class="window-rail-usage-logo" />
+            <span class="window-rail-credits-count">{format.compact(props.row.available)}</span>
+          </span>
         }
       >
         <svg class="window-rail-usage-ring" viewBox={`0 0 ${RING.size} ${RING.size}`} fill="none" aria-hidden="true">

@@ -55,6 +55,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "所选模型不属于该服务商。",
   "error.agent.modelNotListed": "模型“{model}”不可用。可用模型：{models}。",
   "error.agent.providerNotListed": "当前没有可用的 {provider} 模型，请调用 list_models 查看可用模型。",
+  "error.agent.creatorModelNotListed":
+    "你的模型“{model}”当前不在模型列表中，因此新智能体无法使用它启动。请几秒后重试，或将 provider 和 model 设为 list_models 显示的模型。",
   "error.agent.reasoningEffortUnsupported": "模型“{model}”不支持推理强度“{effort}”。支持的强度：{efforts}。",
   "error.agent.reasoningEffortNotConfigurable": "模型“{model}”没有推理强度设置，因此无法更改其推理强度。",
   "error.agent.noStartingModelInSettings":
@@ -80,6 +82,7 @@ export const messages = {
   "error.agent.copyNameFailed": "OpenBot 无法生成唯一的助手副本名称。",
   "error.agent.endpointRemoved": "该助手使用的端点已被移除，请为它选择其他模型。",
   "error.agent.turnStalled": "{provider} 已停止响应，因此 OpenBot 结束了该轮次。请重新发送消息，或选择其他模型。",
+  "error.agent.promptCancelled": "{provider} 在开始处理前取消了这条消息。请重新发送消息。",
   "error.agent.toolLoopStopped":
     "{provider} 多次重复了一个失败的步骤，因此 OpenBot 停止了该轮次。请重新发送消息，或选择其他模型。",
   "error.agent.answerCutOff": "智能体在完成回答之前停止了，因此回答不完整。请重新发送消息。",

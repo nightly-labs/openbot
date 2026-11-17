@@ -465,7 +465,6 @@ export const messages = {
   "mobile.server.route.providers": "Dostawcy",
   "mobile.server.route.provider": "Dostawca",
   "mobile.server.route.providerModels": "Modele",
-  "mobile.server.route.mcp": "Serwery MCP",
   "mobile.server.route.mcpServer": "Serwer MCP",
   "mobile.server.members.rowLabel": "{name}, {role}",
   "mobile.server.members.you": "{name} (ty)",
@@ -1017,7 +1016,7 @@ export const messages = {
     "Pisać mogą tylko twój czat „Wiadomość do siebie” i osoby, którym pozwolisz. Inne osoby nie dostają odpowiedzi. Gdy jest wyłączone, OpenBot odpowiada nieznanym osobom kodem.",
   "mobile.server.connectors.whatsapp.workingMessage": "Wiadomość „Pracuję nad tym…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Wyłącz, aby wysyłać tylko odpowiedź.",
+    "OpenBot wysyła ją, gdy agent pracuje, a potem zastępuje odpowiedzią. Żądanie, które czeka na wcześniejsze, też dostaje wiadomość o oczekiwaniu. Wyłącz, aby wysyłać tylko odpowiedź.",
   "mobile.server.connectors.whatsapp.statusReactions": "Reakcje stanu",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "OpenBot reaguje 👀, gdy przychodzi wiadomość, i ✅, gdy odpowiedź jest gotowa. Wyłącz, aby nie wysyłać reakcji.",
@@ -1313,29 +1312,12 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "Domyślny dla nowych agentów",
   "mobile.server.providers.startsWith": "Nowi agenci startują z {name}.",
   "mobile.server.providers.connectFirst": "Najpierw połącz {name}.",
-  "mobile.server.settings.mcp": "Serwery MCP",
-  "mobile.server.settings.mcpCount": {
-    one: "{count} serwer",
-    few: "{count} serwery",
-    many: "{count} serwerów",
-    other: "{count} serwera",
-  },
   "mobile.server.mcp.unsupported": "Zaktualizuj OpenBot na tym serwerze, aby zarządzać tutaj jego serwerami MCP.",
   "mobile.server.mcp.unavailable":
     "Połącz się z tym serwerem jako właściciel lub administrator, aby zarządzać jego serwerami MCP.",
   "mobile.server.mcp.accessUnsupported":
     "Zaktualizuj OpenBot na tym serwerze, aby wybrać, kto dostaje jego serwery MCP.",
-  "mobile.server.mcp.description":
-    "Serwery MCP dają agentom tego serwera więcej narzędzi. Agenci Claude i Codex dostają tylko serwery z tej listy.",
   "mobile.server.mcp.loading": "Wczytywanie serwerów MCP…",
-  "mobile.server.mcp.loadFailed": "Nie udało się wczytać serwerów MCP.",
-  "mobile.server.mcp.empty": "Nie ma jeszcze serwerów MCP.",
-  "mobile.server.mcp.retry": "Spróbuj ponownie",
-  "mobile.server.mcp.add": "Dodaj serwer MCP",
-  "mobile.server.mcp.rowLabel": "{name}, {status}",
-  "mobile.server.mcp.enabled": "Wł.",
-  "mobile.server.mcp.disabled": "Wył.",
-  "mobile.server.mcp.signedIn": "Zalogowano",
   "mobile.server.mcp.gone": "Tego serwera MCP nie ma już na tym serwerze.",
   "mobile.server.mcp.addTitle": "Dodaj serwer MCP",
   "mobile.server.mcp.addConfirm": "Dodaj",

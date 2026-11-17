@@ -244,15 +244,32 @@ const readSettings = Effect.fn("ClaudeStoredSignIn.readSettings")(function* (
 });
 
 /**
+ * Whether the user settings file of the CLI signs it in another way: an `apiKeyHelper`, or one of the
+ * variables above in its `env`. The agents get both (`claudeSignInSettings`), and the CLI then uses an
+ * API key in place of the claude.ai sign-in (checked on 2.1.322), so only `auth status` can tell (#10192).
+ */
+const settingsSignIn = Effect.fn("ClaudeStoredSignIn.settingsSignIn")(function* (configDirectory: string) {
+  const text = yield* readText(join(configDirectory, "settings.json"));
+  const settings = Option.flatMap(text, Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown)));
+  if (Option.isNone(settings) || !isDynamicRecord(settings.value)) return false;
+  const { apiKeyHelper, env } = settings.value;
+  return (
+    (typeof apiKeyHelper === "string" && apiKeyHelper.length > 0) ||
+    (isDynamicRecord(env) && AUTH_OVERRIDE_VARIABLES.some((name) => env[name]))
+  );
+});
+
+/**
  * A signed-in status in the shape of `claude auth status --json`, from the sign-in that the CLI stored
- * for the environment's `CLAUDE_CONFIG_DIR`. None when the environment signs the CLI in another way,
- * when the store cannot be read, or when it has no usable refresh token: the caller then asks the CLI.
- * With no refresh token stored, `auth status` has no token to spend.
+ * for the environment's `CLAUDE_CONFIG_DIR`. None when the environment or the user settings sign the CLI
+ * in another way, when the store cannot be read, or when it has no usable refresh token: the caller then
+ * asks the CLI. With no refresh token stored, `auth status` has no token to spend.
  */
 export const readClaudeStoredSignIn = Effect.fn("ClaudeStoredSignIn.read")(function* (environment: NodeJS.ProcessEnv) {
   if (AUTH_OVERRIDE_VARIABLES.some((name) => environment[name])) return Option.none<DynamicRecord>();
   const customConfigDirectory = Boolean(environment.CLAUDE_CONFIG_DIR);
   const configDirectory = (environment.CLAUDE_CONFIG_DIR || join(homedir(), ".claude")).normalize("NFC");
+  if (yield* settingsSignIn(configDirectory)) return Option.none<DynamicRecord>();
   const settings = yield* readSettings(environment, configDirectory);
   const text = yield* readCredentialText(
     environment,

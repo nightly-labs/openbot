@@ -98,6 +98,7 @@ export const messages = {
   "mobile.marketplace.skill.doc": "SKILL.md",
   "mobile.marketplace.skill.examplePrompt": "このスキルの使い方を手伝ってください。",
   "mobile.marketplace.app.add": "アプリを追加",
+  "mobile.marketplace.app.addCustom": "カスタムを追加",
   "mobile.marketplace.app.connect": "接続",
   "mobile.marketplace.app.connectTitle": "{name} を接続",
   "mobile.marketplace.app.keyIntro":

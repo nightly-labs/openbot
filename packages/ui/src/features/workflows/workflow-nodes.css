@@ -1626,6 +1626,21 @@ fieldset.wfn-picker-group {
   z-index: 1;
 }
 
+/*
+ * The ports sit outside the card, so a near node that comes later can cover them. A selected or
+ * focused node with ports goes above the other nodes until the selection ends. The saved order stays.
+ * A node that can take the open connection goes up too. The node that the connection starts from
+ * stays down while it is open, so it does not cover a target port in either order.
+ */
+.wfn-stage .wfn-node:has(> .wfn-ports):is([data-selected], :focus-within),
+.wfn-stage .wfn-node:has(.wfn-port[data-target]) {
+  z-index: 2;
+}
+
+.wfn-stage .wfn-node:has(.wfn-port[data-armed]) {
+  z-index: 1;
+}
+
 .wfn-edges {
   position: absolute;
   top: 0;
@@ -1769,10 +1784,11 @@ fieldset.wfn-picker-group {
 /*
  * The remove button of a connection sits on the line at the point nearest to the pointer, and keeps
  * its screen size at every zoom. It takes the danger colour, and so does the line while the pointer is on it.
+ * It stays above a raised node.
  */
 .wfn-edge-actions {
   position: absolute;
-  z-index: 2;
+  z-index: 3;
   display: flex;
   transform-origin: 0 0;
   translate: calc(-50% / var(--wfn-scale, 1)) calc(-50% / var(--wfn-scale, 1));

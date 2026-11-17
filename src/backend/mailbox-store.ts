@@ -6,6 +6,7 @@ import { rewriteAttachmentReferences } from "@openbot/contracts/attachment-refer
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import type {
   AgentRuntimeWorkItem,
+  AgentTaskAwaitedReply,
   AttachmentDataInput,
   AttachmentSummary,
   ConversationMessage,
@@ -26,6 +27,7 @@ import {
   AGENT_RUNTIME_ATTENTION_LIMIT,
   AGENT_RUNTIME_TEXT_LIMIT,
   AGENT_RUNTIME_WORKING_ITEMS_LIMIT,
+  AGENT_TASK_AWAITED_STATES,
   AGENT_WELCOME_ITEM_TYPE,
   isConversationMessageSender,
   isMessageReaction,
@@ -54,7 +56,7 @@ import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { runIdOrigins } from "./message-run-ids";
-import { OpenBotDatabase } from "./openbot-database";
+import type { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
@@ -335,7 +337,11 @@ export class MailboxStore {
     reactionKeys: new Set<string>(),
   };
 
-  constructor(userDataPath: string, sharedRoot: string, database = new OpenBotDatabase(userDataPath)) {
+  /**
+   * `database` is the one connection of the process to `openbot.db`, the one that `AgentStore` holds.
+   * A second connection would run the migrations again and compete for the write lock.
+   */
+  constructor(userDataPath: string, sharedRoot: string, database: OpenBotDatabase) {
     this.#statePath = join(userDataPath, "mailbox.json");
     this.#files = new AttachmentFiles({ userDataPath, sharedRoot });
     this.#database = database;
@@ -1007,6 +1013,40 @@ export class MailboxStore {
     for (const message of this.#state.messages)
       if (message.channelId || message.messaging || message.taskId || message.welcome) ids.add(message.id);
     return ids;
+  }
+
+  /**
+   * The requests that agents sent from their side threads and that wait for an answer: the recipient
+   * has not ended the turn that runs them, and has not answered them yet, as `sideThreadWaitsFor` reads
+   * an answer. An answer or a note for a failed request then goes back to the thread.
+   */
+  awaitedThreadRequests(): Array<
+    AgentTaskAwaitedReply & { deliveryId: string; senderAgentId: string; taskId: string }
+  > {
+    let messages: Map<string, StoredMessage> | undefined;
+    let answered: Set<string> | undefined;
+    return this.#state.deliveries.flatMap((delivery) => {
+      if (!isOneOf(AGENT_TASK_AWAITED_STATES, delivery.status)) return [];
+      messages ??= this.#messagesById();
+      const message = messages.get(delivery.messageId);
+      if (!message?.senderTaskId || message.sender.kind !== "agent" || message.expectsReply === false) return [];
+      answered ??= new Set(
+        this.#state.messages.flatMap((answer) =>
+          isAnswer(answer) ? [`${answer.replyToMessageId}:${answer.sender.agentId}`] : [],
+        ),
+      );
+      if (answered.has(`${message.id}:${delivery.recipientAgentId}`)) return [];
+      return [
+        {
+          deliveryId: delivery.id,
+          senderAgentId: message.sender.agentId,
+          taskId: message.senderTaskId,
+          messageId: message.id,
+          recipientAgentId: delivery.recipientAgentId,
+          status: delivery.status,
+        },
+      ];
+    });
   }
 
   /** Indexed once for a whole read, so a read over many deliveries does not scan the messages for each one. */
@@ -1736,6 +1776,7 @@ export class MailboxStore {
                 }
               : undefined,
           createdAt: storedDelivery.steeredAt ?? message.createdAt,
+          ...(storedDelivery.steeredAt === undefined ? {} : { steered: true as const }),
           status: delivery.status === "failed" ? "failed" : "completed",
           itemType:
             message.sender.kind === "agent"
@@ -3178,19 +3219,25 @@ export class MailboxStore {
    * As {@link hasUnfinishedDelivery}, without the work of the agent's tasks, which run in their own
    * threads. External conversation work counts as before it had its own lane. Channel work counts
    * only with `includeChannels`: on a provider that runs one turn at a time, a channel turn holds the
-   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued.
+   * agent's own chat too. The `exceptQueued` deliveries do not count while they are queued. Without
+   * `includeMessaging`, the work of the messaging lane does not count.
    */
   hasUnfinishedDeliveryOutsideTasks(
     agentId: string,
     includeChannels: boolean,
     exceptQueued: readonly string[] = [],
+    includeMessaging = true,
   ): boolean {
     const messages = this.#messagesById();
     return this.#state.deliveries.some((delivery) => {
       if (delivery.recipientAgentId !== agentId || !isActiveDelivery(delivery)) return false;
       if (delivery.status === "queued" && exceptQueued.includes(delivery.id)) return false;
       const lane = this.#laneOf(delivery, messages);
-      return lane === null || lane === MESSAGING_LANE || (includeChannels && laneChannelId(lane) !== null);
+      return (
+        lane === null ||
+        (includeMessaging && lane === MESSAGING_LANE) ||
+        (includeChannels && laneChannelId(lane) !== null)
+      );
     });
   }
 

@@ -60,6 +60,7 @@ import { AGENT_THREAD_PAGES_CAPABILITY } from "@openbot/contracts/team-protocol/
 import { AGENT_THREAD_QUEUE_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import { BACKGROUND_PROCESSES_CAPABILITY } from "@openbot/contracts/team-protocol/background-processes-v1";
 import { BROWSER_EGRESS_CAPABILITY } from "@openbot/contracts/team-protocol/browser-egress-v1";
@@ -186,6 +187,7 @@ import {
   WORKFLOWS_GITHUB_CAPABILITY,
   WORKFLOWS_HIGGSFIELD_CAPABILITY,
   WORKFLOWS_MEDIA_CAPABILITY,
+  WORKFLOWS_MEDIA_CATALOG_CAPABILITY,
   WORKFLOWS_SUNRA_CAPABILITY,
 } from "@openbot/contracts/team-protocol/current";
 import { CUSTOM_AGENTS_CAPABILITY } from "@openbot/contracts/team-protocol/custom-agents-v1";
@@ -344,6 +346,7 @@ import { routeAgentQueueTask } from "./team-api/route-agent-queue-task";
 import { routeAgentSessionSettings } from "./team-api/route-agent-session-settings";
 import { agentTasksWireSnapshot, routeAgentTasks } from "./team-api/route-agent-tasks";
 import { routeAgentThreadQueue } from "./team-api/route-agent-thread-queue";
+import { routeAgentThreadRequests } from "./team-api/route-agent-thread-requests";
 import {
   routeAgentThreadBranches,
   routeAgentThreadFiles,
@@ -1321,6 +1324,7 @@ export class TeamApiServer {
       if ((await routeAgentActiveQueues(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreadQueue(context, this.#options.agentTasks, this.#options.agents, hidden)) === "handled")
         return;
+      if ((await routeAgentThreadRequests(context, this.#options.agentTasks, hidden)) === "handled") return;
       if ((await routeAgentUsageLimit(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentPendingRuntime(context, this.#options.agents, hidden)) === "handled") return;
       if ((await routeAgentThreads(context, this.#options.agentTasks, hidden)) === "handled") return;
@@ -1741,6 +1745,12 @@ export class TeamApiServer {
       return resolved;
     };
 
+    // A completed turn sends the runtime snapshot to some clients. It is read once for all of them.
+    let runtimeSnapshot = () => {
+      const snapshot = this.#options.agents.getRuntimeSnapshot();
+      runtimeSnapshot = () => snapshot;
+      return snapshot;
+    };
     for (const [client, connection] of this.#eventClients) {
       if (memberId !== undefined && connection.memberId !== memberId) continue;
       const event = this.#eventFor(connection, broadcast);
@@ -1921,7 +1931,7 @@ export class TeamApiServer {
         encodeEvent(
           {
             type: "runtime-snapshot",
-            snapshot: this.#options.agents.getRuntimeSnapshot(),
+            snapshot: runtimeSnapshot(),
           },
           encodingOptions,
         ) ?? undefined;
@@ -2696,6 +2706,7 @@ export class TeamApiServer {
           if (capability === AGENT_TASKS_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_QUEUE_TASK_CAPABILITY) return this.#options.agentTasks !== undefined;
           if (capability === AGENT_THREAD_QUEUE_CAPABILITY) return this.#options.agentTasks !== undefined;
+          if (capability === AGENT_THREAD_REQUESTS_CAPABILITY) return this.#options.agentTasks !== undefined;
           // The queue list uses the agent operations, which every host has.
           if (capability === AGENT_ACTIVE_QUEUES_CAPABILITY) return true;
           if (capability === AGENT_THREADS_CAPABILITY) return this.#options.agentTasks !== undefined;
@@ -2807,6 +2818,7 @@ export class TeamApiServer {
           if (capability === WORKFLOWS_MEDIA_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_SUNRA_CAPABILITY) return this.#options.workflows !== undefined;
           if (capability === WORKFLOWS_HIGGSFIELD_CAPABILITY) return this.#options.workflows !== undefined;
+          if (capability === WORKFLOWS_MEDIA_CATALOG_CAPABILITY) return this.#options.workflows !== undefined;
           // The workflow store posts a chat-channel output into this host's channels.
           if (capability === WORKFLOWS_CHANNELS_CAPABILITY) return this.#options.workflows !== undefined;
           // The chats and workspaces of Telegram and Slack nodes come from the routine-results options.

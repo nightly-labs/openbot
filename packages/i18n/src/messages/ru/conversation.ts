@@ -65,6 +65,7 @@ export const messages = {
   "conversation.sidePanel.pane.files": "Файлы",
   "conversation.threads.new": "Новая ветка",
   "conversation.threads.all": "Все ветки",
+  "conversation.threads.allUnread": "Все ветки, новые ответы",
   "conversation.threads.open": "Открытые ветки",
   "conversation.threads.current": "Ветка: {title}",
   "conversation.threads.actions": "Действия с веткой",

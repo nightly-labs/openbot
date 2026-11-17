@@ -247,8 +247,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "החלקה ימינה בצ׳אט של סוכן",
   "mobile.settings.conversations.swipeThreads": "שרשורים",
   "mobile.settings.conversations.swipeBrowser": "דפדפן",
+  "mobile.settings.conversations.swipeOff": "כבוי",
   "mobile.settings.conversations.swipeFooter":
-    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. החלקה על הודעה עדיין עונה לה.",
+    "החלקה בכיוון ההפוך לחזרה בצ׳אט של סוכן פותחת את זה. אותה החלקה על הודעה מציגה את שעות ההודעות.",
   "mobile.settings.conversations.pullInfo": "משיכה למעלה למידע",
   "mobile.settings.conversations.pullInfoFooter":
     "משכו למעלה מעבר להודעה האחרונה בצ׳אט, בערוץ או בשרשור ושחררו כדי לפתוח את המידע שלו.",
@@ -510,6 +511,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "לא ניתן לעצור את התהליך.",
   "mobile.settings.agents.processes.stopTitle": "לעצור את התוכנית הזו?",
   "mobile.settings.agents.processes.stopLabel": "עצירת תהליך {pid}",
+  "mobile.settings.quickActions.title": "תפריט סמל האפליקציה",
+  "mobile.settings.quickActions.footer":
+    "לחצו לחיצה ארוכה על סמל OpenBot כדי לראות את הפעולות. אפשר להפעיל עד {count}.",
+  "mobile.settings.quickActions.latestChat": "הצ׳אט האחרון",
+  "mobile.settings.quickActions.secondChat": "הצ׳אט הלפני אחרון",
   "mobile.settings.shortcuts.title": "קיצורים",
   "mobile.settings.shortcuts.agent": "סוכן",
   "mobile.settings.shortcuts.none": "ללא",

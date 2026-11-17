@@ -84,6 +84,8 @@ export const messages = {
   "error.team.routineRunCommandUnsupported":
     "Questa connessione non può fornire il comando di esecuzione di una routine.",
   "error.team.threadQueueUnsupported": "Questa connessione non può mostrare la coda di un thread secondario.",
+  "error.team.threadRequestsUnsupported":
+    "Questa connessione non può mostrare le richieste di un thread secondario ad altri agenti.",
   "error.team.hostTurnLimitsUnsupported":
     "Questa connessione non può mostrare né modificare i limiti dei thread del server.",
   "error.team.usageLimitUnsupported":

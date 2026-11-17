@@ -262,8 +262,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
   "mobile.settings.conversations.swipeThreads": "السلاسل",
   "mobile.settings.conversations.swipeBrowser": "المتصفح",
+  "mobile.settings.conversations.swipeOff": "إيقاف",
   "mobile.settings.conversations.swipeFooter":
-    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب على رسالة لا يزال يرد عليها.",
+    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب نفسه على رسالة يعرض أوقات الرسائل.",
   "mobile.settings.conversations.pullInfo": "السحب لأعلى للمعلومات",
   "mobile.settings.conversations.pullInfoFooter":
     "اسحب لأعلى بعد آخر رسالة في محادثة أو قناة أو سلسلة ثم أفلت لفتح معلوماتها.",
@@ -544,6 +545,10 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "تعذّر إيقاف العملية.",
   "mobile.settings.agents.processes.stopTitle": "هل تريد إيقاف هذا البرنامج؟",
   "mobile.settings.agents.processes.stopLabel": "إيقاف العملية {pid}",
+  "mobile.settings.quickActions.title": "قائمة أيقونة التطبيق",
+  "mobile.settings.quickActions.footer": "المس أيقونة OpenBot مطولًا لرؤية هذه الإجراءات. يمكنك تشغيل {count} كحد أقصى.",
+  "mobile.settings.quickActions.latestChat": "آخر محادثة",
+  "mobile.settings.quickActions.secondChat": "المحادثة قبل الأخيرة",
   "mobile.settings.shortcuts.title": "الاختصارات",
   "mobile.settings.shortcuts.agent": "الوكيل",
   "mobile.settings.shortcuts.none": "بلا",

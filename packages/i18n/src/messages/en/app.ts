@@ -109,6 +109,7 @@ export const messages = defineMessages("app", {
   "app.settingsPage.searchPlaceholder": "Search settings…",
   "app.settingsPage.results": "Settings search results",
   "app.settingsPage.noResults": "No matching settings.",
+  "app.settingsPage.marketplaceApps": "Connectors and MCP servers",
   "app.settingsPage.resultCount": {
     one: "{count} matching setting.",
     other: "{count} matching settings.",

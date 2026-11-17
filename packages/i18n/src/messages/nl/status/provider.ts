@@ -29,4 +29,6 @@ export const messages = {
     "Claude antwoordde op de standaardsnelheid. De snelle modus is uitgeschakeld in de instellingen van Claude Code of door je organisatie.",
   "status.provider.claudeFastModeUnavailable":
     "Claude antwoordde op de standaardsnelheid. Claude Code kon de snelle modus niet gebruiken voor deze beurt.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code is ingesteld om een Anthropic API-sleutel te gebruiken. Anthropic rekent elke aanvraag af op het API-tegoed van de sleutel, niet op je Claude-abonnement. Verwijder de sleutel uit de Claude Code-instellingen of de omgevingsvariabelen om je abonnement te gebruiken, en start OpenBot daarna opnieuw.",
 } as const satisfies PartialTranslation<typeof source>;

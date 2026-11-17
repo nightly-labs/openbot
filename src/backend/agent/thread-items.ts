@@ -596,12 +596,13 @@ function resultText(value: unknown, depth = 0): string | null {
  */
 const FAILURE_WINDOW = CONVERSATION_TRACE_TEXT_LIMIT * 16;
 
-/** Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool. */
+/**
+ * Whether a tool step runs a shell command: a Codex command, a command tool, or Pi's `bash` tool, or
+ * its `powershell` tool on a Windows computer with no bash that runs (#11209).
+ */
 function isShellCommand(item: ThreadItem): boolean {
-  return (
-    toolUsage(item)?.kind === "command" ||
-    (item.type === "dynamicToolCall" && !getString(item, "namespace") && getString(item, "tool") === "bash")
-  );
+  const tool = item.type === "dynamicToolCall" && !getString(item, "namespace") ? getString(item, "tool") : undefined;
+  return toolUsage(item)?.kind === "command" || tool === "bash" || tool === "powershell";
 }
 
 /**

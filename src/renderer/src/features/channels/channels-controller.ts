@@ -610,10 +610,20 @@ export function createChannelsController(env: ChannelsEnvironment) {
         state.editing = "settings";
       });
     },
+    /**
+     * The delete dialog shows a failure, so it does not stay as the open channel's error with a Retry
+     * of this delete. The host refuses it while a task runs there (#10472).
+     */
     remove: async (channelId: string) => {
-      if (!(await command({ type: "archive", channelId, operationId: crypto.randomUUID() }))) {
-        throw new Error(state.error ?? currentText().t("channel.error.delete"));
+      if (await command({ type: "archive", channelId, operationId: crypto.randomUUID() })) return;
+      const message = state.error ?? currentText().t("channel.error.delete");
+      if (failedCommand?.type === "archive" && failedCommand.channelId === channelId) {
+        failedCommand = null;
+        setState((state) => {
+          Object.assign(state, { error: null, errorReference: null });
+        });
       }
+      throw new Error(message);
     },
     /**
      * A deleted channel comes back with its history. Its stopped tasks stay stopped. The sidebar menu

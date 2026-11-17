@@ -122,6 +122,7 @@ import {
 } from "../workflows/workflow-tools";
 import { AgentInterruptTool } from "./agent-interrupt-tool";
 import type { AgentMemories } from "./agent-memories";
+import { AgentSettingsRefused } from "./agent-settings-refused";
 import { type ApprovalAutomationPolicy, NO_APPROVAL_AUTOMATION } from "./approval-automation";
 import type { AttachmentGateway } from "./attachment-gateway";
 import type { AttentionRegistry, CodexSubagentParent } from "./attention-registry";
@@ -215,7 +216,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -2597,7 +2598,7 @@ export class OpenBotToolRouter {
         app: args.app,
         next:
           args.app === "github"
-            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Server settings, Connectors, also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
+            ? "The card is in the chat. When you can do the task now another way, such as with gh, git, or public pages, do it, and tell the user in one sentence that connecting GitHub in Marketplace > Apps > GitHub also signs in gh and git. Otherwise end your answer: tell the user to connect GitHub there."
             : "The card is in the chat. When you can do the task now another way, such as with web search, the shell, or the browser, do it, and mention the card in one sentence. Otherwise end your answer: tell the user to connect the app with the card or in Marketplace, on the Apps tab, so that every agent can use it directly; you have no tools for it until then.",
       });
     }
@@ -2608,13 +2609,25 @@ export class OpenBotToolRouter {
       const setting = args.setting.trim();
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
+        const serverPlaces = searchServerPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0;
         return openBotToolResult({
-          status: matches.length > 0 ? "matches" : "not_found",
+          status: found ? "matches" : "not_found",
           matches,
-          next:
-            matches.length > 0
-              ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id. When none fits, try other words once, then say that OpenBot has no such setting."
-              : "No setting matches. Try other words once, such as the name of the feature. Otherwise say that OpenBot has no setting for it, and offer openbot.send_feedback with an idea.",
+          ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          next: found
+            ? [
+                matches.length > 0
+                  ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id."
+                  : "",
+                serverPlaces.length > 0
+                  ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                "When none fits, try other English words once, then say that you found no setting for it.",
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
         });
       }
       const shown = settingLinkSummary(setting);
@@ -3028,6 +3041,7 @@ export class OpenBotToolRouter {
     const agentServers = { ...servers, builtIn: () => agentMcpServers(servers.builtIn(), computerUse) };
     return yield* handleMcpServerTool(agentServers, {
       tool: params.tool,
+      agentId,
       arguments: params.arguments,
       approve: (reason, cwd) =>
         this.#attention
@@ -3340,6 +3354,15 @@ export class OpenBotToolRouter {
         named === null
           ? (listed.find((model) => model.provider === caller.provider && model.id === caller.model) ?? null)
           : null;
+      // A provider that lists no model now, or a custom agent whose list is not loaded, is no proof that the
+      // caller's model is gone: the caller runs on it. Before, the new agent started on another provider (#11033).
+      if (
+        named === null &&
+        inherited === null &&
+        (caller.provider === "acp" || !listed.some((model) => model.provider === caller.provider))
+      ) {
+        throw new AgentSettingsRefused(sourceText("error.agent.creatorModelNotListed", { model: caller.model }));
+      }
       if (inherited && args.reasoningEffort !== undefined) requireReasoningEffort(inherited, args.reasoningEffort);
       const requested = named ?? inherited;
       const reasoningEffort = args.reasoningEffort ?? (inherited ? caller.reasoningEffort : undefined);

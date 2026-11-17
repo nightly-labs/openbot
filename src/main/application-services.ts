@@ -120,6 +120,7 @@ import {
   latestTurnAnswer,
 } from "@openbot/contracts/ipc";
 import { decodeRecord, requiredString } from "@openbot/contracts/ipc-decoding";
+import { isValidSemver } from "@openbot/contracts/release-version";
 import { CHANNEL_ROUTES } from "@openbot/contracts/team-protocol/channels-v1";
 import { localeDirection } from "@openbot/i18n";
 import { sourceText } from "@openbot/i18n/source";
@@ -446,7 +447,6 @@ import {
   createDisabledUpdateAdapter,
   electronUpdaterCacheDirectory,
   isNixStoreInstall,
-  isValidSemver,
   loadElectronUpdater,
   supportsInstalledUpdates,
   type UpdateAdapter,
@@ -2451,6 +2451,10 @@ export async function createApplicationServices({
       // never the token; only a test the user pressed may open a browser.
       mcpOAuth,
       mcpOAuthProxySettings,
+      // Chromium's network stack uses the computer's proxy settings, as the built-in browser does.
+      // Node `fetch` ignores them, so the Gemini quota read timed out behind a system proxy (#11278).
+      // The requests carry a bearer token: no browser cookie and no HTTP cache.
+      systemProxyFetch: (url, init) => net.fetch(url, { ...init, credentials: "omit", cache: "no-store" }),
       appVersion: app.getVersion(),
       providerStateDirectory: join(app.getPath("userData"), "provider-state"),
       ...(process.platform === "win32" ? { providerTempDirectory } : {}),
@@ -2682,6 +2686,8 @@ export async function createApplicationServices({
         ),
       mediaProviders: () => service.workflowMediaProviders(),
       mediaCredits: (only) => service.workflowMediaCredits(only),
+      mediaCatalog: (only) => service.workflowMediaCatalog(only),
+      mediaPrice: (request) => service.workflowMediaPrice(request),
       // A kept picture is new in the Library, so the next scan must not answer from before it. A failure
       // after the file is stored also clears the scan.
       keepPicture: (draftId, types) =>
@@ -4303,6 +4309,7 @@ export async function createApplicationServices({
       const contents = webContents.fromId(owner);
       sendToRenderer(contents && BrowserWindow.fromWebContents(contents), IPC_ENDPOINTS.browser.liveViewEvent, event);
     },
+    writeClipboard: (text) => clipboard.writeText(text),
   });
   teardown.push(TEARDOWN_ORDER.browserView, "the live browser view", () => runCauseEffect(browserView.stop()));
   const remoteDesktop = new RemoteDesktopManager({

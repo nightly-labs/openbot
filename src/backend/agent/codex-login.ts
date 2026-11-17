@@ -199,8 +199,9 @@ export class CodexLoginFlow {
     }
 
     yield* Effect.gen({ self: this }, function* () {
+      // The sign-in is new, so a forced refresh only spends its refresh token (#10372).
       const account = yield* pending.client
-        .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
+        .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
         .pipe(toCodexLoginFailed);
       // Codex kept the login, but its model provider does not use it.
       if (account.account?.type === CODEX_MODEL_PROVIDER_ACCOUNT_TYPE) {
@@ -274,7 +275,7 @@ export class CodexLoginFlow {
     const activated = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
         const result = yield* pending.client
-          .request("account/read", { refreshToken: true }, decodeCodexAccountReadResult)
+          .request("account/read", { refreshToken: false }, decodeCodexAccountReadResult)
           .pipe(toCodexLoginFailed);
         const account = result.account;
         if (account?.type !== "chatgpt") return false;

@@ -255,8 +255,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "エージェントのチャットで右にスワイプ",
   "mobile.settings.conversations.swipeThreads": "スレッド",
   "mobile.settings.conversations.swipeBrowser": "ブラウザー",
+  "mobile.settings.conversations.swipeOff": "オフ",
   "mobile.settings.conversations.swipeFooter":
-    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上のスワイプは引き続き返信です。",
+    "エージェントのチャットで「戻る」と逆方向にスワイプすると、これが開きます。メッセージ上で同じ方向にスワイプすると、メッセージの時刻が表示されます。",
   "mobile.settings.conversations.pullInfo": "上に引いて情報を表示",
   "mobile.settings.conversations.pullInfoFooter":
     "チャット、チャンネル、スレッドで最新のメッセージより先まで上に引いて離すと、その情報が開きます。",
@@ -518,6 +519,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "プロセスを停止できませんでした。",
   "mobile.settings.agents.processes.stopTitle": "このプログラムを停止しますか？",
   "mobile.settings.agents.processes.stopLabel": "プロセス {pid} を停止",
+  "mobile.settings.quickActions.title": "アプリアイコンのメニュー",
+  "mobile.settings.quickActions.footer":
+    "OpenBotのアイコンを長押しすると、これらの操作が表示されます。最大{count}個までオンにできます。",
+  "mobile.settings.quickActions.latestChat": "最新のチャット",
+  "mobile.settings.quickActions.secondChat": "2番目に新しいチャット",
   "mobile.settings.shortcuts.title": "ショートカット",
   "mobile.settings.shortcuts.agent": "エージェント",
   "mobile.settings.shortcuts.none": "なし",

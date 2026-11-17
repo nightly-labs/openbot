@@ -94,6 +94,7 @@ export const messages = {
   "error.backend.channelCompactNotSupported":
     "Aucun membre de ce canal ne peut compacter à la demande. Les membres qui le prennent en charge compactent leur contexte automatiquement quand il est presque plein.",
   "error.backend.channelArchived": "Restaurez ce canal avant d’envoyer des messages ou de modifier des tâches.",
+  "error.backend.channelArchiveRunning": "Arrêtez le travail en cours dans ce canal, puis supprimez-le.",
   "error.backend.channelReferenceUnavailable": "Le message de canal référencé est indisponible.",
   "error.backend.channelTaskNotFound": "Tâche de canal introuvable.",
   "error.backend.channelTaskComplete": "Cette tâche est déjà terminée.",

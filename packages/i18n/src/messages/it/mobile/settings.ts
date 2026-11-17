@@ -254,8 +254,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Scorri a destra in una chat",
   "mobile.settings.conversations.swipeThreads": "Thread",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Disattivato",
   "mobile.settings.conversations.swipeFooter":
-    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Uno scorrimento su un messaggio risponde ancora.",
+    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Lo stesso scorrimento su un messaggio mostra l’ora dei messaggi.",
   "mobile.settings.conversations.pullInfo": "Trascina in su per le info",
   "mobile.settings.conversations.pullInfoFooter":
     "In una chat, un canale o un thread trascina in su oltre l’ultimo messaggio e rilascia per aprirne le info.",
@@ -527,6 +528,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossibile arrestare il processo.",
   "mobile.settings.agents.processes.stopTitle": "Arrestare questo programma?",
   "mobile.settings.agents.processes.stopLabel": "Arresta il processo {pid}",
+  "mobile.settings.quickActions.title": "Menu dell’icona",
+  "mobile.settings.quickActions.footer":
+    "Tieni premuta l’icona di OpenBot per vedere queste azioni. Puoi attivarne fino a {count}.",
+  "mobile.settings.quickActions.latestChat": "Ultima chat",
+  "mobile.settings.quickActions.secondChat": "Penultima chat",
   "mobile.settings.shortcuts.title": "Comandi rapidi",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Nessuno",

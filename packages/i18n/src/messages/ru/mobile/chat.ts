@@ -256,9 +256,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Отменить ответ",
   "mobile.chat.composer.messageAgent": "Сообщение для {name}",
   "mobile.chat.composer.pasteFailed": "Не удалось прикрепить вставленный текст",
-  "mobile.chat.composer.cancelDictation": "Отменить диктовку",
   "mobile.chat.voice.listening": "Слушаю…",
-  "mobile.chat.voice.continue": "Продолжить диктовку",
   "mobile.chat.liveVoice.start": "Начать голосовой разговор",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Запуск",
@@ -436,7 +434,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Войдите на своём компьютере",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Этот сайт не принимает вход с сервера. Откройте этот чат в приложении OpenBot для компьютера и войдите там.",
-  "mobile.chat.browserSecret.takeoverReload": "Затем обновите страницу и только потом нажмите «Готово».",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot не смог до конца ввести пароль или код. Введите на странице недостающее. Затем обновите страницу и только потом нажмите «Готово».",
   "mobile.chat.browserSecret.takeoverFailed": "Не удалось выполнить запрос.",
   "mobile.chat.browserSecret.done": "Готово",
   "mobile.chat.browserSecret.submitOnce": "Однократная отправка на {origin}. Это значение не попадёт в чат.",
@@ -624,6 +623,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Остановить агента и отправить сейчас следующее сообщение из очереди",
   "mobile.chat.queue.deleteNext": "Удалить следующее сообщение в очереди",
   "mobile.chat.queue.moveFirst": "Переместить в начало",
+  "mobile.chat.queue.runInNewThread": "Запустить в новой ветке",
+  "mobile.chat.queue.runNextInNewThread": "Запустить следующее сообщение из очереди в новой ветке",
   "mobile.chat.queue.deleteTitle": "Удалить сообщение из очереди?",
   "mobile.chat.queue.deleteMessage": "Агент его не получит.",
   "mobile.chat.queue.keep": "Оставить",

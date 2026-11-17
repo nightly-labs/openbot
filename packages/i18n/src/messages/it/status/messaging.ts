@@ -3,7 +3,7 @@ import type { messages as source } from "../../en/status/messaging";
 
 export const messages = {
   "status.messaging.working": "Ci sto lavorando…",
-  "status.messaging.queued": "In attesa: OpenBot sta lavorando a un'altra richiesta. La risposta arriva qui.",
+  "status.messaging.queued": "In attesa che finisca una richiesta precedente. La risposta arriva qui.",
   "status.messaging.busy": "Ci sono troppe richieste in attesa. Riprova più tardi.",
   "status.messaging.failed":
     "OpenBot non è riuscito a completare questa richiesta. I dettagli sono sull'host di OpenBot.",

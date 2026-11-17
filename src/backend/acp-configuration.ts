@@ -256,7 +256,9 @@ export class AcpConfiguration {
    *
    * Only for a catalog that came from the config option. An agent that describes each model's efforts
    * in `session/new` has answered already and is not asked again. An agent that groups its listed
-   * models in the option (`groupedModelOption`) is asked: the list says nothing about efforts.
+   * models in the option (`groupedModelOption`) is asked: the list says nothing about efforts. So is
+   * one whose list says nothing about efforts and whose session opened on a model without them
+   * (`listsModelsWithoutEfforts`).
    *
    * No probe has to succeed. A model whose probe fails, or that the time does not reach, keeps the
    * session-wide efforts the catalog held before, and the user can still select them. `deadline` is when the caller's own `model/list`
@@ -276,7 +278,12 @@ export class AcpConfiguration {
         candidate.category === "model" && candidate.type === "select",
     );
     const grouped = groupedModelOption(probe) !== null;
-    if (!option || (availableModels(probe).length > 0 && !grouped)) return yield* providerSync(() => models);
+    const listed = availableModels(probe).length > 0 && !grouped;
+    // Not for an agent whose model belongs to the process: each model the sweep selects moves every
+    // session of the process to it, and Cursor asks its server again on each set (#3800).
+    const withoutEfforts =
+      !!option && listed && !this.options.processWideModel && listsModelsWithoutEfforts(probe, option);
+    if (!option || (listed && !withoutEfforts)) return yield* providerSync(() => models);
     // A grouped option resolves a model to one of its efforts, so the session opened on the exact
     // model in the list, and goes back to it. The agent takes that model as a value too.
     const opening = grouped ? (listedCurrentModel(probe) ?? option.currentValue) : option.currentValue;
@@ -306,8 +313,11 @@ export class AcpConfiguration {
       const efforts = response ? reasoningFromConfig(response.configOptions) : answeredEfforts.get(model.id);
       if (response && efforts) answeredEfforts.set(model.id, efforts);
       // An unanswered model keeps its last answer. With no answer yet, it holds the opening model's
-      // options, which say nothing about this model.
-      probed.push(efforts ? { ...model, ...efforts } : { ...model, reasoningEffortConfigurable: true });
+      // options, which say nothing about this model. A listed model without efforts keeps none: the
+      // opening model had no effort option, so an Effort menu would offer a placeholder only.
+      probed.push(
+        efforts ? { ...model, ...efforts } : withoutEfforts ? model : { ...model, reasoningEffortConfigurable: true },
+      );
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
@@ -767,6 +777,29 @@ function groupedModelOption(response: SessionSetupResponse): Extract<SessionConf
   const values = new Set(selectValues(option).map((entry) => entry.value));
   const ids = new Set(listed.map((model) => model.id));
   return values.size === ids.size && [...values].every((value) => ids.has(value)) ? null : option;
+}
+
+/**
+ * Whether an agent lists the values of its model option as its models, says nothing about their
+ * efforts, and opened the session on a model without a `thought_level` option.
+ *
+ * Qoder CN opens on `auto`, which has no efforts, and publishes the efforts of Qwen4-Max only after
+ * the session selects it (#10976). Read from `session/new`, every model then had `auto`'s answer, and
+ * none had an Effort menu. An agent that publishes `thought_level` for the opening model, or describes
+ * each model's efforts, keeps the list without a sweep.
+ */
+function listsModelsWithoutEfforts(
+  response: SessionSetupResponse,
+  option: Extract<SessionConfigOption, { type: "select" }>,
+): boolean {
+  const listed = availableModels(response);
+  if (listed.some((model) => model.supportedReasoningEfforts || model.usesModelReasoningEffort !== null)) return false;
+  const efforts = (candidate: SessionConfigOption) =>
+    candidate.category === "thought_level" && candidate.type === "select";
+  if (sessionConfigOptions(response).some(efforts)) return false;
+  // Cline's first model option is a provider: its values are not the models.
+  const values = new Set(selectValues(option).map((entry) => entry.value));
+  return listed.every((model) => values.has(model.id));
 }
 
 function availableModels(response: SessionSetupResponse): Array<{

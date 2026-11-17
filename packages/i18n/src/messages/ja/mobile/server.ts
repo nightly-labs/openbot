@@ -411,7 +411,6 @@ export const messages = {
   "mobile.server.route.providers": "プロバイダー",
   "mobile.server.route.provider": "プロバイダー",
   "mobile.server.route.providerModels": "モデル",
-  "mobile.server.route.mcp": "MCP サーバー",
   "mobile.server.route.mcpServer": "MCP サーバー",
   "mobile.server.members.rowLabel": "{name}、{role}",
   "mobile.server.members.you": "{name}（あなた）",
@@ -885,7 +884,7 @@ export const messages = {
     "あなたの「自分にメッセージ」チャットと、許可した人だけが書き込めます。それ以外の人には返信しません。オフにすると、OpenBot は知らない人にコードを返信します。",
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
-    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
+    "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。前のリクエストを待っているリクエストには、待機中のメッセージも送信します。回答だけを送信するにはオフにしてください。",
   "mobile.server.connectors.whatsapp.statusReactions": "ステータスのリアクション",
   "mobile.server.connectors.whatsapp.statusReactionsDescription":
     "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
@@ -1175,24 +1174,12 @@ export const messages = {
   "mobile.server.providers.defaultForNew": "新しいエージェントの既定",
   "mobile.server.providers.startsWith": "新しいエージェントは {name} で開始します。",
   "mobile.server.providers.connectFirst": "先に {name} を接続してください。",
-  "mobile.server.settings.mcp": "MCP サーバー",
-  "mobile.server.settings.mcpCount": { other: "{count} 台" },
   "mobile.server.mcp.unsupported": "ここで MCP サーバーを管理するには、このサーバーの OpenBot を更新してください。",
   "mobile.server.mcp.unavailable":
     "MCP サーバーを管理するには、オーナーまたは管理者としてこのサーバーに接続してください。",
   "mobile.server.mcp.accessUnsupported":
     "MCP サーバーを受け取る相手を選ぶには、このサーバーの OpenBot を更新してください。",
-  "mobile.server.mcp.description":
-    "MCP サーバーは、このサーバーのエージェントにツールを追加します。Claude と Codex のエージェントは、このリストのサーバーだけを使います。",
   "mobile.server.mcp.loading": "MCP サーバーを読み込み中…",
-  "mobile.server.mcp.loadFailed": "MCP サーバーを読み込めませんでした。",
-  "mobile.server.mcp.empty": "MCP サーバーはまだありません。",
-  "mobile.server.mcp.retry": "再試行",
-  "mobile.server.mcp.add": "MCP サーバーを追加",
-  "mobile.server.mcp.rowLabel": "{name}、{status}",
-  "mobile.server.mcp.enabled": "オン",
-  "mobile.server.mcp.disabled": "オフ",
-  "mobile.server.mcp.signedIn": "サインイン済み",
   "mobile.server.mcp.gone": "この MCP サーバーはもうこのサーバーにありません。",
   "mobile.server.mcp.addTitle": "MCP サーバーを追加",
   "mobile.server.mcp.addConfirm": "追加",

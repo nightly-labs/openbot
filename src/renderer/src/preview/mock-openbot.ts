@@ -1475,6 +1475,7 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
       },
       getPresentation: async () => clone(dynamicIslandPresentation),
       getBuiltInDisplayGeometry: async () => ({ width: 192, height: 32 }),
+      openBrowserTakeover: async () => undefined,
       onPreference: () => () => undefined,
       onPresentation: () => () => undefined,
       onGeometry: () => () => undefined,
@@ -3993,6 +3994,8 @@ export function createMockOpenBot(options: MockOpenBotOptions = {}): MockOpenBot
         emitAgentEvent({ type: "agents-changed", agents });
         return clone({ agents: copied, skipped: [], signIn: ["claude"], warnings: [] });
       },
+      // The preview has no joined server to send a file to.
+      onUploadProgress: () => () => undefined,
     },
     remoteDesktop: mockTeam.remoteDesktop,
   };

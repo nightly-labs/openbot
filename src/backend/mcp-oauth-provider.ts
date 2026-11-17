@@ -1020,6 +1020,10 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    *
    * The `/callback` form only when the registration names it and not this run's address: a server
    * that refused `/mcp-auth` registered it (see `watchRegistration`).
+   *
+   * A loopback name also matches when the registration names it with no port. Magnific's Keycloak
+   * saves `http://localhost/mcp-auth` for `http://localhost:<port>/mcp-auth`, and refuses the
+   * `127.0.0.1` form on the authorization page (#10877).
    */
   get redirectUrl(): string {
     const record = this.#record();
@@ -1029,8 +1033,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     const deepLink = this.#deepLinkRedirectUrl;
     if (deepLink && client.redirect_uris.includes(deepLink)) return deepLink;
     const localhost = this.#localhostRedirectUrl;
-    if (localhost && client.redirect_uris.includes(localhost)) return localhost;
-    if (client.redirect_uris.includes(own)) return own;
+    if (localhost && registersAddress(client.redirect_uris, localhost)) return localhost;
+    if (registersAddress(client.redirect_uris, own)) return own;
     for (const address of [own, localhost]) {
       const callback = address ? callbackRedirectUrl(address) : null;
       if (callback && registersAddress(client.redirect_uris, callback)) return callback;
@@ -1050,7 +1054,8 @@ class McpOAuthClientProvider implements OAuthClientProvider {
    * client, because a secret on the user's computer is not secret, and PKCE protects the grant.
    * Some servers also issue a secret they never accept: Railway registers `client_secret_basic` and
    * then refuses that secret at the token endpoint (#3429). A server that does not list `none` still
-   * picks its own method, and the SDK uses the one it registered.
+   * picks its own method, and the SDK uses the one it registered. A server that registers `none` but
+   * issues a secret and wants it, as Enrich does (#11426), gets it back: see `withIssuedSecretMethod`.
    *
    * Except a server that lists only `client_secret_post`. A request with no method asks for the RFC
    * 7591 default, `client_secret_basic`, and Make refuses that registration with a 400: "No supported
@@ -1149,7 +1154,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
     // The last browser trip on the address of this registration got no grant back: register the
     // next address (see the constructor). A client metadata document lists only one address.
     const retry = this.#retryRedirectUrl;
-    if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !client.redirect_uris.includes(retry))
+    if (retry && client.client_id !== MCP_CLIENT_METADATA_URL && !registersAddress(client.redirect_uris, retry))
       return this.#register();
     // A registration made before its scope named `offline_access` refuses the request that adds it.
     // Only a scope from the resource's metadata is checked: with no scope to send, nothing is added.
@@ -1339,7 +1344,7 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         this.recordSecret(information.client_secret);
         // The SDK binds an unstamped client to its issuer after an exchange. For a sign-in app that
         // binding is all that is written: the app is not a registration.
-        const { app } = this.#record();
+        const { app, client: stored } = this.#record();
         if (app) {
           if (!app.issuer && typeof information.issuer === "string" && information.client_id === app.clientId)
             yield* this.#save({ app: { ...app, issuer: information.issuer } });
@@ -1348,10 +1353,16 @@ class McpOAuthClientProvider implements OAuthClientProvider {
         // For a client metadata document the SDK passes only its URL and the issuer. The store
         // refuses a client with no `redirect_uris`, so the address of this run is added, as a
         // registration has it. A later run on another port then uses the document again.
+        // A client already on file is only bound to its issuer here, and keeps its method.
         const client: OAuthClientInformationFull =
           information.client_id === MCP_CLIENT_METADATA_URL
             ? { ...information, redirect_uris: [this.#options.redirectUrl], token_endpoint_auth_method: "none" }
-            : information;
+            : information.client_id === stored?.client_id
+              ? information
+              : withIssuedSecretMethod(
+                  information,
+                  this.#discoveryState?.authorizationServerMetadata?.token_endpoint_auth_methods_supported,
+                );
         // The tokens on file belong to the client on file: the silent refresh and the revocation at
         // sign-out send them with it. A sign-in that registers again keeps its client here until its
         // grant is exchanged, so a cancel or a timeout keeps the stored sign-in usable (#6975).
@@ -2272,6 +2283,22 @@ function tokenEndpointAuthMethod(
   if (methods?.includes("client_secret_post") && !methods.includes("client_secret_basic"))
     return { token_endpoint_auth_method: "client_secret_post" };
   return {};
+}
+
+/**
+ * A new registration as the token endpoint must receive it. Enrich (#11426) registers the public
+ * client (`none`) that OpenBot asks for, but also issues a secret and refuses a token request without
+ * it. The SDK follows the registered `none` and sends no secret, so each sign-in failed. A secret
+ * that the server issued is sent in a way that the server lists: in the body first, as Make wants.
+ * A server that lists no secret method, or issues no secret, keeps `none`.
+ */
+function withIssuedSecretMethod(
+  information: OAuthClientInformationFull,
+  methods: string[] | undefined,
+): OAuthClientInformationFull {
+  if (!information.client_secret || information.token_endpoint_auth_method !== "none") return information;
+  const method = ["client_secret_post", "client_secret_basic"].find((name) => methods?.includes(name));
+  return method ? { ...information, token_endpoint_auth_method: method } : information;
 }
 
 /** The class of a failure, for a log line that must not carry the failure's own text. */

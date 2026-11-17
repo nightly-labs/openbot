@@ -251,8 +251,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Ajan sohbetinde sağa kaydır",
   "mobile.settings.conversations.swipeThreads": "Mesaj dizileri",
   "mobile.settings.conversations.swipeBrowser": "Tarayıcı",
+  "mobile.settings.conversations.swipeOff": "Kapalı",
   "mobile.settings.conversations.swipeFooter":
-    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Bir mesajda kaydırmak yine ona yanıt verir.",
+    "Bir ajanın sohbetinde Geri'nin tersine kaydırmak bunu açar. Aynı kaydırma bir mesajda mesajların saatlerini gösterir.",
   "mobile.settings.conversations.pullInfo": "Bilgi için yukarı çek",
   "mobile.settings.conversations.pullInfoFooter":
     "Bir sohbet, kanal veya mesaj dizisinde son mesajın ötesine yukarı çekip bırakarak bilgisini açın.",
@@ -516,6 +517,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "İşlem durdurulamadı.",
   "mobile.settings.agents.processes.stopTitle": "Bu program durdurulsun mu?",
   "mobile.settings.agents.processes.stopLabel": "{pid} işlemini durdur",
+  "mobile.settings.quickActions.title": "Uygulama simgesi menüsü",
+  "mobile.settings.quickActions.footer":
+    "Bu eylemleri görmek için OpenBot simgesine dokunup basılı tut. En fazla {count} tanesini açabilirsin.",
+  "mobile.settings.quickActions.latestChat": "Son sohbet",
+  "mobile.settings.quickActions.secondChat": "Sondan ikinci sohbet",
   "mobile.settings.shortcuts.title": "Kestirmeler",
   "mobile.settings.shortcuts.agent": "Ajan",
   "mobile.settings.shortcuts.none": "Yok",

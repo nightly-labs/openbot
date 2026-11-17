@@ -33,6 +33,7 @@ import {
   resolveMediaInputs,
   uploadToService,
 } from "./mcp-media";
+import { isSunraModelList, type SunraPlan, sunraCatalogEntry } from "./sunra-catalog";
 import type { MediaImageRole } from "./workflow-walk";
 
 /** The host of Sunra's MCP server. An enabled http MCP row with this host is the Sunra connection. */
@@ -55,6 +56,11 @@ const SUNRA_CREDITS_DEADLINE = Duration.seconds(20);
 const SUNRA_TRANSFER_DEADLINE = { upload: Duration.minutes(2), download: Duration.minutes(5) } as const;
 /** How many `get_job` calls in a row can fail before the step fails. */
 const SUNRA_POLL_FAILURES = 3;
+/** A read of the model list or of a price that takes longer gives no list or no price. */
+const SUNRA_CATALOG_DEADLINE = Duration.seconds(30);
+const SUNRA_PRICE_DEADLINE = Duration.seconds(20);
+/** The description of a price quote. Sunra prices an image by the length of its description. */
+const SUNRA_PRICE_PROMPT = "A picture.";
 
 /** The sign-in of the Sunra row: its address and its OAuth token. Never logged. */
 export type SunraSignIn = McpMediaSignIn;
@@ -66,6 +72,8 @@ export interface SunraMediaRequest {
   prompt: string;
   specs: WorkflowMediaSpecs;
   images: readonly { role: MediaImageRole; attachmentId: string }[];
+  /** Which pictures and which background the model takes. */
+  plan: SunraPlan;
 }
 
 /** The error for a refusal or a failed job, from the words of Sunra. */
@@ -181,6 +189,16 @@ const waitForFile = Effect.fnUntraced(function* (client: Client, task: string, k
 const download = (url: string, kind: WorkflowMediaKind) =>
   downloadMedia(url, kind, { allowed: isSunraMedia, deadline: SUNRA_TRANSFER_DEADLINE.download, timedOut });
 
+/** The choices of the step as Sunra takes them: aspect, resolution, length and background. */
+function sunraChoices(kind: WorkflowMediaKind, specs: WorkflowMediaSpecs, plan: SunraPlan): McpToolArguments {
+  return {
+    aspect_ratio: specs.aspect,
+    ...(specs.resolution ? { resolution: specs.resolution } : {}),
+    ...(kind === "video" ? { duration: specs.duration } : {}),
+    ...(kind === "image" && plan.transparent && specs.transparent ? { background: "transparent" } : {}),
+  };
+}
+
 /**
  * Makes one file with Sunra and keeps it in Storage. Answers the id of the stored attachment.
  */
@@ -190,7 +208,13 @@ export const generateSunraMedia = Effect.fn("generateSunraMedia")(function* (
 ) {
   const signIn = dependencies.signIn();
   if (!signIn) return yield* notSignedIn();
-  const files = yield* resolveMediaInputs(dependencies, request.images);
+  const all = yield* resolveMediaInputs(dependencies, request.images);
+  // Only the pictures that the model takes. A last frame alone is not sent: most models refuse it.
+  const { plan } = request;
+  const startFile = plan.start ? all.find((file) => file.role === "first") : undefined;
+  const endFile = plan.end && startFile ? all.find((file) => file.role === "last") : undefined;
+  const referenceFiles = all.filter((file) => file.role === "reference").slice(0, plan.references);
+  const files = [...(startFile ? [startFile] : []), ...(endFile ? [endFile] : []), ...referenceFiles];
   const made = yield* Effect.scoped(
     Effect.gen(function* () {
       const client = yield* connectSignedIn(signIn, notSignedIn);
@@ -205,28 +229,23 @@ export const generateSunraMedia = Effect.fn("generateSunraMedia")(function* (
         if (uploaded.has(file.path)) continue;
         uploaded.set(file.path, yield* uploadPicture(client, file, uploaded.size));
       }
-      const urls = (role: MediaImageRole) =>
-        files.filter((file) => file.role === role).flatMap((file) => uploaded.get(file.path) ?? []);
+      const url = (file: { path: string } | undefined) => (file ? uploaded.get(file.path) : undefined);
+      const references = referenceFiles.flatMap((file) => uploaded.get(file.path) ?? []);
       const common = {
         project_id: project,
         prompt: request.prompt,
         model: request.model,
-        aspect_ratio: request.specs.aspect,
-        ...(request.specs.resolution ? { resolution: request.specs.resolution } : {}),
+        ...sunraChoices(request.kind, request.specs, plan),
         auto_confirm: true,
         // A new id for each run: Sunra makes one file for one id, so a resent create does not charge twice.
         ...(team ? {} : { request_id: `openbot-${randomUUID()}` }),
       };
-      const first = urls("first")[0];
-      const last = urls("last")[0];
-      const references = urls("reference");
       const answer =
         request.kind === "video"
           ? yield* callTool(client, "create_video", {
               ...common,
-              duration: request.specs.duration,
-              ...(first ? { start_image: first } : {}),
-              ...(last ? { end_image: last } : {}),
+              start_image: url(startFile),
+              end_image: url(endFile),
               ...(references.length > 0 ? { reference_images: references } : {}),
             })
           : yield* callTool(client, "create_image", {
@@ -291,4 +310,74 @@ export const readSunraCredits = Effect.fn("readSunraCredits")(function* (signIn:
       orElse: () => Effect.fail(timedOut()),
     }),
   );
+});
+
+/**
+ * The image and video models of Sunra's catalog that the canvas can run, with their plans.
+ * `list_models` only reads the catalog: it spends no credits.
+ */
+export const readSunraCatalog = Effect.fn("readSunraCatalog")(function* (signIn: SunraSignIn) {
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* connectSignedIn(signIn, notSignedIn);
+      const answer = yield* callTool(client, "list_models", {});
+      const models = isSunraModelList(answer.models) ? answer.models : [];
+      const seen = new Set<string>();
+      return models.flatMap((item) => {
+        const entry = sunraCatalogEntry(item);
+        if (!entry || seen.has(entry.model.id)) return [];
+        seen.add(entry.model.id);
+        return [entry];
+      });
+    }),
+  ).pipe(Effect.timeoutOrElse({ duration: SUNRA_CATALOG_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
+});
+
+/** A price in credits: a finite number that is not negative. */
+const priceValue = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : null;
+
+/**
+ * The total of an `estimate_cost` answer. Its fields are not documented, so the usual names of a
+ * total are read, at the top and in a `cost` or `estimate` record.
+ */
+function quotedCredits(answer: DynamicRecord): number | null {
+  const names = ["total_credits", "totalCredits", "credits", "estimated_credits", "estimatedCredits", "total"];
+  for (const record of [answer, answer.cost, answer.estimate]) {
+    if (!isDynamicRecord(record)) continue;
+    for (const name of names) {
+      const value = priceValue(record[name]);
+      if (value !== null) return value;
+    }
+  }
+  return priceValue(answer.cost) ?? priceValue(answer.estimate);
+}
+
+export interface SunraPriceRequest {
+  kind: WorkflowMediaKind;
+  model: string;
+  specs: WorkflowMediaSpecs;
+  plan: SunraPlan;
+}
+
+/**
+ * What one file costs with the choices of the step, in credits, or null when Sunra gives no price.
+ * `estimate_cost` only asks for the price and spends no credits. Sunra quotes the Personal account
+ * only, so a Team sign-in gets no price. The quote sends no picture.
+ */
+export const readSunraPrice = Effect.fn("readSunraPrice")(function* (signIn: SunraSignIn, request: SunraPriceRequest) {
+  return yield* Effect.scoped(
+    Effect.gen(function* () {
+      const client = yield* connectSignedIn(signIn, notSignedIn);
+      if (yield* selectedTeam(client)) return null;
+      const answer = yield* callTool(client, "estimate_cost", {
+        type: request.kind,
+        model: request.model,
+        prompt: SUNRA_PRICE_PROMPT,
+        count: 1,
+        ...sunraChoices(request.kind, request.specs, request.plan),
+      });
+      return quotedCredits(answer);
+    }),
+  ).pipe(Effect.timeoutOrElse({ duration: SUNRA_PRICE_DEADLINE, orElse: () => Effect.fail(timedOut()) }));
 });

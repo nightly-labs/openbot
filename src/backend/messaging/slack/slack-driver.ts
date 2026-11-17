@@ -17,6 +17,7 @@ import type {
   MessagingDriverOptions,
   MessagingIngress,
   MessagingPlace,
+  MessagingPlaces,
   RecentMessages,
   StatusReaction,
 } from "../messaging-types";
@@ -435,7 +436,7 @@ class SlackAdapter implements MessagingAdapter {
   /** The public and private channels that OpenBot is a member of: `chat:write` posts only there. */
   readonly places = Effect.fnUntraced(function* (
     this: SlackAdapter,
-  ): Effect.fn.Return<MessagingPlace[], MessagingAdapterError> {
+  ): Effect.fn.Return<MessagingPlaces, MessagingAdapterError> {
     const places: MessagingPlace[] = [];
     let cursor: string | undefined;
     do {
@@ -453,7 +454,7 @@ class SlackAdapter implements MessagingAdapter {
       const next = isDynamicRecord(page.response_metadata) ? page.response_metadata.next_cursor : undefined;
       cursor = isString(next) && next && places.length < PLACES_LIMIT ? next : undefined;
     } while (cursor);
-    return places.slice(0, PLACES_LIMIT);
+    return { places: places.slice(0, PLACES_LIMIT) };
   });
 
   readonly joinPublicPlaces = Effect.fnUntraced(function* (

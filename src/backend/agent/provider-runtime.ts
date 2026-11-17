@@ -106,7 +106,7 @@ import { ModelCatalog } from "./model-catalog";
 import { startMuseDeviceLogin } from "./muse-login";
 import type { PoolCandidate } from "./provider-account-pool";
 import type { ProviderAccountStore, StoredProviderAccount } from "./provider-account-store";
-import { defaultUsageModel, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
+import { defaultUsageModel, ownApiKeyNotice, ProviderAccountFailed, ProviderAccounts } from "./provider-accounts";
 import {
   createAcpRequestEchoReader,
   isAcpHandlerDiagnostic,
@@ -350,6 +350,8 @@ export interface ProviderHooks {
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** `isProviderBusy` without the turns of this agent. Absent: as `isProviderBusy`. */
+  isProviderBusyApartFrom?(provider: AgentProvider, agentId: string): boolean;
   /** True while a turn of this agent runs. An agent's own process stays while its own turn runs. */
   isAgentBusy(agentId: string): boolean;
   /** True while an agent is set to this provider, so a turn on it can come at any time. */
@@ -516,8 +518,8 @@ export class ProviderRuntime implements ProviderPort {
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
   /**
-   * Providers that a turn kept on the old agent environment or OpenCode config. The idle check
-   * restarts each after its turn.
+   * Providers that a turn kept on the old agent environment or OpenCode config, or whose restart
+   * waited for an update that was cancelled. The idle check restarts each after its turn.
    */
   readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
@@ -846,7 +848,7 @@ export class ProviderRuntime implements ProviderPort {
         const accounts =
           row.state === "available" && row.id !== "acp"
             ? this.#providerAccounts
-                ?.rows(row.id, row.email ?? null)
+                ?.rows(row.id, row.email ?? null, ownApiKeyNotice(this.#accounts.get(row.id)))
                 ?.map((account) => this.#extraModels(row.id, account))
             : undefined;
         const pool = accounts ? this.accountPool(row.id) : null;
@@ -1072,10 +1074,17 @@ export class ProviderRuntime implements ProviderPort {
     }
   }, Effect.uninterruptible);
 
-  /** True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's process. */
-  #providerInUse(provider: AgentProvider): boolean {
+  /**
+   * True while a turn, a start, a connection command, a CLI change or a sign-in uses the provider's
+   * process. `apartFrom` leaves out the turns of that agent.
+   */
+  #providerInUse(provider: AgentProvider, apartFrom?: string): boolean {
+    const busy =
+      apartFrom === undefined
+        ? this.#hooks.isProviderBusy(provider)
+        : (this.#hooks.isProviderBusyApartFrom?.(provider, apartFrom) ?? this.#hooks.isProviderBusy(provider));
     return (
-      this.#hooks.isProviderBusy(provider) ||
+      busy ||
       this.#providerStarts.has(provider) ||
       this.#providerConnectionCommands.has(provider) ||
       this.isReplacingCli(provider) ||
@@ -2732,9 +2741,18 @@ export class ProviderRuntime implements ProviderPort {
     }
   });
 
-  /** Ends a wait that did not reach the install, because it was cancelled or failed. */
+  /**
+   * Ends a wait that did not reach the install, because it was cancelled or failed. A restart that
+   * waits for the same turns then runs when they end, and new turns do not wait for it: one Cancel
+   * releases them (#10825).
+   */
   #endUpdateWhenIdle(provider: AgentProvider): void {
-    if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
+    if (!this.#updatesWhenIdle.delete(provider)) return;
+    if (this.#restartsWhenIdle.get(provider) && this.#hooks.isProviderBusy(provider)) {
+      this.cancelProviderRestart(provider);
+      this.#environmentReloadPending.add(provider);
+    }
+    this.#hooks.onProviderResumed(provider);
   }
 
   /** Answers null, and installs nothing, when a turn started on the provider after the wait. */
@@ -2785,6 +2803,9 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
+          // The new process does a restart that waits, also one that a cancelled update gave to the idle check.
+          this.cancelProviderRestart(provider);
+          this.#environmentReloadPending.delete(provider);
           // The new copy runs from now on, also when a client of the user's CLI ran during the update.
           this.#installedFallback.delete(provider);
           // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
@@ -2943,6 +2964,18 @@ export class ProviderRuntime implements ProviderPort {
     agent: AgentSummary,
   ) {
     const provider = providerForAgent(agent);
+    const shared = this.#clients.get(provider);
+    // Checked again after the replacement check, which waits for the process.
+    if (
+      shared &&
+      !this.#providerInUse(provider, agent.id) &&
+      (yield* this.#mustReplace(shared)) &&
+      this.#clients.get(provider) === shared &&
+      !this.#providerInUse(provider, agent.id)
+    ) {
+      logger.info("Replaced a provider CLI that still runs a stopped turn.", { provider });
+      yield* this.#releaseClient(provider, shared);
+    }
     yield* this.ensureProvider(provider);
     yield* this.#awaitConfinedStart(agent.id);
     if (provider === "acp" && this.#removingCustomRuntime)
@@ -2951,7 +2984,7 @@ export class ProviderRuntime implements ProviderPort {
     const own = this.#ownProcessFor(agent);
     const current = this.#confined.get(agent.id);
     const key = own ? this.#confinedKey(provider, own) : null;
-    if (current && current.key === key) {
+    if (current && current.key === key && !(yield* this.#mustReplace(current.client))) {
       current.lastUsed = Date.now();
       return current.client;
     }
@@ -2964,6 +2997,15 @@ export class ProviderRuntime implements ProviderPort {
     if (this.#confinedStarts.get(agent.id) === completion) this.#confinedStarts.delete(agent.id);
     return yield* exit;
   }, Effect.uninterruptible).bind(this);
+
+  /**
+   * Codex adds a new turn of a thread to the turn that runs there. A process that still runs a stopped
+   * turn, as when a command hangs (#11100), would hold each next turn of that thread too. It is
+   * replaced as an idle one is, so the next turn resumes the thread on a new process.
+   */
+  #mustReplace(client: AgentClient): Effect.Effect<boolean> {
+    return client.replaceForNextTurn?.(this.#conversation.clientThreads(client)) ?? Effect.succeed(false);
+  }
 
   #countActivation(provider: AgentProvider): void {
     this.#activations.set(provider, (this.#activations.get(provider) ?? 0) + 1);
@@ -3440,8 +3482,9 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const result = yield* Effect.result(
       Effect.gen({ self: this }, function* () {
+        // Without a forced refresh, as at a start: see `#authenticateClient`.
         const account = yield* client
-          .request("account/read", { refreshToken: true }, accountReadDecoder(provider), 5_000)
+          .request("account/read", { refreshToken: false }, accountReadDecoder(provider), 5_000)
           .pipe(toProviderOperationFailed);
         // An activation can replace this client while the account request is pending.
         if (this.#clients.get(provider) !== client) return;
@@ -3603,8 +3646,13 @@ export class ProviderRuntime implements ProviderPort {
               ),
             );
             logger.info("A provider answered initialize.", { provider, durationMs: durationMs() });
+            // No forced refresh. Codex processes of one sign-in folder share its single-use refresh
+            // token, and a refresh at each start made processes that start together spend it twice:
+            // OpenAI then ends the sign-in with "refresh token was already used" (#10372). Codex
+            // refreshes by itself when the token expires, and reads the folder again first. Codex
+            // 0.160.1 to 0.169.0 also ignore the result of a forced refresh in their answer.
             const response = yield* client
-              .request("account/read", { refreshToken: true }, accountReadDecoder(provider))
+              .request("account/read", { refreshToken: false }, accountReadDecoder(provider))
               .pipe(toProviderOperationFailed);
             const account = response.account;
             if (!account)
@@ -4415,6 +4463,15 @@ export class ProviderRuntime implements ProviderPort {
         stderrLogger.warn("Hermes logged a diagnostic.", { provider: client.provider, message });
         return;
       }
+      if (client.provider === "acp" && origin?.stderr) {
+        // A custom agent can be any program, and its stderr is a log in a form OpenBot cannot read.
+        // A Python traceback is one record per line, so one failure was a stack of toasts with lines
+        // such as `raise HTTPError(...)` (#10908). Failures reach the user in the protocol: a failed
+        // request or turn, and a crash as the process exit, which keeps the last stderr line.
+        // OpenBot's own reports of the agent, such as a model list that failed, have no stderr mark.
+        stderrLogger.warn("A custom agent logged a diagnostic.", { provider: client.provider, message });
+        return;
+      }
       if (client.provider === "mistral") {
         // Mistral Vibe 3.1.0 reports each failure in the protocol: a failed turn in its prompt error
         // (rate limit, refused key, backend error), and a crash as the process exit. Its stderr is the
@@ -4470,7 +4527,7 @@ export class ProviderRuntime implements ProviderPort {
    * same failure can name neither the server nor its URL, such as the `rmcp` worker's `Unexpected
    * content type: … when send initialized notification` (#7895), so `#configuredMcpServerIn` finds
    * no server in it. Codex names a server by its key (`codexMcpServerKey`): the name in the form it
-   * accepts, or that name with `openbot_` in front when the user's own Codex file has the key. Each
+   * accepts with `openbot_` in front, or without it when that key is reserved or the user's. Each
    * server of that file goes to Codex turned off (`codexDisabledServers`), so it does not start and
    * a failure under either key is the failure of OpenBot's server. A key that matches no row, and a
    * built-in server, go to the log only, as from stderr.
@@ -4479,10 +4536,11 @@ export class ProviderRuntime implements ProviderPort {
     const key = getString(params, "name");
     if (getString(params, "status") !== "failed" || !key) return;
     const message = shortenDiagnostic(this.#redactMcp(getString(params, "error") ?? ""));
-    const config = this.#credentials.mcpServers().find((row) => {
-      const name = providerMcpServerName(row.name);
-      return key === name || key === `openbot_${name}`;
-    });
+    // A row's `openbot_` key comes first: a row named `openbot_x` travels as `openbot_openbot_x`.
+    const rows = this.#credentials.mcpServers();
+    const config =
+      rows.find((row) => key === `openbot_${providerMcpServerName(row.name)}`) ??
+      rows.find((row) => key === providerMcpServerName(row.name));
     const builtIn = config?.id === COMPUTER_USE_MCP_SERVER_ID || config?.id === GITHUB_CONNECTOR_MCP_SERVER_ID;
     const server = config && !builtIn ? config.name : null;
     stderrLogger.warn("A provider reported an MCP server failure.", { provider: client.provider, server, message });

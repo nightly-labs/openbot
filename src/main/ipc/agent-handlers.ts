@@ -118,6 +118,11 @@ import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_ROUTES,
+  withAgentThreadRequests,
+} from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import { AGENT_THREADS_CAPABILITY, AGENT_THREADS_ROUTES } from "@openbot/contracts/team-protocol/agent-threads-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
@@ -202,6 +207,7 @@ import {
   decodeRemoteAgentTasks,
   decodeRemoteAgentThreadBranches,
   decodeRemoteAgentThreadQueues,
+  decodeRemoteAgentThreadRequests,
   decodeRemoteTaskConversation,
   decodeRemoteTaskPage,
   decodeRemoteTaskReadState,
@@ -1343,6 +1349,7 @@ export function agentIpcHandlers({
           const init = { method: "POST", body: { agentId } } as const;
           const branched = remoteServers.supportsCapability(serverId, AGENT_THREAD_BRANCHES_CAPABILITY);
           const queued = remoteServers.supportsCapability(serverId, AGENT_THREAD_QUEUE_CAPABILITY);
+          const requested = remoteServers.supportsCapability(serverId, AGENT_THREAD_REQUESTS_CAPABILITY);
           return runCauseEffect(
             Effect.gen(function* () {
               let snapshot = yield* remoteServers.request(
@@ -1359,6 +1366,15 @@ export function agentIpcHandlers({
                   init,
                 );
                 snapshot = withAgentThreadBranches(snapshot, links.branches);
+              }
+              if (requested) {
+                const requests = yield* remoteServers.request(
+                  serverId,
+                  AGENT_THREAD_REQUESTS_ROUTES.list,
+                  decodeRemoteAgentThreadRequests,
+                  init,
+                );
+                snapshot = withAgentThreadRequests(snapshot, requests);
               }
               if (!queued) return snapshot;
               const queues = yield* remoteServers.request(

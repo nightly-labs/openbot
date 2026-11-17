@@ -35,6 +35,7 @@ import { AGENT_THREAD_PAGES_CODECS } from "./agent-thread-pages-v1";
 import { AGENT_THREAD_QUEUE_CODECS } from "./agent-thread-queue-v1";
 import { AGENT_THREAD_READS_CODECS } from "./agent-thread-reads-v1";
 import { AGENT_THREAD_REPLIES_CODECS } from "./agent-thread-replies-v1";
+import { AGENT_THREAD_REQUESTS_CODECS } from "./agent-thread-requests-v1";
 import { AGENT_THREADS_CODECS } from "./agent-threads-v1";
 import { AGENT_UPDATE_CODECS } from "./agent-update-v1";
 import { AGENT_USAGE_LIMIT_CODECS } from "./agent-usage-limit-v1";
@@ -161,6 +162,7 @@ import { WHATSAPP_STATUS_REACTIONS_CODECS } from "./whatsapp-status-reactions-v1
 import { WHATSAPP_WORKING_MESSAGE_CODECS } from "./whatsapp-working-message-v1";
 import { WORKFLOWS_GITHUB_CODECS } from "./workflows-github-v1";
 import { WORKFLOWS_HIGGSFIELD_CODECS } from "./workflows-higgsfield-v1";
+import { WORKFLOWS_MEDIA_CATALOG_CODECS } from "./workflows-media-catalog-v1";
 import { WORKFLOWS_MEDIA_CODECS } from "./workflows-media-v1";
 import { WORKFLOWS_SUNRA_CODECS } from "./workflows-sunra-v1";
 import { WORKFLOWS_CODECS } from "./workflows-v1";
@@ -254,6 +256,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...PROVIDER_ACCOUNT_CODE_CODECS,
   ...GITHUB_SKILLS_CODECS,
   ...AGENT_THREAD_QUEUE_CODECS,
+  ...AGENT_THREAD_REQUESTS_CODECS,
   ...AGENT_ACTIVE_QUEUES_CODECS,
   ...AGENT_USAGE_LIMIT_CODECS,
   ...AGENT_PENDING_RUNTIME_CODECS,
@@ -322,6 +325,7 @@ const CODECS: ReadonlyMap<string, OptionalRouteCodec> = new Map([
   ...WORKFLOWS_MEDIA_CODECS,
   ...WORKFLOWS_SUNRA_CODECS,
   ...WORKFLOWS_HIGGSFIELD_CODECS,
+  ...WORKFLOWS_MEDIA_CATALOG_CODECS,
   ...SIDEBAR_FOLDERS_CODECS,
   ...LIBRARY_FOLDERS_CODECS,
   ...VAULT_CODECS,

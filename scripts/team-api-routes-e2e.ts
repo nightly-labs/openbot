@@ -148,6 +148,7 @@ import {
   AGENT_TASK_LIMIT_CAPABILITY,
   AGENT_TASK_LIMIT_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-task-limit-v1";
+import { AGENT_TASKS_CAPABILITY, AGENT_TASKS_ROUTES } from "@openbot/contracts/team-protocol/agent-tasks-v1";
 import {
   AGENT_THREAD_PAGES_CAPABILITY,
   AGENT_THREAD_PAGES_ROUTES,
@@ -160,6 +161,10 @@ import {
   AGENT_THREAD_REPLIES_CAPABILITY,
   AGENT_THREAD_REPLIES_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-thread-replies-v1";
+import {
+  AGENT_THREAD_REQUESTS_CAPABILITY,
+  AGENT_THREAD_REQUESTS_ROUTES,
+} from "@openbot/contracts/team-protocol/agent-thread-requests-v1";
 import {
   AGENT_USAGE_LIMIT_CAPABILITY,
   AGENT_USAGE_LIMIT_ROUTES,
@@ -399,6 +404,7 @@ import {
   THREAD_MESSAGE_SEARCH_CAPABILITY,
   THREAD_MESSAGE_SEARCH_ROUTES,
 } from "@openbot/contracts/team-protocol/thread-message-search-v1";
+import { UI_BLOCK_PREVIEW_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/ui-block-preview-edit-v1";
 import { USAGE_CREDITS_CAPABILITY, USAGE_CREDITS_ROUTES } from "@openbot/contracts/team-protocol/usage-credits-v1";
 import {
   TEAM_APP_VERSION_HEADER,
@@ -428,6 +434,7 @@ import {
 } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
+import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -1595,7 +1602,8 @@ const fakeAgents: TeamApiAgents = {
       };
     return undefined;
   },
-  respondToPrompt: unused("respondToPrompt"),
+  // Records the answers as the route decodes them, such as an edited confirm preview (`_preview`).
+  respondToPrompt: (input, responder) => Effect.sync(() => record("respondToPrompt", input, responder)),
   // As the agent service answers: a closed request, an answer that only the owner can give, and a
   // report about the phone app (request 7), which takes "accept" only with the phone's data.
   respondToApproval: (input, responder) => {
@@ -1617,6 +1625,7 @@ const fakeAgents: TeamApiAgents = {
 // (`agent-thread-pages-v1`) reach the side threads in this run. The thread holds one message before
 // `message-7`, and no other message.
 // The thread list has one thread with a waiting message (`agent-thread-queue-v1`) and one without.
+// The thread without one waits for the answer to a request to another agent (`agent-thread-requests-v1`).
 // With `longThreadQueue`, the waiting thread holds 20 messages of 100,000 characters: more than one
 // WebRTC frame.
 let longThreadQueue = false;
@@ -1678,7 +1687,11 @@ const fakeAgentTasks: TeamApiAgentTasks = {
           position: index + 1,
         }))
       : [waiting];
-    return { agentId, tasks: [task("task-queued", queue), task("task-idle", [])], limit: 10 };
+    const asking: AgentTask = {
+      ...task("task-idle", []),
+      awaitedReplies: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+    };
+    return { agentId, tasks: [task("task-queued", queue), asking], limit: 10 };
   },
   readTask: unused("readTask"),
   readTaskPage: (input) => {
@@ -3535,6 +3548,12 @@ try {
         (process.platform !== "darwin") &&
         !list(field(hiddenWorkV8.body, "capabilities")).includes(MAC_APPS_LIMIT_CAPABILITY),
       { platform: process.platform, v9: summary(hiddenWorkV9) },
+    );
+    check(
+      "the host advertises ui-block-preview-edit to a protocol 9 peer only",
+      list(field(hiddenWorkV9.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY) &&
+        !list(field(hiddenWorkV8.body, "capabilities")).includes(UI_BLOCK_PREVIEW_EDIT_CAPABILITY),
+      { v9: summary(hiddenWorkV9) },
     );
     const unsupported = await call("POST", AGENT_HIDDEN_ROUTES.read, { token: bobToken, json: {}, capabilities: [] });
     check(
@@ -12311,6 +12330,19 @@ try {
       errorIs(plain, 403, sourceText("error.backend.feedbackNeedsPhone")) && declined.status === 204,
       [summary(plain), summary(declined)],
     );
+    // The host reads an edited confirm preview beside the answers (`ui-block-preview-edit-v1`).
+    const editedAnswers = { action: ["Send"], [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Tuesday."] };
+    const edited = await call("POST", TEAM_API_ROUTES.respond.prompt, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, answers: editedAnswers },
+    });
+    check(
+      "the prompt route gives the agent service an edited confirm preview with the answers",
+      edited.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToPrompt").at(-1)?.[0], { requestId: 7, answers: editedAnswers }),
+      { status: edited.status, call: callsOf("respondToPrompt").at(-1) },
+    );
   }
 
   /**
@@ -12691,6 +12723,64 @@ try {
           [{ ...order, deliveryIds: ["delivery-stale"] }],
         ]),
       [summary(reordered), summary(stale)],
+    );
+  }
+
+  // ---- The requests of a side thread to other agents (agent-thread-requests-v1) ----
+  {
+    const capabilities = [AGENT_THREAD_REQUESTS_CAPABILITY];
+    const v9 = { capabilities, protocol: TEAM_PROTOCOL_V9 };
+    const listBody = { agentId: "agent-ada" };
+    const unsupported = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, json: listBody });
+    const extraField = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: { ...listBody, taskId: "task-idle" },
+    });
+    const hiddenAgent = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      capabilities,
+      protocol: 6,
+      json: { agentId: "agent-pi" },
+    });
+    accessLevels = { revision: 26, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewerList = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, {
+      token: bobToken,
+      ...v9,
+      json: listBody,
+    });
+    accessLevels = { revision: 27, everyone: {}, roles: [] };
+    check(
+      "the thread requests route without the capability, with an unknown field, of a hidden agent, or for a member who can only view is refused",
+      errorIs(unsupported, 400, sourceText("error.team.threadRequestsUnsupported")) &&
+        extraField.status === 400 &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(viewerList, 403, sourceText("error.team.agentViewOnly")),
+      [summary(unsupported), summary(extraField), summary(hiddenAgent), summary(viewerList)],
+    );
+    const listed = await call("POST", AGENT_THREAD_REQUESTS_ROUTES.list, { token: bobToken, ...v9, json: listBody });
+    const tasks = await call("POST", AGENT_TASKS_ROUTES.list, {
+      token: bobToken,
+      capabilities: [AGENT_TASKS_CAPABILITY],
+      protocol: TEAM_PROTOCOL_V9,
+      json: listBody,
+    });
+    check(
+      "a member reads the open requests of each side thread, and the frozen task list does not carry them",
+      listed.status === 200 &&
+        isDeepStrictEqual(listed.body, {
+          agentId: "agent-ada",
+          threads: [
+            {
+              taskId: "task-idle",
+              requests: [{ messageId: "message-asked", recipientAgentId: "agent-grace", status: "running" }],
+            },
+          ],
+        }) &&
+        tasks.status === 200 &&
+        field(tasks.body, "tasks", 1, "id") === "task-idle" &&
+        field(tasks.body, "tasks", 1, "awaitedReplies") === undefined,
+      [summary(listed), summary(tasks)],
     );
   }
 
