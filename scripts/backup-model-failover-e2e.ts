@@ -869,7 +869,12 @@ try {
         }),
       );
       assert.equal(received.status, "queued");
+      const linkId = received.status === "queued" ? received.link.linkId : "";
       await waitFor("the conversation's request to end", () => ends.length > 0);
+      await waitFor(
+        "the conversation's requests to settle",
+        () => mailbox.unresolvedMessagingDeliveries(linkId).length === 0,
+      );
     } finally {
       stopListening();
     }
