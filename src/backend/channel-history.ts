@@ -79,7 +79,7 @@ const UNCHANGED_MEMORIES_RULE =
 const HANDOFF_INSTRUCTION_CHARACTERS = 24_000;
 const ASSIGNMENT_REFERENCE = '[the text under "Current assignment"]';
 const RESUMED_ASSIGNMENT_NOTE =
-  "The sub-tasks that this assignment waited for have ended. dependencyTasks gives their state, and their results are channel messages. The assignment below is the same request as before: the person did not send it again. Continue it with those results. An approval or an instruction in it is not new.";
+  "The sub-tasks that this assignment waited for have ended. dependencyTasks gives their state, and their results are channel messages. The person did not send the assignment below again: it is the same request, and an approval in it is not a new approval. Continue the request with those results.";
 // The instruction of a task that this task waits for. Its result is a channel message.
 const DEPENDENCY_INSTRUCTION_CHARACTERS = 500;
 /**
