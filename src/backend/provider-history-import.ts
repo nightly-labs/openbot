@@ -82,10 +82,11 @@ export interface ProviderHistoryImportInput {
    */
   continuesQuietRun?(delivery: DeliveryContext["delivery"]): boolean;
   /**
-   * Whether the agent answered this teammate request with its own `send_message` reply in the turn that
-   * ran it, so the turn can have ended quiet, as at the turn completion (#7465). Left out, it cannot.
+   * Whether this teammate request has its result: the agent's own `send_message` reply in the turn that
+   * ran it (#7465), or the turn's answer that OpenBot sent when the turn ended (#8021). The turn can
+   * then have ended quiet, as at the turn completion. Left out, it cannot.
    */
-  hasOwnReplyFrom?(deliveryId: string): boolean;
+  requestAnswered?(deliveryId: string): boolean;
 }
 
 export interface ProviderHistoryImportResult {
@@ -357,7 +358,7 @@ function routineTurnAnswers(
           routine =
             delivery !== undefined &&
             ((input.quietTeammateThread === true &&
-              quietTeammateTurnDelivery(delivery, (request) => input.hasOwnReplyFrom?.(request.id) === true)) ||
+              quietTeammateTurnDelivery(delivery, (request) => input.requestAnswered?.(request.id) === true)) ||
               (delivery.sender.kind === "routine" && input.quietRoutineDelivery(delivery.id)) ||
               continuesQuietRun);
           requestsOnly &&= delivery !== undefined && teammateRequest(delivery);
