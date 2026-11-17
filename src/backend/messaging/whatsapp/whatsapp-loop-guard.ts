@@ -1,22 +1,24 @@
 import { sourceText } from "@openbot/i18n/source";
+import { CANCEL_TEXT } from "../messaging-types";
 
 /**
  * OpenBot 0.70 and older ended each post in the owner's own chat with a line of blank braille
  * characters (U+2800). A person does not type this line, so a message with it is another OpenBot's post.
  */
 const OLD_SPACER = /\n⠀{8,}\s*$/u;
-/** The request that stops the running request. It goes through also while the chat is paused. */
-const STOP_TEXT = /^(cancel|stop)$/iu;
-/** Requests in the owner's own chat within this time count toward the limit. */
-const SELF_CHAT_WINDOW_MS = 10 * 60_000;
 /** The limit counts spans of this length that have a request, so a burst of messages counts once. */
 const SELF_CHAT_SPAN_MS = 10_000;
 /**
- * A request in more spans than this in the window is not a person: it is a loop, such as two OpenBots
- * that answer each other's posts every few seconds. A person who writes a burst, or forwards many files
- * at once, fills only a few spans.
+ * A request in more spans than the limit of a window is not a person: it is a loop, such as two
+ * OpenBots that answer each other's posts. A fast loop fills the short window; a loop of slow agent
+ * turns, a request each half minute or more often, fills the long one. A person who writes a burst, or
+ * forwards many files at once, fills only a few spans.
  */
-const SELF_CHAT_MAX_SPANS = 30;
+const SELF_CHAT_LIMITS = [
+  { windowMs: 10 * 60_000, maxSpans: 30 },
+  { windowMs: 60 * 60_000, maxSpans: 120 },
+] as const;
+const SELF_CHAT_KEPT_MS = 60 * 60_000;
 /** How long the owner's own chat gets no answers after the limit. The other side of a loop stops in this time. */
 const SELF_CHAT_PAUSE_MS = 10 * 60_000;
 
@@ -71,13 +73,19 @@ export class WhatsAppSelfChatLimit {
    * pause, and "paused" during it.
    */
   check(at: number, text: string): "allow" | "pause" | "paused" {
-    if (STOP_TEXT.test(text.trim())) return "allow";
+    if (CANCEL_TEXT.test(text.trim())) return "allow";
     if (at < this.#pausedUntil) return "paused";
     const span = Math.floor(at / SELF_CHAT_SPAN_MS);
-    const oldest = Math.floor((at - SELF_CHAT_WINDOW_MS) / SELF_CHAT_SPAN_MS);
-    for (const kept of this.#spans) if (kept <= oldest) this.#spans.delete(kept);
+    const spanOf = (msAgo: number) => Math.floor((at - msAgo) / SELF_CHAT_SPAN_MS);
+    for (const kept of this.#spans) if (kept <= spanOf(SELF_CHAT_KEPT_MS)) this.#spans.delete(kept);
     this.#spans.add(span);
-    if (this.#spans.size <= SELF_CHAT_MAX_SPANS) return "allow";
+    const over = SELF_CHAT_LIMITS.some(({ windowMs, maxSpans }) => {
+      const oldest = spanOf(windowMs);
+      let count = 0;
+      for (const kept of this.#spans) if (kept > oldest) count += 1;
+      return count > maxSpans;
+    });
+    if (!over) return "allow";
     this.#spans.clear();
     this.#pausedUntil = at + SELF_CHAT_PAUSE_MS;
     return "pause";
