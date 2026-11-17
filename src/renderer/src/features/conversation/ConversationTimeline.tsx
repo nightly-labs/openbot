@@ -49,7 +49,7 @@ import { planItems, planTitle, replacedPlanIds } from "../../app-message-project
 import { useChatBubbleStyle } from "../../chat-bubble-style-preference";
 import { useCompactMessageActions } from "../../compact-message-actions-preference";
 import { currentDevicePlatform } from "../../send-shortcut-preference";
-import { remoteRoutineRecovery, serverCanAdminister, serverSupportsCapability } from "../servers/server-capabilities";
+import { remoteRoutineRecovery, serverSupportsCapability } from "../servers/server-capabilities";
 import { speechModelReady } from "../speech/speech-model";
 import { recordingGone, speechReading, spokenReply } from "../speech/speech-playback";
 import {
@@ -61,7 +61,6 @@ import {
   toggleSpokenReply,
 } from "../speech/speech-replies";
 import { cycleSpeechSpeed, speechSpeed } from "../speech/speech-speed";
-import { agentInstructionsCalls } from "./agent-folders-port";
 import { groupedMessageIds } from "./agent-message-timeline";
 import { ChatVisualReply, shownVisualReply } from "./ChatVisualReply";
 import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
@@ -74,7 +73,6 @@ import { conversationPort } from "./conversation-port";
 import { isIncomingAgentMessage } from "./conversation-read-state";
 import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
-import { agentSkillsMode } from "./installed-skills-source";
 import { MarketplaceSuggestionChatCard, marketplaceSuggestionKnown } from "./MarketplaceSuggestionChatCard";
 import { McpSignInChatCard } from "./McpSignInChatCard";
 import { useMessageBackdropAction, watchAgentBackdrops } from "./message-backdrop";
@@ -187,8 +185,7 @@ export function ConversationTimeline() {
     openExternalMessageUrl,
     openReactionMessageId,
     openRoutineSettings,
-    openSkillSettings,
-    openInstructionsSettings,
+    changeMarkerActions,
     openAgentSettingRow,
     openSharedFile,
     openWorkspaceFile,
@@ -379,25 +376,6 @@ export function ConversationTimeline() {
   );
   // The browser client reads a host file whole, with no size limit, so a named image stays a chip there.
   const messageImageFiles = props.runtime ? undefined : createMessageImageFiles(runtime.agent);
-  const localInstructions = agentInstructionsCalls();
-  /**
-   * The server whose instruction file View and Undo read on a change line: a joined server only for an
-   * owner or admin, through `agent-instructions-v1`. The calls follow the server id, so a new summary
-   * of the same server keeps an open view. The web client gets the calls from its runtime, which gives
-   * them only for such a host and user.
-   */
-  const webInstructionsApi = createMemo(() => props.runtime?.agentInstructions);
-  const instructionsServerId = createMemo(() => {
-    if (props.runtime) return webInstructionsApi() ? props.server?.id : undefined;
-    return props.server?.kind === "remote" && serverCanAdminister(props.server, "agent-instructions-v1")
-      ? props.server.id
-      : undefined;
-  });
-  const instructionsCalls = createMemo(() => {
-    if (!props.runtime && props.server?.kind === "local") return localInstructions;
-    const serverId = instructionsServerId();
-    return serverId === undefined ? undefined : agentInstructionsCalls(serverId, webInstructionsApi());
-  });
   /**
    * Remove on a thank-you card. The host whose account sent the report removes it: this computer, or
    * a joined server with `feedback-withdraw-v1` for its owner. Only the owner approves a report. For
@@ -693,7 +671,6 @@ export function ConversationTimeline() {
   /** A memory review's skill suggestion with its name is a card; one from an older host keeps its text. */
   const skillSuggestionMarker = (marker: ChatActionMarkerModel) =>
     marker.kind === "skill-suggestion" ? marker : undefined;
-  const skillOpener = () => (agentSkillsMode(props.server, props.runtime) === "hidden" ? undefined : openSkillSettings);
   /** The saved http row a sign-in card names. A row this client cannot read keeps the marker. */
   const mcpSignInConfig = (marker: ChatActionMarkerModel) =>
     marker.kind === "mcp-sign-in"
@@ -1166,11 +1143,7 @@ export function ConversationTimeline() {
                                                         when={settingLinkMarker(marker())}
                                                         fallback={
                                                           <ChatActionMarker
-                                                            onOpenSkill={
-                                                              agentSkillsMode(props.server, props.runtime) === "hidden"
-                                                                ? undefined
-                                                                : openSkillSettings
-                                                            }
+                                                            onOpenSkill={changeMarkerActions.onOpenSkill}
                                                             marker={marker()}
                                                             agents={props.agents}
                                                             announce={arrives}
@@ -1188,12 +1161,8 @@ export function ConversationTimeline() {
                                                             onToggleRoutineRun={toggleRoutineRun}
                                                             onToggleAgentMessage={toggleAgentMessage}
                                                             agentMessageText={agentMessageText}
-                                                            instructions={instructionsCalls()}
-                                                            onOpenInstructions={
-                                                              channel || !instructionsCalls()
-                                                                ? undefined
-                                                                : openInstructionsSettings
-                                                            }
+                                                            instructions={changeMarkerActions.instructions}
+                                                            onOpenInstructions={changeMarkerActions.onOpenInstructions}
                                                           />
                                                         }
                                                       >
@@ -1279,7 +1248,7 @@ export function ConversationTimeline() {
                                         onSave={(reply) =>
                                           saveSkillSuggestion(message()?.id ?? initialMessage.id, reply)
                                         }
-                                        onOpenSkill={skillOpener()}
+                                        onOpenSkill={changeMarkerActions.onOpenSkill}
                                       />
                                     )}
                                   </Show>

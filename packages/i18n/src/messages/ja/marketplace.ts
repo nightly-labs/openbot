@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "一部のアプリまたはスキルがインストールされていません。再接続するとインストールされます。",
   "marketplace.app.notConnected": "未接続",
+  "marketplace.app.paused": "一時停止中",
   "marketplace.app.custom": "MCP サーバー",
   "marketplace.app.githubTagline": "リポジトリ、Issue、プルリクエスト",
   "marketplace.app.onePasswordTagline": "共有したログイン情報でサイトにサインイン",

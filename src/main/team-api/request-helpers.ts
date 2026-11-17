@@ -13,6 +13,7 @@ import {
   AGENT_WELCOME_ITEM_TYPE,
   type AgentAccessLevel,
   agentAccessRank,
+  CHANNEL_RESUME_ITEM_TYPE,
   type ConversationMessage,
   type ConversationMessageSender,
   type ConversationPageAnchor,
@@ -208,10 +209,16 @@ export function markerExclusionsForCapabilities(capabilities: ReadonlySet<string
 /**
  * Whether a client can show a message of this kind. No client can collapse a quiet routine answer
  * into its run, so a quiet answer goes to none: it would show as a new answer to every client. A new
- * agent's setup message (`agent-welcome-v1`) is for the agent only, so it goes to none either.
+ * agent's setup message (`agent-welcome-v1`) and the continuation of a channel request are for the
+ * agent only, so they go to none either.
  */
 function markerSupported(itemType: string | undefined, capabilities: ReadonlySet<string>): boolean {
-  if (itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE || itemType === AGENT_WELCOME_ITEM_TYPE) return false;
+  if (
+    itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE ||
+    itemType === AGENT_WELCOME_ITEM_TYPE ||
+    itemType === CHANNEL_RESUME_ITEM_TYPE
+  )
+    return false;
   if (itemType?.startsWith(ROUTINE_EVENT_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");
   // Paged history drops suggestions with routine events, so live events drop them the same way.
   if (itemType?.startsWith(MARKETPLACE_SUGGESTION_ITEM_TYPE_PREFIX)) return capabilities.has("routine-event-markers");

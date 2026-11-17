@@ -337,9 +337,14 @@ const PROVIDER_RUNTIME_DESCRIPTORS: Record<ManagedRuntimeId, ProviderRuntimeDesc
             yield* runtimeIO(() => mkdir(join(staging, "bin"), { recursive: true }));
             yield* Effect.all(
               [
-                runtimeIO(() =>
-                  copyFile(join(packageRoot, artifact.executable), join(staging, "bin", artifact.executable)),
-                ),
+                // A move, not a copy: the unpacked folder is beside `staging`, on the same disk, and a
+                // second copy of a binary of more than 300 MB filled disks that the space check passed (#10191).
+                // A scanner on Windows can hold the new file, so a move that fails is a copy, as before.
+                runtimeIO(async () => {
+                  const source = join(packageRoot, artifact.executable);
+                  const target = join(staging, "bin", artifact.executable);
+                  await rename(source, target).catch(() => copyFile(source, target));
+                }),
                 runtimeIO(() => copyFile(join(packageRoot, "LICENSE.md"), join(staging, "LICENSE.md"))),
                 runtimeIO(() =>
                   writeFile(

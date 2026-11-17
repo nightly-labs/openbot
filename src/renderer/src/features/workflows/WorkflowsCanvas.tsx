@@ -26,12 +26,15 @@ export function WorkflowsCanvas(props: {
   self?: WorkflowCatalogs["self"];
   /** The workflow to open, such as the one of a clicked notification. Without it, the first one opens. */
   request?: WorkflowRequest | undefined;
+  /** The server of the host. The page shows the workflow of its last visit while it reads the host. */
+  serverId?: string | undefined;
 }) {
   // The keyed parent mounts a new canvas for each server, so the host does not change.
   const workflows = createWorkflowsController(
     untrack(() => props.host),
     () => desktopAnalytics.scope(),
     untrack(() => props.request),
+    untrack(() => props.serverId),
   );
   // Sunra and Higgsfield make files on the host's sign-in of that service, which the person makes in
   // Apps and finishes in the browser. The canvas reads them again when the window comes back to the

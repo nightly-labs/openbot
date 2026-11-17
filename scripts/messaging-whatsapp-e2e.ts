@@ -1,6 +1,7 @@
 // Checks the WhatsApp connector end to end against a fake WhatsApp: the link by QR code and by pairing
 // code, the encrypted store and its lock, the sender rules (the owner's own chat, personal chats left
-// alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard,
+// alone, pairing codes on a dedicated number, the group mention gate, LID authors), the echo guard, the
+// guard against another OpenBot on the same number and against a loop in the owner's own chat,
 // numbered approval answers, the saved history and its search, held messages after a wake, the
 // journal replay after a restart, each close code, the send queue while the socket is down, and the
 // disconnect. Runs the real agent service, messaging service, WhatsApp driver, runtime, session and
@@ -653,12 +654,21 @@ try {
       assert.ok(own);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "👀", id: own.id })]);
       phone.current().receive([message({ chat: OWNER_JID, fromMe: true, text: "echo", id: own.id })], "append");
-      // A later message is read, so the two echoes above were read and dropped.
+      // Another OpenBot linked to the same number posts with ids that this one does not know: its status
+      // post, and an answer of OpenBot 0.70 or older, which ends with a line of blank braille characters.
+      const otherStatus = message({ chat: OWNER_JID, fromMe: true, text: "Working on it…\n\nReply stop to stop." });
+      const otherAnswer = message({ chat: OWNER_JID, fromMe: true, text: `Here you go.\n${"\u2800".repeat(36)}` });
+      phone.current().receive([otherStatus, otherAnswer]);
+      // A later message is read, so the posts above were read and dropped.
       const later = message({ chat: OWNER_JID, fromMe: true, text: "And tomorrow?" });
       phone.current().receive([later]);
       await until(() => received(agents, OWNER_JID, later.key.id ?? ""), "the later message");
       assert.equal(received(agents, OWNER_JID, own.id), false, "An own post was read as a request.");
-      return { echoId: own.id };
+      for (const other of [otherStatus, otherAnswer])
+        assert.equal(received(agents, OWNER_JID, other.key.id ?? ""), false, "Another OpenBot's post was a request.");
+      const told = () => phone.textsTo(OWNER_JID).filter((text) => text.startsWith("Another OpenBot is linked")).length;
+      await until(() => told() === 1, "one notice about the other OpenBot");
+      return { echoId: own.id, otherOpenBotNotices: told() };
     });
 
     await step(
@@ -1155,7 +1165,7 @@ try {
           me: { number: OWNER, lid: `${OWNER_LID}@lid` },
           openedAt: Date.now(),
           now: Date.now(),
-          rules: { ownNumber: true, contacts: new Set<string>(), groups: new Set<string>() },
+          rules: { ownNumber: true, contacts: new Map<string, string>(), groups: new Set<string>() },
           chats,
           isOwnPost: () => false,
           threadOf: () => null,
@@ -1362,6 +1372,60 @@ try {
         const lunch = await readHistory(agents, { place: GROUP, query: "lunch" });
         assert.equal(lunch.messages.length, 1);
         return { saved: saved.length };
+      },
+    );
+
+    await step(
+      "loop guard: a loop in the owner's own chat pauses it, a burst does not, and stop goes through",
+      async () => {
+        const paused = () =>
+          phone.textsTo(OWNER_JID).filter((text) => text.startsWith("OpenBot stopped answering here")).length;
+        const handle = runtime.get(credentials.get(connectionId(agents))?.storeId ?? "");
+        assert.ok(handle, "No open store.");
+        const journaled = (chat: string, id: string | null | undefined) =>
+          handle.store.unhandled().some((entry) => entry.dedupKey === `${chat}:${id}`);
+        const mention = (text: string) =>
+          message({
+            chat: GROUP,
+            participant: `${FRIEND}@s.whatsapp.net`,
+            text: `@48600100200 ${text}`,
+            mentions: [OWNER_JID],
+          });
+        // A person who sends many messages at once, such as forwarded files, is not a loop.
+        const burst = Array.from({ length: 35 }, (_, index) =>
+          message({ chat: OWNER_JID, fromMe: true, text: `note ${index}` }),
+        );
+        phone.current().receive(burst);
+        const afterBurst = mention("after the burst");
+        phone.current().receive([afterBurst]);
+        // Messages are read in order, and the mention goes on after the joined burst.
+        await until(() => phone.reactedTo(afterBurst.key.id), "a group mention after the burst");
+        assert.equal(paused(), 0, "A burst of messages paused the owner's own chat.");
+        assert.equal(journaled(OWNER_JID, burst[0]?.key.id), true, "The burst did not go on as one request.");
+        // Two OpenBots that answer each other's posts send a request every few seconds, without end.
+        const start = Date.now() - 31 * 12_000;
+        const loop = Array.from({ length: 31 }, (_, index) => {
+          const sent = message({ chat: OWNER_JID, fromMe: true, text: `loop ${index}` });
+          sent.messageTimestamp = Math.floor((start + index * 12_000) / 1_000);
+          return sent;
+        });
+        phone.current().receive(loop);
+        await until(() => paused() === 1, "the pause notice");
+        // The requests before the limit go on as one joined burst first, so the next ones stand alone.
+        await until(() => !journaled(OWNER_JID, loop[1]?.key.id), "the loop requests before the limit");
+        const during = message({ chat: OWNER_JID, fromMe: true, text: "during the pause" });
+        const stop = message({ chat: OWNER_JID, fromMe: true, text: "stop" });
+        const marker = mention("during the pause");
+        phone.current().receive([during]);
+        phone.current().receive([stop]);
+        phone.current().receive([marker]);
+        // The mention goes on after the owner's messages above, so they were read.
+        await until(() => phone.reactedTo(marker.key.id), "a group mention during the pause");
+        assert.equal(journaled(OWNER_JID, during.key.id), false, "The paused chat took a request.");
+        assert.equal(journaled(OWNER_JID, stop.key.id), true, "A stop request did not go through the pause.");
+        assert.equal(journaled(OWNER_JID, loop.at(-1)?.key.id), false, "The loop went on past the limit.");
+        assert.equal(paused(), 1, "The pause notice came more than once.");
+        return { pauseNotices: paused() };
       },
     );
   });

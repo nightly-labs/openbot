@@ -50,13 +50,18 @@ import {
   withQuestionContext,
 } from "@/features/chat/model/chat-messages";
 import type { AgentChatTarget } from "@/features/chat/model/chat-target";
-import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
+import {
+  answerlessTurnSummaries,
+  finishedTurnSummaries,
+  type TurnStepsSummary,
+} from "@/features/chat/model/turn-thinking";
 import { uploadChatAttachments } from "@/features/chat/model/upload-chat-attachments";
 import { useAgentMentionReferences } from "@/features/chat/model/use-agent-mention-references";
 import { useProgressUpdates } from "@/features/chat/model/use-progress-updates";
 import { voiceAccent, voicePalette } from "@/features/chat/model/voice-palette";
 import { agentTaskHoldText } from "@/features/servers/model/agent-task-text";
 import { useThreadActions } from "@/features/servers/model/use-thread-actions";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useChatPullPreference } from "@/features/settings/model/chat-swipe";
 import { ConnectionStatus } from "@/features/workspace/components/connection-status";
 import { useTurnStepLines } from "@/features/workspace/components/use-agent-activity";
@@ -308,12 +313,18 @@ function AgentTaskChat({
   // As in the agent's chat: the steps row of a finished turn and the activity row open the thinking sheet.
   const turnLines = useTurnStepLines(serverId);
   const lastTurnSummaries = useRef<ReadonlyMap<string, TurnStepsSummary> | undefined>(undefined);
-  const turnSummaries = useMemo(() => {
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
+  const allTurnSummaries = useMemo(() => {
     lastTurnSummaries.current = conversation.data
       ? finishedTurnSummaries(conversation.data.messages, activeTurnId, turnLines, lastTurnSummaries.current)
       : undefined;
     return lastTurnSummaries.current;
   }, [conversation.data, activeTurnId, turnLines]);
+  // With the thinking display off, only a turn with no answer keeps its steps row. A separate memo
+  // keeps the map while a streamed word leaves the summaries the same.
+  const answerlessSummaries = useMemo(() => answerlessTurnSummaries(allTurnSummaries), [allTurnSummaries]);
+  const turnSummaries = showThinking ? allTurnSummaries : answerlessSummaries;
+  const rowShown = useChatRowShown(turnSummaries);
   const openTurn = useCallback(
     (turnId: string) => router.push({ pathname: "/turn-thinking", params: { agentId, serverId, taskId, turnId } }),
     [agentId, serverId, taskId],
@@ -422,7 +433,7 @@ function AgentTaskChat({
     insets.top + 84,
     keyboardOffset,
     ready && rowsShown,
-    rowsShown && messages.some((row) => row.kind !== "thinking" || turnSummaries?.has(row.id)),
+    rowsShown && messages.some(rowShown),
     lastUserId,
     questionForm.question ? (questionForm.messageId ?? null) : null,
     // As a chat that opens at a message from search: the list does not take the latest message first.

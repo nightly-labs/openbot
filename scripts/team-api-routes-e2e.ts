@@ -9,6 +9,7 @@
 // host's Vault (`vault-v1`, its API keys through `vault-v2`, the agents of each item through `vault-v4`, and the CSV import of `vault-import-v1`)
 // over the real service and store,
 // where each routine runs (`routine-run-place-v1`) over stand-in routine records,
+// which run paused each paused routine (`routine-pause-reasons-v1`) over the same records,
 // a password that an admin saves from the secure card (`browser-secret-vault-v1`),
 // a transfer file larger than one part, sent and read in parts (`instance-transfer-chunks-v1`),
 // the whole copy of a pending approval (`pending-approval-v1`),
@@ -359,6 +360,10 @@ import { PROVIDERS_V5_CAPABILITY, PROVIDERS_V5_ROUTES } from "@openbot/contracts
 import { PROVIDERS_V8_CAPABILITY, PROVIDERS_V8_ROUTES } from "@openbot/contracts/team-protocol/providers-v8";
 import { QueueEditRejectedError, TEAM_QUEUE_EDIT_CAPABILITY } from "@openbot/contracts/team-protocol/queue-edit-v1";
 import {
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_ROUTES,
+} from "@openbot/contracts/team-protocol/routine-pause-reasons-v1";
+import {
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RESULTS_ROUTES,
 } from "@openbot/contracts/team-protocol/routine-results-v1";
@@ -449,7 +454,11 @@ import { createAgentHostSettings } from "../src/main/agent-host-settings";
 import { AgentImportService } from "../src/main/agent-import-service";
 import { createAgentInstructionsFiles } from "../src/main/agent-instructions-files";
 import { AgentNotificationLevelStore } from "../src/main/agent-notification-level-store";
-import { type BitwardenCliRunner, BitwardenConnectorService } from "../src/main/bitwarden-connector-service";
+import {
+  type BitwardenCliRunner,
+  BitwardenConnectorService,
+  BitwardenKeyIdBackfillError,
+} from "../src/main/bitwarden-connector-service";
 import { BitwardenConnectorStore } from "../src/main/bitwarden-connector-store";
 import { createBrowserProfileService } from "../src/main/browser-profile-service";
 import { BrowsingMemoryPreferenceStore } from "../src/main/browsing-memory-preference-store";
@@ -1803,12 +1812,20 @@ const bitwardenFile = join(root, "openbot-bitwarden-connector-v1.json");
 const bitwardenCalls: { args: string[]; env: Record<string, string> }[] = [];
 /** While set, `unlock` reports that it started and waits for `released`. */
 let bitwardenUnlockGate: { started: () => void; released: Promise<void> } | null = null;
+/** While set, the server has no user key id route, as Vaultwarden before 1.37.4 (#10130). */
+let bitwardenServerRefusesBackfill = false;
+interface BitwardenCliState {
+  server: string | null;
+  signedIn: boolean;
+  /** `bw` pauses its user key id backfill after the server refuses it. */
+  backfillPaused?: boolean;
+}
 /** The CLI's own state lives in its data folder, so removing the folder signs it out. */
-function bitwardenCliState(): { server: string | null; signedIn: boolean } {
+function bitwardenCliState(): BitwardenCliState {
   const path = join(bitwardenData, "data.json");
   return existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : { server: null, signedIn: false };
 }
-function saveBitwardenCliState(change: Partial<{ server: string | null; signedIn: boolean }>): void {
+function saveBitwardenCliState(change: Partial<BitwardenCliState>): void {
   mkdirSync(bitwardenData, { recursive: true });
   writeFileSync(join(bitwardenData, "data.json"), JSON.stringify({ ...bitwardenCliState(), ...change }));
 }
@@ -1839,6 +1856,11 @@ const fakeBitwardenCli: BitwardenCliRunner = async (_executable, args, env) => {
       await bitwardenUnlockGate.released;
     }
     if (!state.signedIn || env.BW_PASSWORD !== BW_MASTER_PASSWORD) throw new Error("bad password");
+    // As `bw` 2026.9: the unlock runs the backfill, and a refusal pauses it, then fails the unlock.
+    if (bitwardenServerRefusesBackfill && !state.backfillPaused) {
+      saveBitwardenCliState({ backfillPaused: true });
+      throw new BitwardenKeyIdBackfillError("KeyIdBackfillError");
+    }
     return `${BW_SESSION_KEY}\n`;
   }
   if (env.BW_SESSION !== BW_SESSION_KEY) throw new Error("locked");
@@ -9086,6 +9108,7 @@ try {
         !wrongStatus.connected &&
         wrongStatus.error === sourceText("error.connector.bitwardenHostFailed") &&
         bitwardenCalls.some((entry) => entry.args[0] === "login") &&
+        bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length === 1 &&
         !existsSync(bitwardenFile) &&
         !existsSync(bitwardenData),
       { wrong: summary(wrong), wrongStatus },
@@ -9182,6 +9205,20 @@ try {
         !bitwardenConnector.connected(),
       summary(disconnect),
     );
+    // `bw` fails the first unlock after a sign-in when the server refuses its user key id backfill.
+    bitwardenServerRefusesBackfill = true;
+    bitwardenCalls.length = 0;
+    const backfillSettled = bitwardenSettled(bitwardenConnector);
+    await connectAs(adaToken, input);
+    const backfill = await backfillSettled;
+    const unlocks = bitwardenCalls.filter((entry) => entry.args[0] === "unlock").length;
+    check(
+      "a server that refuses the user key id backfill still connects: the host unlocks once more",
+      backfill.connected && backfill.error === null && unlocks === 2 && existsSync(bitwardenFile),
+      { backfill, unlocks },
+    );
+    bitwardenServerRefusesBackfill = false;
+    await runCauseEffect(bitwardenConnector.disconnect());
   }
 
   // ---- WhatsApp numbers on the host (whatsapp-connector-v1) ----
@@ -10793,6 +10830,95 @@ try {
         errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
         saves().length === 2,
       [summary(gone), summary(badPlace), summary(missing), summary(hiddenAgent)],
+    );
+  }
+
+  // ---- Why a routine is paused (routine-pause-reasons-v1) ----
+  {
+    const capabilities = [AGENT_HIDDEN_CAPABILITY, ROUTINE_PAUSE_REASONS_CAPABILITY];
+    const saves = () => [...callsOf("updateRoutine"), ...callsOf("saveRoutineRecord")];
+    const savesBefore = saves().length;
+    const unchanged = routineRecords;
+    // Each routine was paused by a scheduled run of its own: a schedule routine, a webhook routine and
+    // a `once` routine. The store gives `pausedByRun` only on a paused routine.
+    routineRecords = routineRecords.map((routine) => ({
+      ...routine,
+      active: false,
+      pausedByRun: { scheduledFor: `2026-11-15T0${routine.id === "routine-hook" ? 9 : 8}:00:00.000Z` },
+    }));
+    const compatibility = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: TEAM_PROTOCOL_V9 });
+    const older = await call("GET", TEAM_API_ROUTES.compatibility, { protocol: 8 });
+    check(
+      "the host advertises routine-pause-reasons-v1 to a protocol 9 peer and not to a protocol 8 peer",
+      list(field(compatibility.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY) &&
+        !list(field(older.body, "capabilities")).includes(ROUTINE_PAUSE_REASONS_CAPABILITY),
+      [summary(compatibility), summary(older)],
+    );
+    const unsupported = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+    });
+    check(
+      "the list route without the capability gets 400 routinePauseReasonsUnsupported",
+      errorIs(unsupported, 400, sourceText("error.team.routinePauseReasonsUnsupported")),
+      summary(unsupported),
+    );
+    const member = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    const admin = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member reads the run that paused each schedule routine that the released routes show; an admin also reads the webhook routines; nobody reads a `once` routine",
+      member.status === 200 &&
+        isDeepStrictEqual(member.body, {
+          routines: [{ routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" }],
+        }) &&
+        isDeepStrictEqual(admin.body, {
+          routines: [
+            { routineId: "routine-ada", scheduledFor: "2026-11-15T08:00:00.000Z" },
+            { routineId: "routine-hook", scheduledFor: "2026-11-15T09:00:00.000Z" },
+          ],
+        }),
+      [summary(member), summary(admin)],
+    );
+    accessLevels = { revision: 12, everyone: { "agent-ada": "view" }, roles: [] };
+    const viewer = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    accessLevels = { revision: 13, everyone: {}, roles: [] };
+    const missing = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-none" },
+      capabilities,
+    });
+    const hiddenAgent = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: bobToken,
+      json: { agentId: "agent-pi" },
+      capabilities,
+      protocol: 6,
+    });
+    routineRecords = unchanged;
+    const resumed = await call("POST", ROUTINE_PAUSE_REASONS_ROUTES.list, {
+      token: adaToken,
+      json: { agentId: "agent-ada" },
+      capabilities,
+    });
+    check(
+      "a member who can only view the agent reads the reasons, an unknown or hidden agent gets 404, a routine with no reason is not listed, and the route saves nothing",
+      isDeepStrictEqual(viewer.body, member.body) &&
+        errorIs(missing, 404, sourceText("error.team.agentNotFound")) &&
+        errorIs(hiddenAgent, 404, sourceText("error.team.agentNotFound")) &&
+        isDeepStrictEqual(resumed.body, { routines: [] }) &&
+        saves().length === savesBefore,
+      [summary(viewer), summary(missing), summary(hiddenAgent), summary(resumed)],
     );
   }
 

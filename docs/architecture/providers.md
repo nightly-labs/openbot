@@ -748,7 +748,9 @@ Free means a display name ending in "Free", or an id in a short explicit list
 (`opencode/big-pickle`): `model/list` carries no price and neither Go endpoint authenticates.
 `isFreeOpencodeModel` in `packages/contracts/src/agent-providers.ts` is shared with the picker badge in
 `packages/ui/src/components/provider-model-options.ts`, so a badge and a default cannot disagree
-about what costs money.
+about what costs money. A model of a custom endpoint that Pi runs gets the badge by the same name
+rule (`isFreeOpencodeModelName`). Pi gets cost 0 for each endpoint model, so its cost does not
+show that a model is free.
 
 A keyless OpenCode still lists models whose provider has no sign-in. OpenCode 2.1.1 fails a turn on
 one with `-32000` "provider authentication required" and no provider ID. `OPENCODE_ACP_FLAVOR`
@@ -759,6 +761,15 @@ expired one (#9095). OpenBot sends its saved key only to OpenCode Go, so with a 
 `opencode-go/` model the client's `savedKey` option makes the flavor show
 `error.provider.opencodeKeyRefused`. With no saved key, a refused key and a missing key look the
 same, and the text stays `error.provider.opencodeAuthRequired`.
+
+OpenCode 2.3.0 also sends each HTTP 401 and 403 of a provider as this `-32000`, with no status, also
+when a firewall blocks a VPN address (#10166). The client's `providerKeyStored` option then reads
+OpenCode's own store (`hasOpenCodeProviderKey` in `opencode-usage.ts`): an active `credential` row
+of OpenCode 2, an `auth.json` entry, or `OPENCODE_AUTH_CONTENT`. With a key for the provider, the
+flavor shows `error.provider.opencodeProviderRefused`: the provider refused the request, and a VPN,
+a proxy or a blocked country can be the cause. A key in an environment variable or a config file is
+not found, so the text stays `error.provider.opencodeAuthRequired`. An `opencode-go/` model keeps
+that text too, because it names the fix in OpenBot's settings for an expired Go key.
 
 #### Turns of a background subagent or shell command
 
@@ -803,6 +814,13 @@ the first timeout retry notice after other output or a steer counts as activity:
 does not answer the retry fails the turn after about 11 minutes, with the stall message, and not
 after all four attempts with OpenCode's raw error text. A retry after a rate limit, a provider
 failure or a lost network comes sooner, and each of its notices keeps the turn open as before.
+
+A provider failure, such as the 502 or 504 of an overloaded endpoint, gets 10 attempts in about 90 s.
+`retryUpdate` of `OPENCODE_ACP_FLAVOR` shows each retry after a provider failure (`provider.internal`),
+a timeout or a lost connection as the turn's status, with the attempt number: OpenCode does not say
+how many attempts it makes. The first output after it replaces the status. When OpenCode gives up, a
+`provider.internal` error shows `error.provider.opencodeProviderFailed`, also when its text matches
+no OpenCode 1 pattern (#10129).
 
 #### Text of two steps
 

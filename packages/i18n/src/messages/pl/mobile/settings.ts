@@ -140,19 +140,23 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
+  "mobile.settings.appearance.replyDetails": "Szczegóły odpowiedzi",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Wyłącz szczegół, aby ukryć jego wiersz w czatach. Agent nadal rozumuje, uruchamia subagentów i zapisuje wspomnienia.",
+  "mobile.settings.appearance.showThinking": "Pokazuj myślenie agenta",
+  "mobile.settings.appearance.showSubagents": "Pokazuj subagentów",
+  "mobile.settings.appearance.showMemoryChanges": "Pokazuj zapisane wspomnienia",
   "mobile.settings.appearance.fullVisuals": "Pokazuj pełne podglądy wizualne",
   "mobile.settings.appearance.fullVisualsFooter":
     "Wizualizacja od agenta ma w czacie pełną wysokość. Gdy to jest wyłączone, wysoka wizualizacja jest przycięta. Dotknij jej, aby zobaczyć całość.",
   "mobile.settings.animations.title": "Animacje",
-  "mobile.settings.animations.footer":
-    "Wyłącz animacje, aby ograniczyć ruch w całej aplikacji. Gdy w ustawieniach telefonu jest włączona opcja Ogranicz ruch, aplikacja także ogranicza ruch. Poniższe animacje pozostają wtedy wyłączone.",
-  "mobile.settings.animations.all": "Animacje",
+  "mobile.settings.animations.fullMotion": "Pełny ruch",
+  "mobile.settings.animations.reduced": "Ograniczony",
+  "mobile.settings.animations.motionFooter":
+    "Ograniczony zmniejsza ruch w całej aplikacji i wyłącza animacje poniżej. Gdy w ustawieniach telefonu włączone jest Ogranicz ruch, aplikacja też ogranicza ruch.",
   "mobile.settings.animations.agentFaces": "Animowane twarze agentów",
   "mobile.settings.animations.agentFacesFooter":
     "Awatary agentów poruszają twarzami, gdy agenci pracują i odpoczywają. Gdy to jest wyłączone, twarze są nieruchome, a postacie na ekranie powitalnym i pustym ekranie głównym przestają się unosić.",
-  "mobile.settings.animations.composerResize": "Kompaktowe pole wiadomości",
-  "mobile.settings.animations.composerResizeFooter":
-    "Pole wiadomości zmienia się w mały pasek, gdy klawiatura jest zamknięta. Gdy to jest wyłączone, pole ma pełny rozmiar.",
   "mobile.settings.animations.textReveal": "Animuj odpowiedzi",
   "mobile.settings.animations.textRevealFooter":
     "Odpowiedź pojawia się słowo po słowie, a jej dymek płynnie rośnie. Gdy to jest wyłączone, tekst pojawia się w miarę napływania.",
@@ -246,6 +250,14 @@ export const messages = {
   "mobile.settings.conversations.largeFiles": "Automatycznie pobieraj duże pliki",
   "mobile.settings.conversations.largeFilesFooter":
     "Obrazy, filmy i dźwięki większe niż {small} pobierają się dopiero po stuknięciu. Włącz, aby pobierać je od razu, do {large}. Może to zużyć dużo danych komórkowych.",
+  "mobile.settings.conversations.messageField": "Pole wiadomości",
+  "mobile.settings.conversations.compact": "Kompaktowe",
+  "mobile.settings.conversations.fullSize": "Pełny rozmiar",
+  "mobile.settings.conversations.compactFooter":
+    "Kompaktowe zmienia pole wiadomości w mały pasek, gdy klawiatura jest zamknięta.",
+  "mobile.settings.conversations.compactComposerReduced":
+    "Ruch jest ograniczony w Animacjach lub w ustawieniach telefonu, więc pole wiadomości zostaje w pełnym rozmiarze.",
+  "mobile.settings.conversations.media": "Zdjęcia i pliki",
   "mobile.settings.conversations.swipeLeft": "Przesunięcie w lewo w czacie agenta",
   "mobile.settings.conversations.swipeRight": "Przesunięcie w prawo w czacie agenta",
   "mobile.settings.conversations.swipeThreads": "Wątki",

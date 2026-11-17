@@ -60,6 +60,7 @@ import {
   type MessagingThreads,
 } from "./messaging-threads";
 import {
+  CANCEL_TEXT,
   type ConnectionIdentity,
   DiscordApiError,
   type HistoryFilter,
@@ -186,7 +187,6 @@ const FATAL_STATES = new Set<MessagingConnectionState>(["invalid_token", "remove
 const APPROVAL_TEXT_LIMIT = 2_500;
 /** A progress line is one or two sentences; a longer one is cut, so every platform takes the edit. */
 const PROGRESS_TEXT_LIMIT = 1_000;
-const CANCEL_TEXT = /^(cancel|stop)$/i;
 const LIVE_STATES = new Set<MessagingConnectionState>(["connecting", "connected", "reconnecting", "rate_limited"]);
 /** The states in which a connection can still get a transport that takes deliveries. */
 const STARTING_STATES = new Set<MessagingConnectionState>(["connecting", "reconnecting", "rate_limited"]);
@@ -1484,10 +1484,11 @@ export class MessagingService {
                 orElse: () => Effect.succeed(message.platformChannelId),
               }),
             ),
-        // Only Discord's earlier messages have files, such as an image that a person posted without a
-        // mention just before this message. The agent gets them with this message. Slack is not asked:
-        // before Marketplace approval it allows one thread read a minute, which the prompt needs.
-        adapter.platform === "discord" && !message.isDirect
+        // Only Discord's and Telegram's earlier messages have files, such as an image or a voice note
+        // that a person posted without a mention just before this message. The agent gets them with
+        // this message. Slack is not asked: before Marketplace approval it allows one thread read a
+        // minute, which the prompt needs.
+        (adapter.platform === "discord" || adapter.platform === "telegram") && !message.isDirect
           ? adapter
               .history(
                 message.platformChannelId,
@@ -1618,13 +1619,16 @@ export class MessagingService {
             [...message.files, ...earlierFiles.map((item) => item.file)],
             staging,
           );
-          const given = earlierFiles.filter((item) => !skipped.includes(item.file)).map((item) => item.label);
-          const notGiven = earlierFiles.filter((item) => skipped.includes(item.file)).map((item) => item.label);
-          const missing = skipped.filter((file) => message.files.includes(file));
+          const given = earlierFiles.filter((item) => !skipped.has(item.file)).map((item) => item.label);
+          const notGiven = earlierFiles.filter((item) => skipped.has(item.file)).map((item) => item.label);
+          const missing = message.files.flatMap((file) => {
+            const reason = skipped.get(file);
+            return reason ? [`${file.name} (${reason})`] : [];
+          });
           const notes = [
             given.length ? `(Files of earlier messages, given with this one: ${given.join(", ")})` : "",
             notGiven.length ? `(Files of earlier messages that were not given: ${notGiven.join(", ")})` : "",
-            missing.length ? `(Files that did not arrive: ${missing.map((file) => file.name).join(", ")})` : "",
+            missing.length ? `(Files that did not arrive: ${missing.join(", ")})` : "",
           ].filter(Boolean);
           const text = notes.length ? `${named}\n\n${notes.join("\n")}` : named;
           const result = yield* this.#threads
@@ -1706,7 +1710,10 @@ export class MessagingService {
     return id && this.#agents.listAgents().some((agent) => agent.id === id) ? id : null;
   }
 
-  /** Downloads files into `staging`, in their order, within the attachment limits. */
+  /**
+   * Downloads files into `staging`, in their order, within the attachment limits. `skipped` gives,
+   * for each file that did not arrive, the reason that the agent reads.
+   */
   readonly #download = Effect.fn("MessagingService.download")(function* (
     this: MessagingService,
     adapter: MessagingAdapter,
@@ -1714,15 +1721,15 @@ export class MessagingService {
     staging: string,
   ) {
     const paths: string[] = [];
-    const skipped: InboundFile[] = [];
+    const skipped = new Map<InboundFile, string>();
     let total = 0;
     for (const [index, file] of files.entries()) {
-      if (
-        paths.length >= INPUT_LIMITS.attachments ||
-        file.size > ATTACHMENT_LIMITS.fileBytes ||
-        total + file.size > ATTACHMENT_LIMITS.totalBytes
-      ) {
-        skipped.push(file);
+      if (paths.length >= INPUT_LIMITS.attachments) {
+        skipped.set(file, `more than ${INPUT_LIMITS.attachments} files`);
+        continue;
+      }
+      if (file.size > ATTACHMENT_LIMITS.fileBytes || total + file.size > ATTACHMENT_LIMITS.totalBytes) {
+        skipped.set(file, "too large");
         continue;
       }
       const downloaded = yield* Effect.result(
@@ -1736,8 +1743,11 @@ export class MessagingService {
           return destination;
         }),
       );
-      if (Result.isFailure(downloaded)) skipped.push(file);
-      else {
+      if (Result.isFailure(downloaded)) {
+        const cause = downloaded.failure.cause;
+        skipped.set(file, tooLarge(cause) ? "too large" : "the download failed; the sender can send it again");
+        this.#warn(cause, "A messaging file did not download.");
+      } else {
         total += file.size;
         paths.push(downloaded.success);
       }
@@ -2515,15 +2525,28 @@ export class MessagingService {
     }
   }
 
-  #warn(error: unknown): void {
+  #warn(error: unknown, message = "A messaging action failed."): void {
     // Only the kind of failure and the platform's error code: a Slack error message can quote
     // message text, and its code cannot.
     const code = isDynamicRecord(error) && isString(error.code) ? error.code : undefined;
-    logger.warn("A messaging action failed.", {
+    logger.warn(message, {
       error: error instanceof Error ? error.name : "unknown",
       ...(code ? { code } : {}),
     });
   }
+}
+
+/**
+ * True when a platform refused a file for its size: Slack and Discord give the code `too_large`, and
+ * Telegram and WhatsApp the message `file_too_large`, or Telegram's "file is too big".
+ */
+function tooLarge(cause: unknown): boolean {
+  if (!(cause instanceof Error)) return false;
+  return (
+    (isDynamicRecord(cause) && cause.code === "too_large") ||
+    cause.message === "file_too_large" ||
+    cause.message.endsWith("file is too big")
+  );
 }
 
 /** The sidebar section that holds the orchestrators. It is found by its name. */
@@ -2645,11 +2668,12 @@ function finalPost(
       text: quiet || answerOnly ? "" : sourceText("status.messaging.stopped"),
       reaction: reacts ? "stopped" : null,
     };
-  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence.
+  // The provider's error can hold local paths or MCP values, so the platform gets a fixed sentence:
+  // the catalog text of a start that failed, such as a provider that is not downloaded, or the general one.
   if (activity.status === "failed")
     return {
       answer: false,
-      text: quiet ? "" : sourceText("status.messaging.failed"),
+      text: quiet ? "" : (activity.reason ?? sourceText("status.messaging.failed")),
       reaction: reacts ? "failed" : null,
     };
   const reaction = reacts ? "done" : null;

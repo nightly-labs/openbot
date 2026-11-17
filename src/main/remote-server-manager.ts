@@ -2679,11 +2679,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
       attachmentId: string,
       serverId = this.#store.activeServerId,
       preview = false,
-      // The size that the message names. With it, the download reports its bytes and can be stopped.
+      // The size that the message names. With it, the download reports its bytes. Only a click, not a
+      // preview, can be stopped.
       size?: number,
     ): Effect.fn.Return<RemoteAttachment, RemoteWorkflowError, RemoteRequest> {
       const server = yield* remoteDecode(() => this.#store.require(serverId));
       const progress = size === undefined ? undefined : this.#attachmentProgress(server.id, attachmentId, size);
+      const stoppable = progress !== undefined && !preview;
       const load = this.#attachments.get(
         server.id,
         attachmentId,
@@ -2708,13 +2710,13 @@ export class RemoteServerManager extends EventEmitter<RemoteServerEvents> {
                 name: contentDispositionFileName(response.headers.get("content-disposition"), attachmentId),
                 mimeType: response.headers.get("content-type") ?? "application/octet-stream",
               };
-            }).pipe((download) => (progress ? this.#stoppable(server.id, attachmentId, download) : download)),
+            }).pipe((download) => (stoppable ? this.#stoppable(server.id, attachmentId, download) : download)),
           ),
         preview,
       );
       // A click can wait for a load that a preview or a ZIP started. Its stop then ends only its wait.
       // A click that starts the load stops the load itself, above, so the callers that wait get an error.
-      return yield* progress ? this.#stoppable(server.id, attachmentId, load) : load;
+      return yield* stoppable ? this.#stoppable(server.id, attachmentId, load) : load;
     },
     (operation) => this.#owned(operation),
   ).bind(this);

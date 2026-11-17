@@ -237,6 +237,7 @@ export const messages = {
   "routine.settings.loading": "루틴을 불러오는 중…",
   "routine.settings.empty": "아직 루틴이 없어요.",
   "routine.settings.paused": "일시 정지됨",
+  "routine.settings.pausedByRun": "{time} 실행에서 일시 정지됨",
   "routine.settings.completed": "완료 · {schedule}",
   "routine.settings.active": "활성",
   "routine.settings.pauseFailed": "이 루틴을 일시 정지할 수 없어요.",

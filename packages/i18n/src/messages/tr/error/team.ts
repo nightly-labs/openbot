@@ -72,6 +72,7 @@ export const messages = {
   "error.team.agentColorsUnsupported": "Ajan renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.chatColorsUnsupported": "Sohbet renkleri bu bağlantı tarafından desteklenmiyor.",
   "error.team.routineRunPlaceUnsupported": "Bu bağlantı bir rutinin nerede çalıştığını değiştiremez.",
+  "error.team.routinePauseReasonsUnsupported": "Bu bağlantı bir rutinin neden duraklatıldığını gösteremez.",
   "error.team.routinesOnceUnsupported": "Bu bağlantı bir kez çalışan rutinleri kaydedemez.",
   "error.team.routineRunCommandUnsupported": "Bu bağlantı bir rutinin çalıştırma komutunu veremez.",
   "error.team.threadQueueUnsupported": "Bu bağlantı bir yan konunun kuyruğunu gösteremez.",

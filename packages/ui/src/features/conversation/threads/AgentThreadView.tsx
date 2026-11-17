@@ -32,7 +32,7 @@ import {
 } from "@openbot/ui/features/conversation/AttachmentCards";
 import { agentActivityExitDuration } from "@openbot/ui/features/conversation/activity-timing";
 import { branchPointIds } from "@openbot/ui/features/conversation/branch-points";
-import { ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
+import { type ChangeMarkerActions, ChatActionMarker } from "@openbot/ui/features/conversation/ChatActionMarker";
 import { type ChatMessageAuthor, ChatMessageRow } from "@openbot/ui/features/conversation/ChatMessageRow";
 import { ComposerAddMenu } from "@openbot/ui/features/conversation/ComposerAddMenu";
 import {
@@ -219,6 +219,8 @@ export interface AgentThreadViewProps {
    * shows as a marker, as in the agent's own chat. Without it, the message shows as a row.
    */
   onSelectAgent?: ((agentId: string, tabId?: string) => void) | undefined;
+  /** The actions of a skill or instruction change line. An instruction change has View, not Undo. */
+  changeMarkerActions?: ChangeMarkerActions | undefined;
   onPreview: (attachment: AttachmentSummary) => void;
   onAttachmentAction: (attachment: AttachmentSummary, action: "open" | "reveal" | "download") => void;
   /** The window draws the macOS window controls over the top start corner. The image viewer leaves room. */
@@ -560,6 +562,11 @@ export function AgentThreadView(props: AgentThreadViewProps) {
     if (message.body.trim() === "") return marker;
     return { ...marker, expanded: openAgentMessages().has(marker.messageId) };
   };
+  /** A skill or instruction change line, which shows as a marker with its actions, as in the agent's own chat. */
+  const changeMarker = (message: AgentMessage) => {
+    const marker = message.actionMarker;
+    return marker?.kind === "skill-lifecycle" || marker?.kind === "instructions-change" ? marker : undefined;
+  };
   /** The text of an open agent message, under its marker, as the sender's message. Its attachments stay under the marker. */
   const agentMessageText = (messageId: string) => {
     const message = () => props.messages.find((candidate) => candidate.exchange?.messageId === messageId);
@@ -841,7 +848,22 @@ export function AgentThreadView(props: AgentThreadViewProps) {
                       </article>
                     )}
                   </Show>
-                  <Show when={message().kind !== "thinking" && !agentMessageMarker(message())}>
+                  <Show when={message().kind !== "thinking" && changeMarker(message())}>
+                    {(marker) => (
+                      <article data-chat-search-message={message().id}>
+                        <ChatActionMarker
+                          marker={marker()}
+                          agents={props.agents}
+                          onSelectAgent={(agentId, tabId) => props.onSelectAgent?.(agentId, tabId)}
+                          onOpenSkill={props.changeMarkerActions?.onOpenSkill}
+                          onOpenInstructions={props.changeMarkerActions?.onOpenInstructions}
+                        />
+                      </article>
+                    )}
+                  </Show>
+                  <Show
+                    when={message().kind !== "thinking" && !agentMessageMarker(message()) && !changeMarker(message())}
+                  >
                     <Show
                       when={card()}
                       fallback={

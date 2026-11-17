@@ -610,6 +610,8 @@ interface ClaudeStreamMessage {
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
   is_error?: boolean;
+  /** The HTTP status of the API error that ended the turn, such as 429 or 529. An older CLI does not send it. */
+  api_error_status?: number | null;
   /** Why an assistant message is a refusal, such as `rate_limit`. */
   error?: string;
   /** Why an API error refused the request, such as `usage_limit_reached`. The SDK types do not declare it. */
@@ -2292,12 +2294,15 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       turn.toolCalls.clear();
       // A rejected window alone is not a failure: the request can still run on overage. Only the
-      // refusal message, or a request that then failed with an API error, ends the turn on the limit.
+      // refusal message, or a request that then failed with a rate-limit error, ends the turn on the
+      // limit. Another API error, such as a 529 overload, stays a provider error (#10486). An older CLI
+      // sends no status, so its API error still counts.
       const limit = turn.usageLimit;
+      const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
       if (
         limit &&
         !interrupted &&
-        (limit.text !== null || apiError) &&
+        (limit.text !== null || limitError) &&
         !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {

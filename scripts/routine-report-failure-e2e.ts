@@ -9,8 +9,9 @@
 // request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
 // teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
 // a flow skips the agents after a failed owner or linked step, that a result destination gets the
-// answer of a reported failure but not of a provider failure, and that a failed run does not pause its
-// own routine in either call order (#9856).
+// answer of a reported failure but not of a provider failure, that a failed run does not pause its
+// own routine in either call order (#9856), and that a routine that its own run paused says which run
+// until the next change of the routine, also after a restart (#10048).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -237,6 +238,8 @@ const report: {
   runs: Record<string, Pick<RoutineRun, "status" | "error"> & { deliveryStatus?: string | null }>;
   flowSteps: Record<string, { agent: string; status: string; error: string | null }[]>;
   resultRuns: string[];
+  /** The run time that each routine list gives for the routine that its own run paused (#10048). */
+  pauseReasons?: Record<string, string | undefined>;
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -927,11 +930,38 @@ try {
     stopped.active === false && stopped.ran.run.status === "succeeded",
     { active: stopped.active, run: stopped.ran.run.status },
   );
+  // Routines and the chat card say which run paused the routine (#10048).
+  const stoppedId = stopped.ran.run.routineId;
+  const pausedBy = (list: readonly { id: string; pausedByRun?: { scheduledFor: string } }[]) =>
+    list.find((entry) => entry.id === stoppedId)?.pausedByRun?.scheduledFor;
+  const reasons = {
+    routine: pausedBy(agents.listRoutines(checker.id)),
+    record: pausedBy(agents.routineRecords.list({ kind: "agent", id: checker.id })),
+    // A second store on the same database reads what a restart reads.
+    restarted: pausedBy(new AgentRoutineStore(store.database).list(checker.id)),
+    run: stopped.ran.run.scheduledFor,
+  };
+  report.pauseReasons = reasons;
+  pass(
+    "A routine that its own run paused names that run in both routine lists and after a restart (#10048)",
+    reasons.routine === reasons.run && reasons.record === reasons.run && reasons.restarted === reasons.run,
+    reasons,
+  );
+  agents.updateRoutine({ agentId: checker.id, routineId: stoppedId, active: true });
+  agents.updateRoutine({ agentId: checker.id, routineId: stoppedId, active: false });
+  const userPaused = pausedBy(agents.listRoutines(checker.id));
+  pass("A person's resume and pause clear the run that paused the routine (#10048)", userPaused === undefined, {
+    userPaused,
+  });
   const pausedThenFailed = await selfPausing("Paused then failed", (id) => [pauseRoutine(id), reportFailure(REASON)]);
   const resumedResult = toolResults(pausedThenFailed.turnId, "routine_report_failure")[0]?.result;
+  const pausedThenFailedReason = agents
+    .listRoutines(checker.id)
+    .find((entry) => entry.id === pausedThenFailed.ran.run.routineId)?.pausedByRun;
   pass(
     "A run that pauses its own routine and then reports a failure turns the routine on again (#9856)",
-    pausedThenFailed.active === true &&
+    pausedThenFailedReason === undefined &&
+      pausedThenFailed.active === true &&
       pausedThenFailed.ran.run.status === "failed" &&
       resumedResult?.contentItems.some((item) => item.text.includes("the routine is on again")) === true,
     { active: pausedThenFailed.active, run: pausedThenFailed.ran.run.status, resumedResult },

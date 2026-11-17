@@ -675,9 +675,10 @@ const advertisesOAuth = Effect.fnUntraced(function* (url: string, remainingMs: n
         const response = await fetch(`${origin}${path}`, { signal, headers: { accept: "application/json" } });
         await response.body?.cancel();
         if (response.ok) return (response.headers.get("content-type") ?? "").includes("json");
-        // Only a missing document says "none". A refusal, such as a firewall's 403 or a 429, or a
-        // server error says nothing about the document.
-        return response.status === 404 || response.status === 410 ? false : null;
+        // A missing document says "none". So does a 401: a sign-in reads this document without a
+        // credential, as `namesAuthorizationServer` does, so a server that wants its key here has
+        // no sign-in to open (#10547). A firewall's 403, a 429 or a server error says nothing.
+        return response.status === 404 || response.status === 410 || response.status === 401 ? false : null;
       },
       catch: (cause) => new McpProbeFailure({ cause }),
     }).pipe(Effect.catch(() => Effect.succeed(null))),

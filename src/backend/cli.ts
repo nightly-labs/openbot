@@ -985,7 +985,12 @@ export function resolveInstalledFirst<Cli extends AgentCliInfo, E>(
  */
 export interface InstalledFirstChoice<Cli> {
   readonly cli: Cli;
-  readonly passedOver: { readonly source: "system" | "managed"; readonly version: string } | null;
+  readonly passedOver: {
+    readonly source: "system" | "managed";
+    readonly version: string;
+    /** The user's CLI lacks parts that it needs (`AgentCliInfo.incomplete`). */
+    readonly incomplete?: boolean;
+  } | null;
 }
 
 /**
@@ -1010,7 +1015,14 @@ export function chooseInstalledFirst<Cli extends AgentCliInfo, E>(
       const copyOffered = installed.incomplete || olderVersion(installed.version, resolved.version);
       return { cli: installed, passedOver: copyOffered ? { source: "managed", version: resolved.version } : null };
     }
-    return { cli: resolved, passedOver: { source: "system", version: installed.version } };
+    return {
+      cli: resolved,
+      passedOver: {
+        source: "system",
+        version: installed.version,
+        ...(installed.incomplete ? { incomplete: true } : {}),
+      },
+    };
   };
   return Effect.gen(function* () {
     // With a copy, the two probes run at once: the user's CLI adds no wait unless it is the slower one.

@@ -10,8 +10,8 @@ const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 export interface WhatsAppSenderRules {
   /** The owner's personal number: only their own chat and the allowed senders count. */
   ownNumber: boolean;
-  /** Phone numbers in digits. */
-  contacts: ReadonlySet<string>;
+  /** Phone numbers in digits, each with the name that the user saved for it (empty when none). */
+  contacts: ReadonlyMap<string, string>;
   /** Group JIDs. */
   groups: ReadonlySet<string>;
 }

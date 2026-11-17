@@ -110,6 +110,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "Niektóre aplikacje lub umiejętności nie są zainstalowane. Ponowne połączenie je zainstaluje.",
   "marketplace.app.notConnected": "Nie połączono",
+  "marketplace.app.paused": "Wstrzymano",
   "marketplace.app.custom": "Serwer MCP",
   "marketplace.app.githubTagline": "Repozytoria, zgłoszenia i pull requesty",
   "marketplace.app.onePasswordTagline": "Loguj się do witryn danymi logowania, które udostępniasz",

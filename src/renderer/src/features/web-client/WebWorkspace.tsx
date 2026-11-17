@@ -3029,6 +3029,7 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                 if (id) void openHostPage(id, "schedule", button);
               }}
               onWorkflows={workflowsRailAction()}
+              onPreloadWorkflows={() => void WorkflowsCanvas.preload()}
               onLibrary={libraryRailAction()}
               onProviders={providersRailAction()}
               onCrm={crmRailAction()}
@@ -3230,16 +3231,19 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                       <Match when={page() === "workflows"}>
                         {/* Keyed: the page reads the workflows of one server, as on desktop. */}
                         <Show when={target().id} keyed>
-                          <Loading>
-                            <WorkflowsCanvas
-                              host={workflowHost}
-                              admin={canAdministerServer(workspace.state.host?.role)}
-                              agents={workspace.profiles()}
-                              models={models()}
-                              status={providerAdmin.status()}
-                              self={account().name ?? undefined}
-                            />
-                          </Loading>
+                          {(serverId) => (
+                            <Loading>
+                              <WorkflowsCanvas
+                                host={workflowHost}
+                                serverId={serverId}
+                                admin={canAdministerServer(workspace.state.host?.role)}
+                                agents={workspace.profiles()}
+                                models={models()}
+                                status={providerAdmin.status()}
+                                self={account().name ?? undefined}
+                              />
+                            </Loading>
+                          )}
                         </Show>
                       </Match>
                       <Match when={page() === "library"}>

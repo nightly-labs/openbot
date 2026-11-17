@@ -162,6 +162,7 @@ import { QUIET_TURN_CAPABILITY } from "./quiet-turn-v1";
 import { TEAM_REASONING_EFFORTS_CAPABILITY } from "./reasoning-efforts-v1";
 import { ROUTINE_FLOW_STOP_CAPABILITY } from "./routine-flow-stop-v1";
 import { ROUTINE_FLOWS_CAPABILITY } from "./routine-flows-v1";
+import { ROUTINE_PAUSE_REASONS_CAPABILITY } from "./routine-pause-reasons-v1";
 import { ROUTINE_RECOVERY_CAPABILITY } from "./routine-recovery-v1";
 import { ROUTINE_RESULTS_CAPABILITY } from "./routine-results-v1";
 import { ROUTINE_RUN_COMMAND_CAPABILITY } from "./routine-run-command-v1";
@@ -404,6 +405,7 @@ export {
   QUIET_TURN_CAPABILITY,
   ROUTINE_FLOW_STOP_CAPABILITY,
   ROUTINE_FLOWS_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
   ROUTINE_RECOVERY_CAPABILITY,
   ROUTINE_RESULTS_CAPABILITY,
   ROUTINE_RUN_PLACE_CAPABILITY,
@@ -704,6 +706,7 @@ export const TEAM_CURRENT_CAPABILITIES = [
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
 ] as const;
 
 export type TeamCurrentCapability = (typeof TEAM_CURRENT_CAPABILITIES)[number];
@@ -956,7 +959,8 @@ export const TEAM_BOOTSTRAP_CAPABILITIES = TEAM_CURRENT_CAPABILITIES.filter(
     capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
     capability !== MAC_APPS_LIMIT_CAPABILITY &&
     capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+    capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+    capability !== ROUTINE_PAUSE_REASONS_CAPABILITY,
 );
 /**
  * The capabilities that only a protocol 9 peer sends and gets. Protocols 7 and 8 read at most 128
@@ -1085,6 +1089,7 @@ export const TEAM_PROTOCOL_V9_ONLY_CAPABILITIES: ReadonlySet<string> = new Set<T
   MAC_APPS_LIMIT_CAPABILITY,
   PROVIDER_MODEL_SOURCE_CAPABILITY,
   WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+  ROUTINE_PAUSE_REASONS_CAPABILITY,
 ]);
 // A v8 host reads at most 128 capabilities, so a client sends the protocol 9 ones only after it
 // negotiates protocol 9.
@@ -1296,6 +1301,7 @@ export function legacyTeamCapabilities(capabilities: readonly string[]): string[
       capability !== WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY &&
       capability !== MAC_APPS_LIMIT_CAPABILITY &&
       capability !== PROVIDER_MODEL_SOURCE_CAPABILITY &&
-      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY,
+      capability !== WORKFLOWS_MEDIA_SIZE_CAPABILITY &&
+      capability !== ROUTINE_PAUSE_REASONS_CAPABILITY,
   );
 }
