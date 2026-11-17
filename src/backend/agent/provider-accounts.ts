@@ -754,7 +754,7 @@ export class ProviderAccounts {
   /**
    * The usage of each connected account of a provider that reports usage. Each account's gate decides
    * when it is read again; until then, or when a read fails, the kept reading answers. A read takes an
-   * agent's process or a short check.
+   * agent's process or a short check. An account in a check, or after a failed one, gives its kept reading.
    */
   readonly usage = Effect.fn("ProviderAccounts.usage")(function* (
     this: ProviderAccounts,
@@ -765,8 +765,18 @@ export class ProviderAccounts {
     if (!this.#support(provider)) return limits;
     for (const account of this.#store.list(provider)) {
       // A key has no plan, so no usage to read.
-      if (isKeyAccount(account) || this.#states.get(account.id)?.state !== "connected") continue;
+      if (isKeyAccount(account)) continue;
       const kept = () => this.#usage.get(account.id)?.limit ?? null;
+      const state = this.#states.get(account.id)?.state;
+      // A check that runs reads the usage itself, and a failed check, such as a refused usage read, keeps
+      // the account from a read. Until a check connects it again, the last reading keeps its row, unless a
+      // window of the reading has reset (#11239).
+      if (state === "checking" || state === "error") {
+        const reading = kept();
+        if (reading && !usageWindowResetSince(reading, 0)) limits.push(reading);
+        continue;
+      }
+      if (state !== "connected") continue;
       const limit = yield* this.#usageGate(account.id)
         .run({
           read: this.#readUsage(account, model),
