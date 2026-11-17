@@ -4206,7 +4206,8 @@ export class ProviderRuntime implements ProviderPort {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
-                  return !disposed() && this.#fallBackToInstalledCli(provider, cli)
+                  // Only a copy that fails its first request: an account check can fail on the network.
+                  return stage === "initialize" && !disposed() && this.#fallBackToInstalledCli(provider, cli)
                     ? message
                     : this.#showStartStopped(provider);
               }
