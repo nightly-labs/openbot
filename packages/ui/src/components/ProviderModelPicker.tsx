@@ -1267,8 +1267,12 @@ export function ProviderModelPicker(props: ProviderModelPickerProps) {
                                       size="xs"
                                       variant="outline"
                                       onClick={() => {
+                                        const custom = providerButtons.get(CUSTOM_RAIL);
                                         selectRailProvider(CUSTOM_RAIL);
-                                        providerButtons.get(CUSTOM_RAIL)?.focus({ preventScroll: true });
+                                        // Focus that enters the tab list goes back to the tab that had it
+                                        // last. As on a rail click, the second focus then moves it to Custom.
+                                        custom?.focus({ preventScroll: true });
+                                        queueMicrotask(() => custom?.focus({ preventScroll: true }));
                                       }}
                                     >
                                       {t("provider.picker.showCustomModels")}
