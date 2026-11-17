@@ -76,14 +76,22 @@ const signatureOutputSchema = Schema.Struct({
   Subject: Schema.NullOr(Schema.String),
 });
 
+// PowerShell rebuilds a drive-qualified path from the root of the drive, so the drive letter can change case.
+function comparablePath(file: string): string {
+  return normalize(file).replace(/^[a-z]:/, (drive) => drive.toUpperCase());
+}
+
 function parseSignature(stdout: string, file: string): Effect.Effect<string, SignatureCheckFailed> {
   return Effect.try({
     try: () => Schema.decodeUnknownSync(signatureOutputSchema)(JSON.parse(stdout)),
-    catch: () => new SignatureCheckFailed({ reason: `Get-AuthenticodeSignature printed no valid result: ${stdout}` }),
+    catch: () =>
+      new SignatureCheckFailed({
+        reason: `Get-AuthenticodeSignature printed no valid result: ${stdout.slice(0, 500)}`,
+      }),
   }).pipe(
     Effect.flatMap(({ Status, Path, Subject }) => {
       if (Status !== 0) return Effect.fail(new SignatureCheckFailed({ reason: `The signature status is ${Status}.` }));
-      if (Path !== null && normalize(Path) !== normalize(file))
+      if (Path !== null && comparablePath(Path) !== comparablePath(file))
         return Effect.fail(new SignatureCheckFailed({ reason: `The checked file is ${Path}.` }));
       if (Subject === null)
         return Effect.fail(new SignatureCheckFailed({ reason: "The signature has no signer certificate." }));
