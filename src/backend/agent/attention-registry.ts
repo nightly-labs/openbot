@@ -431,6 +431,8 @@ interface PendingBrowserTakeover {
   personCompleted?: true;
   /** A member selected Done on another device, not in the window of this computer. */
   memberCompleted?: true;
+  /** The person selected Cancel on the card, so the agent must not ask again (#10452). */
+  personCancelled?: true;
   params: DynamicToolCallParams;
   request: BrowserTakeoverRequest;
   resolve: (result: DynamicToolResult) => void;
@@ -1047,7 +1049,7 @@ export class AttentionRegistry {
         if (input.decision === "complete") {
           pending.personCompleted = true;
           if (fromMember) pending.memberCompleted = true;
-        }
+        } else pending.personCancelled = true;
         this.#resolveBrowserTakeover(input.requestId, pending, input.decision);
       }),
   ).bind(this);
@@ -1066,6 +1068,7 @@ export class AttentionRegistry {
     });
     if (input.decision === "cancel") {
       secret.cancel();
+      pending.personCancelled = true;
       this.#resolveBrowserTakeover(input.requestId, pending, "cancel");
       return;
     }
@@ -2630,7 +2633,9 @@ export class AttentionRegistry {
       agentId: pending.request.agentId,
     });
     this.#emitRuntimeSnapshot();
-    pending.resolve(browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing));
+    pending.resolve(
+      browserTakeoverResult(decision, vault, pending.vaultSkipped, signInMissing, pending.personCancelled === true),
+    );
   }
 
   #persistQuestionPrompt(
