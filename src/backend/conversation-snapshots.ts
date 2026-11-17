@@ -102,7 +102,8 @@ export function messagesFromThreadItems(
       });
     }
     if (isImageGenerationItem(item) && isString(item.id)) {
-      const providerStatus = isString(item.status) ? item.status : turn.status;
+      // Codex gives an empty status to an image that started and did not finish.
+      const providerStatus = item.status === "" ? "interrupted" : isString(item.status) ? item.status : turn.status;
       const failed = providerStatus === "failed";
       const failure = imageGenerationFailure(item);
       messages.push({
