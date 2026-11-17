@@ -399,7 +399,7 @@ export const GEMINI_INVALID_ARGUMENT = /\bRequest contains an invalid argument\b
  * CLI 1.5.9 refreshes the token itself, and sent a request with the old token when it expired during
  * a turn. The new token was ready less than a second later (#10367).
  */
-export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/u;
+export const GEMINI_INVALID_CREDENTIALS = /\bRequest had invalid authentication credentials\b/iu;
 
 /**
  * Whether a model endpoint refused the request because it holds more images than the endpoint
