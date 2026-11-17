@@ -112,6 +112,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "חיפוש בהגדרות…",
   "app.settingsPage.results": "תוצאות חיפוש בהגדרות",
   "app.settingsPage.noResults": "אין הגדרות תואמות.",
+  "app.settingsPage.marketplaceApps": "מחברים ושרתי MCP",
   "app.settingsPage.resultCount": {
     one: "הגדרה תואמת אחת.",
     two: "שתי הגדרות תואמות.",
