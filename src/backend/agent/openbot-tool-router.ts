@@ -216,7 +216,7 @@ import {
   type ScreenCaptureImage,
   type ScreenCaptureRequest,
 } from "./screen-capture";
-import { searchSettingLinks, settingLinkSummary } from "./setting-links";
+import { searchServerPlaces, searchSettingLinks, settingLinkSummary } from "./setting-links";
 import { type AgentSidebar, handleSidebarTool } from "./sidebar-tools";
 import { LOCAL_SKILL_TOOL_DEFINITIONS, type LocalSkillTools, runLocalSkillTool } from "./skill-tools";
 import { isDynamicToolCall } from "./thread-items";
@@ -2609,13 +2609,25 @@ export class OpenBotToolRouter {
       const setting = args.setting.trim();
       if (!isSettingLinkId(setting)) {
         const matches = searchSettingLinks(setting);
+        const serverPlaces = searchServerPlaces(setting);
+        const found = matches.length > 0 || serverPlaces.length > 0;
         return openBotToolResult({
-          status: matches.length > 0 ? "matches" : "not_found",
+          status: found ? "matches" : "not_found",
           matches,
-          next:
-            matches.length > 0
-              ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id. When none fits, try other words once, then say that OpenBot has no such setting."
-              : "No setting matches. Try other words once, such as the name of the feature. Otherwise say that OpenBot has no setting for it, and offer openbot.send_feedback with an idea.",
+          ...(serverPlaces.length > 0 ? { serverPlaces } : {}),
+          next: found
+            ? [
+                matches.length > 0
+                  ? "No card shows yet. Choose the one setting that does what the user wants and call show_setting again with its id."
+                  : "",
+                serverPlaces.length > 0
+                  ? "A server place has no id and no card: when it fits, give the user its steps in words, and say who can do it."
+                  : "",
+                "When none fits, try other English words once, then say that you found no setting for it.",
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : "No setting matches. Try other English words once, such as the name of the feature. Otherwise say that you found no setting for it, and offer openbot.send_feedback with an idea.",
         });
       }
       const shown = settingLinkSummary(setting);
