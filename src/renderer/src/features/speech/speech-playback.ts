@@ -388,7 +388,8 @@ export async function readAloud(
       ahead += seconds;
       asking = false;
       lastSynthesisMs = answer.synthesisMs;
-      askNext();
+      // The part that plays now, if any, also plays before the next part is needed.
+      own.askNext?.();
       return { ...answer, text: part, seconds };
     });
     // A reading that stops before this part plays never reads its answer.
