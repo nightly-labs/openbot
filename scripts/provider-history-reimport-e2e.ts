@@ -93,7 +93,11 @@ interface Report {
   generatedAt: string;
   command: string;
   imports: Record<string, ProviderHistoryImportResult>;
-  compaction: { existingRows: ProviderHistoryCompactionResult; repeat: ProviderHistoryCompactionResult };
+  compaction: {
+    belowMarker: ProviderHistoryCompactionResult;
+    existingRows: ProviderHistoryCompactionResult;
+    repeat: ProviderHistoryCompactionResult;
+  };
   acceptance: Record<string, boolean>;
 }
 
@@ -304,6 +308,22 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
       fragment: { ...turn("legacy-running-turn", 17), complete: false },
     });
     const legacyFullBefore = stagedRows("legacy-session") === 6 && compactedRows("legacy-session") === 0;
+    // Without the schema 64 marker, an older release can open the file, so nothing is compacted: not
+    // the existing rows, and not a turn that an import writes.
+    const marker = database.connection.prepare("SELECT applied_at FROM schema_migrations WHERE version = 64").get();
+    database.connection.prepare("DELETE FROM schema_migrations WHERE version = 64").run();
+    const belowMarkerRows = await Effect.runPromise(compactImportedProviderHistory(database, Duration.zero));
+    const belowMarkerImport = await runImport("below-marker-session", "codex", [turn("below-marker-turn", 18)]);
+    const belowMarkerKeptFull =
+      marker !== undefined &&
+      belowMarkerRows.rows === 0 &&
+      compactedRows("legacy-session") === 0 &&
+      belowMarkerImport.turns === 1 &&
+      stagedRows("below-marker-session") === 2 &&
+      compactedRows("below-marker-session") === 0;
+    database.connection
+      .prepare("INSERT INTO schema_migrations (version, applied_at) VALUES (64, ?)")
+      .run(String(marker?.applied_at));
     const existingRows = await Effect.runPromise(compactImportedProviderHistory(database, Duration.zero));
     const legacyCompacted =
       compactedRows("legacy-session", "legacy-turn-1") === 2 &&
@@ -440,8 +460,9 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         staleEdited,
         legacyFirst,
         legacyRepeat,
+        belowMarkerImport,
       },
-      compaction: { existingRows, repeat: repeatCompaction },
+      compaction: { belowMarker: belowMarkerRows, existingRows, repeat: repeatCompaction },
       acceptance: {
         firstImportsEveryTurn: first.turns === codexHistory.length && messagesAfterFirst.length === 6,
         repeatImportsNoTurn: repeat.turns === 0 && repeat.messages === 0,
@@ -487,9 +508,12 @@ async function runProviderHistoryReimportCheck(outputPath: string): Promise<Repo
         lateSplitEditImportsFullTurnNextRead: lateImportedFullTurn,
         staleHashDroppedAfterFullRead: staleFirst.turns === 1 && staleCompacted && staleDropped,
         existingRowsWereFull: legacyFirst.turns === 2 && legacyFullBefore,
-        // Four legacy rows, and the two rows of the records-only Codex turn above: only ACP and Pi send
-        // records-only turns (`provider-history-persistence.ts`), so a real Codex session has none.
-        existingImportedRowsCompacted: existingRows.rows === 6 && legacyCompacted,
+        noCompactionBelowSchema64: belowMarkerKeptFull,
+        // Four legacy rows, the two rows of the turn imported below schema 64, and the two rows of the
+        // records-only Codex turn above: only ACP and Pi send records-only turns
+        // (`provider-history-persistence.ts`), so a real Codex session has none.
+        existingImportedRowsCompacted:
+          existingRows.rows === 8 && legacyCompacted && compactedRows("below-marker-session") === 2,
         existingRowCompactionRunsOnce: repeatCompaction.rows === 0,
         compactedExistingRowsRepeatWritesNothing: legacyRepeatWroteNothing,
         importCompleted: database.providerHistoryImport("codex-session")?.state === "complete",

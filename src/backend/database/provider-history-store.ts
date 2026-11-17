@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { type DynamicRecord, isDynamicRecord } from "@openbot/contracts/runtime-values";
+import { migration as compactionMigration } from "../migrations/0064-provider-history-compaction";
 import { decodeThreadItem, type ThreadItem } from "../protocol";
 import type { ProviderHistoryFragment } from "../provider-history";
 import type { DatabaseCore } from "./database-core";
@@ -90,6 +91,11 @@ const COMPACTED_PROVIDERS_SQL = "('codex', 'claude')";
 /** A compacted item is a JSON string. A thread item is always a JSON object, so the two never mix. */
 const COMPACTED_PREFIX = '"sha256:';
 const compactedSql = (column: string) => `substr(${column}, 1, ${COMPACTED_PREFIX.length}) = '${COMPACTED_PREFIX}'`;
+/**
+ * A release before this schema version reads a compacted item as a thread item and fails the import.
+ * The migration makes such a release refuse the database, so items are compacted only at this version.
+ */
+const COMPACTION_SCHEMA_VERSION = compactionMigration.version;
 const COMPACTION_BATCH_ROWS = 256;
 const COMPACTION_BATCH_BYTES = 4 * 1024 * 1024;
 
@@ -440,6 +446,7 @@ export class ProviderHistoryStore {
    */
   compactImportedTurn(sessionId: string, turnId: string): void {
     this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return;
       const rows = databaseRows(
         db
           .prepare(
@@ -462,6 +469,7 @@ export class ProviderHistoryStore {
    */
   compactImportedItems(afterRowId: number): ProviderHistoryCompactionBatch {
     return this.#transaction((db) => {
+      if (!hasCompactionSchema(db)) return { lastRowId: null, rows: 0, bytes: 0 };
       // CROSS JOIN keeps the staging rows as the outer loop, read in row id order from `afterRowId`.
       // Another join order sorts the whole table for each batch.
       const select = db.prepare(
@@ -558,6 +566,14 @@ export class ProviderHistoryStore {
  * that is less than one third full only on a delete. An update leaves the page of each large item
  * almost empty, at about 4 KiB for each item.
  */
+function hasCompactionSchema(db: DatabaseSync): boolean {
+  return (
+    databaseRow(
+      db.prepare("SELECT 1 AS found FROM schema_migrations WHERE version = ?").get(COMPACTION_SCHEMA_VERSION),
+    ) !== null
+  );
+}
+
 function compactRows(db: DatabaseSync, rows: readonly DynamicRecord[]): number {
   const select = db.prepare(
     `SELECT session_id, turn_id, item_key, item_index, imported, updated_at
