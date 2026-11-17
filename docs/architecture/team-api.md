@@ -554,9 +554,10 @@ one, the requests that the agent sent from that thread to other agents and whose
 back yet: the message id, the agent it went to, and its state (`queued`, `starting` or `running`). The
 thread shows them as "Waiting for replies", as the agent's own chat does. A member who can send the
 agent a message can use it: a visible agent (else 404) and `chat` on it (else 403). The released
-`agent-tasks-changed` event has no requests, so a client reads the list again when the state of a
-thread changes: a thread sends a request in a turn, and an answer or a note for a failed request
-starts the thread again. `src/main/team-api/route-agent-thread-requests.ts` owns it. Without the
+`agent-tasks-changed` event has no requests, so a client reads the list again when a thread becomes
+idle (a turn can have sent a request), when a thread with requests changes its state (an answer or a
+note for a failed request starts the thread), and on each event while a request is `queued` (it can
+start or be cancelled with no change of the thread's state). `src/main/team-api/route-agent-thread-requests.ts` owns it. Without the
 capability a thread shows no requests.
 
 The optional `agent-usage-limit-v1` capability (protocol 9 only) adds `POST /v1/agent-usage-limit/list`
