@@ -36,7 +36,7 @@ const URL_SECRET = "url-secret-7f3a91";
 const HEADER_SECRET = "header-secret-2c8d40";
 
 /** How each local server answers a request without a token. */
-type Mode = "open" | "sign-in" | "key";
+type Mode = "open" | "sign-in" | "key" | "guarded";
 
 async function body(request: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
@@ -53,6 +53,15 @@ async function mcpServer(mode: Mode): Promise<{ url: string; close: () => Promis
   const server: Server = createServer((request, response) => {
     void (async () => {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
+      // A Bearer challenge on every path, its OAuth documents included: the server wants its key
+      // even there, so it has no sign-in (#10547).
+      if (mode === "guarded")
+        return json(
+          response,
+          401,
+          { error: "a valid API key is required" },
+          { "www-authenticate": 'Bearer realm="e2e"' },
+        );
       // A Bearer challenge without `resource_metadata` wants a sign-in only when the origin publishes
       // OAuth metadata. Without it, the server takes a key, as Coolify does (#9176).
       if (mode === "sign-in" && path === "/.well-known/oauth-authorization-server") {
@@ -157,6 +166,7 @@ const servers: Record<Mode, { url: string; close: () => Promise<void> }> = {
   open: await mcpServer("open"),
   "sign-in": await mcpServer("sign-in"),
   key: await mcpServer("key"),
+  guarded: await mcpServer("guarded"),
 };
 const calls: Call[] = [];
 let refreshes = 0;
@@ -279,6 +289,13 @@ try {
   assert.equal(key.result.status, "needs_key");
   assert.equal(key.signInCards.length, 0);
   assert.ok(row("crm"), "a server that needs a key is saved for the user to add it");
+
+  const guarded = await call("a server that wants its key on every path needs a key", "save_mcp_server", {
+    name: "billing",
+    url: servers.guarded.url,
+  });
+  assert.equal(guarded.result.status, "needs_key");
+  assert.equal(guarded.signInCards.length, 0);
 
   const down = await call("a server that does not answer is not saved", "save_mcp_server", {
     name: "down",
