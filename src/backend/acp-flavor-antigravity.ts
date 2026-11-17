@@ -75,7 +75,7 @@ const GEMINI_EMPTY_OUTPUT_FAILURE =
  * wholly calls is one: an answer that explains this syntax has other text.
  */
 const GEMINI_TEXT_TOOL_CALL = {
-  start: /^\s*(?:```tool_code\b|call:default_api:|print\(default_api\.)/u,
+  starts: ["```tool_code", "call:default_api:", "print(default_api."],
   whole:
     /^\s*(?:```tool_code\s*)?(?:call:default_api:[\w-]+\s*\{[\s\S]*\}|print\(default_api\.[\w-]+\([\s\S]*\)\))\s*(?:```\s*)?$/u,
 };

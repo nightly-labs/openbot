@@ -3556,20 +3556,32 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           (!turn.text && this.#flavor.sdkHarness?.mcpLoadFailure(text)))
       )
         turn.sdkFailureAt = turn.text.length;
-      // A tool call that the model wrote as text is held back until its message ends (#11087).
+      // A tool call that the model wrote as text is held back until its message ends (#11087). The CLI
+      // can split the call's first word, so the start of a message waits while it can still be one.
+      const textToolCall = turn.sdkFailureAt === null ? this.#flavor.sdkHarness?.textToolCall : undefined;
+      let released = "";
       if (
-        turn.sdkFailureAt === null &&
+        textToolCall &&
         turn.textToolCallAt === null &&
-        this.#flavor.sdkHarness?.textToolCall?.start.test(text)
+        textToolCall.starts.some((start) => text.trimStart().startsWith(start))
       )
         turn.textToolCallAt = turn.text.length;
+      else if (textToolCall && (turn.textToolCallAt === 0 || (turn.textToolCallAt === null && !turn.text))) {
+        const message = (turn.text + text).trimStart();
+        if (textToolCall.starts.some((start) => message.startsWith(start) || start.startsWith(message)))
+          turn.textToolCallAt = 0;
+        else if (turn.textToolCallAt === 0) {
+          turn.textToolCallAt = null;
+          released = turn.text;
+        }
+      }
       const held = turn.sdkFailureAt !== null || turn.textToolCallAt !== null;
-      if (update.content.text.trim() && !held) {
+      if ((update.content.text.trim() || released.trim()) && !held) {
         turn.receivedOutput = true;
         turn.interruptedAnswer = null;
       }
       if (this.#flavor.streamAnswerBeforePromptReturns && text && !held) {
-        if (!turn.text)
+        if (!turn.text || released)
           this.emit("notification", {
             method: "item/started",
             params: {
@@ -3580,7 +3592,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           });
         this.emit("notification", {
           method: "item/agentMessage/delta",
-          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: text },
+          params: { threadId: thread.id, turnId: turn.id, itemId: turn.itemId, delta: released + text },
         });
       }
       turn.text += text;

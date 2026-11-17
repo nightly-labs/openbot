@@ -213,11 +213,11 @@ export interface AcpFlavor {
     /** The failure text of a model step that ended with neither text nor tool calls. */
     emptyOutputFailure?: RegExp;
     /**
-     * A tool call that the model wrote as answer text, which the agent does not run: the start of
-     * an answer text chunk that can be one, and the whole text of one. The text is held back, and a
-     * turn that ends on it ends as a turn with no answer.
+     * A tool call that the model wrote as answer text, which the agent does not run: the words that
+     * one starts with, and the whole text of one. The text is held back, and a turn that ends on it
+     * ends as a turn with no answer.
      */
-    textToolCall?: { start: RegExp; whole: RegExp };
+    textToolCall?: { starts: readonly string[]; whole: RegExp };
     /** The message of a turn that failed in this way, from the failure text. */
     turnFailure(text: string): string;
     /**
