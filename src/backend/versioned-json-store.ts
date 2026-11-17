@@ -41,20 +41,10 @@ export function versionedJsonFallbackPath(path: string, version: number): string
 }
 
 /**
- * Reads the versioned JSON file of a store. This never changes a file that holds JSON, and never
- * writes.
- *
- * A file that is not JSON goes to `<path>.corrupt-<time>`. Nothing can read it, and it stays there
- * for diagnosis.
- *
- * A file that is JSON but that this build cannot read stays unchanged. Usually a newer release wrote
- * it, and the user then installed an earlier release. This build then reads and writes
- * `<path>.v<current>` (`versionedJsonFallbackPath`) in its place. When the user installs the newer
- * release again, it reads its own file, which no change of this build touched. The changes that the
- * user made in this build stay only in the fallback file. The same occurs when the read of the path
- * fails: a file that cannot be read can still hold data.
- *
- * Stores must write to `writePath`, never to the path, so that the newer file is never replaced.
+ * Reads the versioned JSON file of a store, and never writes. A file that is not JSON goes to
+ * `<path>.corrupt-<time>`. JSON that this build cannot read, such as the file of a newer release after
+ * a downgrade, and a path that cannot be read stay unchanged: this build reads and writes
+ * `<path>.v<current>` in their place. Stores must write to `writePath`, never to the path.
  */
 export const readVersionedJsonFile = Effect.fn("VersionedJson.read")(function* <Value>(
   path: string,
@@ -100,7 +90,7 @@ const readOneFile = Effect.fn("VersionedJson.readOne")(function* <Value>(
   const file = parsed.value;
   if (!isDynamicRecord(file)) return kept;
   const version = file.version;
-  if (typeof version !== "number" || !Object.hasOwn(format.releases, version)) return kept;
+  if (typeof version !== "number") return kept;
   const step = format.releases[version];
   if (!step) return kept;
   const decoded = yield* Effect.result(Effect.try(() => step(file)));

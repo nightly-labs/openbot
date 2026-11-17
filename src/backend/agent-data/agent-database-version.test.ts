@@ -44,7 +44,7 @@ function stdioHost(): AgentDatabaseHostProcess {
   return {
     send: (request) => child.stdin.write(`${JSON.stringify(request)}\n`),
     onMessage: (listener) => listeners.push(listener),
-    onExit: (listener) => child.once("exit", () => listener()),
+    onExit: (listener) => child.once("exit", (code) => listener(code)),
     kill: () => child.kill("SIGKILL"),
   };
 }
