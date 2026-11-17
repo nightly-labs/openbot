@@ -75,6 +75,9 @@ export const AllStates: Story = {
             agents={agents}
             onSelectAgent={onSelectAgent}
             onOpenRoutine={onOpenRoutine}
+            routineRunFailure={(runId) =>
+              runId === "run-failed" ? "The calendar service did not answer, so the brief has no meetings." : undefined
+            }
           />
         ))}
         {routineActions.map((action) => (
