@@ -675,10 +675,9 @@ export function createWebWorkspace(
         } else if (event.type === "turn-completed") {
           setState((draft) => {
             if (draft.progress[event.agentId]?.turnId === event.turnId) delete draft.progress[event.agentId];
-            draft.prompts = draft.prompts.filter(
-              (item) =>
-                item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
-            );
+            // The host closes each question that ends with its turn with `agent-input-resolved` before
+            // this event. A question that is still here outlives its turn, and the user can answer it
+            // later; the Team API does not mark it (#11440).
             draft.approvals = draft.approvals.filter(
               (item) =>
                 item.agentId !== event.agentId || item.threadId !== event.threadId || item.turnId !== event.turnId,
