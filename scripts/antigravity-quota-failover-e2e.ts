@@ -56,7 +56,7 @@ if (process.argv[2] === "--version") {
 }
 const log = (entry) => fs.appendFileSync(process.env.FAKE_AGY_LOG, JSON.stringify(entry) + NL);
 const write = (message) => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", ...message }) + NL);
-const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-flash"];
+const MODELS = ["gemini-quota-a", "gemini-quota-b", "gemini-quota-c", "gemini-quota-d", "gemini-spent", "gemini-balance", "gemini-flash"];
 const models = { availableModels: MODELS.map((modelId) => ({ modelId, name: modelId })) };
 const current = new Map();
 const setup = (sessionId) => ({ sessionId, models: { ...models, currentModelId: current.get(sessionId) ?? MODELS[0] } });
@@ -76,12 +76,13 @@ function handle(message) {
   if (message.method === "session/prompt") {
     const text = params.prompt.map((block) => block.text ?? "").join("");
     const model = current.get(params.sessionId) ?? MODELS[0];
-    const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent") && text.includes("QUOTA-NOW");
+    const quota = (model.startsWith("gemini-quota-") || model === "gemini-spent" || model === "gemini-balance") && text.includes("QUOTA-NOW");
     log({ model, quota, text });
     if (quota) {
       if (text.includes("ACT-FIRST") && model !== "gemini-spent")
         update(params.sessionId, { sessionUpdate: "tool_call", toolCallId: "read-" + Date.now(), title: "Read notes.txt", kind: "read", status: "completed", rawInput: { path: "notes.txt" } });
-      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 Usage Limit Reached" + NL + NL + "You have reached your current quota for this period. Your limit will reset in 6 days, 22 hours." } });
+      const failure = model === "gemini-balance" ? "Your AI credits balance is too low to continue." : "Usage Limit Reached" + NL + NL + "You have reached your current quota for this period. Your limit will reset in 6 days, 22 hours.";
+      update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: NL + "\u26A0 " + failure } });
       return write({ id: message.id, result: { stopReason: "end_turn" } });
     }
     update(params.sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "Done." } });
@@ -244,6 +245,13 @@ async function runCase(
 
 try {
   await runCauseEffect(agents.initialize());
+
+  const balance = await runCase("Gemini credits exhausted", "gemini-balance", true, "QUOTA-NOW");
+  assert.deepEqual(
+    balance.prompts.map((prompt) => prompt.model),
+    ["gemini-balance", BACKUP],
+  );
+  balance.passed = true;
 
   const before = await runCase("quota before work", "gemini-quota-a", true, "QUOTA-NOW");
   assert.deepEqual(
