@@ -40,6 +40,7 @@ import type { JSX } from "@solidjs/web";
 import { children, createEffect, createSignal, createStore, For, onSettled, Show, untrack } from "solid-js";
 import type { AgentProfile } from "../../data";
 import { useText } from "../../text";
+import { prefersReducedMotion } from "../../utils";
 import { PickerMenu } from "./WorkflowPicker";
 import {
   Hint,
@@ -713,6 +714,40 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
     const next = list()[index() + step];
     if (next) board.pick(props.id, next.id);
   };
+  let row: HTMLSpanElement | undefined;
+  // The row moves to the result on view when it is out of view or under a faded edge: after an arrow,
+  // a new run, or when the row opens. Only the row scrolls; scrollIntoView would also move the canvas.
+  createEffect(index, (at, before) => {
+    const item = row?.querySelectorAll<HTMLElement>(".wfn-strip-item")[at];
+    if (!row || !item) return;
+    const box = row.getBoundingClientRect();
+    const shown = item.getBoundingClientRect();
+    if (shown.left >= box.left + shown.width && shown.right <= box.right - shown.width) return;
+    // The row keeps its screen size at every zoom, but measure the scale so the offset is in its pixels.
+    const scale = box.width > 0 ? row.offsetWidth / box.width : 1;
+    const offset = (shown.left + shown.width / 2 - (box.left + box.width / 2)) * scale;
+    row.scrollBy({ left: offset, behavior: before === undefined || prefersReducedMotion() ? "instant" : "smooth" });
+  });
+  // A wheel or a trackpad scrolls the row while the row can move that way. At an end of the row, and
+  // for a pinch, the canvas pans or zooms as before.
+  const scrollOnWheel = (event: WheelEvent) => {
+    if (!row || event.ctrlKey || event.metaKey) return;
+    const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+    const unit =
+      event.deltaMode === WheelEvent.DOM_DELTA_LINE
+        ? 16
+        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? row.clientWidth
+          : 1;
+    const step = delta * unit;
+    const rightToLeft = getComputedStyle(row).direction === "rtl";
+    const position = rightToLeft ? -row.scrollLeft : row.scrollLeft;
+    const end = row.scrollWidth - row.clientWidth;
+    if (step === 0 || (step > 0 ? position >= end - 1 : position <= 1)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    row.scrollLeft += rightToLeft ? -step : step;
+  };
   return (
     <Show when={list().length > 1}>
       <fieldset class="wfn-strip" aria-label={t("workflow.node.result.list")}>
@@ -725,7 +760,13 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
         >
           <ChevronLeft />
         </Button>
-        <span class="wfn-strip-list">
+        <span
+          ref={(element: HTMLSpanElement) => {
+            row = element;
+          }}
+          class="wfn-strip-list"
+          onWheel={scrollOnWheel}
+        >
           <For each={list()}>
             {(result, at) => (
               <Hint
