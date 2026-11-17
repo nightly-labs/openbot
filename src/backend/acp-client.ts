@@ -1278,6 +1278,22 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
           this.#endIfUnresponsive(sessionId ? this.#threads.get(sessionId) : undefined),
           this.#scope,
         );
+      // A session open or a settings change of a turn sent no prompt, so the message can go again. A
+      // turn that runs in the session fails by itself, and its failure ends the process.
+      if (
+        sessionId &&
+        (method === "turn/start" || method === "thread/resume") &&
+        !this.#threads.get(sessionId)?.transport &&
+        !this.#threads.get(sessionId)?.activeTurn &&
+        this.#flavor.lostServerUntilRestart?.(error)
+      ) {
+        logger.warn("An ACP agent lost the connection to its server.", {
+          provider: this.provider,
+          reason: this.#redact(failureText(error)),
+        });
+        yield* this.#endFailingProcess(sessionId, this.#serverLostEnd(), false);
+        return yield* providerFailure(new Error(sourceText("error.provider.acpServerLost", { provider: this.#label })));
+      }
       if (
         sessionId &&
         (method === "turn/start" || method === "thread/resume") &&
@@ -2895,22 +2911,44 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         return;
       }
       yield* this.#completeTurn(thread, turn, turn.stopped ? "interrupted" : "failed", turn.stopped ? null : failure);
-      // A process that answered before and now refuses can refuse each prompt until it ends (#9718).
-      // A turn of another session, also one that still opens, must not end with it.
-      if (
-        !turn.stopped &&
-        !transport &&
-        this.#promptAnswered &&
-        this.#flavor.refusesUntilRestart?.(failure) &&
-        this.#startingThreads.size === 0 &&
-        ![...this.#openingTurns.keys()].some((id) => id !== thread.id) &&
-        ![...this.#threads.ids()].some((id) => id !== thread.id && this.#threads.get(id)?.activeTurn)
-      ) {
-        this.#promptAnswered = false;
-        yield* this.#endAgentProcess(sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }));
+      // A process that answered before and now refuses can refuse each prompt until it ends (#9718),
+      // and one that lost its server can fail each prompt until it ends (#10624).
+      if (!turn.stopped && !transport) {
+        if (this.#flavor.refusesUntilRestart?.(failure))
+          yield* this.#endFailingProcess(
+            thread.id,
+            sourceText("error.provider.acpRefusedUntilRestart", { provider: this.#label }),
+            true,
+          );
+        else if (this.#flavor.lostServerUntilRestart?.(failure))
+          yield* this.#endFailingProcess(thread.id, this.#serverLostEnd(), false);
       }
     }
   });
+
+  /**
+   * Ends a process that can fail each request until it ends, so the next message starts a new
+   * process. A turn of another session, also one that still opens, must not end with it. With
+   * `answeredFirst`, a process that refused from its first prompt is not ended again.
+   */
+  #endFailingProcess(threadId: string, message: string, answeredFirst: boolean): Effect.Effect<void> {
+    return Effect.suspend(() => {
+      if (
+        (answeredFirst && !this.#promptAnswered) ||
+        this.#startingThreads.size > 0 ||
+        [...this.#openingTurns.keys()].some((id) => id !== threadId) ||
+        [...this.#threads.ids()].some((id) => id !== threadId && this.#threads.get(id)?.activeTurn)
+      )
+        return Effect.void;
+      this.#promptAnswered = false;
+      return this.#endAgentProcess(message);
+    });
+  }
+
+  /** Says nothing about the message: a prompt that the agent took can have run. */
+  #serverLostEnd(): string {
+    return sourceText("error.provider.acpServerLostEnded", { provider: this.#label });
+  }
 
   /** Reports the usage of one prompt reply. `promptId` names it: a delivery that runs again keeps its turn ID. */
   #reportPromptUsage(thread: AcpThread, turn: AcpTurn, response: PromptResponse): void {
