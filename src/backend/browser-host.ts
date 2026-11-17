@@ -3852,9 +3852,10 @@ export class BrowserHost {
         event.preventDefault();
         return;
       }
-      // A stopped download saves no file, so the tab's diagnostics tell the agent why.
+      // A stopped download saves no file, so the tab's diagnostics tell the agent why. A download that
+      // started earlier can stop during secret entry, which keeps no diagnostics.
       const stopped = (message: string) => {
-        if (!tab) return;
+        if (!tab || tab.secret) return;
         tab.diagnostics.add({ kind: "network", level: "error", message, ...diagnosticUrlField(item.getURL()) });
         this.#emitChanged();
       };
