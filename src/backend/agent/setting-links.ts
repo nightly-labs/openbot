@@ -410,7 +410,7 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
     place: `${SERVER_LIST} > Remove server, or ${SERVER_SETTINGS} > General > Remove server. ${PHONE_SERVERS} > Remove server.`,
     about:
       "Only the owner. Removes the server from the account for all members and ends remote access, for example the server of an old computer that is not used now. It works also when that computer is off. Files and chats on that computer stay. It does not show for a hosted server or for the server on this computer.",
-    words: "forget computer machine device mac pc replace unregister",
+    words: "delete forget rid replace unregister old previous",
   },
   {
     title: "Leave server",
@@ -423,22 +423,23 @@ const SERVER_PLACES: readonly SettingLinkEntry[] = [
     place: `On a computer: ${SERVER_SETTINGS} > Transfer.`,
     about:
       "Owners and admins move the agents, with their skills, routines, memories and files, to another computer: export a .zip file from the old server, then import it into the new server.",
-    words: "move migrate migration computer machine device",
+    words: "move migrate migration copy new",
   },
 ];
 
 /** Words for a server or its computer. A server action fits only a query with one of them. */
-const SERVER_TERMS = ["server", "computer", "machine", "device", "mac", "pc"];
+const SERVER_TERMS = ["server", "computer", "machine", "device", "laptop", "macbook", "imac", "mac", "pc"];
 
 /**
  * The server actions that fit the query. Only the title and the words count: the place of each action
- * repeats the same steps, so its common words would match nearly every query. Each title names a
- * server, so "server" does not add to the score.
+ * repeats the same steps, so its common words would match nearly every query. The words for a server
+ * or a computer only open the search and do not add to the score: another word, such as "remove" or
+ * "move", must match.
  */
 export function searchServerPlaces(query: string, limit = 2): ServerPlace[] {
   const queryTerms = terms(query);
   if (!queryTerms.some((term) => hits(term, SERVER_TERMS))) return [];
-  const scored = queryTerms.filter((term) => !hits(term, ["server"]));
+  const scored = queryTerms.filter((term) => !hits(term, SERVER_TERMS));
   return rank(SERVER_PLACES, (entry) => entry, scored, limit, false).map(({ title, place, about }) => ({
     title,
     place,
