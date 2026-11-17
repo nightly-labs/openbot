@@ -1125,6 +1125,7 @@ export class MessagingThreads {
   ): Effect.fn.Return<void, MessagingThreadFailed> {
     for (const threadId of this.store.threadIdsForAgent(agentId))
       yield* this.#hooks.forgetThread(threadId).pipe(toMessagingThreadFailed);
+    for (const link of this.store.links(agentId)) this.#lastOrigins.delete(link.linkId);
     yield* threadsStep(() => this.store.deleteForAgent(agentId));
   });
 
