@@ -350,6 +350,8 @@ export interface ProviderHooks {
   isStopping(): boolean;
   /** True while a turn on this provider runs or starts, which replacing its CLI would cut short. */
   isProviderBusy(provider: AgentProvider): boolean;
+  /** `isProviderBusy` without the turns of this agent. Absent: as `isProviderBusy`. */
+  isProviderBusyApartFrom?(provider: AgentProvider, agentId: string): boolean;
   /** True while a turn of this agent runs. An agent's own process stays while its own turn runs. */
   isAgentBusy(agentId: string): boolean;
   /** True while an agent is set to this provider, so a turn on it can come at any time. */
@@ -2956,11 +2958,13 @@ export class ProviderRuntime implements ProviderPort {
   ) {
     const provider = providerForAgent(agent);
     const shared = this.#clients.get(provider);
+    // Checked again after the replacement check, which waits for the process.
     if (
       shared &&
-      !this.#providerConnectionCommands.has(provider) &&
+      !this.#othersUse(provider, agent.id) &&
       (yield* this.#mustReplace(shared)) &&
-      this.#clients.get(provider) === shared
+      this.#clients.get(provider) === shared &&
+      !this.#othersUse(provider, agent.id)
     ) {
       logger.info("Replaced a provider CLI that still runs a stopped turn.", { provider });
       yield* this.#releaseClient(provider, shared);
@@ -2994,6 +2998,21 @@ export class ProviderRuntime implements ProviderPort {
    */
   #mustReplace(client: AgentClient): Effect.Effect<boolean> {
     return client.replaceForNextTurn?.(this.#conversation.clientThreads(client)) ?? Effect.succeed(false);
+  }
+
+  /**
+   * True while something other than this agent's next turn uses the shared process: a turn or a
+   * start of another agent, a start of the process, a connection command, a CLI change or a sign-in.
+   */
+  #othersUse(provider: AgentProvider, agentId: string): boolean {
+    return (
+      (this.#hooks.isProviderBusyApartFrom?.(provider, agentId) ?? this.#hooks.isProviderBusy(provider)) ||
+      this.#providerStarts.has(provider) ||
+      this.#providerConnectionCommands.has(provider) ||
+      this.isReplacingCli(provider) ||
+      this.#cliLogin.has(provider) ||
+      (provider === "codex" && this.#codexLogin.pending)
+    );
   }
 
   #countActivation(provider: AgentProvider): void {

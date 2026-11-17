@@ -7,7 +7,12 @@ import { Effect, Fiber, Result, Schema } from "effect";
 import { isTurnContextBlock } from "./agent/developer-instructions";
 import { LOG_TIMESTAMP_PREFIX } from "./agent/provider-diagnostics";
 import { TurnContext } from "./agent/turn-context";
-import { AgentProcessExitError, type AgentProvider, RequestTimeoutError } from "./agent-client";
+import {
+  AgentProcessExitError,
+  type AgentProvider,
+  ProviderSessionBusyError,
+  RequestTimeoutError,
+} from "./agent-client";
 import { cliSpawnTarget } from "./cli";
 import { JsonLineDecoder, LineTooLongError } from "./jsonl";
 import {
@@ -348,14 +353,19 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     threadIds: readonly string[],
   ) {
     if (!this.#holdsOnlyAbandonedTurns()) return false;
-    const stopped = new Set(this.#abandonedTurns.values());
-    for (const threadId of threadIds) {
-      if (stopped.has(threadId)) continue;
-      const background = yield* Effect.result(this.holdsBackgroundWork(threadId));
-      if (Result.isFailure(background) || background.success) return false;
-    }
+    const stopped = this.#abandonedThreads();
+    const checks = yield* Effect.forEach(
+      threadIds.filter((threadId) => !stopped.has(threadId)),
+      (threadId) => Effect.result(this.holdsBackgroundWork(threadId)),
+      { concurrency: "unbounded" },
+    );
+    if (checks.some((background) => Result.isFailure(background) || background.success)) return false;
     return this.#holdsOnlyAbandonedTurns();
   });
+
+  #abandonedThreads(): ReadonlySet<string> {
+    return new Set(this.#abandonedTurns.values());
+  }
 
   #holdsOnlyAbandonedTurns(): boolean {
     return (
@@ -490,9 +500,18 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
     const id = this.#nextId++;
     const child = this.#process;
     let answered = false;
-    const threadWork = THREAD_WORK_METHODS.has(method);
-    if (threadWork) this.#threadWork += 1;
+    if ((method === "turn/start" || method === "turn/steer") && isRecord(params) && isString(params.threadId)) {
+      // Codex would add this turn to the stopped turn that still runs in the thread. The drain tries
+      // the message again, and the next try starts it on a new process (#11100).
+      if (this.#abandonedThreads().has(params.threadId))
+        return yield* Effect.fail(new ProviderClientOperationError({ cause: new ProviderSessionBusyError("Codex") }));
+    }
+    let counted = false;
     return yield* Effect.callback<T, ProviderClientOperationError>((resume) => {
+      if (THREAD_WORK_METHODS.has(method)) {
+        this.#threadWork += 1;
+        counted = true;
+      }
       this.#pending.set(id, {
         resolve: (value) => {
           answered = true;
@@ -530,7 +549,7 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       Effect.ensuring(
         Effect.sync(() => {
           this.#pending.delete(id);
-          if (threadWork) this.#threadWork -= 1;
+          if (counted) this.#threadWork -= 1;
           // A turn that was refused, timed out or interrupted may not be in the history, so the
           // next turn sends its blocks again.
           if (method === "turn/start" && !answered && isRecord(params) && isString(params.threadId))
@@ -578,8 +597,12 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
       return;
     }
     if (!isRecord(params) || !isString(params.threadId)) return;
-    if (method === "turn/start") this.#openTurns.add(params.threadId);
-    else if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
+    if (method === "turn/start") {
+      this.#openTurns.add(params.threadId);
+      // A Stop can come before `turn/started`; the stop deadline then still knows the turn.
+      const turn = isRecord(result) ? result.turn : undefined;
+      if (isRecord(turn) && isString(turn.id)) this.#liveTurns.add(JSON.stringify([params.threadId, turn.id]));
+    } else if (method === "thread/resume") this.#turnContext.set(params.threadId, params, true);
     else if (method === "thread/archive" || method === "thread/delete") this.#turnContext.forget(params.threadId);
   }
 
@@ -649,6 +672,12 @@ export class CodexAppServerClient extends EventEmitter<ClientEvents> {
   #handleMessage(message: RpcMessage): void {
     if ("method" in message) {
       if ("id" in message) {
+        const requestTurn = notificationTurnKey(message.params);
+        if (requestTurn !== null && this.#abandonedTurns.has(requestTurn)) {
+          // OpenBot ended this turn: nobody answers its approvals or tool calls any more.
+          this.#write({ id: message.id, error: { code: -32_000, message: "OpenBot stopped this turn." } });
+          return;
+        }
         const id = randomUUID();
         this.#serverRequestIds.set(id, message.id);
         let signal: AbortSignal | undefined;
