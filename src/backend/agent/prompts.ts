@@ -360,27 +360,25 @@ export function lateAnswerText(questions: AgentPromptQuestion[], answers: Record
     .flatMap((question) => {
       const values = answers[question.id] ?? [];
       if (values.length === 0) return [];
-      const quote = question.question
-        .split("\n")
-        .map((line) => `> ${line}`)
-        .join("\n");
-      return [`${quote}\n\n${values.join(", ")}`];
+      return [`${quoted(question.question)}\n\n${values.join(", ")}`];
     })
     .join("\n\n");
 }
 
 /**
- * The message for a detached `request_vault_item` card that the user saved: its title as a quote, and
- * the name of the saved item below. No form value goes in it. Empty for a skip, which sends nothing.
+ * The message for a detached `request_vault_item` card: its title as a quote, and the name of the saved
+ * item below. No form value goes in it. Empty for a skip (null), which sends nothing, as a question does.
  */
-export function vaultLateAnswerText(title: string, savedName: string): string {
-  if (!savedName) return "";
-  const quote = title
+export function vaultLateAnswerText(title: string, savedName: string | null): string {
+  if (savedName === null) return "";
+  return [title ? quoted(title) : "", savedName].filter(Boolean).join("\n\n");
+}
+
+function quoted(text: string): string {
+  return text
     .split("\n")
-    .filter((line) => line.trim())
     .map((line) => `> ${line}`)
     .join("\n");
-  return quote ? `${quote}\n\n${savedName}` : savedName;
 }
 
 /** The answer for a question that expired before the user answered it. Only the model reads it. */

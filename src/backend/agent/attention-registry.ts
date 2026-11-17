@@ -876,7 +876,7 @@ export class AttentionRegistry {
       const lateAnswer = !pending.detached
         ? ""
         : pending.uiBlock?.vault
-          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem?.item.name ?? "")
+          ? vaultLateAnswerText(pending.uiBlock.spec.title ?? "", savedItem ? savedItem.item.name : null)
           : lateAnswerText(pending.questions, input.answers);
       if (pending.detached && lateAnswer)
         this.#sendLateAnswer(pending.agentId, pending.detached, lateAnswer, responder?.sender);
