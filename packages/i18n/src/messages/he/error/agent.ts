@@ -86,6 +86,7 @@ export const messages = {
   "error.agent.endpointRemoved": "נקודת הקצה שהסוכן הזה השתמש בה הוסרה. יש לבחור עבורו מודל אחר.",
   "error.agent.turnStalled":
     "{provider} הפסיק להגיב, ולכן OpenBot סיים את התור הזה. יש לשלוח את ההודעה שוב, או לבחור מודל אחר.",
+  "error.agent.promptCancelled": "{provider} ביטל את ההודעה הזו לפני שהתחילה. יש לשלוח את ההודעה שוב.",
   "error.agent.toolLoopStopped":
     "{provider} חזר על שלב שנכשל פעמים רבות, ולכן OpenBot עצר את התור הזה. שלחו את ההודעה שוב, או בחרו מודל אחר.",
   "error.agent.answerCutOff": "הסוכן נעצר לפני שסיים את התשובה שלו, ולכן התשובה אינה מלאה. שלחו את ההודעה שוב.",

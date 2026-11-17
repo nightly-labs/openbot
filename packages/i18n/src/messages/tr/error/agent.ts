@@ -95,6 +95,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Bu ajanın kullandığı uç nokta kaldırıldı. Ajan için başka bir model seçin.",
   "error.agent.turnStalled":
     "{provider} yanıt vermeyi bıraktı, bu yüzden OpenBot bu turu bitirdi. Mesajı yeniden gönderin veya başka bir model seçin.",
+  "error.agent.promptCancelled": "{provider} bu mesajı başlamadan önce iptal etti. Mesajı yeniden gönderin.",
   "error.agent.toolLoopStopped":
     "{provider} başarısız bir adımı birçok kez tekrarladı, bu yüzden OpenBot bu turu durdurdu. Mesajı yeniden gönderin veya başka bir model seçin.",
   "error.agent.answerCutOff": "Ajan yanıtını bitirmeden durdu, bu yüzden yanıt eksik. Mesajı yeniden gönderin.",

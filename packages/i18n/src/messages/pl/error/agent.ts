@@ -95,6 +95,7 @@ export const messages = {
   "error.agent.endpointRemoved": "Endpoint używany przez tego agenta został usunięty. Wybierz dla niego inny model.",
   "error.agent.turnStalled":
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
+  "error.agent.promptCancelled": "{provider} anulował tę wiadomość, zanim się zaczęła. Wyślij wiadomość ponownie.",
   "error.agent.toolLoopStopped":
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
   "error.agent.answerCutOff":

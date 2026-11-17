@@ -92,6 +92,7 @@ export const messages = {
   "error.agent.endpointRemoved": "이 에이전트가 사용하던 엔드포인트가 제거되었어요. 다른 모델을 선택해 주세요.",
   "error.agent.turnStalled":
     "{provider}이(가) 응답하지 않아 OpenBot이 이 턴을 종료했어요. 메시지를 다시 보내거나 다른 모델을 선택해 주세요.",
+  "error.agent.promptCancelled": "{provider}이(가) 시작 전에 이 메시지를 취소했어요. 메시지를 다시 보내 주세요.",
   "error.agent.toolLoopStopped":
     "{provider}이(가) 실패한 단계를 여러 번 반복해서 OpenBot이 이 턴을 중지했습니다. 메시지를 다시 보내거나 다른 모델을 선택하세요.",
   "error.agent.answerCutOff": "에이전트가 답변을 마치기 전에 멈춰서 답변이 완전하지 않습니다. 메시지를 다시 보내세요.",

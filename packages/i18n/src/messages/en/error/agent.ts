@@ -93,6 +93,7 @@ export const messages = defineMessages("error.agent", {
   "error.agent.endpointRemoved": "The endpoint this agent used was removed. Choose another model for it.",
   "error.agent.turnStalled":
     "{provider} stopped responding, so OpenBot ended this turn. Send the message again, or choose another model.",
+  "error.agent.promptCancelled": "{provider} cancelled this message before it started. Send the message again.",
   "error.agent.toolLoopStopped":
     "{provider} repeated a failed step many times, so OpenBot stopped this turn. Send the message again, or choose another model.",
   "error.agent.answerCutOff":

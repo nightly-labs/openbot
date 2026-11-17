@@ -2795,6 +2795,24 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       while (providerResult(yield* Effect.result(this.#leaveOutFailedMcpServer(thread, turn, response, params))))
         response = providerResult(yield* send());
       if (thread.activeTurn !== turn || turn.completing) return;
+      // An agent can cancel a new prompt for a stop that it already answered (CodeBuddy, #11008). With
+      // no update, the prompt did not run, so it is sent again once. OpenBot's own cancels set a cause first.
+      const cancelledUnstarted = () =>
+        response.stopReason === "cancelled" && !turn.stopped && !turn.answered && turn.failureCause === null;
+      if (cancelledUnstarted()) {
+        response = providerResult(yield* send());
+        if (thread.activeTurn !== turn || turn.completing) return;
+        if (cancelledUnstarted()) {
+          turn.failureCause = "cancelled";
+          yield* this.#completeTurn(
+            thread,
+            turn,
+            "failed",
+            sourceText("error.agent.promptCancelled", { provider: this.#providerName(thread) }),
+          );
+          return;
+        }
+      }
       // A wake prompt left the same commands running: the wait ends.
       let staleWake = false;
       for (;;) {
@@ -3770,9 +3788,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
         continue;
       }
       this.emit("diagnostic", `${this.#label} sent nothing for ${silentFor} ms; ending turn ${turn.id}.`);
-      yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
-      // The agent can ignore the cancel, so a backup model must not start on this stall.
+      // The agent can ignore the cancel, so a backup model must not start on this stall. Set before the
+      // cancel: a `cancelled` reply to it must not send the prompt again (`#consumePrompt`).
       turn.failureCause = "stalled";
+      yield* providerCall(() => this.#sessionConnection(thread).cancel({ sessionId: thread.id })).pipe(Effect.ignore);
       yield* this.#abandonTurn(
         thread,
         turn,

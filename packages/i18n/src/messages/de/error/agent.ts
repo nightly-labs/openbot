@@ -107,6 +107,8 @@ export const messages = {
     "Der von diesem Agenten verwendete Endpunkt wurde entfernt. Wähle ein anderes Modell für ihn.",
   "error.agent.turnStalled":
     "{provider} reagiert nicht mehr, daher hat OpenBot diesen Durchlauf beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
+  "error.agent.promptCancelled":
+    "{provider} hat diese Nachricht abgebrochen, bevor sie begann. Sende die Nachricht erneut.",
   "error.agent.toolLoopStopped":
     "{provider} hat einen fehlgeschlagenen Schritt viele Male wiederholt, daher hat OpenBot diesen Durchgang beendet. Sende die Nachricht erneut oder wähle ein anderes Modell.",
   "error.agent.answerCutOff":

@@ -104,6 +104,7 @@ export const messages = {
     "Le point de terminaison utilisé par cet agent a été supprimé. Choisissez un autre modèle pour lui.",
   "error.agent.turnStalled":
     "{provider} ne répond plus, donc OpenBot a terminé ce tour. Renvoyez le message ou choisissez un autre modèle.",
+  "error.agent.promptCancelled": "{provider} a annulé ce message avant son début. Renvoyez le message.",
   "error.agent.toolLoopStopped":
     "{provider} a répété de nombreuses fois une étape en échec, donc OpenBot a arrêté ce tour. Renvoyez le message ou choisissez un autre modèle.",
   "error.agent.answerCutOff":
