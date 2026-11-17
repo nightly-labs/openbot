@@ -194,6 +194,9 @@ export function mcpServersFromGateway(
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
   );
+  // A stdio server that the fallback starts waits for the same runtimes as a test (#10146).
+  const prepared = (config: McpServerConfig) =>
+    (prepareTest?.(config) ?? Effect.void).pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
   return {
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
@@ -202,14 +205,12 @@ export function mcpServersFromGateway(
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
     inspect: (config, tested) =>
-      (prepareTest?.(config) ?? Effect.void).pipe(
-        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
-      ),
+      prepared(config).pipe(Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure))),
     signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
     forAgent,
-    callTool: (config, name, args) => gateway.callTool(config, name, args).pipe(toToolFailure),
+    callTool: (config, name, args) =>
+      prepared(config).pipe(Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure))),
   };
 }
 
