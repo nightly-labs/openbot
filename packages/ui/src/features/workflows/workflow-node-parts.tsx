@@ -732,21 +732,24 @@ function ResultStrip(props: { id: string; thumb?: ((result: WfnResult) => string
   // for a pinch, the canvas pans or zooms as before.
   const scrollOnWheel = (event: WheelEvent) => {
     if (!row || event.ctrlKey || event.metaKey) return;
-    const delta = Math.abs(event.deltaX) >= Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
     const unit =
       event.deltaMode === WheelEvent.DOM_DELTA_LINE
         ? 16
         : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
           ? row.clientWidth
           : 1;
-    const step = delta * unit;
     const rightToLeft = getComputedStyle(row).direction === "rtl";
-    const position = rightToLeft ? -row.scrollLeft : row.scrollLeft;
+    // A sideways swipe moves the row as the browser does. A vertical wheel moves it toward the end of
+    // the row, which is on the left in a right-to-left language.
+    const sideways = Math.abs(event.deltaX) >= Math.abs(event.deltaY);
+    const step = (sideways ? event.deltaX : rightToLeft ? -event.deltaY : event.deltaY) * unit;
+    // In a right-to-left language, scrollLeft goes from 0 at the start to a negative value at the end.
     const end = row.scrollWidth - row.clientWidth;
-    if (step === 0 || (step > 0 ? position >= end - 1 : position <= 1)) return;
+    const [min, max] = rightToLeft ? [-end, 0] : [0, end];
+    if (step === 0 || (step > 0 ? row.scrollLeft >= max - 1 : row.scrollLeft <= min + 1)) return;
     event.preventDefault();
     event.stopPropagation();
-    row.scrollLeft += rightToLeft ? -step : step;
+    row.scrollLeft += step;
   };
   return (
     <Show when={list().length > 1}>
