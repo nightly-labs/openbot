@@ -3654,9 +3654,9 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
 
   /**
    * The pin of an update, or undefined to keep it (#9116). An agent that names an account of a pooled
-   * provider pins it, and an agent that names the provider's own sign-in gives the account back to
-   * the pool. A person's change of the provider, model or account in the app, which shows the pool as
-   * one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
+   * provider pins it, also the provider's own sign-in as "default", and an agent that names null
+   * gives the account back to the pool. A person's change of the provider, model or account in the
+   * app, which shows the pool as one choice, ends the pin; a change of effort keeps it. Automatic moves keep it too; the store ends
    * it when the agent moves to another account.
    */
   #accountPin(
@@ -3671,7 +3671,11 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
         ? null
         : undefined;
     if (input.providerAccountId === undefined) return undefined;
-    return next?.providerAccountId && this.#pooled(next) ? next.providerAccountId : null;
+    if (!next || !this.#pooled(next)) return null;
+    // The provider's own sign-in is an account too: an agent that names "default" keeps it (#10661).
+    // Only null gives the agent to the pool.
+    if (next.providerAccountId) return next.providerAccountId;
+    return input.providerAccountId === DEFAULT_PROVIDER_ACCOUNT_ID ? DEFAULT_PROVIDER_ACCOUNT_ID : null;
   }
 
   /** An update of the account alone also takes the new account's model when `#modelForAccount` gives one. */
