@@ -9,7 +9,7 @@
  * The Windows shell (the explorer.exe that runs the desktop) starts OpenBot again outside the package.
  * A new explorer.exe gives a path or a link to the running shell and exits, as the start of a
  * non-elevated process from an elevated one does. The shell takes no arguments for a program, so only a
- * plain start or a start for one OpenBot link starts again.
+ * plain start or a start for one `openbot:` link starts again. Other starts continue as before.
  */
 import { spawn } from "node:child_process";
 import { join } from "node:path";
@@ -44,7 +44,9 @@ export const restartOutsideWindowsPackage = Effect.fn("restartOutsideWindowsPack
     return false;
   }
   const [link, ...rest] = argv.slice(1);
-  if (rest.length > 0 || (link !== undefined && !isLink(link))) {
+  // The shell opens a web link in the browser, not in OpenBot, and explorer.exe splits its argument at a comma.
+  const shellOpensInOpenBot = (value: string) => /^openbot:/i.test(value) && !value.includes(",") && isLink(value);
+  if (rest.length > 0 || (link !== undefined && !shellOpensInOpenBot(link))) {
     logger.warn("OpenBot runs inside the package of the app that started it, with arguments the shell cannot take.");
     return false;
   }
