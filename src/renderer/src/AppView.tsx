@@ -68,8 +68,10 @@ export function AppAccessGate() {
   const settings = useSettings();
   const { joinRemoteDuringSetup } = useServerSelection();
   const updates = useUpdates();
+  // An install that cannot update itself can close the screen until the next start (plan 011, item 24).
+  const [requiredUpdateDismissed, setRequiredUpdateDismissed] = createSignal(false);
   // Main sets it only after a check confirms that this version is below the supported minimum.
-  const updateRequired = () => updates.status().requiredVersion !== undefined;
+  const updateRequired = () => updates.status().requiredVersion !== undefined && !requiredUpdateDismissed();
   // The splash also waits for the catalogs of the first language, so the first screen is not in
   // English. A later language change does not bring the splash back.
   const languageLoaded = createMemo<boolean>((was) => was === true || i18n.ready());
@@ -119,6 +121,7 @@ export function AppAccessGate() {
           logoVariant={platform.appInfo()?.variant ?? "production"}
           onUpdate={updates.runAction}
           onOpenDownloadPage={() => void appPort().openExternal("download")}
+          onDismiss={() => setRequiredUpdateDismissed(true)}
         />
       </Show>
       <Show when={started() && !updateRequired()}>

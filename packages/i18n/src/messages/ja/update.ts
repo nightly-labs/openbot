@@ -70,5 +70,6 @@ export const messages = {
   "update.required.description":
     "OpenBot {version} はサポートが終了しました。続けるには {minimum} 以降にアップデートしてください。",
   "update.required.download": "OpenBot をダウンロード",
+  "update.required.continue": "アップデートせずに続ける",
   "update.required.failed": "アップデートが完了しませんでした。",
 } as const satisfies PartialTranslation<typeof source>;

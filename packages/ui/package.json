@@ -418,6 +418,7 @@
     "./features/updates/update-status": "./src/features/updates/update-status.ts",
     "./features/updates/WhatsNewDialog": "./src/features/updates/WhatsNewDialog.tsx",
     "./features/updates/whats-new": "./src/features/updates/whats-new.ts",
+    "./features/updates/update-required.css": "./src/features/updates/update-required.css",
     "./features/updates/whats-new.css": "./src/features/updates/whats-new.css",
     "./features/window/PageHeader": "./src/features/window/PageHeader.tsx",
     "./features/window/page-header.css": "./src/features/window/page-header.css",

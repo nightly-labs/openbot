@@ -22,6 +22,7 @@ const meta = {
     logoVariant: "production",
     onUpdate: fn(async () => undefined),
     onOpenDownloadPage: fn(),
+    onDismiss: fn(),
   },
   parameters: { layout: "fullscreen", a11y: { test: "error" } },
 } satisfies Meta<typeof UpdateRequiredScreen>;
@@ -31,6 +32,10 @@ type Story = StoryObj<typeof meta>;
 
 /** The update downloads by itself. */
 export const Downloading: Story = {};
+
+export const Checking: Story = {
+  args: { status: { ...BELOW_MINIMUM, phase: "checking", availableVersion: null, progress: null } },
+};
 
 /** Downloaded: it installs when the agents are idle, or now with the button. */
 export const WaitingForAgents: Story = {
@@ -56,7 +61,7 @@ export const Failed: Story = {
   },
 };
 
-/** An install that cannot update itself, such as a Linux package: only the download page. */
+/** An install that cannot update itself, such as a Linux package or Nix: it can continue until the next start. */
 export const Unsupported: Story = {
   args: { status: { ...BELOW_MINIMUM, phase: "unsupported", availableVersion: null, progress: null } },
 };

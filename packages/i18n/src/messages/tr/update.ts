@@ -74,5 +74,6 @@ export const messages = {
   "update.required.description":
     "OpenBot {version} artık desteklenmiyor. Devam etmek için {minimum} veya daha yeni bir sürüme güncelleyin.",
   "update.required.download": "OpenBot’u indir",
+  "update.required.continue": "Güncellemeden devam et",
   "update.required.failed": "Güncelleme tamamlanmadı.",
 } as const satisfies PartialTranslation<typeof source>;

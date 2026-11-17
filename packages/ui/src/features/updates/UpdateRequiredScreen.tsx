@@ -2,6 +2,7 @@ import { AppLogo, type AppLogoVariant } from "@openbot/brand";
 import type { UpdateStatus } from "@openbot/contracts/ipc";
 import { createSignal, Show } from "solid-js";
 import { Button } from "../../button";
+import { Progress } from "../../progress";
 import { useText } from "../../text";
 import { restartReasonKey } from "./restart-reasons";
 import { presentUpdateStatus } from "./update-status";
@@ -16,6 +17,11 @@ export interface UpdateRequiredScreenProps {
   onUpdate: () => Promise<void>;
   /** Opens the download page, for an install that cannot update itself or whose update failed. */
   onOpenDownloadPage: () => void;
+  /**
+   * Closes the screen until the next start. Shown only for an install that cannot update itself,
+   * such as a Linux package or Nix, because its user cannot install the update from here.
+   */
+  onDismiss?: () => void;
 }
 
 /**
@@ -33,6 +39,9 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
       ? t("update.idleRestart.updateTitle")
       : `${t("update.idleRestart.updateTitle")}. ${t("update.idleRestart.waitingFor", { reasons: format.list(reasons) })}`;
   };
+  // The updater works by itself in these phases, so a bar takes the place of a disabled button.
+  const working = () => presentation().busy && props.status.phase !== "ready";
+  const progress = () => (props.status.phase === "downloading" ? props.status.progress : null);
   const [actionError, setActionError] = createSignal<string | null>(null);
   const statusError = () =>
     props.status.phase === "error" && props.status.message
@@ -56,7 +65,7 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
           <span class="account-login-wordmark">{PRODUCT_NAME}</span>
         </header>
         <section
-          class="account-login"
+          class="account-login update-required"
           aria-labelledby="update-required-title"
           aria-describedby="update-required-description"
         >
@@ -73,35 +82,71 @@ export function UpdateRequiredScreen(props: UpdateRequiredScreenProps) {
           <Show
             when={presentation().supported}
             fallback={
-              <Button variant="default" type="button" class="account-login-primary" onClick={props.onOpenDownloadPage}>
-                {t("update.required.download")}
-              </Button>
+              <>
+                <Button
+                  variant="default"
+                  type="button"
+                  class="account-login-primary"
+                  onClick={props.onOpenDownloadPage}
+                >
+                  {t("update.required.download")}
+                </Button>
+                <Show when={props.onDismiss}>
+                  {(dismiss) => (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      class="update-required-secondary"
+                      onClick={dismiss()}
+                    >
+                      {t("update.required.continue")}
+                    </Button>
+                  )}
+                </Show>
+              </>
             }
           >
-            <p class="account-login-description" role="status">
-              {waitingFor() ?? presentation().detail}
-            </p>
-            <Button
-              variant="default"
-              type="button"
-              class="account-login-primary"
-              loading={presentation().busy}
-              loadingLabel={presentation().actionLabel}
-              onClick={() => void update()}
+            <Show
+              when={working()}
+              fallback={
+                <>
+                  <Show when={waitingFor()}>
+                    {(text) => (
+                      <p class="update-required-note" role="status">
+                        {text()}
+                      </p>
+                    )}
+                  </Show>
+                  <Button variant="default" type="button" class="account-login-primary" onClick={() => void update()}>
+                    {presentation().actionLabel}
+                  </Button>
+                </>
+              }
             >
-              {presentation().actionLabel}
+              <div class="update-required-progress" role="status">
+                <div class="update-required-progress-label">
+                  <span>{presentation().actionLabel}</span>
+                  <Show when={progress() !== null}>
+                    <span class="update-required-progress-value">{presentation().detail}</span>
+                  </Show>
+                </div>
+                <Progress
+                  value={progress() ?? 0}
+                  indeterminate={progress() === null}
+                  aria-label={presentation().actionLabel}
+                />
+              </div>
+            </Show>
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              class="update-required-secondary"
+              onClick={props.onOpenDownloadPage}
+            >
+              {t("update.required.download")}
             </Button>
-            <div class="account-login-code-actions">
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                class="account-login-code-action"
-                onClick={props.onOpenDownloadPage}
-              >
-                {t("update.required.download")}
-              </Button>
-            </div>
           </Show>
         </section>
       </div>

@@ -76,5 +76,6 @@ export const messages = {
   "update.required.title": "需要更新",
   "update.required.description": "OpenBot {version} 已不再受支持。请更新到 {minimum} 或更高版本以继续使用。",
   "update.required.download": "下载 OpenBot",
+  "update.required.continue": "不更新并继续",
   "update.required.failed": "更新未完成。",
 } as const satisfies PartialTranslation<typeof source>;

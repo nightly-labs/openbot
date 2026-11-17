@@ -69,5 +69,6 @@ export const messages = {
   "update.required.description":
     "OpenBot {version} wordt niet meer ondersteund. Werk bij naar {minimum} of nieuwer om door te gaan.",
   "update.required.download": "OpenBot downloaden",
+  "update.required.continue": "Doorgaan zonder update",
   "update.required.failed": "De update is niet voltooid.",
 } as const satisfies PartialTranslation<typeof source>;

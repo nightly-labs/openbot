@@ -66,5 +66,6 @@ export const messages = {
   "update.required.title": "נדרש עדכון",
   "update.required.description": "OpenBot {version} כבר לא נתמך. יש לעדכן לגרסה {minimum} ומעלה כדי להמשיך.",
   "update.required.download": "הורדת OpenBot",
+  "update.required.continue": "המשך בלי לעדכן",
   "update.required.failed": "העדכון לא הסתיים.",
 } as const satisfies PartialTranslation<typeof source>;
