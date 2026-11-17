@@ -1,7 +1,8 @@
 // @vitest-environment node
 import { DatabaseSync, type SQLOutputValue } from "node:sqlite";
 import { afterEach, describe, expect, it } from "vitest";
-import { CRM_SCHEMA_SQL, CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
+import { CRM_TABLES_AFTER_MIGRATION } from "./crm/crm-schema";
+import { CRM_SCHEMA_SQL } from "./migrations/0063-crm";
 import { migrateOpenBotDatabase } from "./openbot-database-schema";
 
 // Failure modes: the upgrade changes or loses a row of any table; a failed upgrade leaves a CRM table

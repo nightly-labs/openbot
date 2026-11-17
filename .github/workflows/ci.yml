@@ -152,6 +152,10 @@ jobs:
             if: env.CODE == 'true'
             run: bun run check:agent-context
 
+          - name: Check frozen migrations
+            if: env.CODE == 'true'
+            run: bun run check:migrations
+
           - name: Check translated What's new notes
             if: env.CODE == 'true'
             run: bun scripts/whats-new-translations.ts

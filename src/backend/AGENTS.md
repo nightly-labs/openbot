@@ -13,6 +13,7 @@ of something remote — which is what makes the first section below non-negotiab
   continues.
 - Never edit or delete a migration that may have shipped, including the frozen version 8 baseline.
   Append the next contiguous version and update the separate latest schema for new databases.
+  See [Frozen migrations](#frozen-migrations).
   Add the new version to `openbot-database-schema-history.json`: the parity test fails and prints
   the entry to add. A red test on a recorded version means a shipped migration changed. Change the
   migration back; do not change its entry.
@@ -22,10 +23,29 @@ of something remote — which is what makes the first section below non-negotiab
 - No automatic full-database backups: conversation history lives in SQLite, so their time and disk
   cost is unbounded. Make the migration itself safe instead.
 
+### Frozen migrations
+
+Each migration is one file in `migrations/`: `<4-digit version>-<name>.ts`, which exports
+`migration` with the same `version` and `name`. `migrations/registry.ts` lists them in order.
+`bun run check:migrations` (CI job Check) compares the folder with the newest `v*` release tag:
+
+- A file that the tag has must not change, move or go away. `registry.ts` and the `migration.ts`
+  type are the only exceptions. This includes helpers in a migration file and `runtime-values.ts`.
+- A new migration takes a version above the newest released one. Versions are contiguous from 8,
+  and names are unique.
+- A migration file imports only `node:*`, `@openbot/logging`, `./migration`, `./runtime-values` and
+  earlier migrations. Copy any other code into the file, so a change to live code cannot change a
+  released migration.
+
+To fix a bug in a released migration, do not edit it. Add a new migration that repairs each
+database that the bad one made, and keep it safe for databases that the bad one did not touch. Give
+it fixtures for every affected released schema. An unreleased migration can still change.
+
 ### The two build paths
 
 `openbot-database-schema.ts` builds a database twice. `createLatestDatabase` execs
-`LATEST_SCHEMA_SQL` and then stamps every entry in `MIGRATIONS` as applied **without running it**;
+`LATEST_SCHEMA_SQL` and then stamps every entry in `MIGRATIONS` (`migrations/registry.ts`) as
+applied **without running it**;
 an existing database runs them for real. A DDL migration that is not also mirrored by hand into
 `LATEST_SCHEMA_SQL` therefore ships new installs a database missing that column while upgraded
 installs get it, silently, on the user's machine.
