@@ -1,5 +1,6 @@
 import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { isNewerRelease } from "@openbot/contracts/release-version";
 import { Effect, Option, Schema } from "effect";
 import { countCrashDumps } from "./run-marker";
 
@@ -205,7 +206,7 @@ export class StartAttempts {
       lastFailure: null,
       lastGoodVersion: this.#record.appVersion,
       lastGoodSchemaVersion: this.#schemaVersion,
-      loopVersion: loopVersion && !isNewerVersion(loopVersion, this.#record.appVersion) ? null : loopVersion,
+      loopVersion: loopVersion && !isNewerRelease(loopVersion, this.#record.appVersion) ? null : loopVersion,
       attempt: null,
     });
   }
@@ -229,23 +230,6 @@ export class StartAttempts {
       }).pipe(Effect.ignore),
     );
   }
-}
-
-/** True when `version` is a newer semver than `than`. Not semver: false. */
-export function isNewerVersion(version: string, than: string): boolean {
-  const left = semverParts(version);
-  const right = semverParts(than);
-  if (!left || !right) return false;
-  for (let index = 0; index < 3; index += 1) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference !== 0) return difference > 0;
-  }
-  return false;
-}
-
-function semverParts(version: string): number[] | null {
-  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version);
-  return match ? match.slice(1, 4).map((part) => Number.parseInt(part, 10)) : null;
 }
 
 function classify(record: StartAttemptsRecord, options: StartAttemptsOptions): Exclude<PreviousStartOutcome, "none"> {

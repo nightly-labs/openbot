@@ -7,14 +7,13 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { UpdateStatus } from "@openbot/contracts/ipc";
-import { isValidSemver } from "@openbot/contracts/release-version";
+import { isNewerRelease, isValidSemver } from "@openbot/contracts/release-version";
 import type { AppTranslate } from "@openbot/i18n";
 import { createOpenBotLogger, toLogValue } from "@openbot/logging";
 import { Effect } from "effect";
 import { app, type BrowserWindow, dialog, shell } from "electron";
 import { runCauseEffect } from "../backend/effect-boundary";
 import { DOWNLOAD_URL, RELEASES_URL } from "./download-url";
-import { isNewerVersion } from "./start-attempts";
 import { UPDATE_HANDOVER_FILE } from "./update-install-guard";
 import { readUpdatePreference, UPDATE_PREFERENCE_FILE } from "./update-preference-store";
 import {
@@ -49,7 +48,7 @@ interface NewerDatabaseRecoveryOptions {
 export async function recoverFromNewerDatabase(options: NewerDatabaseRecoveryOptions): Promise<void> {
   // Only a newer version than this one can have saved the data. An older one is not the latest release.
   const loopVersion =
-    options.loopVersion && isNewerVersion(options.loopVersion, app.getVersion()) ? options.loopVersion : null;
+    options.loopVersion && isNewerRelease(options.loopVersion, app.getVersion()) ? options.loopVersion : null;
   const updater = await createRecoveryUpdater(options.beforeInstall);
   if (updater) {
     const progress = new AbortController();
@@ -152,7 +151,7 @@ async function installLatest(
     return;
   }
   const startsAgain = (version: string | null) =>
-    !loopVersion || (version !== null && isNewerVersion(version, loopVersion));
+    !loopVersion || (version !== null && isNewerRelease(version, loopVersion));
   if (checked.availableVersion !== null && !startsAgain(checked.availableVersion)) {
     downloaded.cancel();
     return;

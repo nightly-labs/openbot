@@ -12,6 +12,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { compareReleaseVersions, parseReleaseVersion } from "@openbot/contracts/release-version";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TABLE = join(ROOT, "src/main/released-schema-versions.ts");
@@ -23,15 +24,12 @@ function git(args: string[]): string {
   return execFileSync("git", args, { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
 }
 
-function parseVersion(version: string): [number, number, number] {
-  const parts = version.split(".").map((part) => Number.parseInt(part, 10));
-  return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
-}
-
+/** Tags are filtered to X.Y.Z before they come here, so each one parses. */
 function compareVersions(left: string, right: string): number {
-  const a = parseVersion(left);
-  const b = parseVersion(right);
-  return a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+  const a = parseReleaseVersion(left);
+  const b = parseReleaseVersion(right);
+  if (!a || !b) throw new Error(`Not a release version: ${a ? right : left}.`);
+  return compareReleaseVersions(a, b);
 }
 
 /** The highest schema version that the source of one release can open. 0 when it has no database. */
