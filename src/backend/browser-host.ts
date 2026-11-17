@@ -102,7 +102,7 @@ import {
   socksExit,
 } from "./browser-profiles/browser-proxy-relay";
 import type { BrowserProxyConnection } from "./browser-profiles/browser-proxy-store";
-import { BrowserRecorder } from "./browser-recorder";
+import { BrowserRecorder, recordingFrameSize } from "./browser-recorder";
 import {
   BROWSER_PAGE_CRASH_KEPT,
   BROWSER_PAGE_CRASH_RELOADED,
@@ -2792,9 +2792,22 @@ export class BrowserHost {
       Effect.gen({ self: this }, function* () {
         const tabId = args.tabId;
         yield* browserSync(() => this.#requireToolTab(params, tabId));
-        yield* this.#enqueue(tabId, (tab) => {
+        yield* this.#enqueue(tabId, (tab, keepQueueBlocked) => {
           this.#requireNoSecretDocument(tab, "Recording");
-          return this.#recorder.start(tabId, tab.contents);
+          return Effect.gen({ self: this }, function* () {
+            const frameSize = recordingFrameSize(tab.environment);
+            yield* this.#recorder.start(tabId, tab.contents, frameSize);
+            if (!frameSize) return;
+            // The first capture of a tab shows only the part of the page that fits the panel until
+            // the page size is applied again. The recording runs either way, so a failure is ignored.
+            yield* boundEngineOperation(
+              tab,
+              tab.engine.setEnvironment(tab.environment),
+              10_000,
+              "Browser environment change timed out.",
+              keepQueueBlocked,
+            ).pipe(Effect.ignore);
+          });
         });
         return textResult({ recording: true, tabId, limits: { durationMs: 300_000, bytes: 104_857_600 } });
       }),
@@ -3842,8 +3855,10 @@ export class BrowserHost {
       });
       if (!cancelled) this.#emitChanged();
     });
-    target.setPermissionRequestHandler((_webContents, permission, callback) =>
-      callback(isAllowedBrowserPermission(permission)),
+    target.setPermissionRequestHandler((webContents, permission, callback, details) =>
+      callback(
+        isAllowedBrowserPermission(permission) || this.#recorder.allowsTabCapture(webContents, permission, details),
+      ),
     );
     target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     target.on("will-download", (event, item, contents) => {
