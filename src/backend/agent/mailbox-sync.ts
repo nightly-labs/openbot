@@ -142,7 +142,7 @@ export class MailboxSync {
 
   reconcilePersistedMailboxMessages(agent: AgentSummary): void {
     if (!agent.threadId) return;
-    const page = this.#database.readConversationPage(agent.id, agent.threadId, { type: "latest" }, 100);
+    const page = this.#database.readConversationWindow(agent.id, agent.threadId, 100);
     const persisted: ConversationSnapshot = {
       agentId: page.agentId,
       threadId: page.threadId,

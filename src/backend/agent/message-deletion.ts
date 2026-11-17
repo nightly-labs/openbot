@@ -69,9 +69,7 @@ export class MessageDeletion {
       // When the agent moved to another chat during the wait, the stored row of this thread decides.
       const current = taskId ? this.#tasks.read(agentId, taskId) : this.#conversation.ensureSnapshot(agentId, threadId);
       const activeTurnId =
-        current.threadId === threadId
-          ? current.activeTurnId
-          : this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 1).activeTurnId;
+        current.threadId === threadId ? current.activeTurnId : this.#store.database.readActiveTurnId(agentId, threadId);
       const revision = this.#store.database.persistConversationChanges({
         agentId,
         threadId,

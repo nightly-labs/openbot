@@ -39,6 +39,12 @@ import { nextValidRoutineOccurrence, routineOnceInstant } from "@openbot/team-cl
 import { Context, Effect, Exit, Layer, ManagedRuntime, Schema, Scope, Semaphore } from "effect";
 import { quietRoutineRun } from "../agent/routine-quiet-runs";
 import { coalescedPasses } from "../coalesced-passes";
+import type { RoutineFlowDiscovery } from "./routine-flow-discovery";
+import type {
+  RoutineFlowHandoffPage,
+  RoutineFlowOwnerCursor,
+  RoutineFlowOwnerPage,
+} from "./routine-flow-discovery-protocol";
 import { routineFlowDepths } from "./routine-flow-graph";
 import { RoutineFlowError, type RoutineFlowRun, type RoutineFlowStore } from "./routine-flow-store";
 
@@ -64,6 +70,8 @@ interface RoutineFlowDelivery {
 
 export interface RoutineFlowsDependencies {
   store: RoutineFlowStore;
+  /** The application supplies a process-backed reader. Isolated source fixtures can omit it. */
+  discovery?: Pick<RoutineFlowDiscovery, "ownerRuns" | "pendingHandoffs" | "close">;
   routines: {
     /** Routines of every trigger kind: a schedule or a webhook starts each one. */
     list(agentId: string): RoutineFlowRoutineInfo[];
@@ -129,6 +137,8 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
         const scope = yield* Scope.Scope;
         const lock = yield* Semaphore.make(1);
         const { store } = dependencies;
+        const discovery = dependencies.discovery;
+        if (discovery) yield* Effect.addFinalizer(() => discovery.close());
         const now = () => (dependencies.now ?? (() => new Date()))();
 
         const attempt = <A>(work: () => A) =>
@@ -365,11 +375,25 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
           const since = new Date(now().getTime() - SWEEP_WINDOW_MS).toISOString();
           const changed = new Set<string>();
           const runIds = new Set<string>();
-          for (const run of store.endedRunsWithoutOwnerStep(since)) {
+          const recordEnded = (run: RoutineFlowRun) => {
             if (recordOwnerStep(run)) {
               changed.add(run.agentId);
               runIds.add(run.id);
             }
+          };
+          if (dependencies.discovery) {
+            let after: RoutineFlowOwnerCursor | null = null;
+            do {
+              const page: RoutineFlowOwnerPage = yield* dependencies.discovery.ownerRuns(since, after);
+              for (const runId of page.runIds) {
+                const run = store.endedRunWithoutOwnerStep(runId, since);
+                if (run) recordEnded(run);
+              }
+              after = page.after;
+              yield* Effect.yieldNow;
+            } while (after !== null);
+          } else {
+            for (const run of store.endedRunsWithoutOwnerStep(since)) recordEnded(run);
           }
           for (const step of store.runningSteps()) {
             // A step without a delivery lost its handoff to a restart between the two writes.
@@ -387,7 +411,17 @@ class RoutineFlows extends Context.Service<RoutineFlows, RoutineFlowsShape>()("o
             }
           }
           // Also every run with a handoff not sent yet: a restart between an answer and its handoff resumes here.
-          for (const runId of store.runIdsWithPendingHandoff(since)) runIds.add(runId);
+          if (dependencies.discovery) {
+            let after: string | null = null;
+            do {
+              const page: RoutineFlowHandoffPage = yield* dependencies.discovery.pendingHandoffs(since, after);
+              for (const runId of page.runIds) runIds.add(runId);
+              after = page.after;
+              yield* Effect.yieldNow;
+            } while (after !== null);
+          } else {
+            for (const runId of store.runIdsWithPendingHandoff(since)) runIds.add(runId);
+          }
           for (const runId of runIds) {
             const run = store.run(runId);
             if (!run) continue;

@@ -71,6 +71,8 @@ await Promise.all([
     ),
   ),
   access(resolve(resourcesPath, "app.asar")),
+  access(resolve(resourcesPath, "app.asar.unpacked/out/main/routine-flow-discovery-host.js")),
+  access(resolve(resourcesPath, "app.asar.unpacked/out/main/claude-history-host.js")),
   access(packagedIconPath),
   access(sourceIconPath),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),

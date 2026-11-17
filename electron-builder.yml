@@ -38,6 +38,10 @@ files:
 asarUnpack:
   # The database host is loaded by path as a separate process, not required into the main bundle.
   - out/main/agent-database-host.js
+  - out/main/routine-flow-discovery-host.js
+  - out/main/claude-history-host.js
+  # The history host shares parser and protocol chunks with the main bundle.
+  - out/main/chunks/**/*.js
   # The voice transcription and speech hosts are started by path in the same way.
   - out/main/voice-transcription-host.js
   - out/main/voice-speech-host.js

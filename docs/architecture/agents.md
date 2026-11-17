@@ -1404,3 +1404,37 @@ like a plugin link, the link itself installs nothing. The page's fallback line a
 page links `/app` with the four invitation fields, and a plugin page links `/app?plugin=<slug>`. The
 browser client removes these fields after it reads them and opens the join dialog or the marketplace
 listing. It never joins or installs without a press.
+
+
+## Background history and routine reads
+
+Claude model and tool execution runs in provider processes. Its transcript reader also runs in
+owned utility processes: four lazy lanes keep parsing, hashing and disposable history-index SQL
+off Electron main. The normalized index path selects a lane, so aliases cannot write the same
+index from different hosts. Each fragment waits for the main consumer's acknowledgement. A failed,
+cancelled or stopped consumer cannot advance a resume cursor. Cancellation stops only its host;
+a replacement waits for that process to exit. Main still owns history scope checks and canonical
+conversation writes. Shutdown waits for consumers and hosts, with a bounded deadline.
+
+Routine-flow and routine-result discovery each use a separate read-only connection in an owned
+utility process. Fixed queries return pages of at most128 run IDs, never conversation text or
+SQL supplied by a caller. Main re-reads the current run and its eligibility before writing or
+posting. The processes cannot migrate or write the application database. Start and query deadlines
+kill a stuck host; a failed operation does not retry or fall back to blocking SQL on main.
+
+Mailbox read indexes retain references and lookup metadata, not another copy of the transcript.
+Dirty row IDs update memberships before a successful write clears them. A replaced state array,
+including rollback or reload, rebuilds the derived views. Active external lanes still use the
+current provider and messaging policy. Prepared routine lookups cache SQL compilation only, never
+row state, and replace statements when the database connection changes.
+
+Internal working conversation snapshots load the same recent messages as a public latest page
+without counting unloaded history or loading unused reply references. Public pages retain their
+released totals, references and cursors. These changes do not alter queue order, task limits,
+provider permissions, database schemas or Team API adapters.
+
+The focused process fixtures under scripts cover mailbox differential behavior, rollback and
+reload; conversation working-window parity; live routine lookups across transactions and reopen;
+read-only discovery and stale candidates; and Claude history resume, append, rewind, failure,
+backpressure and shutdown. Synthetic lookup timings are diagnostic evidence, not a live model
+throughput guarantee.

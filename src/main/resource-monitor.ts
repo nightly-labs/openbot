@@ -82,6 +82,9 @@ const LOOP_RESOLUTION_MS = 20;
 // give `utilityProcess.fork`. Electron reports it as the `name` of a metric and of a gone process.
 const UTILITY_GROUPS = new Map<string, ProcessGroup & ChildType>([
   ["OpenBot databases", "database_host"],
+  ["OpenBot routine flow discovery", "database_host"],
+  ["OpenBot routine result discovery", "database_host"],
+  ["OpenBot Claude history", "database_host"],
   ["OpenBot voice transcription", "voice_host"],
   ["OpenBot speech", "voice_host"],
 ]);

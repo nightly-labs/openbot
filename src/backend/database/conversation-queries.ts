@@ -296,6 +296,29 @@ export class ConversationQueries {
     requestedLimit = 50,
     options: ConversationMarkerExclusions = {},
   ): ConversationPage {
+    return this.#readConversationPage(agentId, threadId, anchor, requestedLimit, options, true);
+  }
+
+  /** Internal working state does not use unloaded-history totals or reply-reference rows. */
+  readConversationWindow(agentId: string, threadId: string | null, limit = 100): ConversationSnapshot {
+    const page = this.#readConversationPage(agentId, threadId, { type: "latest" }, limit, {}, false);
+    return {
+      agentId: page.agentId,
+      threadId: page.threadId,
+      activeTurnId: page.activeTurnId,
+      revision: page.revision,
+      messages: page.messages,
+    };
+  }
+
+  #readConversationPage(
+    agentId: string,
+    threadId: string | null,
+    anchor: ConversationPageAnchor,
+    requestedLimit: number,
+    options: ConversationMarkerExclusions,
+    includeHistorySummary: boolean,
+  ): ConversationPage {
     if (!threadId) {
       return {
         agentId,
@@ -328,7 +351,7 @@ export class ConversationQueries {
     }
     const referenceIds = [...referenceIdSet];
     const references: Record<string, ConversationMessage> = {};
-    if (referenceIds.length > 0) {
+    if (includeHistorySummary && referenceIds.length > 0) {
       const placeholders = referenceIds.map(() => "?").join(", ");
       const referenceRows = databaseRows(
         this.#core.connection
@@ -346,9 +369,10 @@ export class ConversationQueries {
       }
     }
     const first = rows[0];
-    const older = first
-      ? this.#conversationRowsBefore(threadId, conversationRowCursor(first), options)
-      : { count: 0, oldestAt: null };
+    const older =
+      first && includeHistorySummary
+        ? this.#conversationRowsBefore(threadId, conversationRowCursor(first), options)
+        : { count: 0, oldestAt: null };
     const hasOlder = older.count > 0;
     return {
       agentId,

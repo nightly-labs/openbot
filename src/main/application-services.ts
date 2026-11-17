@@ -11,6 +11,7 @@ import { AgentApiKeys } from "../backend/agent-api-keys";
 import { AgentDatabaseSupervisor } from "../backend/agent-data/agent-database-supervisor";
 import { AgentTables } from "../backend/agent-data/agent-tables";
 import { AgentRoutineStore } from "../backend/agent-routine-store";
+import { ClaudeHistorySupervisor } from "../backend/claude-history-supervisor";
 import { type CrmHandle, createCrm } from "../backend/crm/crm";
 import { CrmError } from "../backend/crm/crm-handle";
 import { stripeSource } from "../backend/crm/crm-stripe";
@@ -42,6 +43,7 @@ import {
   browserProxyConnection,
   createBrowserProfileService,
 } from "./browser-profile-service";
+import { spawnClaudeHistoryHost } from "./claude-history-host-process";
 import { createCrmPreferenceStore, crmSettingsStore } from "./crm-preference-store";
 import { feedbackFacts, feedbackSender } from "./feedback";
 import { HostReleaseService, readInstallationMode } from "./host-release-service";
@@ -60,6 +62,7 @@ import { MAC_PERMISSION_URLS } from "./mac-permission-urls";
 import { PushNotificationStore } from "./push-notification-store";
 import { DESKTOP_USE_MS } from "./push-notifications";
 import { RemoteWorkflowError, toRemoteWorkflowError } from "./remote-service-effects";
+import { createRoutineFlowDiscovery } from "./routine-flow-discovery-process";
 import { sizeWorkflowPicture } from "./workflow-picture-size";
 /**
  * The composition root. Every long-lived service the desktop app owns is built here, in one
@@ -630,6 +633,8 @@ const TEARDOWN_ORDER = {
   automation: 108,
   storageUsage: 109,
   service: 110,
+  // After the agent service stops its history consumers.
+  claudeHistory: 110.1,
   // After the agent service, which stops the provider processes and with them each `cua-driver mcp`
   // proxy. A turn that starts while the service stops still finds the daemon (#6494).
   cuaDriver: 110.5,
@@ -2270,6 +2275,8 @@ export async function createApplicationServices({
   });
   /** The plan storage of a hosted server, set after its sign-in. The agent instructions name it. */
   let hostedStorageGb: number | null = null;
+  const claudeHistory = new ClaudeHistorySupervisor({ spawnHost: spawnClaudeHistoryHost });
+  teardown.push(TEARDOWN_ORDER.claudeHistory, "Claude history readers", () => Effect.runPromise(claudeHistory.close()));
   const service: AgentService = new AgentService({
     store,
     mailbox,
@@ -2391,6 +2398,7 @@ export async function createApplicationServices({
     // built-in default.
     developmentDefaults: appVariant === "dev",
     credentials: {
+      claudeHistoryReader: claudeHistory.reader,
       apiKey: (provider) => providerCredentials.get(provider),
       accountKeys: {
         get: (provider, accountId) => providerCredentials.accountKey(provider, accountId),
@@ -2567,6 +2575,7 @@ export async function createApplicationServices({
   const routineFlowRuntime = await Effect.runPromise(
     createRoutineFlows({
       store: new RoutineFlowStore({ database: store.database }),
+      discovery: createRoutineFlowDiscovery(store.database.userDataPath),
       routines: routineFlowRoutines(new AgentRoutineStore(store.database)),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
@@ -2775,6 +2784,7 @@ export async function createApplicationServices({
   const routineResultRuntime = await Effect.runPromise(
     createRoutineResults({
       store: new RoutineResultStore(store.database),
+      discovery: createRoutineFlowDiscovery(store.database.userDataPath, "result"),
       delivery: (deliveryId) => {
         const found = mailbox.getDelivery(deliveryId)?.delivery;
         return found ? { turnId: found.turnId } : null;

@@ -44,6 +44,7 @@ import { ANTIGRAVITY_TOKEN_FILE, importAntigravityToken } from "./antigravity-to
 import { readAntigravityEmail, readAntigravityQuota } from "./antigravity-usage";
 import { CodexAppServerClient } from "./app-server-client";
 import { ClaudeAgentClient } from "./claude-client";
+import type { ClaudeHistoryReaderFactory } from "./claude-history-host-protocol";
 import {
   type AgentCliInfo,
   antigravityTakesStateFolders,
@@ -568,6 +569,8 @@ const MISTRAL_ARGV: readonly string[] = [];
  * `customProviders` is a getter, because both are read inside a spawn.
  */
 export interface ProviderClientContext {
+  /** Local transcript scans use the process-owned history host when supplied. */
+  readonly claudeHistoryReader?: ClaudeHistoryReaderFactory;
   apiKey(provider: AgentProviderId): string | null;
   /**
    * Optional for the same reason as `reportMcpDrops`: without it no provider account that is a key
@@ -1111,6 +1114,7 @@ export const BUILT_IN_PROVIDER_DRIVERS: readonly BuiltInProviderDriver[] = [
         undefined,
         claudeFallbackApiKey(context),
         context.claudeUserSetup,
+        context.claudeHistoryReader,
       ),
     authState: (account) => ({ kind: "claude", email: account?.email ?? null }),
     validateAccount: () => undefined,

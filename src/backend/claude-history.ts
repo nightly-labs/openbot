@@ -36,6 +36,15 @@ export interface ClaudeHistoryOptions {
   indexDirectory?: string;
 }
 
+/** The scanner and its background scheduler must agree on aliases of the same derived index. */
+export function claudeHistoryIndexPath(options: ClaudeHistoryOptions, threadId: string): string {
+  return resolve(
+    options.indexDirectory ?? tmpdir(),
+    "openbot-claude-history",
+    `${sanitizeProjectPath(threadId)}.sqlite`,
+  );
+}
+
 export interface ClaudeSessionMessage {
   type: "user" | "assistant" | "system";
   uuid: string;
@@ -169,7 +178,7 @@ async function scanClaudeHistory(
   const indexRoot = options.indexDirectory ?? tmpdir();
   const indexDirectory = join(indexRoot, "openbot-claude-history");
   await mkdir(indexDirectory, { recursive: true });
-  const indexPath = join(indexDirectory, `${sanitizeProjectPath(request.threadId)}.sqlite`);
+  const indexPath = claudeHistoryIndexPath(options, request.threadId);
   await oneScanAtATime(indexPath, async () => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (signal.aborted) throw signal.reason;

@@ -142,14 +142,26 @@ export class RoutineResultStore {
            ORDER BY run.updated_at, run.run_id`,
         )
         .all(since),
-    ).map((row) => ({
-      runId: String(row.run_id),
-      routineId: String(row.routine_id),
-      agentId: String(row.agent_id),
-      routineName: String(row.routine_name),
-      deliveryId: nullableString(row.delivery_id),
-      destination: toDestination(row),
-    }));
+    ).map(toPendingRun);
+  }
+
+  /** Revalidates a background run ID against the current run, destination and delivery state. */
+  runWithoutDelivery(runId: string, since: string): RoutineResultPendingRun | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(
+          `SELECT run.run_id, run.routine_id, run.agent_id, run.routine_name, run.delivery_id, destination.*
+       FROM projection_routine_runs AS run
+       JOIN routine_result_destinations AS destination ON destination.routine_id = run.routine_id
+       WHERE run.run_id = ? AND (run.status = 'succeeded'
+         OR (run.status = 'failed' AND EXISTS (SELECT 1 FROM projection_deliveries AS queued
+           WHERE queued.delivery_id = run.delivery_id AND queued.status = 'completed')))
+         AND run.updated_at >= ? AND run.updated_at >= destination.updated_at
+         AND NOT EXISTS (SELECT 1 FROM routine_result_deliveries AS delivery WHERE delivery.run_id = run.run_id)`,
+        )
+        .get(runId, since),
+    );
+    return row ? toPendingRun(row) : null;
   }
 
   /** Records a run's answer for its place. Null text is a quiet run: it ends at once and sends nothing. */
@@ -311,6 +323,17 @@ function expiry(now: string): string {
 
 function nullableString(value: unknown): string | null {
   return value === null || value === undefined ? null : String(value);
+}
+
+function toPendingRun(row: DynamicRecord): RoutineResultPendingRun {
+  return {
+    runId: String(row.run_id),
+    routineId: String(row.routine_id),
+    agentId: String(row.agent_id),
+    routineName: String(row.routine_name),
+    deliveryId: nullableString(row.delivery_id),
+    destination: toDestination(row),
+  };
 }
 
 function toDestination(row: DynamicRecord): RoutineResultDestination {

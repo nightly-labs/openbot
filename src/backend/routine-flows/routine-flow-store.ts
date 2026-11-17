@@ -329,6 +329,21 @@ export class RoutineFlowStore {
     ).map(toRun);
   }
 
+  /** Revalidates one discovery result on the write connection after the background read. */
+  endedRunWithoutOwnerStep(runId: string, since: string): RoutineFlowRun | null {
+    const row = databaseRow(
+      this.#database.connection
+        .prepare(
+          `SELECT * FROM projection_routine_runs AS run WHERE run.run_id = ?
+       AND run.status IN (${placeholders(TERMINAL_RUN_STATUSES)}) AND run.updated_at >= ?
+       AND NOT EXISTS (SELECT 1 FROM routine_flow_steps AS step
+         WHERE step.run_id = run.run_id AND step.agent_id = run.agent_id)`,
+        )
+        .get(runId, ...TERMINAL_RUN_STATUSES, since),
+    );
+    return row ? toRun(row) : null;
+  }
+
   run(runId: string): RoutineFlowRun | null {
     const row = databaseRow(
       this.#database.connection.prepare("SELECT * FROM projection_routine_runs WHERE run_id = ?").get(runId),

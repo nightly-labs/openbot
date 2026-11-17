@@ -1,3 +1,3 @@
 ### Fixed
 
-- Reduce startup work and repeated history scans in large mailboxes.
+- Keep large, active workspaces responsive with indexed mailbox reads and background Claude history and routine checks.

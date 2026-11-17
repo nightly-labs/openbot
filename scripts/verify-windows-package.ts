@@ -47,6 +47,8 @@ await Promise.all([
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/package.json")),
   access(resolve(resourcesPath, "app.asar.unpacked/node_modules/effect/dist/index.js")),
   access(resolve(resourcesPath, "app.asar")),
+  access(resolve(resourcesPath, "app.asar.unpacked/out/main/routine-flow-discovery-host.js")),
+  access(resolve(resourcesPath, "app.asar.unpacked/out/main/claude-history-host.js")),
   access(resolve(resourcesPath, "licenses/Electron-LICENSE")),
   access(resolve(resourcesPath, "licenses/LICENSES.chromium.html")),
   access(resolve(resourcesPath, "licenses/sherpa-onnx-LICENSE")),

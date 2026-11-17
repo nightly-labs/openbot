@@ -269,6 +269,10 @@ export class OpenBotDatabase {
     return this.#conversations.readConversationPage(agentId, threadId, anchor, requestedLimit, options);
   }
 
+  readConversationWindow(agentId: string, threadId: string | null, limit = 100): ConversationSnapshot {
+    return this.#conversations.readConversationWindow(agentId, threadId, limit);
+  }
+
   supportedConversationCursor(
     threadId: string,
     throughMessageId: string | null,

@@ -863,8 +863,7 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
             : loaded.messages;
         const threadId = sideThreadId ?? this.#store.list().find((agent) => agent.id === agentId)?.threadId;
         return threadId
-          ? this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, MEMORY_REVIEW_MESSAGES)
-              .messages
+          ? this.#store.database.readConversationWindow(agentId, threadId, MEMORY_REVIEW_MESSAGES).messages
           : [];
       },
       turnActive: (agentId, sideThreadId) =>

@@ -245,9 +245,7 @@ export class ConversationRuntime {
     const evicted = this.#evictedSnapshots.get(agentId);
     if (!evicted) return undefined;
     const retained = evicted.snapshot.deref();
-    const snapshot =
-      retained ??
-      pageSnapshot(this.#store.database.readConversationPage(agentId, evicted.threadId, { type: "latest" }, 100));
+    const snapshot = retained ?? this.#store.database.readConversationWindow(agentId, evicted.threadId, 100);
     if (retained) this.#restoreEvictedSnapshot(agentId, snapshot);
     else this.#keepSnapshot(agentId, snapshot);
     return this.#snapshots.get(agentId) ?? snapshot;
@@ -593,7 +591,7 @@ export class ConversationRuntime {
     // then held every message until a restart.
     if (this.#store.ownsThread(threadId)) return;
     if (!this.#executionSnapshots.has(threadId)) {
-      const page = this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 100);
+      const page = this.#store.database.readConversationWindow(agentId, threadId, 100);
       this.#setExecutionSnapshot(threadId, {
         agentId,
         threadId: page.threadId,
@@ -619,7 +617,7 @@ export class ConversationRuntime {
     if (execution && publicId) {
       if (execution.agentId !== agentId) throw new Error("Execution thread belongs to another agent.");
       if (!this.#cachedExecutionSnapshots.has(publicId) && execution.messages.length === 0) {
-        const page = this.#store.database.readConversationPage(agentId, publicId, { type: "latest" }, 100);
+        const page = this.#store.database.readConversationWindow(agentId, publicId, 100);
         this.#setExecutionSnapshot(publicId, {
           agentId,
           threadId: page.threadId,
@@ -635,7 +633,7 @@ export class ConversationRuntime {
     if (cached && (!threadId || cached.threadId === threadId)) return cached;
     const agent = this.#store.list().find((candidate) => candidate.id === agentId);
     const publicThreadId = agent?.threadId ?? threadId;
-    const page = this.#store.database.readConversationPage(agentId, publicThreadId, { type: "latest" }, 100);
+    const page = this.#store.database.readConversationWindow(agentId, publicThreadId, 100);
     const snapshot: ConversationSnapshot = {
       agentId,
       threadId: page.threadId ?? publicThreadId,
@@ -1231,22 +1229,6 @@ function completedCacheBytes(snapshot: ConversationSnapshot): number {
     ...snapshot,
     messages: snapshot.messages.filter((message) => !isActiveMessage(message, snapshot.activeTurnId)),
   });
-}
-
-function pageSnapshot(page: {
-  agentId: string;
-  threadId: string | null;
-  activeTurnId: string | null;
-  revision: number;
-  messages: ConversationMessage[];
-}): ConversationSnapshot {
-  return {
-    agentId: page.agentId,
-    threadId: page.threadId,
-    activeTurnId: page.activeTurnId,
-    revision: page.revision,
-    messages: page.messages,
-  };
 }
 
 function copySnapshotContents(target: ConversationSnapshot, source: ConversationSnapshot): ConversationSnapshot {

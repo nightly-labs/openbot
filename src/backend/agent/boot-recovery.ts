@@ -495,14 +495,7 @@ export class BootRecovery {
   });
 
   #refreshBackfilledConversation(agentId: string, threadId: string): void {
-    const page = this.#store.database.readConversationPage(agentId, threadId, { type: "latest" }, 100);
-    const persisted = {
-      agentId: page.agentId,
-      threadId: page.threadId,
-      activeTurnId: page.activeTurnId,
-      revision: page.revision,
-      messages: page.messages,
-    };
+    const persisted = this.#store.database.readConversationWindow(agentId, threadId, 100);
     const live = this.#conversation.loadedSnapshot(agentId);
     const next = live?.activeTurnId ? mergeConversationSnapshots(persisted, live) : persisted;
     const previousSignature = live ? conversationContentSignature(live) : null;

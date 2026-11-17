@@ -45,6 +45,8 @@ export default defineConfig({
           // The database host is its own process. Only node:* and the installed Effect package
           // are runtime imports; the unpacked host must not load the main process bundle.
           "agent-database-host": resolve("src/backend/agent-data/agent-database-host.ts"),
+          "routine-flow-discovery-host": resolve("src/backend/routine-flows/routine-flow-discovery-host.ts"),
+          "claude-history-host": resolve("src/backend/claude-history-host.ts"),
           // The voice hosts are their own processes too. They import only node:* and load the
           // sherpa-onnx addon by path.
           "voice-transcription-host": resolve("src/main/voice-transcription-host.ts"),
