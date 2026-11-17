@@ -930,7 +930,7 @@ export class PiAgentClient extends EventEmitter<ClientEvents> implements AgentCl
               ? Effect.void
               : thread.rpc.request({ type: "get_state" }, this.options.requestTimeoutMs).pipe(
                   Effect.flatMap((state) =>
-                    answered || state.isStreaming === true || state.isCompacting === true
+                    answered || turn.waitingOnUser > 0 || state.isStreaming === true || state.isCompacting === true
                       ? Effect.void
                       : fail(providerFailure(new RequestTimeoutError("Pi", "prompt"))),
                   ),
