@@ -3567,6 +3567,10 @@ function WebWorkspaceFrame(props: WebWorkspaceProps) {
                         sectionQuery={serverSettingsQuery()}
                         openFirstSectionRequest={openFirstServerSectionRequest()}
                         onFirstSectionOpened={() => setServerSettingsQuery("")}
+                        onOpenMarketplaceApps={() => {
+                          setServerSettingsQuery("");
+                          openMarketplace();
+                        }}
                         restoreFocusTarget={serverSettings.restoreTarget()}
                         initialSection={serverSettingsSection()}
                         initialSectionRequest={serverSettingsRequest()}
