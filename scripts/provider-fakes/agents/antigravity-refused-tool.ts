@@ -9,8 +9,10 @@
 // name the tool. From #7482: the CLI saves the schema of each tool of a server that it starts, and
 // Google refuses a request whose tool has an array with no `items` or an empty `enum` value. Its
 // answer names the tool only by its place in the request. A session with the server `ticktick` gets
-// that answer, in the log or, with `CLI_1_5_9`, in the answer.
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+// that answer, in the log or, with `CLI_1_5_9`, in the answer. From #11063: the real CLI 1.5.9 and
+// 1.5.10 refuse the tool of a server that the session had when it opened again from the second prompt
+// of a process that resumed it without that server. A prompt with `SERVERS_RETURN` does the same.
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcpHandler, type AcpRequest, logEntry, serveFakeAcpAgent } from "../acp-agent";
 
@@ -50,7 +52,11 @@ const GOOGLE_REFUSAL = [
 
 /** The servers of each session that this process started. A resume does not change them. */
 const started = new Map<string, string[]>();
+/** The prompts of each session that this process answered. */
+const answered = new Map<string, number>();
 let sessions = 0;
+/** The servers that each session opened with, kept on disk as the CLI keeps its conversations. */
+const openedWith = (sessionId: string) => join(appData, "sessions", sessionId);
 
 function record(request: AcpRequest, sessionId: string): void {
   const names = (request.params.mcpServers ?? []).map((server) => server.name);
@@ -81,6 +87,8 @@ serveFakeAcpAgent({
     sessions += 1;
     const sessionId = `s-${process.pid}-${sessions}`;
     record(request, sessionId);
+    mkdirSync(join(appData, "sessions"), { recursive: true });
+    writeFileSync(openedWith(sessionId), (started.get(sessionId) ?? []).join("\n"));
     peer.reply(request, { sessionId, models: MODELS });
   },
   "session/resume": resume,
@@ -89,9 +97,16 @@ serveFakeAcpAgent({
     const sessionId = request.params.sessionId ?? "";
     const text = (request.params.prompt ?? []).map((block) => block.text ?? "").join("");
     log(`I1111 00:00:00.100000     218 server.go:1817] Sending user message to conversation ${sessionId} (items=1)`);
+    const prompts = answered.get(sessionId) ?? 0;
+    answered.set(sessionId, prompts + 1);
+    const returned =
+      text.includes("SERVERS_RETURN") &&
+      prompts > 0 &&
+      existsSync(openedWith(sessionId)) &&
+      readFileSync(openedWith(sessionId), "utf8").split("\n").includes("resend");
     const refused =
       /REFUSE_TOOL=(\S+)/u.exec(text)?.[1] ??
-      (started.get(sessionId)?.includes("resend") ? "mcp_resend_get-contact" : null);
+      (started.get(sessionId)?.includes("resend") || returned ? "mcp_resend_get-contact" : null);
     const googleRefused = !refused && started.get(sessionId)?.includes("ticktick");
     logEntry({ method: request.method, sessionId, pid: process.pid, refused: googleRefused ? "ticktick" : refused });
     const failure = googleRefused
