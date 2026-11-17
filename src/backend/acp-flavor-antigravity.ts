@@ -139,9 +139,11 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityRateLimited",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}429\b|\bresource has been exhausted\b|\brate[ _-]?limit|\btoo many requests\b|\bquota\b.{0,40}\b(?:exceeded|exhausted)\b/iu,
   ],
+  // The CLI refuses a model that the account cannot use now with "Unknown model ID: <id>", also for a
+  // model that worked before. The raw text gave the user no next step (#11129).
   [
     "error.provider.antigravityModelUnavailable",
-    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b/iu,
+    /\bmodel\b.{0,60}\b(?:not found|not supported|does not exist|is unavailable)\b|\bunknown model\b/iu,
   ],
   ["error.provider.antigravityServiceFailure", /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/u],
   [
