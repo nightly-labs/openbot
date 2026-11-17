@@ -128,6 +128,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",
+  "mobile.settings.appearance.replyDetails": "פרטי תשובות",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "כבו פרט כדי להסתיר את השורה שלו בצ'אטים. הסוכן ממשיך לחשוב, להפעיל תת־סוכנים ולשמור זיכרונות.",
+  "mobile.settings.appearance.showThinking": "הצגת החשיבה של הסוכן",
+  "mobile.settings.appearance.showSubagents": "הצגת תת־סוכנים",
+  "mobile.settings.appearance.showMemoryChanges": "הצגת זיכרונות שנשמרו",
   "mobile.settings.appearance.fullVisuals": "הצגת תצוגות חזותיות מלאות",
   "mobile.settings.appearance.fullVisualsFooter":
     "תצוגה חזותית של סוכן מוצגת בצ׳אט בגובה המלא שלה. כשהאפשרות כבויה, תצוגה גבוהה נחתכת, ואפשר להקיש עליה כדי לראות את כולה.",

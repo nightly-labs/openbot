@@ -135,6 +135,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",
+  "mobile.settings.appearance.replyDetails": "Detalles de las respuestas",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Desactiva un detalle para ocultar su fila en los chats. El agente sigue razonando, iniciando subagentes y guardando recuerdos.",
+  "mobile.settings.appearance.showThinking": "Mostrar el razonamiento del agente",
+  "mobile.settings.appearance.showSubagents": "Mostrar subagentes",
+  "mobile.settings.appearance.showMemoryChanges": "Mostrar recuerdos guardados",
   "mobile.settings.appearance.fullVisuals": "Mostrar vistas visuales completas",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un visual de un agente se muestra en el chat con toda su altura. Si está desactivado, un visual alto se recorta y puedes tocarlo para verlo entero.",

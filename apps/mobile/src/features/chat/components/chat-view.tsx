@@ -46,6 +46,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import { finishedTurnSummaries, type TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { useChatBackgroundColor } from "@/features/settings/model/chat-background";
+import { useHiddenChatDetail, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { liveVoiceWebRtc } from "@/features/voice/model/live-voice-webrtc";
 import { replyVoiceReady } from "@/features/voice/model/reply-voice";
 import { speechNative } from "@/features/voice/model/speech-native";
@@ -498,7 +499,10 @@ export function ChatView({
         : undefined;
     return lastTurnSummaries.current;
   }, [conversationMessages, conversationTurnId, turnLines, target.kind]);
-  const turnSummaries = agentTurnSummaries ?? channelTurnSummaries;
+  // With the thinking display off, a finished turn shows no steps row.
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
+  const turnSummaries = showThinking ? (agentTurnSummaries ?? channelTurnSummaries) : undefined;
+  const hiddenDetail = useHiddenChatDetail();
   const thinkingAgentId = target.kind === "agent" ? target.id : null;
   const openTurn = useCallback(
     (turnId: string) => {
@@ -682,7 +686,10 @@ export function ChatView({
     ready && rowsShown,
     // The list draws a row for each message except the thinking steps, which the activity row or a
     // steps row shows. A finished turn with no answer draws its steps row on its thinking row.
-    rowsShown && messages.some((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+    rowsShown &&
+      messages.some(
+        (message) => (message.kind !== "thinking" || turnSummaries?.has(message.id)) && !hiddenDetail(message),
+      ),
     lastUserId,
     questionForm?.question ? (questionForm.messageId ?? null) : null,
     holdOpening,

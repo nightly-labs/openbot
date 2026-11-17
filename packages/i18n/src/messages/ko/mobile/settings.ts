@@ -129,6 +129,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",
+  "mobile.settings.appearance.replyDetails": "답장 세부 정보",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "세부 정보를 끄면 채팅에서 해당 행이 숨겨집니다. 에이전트는 계속 생각하고, 하위 에이전트를 실행하고, 기억을 저장합니다.",
+  "mobile.settings.appearance.showThinking": "에이전트 생각 표시",
+  "mobile.settings.appearance.showSubagents": "하위 에이전트 표시",
+  "mobile.settings.appearance.showMemoryChanges": "저장된 기억 표시",
   "mobile.settings.appearance.fullVisuals": "시각 자료 미리보기 전체 표시",
   "mobile.settings.appearance.fullVisualsFooter":
     "에이전트의 시각 자료를 채팅에 전체 높이로 표시합니다. 끄면 긴 시각 자료가 잘리며, 탭하면 전체를 볼 수 있습니다.",

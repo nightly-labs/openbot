@@ -131,6 +131,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",
+  "mobile.settings.appearance.replyDetails": "Dettagli delle risposte",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Disattiva un dettaglio per nascondere la sua riga nelle chat. L'agente continua a ragionare, avviare subagenti e salvare ricordi.",
+  "mobile.settings.appearance.showThinking": "Mostra il ragionamento dell'agente",
+  "mobile.settings.appearance.showSubagents": "Mostra i subagenti",
+  "mobile.settings.appearance.showMemoryChanges": "Mostra i ricordi salvati",
   "mobile.settings.appearance.fullVisuals": "Mostra anteprime visive complete",
   "mobile.settings.appearance.fullVisualsFooter":
     "Un elemento visivo di un agente appare nella chat a piena altezza. Se è disattivato, un elemento alto viene tagliato: toccalo per vederlo tutto.",

@@ -129,6 +129,12 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
+  "mobile.settings.appearance.replyDetails": "Reply details",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Turn off a detail to hide its row in chats. The agent still reasons, runs subagents and saves memories.",
+  "mobile.settings.appearance.showThinking": "Show agent thinking",
+  "mobile.settings.appearance.showSubagents": "Show subagents",
+  "mobile.settings.appearance.showMemoryChanges": "Show saved memories",
   "mobile.settings.appearance.fullVisuals": "Show full visual previews",
   "mobile.settings.appearance.fullVisualsFooter":
     "A visual from an agent shows at its full height in the chat. When this is off, a tall visual is cut, and you tap it to see all of it.",

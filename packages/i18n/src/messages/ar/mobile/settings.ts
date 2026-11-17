@@ -143,6 +143,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "طي نشاط المهام الدورية",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "تظهر أحداث المهام الدورية المتتالية في الدردشة كصف واحد مطوي. اضغط على الصف لإظهارها.",
+  "mobile.settings.appearance.replyDetails": "تفاصيل الردود",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "أوقف تفصيلًا لإخفاء صفه في الدردشات. يستمر الوكيل في التفكير وتشغيل الوكلاء الفرعيين وحفظ الذكريات.",
+  "mobile.settings.appearance.showThinking": "إظهار تفكير الوكيل",
+  "mobile.settings.appearance.showSubagents": "إظهار الوكلاء الفرعيين",
+  "mobile.settings.appearance.showMemoryChanges": "إظهار الذكريات المحفوظة",
   "mobile.settings.appearance.fullVisuals": "إظهار المعاينات المرئية كاملة",
   "mobile.settings.appearance.fullVisualsFooter":
     "يظهر العرض المرئي من الوكيل في الدردشة بارتفاعه الكامل. عند إيقاف هذا الخيار، يُقص العرض الطويل، ويمكنك النقر عليه لرؤيته كاملًا.",

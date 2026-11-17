@@ -140,6 +140,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",
+  "mobile.settings.appearance.replyDetails": "Szczegóły odpowiedzi",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Wyłącz szczegół, aby ukryć jego wiersz w czatach. Agent nadal rozumuje, uruchamia subagentów i zapisuje wspomnienia.",
+  "mobile.settings.appearance.showThinking": "Pokazuj myślenie agenta",
+  "mobile.settings.appearance.showSubagents": "Pokazuj subagentów",
+  "mobile.settings.appearance.showMemoryChanges": "Pokazuj zapisane wspomnienia",
   "mobile.settings.appearance.fullVisuals": "Pokazuj pełne podglądy wizualne",
   "mobile.settings.appearance.fullVisualsFooter":
     "Wizualizacja od agenta ma w czacie pełną wysokość. Gdy to jest wyłączone, wysoka wizualizacja jest przycięta. Dotknij jej, aby zobaczyć całość.",

@@ -130,6 +130,12 @@ export const messages = {
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",
+  "mobile.settings.appearance.replyDetails": "Antwoorddetails",
+  "mobile.settings.appearance.replyDetailsFooter":
+    "Zet een detail uit om de rij ervan in chats te verbergen. De agent blijft denken, subagents starten en herinneringen opslaan.",
+  "mobile.settings.appearance.showThinking": "Denken van agent tonen",
+  "mobile.settings.appearance.showSubagents": "Subagents tonen",
+  "mobile.settings.appearance.showMemoryChanges": "Opgeslagen herinneringen tonen",
   "mobile.settings.appearance.fullVisuals": "Volledige visuele voorbeelden tonen",
   "mobile.settings.appearance.fullVisualsFooter":
     "Een visual van een agent staat op volle hoogte in de chat. Als dit uit staat, wordt een hoge visual afgekapt. Tik erop om alles te zien.",
