@@ -459,6 +459,9 @@ const ACP_SESSION_PROCESS_START_TIMEOUT_MS = 180_000;
 /** An agent that reports no context size gets the instructions again after this many prompts. */
 const ACP_INSTRUCTIONS_REFRESH_PROMPTS = 10;
 
+/** A prompt that starts with a slash command, such as `/swarm` or `/compact now`, and not with a path. */
+const SLASH_COMMAND = /^\/[^\s/]+(?:\s|$)/u;
+
 /** A context that shrinks below this share of its last size has been compacted. */
 const ACP_COMPACTION_CONTEXT_RATIO = 0.6;
 
@@ -2614,15 +2617,18 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     // session lacks them. An agent that reports no context size cannot show a compaction, so it
     // gets them again after a number of prompts.
     thread.promptsSinceInstructions += 1;
+    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
+    // Antigravity joins the blocks, so instructions before `/swarm` made it plain text (#11070). The
+    // instructions stay due and go with the next prompt. A path such as `/Users/me` is not a command.
+    const first = blocks[0];
+    const command = first?.type === "text" && SLASH_COMMAND.test(first.text);
     const sendInstructions =
+      !command &&
       thread.developerInstructions &&
       (thread.instructionsSent !== thread.developerInstructions ||
         (thread.contextUsed === null && thread.promptsSinceInstructions > ACP_INSTRUCTIONS_REFRESH_PROMPTS));
     // With the instructions again, the memories and section-mates go in full too.
     if (sendInstructions) this.#turnContext.resend(thread.id);
-    // A slash command gets no blocks: the agent reads a command only at the start of the prompt.
-    const first = blocks[0];
-    const command = first?.type === "text" && first.text.startsWith("/");
     blocks.unshift(...this.#turnContext.take(thread.id, command).map((text) => ({ type: "text" as const, text })));
     if (sendInstructions) {
       blocks.unshift({
