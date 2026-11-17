@@ -309,6 +309,10 @@ jobs:
         if: ${{ !cancelled() }}
         run: bun run test:crm-team-api
 
+      - name: Run the release version comparator E2E test
+        if: ${{ !cancelled() }}
+        run: bun scripts/release-version-comparator-e2e.ts
+
       - name: Upload the Team API routes E2E report
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -317,6 +321,7 @@ jobs:
           path: |
             .openbot-build/team-api-routes-e2e/
             .openbot-build/crm-team-api-e2e/
+            .openbot-build/release-version-comparator-e2e.json
           if-no-files-found: ignore
 
   reverse-actions-e2e:

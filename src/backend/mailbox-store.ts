@@ -56,7 +56,7 @@ import { routineNameInLimit } from "./database/legacy-conversation-message";
 import { mailboxReactionRowKey } from "./database/mailbox-projection";
 import { MailboxDeliveryGate } from "./mailbox-delivery-gate";
 import { runIdOrigins } from "./message-run-ids";
-import { OpenBotDatabase } from "./openbot-database";
+import type { OpenBotDatabase } from "./openbot-database";
 import { isRecord } from "./protocol";
 import { recordRestartActivity } from "./restart-activity";
 
@@ -337,7 +337,11 @@ export class MailboxStore {
     reactionKeys: new Set<string>(),
   };
 
-  constructor(userDataPath: string, sharedRoot: string, database = new OpenBotDatabase(userDataPath)) {
+  /**
+   * `database` is the one connection of the process to `openbot.db`, the one that `AgentStore` holds.
+   * A second connection would run the migrations again and compete for the write lock.
+   */
+  constructor(userDataPath: string, sharedRoot: string, database: OpenBotDatabase) {
     this.#statePath = join(userDataPath, "mailbox.json");
     this.#files = new AttachmentFiles({ userDataPath, sharedRoot });
     this.#database = database;

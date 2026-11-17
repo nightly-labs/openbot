@@ -811,7 +811,11 @@ Servers do not use the stage. Hosted and self-installed Linux servers update wit
 `scripts/hosting/openbot-hosted-update` and `HostedUpdateAdapter`. They read `latest-linux.yml` or
 `latest-linux-arm64.yml`, check for an update 5 minutes after start and then every 6 hours, and
 install a downloaded release at the next boot or when an owner, an admin or a permitted member installs
-it in Server Settings > Updates. The `docker-publish` job moves the Docker `latest` tag when the
+it in Server Settings > Updates. A hosted server also installs it when it is idle and no client uses
+it, because its automatic update switch is always on. A self-installed server or a container
+installs it when idle only when an owner turns on the switch (it is off by default). The version check is
+`isNewerRelease` in `packages/contracts/src/release-version.ts`, and the `newer()` of the update
+script gives the same result for each X.Y.Z release (`scripts/release-version-comparator-e2e.ts`). The `docker-publish` job moves the Docker `latest` tag when the
 release is published, and the `hosted-release` job selects the release for new hosted servers. So
 all servers get a new release in about 6 hours, and a pause does not stop them.
 
