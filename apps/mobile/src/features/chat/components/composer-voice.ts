@@ -19,15 +19,11 @@ export interface ComposerVoice {
   hearing: boolean;
   level: SharedValue<number>;
   presence: SharedValue<number>;
-  /** Dictation only: 0 with one round button, 1 with its two side buttons out. */
-  split?: SharedValue<number>;
   /** The mic of the composer opens the voice mode. */
   start: () => void;
   /** The name of the mic of the composer. */
   startLabel: string;
   center: { label: string; glyph: VoiceGlyph; pressable: boolean; busy: boolean; onPress: () => void };
-  /** Dictation only: the side buttons take presses. */
-  sides?: boolean;
   leading: { label: string; onPress: () => void };
   trailing: { label: string; icon: "send" | "interrupt"; enabled: boolean; onPress: () => void };
   /** The call bar of a live conversation: who speaks or what it does, and the words heard or read. */
