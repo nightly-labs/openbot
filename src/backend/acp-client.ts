@@ -4593,16 +4593,19 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     const turn = this.#threads.get(params.threadId)?.activeTurn;
     if (turn) turn.answered = true;
     // Only a call of the running turn: a call with no turn has a new turn id each time, so a card that
-    // waited past its call could not be joined again or closed with its turn (#9689).
-    const limit = turn?.id === params.turnId ? this.#flavor.mcpToolCallLimitMs : undefined;
+    // waited past its call could not be joined again or closed with its turn (#9689). A client that
+    // asked for no progress, such as Cursor, also stops the call at a fixed time (#10577).
+    const deadlines =
+      turn?.id === params.turnId
+        ? [
+            this.#flavor.mcpToolCallLimitMs === undefined
+              ? undefined
+              : this.#flavor.mcpToolCallLimitMs - MCP_TOOL_CALL_ANSWER_MARGIN_MS,
+            detachAfterMs,
+          ].filter((ms) => ms !== undefined)
+        : [];
     const result = yield* this.#serverRequests
-      .call(
-        "item/tool/call",
-        params,
-        signal,
-        detachAfterMs,
-        limit === undefined ? undefined : limit - MCP_TOOL_CALL_ANSWER_MARGIN_MS,
-      )
+      .call("item/tool/call", params, signal, detachAfterMs, deadlines.length > 0 ? Math.min(...deadlines) : undefined)
       .pipe(toProviderClientOperationError);
     if (!isDynamicToolResult(result))
       return yield* providerFailure(new Error("OpenBot returned an invalid dynamic tool result."));
