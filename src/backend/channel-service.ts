@@ -1591,6 +1591,17 @@ export class ChannelService {
           const agents = this.hooks
             .agents()
             .filter((agent) => channel.members.some((member) => member.agentId === agent.id));
+          // The prompt names each agent by a short key, not by its long id: a model that miscopied one
+          // character of an id named no member, and the request stopped (#10158). An answer that gives
+          // a full id still counts.
+          const memberKeys = new Map(
+            [...new Set([...channel.members.map((member) => member.agentId), lead.id])].map(
+              (agentId, index) => [agentId, `m${index + 1}`] as const,
+            ),
+          );
+          const keyOf = (agentId: string) => memberKeys.get(agentId) ?? agentId;
+          const agentOfKey = new Map<string, string>([...memberKeys].map(([agentId, key]) => [key, agentId] as const));
+          const agentOf = (id: string) => agentOfKey.get(id) ?? id;
           const recent = channelResult(
             yield* Effect.result(
               channelSync(() => this.store.messages(channelId, undefined, ROUTING_RECENT_MESSAGES + 1)),
@@ -1605,7 +1616,7 @@ export class ChannelService {
             .slice(-ROUTING_RECENT_MESSAGES)
             .map((item) => ({
               id: item.id,
-              author: item.author,
+              author: item.author.kind === "agent" ? { ...item.author, id: keyOf(item.author.id) } : item.author,
               taskId: item.taskId,
               text: item.message.text.slice(-ROUTING_TEXT_CHARACTERS),
             }));
@@ -1613,7 +1624,7 @@ export class ChannelService {
             .filter((item) => !terminal(item))
             .map((item) => ({
               id: item.id,
-              ownerAgentId: item.ownerAgentId,
+              ownerAgentId: item.ownerAgentId && keyOf(item.ownerAgentId),
               state: item.state,
               instruction: item.instruction.slice(0, ROUTING_TEXT_CHARACTERS),
             }));
@@ -1623,10 +1634,10 @@ export class ChannelService {
               JSON.stringify({
                 title: channel.title,
                 instructions: channel.instructions,
-                lead: lead.id,
-                members: channel.members,
+                lead: keyOf(lead.id),
+                members: channel.members.map((member) => ({ ...member, agentId: keyOf(member.agentId) })),
                 agents: agents.map(({ id, name, title, description }) => ({
-                  id,
+                  id: keyOf(id),
                   name,
                   title,
                   description: description.slice(0, descriptionCharacters),
@@ -1798,13 +1809,24 @@ export class ChannelService {
                   : "question" in decision
                     ? [lead.id]
                     : "agentId" in decision
-                      ? [decision.agentId]
-                      : decision.agentIds,
+                      ? [agentOf(decision.agentId)]
+                      : decision.agentIds.map(agentOf),
             ),
           ];
-          // A member the model named that cannot take work is left out; with none left, the first
-          // one gives the reason.
-          const [owner, ...rest] = picked.filter((agentId) => eligible.includes(agentId));
+          // A member the model named that cannot take work is left out. With none left, the lead takes
+          // the request, as it takes an unreadable answer: the person gets an answer, not a stopped
+          // request (#10158). Only a lead that cannot take work gives the reason.
+          const chosen = picked.filter((agentId) => eligible.includes(agentId));
+          if (!chosen.length && eligible.includes(lead.id)) {
+            logger.warn("A routing answer named no member who can take work, so the lead takes the request.", {
+              channelId,
+              provider: lead.provider,
+              model: lead.model,
+              named: picked.length,
+            });
+            chosen.push(lead.id);
+          }
+          const [owner, ...rest] = chosen;
           if (!owner) {
             const first = picked[0] ?? lead.id;
             channelResult(yield* Effect.result(channelSync(() => this.requireMember(channel, first))));
