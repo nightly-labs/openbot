@@ -410,6 +410,12 @@ interface AcpThread {
    * session, or `ACP_WORK_HOLD_MAX_MS` after the turn. `changedAt` starts as the end of the turn.
    */
   workHold: { since: number; changedAt: number } | null;
+  /**
+   * The servers that OpenBot left out of this session (`#leaveOutFailedMcpServer`), with the turn
+   * that last left each one out. Antigravity 1.5.9 and 1.5.10 refuse the tool again from the second
+   * prompt after the resume without it, so the server is left out again, once in each turn (#11063).
+   */
+  leftOutMcpServers: Map<McpServer, string>;
 }
 
 /**
@@ -2071,6 +2077,7 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
               backgroundSkipUntil: 0,
               backgroundReplay: null,
               workHold: null,
+              leftOutMcpServers: new Map(),
             };
             threadRef = thread;
             providerResult(
@@ -3231,9 +3238,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       !this.#supportsSessionResume
     )
       return false;
-    const failed = this.#failedMcpServer(thread, turn.text);
+    const failed = this.#failedMcpServer(thread, turn, turn.text);
     if (!failed) return false;
     const { server, detail, started } = failed;
+    thread.leftOutMcpServers.set(server, turn.id);
     this.#reportFailedMcpServer(thread.cwd, server.name, detail);
     // Antigravity 1.5.6 keeps the servers that a session's process started, also after a resume
     // without them. A server that started leaves only with that process (#7228).
@@ -3269,10 +3277,12 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
    * as the tool `mcp_<server>_<tool>`, in the agent's log (#7228) or, since CLI 1.5.9, in the
    * failure text (#9568). A server name can hold `_`, so the longest name wins, also against the
    * agent's own servers: a tool of the user's `github_enterprise` does not leave out OpenBot's
-   * `github`. `started`: the server started, as a server with tools did.
+   * `github`. `started`: the server started, as a server with tools did. A tool of a server that an
+   * earlier turn left out counts too: the agent can refuse it again (#11063).
    */
   #failedMcpServer(
     thread: AcpThread,
+    turn: AcpTurn,
     text: string,
   ): { server: McpServer; detail: string; started: boolean } | undefined {
     const harness = this.#flavor.sdkHarness;
@@ -3283,13 +3293,16 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       const detail = sourceText("error.backend.mcpServerFailedToStart", { reason: failure.reason });
       return server && { server, detail, started: false };
     }
-    if (given.length === 0 || !harness?.refusedMcpTools) return undefined;
-    const names = [...given.map((entry) => entry.name), ...this.#ownMcpServerNames(thread.cwd)];
+    // Not one that this turn left out: when it comes back at once, the retry ends with the failure.
+    const refusable = [...given];
+    for (const [server, turnId] of thread.leftOutMcpServers) if (turnId !== turn.id) refusable.push(server);
+    if (refusable.length === 0 || !harness?.refusedMcpTools) return undefined;
+    const names = [...refusable.map((entry) => entry.name), ...this.#ownMcpServerNames(thread.cwd)];
     for (const tool of harness.refusedMcpTools(text, this.options.argv, thread.id)) {
       const name = names
         .filter((candidate) => tool.startsWith(`mcp_${candidate}_`))
         .sort((a, b) => b.length - a.length)[0];
-      const server = given.find((entry) => entry.name === name);
+      const server = refusable.find((entry) => entry.name === name);
       if (server) {
         const shown = tool.slice(`mcp_${server.name}_`.length);
         return { server, detail: sourceText("error.backend.mcpToolSchemaRefused", { tool: shown }), started: true };
