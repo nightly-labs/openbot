@@ -1313,8 +1313,9 @@ export function ChatView({
     <GestureDetector gesture={edgeBackGesture}>
       <View className="flex-1" style={{ backgroundColor: chatBackground }}>
         <ChatDropTarget
-          // A drop needs the composer, as a paste does. A secret request or question replaces it.
-          enabled={isFocused && writable && !secretRequest && !secretQuestion}
+          // A drop needs the composer, as a paste does. A secret request or question replaces it, and
+          // the voice bar or the dictation strip hides its attachments.
+          enabled={isFocused && writable && !secretRequest && !secretQuestion && !voiceOpen && !dictating}
           onDropFiles={(dropped) => addPastedFiles(attachments, dropped)}
         >
           <View

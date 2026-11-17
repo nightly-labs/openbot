@@ -52,7 +52,12 @@ final class ChatDropView: ExpoView, UIDropInteractionDelegate {
     let providers = session.items.map(\.itemProvider).filter { PastedItem.isFile($0.registeredTypeIdentifiers) }
     guard !providers.isEmpty else { return }
     PastedItem.copyFiles(providers, extensions) { [weak self] result in
-      self?.onDropFiles(result)
+      guard let self else {
+        // The chat closed during the copy, so no code reads the copies.
+        PastedItem.delete(result)
+        return
+      }
+      self.onDropFiles(result)
     }
   }
 }
@@ -154,6 +159,15 @@ private enum PastedItem {
       return nil
     }
     return ["uri": target.absoluteString, "name": name]
+  }
+
+  /// Deletes the copies of a result of `copyFiles`.
+  static func delete(_ result: [String: Any]) {
+    for file in result["files"] as? [[String: String]] ?? [] {
+      if let uri = file["uri"], let url = URL(string: uri) {
+        try? FileManager.default.removeItem(at: url)
+      }
+    }
   }
 
   /// Reads only the formats of the items. iOS does not show a paste notice for this.

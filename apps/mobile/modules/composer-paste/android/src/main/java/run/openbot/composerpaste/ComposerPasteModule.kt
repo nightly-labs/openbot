@@ -4,6 +4,8 @@ import android.content.ClipDescription
 import android.content.ContentResolver
 import android.content.Context
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.provider.OpenableColumns
 import android.view.DragEvent
 import android.view.KeyEvent
@@ -110,10 +112,9 @@ class ChatDropView(context: Context, appContext: AppContext) : ExpoView(context,
     setOnDragListener { _, event ->
       when (event.action) {
         DragEvent.ACTION_DRAG_STARTED -> dropEnabled && hasFile(event.clipDescription)
-        DragEvent.ACTION_DROP -> {
-          drop(event)
-          true
-        }
+        // The chat can close the composer during the drag. A drop with no file is refused, so
+        // the other app does not show it as done.
+        DragEvent.ACTION_DROP -> dropEnabled && drop(event)
         else -> true
       }
     }
@@ -128,29 +129,35 @@ class ChatDropView(context: Context, appContext: AppContext) : ExpoView(context,
   private fun hasFile(description: ClipDescription?): Boolean =
     description != null && FILE_TYPES.any { description.hasMimeType(it) }
 
-  private fun drop(event: DragEvent) {
-    val clip = event.clipData ?: return
+  private fun drop(event: DragEvent): Boolean {
+    val clip = event.clipData ?: return false
     // The permission keeps the addresses of another app readable until the copy ends.
     val permissions = appContext.currentActivity?.requestDragAndDropPermissions(event)
     val uris = (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri }
       .filter { it.scheme == ContentResolver.SCHEME_CONTENT }
     if (uris.isEmpty()) {
       permissions?.release()
-      return
+      return false
     }
     copyUris(this, uris, maxBytes) { result ->
       permissions?.release()
       onDropFiles(result)
     }
+    return true
   }
 }
 
-/** Copies the files on the copy thread, then calls `done` on the thread of the view. */
+private val mainThread = Handler(Looper.getMainLooper())
+
+/**
+ * Copies the files on the copy thread, then calls `done` on the main thread. `View.post` waits for
+ * the view to attach again, so a chat closed during the copy never released the drop permission.
+ */
 private fun copyUris(view: View, uris: List<Uri>, maxBytes: Long, done: (Map<String, Any>) -> Unit) {
   val context = view.context
   copier.execute {
     val copied = uris.mapNotNull { uri -> runCatching { copyFile(context, uri, maxBytes) }.getOrNull() }
-    view.post { done(mapOf("files" to copied, "failed" to uris.size - copied.size)) }
+    mainThread.post { done(mapOf("files" to copied, "failed" to uris.size - copied.size)) }
   }
 }
 
