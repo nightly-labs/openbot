@@ -428,6 +428,7 @@ import {
 } from "@openbot/contracts/team-protocol/whatsapp-working-message-v1";
 import { WORKSPACE_ONLY_PROCESS_LIMIT_CAPABILITY } from "@openbot/contracts/team-protocol/workspace-only-process-limit-v1";
 import { parseTwoStepKey, twoStepCode } from "@openbot/contracts/two-step-code";
+import { UI_CONFIRM_PREVIEW_ANSWER_ID } from "@openbot/contracts/ui-blocks";
 import { sourceText } from "@openbot/i18n/source";
 import { createOpenBotLogger } from "@openbot/logging";
 import { RoutineInputError } from "@openbot/team-client/routine-schedule";
@@ -1561,7 +1562,8 @@ const fakeAgents: TeamApiAgents = {
       };
     return undefined;
   },
-  respondToPrompt: unused("respondToPrompt"),
+  // Records the answers as the route decodes them, such as an edited confirm preview (`_preview`).
+  respondToPrompt: (input, responder) => Effect.sync(() => record("respondToPrompt", input, responder)),
   // As the agent service answers: a closed request, an answer that only the owner can give, and a
   // report about the phone app (request 7), which takes "accept" only with the phone's data.
   respondToApproval: (input, responder) => {
@@ -12196,6 +12198,19 @@ try {
       "a plain accept of a report about the phone app is refused, and a decline is taken",
       errorIs(plain, 403, sourceText("error.backend.feedbackNeedsPhone")) && declined.status === 204,
       [summary(plain), summary(declined)],
+    );
+    // The host reads an edited confirm preview beside the answers (`ui-block-preview-edit-v1`).
+    const editedAnswers = { action: ["Send"], [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Hi Ann, see you on Tuesday."] };
+    const edited = await call("POST", TEAM_API_ROUTES.respond.prompt, {
+      token: owner.sessionToken,
+      ...v9,
+      json: { requestId: 7, answers: editedAnswers },
+    });
+    check(
+      "the prompt route gives the agent service an edited confirm preview with the answers",
+      edited.status === 204 &&
+        isDeepStrictEqual(callsOf("respondToPrompt").at(-1)?.[0], { requestId: 7, answers: editedAnswers }),
+      { status: edited.status, call: callsOf("respondToPrompt").at(-1) },
     );
   }
 

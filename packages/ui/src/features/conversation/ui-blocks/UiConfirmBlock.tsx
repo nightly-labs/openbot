@@ -5,6 +5,7 @@ import {
   type UiActionStyle,
   type UiBlockResponse,
   type UiConfirmBlock as UiConfirmSpec,
+  uiConfirmPreviewEditable,
 } from "@openbot/contracts/ui-blocks";
 import { Button, NativeSelect, Textarea } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
@@ -25,14 +26,13 @@ const BUTTON_VARIANT = {
   danger: "destructive",
 } as const satisfies Record<UiActionStyle, "default" | "secondary" | "ghost" | "destructive">;
 
-export interface UiConfirmBlockProps extends UiBlockProps<UiConfirmSpec> {
+export interface UiConfirmBlockProps extends Omit<UiBlockProps<UiConfirmSpec>, "onRespond"> {
+  /** Gets the response, and the edited preview when the person changed it. */
+  onRespond: (response: UiBlockResponse, preview?: string) => void;
   /** Draws `spec.preview` as safe Markdown. Without it the preview is plain text. */
   renderPreview?: ((markdown: string) => JSX.Element) | undefined;
-  /**
-   * With it, the `UI_CONFIRM_EDIT_ACTION_ID` button opens the preview for editing in the card, and the
-   * next button sends its response here with the edited text. An unchanged text goes to `onRespond`.
-   */
-  onRespondEdited?: ((response: UiBlockResponse, preview: string) => void) | undefined;
+  /** The `UI_CONFIRM_EDIT_ACTION_ID` button opens the preview for editing in the card. */
+  canEditPreview?: boolean | undefined;
 }
 
 function actionStyle(action: UiAction): UiActionStyle {
@@ -168,7 +168,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
   const blankDraft = () => editing() && !draft()?.trim();
   let editor: HTMLTextAreaElement | undefined;
   const opensEditor = (action: UiAction) =>
-    action.id === UI_CONFIRM_EDIT_ACTION_ID && props.onRespondEdited !== undefined && props.spec.preview !== undefined;
+    action.id === UI_CONFIRM_EDIT_ACTION_ID && props.canEditPreview === true && uiConfirmPreviewEditable(props.spec);
   // A `confirm: true` action, or a held action that was clicked instead of held. The card asks for it
   // again before it acts.
   const [confirming, setConfirming] = createSignal<UiAction>();
@@ -210,16 +210,15 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
     for (const field of props.spec.fields ?? []) {
       if ("select" in field) values[field.select] = selected()[field.select] ?? field.options[0] ?? "";
     }
+    // An edit always goes with the answer, also when the host has lost the capability since: that host
+    // refuses it, and the card shows the error, so the agent never gets the old text by mistake.
     const edited = draft();
-    const onRespondEdited = edited !== undefined && edited !== props.spec.preview ? props.onRespondEdited : undefined;
     sendUiBlockResponse(
       props.spec,
       { actionId: action.id, ...(Object.keys(values).length > 0 ? { values } : {}) },
       (response) => {
-        if (onRespondEdited && edited !== undefined) {
-          setSentDraft(edited);
-          onRespondEdited(response, edited);
-        } else props.onRespond(response);
+        setSentDraft(edited);
+        props.onRespond(response, edited);
       },
     );
   }
@@ -314,7 +313,7 @@ export function UiConfirmBlock(props: UiConfirmBlockProps) {
       <Show
         when={editing()}
         fallback={
-          <Show when={(frozen() ? sentDraft() : undefined) ?? props.spec.preview}>
+          <Show when={(state().status === "answered" ? sentDraft() : undefined) ?? props.spec.preview}>
             {(preview) => (
               <UiConfirmPreview>
                 <Show when={props.renderPreview} fallback={<p class="ui-block-preview-text">{preview()}</p>}>

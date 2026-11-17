@@ -495,7 +495,7 @@ export function uiBlockPromptResult(outcome: UiBlockPromptOutcome): DynamicToolR
                 next: "The user edited the preview. For the chosen action, use this text exactly, not your draft.",
               }
             : outcome.response.actionId === UI_CONFIRM_EDIT_ACTION_ID
-              ? { next: "The app could not open the preview for editing. Ask the user what to change." }
+              ? { next: "The user wants changes to the preview. Ask what to change." }
               : {}),
         }
       : outcome.status === "expired"

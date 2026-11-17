@@ -184,7 +184,7 @@ const confirmSpec: UiBlockSpec = {
     { id: "cancel", label: "Cancel" },
   ],
 };
-const draftSpec: UiBlockSpec = {
+const draftSpec = {
   type: "confirm",
   title: "Send the letter to Ann?",
   fields: [{ label: "To", value: "ann@example.com" }],
@@ -194,7 +194,7 @@ const draftSpec: UiBlockSpec = {
     { id: UI_CONFIRM_EDIT_ACTION_ID, label: "Edit" },
     { id: "keep", label: "Keep draft" },
   ],
-};
+} satisfies UiBlockSpec;
 const dangerSpec: UiBlockSpec = {
   type: "confirm",
   title: "Delete the archive?",
@@ -341,7 +341,7 @@ try {
     return { agentGot: sent, stored: message.uiBlock };
   });
 
-  await step("an unchanged draft adds nothing; a blank one, or an edit without a preview, is refused", async () => {
+  await step("an unchanged draft adds nothing; a blank one, or an edit with no Edit button, is refused", async () => {
     const draft = ask(draftSpec, "turn-edit-2");
     const keep = asNewClient(draft.spec, { actionId: "keep" });
     await assert.rejects(answer(draft.id, { ...keep, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["  "] }, OWNER));
@@ -357,6 +357,16 @@ try {
     await assert.rejects(answer(plain.id, { ...send, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["text"] }, OWNER));
     await answer(plain.id, send, OWNER);
     assert.equal(plain.message.uiBlock?.state.status, "answered");
+    // With a preview but no Edit button, the agent asks to approve the text as it is.
+    const exact = ask(
+      { ...draftSpec, actions: draftSpec.actions.filter((action) => action.id !== UI_CONFIRM_EDIT_ACTION_ID) },
+      "turn-edit-4",
+    );
+    const approve = asNewClient(exact.spec, { actionId: "send" });
+    await assert.rejects(answer(exact.id, { ...approve, [UI_CONFIRM_PREVIEW_ANSWER_ID]: ["Other text"] }, MEMBER));
+    assert.equal(exact.message.uiBlock?.state.status, "pending");
+    await answer(exact.id, approve, MEMBER);
+    assert.equal(client.answers.get(exact.id)?.value?.preview, undefined);
   });
 
   await step("member cannot press a danger action or answer it in words; an admin can", async () => {

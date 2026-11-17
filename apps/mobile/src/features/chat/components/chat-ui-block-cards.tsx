@@ -7,7 +7,6 @@ import {
   UI_CHOICE_VALUES_KEY,
   UI_CONFIRM_ACTION_QUESTION_ID,
   UI_CONFIRM_EDIT_ACTION_ID,
-  UI_CONFIRM_PREVIEW_ANSWER_ID,
   type UiAction,
   type UiActionStyle,
   type UiBlockResponse,
@@ -15,6 +14,8 @@ import {
   type UiConfirmBlock,
   type UiConfirmField,
   uiBlockAnswersFromResponse,
+  uiConfirmAnswersWithPreview,
+  uiConfirmPreviewEditable,
 } from "@openbot/contracts/ui-blocks";
 import { router } from "expo-router";
 import { Button, Typography } from "heroui-native";
@@ -351,7 +352,7 @@ export function ChatConfirmPrompt({
   const [draft, setDraft] = useState<string>();
   const blankDraft = draft !== undefined && !draft.trim();
   const opensEditor = (action: UiAction) =>
-    canEditPreview && spec.preview !== undefined && action.id === UI_CONFIRM_EDIT_ACTION_ID;
+    canEditPreview && uiConfirmPreviewEditable(spec) && action.id === UI_CONFIRM_EDIT_ACTION_ID;
   const screenReader = useScreenReaderEnabled();
   const holdMs = spec.confirmHold ?? DEFAULT_HOLD_MS;
   const holdsPrimary = spec.danger === true || spec.confirmHold !== undefined;
@@ -372,10 +373,7 @@ export function ChatConfirmPrompt({
     const response: UiBlockResponse = Object.keys(values).length
       ? { actionId: action.id, values }
       : { actionId: action.id };
-    const answers = uiBlockAnswersFromResponse(spec, response);
-    void submit(
-      draft !== undefined && draft !== spec.preview ? { ...answers, [UI_CONFIRM_PREVIEW_ANSWER_ID]: [draft] } : answers,
-    );
+    void submit(uiConfirmAnswersWithPreview(spec, response, draft));
   }
 
   return (

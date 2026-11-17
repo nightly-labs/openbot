@@ -4,13 +4,13 @@ import {
   isSecretFormField,
   UI_API_KEY_SCOPE_FIELD_ID,
   UI_BLOCK_SUBMIT_ACTION_ID,
-  UI_CONFIRM_PREVIEW_ANSWER_ID,
   UI_VAULT_SECRET_FIELDS,
   type UiBlockResponse,
   type UiBlockState,
   uiBlockAnswersFromResponse,
   uiBlockFallbackQuestions,
   uiBlockOutcomeText,
+  uiConfirmAnswersWithPreview,
 } from "@openbot/contracts/ui-blocks";
 import type { AgentProfile } from "@openbot/ui/data";
 import { MarkdownMessageText } from "@openbot/ui/features/conversation/MarkdownMessageText";
@@ -140,8 +140,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
   function respond(response: UiBlockResponse, preview?: string): void {
     const spec = props.block.spec;
     const outcome = uiBlockOutcomeText(spec, response);
-    const answers = uiBlockAnswersFromResponse(spec, response);
-    void send(preview === undefined ? answers : { ...answers, [UI_CONFIRM_PREVIEW_ANSWER_ID]: [preview] }, {
+    void send(uiConfirmAnswersWithPreview(spec, response, preview), {
       status: "answered",
       response,
       ...(outcome.trim() ? { outcome } : {}),
@@ -242,7 +241,7 @@ export function UiBlockPrompt(props: UiBlockPromptProps) {
         error={error()}
         disabled={!props.onAnswer}
         onRespond={respond}
-        onRespondEdited={props.canEditPreview ? respond : undefined}
+        canEditPreview={props.canEditPreview}
         onSkip={props.onAnswer ? skip : undefined}
         elementRef={(element) => props.elementRef?.(element)}
         renderPreview={(markdown) => (
