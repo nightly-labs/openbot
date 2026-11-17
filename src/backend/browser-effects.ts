@@ -19,6 +19,7 @@ const SECURE_INPUT_FAILURES = [
   "Authentication target changed.",
   "Authentication submit button is not ready.",
   "Authentication submission timed out.",
+  "Authentication page reload timed out.",
 ] as const;
 
 /**

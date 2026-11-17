@@ -335,17 +335,14 @@ try {
     );
     assert.equal(
       answer.secureInput,
-      "OpenBot could not finish entering the value. Authentication submit button is not ready. The user got the page to finish the step.",
+      "OpenBot could not finish entering the value. Authentication submit button is not ready. The page went to the user.",
     );
     return answer;
   });
 
   await step("a failed fill with another error tells the agent no page text", async () => {
     const answer = await failedFill("turn-9", new Error(`ERR_ABORTED loading https://example.test/?code=${SECRET}`));
-    assert.equal(
-      answer.secureInput,
-      "OpenBot could not finish entering the value. The user got the page to finish the step.",
-    );
+    assert.equal(answer.secureInput, "OpenBot could not finish entering the value. The page went to the user.");
     return answer;
   });
 
