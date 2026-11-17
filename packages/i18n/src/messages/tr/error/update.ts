@@ -9,6 +9,8 @@ export const messages = {
   "error.update.downloadStalled": "Güncelleme indirmesi yanıt vermeyi durdurdu. Tekrar deneyin.",
   "error.update.installFailed": "Güncelleme yüklenemedi. OpenBot'tan çıkıp yeniden açın, ardından tekrar deneyin.",
   "error.update.downloadFailed": "Güncelleme indirilemedi. Tekrar deneyin.",
+  "error.update.signatureNotConfirmed":
+    "OpenBot güncellemeyi doğrulayamadı. Tekrar deneyin. Bu hata sürerse OpenBot'u openbot.run/download adresinden indirin.",
   "error.update.checkFailed": "Güncellemeler denetlenemedi. Tekrar deneyin.",
   "error.update.checkStalled": "Güncelleme denetimi yanıt vermeyi durdurdu. Tekrar deneyin.",
   "error.update.checkOffline":
