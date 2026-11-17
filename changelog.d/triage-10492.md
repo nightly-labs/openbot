@@ -8,6 +8,6 @@
 
 ### Changed
 
-- When an agent changes a routine that is now paused, its routine card in the chat says "Paused" and
-  has a Turn on button, on desktop and in the web client. Before, the card did not show that the
-  routine was off.
+- The routine card in the chat now has a Turn on button when the routine is paused, on desktop and in
+  the web client. It also says "Paused" when no run paused the routine. Before, you had to open the
+  routine settings to turn it on again.
