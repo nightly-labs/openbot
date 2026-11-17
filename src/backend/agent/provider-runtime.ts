@@ -516,8 +516,8 @@ export class ProviderRuntime implements ProviderPort {
   /** A custom agent change that a turn delayed. The idle check applies it when the turn stops. */
   #customAgentsReloadPending = false;
   /**
-   * Providers that a turn kept on the old agent environment or OpenCode config. The idle check
-   * restarts each after its turn.
+   * Providers that a turn kept on the old agent environment or OpenCode config, or whose restart
+   * waited for an update that was cancelled. The idle check restarts each after its turn.
    */
   readonly #environmentReloadPending = new Set<AgentProvider>();
   readonly #lastUsed = new Map<AgentProvider, number>();
@@ -2732,9 +2732,18 @@ export class ProviderRuntime implements ProviderPort {
     }
   });
 
-  /** Ends a wait that did not reach the install, because it was cancelled or failed. */
+  /**
+   * Ends a wait that did not reach the install, because it was cancelled or failed. A restart that
+   * waits for the same turns then runs when they end, and new turns do not wait for it: one Cancel
+   * releases them (#10825).
+   */
   #endUpdateWhenIdle(provider: AgentProvider): void {
-    if (this.#updatesWhenIdle.delete(provider)) this.#hooks.onProviderResumed(provider);
+    if (!this.#updatesWhenIdle.delete(provider)) return;
+    if (this.#restartsWhenIdle.get(provider) && this.#hooks.isProviderBusy(provider)) {
+      this.cancelProviderRestart(provider);
+      this.#environmentReloadPending.add(provider);
+    }
+    this.#hooks.onProviderResumed(provider);
   }
 
   /** Answers null, and installs nothing, when a turn started on the provider after the wait. */
@@ -2785,6 +2794,9 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
+          // The new process does a restart that waits, also one that a cancelled update gave to the idle check.
+          this.cancelProviderRestart(provider);
+          this.#environmentReloadPending.delete(provider);
           // The new copy runs from now on, also when a client of the user's CLI ran during the update.
           this.#installedFallback.delete(provider);
           // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
