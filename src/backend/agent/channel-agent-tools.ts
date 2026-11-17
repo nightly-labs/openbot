@@ -89,9 +89,7 @@ export const updateChannelToolSchema = z
     imagePath: channelFields.imagePath.nullable().describe(`${IMAGE_TEXT} null removes it.`).optional(),
     archived: z
       .boolean()
-      .describe(
-        "true archives the channel and stops its queued work; it fails while a task runs there, so wait for that task or ask the user to stop it. false brings an archived channel back.",
-      )
+      .describe("true archives the channel; it fails while a task runs there. false brings it back.")
       .optional(),
   })
   .refine(
