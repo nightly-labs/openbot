@@ -233,7 +233,7 @@ export const BROWSER_TOOL_DEFINITIONS = [
   browserTool({
     name: "snapshot",
     description:
-      'Read the current semantic page and obtain element refs. Refs stay valid until a navigation or the next snapshot. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more. Each element is a line: ref, role, "name", then <tag>, value=, description= and states when present. diagnostics and actions list only new entries, without successful requests and plain successful actions. A finished download is a diagnostics entry with the path of the saved file.',
+      'Read the current semantic page and obtain element refs. Refs stay valid until a navigation or the next snapshot. An adaptive image is returned separately when useful. The output is bounded: text in the viewport comes first, and truncated is true when text or elements were left out. Scroll, or wait for text, to read more. Each element is a line: ref, role, "name", then <tag>, value=, description= and states when present. diagnostics and actions list only new entries, without successful requests and plain successful actions.',
     shape: { tabId, image },
   }),
   browserTool({
