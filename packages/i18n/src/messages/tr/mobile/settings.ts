@@ -517,6 +517,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "İşlem durdurulamadı.",
   "mobile.settings.agents.processes.stopTitle": "Bu program durdurulsun mu?",
   "mobile.settings.agents.processes.stopLabel": "{pid} işlemini durdur",
+  "mobile.settings.quickActions.title": "Uygulama simgesi menüsü",
+  "mobile.settings.quickActions.footer":
+    "Bu eylemleri görmek için OpenBot simgesine dokunup basılı tut. En fazla {count} tanesini açabilirsin.",
+  "mobile.settings.quickActions.latestChat": "Son sohbet",
+  "mobile.settings.quickActions.secondChat": "Sondan ikinci sohbet",
   "mobile.settings.shortcuts.title": "Kestirmeler",
   "mobile.settings.shortcuts.agent": "Ajan",
   "mobile.settings.shortcuts.none": "Yok",

@@ -528,6 +528,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "Impossibile arrestare il processo.",
   "mobile.settings.agents.processes.stopTitle": "Arrestare questo programma?",
   "mobile.settings.agents.processes.stopLabel": "Arresta il processo {pid}",
+  "mobile.settings.quickActions.title": "Menu dell’icona",
+  "mobile.settings.quickActions.footer":
+    "Tieni premuta l’icona di OpenBot per vedere queste azioni. Puoi attivarne fino a {count}.",
+  "mobile.settings.quickActions.latestChat": "Ultima chat",
+  "mobile.settings.quickActions.secondChat": "Penultima chat",
   "mobile.settings.shortcuts.title": "Comandi rapidi",
   "mobile.settings.shortcuts.agent": "Agente",
   "mobile.settings.shortcuts.none": "Nessuno",

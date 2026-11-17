@@ -509,6 +509,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "프로세스를 중지할 수 없어요.",
   "mobile.settings.agents.processes.stopTitle": "이 프로그램을 중지할까요?",
   "mobile.settings.agents.processes.stopLabel": "프로세스 {pid} 중지",
+  "mobile.settings.quickActions.title": "앱 아이콘 메뉴",
+  "mobile.settings.quickActions.footer":
+    "OpenBot 아이콘을 길게 누르면 이 동작이 표시됩니다. 최대 {count}개까지 켤 수 있습니다.",
+  "mobile.settings.quickActions.latestChat": "최근 채팅",
+  "mobile.settings.quickActions.secondChat": "두 번째 최근 채팅",
   "mobile.settings.shortcuts.title": "단축어",
   "mobile.settings.shortcuts.agent": "에이전트",
   "mobile.settings.shortcuts.none": "없음",

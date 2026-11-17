@@ -519,6 +519,11 @@ export const messages = {
   "mobile.settings.agents.processes.stopFailed": "プロセスを停止できませんでした。",
   "mobile.settings.agents.processes.stopTitle": "このプログラムを停止しますか？",
   "mobile.settings.agents.processes.stopLabel": "プロセス {pid} を停止",
+  "mobile.settings.quickActions.title": "アプリアイコンのメニュー",
+  "mobile.settings.quickActions.footer":
+    "OpenBotのアイコンを長押しすると、これらの操作が表示されます。最大{count}個までオンにできます。",
+  "mobile.settings.quickActions.latestChat": "最新のチャット",
+  "mobile.settings.quickActions.secondChat": "2番目に新しいチャット",
   "mobile.settings.shortcuts.title": "ショートカット",
   "mobile.settings.shortcuts.agent": "エージェント",
   "mobile.settings.shortcuts.none": "なし",
