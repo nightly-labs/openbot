@@ -12,7 +12,7 @@ of something remote — which is what makes the first section below non-negotiab
   error, restore foreign-key enforcement in `finally`, and run the integrity checks before startup
   continues.
 - Never edit or delete a migration that may have shipped, including the frozen version 8 baseline.
-  Append the next contiguous version and update the separate latest schema for new databases.
+  Append the next contiguous version; a new database runs it too ([One build path](#one-build-path)).
   See [Frozen migrations](#frozen-migrations).
   Add the new version to `openbot-database-schema-history.json`: the parity test fails and prints
   the entry to add. A red test on a recorded version means a shipped migration changed. Change the
@@ -41,19 +41,17 @@ To fix a bug in a released migration, do not edit it. Add a new migration that r
 database that the bad one made, and keep it safe for databases that the bad one did not touch. Give
 it fixtures for every affected released schema. An unreleased migration can still change.
 
-### The two build paths
+### One build path
 
-`openbot-database-schema.ts` builds a database twice. `createLatestDatabase` execs
-`LATEST_SCHEMA_SQL` and then stamps every entry in `MIGRATIONS` (`migrations/registry.ts`) as
-applied **without running it**;
-an existing database runs them for real. A DDL migration that is not also mirrored by hand into
-`LATEST_SCHEMA_SQL` therefore ships new installs a database missing that column while upgraded
-installs get it, silently, on the user's machine.
+A new database runs the same migrations as an existing one. `migrateOpenBotDatabase` sees an empty file
+and runs every entry of `MIGRATIONS` from the version 8 baseline, which creates each table with
+`IF NOT EXISTS`. So there is no second schema to update, and a new install cannot miss a column that an
+upgraded install has. A new database skips `vacuumAfterCommit`: it has no free pages.
 
-`openbot-database-schema-parity.test.ts` builds a database both ways and compares the normalised
-`sqlite_master` SQL and `PRAGMA table_info` per table, so that divergence is a red test rather than a
-support ticket. Do not weaken it; a new DDL migration means editing `LATEST_SCHEMA_SQL` in the same
-change.
+`openbot-database-schema-parity.test.ts` builds a new database from an empty file and compares it with
+the schema that `openbot-database-schema-history.json` records, version by version. Do not weaken it.
+Databases that an older release made for a new install (from its separate `LATEST_SCHEMA_SQL`) are
+in `released-schemas/releases.json`, and the migration harness upgrades them.
 
 ### The migration harness
 

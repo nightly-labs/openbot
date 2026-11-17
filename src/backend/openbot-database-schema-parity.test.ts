@@ -1,12 +1,8 @@
 // @vitest-environment node
 
-// A new install and an upgraded install are built by two different code paths:
-// `createLatestDatabase` execs LATEST_SCHEMA_SQL and stamps every migration as
-// applied without running it, while an existing database runs the migrations.
-// Nothing but a comment keeps the two in agreement, so the first DDL migration
-// that is not also mirrored into LATEST_SCHEMA_SQL would ship new installs a
-// database missing a column while upgraded installs get it - on users' machines,
-// with no backup to fall back on. These tests are that agreement.
+// A new install and an upgraded install run the same migrations: a new install starts at the version 8
+// baseline from an empty file. These tests prove that the empty file takes that path and ends at the
+// schema that the recorded history of every migration makes, with no backup to fall back on.
 
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -42,10 +38,24 @@ describe("OpenBot database build paths", () => {
     expect(readNormalizedDeclarations(upgraded)).toEqual(readNormalizedDeclarations(fresh));
   });
 
-  it("records the same applied migration versions on both paths", async () => {
+  it("gives a new install the schema that the recorded history of every migration makes", async () => {
+    const fresh = await newInstallDatabase();
+    const recorded = new Map<string, string>();
+    for (const changes of Object.values<SchemaChanges>(recordedSchemaHistory)) {
+      for (const [key, sql] of Object.entries(changes)) {
+        if (sql === null) recorded.delete(key);
+        else recorded.set(key, sql);
+      }
+    }
+
+    expect(Object.fromEntries(declarationsByKey(fresh))).toEqual(Object.fromEntries(recorded));
+  });
+
+  it("records every migration version on a new install, as on an upgraded one", async () => {
     const fresh = await newInstallDatabase();
     const upgraded = await upgradedInstallDatabase();
 
+    expect(readAppliedVersions(fresh)).toEqual(Object.keys(recordedSchemaHistory).map(Number));
     expect(readAppliedVersions(upgraded)).toEqual(readAppliedVersions(fresh));
   });
 });
@@ -145,15 +155,19 @@ async function schemaChangesByVersion(): Promise<Record<string, SchemaChanges>> 
     const applied = readAppliedVersions(database);
     const version = applied.at(-1);
     if (applied.length === appliedBefore || version === undefined) return changes;
-    const after = new Map(
-      readNormalizedDeclarations(database).map((declaration) => [
-        `${declaration.type} ${declaration.name}`,
-        declaration.sql.join(" "),
-      ]),
-    );
+    const after = declarationsByKey(database);
     changes[String(version)] = diffDeclarations(before, after);
     before = after;
   }
+}
+
+function declarationsByKey(database: DatabaseSync): Map<string, string> {
+  return new Map(
+    readNormalizedDeclarations(database).map((declaration) => [
+      `${declaration.type} ${declaration.name}`,
+      declaration.sql.join(" "),
+    ]),
+  );
 }
 
 function diffDeclarations(before: ReadonlyMap<string, string>, after: ReadonlyMap<string, string>): SchemaChanges {
@@ -163,21 +177,16 @@ function diffDeclarations(before: ReadonlyMap<string, string>, after: ReadonlyMa
   return changes;
 }
 
-// An empty database has no tables, so `migrateOpenBotDatabase` takes the
-// `createLatestDatabase` branch - the path every new install follows.
+// An empty database has no tables: the path every new install follows.
 async function newInstallDatabase(): Promise<DatabaseSync> {
   const database = await openDatabase();
   migrateOpenBotDatabase(database, { appliedAt });
   return database;
 }
 
-// One empty table is enough for `hasExistingSchema` to report an existing
-// database, and an empty `schema_migrations` reads as a version older than the
-// baseline, so every migration runs in order from the v8 baseline SQL upwards -
-// the path every upgraded install follows. Building the fixture this way rather
-// than by stripping rows from a new install matters: a new install already
-// carries the columns a future migration adds, so re-running that migration
-// against it would fail on a duplicate column and go red on correct code.
+// One empty table is enough for `hasExistingSchema` to report an existing database, and an empty
+// `schema_migrations` reads as a version older than the baseline: the path of an install from before
+// version 8.
 async function upgradedInstallDatabase(): Promise<DatabaseSync> {
   const database = await openDatabase();
   database.exec("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)");

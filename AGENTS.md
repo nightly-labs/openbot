@@ -190,7 +190,7 @@ State which surfaces a change touches. Check all affected consumers and reverse 
 - IPC contracts (`packages/contracts`) and their preview implementation
   (`src/renderer/src/preview/mock-openbot.ts`).
 - Reverse actions: snooze/unsnooze, pause/resume, revoke/reconnect, mute/unmute.
-- Migrations and the separate latest schema for new databases.
+- Migrations, which also build each new database.
 - Documentation: `README.md` commands, `docs/architecture/`, and `PRIVACY.md` when outbound data
   changes.
 

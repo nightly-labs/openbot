@@ -782,9 +782,9 @@ export function readNormalizedDeclarations(database: DatabaseSync): readonly Dec
 }
 
 // SQLite stores a CREATE statement close to how it was written, so this text is
-// as much a record of the author's formatting as of the schema. The two paths
-// declare the same table from two different pieces of source - the latest schema
-// and the migration that produced it - so comparing the text would go red on a
+// as much a record of the author's formatting as of the schema. A new install of an
+// older release declared a table from a different piece of source (its separate latest
+// schema) than the migration that produced it, so comparing the text would go red on a
 // space before a comma, `TEXT` against `text`, `x > 0` against `x>0` or a comment
 // only one side carries, none of which any caller can observe. Comparing the
 // token sequence instead drops formatting entirely and keeps what a caller can
@@ -881,7 +881,7 @@ export function readAppliedVersions(database: DatabaseSync): readonly number[] {
 // `schema_migrations` is excluded from the comparisons: the upgraded fixture has
 // to create that table itself to reach the migration path, so its declaration is
 // the fixture's rather than the product's. Its contents are asserted instead,
-// which is the part `createLatestDatabase` writes without running anything.
+// which an older release wrote for a new install without running the migrations.
 function readTableNames(database: DatabaseSync): readonly string[] {
   return query(
     database,
