@@ -1,7 +1,6 @@
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentTask,
-  type AgentTasksSnapshot,
   type ConversationMessage,
   isQueuedAgentReply,
   type QueueDelivery,
@@ -20,6 +19,7 @@ import {
   useMobileWorkspaceSelector,
 } from "@/features/workspace/context/mobile-workspace-context";
 import { queryKeys } from "@/features/workspace/model/query-keys";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import { withUploadCancel } from "@/features/workspace/model/upload-cancels";
 import { currentText, useText } from "@/shared/lib/text";
 import { useHiddenReplies } from "../context/queued-messages-context";
@@ -483,18 +483,9 @@ export function useChatQueue(
         const started: { task: AgentTask | null } = { task: null };
         const done = await run(async () => {
           started.task = await workspace().runQueuedMessageAsTask({ agentId, deliveryId: delivery.id }, serverId);
-          if (edit?.delivery.id === delivery.id) await clearEdit();
         });
         const task = done ? started.task : null;
-        // The thread shows before its list event arrives.
-        if (task)
-          queryClient.setQueryData<AgentTasksSnapshot>(
-            queryKeys.agentTasks(queryScope, serverId, task.agentId),
-            (stored) =>
-              stored && !stored.tasks.some((entry) => entry.id === task.id)
-                ? { ...stored, tasks: [task, ...stored.tasks] }
-                : stored,
-          );
+        if (task) addStartedTask(queryClient, queryScope, serverId, task);
         return task;
       },
       moveFirst: (delivery: QueueDelivery) =>

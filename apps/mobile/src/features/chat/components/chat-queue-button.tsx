@@ -226,7 +226,7 @@ function ChatQueueCard({
           {queue.canRunAsThread ? (
             <CardAction
               accessibilityLabel={t("mobile.chat.queue.runNextInNewThread")}
-              disabled={locked || editedElsewhere}
+              disabled={locked || editedElsewhere || Boolean(locks?.heldForEdit)}
               onPress={() => {
                 if (!next) return;
                 void haptics.selection();

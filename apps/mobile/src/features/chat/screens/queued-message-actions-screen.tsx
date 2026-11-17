@@ -1,4 +1,4 @@
-import type { AttachmentSummary } from "@openbot/contracts/ipc";
+import type { AttachmentSummary, QueueDelivery } from "@openbot/contracts/ipc";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { StackActions } from "expo-router/react-navigation";
 import { Typography } from "heroui-native";
@@ -9,6 +9,7 @@ import ExternalLink from "lucide-react-native/icons/external-link";
 import GitBranch from "lucide-react-native/icons/git-branch";
 import Pencil from "lucide-react-native/icons/pencil";
 import Trash2 from "lucide-react-native/icons/trash";
+import { useState } from "react";
 import { Alert } from "react-native";
 import { useCSSVariable } from "uniwind";
 import {
@@ -39,7 +40,11 @@ export function QueuedMessageActionsScreen() {
   const held = queue?.edit?.delivery ?? null;
   // A teammate's answer is not the user's message: steer is its only action.
   const reply = queue?.replies.find((item) => item.id === deliveryId);
-  const delivery = held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply);
+  // The host takes the message out of the queue before it answers the move. The screen keeps it until
+  // the new thread opens.
+  const [moving, setMoving] = useState<QueueDelivery | null>(null);
+  const delivery =
+    (held?.id === deliveryId ? held : (queue?.queued.find((item) => item.id === deliveryId) ?? reply)) ?? moving;
 
   if (!queue || !delivery) {
     return (
@@ -51,7 +56,11 @@ export function QueuedMessageActionsScreen() {
     );
   }
 
-  const { locked, editedElsewhere } = queuedMessageLocks(delivery, { busy: queue.busy, online: queue.online, held });
+  const { locked, editedElsewhere, heldForEdit } = queuedMessageLocks(delivery, {
+    busy: queue.busy,
+    online: queue.online,
+    held,
+  });
   const head = queue.queued[0];
   const headEdited = Boolean(head && head.id !== delivery.id && (head.editing || held?.id === head.id));
   const finish = (action: Promise<boolean>) => {
@@ -64,9 +73,13 @@ export function QueuedMessageActionsScreen() {
   // As on desktop's "Run in new thread": the message leaves the queue, starts in a new thread, and the
   // thread opens in place of this sheet.
   const runAsThread = () => {
+    setMoving(delivery);
     void queue.runAsThread(delivery).then((task) => {
       void haptics.notification(task ? "success" : "error");
-      if (!task) return;
+      if (!task) {
+        setMoving(null);
+        return;
+      }
       sheetStack?.dispatch(
         StackActions.replace(TASK_ROUTE, { taskId: task.id, agentId: task.agentId, serverId: queue.serverId }),
       );
@@ -135,7 +148,7 @@ export function QueuedMessageActionsScreen() {
           <SettingsRow
             leading={<GitBranch color={foreground} size={22} />}
             disclosure={false}
-            disabled={locked || editedElsewhere}
+            disabled={locked || editedElsewhere || heldForEdit || moving !== null}
             onPress={runAsThread}
           >
             <Typography>{t("mobile.chat.queue.runInNewThread")}</Typography>

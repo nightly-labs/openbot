@@ -1,6 +1,6 @@
 import { avatarHeadColor } from "@openbot/brand/bloub-avatar";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
-import type { AgentTask, AgentTasksSnapshot, RespondToPromptInput } from "@openbot/contracts/ipc";
+import type { AgentTask, RespondToPromptInput } from "@openbot/contracts/ipc";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Crypto from "expo-crypto";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
@@ -72,6 +72,7 @@ import { useMobileWorkspace } from "@/features/workspace/context/mobile-workspac
 import type { MobileAgentActivity } from "@/features/workspace/model/agent-activity";
 import { queryKeys } from "@/features/workspace/model/query-keys";
 import { showsOnline } from "@/features/workspace/model/server-status";
+import { addStartedTask } from "@/features/workspace/model/task-cache";
 import type { MenuAction } from "@/shared/components/menu-view";
 import { haptics } from "@/shared/lib/haptics";
 import { useText } from "@/shared/lib/text";
@@ -559,11 +560,7 @@ function AgentTaskChat({
         );
         attachments.clear();
         // The thread shows in the menu before its list event arrives.
-        queryClient.setQueryData<AgentTasksSnapshot>(queryKeys.agentTasks(queryScope, serverId, agentId), (stored) =>
-          stored && !stored.tasks.some((entry) => entry.id === started.id)
-            ? { ...stored, tasks: [started, ...stored.tasks] }
-            : stored,
-        );
+        addStartedTask(queryClient, queryScope, serverId, started);
         router.setParams<"/task/[taskId]">({ taskId: started.id });
       } catch (error) {
         void haptics.notification("error");
