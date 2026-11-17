@@ -182,7 +182,7 @@ export const messages = {
     "{name} : l’ordinateur hôte n’accepte pas ces fichiers. Mettez OpenBot à jour sur cet ordinateur pour les joindre.",
   "mobile.chat.attachment.nameTooLong": "Choisissez un fichier dont le nom est plus court.",
   "mobile.chat.attachment.damaged": "La pièce jointe est endommagée. Sélectionnez-la de nouveau.",
-  "mobile.chat.attachment.tooLarge": "{name} dépasse 10 Mo.",
+  "mobile.chat.attachment.tooLarge": "{name} dépasse {limit}.",
   "mobile.chat.attachment.cameraPermission":
     "Autorisez l’accès à l’appareil photo dans Réglages pour prendre une photo.",
   "mobile.chat.composer.send": "Envoyer le message",
@@ -374,6 +374,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "Prise de contrôle du navigateur",
   "mobile.chat.browserSecret.takeoverBody":
     "Terminez cette étape dans le navigateur de l’ordinateur qui exécute OpenBot.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Connectez-vous sur votre ordinateur",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Ce site n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là.",
   "mobile.chat.browserSecret.takeoverReload": "Rechargez ensuite la page avant de choisir « J’ai terminé ».",
   "mobile.chat.browserSecret.takeoverFailed": "La demande n’a pas pu aboutir.",
   "mobile.chat.browserSecret.done": "J’ai terminé",
@@ -469,6 +472,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "mobile.chat.approval.report.dontSend": "Pas maintenant",
   "mobile.chat.approval.report.send": "Envoyer à l'équipe OpenBot",
+  "mobile.chat.approval.report.phoneAdds": "Ce téléphone ajoute au rapport :",
   "mobile.chat.approval.allow": "Autoriser",
   "mobile.chat.approval.deny": "Refuser",
   "mobile.chat.approval.reconnect": "Connectez-vous à {server} pour répondre à cette demande.",
@@ -534,10 +538,12 @@ export const messages = {
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Pièces jointes",
   "mobile.chat.queue.steer": "Orienter",
+  "mobile.chat.queue.sendNow": "Envoyer maintenant",
   "mobile.chat.queue.more": { one: "{count} de plus", other: "{count} de plus" },
   "mobile.chat.queue.nextLabel": "Prochain message en attente : {text}. Afficher les messages en attente",
   "mobile.chat.queue.editNext": "Modifier le prochain message en attente",
   "mobile.chat.queue.steerNext": "Orienter le prochain message en attente",
+  "mobile.chat.queue.sendNowNext": "Arrêter l’agent et envoyer maintenant le prochain message en attente",
   "mobile.chat.queue.deleteNext": "Supprimer le prochain message en attente",
   "mobile.chat.queue.moveFirst": "Placer en premier",
   "mobile.chat.queue.deleteTitle": "Supprimer le message en file d’attente ?",
@@ -545,6 +551,7 @@ export const messages = {
   "mobile.chat.queue.keep": "Conserver",
   "mobile.chat.queue.editedElsewhere": "Un autre appareil modifie ce message.",
   "mobile.chat.queue.steerNeedsTurn": "Pour orienter, un tour doit être en cours.",
+  "mobile.chat.queue.sendNowNeedsTurn": "Pour envoyer maintenant, un tour doit être en cours.",
   "mobile.chat.queue.stillHoldingTitle": "Le message est toujours retenu",
   "mobile.chat.queue.stillHoldingMessage":
     "OpenBot n’a pas pu libérer ce message, l’agent continue donc de l’attendre. Réessayez quand le téléphone sera reconnecté.",
@@ -554,6 +561,8 @@ export const messages = {
   "mobile.chat.queue.discardMessage": "Le message en file d’attente conserve le texte que l’agent a déjà.",
   "mobile.chat.queue.discard": "Abandonner",
   "mobile.chat.queue.alreadyReceived": "L’agent a déjà reçu ce message, il ne peut donc plus être modifié.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "L’agent a déjà reçu ce message, il ne peut donc plus être modifié. Quand vous fermez cet écran, votre texte va dans la zone de message.",
   "mobile.chat.queue.holding": "Retenue du message pour vous…",
   "mobile.chat.queue.holdFailed": "OpenBot n’a pas pu retenir ce message pour le modifier.",
   "mobile.chat.queue.messageLabel": "Message",

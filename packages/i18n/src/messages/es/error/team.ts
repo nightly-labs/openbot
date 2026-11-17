@@ -83,6 +83,8 @@ export const messages = {
   "error.team.hermesImportUnsupported": "Esta conexión no puede importar perfiles de Hermes desde el servidor.",
   "error.team.providerDetectionUnsupported":
     "Esta conexión no puede encontrar los servidores de modelos y los agentes del servidor.",
+  "error.team.providerModelSourceUnsupported":
+    "Esta conexión no puede mostrar de dónde vienen los modelos de un proveedor.",
   "error.team.routineFlowStopUnsupported": "Esta conexión no puede detener una ejecución de rutina.",
   "error.team.sidebarFoldersUnsupported": "Esta conexión no permite carpetas dentro de carpetas.",
   "error.team.libraryFoldersUnsupported": "Esta conexión no permite carpetas de la Biblioteca.",
@@ -131,6 +133,7 @@ export const messages = {
   "error.team.promptCacheTtlUnsupported": "Esta conexión no admite la duración de la caché de prompts.",
   "error.team.claudeUserSetupUnsupported": "Esta conexión no admite el interruptor de configuración de Claude Code.",
   "error.team.claudeCompactWindowUnsupported": "Esta conexión no admite el tamaño de compactación de Claude.",
+  "error.team.providerEnvironmentUnsupported": "Esta conexión no admite variables de proveedor.",
   "error.team.modelVisibilityUnsupported": "Esta conexión no admite la lista de modelos.",
   "error.team.providerDefaultUnsupported": "Esta conexión no admite el proveedor predeterminado.",
   "error.team.attachmentNameRequired": "Se requiere un nombre seguro para el archivo adjunto.",
@@ -184,6 +187,7 @@ export const messages = {
   "error.team.hostPersonalityUnsupported": "Esta conexión no admite la personalidad del servidor.",
   "error.team.agentWaitsUnsupported": "Esta conexión no admite esperas abiertas.",
   "error.team.pendingApprovalUnsupported": "Esta conexión no permite leer una aprobación completa.",
+  "error.team.phoneFeedbackUnsupported": "Esta conexión no permite enviar un informe desde la app del teléfono.",
   "error.team.messagePinsUnsupported": "Esta conexión no admite los mensajes fijados.",
   "error.team.queuedMessageThreadUnsupported":
     "Esta conexión no admite ejecutar un mensaje en cola como un hilo nuevo.",

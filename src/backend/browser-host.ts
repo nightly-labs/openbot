@@ -254,6 +254,11 @@ const DIALOG_ACTION_WAIT_MS = 10_000;
 const OPEN_REDIRECT_WAIT_MS = 5_000;
 /** A page dialog holds a script. The sign-in then loads the page again with the cookies only. */
 const SIGN_IN_STORAGE_WRITE_TIMEOUT_MS = 5_000;
+/**
+ * How long OpenBot waits for the loads of a site after an agent script there ends, before it deletes
+ * the site's service workers. A fill does not wait for this.
+ */
+const SERVICE_WORKER_CLEAR_WAIT_MS = 10_000;
 /** A site can redirect more than one time before its page stays. */
 const OPEN_REDIRECT_READS = 2;
 /**
@@ -271,6 +276,9 @@ const FORWARDED_KEY_CODES: Partial<Record<string, string>> = { ArrowLeft: "Left"
  */
 const MAX_ACTIVE_DOWNLOADS = 4;
 const MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+/** The diagnostic for a download over `MAX_DOWNLOAD_BYTES`, so the agent can tell the user what to do. */
+const DOWNLOAD_TOO_LARGE =
+  "Download stopped: the file is larger than 2 GiB, the download limit of this browser. No file was saved. The user can download it in their own web browser.";
 
 export interface BrowserViewOptions {
   /** Hears the page's mouse cursor when it changes. Not called while a secret is on the page. */
@@ -636,8 +644,8 @@ export class BrowserHost {
    * relay: the second would replace the first in `#appliedProxies`, and the first would stay open.
    */
   readonly #proxyLock = Semaphore.makeUnsafe(1);
-  /** The proxies whose last page load could not connect to them. */
-  readonly #proxyFailures = new Map<string, BrowserProxyFailure>();
+  /** The proxies whose last page load could not connect to them, with the member of a computer proxy. */
+  readonly #proxyFailures = new Map<string, { failure: BrowserProxyFailure; memberId: string | null }>();
   /**
    * The tabs whose proxy asked for a sign-in that the tab did not give again, until a page loads.
    * Chromium then reports a failed tunnel, which alone means that the proxy did not answer.
@@ -679,6 +687,8 @@ export class BrowserHost {
   /** True while `#syncAttachedView` shows `#attachedView`. On Linux the views in the background window are all shown. */
   #attachedViewShown = false;
   readonly #takeoverTabIds = new Set<string>();
+  /** The takeover tabs that got a sign-in from a member's own device, so the agent learns whether one came. */
+  readonly #takeoverSignInTabIds = new Set<string>();
   /** The tabs that a person controls, with who took each one, so a closed session releases its own. */
   readonly #userControlTabIds = new Map<string, BrowserUserControlHolder>();
   /**
@@ -941,7 +951,11 @@ export class BrowserHost {
     return this.#activeTabId === tab.id || this.#tabBusy(tab);
   }
 
-  /** A task, a recording, a live view or a person uses the tab now, also when the panel does not show it. */
+  /**
+   * A task, a recording, a live view or a person uses the tab now, also when the panel does not show it.
+   * Sound is not a use: `#createView` mutes each tab, and Chromium still counts a muted page as audible,
+   * so a hidden video or live stream would never pause or unload (#9913).
+   */
   #tabBusy(tab: BrowserHostTab): boolean {
     return (
       // A preview capture is not a use. An unload that starts during one waits behind it on the queue.
@@ -952,8 +966,7 @@ export class BrowserHost {
       tab.secretDocument === true ||
       tab.filledCard === true ||
       this.#takeoverTabIds.has(tab.id) ||
-      this.#userControlTabIds.has(tab.id) ||
-      tab.contents.isCurrentlyAudible()
+      this.#userControlTabIds.has(tab.id)
     );
   }
 
@@ -1403,6 +1416,7 @@ export class BrowserHost {
           )
         : 0;
     if (count === 0 && stored === 0) return { cookies: 0, storage: 0 };
+    if (this.#takeoverTabIds.has(tabId)) this.#takeoverSignInTabIds.add(tabId);
     // The sign-in is set. A page that does not load again shows its own error in the tab.
     yield* this.reload(tabId).pipe(Effect.ignore);
     return { cookies: count, storage: stored };
@@ -1440,6 +1454,7 @@ export class BrowserHost {
       .filter((child) => child.openerTabId === tabId || (signInSession && child.privateSession === signInSession))
       .map((child) => this.close(child.id));
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#userControlTabIds.delete(tabId);
     this.#teachRecordings.delete(tabId);
     this.#completeUserControlWaiters(tabId);
@@ -1500,6 +1515,7 @@ export class BrowserHost {
     if (!tab) return yield* browserFailure(new Error(sourceText("error.backend.browserTabNotFound")));
     tab.engine.invalidateReferences();
     this.#takeoverTabIds.add(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     stopCookieBanners(tab.contents);
     this.#syncAttachedView();
     tab.diagnostics.clearDiagnostics();
@@ -1989,9 +2005,18 @@ export class BrowserHost {
     delete tab.workerExposedOrigins;
     // A tab that closed itself has no `contents.session`.
     const target = this.#tabSession(tab);
-    // The next fill on the origin reads the result from `#originPurges`.
-    for (const origin of new Set([...(scripted ?? []), ...(exposed ?? [])]))
-      if (this.#cacheTaintedOrigins.get(target)?.has(origin)) void this.#purgeOrigin(target, origin);
+    // The next fill on the origin reads the result from `#originPurges`. A deleted service worker fails
+    // the requests that it handles, such as those of the page that replaces this one, so the service
+    // workers go when the origin's pages stop loading (#9981). A fill deletes them itself when it needs to.
+    for (const origin of new Set([...(scripted ?? []), ...(exposed ?? [])])) {
+      if (!this.#cacheTaintedOrigins.get(target)?.has(origin)) continue;
+      void this.#purgeOrigin(target, origin, ["cachestorage"]);
+      void this.#originStoppedLoading(target, origin).then(() =>
+        target.clearStorageData({ origin, storages: ["serviceworkers"] }).catch((error: unknown) => {
+          logger.warn("Unable to clear a site's service workers", { origin, error: toLogValue(error) });
+        }),
+      );
+    }
     if (!scripted) return;
     const connected = this.#connectedTabs(tab);
     for (const other of this.#sessionTabs(target)) {
@@ -2062,11 +2087,15 @@ export class BrowserHost {
    * Clears the origin's Cache Storage and service workers after the purge that already runs for it.
    * A later purge that succeeds clears what an earlier one that failed left.
    */
-  #purgeOrigin(target: Session, origin: string): Promise<boolean> {
+  #purgeOrigin(
+    target: Session,
+    origin: string,
+    storages: ("cachestorage" | "serviceworkers")[] = ["cachestorage", "serviceworkers"],
+  ): Promise<boolean> {
     const purges = this.#originPurges.get(target) ?? new Map<string, Promise<boolean>>();
     this.#originPurges.set(target, purges);
     const purge = (purges.get(origin) ?? Promise.resolve(true)).then(() =>
-      target.clearStorageData({ origin, storages: ["cachestorage", "serviceworkers"] }).then(
+      target.clearStorageData({ origin, storages }).then(
         () => true,
         (error: unknown) => {
           logger.warn("Unable to clear a site's caches", { origin, error: toLogValue(error) });
@@ -2076,6 +2105,51 @@ export class BrowserHost {
     );
     purges.set(origin, purge);
     return purge;
+  }
+
+  /**
+   * Settles when no tab of the session shows a frame of the origin that loads, or after
+   * `SERVICE_WORKER_CLEAR_WAIT_MS`. It does not stop a load, as `waitForLoading` does at its deadline.
+   */
+  #originStoppedLoading(target: Session, origin: string): Promise<void> {
+    return new Promise((resolve) => {
+      const watched = new Set<WebContents>();
+      let settled = false;
+      let timer: NodeJS.Timeout | undefined;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        for (const contents of watched) {
+          contents.off("did-stop-loading", check);
+          contents.off("destroyed", check);
+        }
+        resolve();
+      };
+      // A tab that starts to load while others load is watched from the next check.
+      const check = () => {
+        if (settled) return;
+        const loading = this.#sessionTabs(target)
+          .map((tab) => tab.contents)
+          .filter(
+            (contents) => !contents.isDestroyed() && contents.isLoading() && frameOrigins(contents).includes(origin),
+          );
+        if (loading.length === 0) {
+          finish();
+          return;
+        }
+        for (const contents of loading) {
+          if (watched.has(contents)) continue;
+          watched.add(contents);
+          contents.on("did-stop-loading", check);
+          contents.once("destroyed", check);
+        }
+      };
+      // A page that never stops loading must not keep the service workers.
+      timer = setTimeout(finish, SERVICE_WORKER_CLEAR_WAIT_MS);
+      timer.unref();
+      check();
+    });
   }
 
   /** Whether a page of the origin other than the tab's own is open in the session. */
@@ -2095,6 +2169,11 @@ export class BrowserHost {
     return connected;
   }
 
+  /** A member's device sent a sign-in to the tab while its takeover waited. */
+  takeoverSignInArrived(tabId: string): boolean {
+    return this.#takeoverSignInTabIds.has(tabId);
+  }
+
   /** `completed`: the person selected Done, so a bot check that was on the page is one they could not pass. */
   endTakeover(tabId: string, completed = false): void {
     const tab = this.#tabs.get(tabId);
@@ -2104,6 +2183,7 @@ export class BrowserHost {
       if (completed && tab.checkOrigin) tab.checkAfterTakeover = tab.checkOrigin;
     }
     this.#takeoverTabIds.delete(tabId);
+    this.#takeoverSignInTabIds.delete(tabId);
     this.#syncAttachedView();
     this.#emitChanged();
     // A failed submission can leave the secret in a page that never loads a new document, such as a
@@ -3547,10 +3627,14 @@ export class BrowserHost {
 
   /** Records whether a page load could reach the proxy of its tab, and why not. */
   #noteProxyLoad(tab: BrowserHostTab, failure: BrowserProxyFailure | null): void {
-    const proxyId = this.#tabProxy(tab)?.proxyId;
-    if (proxyId === undefined || (this.#proxyFailures.get(proxyId) ?? null) === failure) return;
-    if (failure === null) this.#proxyFailures.delete(proxyId);
-    else this.#proxyFailures.set(proxyId, failure);
+    const proxy = this.#tabProxy(tab);
+    if (proxy === null || (this.#proxyFailures.get(proxy.proxyId)?.failure ?? null) === failure) return;
+    if (failure === null) this.#proxyFailures.delete(proxy.proxyId);
+    else
+      this.#proxyFailures.set(proxy.proxyId, {
+        failure,
+        memberId: proxy.kind === "computer" ? proxy.memberId : null,
+      });
     this.#onProxyStatusChanged();
   }
 
@@ -3582,7 +3666,7 @@ export class BrowserHost {
       );
     // The network error of this load came first and recorded why. Chromium commits its error page
     // before the load fails here, and that commit clears the sign-in mark of the tab.
-    const reason = this.#proxyFailures.get(proxy.proxyId) ?? this.#tabProxyFailure(tab, proxyError);
+    const reason = this.#proxyFailures.get(proxy.proxyId)?.failure ?? this.#tabProxyFailure(tab, proxyError);
     return browserFailure(
       new Error(
         reason === "signIn"
@@ -3594,12 +3678,21 @@ export class BrowserHost {
 
   /** Why the last page load through a proxy failed, or null when it did not fail. */
   proxyFailure(proxyId: string): BrowserProxyFailure | null {
-    return this.#proxyFailures.get(proxyId) ?? null;
+    return this.#proxyFailures.get(proxyId)?.failure ?? null;
   }
 
   /** Forgets the failure of a proxy that changed or went away. The next page load reports again. */
   forgetProxyFailure(proxyId: string): void {
     this.#proxyFailures.delete(proxyId);
+  }
+
+  /**
+   * Forgets the failures of the computer proxies of a member whose computer connected again. A page
+   * that failed while the computer was away, such as a tab that a restart restored, does not mark it.
+   */
+  forgetComputerFailures(memberId: string): void {
+    for (const [proxyId, failure] of this.#proxyFailures)
+      if (failure.memberId === memberId) this.#proxyFailures.delete(proxyId);
   }
 
   #persistentSessions(): Session[] {
@@ -3754,12 +3847,28 @@ export class BrowserHost {
     );
     target.setPermissionCheckHandler((_webContents, permission) => isAllowedBrowserPermission(permission));
     target.on("will-download", (event, item, contents) => {
-      if ([...this.#tabs.values()].some((tab) => tab.secret && tab.contents === contents)) {
+      const tab = [...this.#tabs.values()].find((candidate) => candidate.contents === contents);
+      if (tab?.secret) {
         event.preventDefault();
         return;
       }
-      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS || item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+      // A stopped download saves no file, so the tab's diagnostics tell the agent why. A download that
+      // started earlier can stop during secret entry, which keeps no diagnostics.
+      const stopped = (message: string) => {
+        if (!tab || tab.secret) return;
+        tab.diagnostics.add({ kind: "network", level: "error", message, ...diagnosticUrlField(item.getURL()) });
+        this.#emitChanged();
+      };
+      if (this.#activeDownloads >= MAX_ACTIVE_DOWNLOADS) {
         event.preventDefault();
+        stopped(
+          `Download refused: ${MAX_ACTIVE_DOWNLOADS} downloads are already in progress. No file was saved. Try again when one is done.`,
+        );
+        return;
+      }
+      if (item.getTotalBytes() > MAX_DOWNLOAD_BYTES) {
+        event.preventDefault();
+        stopped(DOWNLOAD_TOO_LARGE);
         return;
       }
       const safeName = basename(item.getFilename()).replace(/[^a-zA-Z0-9._ -]/g, "_");
@@ -3776,6 +3885,7 @@ export class BrowserHost {
         if (item.getState() !== "progressing" || item.getReceivedBytes() <= MAX_DOWNLOAD_BYTES) return;
         logger.warn("Browser download stopped at the size limit", { limitBytes: MAX_DOWNLOAD_BYTES });
         item.cancel();
+        stopped(DOWNLOAD_TOO_LARGE);
       });
       item.once("done", () => {
         this.#activeDownloads -= 1;
@@ -4061,9 +4171,10 @@ export class BrowserHost {
       changed();
       this.#schedulePersist();
     });
-    contents.on("did-navigate-in-page", (_event, url) => {
+    contents.on("did-navigate-in-page", (_event, url, isMainFrame) => {
       if (this.#tabs.get(tab.id) !== tab) return;
-      if (isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
+      // Electron reports this for each frame. A frame of another site must not become the tab address (#9974).
+      if (isMainFrame && isPersistableBrowserUrl(url)) tab.requestedUrl = persistentBrowserUrl(url);
       tab.revision += 1;
       changed();
       this.#schedulePersist();

@@ -788,6 +788,8 @@ function publicHold(reason: string | null): AgentTaskHold | null {
     // The providers start, restart, or cannot start at all: no task hold names that, so none shows (#8915).
     case null:
     case "providers-not-ready":
+    // A routine run waits for its provider to start again (#6751).
+    case "provider-start":
       return null;
     case "task-limit":
       return "task-limit";

@@ -694,8 +694,8 @@ do not all pass the check before their processes grow. A start that fails counts
 
 | Level | When | What happens |
 | --- | --- | --- |
-| `ok` | Other times. After `low`, only at 256 MB above the `low` limit. | Turns start. |
-| `low` | Free memory is less than 512 MB or 12% of the total. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
+| `ok` | Other times. After `low`, only at 256 MB above the `low` limit (10% of the total when that is less). | Turns start. |
+| `low` | Free memory is less than 512 MB or 12% of the total. Below 2.5 GB of total memory, 20% of the total replaces 512 MB, so a small server does not stay `low`. It is always at least 64 MB above the `critical` limit. | No new turn starts; the message stays queued. The agent shows one notice in each low period. The browser opens no new tab. At each sample, a Claude thread whose background tasks sent nothing for 30 minutes closes; with normal memory, background tasks keep their thread open. |
 | `critical` | Free memory is less than 256 MB or 6% of the total. | As `low`. Also, the provider threads with no turn close one time. They open again from their session at the next turn. Leftover agent processes stop (see below). |
 
 Agent processes (`AgentProcesses` in `src/main/server-memory.ts`):
@@ -1752,6 +1752,8 @@ sends the operator one message:
 | The owner cancels the renewal of a server plan or a license | ``Cancelled renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. It ends on <date>.`` | None. |
 | The owner resumes that renewal | ``Resumed renewal of the <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>.`` | None. |
 | A server plan or a license ends | ``Ended <server plan or license> for `<email>`: <product>, <amount> (<currency>) for 1 <month or year>. Reason: <cancelled or not paid>.`` | None. |
+| A paid Checkout page has a billing address in another country than the saved billing country | `VAT check: Checkout page <session ID> took the VAT of <country> (<treatment>), but its billing address is in <country>. ...` | Check the VAT of its invoice. |
+| Paid sales to consumers in other EU countries reach EUR 9,000 (net) in a calendar year, once a year | `VAT limit: in <year>, sales to consumers in other EU countries reached <amount> (net). ...` | Register for the EU One Stop Shop and charge the VAT of the buyer's country before EUR 10,000. |
 
 A purchase message (the last 5 rows) and a payment message (below) have the email of the account, on a
 developer decision, so keep the webhook in a private channel. A pool message has no account, email or

@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Wyczyścić dziennik pomocy?",
   "mobile.settings.support.clearBody": "Usuwa to wszystkie zdarzenia z dziennika na tym telefonie.",
   "mobile.settings.support.logFooter":
-    "Dziennik pozostaje na tym telefonie, a OpenBot go nie wysyła. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
+    "Dziennik pozostaje na tym telefonie. OpenBot wysyła jego wiersze tylko ze zgłoszeniem błędu aplikacji na telefon, które wysyłasz, a karta zgłoszenia najpierw je pokazuje. Zapisuje kroki połączenia, żądania i błędy. Nie zapisuje wiadomości ani plików i maskuje hasła oraz tokeny. Przeczytaj plik, zanim go udostępnisz.",
   "mobile.settings.support.saveFailed": "Nie udało się zapisać pliku dziennika. Spróbuj ponownie.",
   "mobile.settings.support.sharingUnavailable": "Udostępnianie jest niedostępne na tym telefonie.",
   "mobile.settings.support.newestFirst": "Od najnowszych.",
@@ -133,6 +133,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Jasność",
   "mobile.settings.appearance.messageColorFooter":
     "Z kolorem agenta Twoje wiadomości w czacie z agentem mają kolor tego agenta. Z własnym kolorem Twoje wiadomości we wszystkich czatach mają wybrany kolor. Kolor tekstu zmienia się, aby tekst był czytelny.",
+  "mobile.settings.appearance.chatBackground": "Tło czatu",
+  "mobile.settings.appearance.chatBackgroundDefault": "Domyślne",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Każdy motyw ma własny kolor. Kolor, przy którym tekst trudno czytać, staje się ciemniejszy lub jaśniejszy.",
   "mobile.settings.appearance.collapseRoutines": "Zwijaj aktywność rutyn",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Kolejne zdarzenia rutyn w czacie są widoczne jako jeden zwinięty wiersz. Stuknij wiersz, aby je pokazać.",

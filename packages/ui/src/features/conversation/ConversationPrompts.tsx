@@ -174,6 +174,8 @@ export function ApprovalCard(props: {
 /**
  * The agent's offer to send a bug report or an idea to the OpenBot team. It reads as a message, not
  * as a grant: the report is a quote, and Send keeps its loader until the thank-you card replaces it.
+ * A bug report about the phone app has no Send here: only the phone has its version, its system and
+ * its support log, so the card tells the user to send the report from the phone app.
  */
 function FeedbackOffer(props: {
   report: FeedbackApproval;
@@ -211,6 +213,9 @@ function FeedbackOffer(props: {
       <Show when={props.cut}>
         <p class="approval-cut-note">{t("prompt.approval.cut")}</p>
       </Show>
+      <Show when={props.report.phone}>
+        <p class="approval-cut-note">{t("prompt.approval.report.phoneOnly")}</p>
+      </Show>
       <div class="feedback-offer-actions">
         <Button
           variant="secondary"
@@ -223,7 +228,7 @@ function FeedbackOffer(props: {
         >
           {t("prompt.approval.report.dontSend")}
         </Button>
-        <Show when={!props.cut}>
+        <Show when={!props.cut && !props.report.phone}>
           <Button
             variant="default"
             type="button"
@@ -258,6 +263,8 @@ interface BrowserTakeoverCardProps {
    * sign-in on this computer; `signingIn` is true while that sign-in is open.
    */
   signInBlocked?: { server: string; signingIn: boolean } | undefined;
+  /** The page refused the sign-in from the server, and only the desktop app can send one from the user's device. */
+  signInOnDesktop?: boolean | undefined;
   browserSecret?: {
     loadPreview?: (tabId: string) => Promise<BrowserPreview>;
     /** Offer "Save to Vault" for a password. */
@@ -314,12 +321,14 @@ function BrowserManualTakeoverCard(props: BrowserTakeoverCardProps) {
     const blocked = props.signInBlocked;
     if (completed()) return t("prompt.browser.continuing", { name: props.agentName });
     if (cancelled()) return t(blocked ? "prompt.browser.signInBlocked.cancelledBody" : "prompt.browser.cancelledBody");
-    return blocked
-      ? t("prompt.browser.signInBlocked.body", {
-          host: pageDetails().host,
-          server: blocked.server,
-          name: props.agentName,
-        })
+    if (blocked)
+      return t("prompt.browser.signInBlocked.body", {
+        host: pageDetails().host,
+        server: blocked.server,
+        name: props.agentName,
+      });
+    return props.signInOnDesktop
+      ? t("prompt.browser.signInBlocked.desktopBody", { host: pageDetails().host, name: props.agentName })
       : t("prompt.browser.pendingBody", { name: props.agentName });
   };
   const pageHost = () => {

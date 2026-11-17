@@ -455,7 +455,9 @@ export class BrowserCdpEngine {
     },
     BrowserOperationError
   > {
-    const generation = this.#navigationGeneration;
+    // A new document stops the fill. A same-document navigation, as a sign-in page that sets its address
+    // for the password step, keeps the fields; the checks in the page below still refuse a changed field (#10462).
+    const generation = this.#documentGeneration;
     // A submitter that overrides the form to GET is part of it, so a page cannot add one while the
     // vault read waits.
     const fingerprintFields = `[this.localName, this.type, this.id, this.name, this.getAttribute('autocomplete'), this.getAttribute('aria-label'), this.form?.action, this.form?.method, [...(this.form?.elements ?? [])].some((element) => element.hasAttribute('formmethod') && element.getAttribute('formmethod').trim().toLowerCase() !== 'post')]`;
@@ -567,14 +569,14 @@ export class BrowserCdpEngine {
         return { inputs, button, fingerprints, kinds, servedByWorker, origin: fieldOrigin };
       }),
     );
-    if (generation !== this.#navigationGeneration)
+    if (generation !== this.#documentGeneration)
       return yield* browserFailure(new Error("Authentication page changed."));
     const enter = (values: readonly string[]) =>
       Effect.gen({ self: this }, function* () {
         yield* Effect.gen({ self: this }, function* () {
           yield* this.#leaseEffect((send) =>
             Effect.gen({ self: this }, function* () {
-              if (generation !== this.#navigationGeneration)
+              if (generation !== this.#documentGeneration)
                 return yield* browserFailure(new Error("Authentication page changed."));
               for (const [index, node] of [...nodes.inputs, ...(nodes.button ? [nodes.button] : [])].entries()) {
                 if (
@@ -599,7 +601,7 @@ export class BrowserCdpEngine {
                 if (valid !== true) return yield* browserFailure(new Error("Authentication target changed."));
               }
               for (const [index, node] of nodes.inputs.entries()) {
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 yield* send("DOM.focus", { backendNodeId: node.backendNodeId }, node.sessionId);
                 yield* this.#callOnNode(
@@ -613,7 +615,7 @@ export class BrowserCdpEngine {
                   node.sessionId,
                   node.contextId,
                 );
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 // Native entry emits trusted input events across shadow roots, as regular browser typing
                 // does. Synthetic value setters can leave component forms unaware of the filled field.
@@ -621,7 +623,7 @@ export class BrowserCdpEngine {
                 if (text === undefined) return yield* browserFailure(new Error("Authentication target changed."));
                 yield* send("Input.insertText", { text }, node.sessionId);
               }
-              if (submission === "on_input" || generation !== this.#navigationGeneration) return;
+              if (submission === "on_input" || generation !== this.#documentGeneration) return;
               const { button } = nodes;
               if (submission === "click" && button) {
                 yield* this.#callOnNode(
@@ -651,7 +653,7 @@ export class BrowserCdpEngine {
                   true,
                   button.sessionId,
                 );
-                if (generation !== this.#navigationGeneration)
+                if (generation !== this.#documentGeneration)
                   return yield* browserFailure(new Error("Authentication page changed."));
                 yield* dispatchMouseClick(send, point, "left", 1, 0, sessionId);
               } else if (submission === "enter") {
@@ -2009,6 +2011,7 @@ export class BrowserCdpEngine {
           return assignment;
         }
         onDispatch?.();
+        yield* this.#clearFileInputEffect(send, resolved.backendNodeId, resolved.sessionId);
         yield* send(
           "DOM.setFileInputFiles",
           { backendNodeId: resolved.backendNodeId, files: paths },
@@ -2078,7 +2081,7 @@ export class BrowserCdpEngine {
             debuggerClient.on("message", listener);
             return stopWaitingForChooser;
           });
-          yield* Effect.gen(function* () {
+          yield* Effect.gen({ self: this }, function* () {
             yield* send("Page.enable", {}, chooserSessionId);
             yield* send("Page.setInterceptFileChooserDialog", { enabled: true }, chooserSessionId);
             yield* browserSync(() => assertBeforeDeadline(deadline));
@@ -2094,6 +2097,7 @@ export class BrowserCdpEngine {
             if (!backendNodeId) return yield* browserFailure(new Error("The file chooser has no file input."));
             if (opened.mode === "selectSingle" && paths.length > 1)
               return yield* browserFailure(new Error("The file chooser accepts only one file."));
+            yield* this.#clearFileInputEffect(send, backendNodeId, chooserSessionId);
             yield* send("DOM.setFileInputFiles", { backendNodeId, files: paths }, chooserSessionId);
           }).pipe(
             Effect.ensuring(
@@ -2112,6 +2116,28 @@ export class BrowserCdpEngine {
       (ownSessionId) =>
         ownSessionId ? send("Target.detachFromTarget", { sessionId: ownSessionId }).pipe(Effect.ignore) : Effect.void,
     );
+  });
+
+  /**
+   * Empties a file input, with no event, before `DOM.setFileInputFiles` sets its files. The browser sends
+   * `input` and `change` only when the file list changes, and an upload of unchanged files reuses the
+   * kept copy at the same path (`BrowserUploads`), so without this a retry reaches no page code. It runs
+   * in the automation world, where a page cannot replace `DataTransfer`. A failure leaves the upload as
+   * it was without this step.
+   */
+  readonly #clearFileInputEffect = Effect.fn("BrowserCdp.clearFileInput")(function* (
+    this: BrowserCdpEngine,
+    send: SendCommand,
+    backendNodeId: number,
+    sessionId?: string,
+  ): Effect.fn.Return<void> {
+    yield* this.#callOnNode(
+      send,
+      backendNodeId,
+      "function() { this.files = new DataTransfer().files; }",
+      [],
+      sessionId,
+    ).pipe(Effect.ignore);
   });
 
   readonly #identifyUploadTargetEffect = Effect.fn("BrowserCdp.identifyUploadTarget")(function* (

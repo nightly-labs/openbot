@@ -71,7 +71,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Очистить журнал поддержки?",
   "mobile.settings.support.clearBody": "Все события будут удалены из журнала на этом телефоне.",
   "mobile.settings.support.logFooter":
-    "Журнал хранится на этом телефоне, OpenBot его не отправляет. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
+    "Журнал хранится на этом телефоне. OpenBot отправляет его строки только с отчётом об ошибке в приложении на телефоне, который отправляете вы, и карточка отчёта сначала их показывает. В нём записаны шаги подключения, запросы и ошибки, но не сообщения и файлы; пароли и токены скрыты. Прочитайте файл, прежде чем делиться им.",
   "mobile.settings.support.saveFailed": "Не удалось сохранить файл журнала. Повторите попытку.",
   "mobile.settings.support.sharingUnavailable": "На этом телефоне нельзя поделиться файлом.",
   "mobile.settings.support.newestFirst": "Сначала новые.",
@@ -133,6 +133,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Светлота",
   "mobile.settings.appearance.messageColorFooter":
     "С цветом агента ваши сообщения в чате с агентом окрашиваются в цвет этого агента. Со своим цветом ваши сообщения во всех чатах окрашиваются в выбранный цвет. Цвет текста меняется, чтобы текст оставался читаемым.",
+  "mobile.settings.appearance.chatBackground": "Фон чата",
+  "mobile.settings.appearance.chatBackgroundDefault": "По умолчанию",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Каждая тема хранит свой цвет. Цвет, на котором текст трудно читать, становится темнее или светлее.",
   "mobile.settings.appearance.collapseRoutines": "Сворачивать активность регулярных задач",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Идущие подряд события регулярных задач в чате показываются одной свёрнутой строкой. Коснитесь строки, чтобы показать их.",

@@ -43,6 +43,19 @@ export const messages = {
   "settings.chatBackground.light": "Chathintergrund im Design Hell",
   "settings.chatBackground.dark": "Chathintergrund im Design Dunkel",
   "settings.chatBackground.default": "Standard",
+  "settings.chatBackdrop.title": "Fensterhintergrund",
+  "settings.chatBackdrop.description":
+    "Eine Szene, ein Bild oder ein GIF hinter dem ganzen Fenster auf diesem Gerät. Bitte einen Agenten um eine Szene und wähle dann bei seiner Antwort „Als Fensterhintergrund verwenden“.",
+  "settings.chatBackdrop.none": "Keiner",
+  "settings.chatBackdrop.pond": "Koi-Teich",
+  "settings.chatBackdrop.jellyfish": "Quallen",
+  "settings.chatBackdrop.sunset": "Retro-Sonnenuntergang",
+  "settings.chatBackdrop.snowfall": "Schneefall",
+  "settings.chatBackdrop.fireflies": "Glühwürmchen",
+  "settings.chatBackdrop.upload": "Bild hochladen…",
+  "settings.chatBackdrop.uploadRefused": "Verwende ein PNG-, JPEG-, GIF-, WebP- oder AVIF-Bild mit höchstens 20 MB.",
+  "settings.chatBackdrop.saveFailed": "Der Fensterhintergrund wurde nicht gespeichert.",
+  "settings.chatBackdrop.removeFailed": "Der Fensterhintergrund wurde nicht entfernt.",
   "settings.chatColor.title": "Chatfarbe",
   "settings.chatColor.description":
     "Färbt die Blasen deiner Nachrichten ein. Personen auf deinen Servern sehen sie auch.",
@@ -106,7 +119,7 @@ export const messages = {
   "settings.sendShortcut.title": "Tastenkürzel zum Senden",
   "settings.sendShortcut.description": "Wähle die Tasten zum Senden auf diesem Gerät und in diesem Browser.",
   "settings.chatOrder.description":
-    "Wähle, wo die Seitenleiste ungelesene Chats auf diesem Gerät zeigt. „Manuell“ schaltet die Gruppe „Ungelesen“ aus.",
+    "Wähle, wie die Seitenleiste Chats auf diesem Gerät sortiert. „Manuell“ und „Letzte Aktivität“ schalten die Gruppe „Ungelesen“ aus.",
   "settings.sendShortcut.enter": "Mit Enter senden",
   "settings.sendShortcut.modEnterMac": "Mit ⌘Enter senden",
   "settings.sendShortcut.modEnterWin": "Mit Strg+Enter senden",
@@ -683,6 +696,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "Parakeet Unified erkennt nur Englisch. Um eine Sprache festzulegen, verwende Whisper, Cohere oder ElevenLabs.",
   "settings.voice.language.automatic": "Automatisch",
+  "settings.voice.pause.title": "Pause vor dem Senden",
+  "settings.voice.pause.description":
+    "In einem Sprachgespräch sendet OpenBot deine Worte, wenn du so lange nicht sprichst. Wähle eine längere Pause, wenn du langsam sprichst oder zum Nachdenken innehältst. Codex-Live-Sprache erkennt das Ende selbst.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Die Sprachmodelle konnten nicht gelesen werden.",
   "settings.voice.saveFailed": "Die Spracheinstellung konnte nicht gespeichert werden. Versuche es erneut.",
   "settings.voice.downloadFailed": "Der Download konnte nicht starten. Versuche es erneut.",

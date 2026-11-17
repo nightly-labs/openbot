@@ -744,6 +744,10 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
   // X11: a window that is not focusable when it is made has no window manager, so it never takes keys.
   // A dock window that is focusable at first stays on top on each desktop and takes keys for the chat.
   const x11 = process.platform === "linux";
+  // Hyprland ignores the X11 shape and draws its border and shadow around the full window, also around
+  // its empty part (#9855). It draws none around a splash window, which floats and takes focus on a
+  // click there, as a dock window does.
+  const x11Type = process.env.HYPRLAND_INSTANCE_SIGNATURE ? "splash" : "dock";
   const window = new BrowserWindow({
     ...bounds,
     show: false,
@@ -760,7 +764,7 @@ export function createAgentDockWindow(bounds: Rectangle): BrowserWindow {
     hasShadow: false,
     skipTaskbar: true,
     // A Windows tool window stays out of Alt+Tab and the taskbar, as a macOS panel does.
-    type: process.platform === "darwin" ? "panel" : x11 ? "dock" : "toolbar",
+    type: process.platform === "darwin" ? "panel" : x11 ? x11Type : "toolbar",
     backgroundColor: "#00000000",
     webPreferences: {
       preload: join(__dirname, "../preload/index.cjs"),
@@ -828,8 +832,9 @@ export function createComputerUseHighlightWindow(bounds: Rectangle): BrowserWind
   // A floating level, which is the only thing that holds this window in front on macOS: both
   // `moveAbove` and `moveTop` return without an error and leave a transparent panel where it was.
   // The level stays below the menu bar, and the rim is a thin edge around one window, so being in
-  // front costs the user almost none of what is behind it.
-  window.setAlwaysOnTop(true, "floating");
+  // front costs the user almost none of what is behind it. On Windows, Electron puts a "floating"
+  // window just behind the taskbar, where a full-screen app can put it under other apps.
+  window.setAlwaysOnTop(true, process.platform === "darwin" ? "floating" : "normal");
   // The agent works wherever the user left the window, which can be another Space or another
   // application's full screen. One overlay on every Space is what lets the rim follow it there
   // without a second window and without pulling the user out of the Space they are on. The

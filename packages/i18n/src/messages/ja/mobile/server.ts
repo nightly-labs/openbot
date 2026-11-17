@@ -447,7 +447,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "この検索に一致するタイムゾーンはありません。",
   "mobile.server.settings.timezoneMore": "他のタイムゾーンを表示するには、名前をもっと入力してください。",
   "mobile.server.settings.timezoneDescription":
-    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。",
+    "メッセージに送信者のタイムゾーンがない場合、新しいルーティンはこのタイムゾーンを使います。サーバーでは、次の再起動後にブラウザーもこのタイムゾーンを使います。",
   "mobile.server.settings.timezoneLoading": "タイムゾーンを読み込んでいます…",
   "mobile.server.settings.timezoneLoadFailed": "サーバーのタイムゾーンを読み込めませんでした。",
   "mobile.server.settings.timezoneSaveFailed": "タイムゾーンを保存できませんでした。もう一度お試しください。",
@@ -886,6 +886,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "「対応しています…」メッセージ",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "エージェントの作業中に OpenBot が送信し、その後、回答に置き換えます。回答だけを送信するにはオフにしてください。",
+  "mobile.server.connectors.whatsapp.statusReactions": "ステータスのリアクション",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "メッセージが届くと OpenBot が 👀 で、回答の準備ができると ✅ でリアクションします。リアクションを送信しないにはオフにしてください。",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "このエージェントは、リンクしたすべての番号から OpenBot 宛てのメッセージを受け取ります。短いものには自分で回答し、その他の作業は適切なエージェントに任せて、WhatsApp で回答します。",
@@ -1116,6 +1119,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Claude Code の既定",
   "mobile.server.providers.compactWindowTokens": "{size} トークン",
   "mobile.server.providers.compactWindowLoadFailed": "このサーバーの圧縮サイズを読み込めませんでした。",
+  "mobile.server.environment.row": "変数",
+  "mobile.server.environment.title": "環境",
+  "mobile.server.environment.hint":
+    "{name} の各プロセスが受け取る API キー、ベース URL などの設定です。変更は進行中のターンが終わると適用されます。",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL と、そのキーとしての OPENAI_API_KEY で、ChatGPT のモデルへのリクエストをそのアドレスに送ります。",
+  "mobile.server.environment.shellNote": "エージェントが実行するコマンドはこれらの値を読めます。",
+  "mobile.server.environment.add": "変数を追加",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "値",
+  "mobile.server.environment.saved": "保存済み",
+  "mobile.server.environment.sensitive": "機密",
+  "mobile.server.environment.remove": "削除",
+  "mobile.server.environment.save": "保存",
+  "mobile.server.environment.loadFailed": "{name} の変数を読み込めませんでした。",
+  "mobile.server.environment.invalid": "先に名前を修正してください。",
   "mobile.server.providers.disconnect": "接続を解除",
   "mobile.server.providers.disconnectTitle": "{name} の接続を解除しますか？",
   "mobile.server.providers.disconnectBody":

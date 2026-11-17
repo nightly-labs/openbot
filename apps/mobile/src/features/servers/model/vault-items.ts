@@ -208,6 +208,11 @@ export interface VaultDraft extends VaultContactFields {
    * setup key or `otpauth://totp/` link. The host never sends a saved key.
    */
   twoStepKey: string | null;
+  /**
+   * The ids of the agents that can use the item, or null for every agent, also each agent that is
+   * added later. Only a `vault-v4` host keeps it.
+   */
+  agents: string[] | null;
 }
 
 const EMPTY_CONTACT: VaultContactFields = {
@@ -240,6 +245,7 @@ export function vaultDraft(item: VaultItemSummary | undefined): VaultDraft {
     name: "",
     key: "",
     twoStepKey: null,
+    agents: item?.agents ? [...item.agents] : null,
   };
   switch (item?.kind) {
     case "login":
@@ -255,7 +261,7 @@ export function vaultDraft(item: VaultItemSummary | undefined): VaultDraft {
         fillSites: [...item.fillSites],
       };
     case "contact": {
-      const { id: _id, kind: _kind, addedBy: _addedBy, ...fields } = item;
+      const { id: _id, kind: _kind, addedBy: _addedBy, agents: _agents, ...fields } = item;
       return { ...draft, ...fields };
     }
     case "apiKey":
@@ -270,11 +276,37 @@ function whole(value: string): number | null {
   return /^\d{1,4}$/u.test(value.trim()) ? Number(value.trim()) : null;
 }
 
+/** The agent summary of an item that is for chosen agents: one agent's name, or "2 of 5". */
+export function vaultAgentsSummary(
+  scope: readonly string[],
+  agents: readonly { id: string; name: string }[],
+  t: MobileText["t"],
+): string {
+  // An id of an agent that the server no longer has does not count.
+  const chosen = agents.filter((agent) => scope.includes(agent.id));
+  if (chosen.length === 1 && chosen[0]) return chosen[0].name;
+  return t("mobile.server.vault.agentsSome", { chosen: chosen.length, total: agents.length });
+}
+
 /**
  * The save input of `draft`, or null while a required field is empty. The host checks every value
  * again, with the rules of its own Vault page, and answers a wrong one with that page's sentence.
+ * With `agentScope` (a `vault-v4` host) it carries the agents; without, the saved agents stay.
  */
-export function vaultSaveInput(kind: VaultItemKind, id: string | null, draft: VaultDraft): VaultSaveInput | null {
+export function vaultSaveInput(
+  kind: VaultItemKind,
+  id: string | null,
+  draft: VaultDraft,
+  agentScope = false,
+): VaultSaveInput | null {
+  if (!agentScope) return vaultItemInput(kind, id, draft);
+  // The host refuses an item for no agent.
+  if (draft.agents?.length === 0) return null;
+  const item = vaultItemInput(kind, id, draft);
+  return item && { ...item, agents: draft.agents === null ? null : [...draft.agents] };
+}
+
+function vaultItemInput(kind: VaultItemKind, id: string | null, draft: VaultDraft): VaultSaveInput | null {
   const secret = (value: string) => (value.length === 0 ? null : value);
   switch (kind) {
     case "login": {

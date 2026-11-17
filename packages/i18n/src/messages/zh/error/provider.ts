@@ -39,6 +39,12 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "地址或文件夹数量过多。",
   "error.provider.credentialFileUnreadable": "服务商凭据文件无法读取。",
   "error.provider.credentialFileTooLarge": "服务商凭据文件过大。",
+  "error.provider.environmentNameInvalid": "{name} 不是有效的变量名。请使用字母、数字和 _，且不要以数字开头。",
+  "error.provider.environmentNameReserved": "OpenBot 会为此提供方设置 {name}。请移除此变量。",
+  "error.provider.environmentNameDuplicate": "{name} 在列表中出现了多次。",
+  "error.provider.environmentValueTooLong": "{name} 的值太长。",
+  "error.provider.environmentTooMany": "一个提供方最多可以有 {limit} 个变量。",
+  "error.provider.environmentSecretsTooLarge": "敏感值加起来太长。请保存更短或更少的值。",
   "error.provider.archiveSpecialFile": "运行时压缩包中包含链接或特殊文件。",
   "error.provider.archiveUnsafePath": "运行时压缩包中包含不安全的路径。",
   "error.provider.runtimeSpecialFile": "运行时中包含链接或特殊文件。",
@@ -157,6 +163,8 @@ export const messages = {
   "error.provider.codeLoginBadCode": "请粘贴登录页显示的验证码。",
   "error.provider.codeLoginRefused": "服务商未接受该验证码，请重新开始登录。",
   "error.provider.codeLoginUnsupported": "该服务器不支持用粘贴验证码的方式登录。请在服务器电脑的浏览器中登录。",
+  "error.provider.claudeLoginNotSaved":
+    "Claude 无法在 Mac 上保存登录信息。请重启运行 OpenBot 的 Mac，然后重新连接 Claude。",
   "error.provider.cliBusyRetry": "{provider} CLI 正在处理对话，请等它结束后重试。",
   "error.provider.cliSigningIn": "{provider} CLI 正在登录，请完成或取消登录后再更新。",
   "error.provider.cliBusyUpdate": "{provider} CLI 正在处理对话，请等它结束后再更新。",
@@ -176,6 +184,8 @@ export const messages = {
     "OpenCode 尚未登录模型服务商“{provider}”。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode 尚未登录该模型的服务商。请选择带“免费”标签的模型，或连接该服务商：在 OpenCode 设置中粘贴 OpenCode Go 密钥，或在终端中运行 `opencode auth login`。然后重试。",
+  "error.provider.opencodeProviderRefused":
+    "模型服务商“{provider}”拒绝了请求。OpenCode 已有该服务商的密钥，因此原因可能是你的网络：部分服务商会屏蔽 VPN、代理或部分国家和地区。请关闭 VPN 或换用其他网络，然后重试。如果错误仍然出现，密钥可能不正确：在终端中运行 `opencode auth login` 并重新输入密钥。",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode 拒绝了这个免费模型。部分免费模型并非在所有国家/地区都可用。请选择其他带“免费”标签的模型，或在 OpenCode 设置中粘贴 OpenCode Go 密钥并选择 OpenCode Go 模型。",
   "error.provider.customEndpointKeyRefused":
@@ -242,8 +252,14 @@ export const messages = {
     "Google 提示已达到 Gemini 用量上限。上限可能只针对某一个模型，因此你的套餐用量页面可能显示还有剩余。请选择其他 Gemini 模型，或等待重置。\n{detail}",
   "error.provider.antigravityModelUnavailable": "Gemini 目前无法使用该模型。请改用其他模型后重试。\n{detail}",
   "error.provider.antigravityServiceFailure": "Google 的 Gemini 服务未能完成该请求。请过几分钟再试。\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google 未接受此请求的 Gemini 登录。请重新发送你的消息；若错误持续，请在设置中重新连接 Gemini。\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini 拒绝了此请求。请改用其他模型，然后重新发送消息。如果仍然失败，请开始新对话。\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini 拒绝了此请求，但没有给出原因。聊天记录中的某一项可能导致这种情况，例如智能体打开的图片。OpenBot 已带着聊天记录开启新的 Gemini 会话，请重试。如果仍然报错，请换一个模型。",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini 无法读取此聊天的已保存记录。OpenBot 已带着聊天记录开启新的 Gemini 会话。请重新发送你的消息。",
   "error.provider.antigravityLocationUnsupported":
     "Google 不允许在运行此助手的电脑所在的网络位置使用 Gemini。请在其他电脑上使用 Gemini，或为此助手选择其他服务商。\n{detail}",
   "error.provider.antigravityConnectionLost": "Gemini 与其代理的连接已断开，已停止。请发送一条消息以继续。",
@@ -283,7 +299,7 @@ export const messages = {
   "error.provider.hermesVersionUnreadable": "无法读取 Hermes Agent 的版本。",
   "error.provider.hermesSignIn": "要使用 Hermes，请使用 Nous Portal 登录，或在终端中运行 `hermes setup`。",
   "error.provider.hermesTurnFailed":
-    "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 服务器设置 › MCP 中检查，然后重新发送消息。",
+    "Hermes 未能完成本轮。如果它的回复说明了原因，请按回复操作。如果没有，此智能体的某个 MCP 服务器可能不可用：请在 市场、应用 中检查，然后重新发送消息。",
   "error.provider.hermesRefused":
     "Hermes 在开始前拒绝了这条消息。请重新发送。如果 Hermes 拒绝每条消息，请在运行此智能体的计算机上重新启动 OpenBot。",
   "error.provider.copilotThinkingRejected":
@@ -297,12 +313,18 @@ export const messages = {
     "Claude 服务拦截了这个请求。这通常是 Claude 方面的短暂问题，不是你的账号问题。请过几分钟再发送一次消息。",
   "error.provider.foreignReasoning":
     "此前的推理内容由另一个账号或 API 密钥接收，因此 {provider} 未接受它。OpenBot 已带着聊天记录开启新的 {provider} 会话，请重试。",
+  "error.provider.codexHistoryItemMissing":
+    "Codex 保存的历史记录中缺少一项内容，因此无法继续此聊天。OpenBot 已带着聊天记录开启新的 Codex 会话，请重试。",
+  "error.provider.codexRequestRefused":
+    "{provider} 拒绝了此聊天的请求，但没有给出原因。在包含大量图片的长聊天中可能出现这种情况。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooSmall":
     "图片太小，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageTooLarge":
     "图片太大，模型未接受此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.imageCountLimit":
     "此聊天中的图片太多，模型未接受此聊天。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
+  "error.provider.imageUnreadable":
+    "模型无法读取此聊天中的一张图片。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。如果你发送了图片，请换一张图片。",
   "error.provider.requestTooLarge":
     "此聊天太大，无法发送给模型。这通常是聊天中的图片导致的。OpenBot 已使用聊天记录开始新的 {provider} 会话。请重试。",
   "error.provider.opencodeSessionRejected":
@@ -401,6 +423,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI 无法启动。",
   "error.provider.nativeVersionUnreadable": "无法读取 {provider} CLI 版本。",
   "error.provider.piSessionBusy": "请等待当前 Pi 对话结束。",
+  "error.provider.acpSessionBusy": "{provider} 仍在结束已停止的对话。请稍后再试。",
   "error.provider.piStopped": "Pi 未运行。请连接 Pi 后重试。",
   "error.provider.piSessionMissing": "该电脑上没有可用的 Pi 会话文件。",
   "error.provider.piResumeCancelled": "Pi 取消了会话恢复，请重试。",

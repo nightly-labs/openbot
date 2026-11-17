@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Une idée ? Concrétisons-la.",
   "prompt.approval.report.dontSend": "Pas maintenant",
   "prompt.approval.report.send": "Envoyer à l'équipe OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Ouvre cette discussion dans l'app OpenBot du téléphone et envoie le rapport depuis là. Le téléphone ajoute sa version, son système et son journal d'assistance. Si le téléphone ne peut pas se connecter, ouvre Réglages > Assistance dans l'app du téléphone et signale le problème sur GitHub.",
   "prompt.approval.title.command": "Exécuter une commande",
   "prompt.approval.title.fileChange": "Modifier des fichiers",
   "prompt.approval.title.permissions": "Accorder des autorisations",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Connexion à {host} annulée",
   "prompt.browser.signInBlocked.body":
     "Connectez-vous sur cet ordinateur. OpenBot envoie uniquement la connexion à {host} vers {server}, et {name} continue.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} n’accepte pas de connexion depuis le serveur. Ouvrez ce chat dans l’application de bureau OpenBot sur votre ordinateur, et connectez-vous là. Ensuite, {name} continue.",
   "prompt.browser.signInBlocked.cancelledBody": "La connexion a été annulée.",
   "prompt.browser.signInBlocked.waiting": "En attente de la connexion",
   "prompt.browser.signInBlocked.waitingButton": "En attente de la connexion…",

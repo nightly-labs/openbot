@@ -19,6 +19,10 @@ import {
   CUSTOM_PROVIDER_EDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
 import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
+import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-harness-v1";
@@ -416,11 +420,13 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
           ? PROVIDERS_V5_ROUTES
           : PROVIDERS_ADMIN_ROUTES,
     () =>
-      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY)
-        ? CUSTOM_PROVIDER_EDIT_ROUTES
-        : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
-          ? CUSTOM_PROVIDER_HARNESS_ROUTES
-          : PROVIDERS_ADMIN_ROUTES,
+      serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY)
+        ? CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
+        : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_EDIT_CAPABILITY)
+          ? CUSTOM_PROVIDER_EDIT_ROUTES
+          : serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CAPABILITY)
+            ? CUSTOM_PROVIDER_HARNESS_ROUTES
+            : PROVIDERS_ADMIN_ROUTES,
     accountRelayOfServer,
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_MODELS_CAPABILITY),
     () => serverSupportsCapability(options.server(), PROVIDER_ACCOUNT_POOL_CAPABILITY),
@@ -837,6 +843,9 @@ export function createWebProviderSettings(options: WebProviderSettingsOptions) {
         editsCustomProviders() &&
         (customProviders()?.customProviders() ?? []).every((provider) => provider.headerNames !== undefined);
       return editable ? updateEndpoint : undefined;
+    },
+    get customProviderHarnessChoice() {
+      return serverSupportsCapability(options.server(), CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY);
     },
     get providerKeys() {
       return providerKeys();

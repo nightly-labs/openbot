@@ -11,6 +11,11 @@ export const messages = {
     "{provider} ne peut pas se connecter à son serveur. Nouvelle tentative {attempt} sur {maxAttempts}.",
   "status.provider.retryServerError":
     "Le serveur de {provider} est occupé ou en erreur. Nouvelle tentative {attempt} sur {maxAttempts}.",
+  "status.provider.modelRetryUnreachable":
+    "{provider} ne peut pas se connecter au fournisseur du modèle. Nouvel essai : tentative {attempt}.",
+  "status.provider.modelRetryServerError":
+    "Le fournisseur du modèle est occupé ou en erreur. {provider} réessaie : tentative {attempt}.",
+  "status.provider.modelRetryRecovered": "Le fournisseur du modèle répond de nouveau.",
   "status.provider.retryRecovered": "{provider} reçoit de nouveau des réponses de son serveur.",
   "status.provider.claudeFastModeNeedsUsageCredits":
     "Claude a répondu à la vitesse standard. Avec un abonnement Claude, le mode rapide utilise des crédits d’utilisation. Activez-les dans votre compte Claude.",

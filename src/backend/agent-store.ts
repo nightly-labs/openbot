@@ -1609,6 +1609,11 @@ export class AgentStore {
     agent.updatedAt = updatedAt;
   }
 
+  /** The provider of an agent. It copies no agent, so a hot path can ask it. */
+  providerOf(id: string): AgentProviderId | undefined {
+    return this.#state.agents.find((agent) => agent.id === id)?.provider;
+  }
+
   /** Whether this thread is an agent's own chat. It copies no agent, so a hot path can ask it. */
   ownsThread(threadId: string): boolean {
     return this.#state.agents.some((agent) => agent.threadId === threadId);

@@ -46,6 +46,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Es gibt zu viele Adressen oder Ordner.",
   "error.provider.credentialFileUnreadable": "Die Zugangsdaten-Datei des Anbieters ist nicht lesbar.",
   "error.provider.credentialFileTooLarge": "Die Zugangsdaten-Datei des Anbieters ist zu groß.",
+  "error.provider.environmentNameInvalid":
+    "{name} ist kein gültiger Variablenname. Verwende Buchstaben, Ziffern und _, und beginne nicht mit einer Ziffer.",
+  "error.provider.environmentNameReserved": "OpenBot setzt {name} für diesen Anbieter. Entferne diese Variable.",
+  "error.provider.environmentNameDuplicate": "{name} steht mehr als einmal in der Liste.",
+  "error.provider.environmentValueTooLong": "Der Wert von {name} ist zu lang.",
+  "error.provider.environmentTooMany": "Ein Anbieter kann höchstens {limit} Variablen haben.",
+  "error.provider.environmentSecretsTooLarge":
+    "Die vertraulichen Werte sind zusammen zu lang. Speichere kürzere oder weniger Werte.",
   "error.provider.archiveSpecialFile": "Das Laufzeitarchiv enthält einen Link oder eine spezielle Datei.",
   "error.provider.archiveUnsafePath": "Das Laufzeitarchiv enthält einen unsicheren Pfad.",
   "error.provider.runtimeSpecialFile": "Die Laufzeit enthält einen Link oder eine spezielle Datei.",
@@ -186,6 +194,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Der Anbieter hat den Code nicht akzeptiert. Starte die Anmeldung erneut.",
   "error.provider.codeLoginUnsupported":
     "Dieser Server unterstützt keine Anmeldung mit einem eingefügten Code. Melde dich im Browser auf dem Servercomputer an.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude konnte die Anmeldung auf dem Mac nicht speichern. Starte den Mac, auf dem OpenBot läuft, neu und verbinde Claude dann erneut.",
   "error.provider.cliBusyRetry":
     "Die CLI von {provider} bearbeitet einen Durchlauf. Warte auf den Abschluss und versuche es erneut.",
   "error.provider.cliSigningIn":
@@ -211,6 +221,8 @@ export const messages = {
     "OpenCode hat keine Anmeldung für den Modellanbieter „{provider}“. Wähle ein Modell mit der Markierung „Kostenlos“ oder verbinde den Anbieter: Füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein oder führe `opencode auth login` in einem Terminal aus. Versuche es dann erneut.",
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode hat keine Anmeldung für den Anbieter dieses Modells. Wähle ein Modell mit der Markierung „Kostenlos“ oder verbinde den Anbieter: Füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein oder führe `opencode auth login` in einem Terminal aus. Versuche es dann erneut.",
+  "error.provider.opencodeProviderRefused":
+    "Der Modellanbieter „{provider}“ hat die Anfrage abgelehnt. OpenCode hat einen Schlüssel für diesen Anbieter, daher kann dein Netzwerk die Ursache sein: Manche Anbieter sperren VPNs, Proxys oder einige Länder. Schalte das VPN aus oder nutze ein anderes Netzwerk und versuche es dann erneut. Wenn der Fehler bleibt, ist der Schlüssel eventuell falsch: Führe `opencode auth login` in einem Terminal aus und gib den Schlüssel erneut ein.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode hat dieses kostenlose Modell abgelehnt. Manche kostenlosen Modelle sind nicht in jedem Land verfügbar. Wähle ein anderes Modell mit der Markierung „Kostenlos“ oder füge einen OpenCode-Go-Schlüssel in den OpenCode-Einstellungen ein und wähle ein OpenCode-Go-Modell.",
   "error.provider.customEndpointKeyRefused":
@@ -289,8 +301,14 @@ export const messages = {
     "Gemini kann dieses Modell gerade nicht verwenden. Wähle ein anderes Modell und versuche es dann erneut.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Der Gemini-Dienst von Google hat die Anfrage nicht abgeschlossen. Versuche es in ein paar Minuten erneut.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google hat die Gemini-Anmeldung für diese Anfrage nicht akzeptiert. Sende deine Nachricht erneut. Wenn der Fehler bleibt, verbinde Gemini in den Einstellungen neu.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini hat diese Anfrage abgelehnt. Wähle ein anderes Modell und sende deine Nachricht erneut. Wenn es wieder fehlschlägt, starte einen neuen Chat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini hat diese Anfrage abgelehnt und keinen Grund genannt. Ein Element im Chatverlauf kann die Ursache sein, zum Beispiel ein Bild, das der Agent geöffnet hat. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn der Fehler bleibt, wähle ein anderes Modell.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini konnte den gespeicherten Verlauf dieses Chats nicht lesen. OpenBot hat eine neue Gemini-Sitzung mit dem Chatverlauf gestartet. Sende deine Nachricht erneut.",
   "error.provider.antigravityLocationUnsupported":
     "Google lässt Gemini am Netzwerkstandort des Computers, auf dem dieser Agent läuft, nicht arbeiten. Nutze Gemini auf einem anderen Computer oder wähle einen anderen Anbieter für diesen Agenten.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -336,7 +354,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Melde dich mit Nous Portal an oder führe `hermes setup` in einem Terminal aus, um Hermes zu verwenden.",
   "error.provider.hermesTurnFailed":
-    "Hermes konnte diesen Durchlauf nicht abschließen. Wenn die Antwort einen Grund nennt, folge ihm. Sonst ist vielleicht ein MCP-Server dieses Agenten nicht erreichbar: Prüfe ihn unter Servereinstellungen › MCP und sende deine Nachricht erneut.",
+    "Hermes konnte diesen Durchlauf nicht abschließen. Wenn die Antwort einen Grund nennt, folge ihm. Sonst ist vielleicht ein MCP-Server dieses Agenten nicht erreichbar: Prüfe ihn unter Marketplace, Apps und sende deine Nachricht erneut.",
   "error.provider.hermesRefused":
     "Hermes hat diese Nachricht abgelehnt, bevor sie begann. Sende sie erneut. Wenn Hermes jede Nachricht ablehnt, starte OpenBot auf dem Computer neu, auf dem dieser Agent läuft.",
   "error.provider.copilotThinkingRejected":
@@ -350,12 +368,18 @@ export const messages = {
     "Der Claude-Dienst hat diese Anfrage blockiert. Das ist meist ein kurzes Problem bei Claude, kein Problem mit deinem Konto. Sende die Nachricht in ein paar Minuten noch einmal.",
   "error.provider.foreignReasoning":
     "{provider} hat die früheren Überlegungen in diesem Chat nicht akzeptiert, da ein anderes Konto oder ein anderer API-Schlüssel sie erhalten hat. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.codexHistoryItemMissing":
+    "Codex konnte diesen Chat nicht fortsetzen, da ein Element in seinem gespeicherten Verlauf fehlt. OpenBot hat eine neue Codex-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.codexRequestRefused":
+    "{provider} hat die Anfrage für diesen Chat abgelehnt und keinen Grund genannt. Das kann in einem langen Chat mit vielen Bildern passieren. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooSmall":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu klein ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageTooLarge":
     "Das Modell hat ein Bild in diesem Chat nicht akzeptiert, weil das Bild zu groß ist. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.imageCountLimit":
     "Das Modell hat diesen Chat nicht akzeptiert, weil er zu viele Bilder enthält. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
+  "error.provider.imageUnreadable":
+    "Das Modell konnte ein Bild in diesem Chat nicht lesen. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut. Wenn du ein Bild gesendet hast, sende ein anderes.",
   "error.provider.requestTooLarge":
     "Dieser Chat ist zu groß geworden, um ihn an das Modell zu senden. Oft sind Bilder im Chat die Ursache. OpenBot hat eine neue {provider}-Sitzung mit dem Chatverlauf gestartet. Versuche es erneut.",
   "error.provider.opencodeSessionRejected":
@@ -482,6 +506,8 @@ export const messages = {
   "error.provider.nativeNotStarted": "Die {provider} CLI konnte nicht starten.",
   "error.provider.nativeVersionUnreadable": "Die Version der {provider} CLI konnte nicht gelesen werden.",
   "error.provider.piSessionBusy": "Warte, bis der aktuelle Pi-Durchlauf endet.",
+  "error.provider.acpSessionBusy":
+    "{provider} beendet noch einen gestoppten Durchlauf. Versuche es gleich noch einmal.",
   "error.provider.piStopped": "Pi läuft nicht. Verbinde Pi und versuche es erneut.",
   "error.provider.piSessionMissing": "Die Pi-Sitzungsdatei ist auf diesem Computer nicht verfügbar.",
   "error.provider.piResumeCancelled": "Pi hat das Fortsetzen der Sitzung abgebrochen. Versuche es erneut.",

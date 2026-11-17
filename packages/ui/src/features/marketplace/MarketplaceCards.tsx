@@ -2,7 +2,7 @@ import { Button, Plus, TriangleAlert } from "@openbot/ui";
 import { useText } from "@openbot/ui/text";
 import { Show } from "solid-js";
 import { AppLogo, Done } from "./MarketplaceParts";
-import { customServerStatus, type MarketplaceApp } from "./marketplace-model";
+import { customServerStatus, type MarketplaceApp, pluginNeedsMac } from "./marketplace-model";
 import type { MarketplaceScope } from "./marketplace-view";
 
 /** "1,204 installs", in the reader's number format. */
@@ -87,13 +87,15 @@ export function AppAction(props: {
         </Show>
       }
     >
-      {/* A custom server is turned on in Server settings › MCP, not here. The Apps tab lists only the
+      {/* A custom server is turned on on its own page, not here. The Apps tab lists only the
           connectors that this account can connect. While the app reads what a joined server serves,
           the app page shows Connect as busy; a list leaves it out. */}
       <Show
         when={
           props.app.kind === "connector" ||
-          (props.app.kind === "plugin" && (model().canConnectApps() || (!list() && checking())))
+          (props.app.kind === "plugin" &&
+            !pluginNeedsMac(model(), props.app.plugin) &&
+            (model().canConnectApps() || (!list() && checking())))
         }
       >
         <Button

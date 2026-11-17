@@ -29,6 +29,7 @@ export const messages = {
   "error.workflow.pictureMissing": "התמונה כבר לא בשרת. יש לשלוח אותה שוב.",
   "error.workflow.pictureType": "יש להשתמש בתמונה בפורמט PNG,‏ JPEG או WebP.",
   "error.workflow.mediaInputMissing": "תמונה משלב קודם אינה זמינה. יש להריץ את השלב הזה שוב.",
+  "error.workflow.mediaEmptyRequest": "יש לכתוב תיאור, או להריץ את השלבים שלפני השלב הזה כדי שיגיע טקסט או תמונה.",
   "error.workflow.mediaInputNotImage": "שלב זה מקבל רק תמונות, לא סרטונים. יש להסיר את החיבור מהסרטון.",
   "error.workflow.stepMissing": "השלב הזה כבר לא קיים.",
   "error.workflow.nodeMissing": "השלב הזה אינו בתהליך העבודה.",
@@ -80,4 +81,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra לא הצליח ליצור את הקובץ: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra לא סיים את הקובץ בזמן. כדאי לבדוק את הפרויקט OpenBot ב-sunra.ai לפני שמריצים את השלב שוב.",
+  "error.workflow.higgsfieldSignIn": "יש להתחבר ל-Higgsfield ב״אפליקציות״ כדי להשתמש במודלים של Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "בחשבון Higgsfield אין מספיק קרדיטים. אפשר להוסיף קרדיטים ב-higgsfield.ai/pricing ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "מודל Higgsfield זה דורש תוכנית Higgsfield. אפשר לבחור תוכנית ב-higgsfield.ai/pricing או לבחור מודל אחר.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield לא יצר את הקובץ כי בדיקת התוכן עצרה אותו. יש לשנות את ההנחיה או את תמונות הקלט ואז להריץ את השלב שוב.",
+  "error.workflow.higgsfieldFailed": "Higgsfield לא הצליח ליצור את הקובץ: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield לא סיים את הקובץ בזמן. כדאי לבדוק את ההיסטוריה ב-higgsfield.ai לפני שמריצים את השלב שוב.",
 } as const satisfies PartialTranslation<typeof source>;

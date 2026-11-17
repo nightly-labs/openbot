@@ -128,7 +128,7 @@ import {
   providerFailureStatus,
   setProviderStatus,
   updateProviderStatus,
-  waitForSuccessfulProcess,
+  waitForSignInProcess,
 } from "./provider-status";
 import { hasZeroRealtimeLimit } from "./realtime-limit";
 import { providerForAgent, providerLabel } from "./thread-items";
@@ -375,6 +375,8 @@ export interface ProviderHooks {
   onProviderActivated(provider: AgentProvider, configRevision: number): Effect.Effect<void, ProviderOperationFailed>;
   /** Runs after an account after the first listed its models, which `accountModels` now answers. */
   onAccountModelsListed?(provider: AgentProvider, accountId: string): Effect.Effect<void>;
+  /** Runs after a change to the accounts of a provider, such as an account that connected. */
+  onAccountsChanged?(): void;
   /**
    * The configuration a process spawning now reads. A CLI reads the endpoint files once, at spawn,
    * so a change made while it starts is not in the process that arrives.
@@ -480,7 +482,10 @@ export class ProviderRuntime implements ProviderPort {
    */
   readonly #cliSources = new Map<AgentProvider, Pick<AgentCliInfo, "source" | "incomplete">>();
   /** The CLI the last resolution passed over, which the user can switch to (`chooseInstalledCli`). */
-  readonly #passedOverClis = new Map<AgentProvider, { source: AgentCliInfo["source"]; version: string }>();
+  readonly #passedOverClis = new Map<
+    AgentProvider,
+    { source: AgentCliInfo["source"]; version: string; incomplete?: boolean }
+  >();
   readonly #accounts = new Map<AgentProvider, AccountReadResult["account"]>();
   readonly #providerStarts = new Map<AgentProvider, Deferred.Deferred<void, ProviderOperationFailed>>();
   /**
@@ -598,6 +603,11 @@ export class ProviderRuntime implements ProviderPort {
   readonly #saveProviderUse: (provider: AgentProvider, on: boolean) => Effect.Effect<void, ProviderOperationFailed>;
   /** The managed CLIs that the user chose to run in their own install, also when OpenBot's copy is newer. */
   readonly #installedChosen: Set<AgentProvider>;
+  /**
+   * The managed CLIs whose newer copy from OpenBot failed each start, so the CLI that the user installed
+   * runs in its place until the app restarts, the copy changes, or the user chooses (#10174). Not saved.
+   */
+  readonly #installedFallback = new Set<AgentProvider>();
   readonly #saveInstalledChoice: (
     provider: AgentProvider,
     installed: boolean,
@@ -647,7 +657,7 @@ export class ProviderRuntime implements ProviderPort {
     this.#redactMcp = options.redactMcp;
     this.#codexLogin = new CodexLoginFlow({
       bundledExecutable: () => this.#bundledExecutables.codex,
-      installedChosen: () => this.#installedChosen.has("codex"),
+      installedChosen: () => this.#installedChosen.has("codex") || this.#installedFallback.has("codex"),
       createClient: (cli) => {
         const client = this.#clientFactory
           ? this.#clientFactory("codex", cli)
@@ -767,7 +777,10 @@ export class ProviderRuntime implements ProviderPort {
             this.#consumeUsageReset(client).pipe(
               Effect.mapError((error) => new ProviderAccountFailed({ cause: error.cause })),
             ),
-          changed: () => this.#setStatus({}),
+          changed: () => {
+            this.#setStatus({});
+            this.#hooks.onAccountsChanged?.();
+          },
           // Forked: the hook can move agents, and the check that listed the models must not wait for that.
           modelsListed: (provider, accountId) =>
             (this.#hooks.onAccountModelsListed?.(provider, accountId) ?? Effect.void).pipe(
@@ -783,6 +796,10 @@ export class ProviderRuntime implements ProviderPort {
       isSignedOut: (provider) => this.signInRequired(provider),
       requestTimeoutMs: this.#requestTimeoutMs,
       recordProviderError: (provider, error) => this.#recordProviderError(provider, error),
+      // Apart from the read: the restart reads the catalogue again itself. An agent's own process, such
+      // as one of an account after the first, read the same settings at its start, so it starts again too.
+      startSettingsChanged: (provider) =>
+        this.spawnSettingsChanged(provider).pipe(Effect.ignore, Effect.forkIn(this.#scope), Effect.asVoid),
     });
   }
 
@@ -811,6 +828,7 @@ export class ProviderRuntime implements ProviderPort {
         const lastError = this.#lastErrors.get(row.id);
         const unverified =
           row.id === "muse" && row.state === "available" && this.#accounts.get(row.id)?.type === "muse-unverified";
+        const modelSource = this.#modelCatalog.source(row.id);
         const withSource = {
           ...row,
           ...(unverified
@@ -823,6 +841,7 @@ export class ProviderRuntime implements ProviderPort {
           ...(row.id === "antigravity" && this.#credentials.apiKey("antigravity") ? { apiKeyInUse: true } : {}),
           ...(row.id === "codex" && this.#accounts.get("codex")?.type === "apiKey" ? { apiKeyInUse: true } : {}),
           ...(row.id === "muse" && this.#credentials.apiKey("muse") ? { apiKeyInUse: true } : {}),
+          ...(modelSource ? { modelSource } : {}),
         };
         const accounts =
           row.state === "available" && row.id !== "acp"
@@ -947,7 +966,7 @@ export class ProviderRuntime implements ProviderPort {
         (input) => driver.resolveCli(input),
         this.#bundledExecutables[cliProvider],
         preferInstalled,
-        this.#installedChosen.has(cliProvider),
+        this.#installedChosen.has(cliProvider) || this.#installedFallback.has(cliProvider),
       ).pipe(toProviderOperationFailed);
       this.#cliSources.set(provider, cli);
       if (passedOver) this.#passedOverClis.set(provider, passedOver);
@@ -1877,7 +1896,7 @@ export class ProviderRuntime implements ProviderPort {
                     spawn(target.command, target.args, {
                       cwd: process.cwd(),
                       env: { ...process.env, ...signIn.command.env(cli, region), ...browser },
-                      stdio: "ignore",
+                      stdio: signIn.command.failureText ? ["ignore", "pipe", "pipe"] : "ignore",
                       shell: false,
                       windowsHide: process.platform === "win32",
                       windowsVerbatimArguments: target.windowsVerbatimArguments,
@@ -1886,7 +1905,7 @@ export class ProviderRuntime implements ProviderPort {
                 }),
                 (child) => stopProcessTree(child).pipe(Effect.orDie),
               );
-              return { child, done: waitForSuccessfulProcess(child, signIn.command.timeoutMs) };
+              return { child, done: waitForSignInProcess(child, signIn.command) };
             }),
           )
           .pipe(toProviderOperationFailed);
@@ -2535,7 +2554,14 @@ export class ProviderRuntime implements ProviderPort {
     this: ProviderRuntime,
   ): Effect.fn.Return<CustomProviderRestart, ProviderOperationFailed> {
     if (!this.#clients.has("acp")) {
-      if (this.#released.has("acp") || savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      if (savedCustomAgents(this.#credentials).length === 0) return "not-running";
+      // A process stopped for idle keeps its old catalogue, and only an agent's turn starts it again.
+      // A changed agent would then list no model, so no agent could be set to it (#10026). As for a
+      // custom endpoint, the start is not awaited; a failure shows on the status.
+      if (this.#released.has("acp")) {
+        yield* this.ensureProvider("acp").pipe(Effect.ignore, Effect.forkIn(this.#scope));
+        return "not-running";
+      }
       yield* this.refreshProvider("acp").pipe(toProviderOperationFailed);
       return this.#clients.has("acp") ? "restarted" : "not-running";
     }
@@ -2759,6 +2785,8 @@ export class ProviderRuntime implements ProviderPort {
               cause: new Error(sourceText("error.provider.cliSelectFailed")),
             });
           yield* this.#reloadProviderCli(provider, cli, firstInstall);
+          // The new copy runs from now on, also when a client of the user's CLI ran during the update.
+          this.#installedFallback.delete(provider);
           // An update asks for OpenBot's copy, so it ends the choice of the user's own CLI.
           if (this.#installedChosen.delete(provider))
             yield* this.#saveInstalledChoice(provider, false).pipe(
@@ -3104,6 +3132,19 @@ export class ProviderRuntime implements ProviderPort {
   }).bind(this);
 
   /**
+   * A setting that each process of the provider reads at its start changed, such as the CLI proxy.
+   * The shared process restarts when its turns end, as for `restartProviderWhenIdle`, and an agent's
+   * own process, such as one of an account after the first, starts again before the agent's next turn.
+   */
+  readonly spawnSettingsChanged = Effect.fn("ProviderRuntime.spawnSettingsChanged")(function* (
+    this: ProviderRuntime,
+    provider: AgentProvider,
+  ) {
+    yield* providerStep(() => this.#countActivation(provider));
+    return yield* this.restartProviderWhenIdle(provider);
+  }).bind(this);
+
+  /**
    * `installed`: runs the CLI the user installed, also when OpenBot's copy is newer. A launcher of
    * theirs, such as a script that picks Pi's settings folder, then runs again (#6327). Otherwise the
    * newer of the two runs, as before the choice. The provider restarts when its turns end. A provider
@@ -3116,6 +3157,7 @@ export class ProviderRuntime implements ProviderPort {
     installed: boolean,
   ) {
     yield* providerStep(() => this.requireProviderOn(provider));
+    this.#installedFallback.delete(provider);
     if (installed !== this.#installedChosen.has(provider)) {
       yield* this.#saveInstalledChoice(provider, installed);
       if (installed) this.#installedChosen.add(provider);
@@ -4168,7 +4210,10 @@ export class ProviderRuntime implements ProviderPort {
                 this.#emitProviderError(provider, "start_failed", failed);
                 // No process started, and the row keeps the reason the user can act on.
                 if (!(failed instanceof ProviderTempDiskSpaceError) && this.#countStartFailure(provider))
-                  return this.#showStartStopped(provider);
+                  // Only a copy that fails its first request: an account check can fail on the network.
+                  return stage === "initialize" && !disposed() && this.#fallBackToInstalledCli(provider, cli)
+                    ? message
+                    : this.#showStartStopped(provider);
               }
               // OpenCode can fail a start on a slow computer, and a later start works. Without a retry
               // the provider stayed off until the user refreshed it (#4237).
@@ -4301,7 +4346,7 @@ export class ProviderRuntime implements ProviderPort {
         return;
       }
       // A failed tool call names its server too, but is not a server that did not start. A built-in
-      // server is not in the MCP settings, and its failure stays the provider's error, as before.
+      // server is not in the Marketplace apps, and its failure stays the provider's error, as before.
       // Codex reports each failed start in `mcpServer/startupStatus/updated` too
       // (`#reportMcpStartupStatus`). Its stderr line of the same failure can give a different
       // cause, such as the `rmcp` worker's `AuthRequired(…)` beside a status that read as a failed
@@ -4584,6 +4629,34 @@ export class ProviderRuntime implements ProviderPort {
     return sourceText("error.provider.startStopped", { provider: providerLabel(provider) });
   }
 
+  /**
+   * OpenBot's copy failed each start, and the CLI that the user installed was passed over because it
+   * is older. That CLI starts now, and the row offers the copy back. The copy showed its version but
+   * failed its first request, so the next refresh started it again and the provider stayed off (#10174).
+   * A CLI of the user's that lacks parts runs only when the user chooses it.
+   */
+  #fallBackToInstalledCli(provider: AgentProvider, cli: AgentCliInfo | null): boolean {
+    const cliProvider = requireProviderDriver(provider).cliProvider ?? provider;
+    const installed = this.#passedOverClis.get(provider);
+    if (
+      cli?.source !== "managed" ||
+      installed?.source !== "system" ||
+      installed.incomplete ||
+      this.#installedFallback.has(cliProvider)
+    )
+      return false;
+    logger.warn("OpenBot's provider CLI did not start, so the installed CLI runs.", {
+      provider,
+      version: cli.version,
+      installedVersion: installed.version,
+    });
+    this.#installedFallback.add(cliProvider);
+    this.#startFailures.delete(provider);
+    this.#resetRestarts(provider);
+    this.#scheduleRestart(provider, 0, true);
+    return true;
+  }
+
   /** Shows on the provider row that OpenBot stopped starting it, and answers the message. */
   #showStartStopped(provider: AgentProvider): string {
     const row = this.#status.providers?.find((candidate) => candidate.id === provider);
@@ -4651,18 +4724,25 @@ export class ProviderRuntime implements ProviderPort {
   readonly #refreshModelCatalog = Effect.fn("ProviderRuntime.refreshModelCatalog")(function* (this: ProviderRuntime) {
     this.#modelsReadAt = Date.now();
     const errorSerialAtStart = this.#errorSerial;
-    const { fresh, timedOut, failed } = yield* this.#modelCatalog.refresh();
-    let cleared = false;
+    const { fresh, timedOut, failed, sourceChanged } = yield* this.#modelCatalog.refresh();
+    let changed = false;
     for (const provider of fresh) {
       const lastError = this.#lastErrors.get(provider);
       if (!lastError || lastError.serial > errorSerialAtStart) continue;
       this.#lastErrors.delete(provider);
-      cleared = true;
+      changed = true;
     }
-    if (cleared) this.#setStatus({});
+    // A list that timed out gets one more read below, which keeps its own failure. A provider that a
+    // read holds already gets none, and the quiet read of `#rereadModels` keeps no error.
+    for (const [provider, cause] of timedOut) {
+      if (!this.#relisting.has(provider)) continue;
+      this.#recordProviderError(provider, cause);
+      changed = true;
+    }
+    if (changed || sourceChanged) this.#setStatus({});
     // A CLI can need more than the 5 s of a pass while many agents start. Without one more read,
     // the picker kept the built-in models until a provider started again (#6212).
-    for (const provider of timedOut) {
+    for (const provider of timedOut.keys()) {
       if (this.#relisting.has(provider)) continue;
       this.#relisting.add(provider);
       yield* this.#relistModels(provider).pipe(
@@ -4729,8 +4809,12 @@ export class ProviderRuntime implements ProviderPort {
     );
     if (providers.length === 0) return;
     const errorSerialAtStart = this.#errorSerial;
+    // The source of the models is part of the row too (#9956), so a changed source also sends the status.
     const listOf = (provider: AgentProvider) =>
-      JSON.stringify(this.#modelCatalog.list().filter((model) => model.provider === provider));
+      JSON.stringify([
+        this.#modelCatalog.list().filter((model) => model.provider === provider),
+        this.#modelCatalog.source(provider) ?? null,
+      ]);
     let changed = false;
     for (const provider of providers) this.#relisting.add(provider);
     yield* Effect.forEach(

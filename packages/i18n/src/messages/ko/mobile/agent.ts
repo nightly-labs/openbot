@@ -312,6 +312,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "이 제공자에서 사용할 수 있는 모델이 없어요.",
   "mobile.agent.runtime.searchModels": "모델 검색",
   "mobile.agent.runtime.noMatches": "검색과 일치하는 모델이 없어요.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "이 제공업체는 Windows와 Linux에서 '워크스페이스만'으로 작동하지 않아요. 사용하려면 먼저 '권한'을 바꾸세요.",
   "mobile.agent.runtime.usageLimit": "사용 한도에 도달했어요",
   "mobile.agent.runtime.usageLimitWindow": "{window} 한도",
   "mobile.agent.runtime.usageLimitResets": "{limit} · {time} 초기화",
@@ -594,6 +596,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "모두 읽음으로 표시",
   "mobile.agent.home.sort.title": "채팅 정렬",
   "mobile.agent.home.sort.manual": "수동",
+  "mobile.agent.home.sort.recent": "최근 활동",
   "mobile.agent.home.sort.unreadGroup": "읽지 않음을 그룹으로",
   "mobile.agent.home.sort.unreadFirst": "폴더에서 읽지 않음 먼저",
   "mobile.agent.route.appearance": "외형",

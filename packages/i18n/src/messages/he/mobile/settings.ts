@@ -60,7 +60,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "לנקות את יומן התמיכה?",
   "mobile.settings.support.clearBody": "הפעולה מסירה את כל האירועים מהיומן בטלפון הזה.",
   "mobile.settings.support.logFooter":
-    "היומן נשאר בטלפון הזה, ו-OpenBot אינו שולח אותו. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
+    "היומן נשאר בטלפון הזה. OpenBot שולח שורות ממנו רק עם דיווח על באג באפליקציית הטלפון שנשלח על ידך, וכרטיס הדיווח מציג אותן קודם. הוא מתעד שלבי חיבור, בקשות ושגיאות. הוא אינו מתעד הודעות או קבצים, ומסתיר סיסמאות ואסימונים. מומלץ לקרוא את הקובץ לפני שיתוף.",
   "mobile.settings.support.saveFailed": "לא ניתן לשמור את קובץ היומן. אפשר לנסות שוב.",
   "mobile.settings.support.sharingUnavailable": "שיתוף אינו זמין בטלפון הזה.",
   "mobile.settings.support.newestFirst": "מהחדש לישן.",
@@ -121,6 +121,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "בהירות",
   "mobile.settings.appearance.messageColorFooter":
     "עם צבע הסוכן, ההודעות שלך בצ'אט עם סוכן משתמשות בצבע של הסוכן. עם צבע מותאם, ההודעות שלך בכל הצ'אטים משתמשות בצבע שבחרת. צבע הטקסט משתנה כדי שיישאר קריא.",
+  "mobile.settings.appearance.chatBackground": "רקע הצ'אט",
+  "mobile.settings.appearance.chatBackgroundDefault": "ברירת מחדל",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "כל ערכת נושא שומרת על צבע משלה. צבע שמקשה על קריאת הטקסט נעשה כהה או בהיר יותר.",
   "mobile.settings.appearance.collapseRoutines": "כיווץ פעילות שגרות",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "אירועי שגרות רצופים בצ'אט מוצגים כשורה מכווצת אחת. הקישו על השורה כדי להציג אותם.",

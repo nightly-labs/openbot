@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { RequestError } from "@agentclientprotocol/sdk";
 import { type SourceMessages, sourceText } from "@openbot/i18n/source";
 import { type AcpFlavor, shownFailureDetail } from "./acp-flavor";
+import { GEMINI_INVALID_ARGUMENT, GEMINI_INVALID_CREDENTIALS } from "./agent/provider-diagnostics";
 import { getRecord, getString, isRecord } from "./protocol";
 
 /**
@@ -134,10 +135,14 @@ const GEMINI_REQUEST_FAILURES = [
     "error.provider.antigravityServiceFailure",
     /\b(?:status|code|HTTP(?:\/[\d.]+)?)\W{0,4}50[0-4]\b|\bservice unavailable\b|\boverloaded\b|\bdeadline exceeded\b|\binternal server error\b/iu,
   ],
-  // Google's generic text for a 400 INVALID_ARGUMENT that names no field. The chat stopped with only
-  // this text, and another model let the user continue (#7116). Not the status name: a refused API
-  // key is also INVALID_ARGUMENT.
-  ["error.provider.antigravityRequestRejected", /\bRequest contains an invalid argument\b/iu],
+  // The CLI had a new token less than a second later, so a turn that did no work runs again once.
+  // This text shows when that retry does not run or fails too (#10367).
+  ["error.provider.antigravitySignInRefused", GEMINI_INVALID_CREDENTIALS],
+  // The chat stopped with only this text, and another model let the user continue (#7116). The CLI
+  // keeps the refused item in the session, so a turn that fails with it shows
+  // `antigravitySessionRejected` instead, and OpenBot opens a new session (#9593). This text shows
+  // only when that recovery does not run.
+  ["error.provider.antigravityRequestRejected", GEMINI_INVALID_ARGUMENT],
 ] as const satisfies readonly (readonly [keyof SourceMessages, RegExp])[];
 
 /** The message of a Gemini turn that the server failed but reported as answer text. */
@@ -419,6 +424,10 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // decide what the agent can call: "tool COMPOSIO_SEARCH_TOOLS is not enabled for server composio"
   // is the CLI's answer for a tool that an own entry does not turn on (#7785).
   ownMcpServerNames: antigravityOwnMcpServerNames,
+  // A probe of 1.5.9 sent `notifications/cancelled` for each OpenBot tool call after exactly 180 s,
+  // also with progress every 20 s, and also with `timeoutSeconds` in the session server entry. Only
+  // the CLI's own `mcp_config.json` changes it, which is the user's file (#9689).
+  mcpToolCallLimitMs: 180_000,
   // Antigravity 1.4 offered its Claude and GPT models only to a client named `zed`. The 1.5 CLI
   // offers the same models to every client, so OpenBot sends its own name.
   // Antigravity 1.4.5 declares these built-ins in each request, about 2.4k tokens. OpenBot has its own
@@ -486,6 +495,11 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
   // 1.5.x ends the prompt when its model waits for a command over 10 s, and sends nothing for the
   // wake-up. The idle release then stopped the process 5 minutes later (#8660).
   wakesAfterPromptEnds: true,
+  // 1.5.x starts subagents with `start_subagent` or `invoke_subagent` ("Running start_subagent",
+  // "Run invoke_subagent?"), and the call completes at once. 1.5.9 also runs `schedule`, a timer,
+  // although `sessionMeta` turns it off. The end of that work wakes the model with no prompt open, as
+  // for a command. Its results and approvals did not show (#8993).
+  selfWakeTools: /\b(?:start|invoke)_subagent\b|^(?:Run(?:ning)? )?schedule\??$/u,
   // Antigravity 1.3.0 sends `usage_update` but has no ACP method or command that compacts.
   contextCompaction: "handoff",
   // Antigravity 1.4.4 starts a `localharness_external` of about 100 MB for each session and keeps it

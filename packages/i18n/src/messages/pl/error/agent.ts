@@ -18,6 +18,10 @@ export const messages = {
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Użyj dokładnej pełnej nazwy z tool_search, na przykład openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "Narzędzie nie zostało uruchomione. tool_call nie znalazł narzędzia o tej nazwie. Pełna nazwa to prawdopodobnie {name}. Jeśli tak, wyślij wywołanie ponownie z tą nazwą.",
+  "error.agent.toolDescribeUnknownNames":
+    "tool_describe nie znalazł narzędzia OpenBot o nazwie {names}. Opisuje tylko narzędzia OpenBot i przeglądarki, które podaje openbot.tool_search, a nie narzędzia MCP.",
+  "error.agent.toolDescribeDiscoveryNames":
+    "Wywołaj {names} bezpośrednio. tool_describe nie opisuje narzędzi wyszukiwania.",
   "error.agent.routineScheduleArgumentsInvalid":
     "Harmonogram rutyny jest nieprawidłowy: {detail} Popraw harmonogram i spróbuj ponownie. openbot.tool_describe podaje schemat.",
   "error.agent.approvalWhileDeleting": "Nie można udzielić zatwierdzenia podczas usuwania agenta.",
@@ -93,8 +97,12 @@ export const messages = {
     "{provider} przestał odpowiadać, więc OpenBot zakończył tę turę. Wyślij wiadomość ponownie albo wybierz inny model.",
   "error.agent.toolLoopStopped":
     "{provider} wiele razy powtórzył nieudany krok, więc OpenBot zatrzymał tę turę. Wyślij wiadomość ponownie lub wybierz inny model.",
+  "error.agent.answerCutOff":
+    "Agent zatrzymał się przed ukończeniem odpowiedzi, więc odpowiedź jest niepełna. Wyślij wiadomość ponownie.",
   "error.agent.compactionConnectionLost":
     "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem, a potem wyślij wiadomość, aby kontynuować.",
+  "error.agent.compactionConnectionLostAddress":
+    "Połączenie przerwało się, gdy agent kompaktował kontekst, więc zadanie się zatrzymało. Sprawdź połączenie z internetem. Sprawdź też, czy {variable} w sekcji Zmienne w ustawieniach {provider} to adres API Twojej usługi modeli (często kończy się na /v1). Potem wyślij wiadomość.",
   "error.agent.compactionLoopStopped":
     "{provider} kompaktował kontekst raz za razem i za każdym razem był on zbyt pełny, aby kontynuować, więc OpenBot zatrzymał tę turę. Wyłącz serwery MCP lub użycie komputera, których ten agent nie potrzebuje, a potem wyślij wiadomość. Jeśli ty lub agent zmieniliście, kiedy {provider} kompaktuje, cofnij tę zmianę.",
   "error.agent.selectedGone": "Wybrany agent już nie istnieje.",
@@ -153,6 +161,10 @@ export const messages = {
     "Tryb „Tylko obszar roboczy” wymaga piaskownicy Codex, której Codex nie może uruchomić na tym komputerze, więc polecenia agenta kończą się błędem. Wybierz „Najpierw pytaj” lub „Pełny dostęp” w ustawieniach agenta.",
   "error.agent.claudeSandboxUnavailable":
     "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze: {reason}. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
+  "error.agent.claudeNoSandbox":
+    "Claude nie może używać piaskownicy na tym komputerze, więc tryb „Tylko obszar roboczy” z nim nie działa. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
+  "error.agent.claudeSandboxBlocked":
+    "Tryb „Tylko obszar roboczy” wymaga piaskownicy Claude, której Claude nie może uruchomić na tym komputerze, więc polecenia agenta kończą się błędem. Wybierz pełny dostęp lub innego dostawcę w ustawieniach agenta.",
   "error.agent.screenCaptureOff":
     "Przechwytywanie ekranu jest wyłączone dla tego agenta. Użytkownik może włączyć Sterowanie komputerem w ustawieniach agenta.",
   "error.agent.screenCaptureUnavailable": "Przechwytywanie ekranu nie jest dostępne na tym komputerze.",

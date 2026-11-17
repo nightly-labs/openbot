@@ -43,6 +43,14 @@ export const messages = defineMessages("error.provider", {
   "error.provider.detectionEntriesTooMany": "There are too many addresses or folders.",
   "error.provider.credentialFileUnreadable": "The provider credential file is unreadable.",
   "error.provider.credentialFileTooLarge": "The provider credential file is too large.",
+  "error.provider.environmentNameInvalid":
+    "{name} is not a valid variable name. Use letters, digits and _, and do not start with a digit.",
+  "error.provider.environmentNameReserved": "OpenBot sets {name} for this provider. Remove this variable.",
+  "error.provider.environmentNameDuplicate": "{name} is in the list more than one time.",
+  "error.provider.environmentValueTooLong": "The value of {name} is too long.",
+  "error.provider.environmentTooMany": "A provider can have at most {limit} variables.",
+  "error.provider.environmentSecretsTooLarge":
+    "The sensitive values are too long together. Save shorter values or fewer of them.",
   "error.provider.archiveSpecialFile": "The runtime archive contains a link or special file.",
   "error.provider.archiveUnsafePath": "The runtime archive contains an unsafe path.",
   "error.provider.runtimeSpecialFile": "The runtime contains a link or special file.",
@@ -175,6 +183,8 @@ export const messages = defineMessages("error.provider", {
   "error.provider.codeLoginRefused": "The provider did not accept the code. Start the sign-in again.",
   "error.provider.codeLoginUnsupported":
     "This server cannot sign in with a pasted code. Sign in on the server computer, in its browser.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude could not save its sign-in on the Mac. Restart the Mac that runs OpenBot, then connect Claude again.",
   "error.provider.cliBusyRetry": "The {provider} CLI is working on a turn. Wait for it to finish, then try again.",
   "error.provider.cliSigningIn": "The {provider} CLI is signing in. Finish or cancel sign-in, then update.",
   "error.provider.cliBusyUpdate": "The {provider} CLI is working on a turn. Wait for it to finish, then update.",
@@ -194,6 +204,8 @@ export const messages = defineMessages("error.provider", {
     'OpenCode has no sign-in for the model provider "{provider}". Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode has no sign-in for the provider of this model. Choose a model with the Free label, or connect the provider: paste an OpenCode Go key in the OpenCode settings, or run `opencode auth login` in a terminal. Then try again.",
+  "error.provider.opencodeProviderRefused":
+    'The model provider "{provider}" refused the request. OpenCode has a key for this provider, so the cause can be your network: some providers block VPNs, proxies or some countries. Turn off the VPN or use a different network, then try again. If the error continues, the key can be incorrect: run `opencode auth login` in a terminal and enter the key again.',
   "error.provider.opencodeFreeModelRefused":
     "OpenCode refused this free model. Some free models are not available in every country. Choose a different model with the Free label, or paste an OpenCode Go key in the OpenCode settings and choose an OpenCode Go model.",
   "error.provider.customEndpointKeyRefused":
@@ -266,8 +278,14 @@ export const messages = defineMessages("error.provider", {
     "Gemini cannot use this model now. Choose another model, then try again.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google's Gemini service did not complete the request. Try again in a few minutes.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google did not accept the Gemini sign-in for this request. Send your message again. If the error continues, reconnect Gemini in Settings.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini refused this request. Choose another model, then send your message again. If it fails again, start a new chat.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini refused this request and did not give the cause. An item in the chat history can cause this, such as an image that the agent opened. OpenBot started a new Gemini session with the chat history. Try again. If the error continues, choose another model.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini could not read the saved history of this chat. OpenBot started a new Gemini session with the chat history. Send your message again.",
   "error.provider.antigravityLocationUnsupported":
     "Google does not let Gemini work from the network location of the computer that runs this agent. Use Gemini on another computer, or choose another provider for this agent.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -310,7 +328,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.hermesVersionUnreadable": "Unable to read the Hermes Agent version.",
   "error.provider.hermesSignIn": "Sign in with Nous Portal, or run `hermes setup` in a terminal, to use Hermes.",
   "error.provider.hermesTurnFailed":
-    "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Server settings › MCP, then send your message again.",
+    "Hermes could not finish this turn. If its reply gives a reason, do what it says. If not, an MCP server of this agent can be unavailable: check it in Marketplace, Apps, then send your message again.",
   "error.provider.hermesRefused":
     "Hermes refused this message before it started. Send it again. If Hermes refuses each message, restart OpenBot on the computer that runs this agent.",
   "error.provider.copilotThinkingRejected":
@@ -324,12 +342,18 @@ export const messages = defineMessages("error.provider", {
     "Claude's service blocked this request. This is usually a short problem on Claude's side, not a problem with your account. Send the message again in a few minutes.",
   "error.provider.foreignReasoning":
     "{provider} did not accept the earlier reasoning in this chat, because a different account or API key received it. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.codexHistoryItemMissing":
+    "Codex could not continue this chat, because an item in its saved history is missing. OpenBot started a new Codex session with the chat history. Try again.",
+  "error.provider.codexRequestRefused":
+    "{provider} refused the request for this chat and did not give the cause. This can occur in a long chat with many images. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooSmall":
     "The model did not accept an image in this chat because the image is too small. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageTooLarge":
     "The model did not accept an image in this chat because the image is too large. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.imageCountLimit":
     "The model did not accept this chat because the chat has too many images. OpenBot started a new {provider} session with the chat history. Try again.",
+  "error.provider.imageUnreadable":
+    "The model could not read an image in this chat. OpenBot started a new {provider} session with the chat history. Try again. If you sent an image, send a different one.",
   "error.provider.requestTooLarge":
     "This chat became too large to send to the model. Images in the chat often cause this. OpenBot started a new {provider} session with the chat history. Try again.",
   "error.provider.opencodeSessionRejected":
@@ -444,6 +468,7 @@ export const messages = defineMessages("error.provider", {
   "error.provider.nativeNotStarted": "The {provider} CLI could not start.",
   "error.provider.nativeVersionUnreadable": "The {provider} CLI version could not be read.",
   "error.provider.piSessionBusy": "Wait for the current Pi turn to finish.",
+  "error.provider.acpSessionBusy": "{provider} still finishes a stopped turn. Try again in a moment.",
   "error.provider.piStopped": "Pi is not running. Connect Pi and try again.",
   "error.provider.piSessionMissing": "The Pi session file is not available on this computer.",
   "error.provider.piResumeCancelled": "Pi cancelled the session resume. Try again.",

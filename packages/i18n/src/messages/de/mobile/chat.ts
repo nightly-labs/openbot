@@ -180,7 +180,7 @@ export const messages = {
     "{name}: Der Host-Computer akzeptiert diese Dateien nicht. Aktualisiere OpenBot dort, um sie anzuhängen.",
   "mobile.chat.attachment.nameTooLong": "Wähle eine Datei mit einem kürzeren Namen.",
   "mobile.chat.attachment.damaged": "Der Anhang ist beschädigt. Wähle ihn erneut aus.",
-  "mobile.chat.attachment.tooLarge": "{name} ist größer als 10 MB.",
+  "mobile.chat.attachment.tooLarge": "{name} ist größer als {limit}.",
   "mobile.chat.attachment.cameraPermission": "Erlaube den Kamerazugriff in den Einstellungen, um ein Foto aufzunehmen.",
   "mobile.chat.composer.send": "Nachricht senden",
   "mobile.chat.composer.stop": "{name} stoppen",
@@ -373,6 +373,9 @@ export const messages = {
   "mobile.chat.browserSecret.takeoverTitle": "Browserübernahme",
   "mobile.chat.browserSecret.takeoverBody":
     "Schließe diesen Schritt im Browser auf dem Computer ab, auf dem OpenBot läuft.",
+  "mobile.chat.browserSecret.signInBlockedTitle": "Melde dich auf deinem Computer an",
+  "mobile.chat.browserSecret.signInBlockedBody":
+    "Diese Website akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an.",
   "mobile.chat.browserSecret.takeoverReload": "Lade dann die Seite neu, bevor du „Fertig“ wählst.",
   "mobile.chat.browserSecret.takeoverFailed": "Die Anfrage konnte nicht abgeschlossen werden.",
   "mobile.chat.browserSecret.done": "Fertig",
@@ -469,6 +472,7 @@ export const messages = {
   "mobile.chat.approval.report.ideaHeadline": "Eine Idee? Lass sie uns umsetzen.",
   "mobile.chat.approval.report.dontSend": "Nicht jetzt",
   "mobile.chat.approval.report.send": "An das OpenBot-Team senden",
+  "mobile.chat.approval.report.phoneAdds": "Dieses Telefon fügt dem Bericht hinzu:",
   "mobile.chat.approval.allow": "Erlauben",
   "mobile.chat.approval.deny": "Ablehnen",
   "mobile.chat.approval.reconnect": "Verbinde dich mit {server}, um diese Anfrage zu beantworten.",
@@ -535,11 +539,13 @@ export const messages = {
   "mobile.chat.queue.position": "Position {position} · {date}",
   "mobile.chat.queue.attachments": "Anhänge",
   "mobile.chat.queue.steer": "Steuern",
+  "mobile.chat.queue.sendNow": "Jetzt senden",
   "mobile.chat.queue.more": { one: "{count} weitere", other: "{count} weitere" },
   "mobile.chat.queue.nextLabel":
     "Nächste Nachricht in der Warteschlange: {text}. Nachrichten in der Warteschlange anzeigen",
   "mobile.chat.queue.editNext": "Nächste Nachricht in der Warteschlange bearbeiten",
   "mobile.chat.queue.steerNext": "Nächste Nachricht in der Warteschlange steuern",
+  "mobile.chat.queue.sendNowNext": "Agent stoppen und nächste Nachricht in der Warteschlange jetzt senden",
   "mobile.chat.queue.deleteNext": "Nächste Nachricht in der Warteschlange löschen",
   "mobile.chat.queue.moveFirst": "An erste Stelle verschieben",
   "mobile.chat.queue.deleteTitle": "Nachricht aus der Warteschlange löschen?",
@@ -547,6 +553,7 @@ export const messages = {
   "mobile.chat.queue.keep": "Behalten",
   "mobile.chat.queue.editedElsewhere": "Ein anderes Gerät bearbeitet diese Nachricht.",
   "mobile.chat.queue.steerNeedsTurn": "Steuern braucht einen laufenden Durchlauf.",
+  "mobile.chat.queue.sendNowNeedsTurn": "Jetzt senden braucht einen laufenden Durchlauf.",
   "mobile.chat.queue.stillHoldingTitle": "Nachricht wird noch angehalten",
   "mobile.chat.queue.stillHoldingMessage":
     "OpenBot konnte diese Nachricht nicht freigeben, daher wartet der Agent weiter auf sie. Versuche es erneut, sobald das Telefon wieder verbunden ist.",
@@ -557,6 +564,8 @@ export const messages = {
   "mobile.chat.queue.discard": "Verwerfen",
   "mobile.chat.queue.alreadyReceived":
     "Der Agent hat diese Nachricht bereits erhalten, daher kann sie nicht mehr geändert werden.",
+  "mobile.chat.queue.alreadyReceivedKept":
+    "Der Agent hat diese Nachricht bereits erhalten, daher kann sie nicht mehr geändert werden. Wenn du diesen Bildschirm schließt, kommt dein Text ins Nachrichtenfeld.",
   "mobile.chat.queue.holding": "Die Nachricht wird für dich angehalten…",
   "mobile.chat.queue.holdFailed": "OpenBot konnte diese Nachricht nicht zur Bearbeitung anhalten.",
   "mobile.chat.queue.messageLabel": "Nachricht",

@@ -58,6 +58,9 @@ tabs. When the closed pane showed, the panel shows, in this order:
 4. The pane list, when no tab stays.
 
 The panel keeps its tabs while it is collapsed. Each agent and each channel has its own tabs.
+The panel stays open or closed when the user opens another agent or channel on the same server
+(`keepSidePanelShown` in `conversation-scope.ts`). An open panel shows the last tab of the new chat,
+or the pane list when that chat has no tab.
 
 ### Verification
 
@@ -69,12 +72,13 @@ these in the real app:
 - Collapse and open the panel again. The same tab must show.
 - Maximize and restore the panel.
 - File tabs and side threads beside the panes.
-- Switch to another agent or server and back.
+- Switch to another agent or server and back. An open panel stays open, and a closed panel stays closed.
 - The question pane deletes its question on close.
 
 `scripts/side-panel-panes-e2e.ts` checks the launcher and Add menu order, selection, close, collapse,
-maximize, an agent change, and the side question release in the `App/Playground` story.
+maximize, an agent change with the panel open and closed, and the side question release in the
+`App/Playground` story.
 `scripts/web-side-panel-e2e.ts` compares the web and desktop panels in Storybook.
 
 An agent change closes Agent settings, Files, and a file preview (`resetPanelsForAgent` in
-`conversation-scope.ts`). The tabs stay.
+`conversation-scope.ts`). The tabs stay. When the panel stays open, it then shows the last tab again.

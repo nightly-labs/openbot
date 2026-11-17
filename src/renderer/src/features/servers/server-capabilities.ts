@@ -52,6 +52,8 @@ export function serverSupportsCapability(
       capability === "password-managers-v1" ||
       capability === "whatsapp-connector-v1" ||
       capability === "vault-v1" ||
+      capability === "crm-v1" ||
+      capability === "mac-apps-limit-v1" ||
       capability === "vault-v2" ||
       capability === "vault-v3" ||
       capability === "browser-secret-vault-v1" ||
@@ -79,6 +81,7 @@ export function serverSupportsCapability(
       capability === "providers-v5" ||
       capability === "custom-provider-harness-v1" ||
       capability === "custom-provider-edit-v1" ||
+      capability === "custom-provider-harness-choice-v1" ||
       capability === "agent-session-settings-v1" ||
       capability === "acp-registry-v1" ||
       capability === "host-admin-v1" ||
@@ -106,6 +109,7 @@ export function serverSupportsCapability(
       capability === "server-audit-v1" ||
       capability === "discord-access-v1" ||
       capability === "whatsapp-working-message-v1" ||
+      capability === "whatsapp-status-reactions-v1" ||
       capability === "events-v1" ||
       capability === "context-reset-v1" ||
       capability === "routine-flows-v1" ||
@@ -137,6 +141,7 @@ export function serverSupportsCapability(
       capability === "context-compact-v1" ||
       capability === "agent-instructions-v1" ||
       capability === "message-delete-v1" ||
+      capability === "feedback-withdraw-v1" ||
       capability === "message-pins-v1" ||
       capability === "chat-history-v1" ||
       capability === "conversation-unread-from-v1" ||
@@ -155,6 +160,7 @@ export function serverSupportsCapability(
       capability === "routine-run-command-v1" ||
       capability === "claude-user-setup-v1" ||
       capability === "claude-compact-window-v1" ||
+      capability === "provider-environment-v1" ||
       capability === "agent-usage-limit-v1" ||
       capability === "hermes-import-v1" ||
       capability === "provider-detection-v1") &&
@@ -184,17 +190,13 @@ export function serverSetsWebhookSenderSecret(server: ServerSummary | undefined)
 }
 
 /**
- * Whether a joined server signs in to an MCP server for this computer. With `sign-in-relay-v1` the
- * page opens in this computer's browser and the callback is relayed to the host. An older host opens
- * the page in its own browser, and the live view shows it; the live view streams the active server only.
+ * Whether the Marketplace can sign in to a joined server's MCP server for this computer: the user
+ * manages the host's MCP servers, and the host relays its sign-ins (`sign-in-relay-v1`), so the page
+ * opens in this computer's browser and the callback is relayed to the host.
  */
 export function remoteMcpSignIn(server: ServerSummary | undefined): boolean {
-  if (server?.kind !== "remote") return false;
-  if (serverSupportsCapability(server, "sign-in-relay-v1")) return true;
   return (
-    server.active &&
-    serverSupportsCapability(server, "mcp-sign-in-v1") &&
-    serverSupportsCapability(server, "browser-view")
+    server?.kind === "remote" && serverCanManageMcp(server) && serverSupportsCapability(server, "sign-in-relay-v1")
   );
 }
 

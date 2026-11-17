@@ -45,6 +45,14 @@ export const messages = {
   "error.provider.detectionEntriesTooMany": "Çok fazla adres veya klasör var.",
   "error.provider.credentialFileUnreadable": "Sağlayıcı kimlik bilgisi dosyası okunamıyor.",
   "error.provider.credentialFileTooLarge": "Sağlayıcı kimlik bilgisi dosyası çok büyük.",
+  "error.provider.environmentNameInvalid":
+    "{name} geçerli bir değişken adı değil. Harf, rakam ve _ kullanın ve rakamla başlamayın.",
+  "error.provider.environmentNameReserved": "OpenBot bu sağlayıcı için {name} değerini ayarlar. Bu değişkeni kaldırın.",
+  "error.provider.environmentNameDuplicate": "{name} listede birden fazla kez var.",
+  "error.provider.environmentValueTooLong": "{name} değeri çok uzun.",
+  "error.provider.environmentTooMany": "Bir sağlayıcının en fazla {limit} değişkeni olabilir.",
+  "error.provider.environmentSecretsTooLarge":
+    "Gizli değerler toplamda çok uzun. Daha kısa ya da daha az değer kaydedin.",
   "error.provider.archiveSpecialFile": "Çalışma zamanı arşivi bir bağlantı veya özel dosya içeriyor.",
   "error.provider.archiveUnsafePath": "Çalışma zamanı arşivi güvenli olmayan bir yol içeriyor.",
   "error.provider.runtimeSpecialFile": "Çalışma zamanı bir bağlantı veya özel dosya içeriyor.",
@@ -180,6 +188,8 @@ export const messages = {
   "error.provider.codeLoginRefused": "Sağlayıcı kodu kabul etmedi. Oturum açmayı tekrar başlatın.",
   "error.provider.codeLoginUnsupported":
     "Bu sunucu yapıştırılan bir kodla oturum açamaz. Sunucu bilgisayarında, onun tarayıcısında oturum açın.",
+  "error.provider.claudeLoginNotSaved":
+    "Claude oturum açma bilgisini Mac'e kaydedemedi. OpenBot'un çalıştığı Mac'i yeniden başlatın, sonra Claude'u tekrar bağlayın.",
   "error.provider.cliBusyRetry":
     "{provider} CLI bir tur üzerinde çalışıyor. Bitmesini bekleyin, ardından tekrar deneyin.",
   "error.provider.cliSigningIn":
@@ -204,6 +214,8 @@ export const messages = {
     'OpenCode, "{provider}" model sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.',
   "error.provider.opencodeAuthRequiredUnknown":
     "OpenCode, bu modelin sağlayıcısında oturum açmamış. Ücretsiz etiketli bir model seçin veya sağlayıcıyı bağlayın: OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırın ya da bir terminalde `opencode auth login` komutunu çalıştırın. Ardından tekrar deneyin.",
+  "error.provider.opencodeProviderRefused":
+    "\"{provider}\" model sağlayıcısı isteği reddetti. OpenCode'un bu sağlayıcı için bir anahtarı var, bu yüzden neden ağınız olabilir: bazı sağlayıcılar VPN'leri, proxy'leri veya bazı ülkeleri engeller. VPN'i kapatın veya farklı bir ağ kullanın, ardından tekrar deneyin. Hata devam ederse anahtar yanlış olabilir: bir terminalde `opencode auth login` komutunu çalıştırın ve anahtarı yeniden girin.",
   "error.provider.opencodeFreeModelRefused":
     "OpenCode bu ücretsiz modeli reddetti. Bazı ücretsiz modeller her ülkede kullanılamaz. Ücretsiz etiketli başka bir model seçin veya OpenCode ayarlarına bir OpenCode Go anahtarı yapıştırıp bir OpenCode Go modeli seçin.",
   "error.provider.customEndpointKeyRefused":
@@ -278,8 +290,14 @@ export const messages = {
     "Gemini şu anda bu modeli kullanamıyor. Başka bir model seçin, sonra yeniden deneyin.\n{detail}",
   "error.provider.antigravityServiceFailure":
     "Google'ın Gemini hizmeti isteği tamamlamadı. Birkaç dakika sonra yeniden deneyin.\n{detail}",
+  "error.provider.antigravitySignInRefused":
+    "Google bu istek için Gemini oturum açma bilgisini kabul etmedi. Mesajınızı yeniden gönderin. Hata devam ederse Ayarlar'dan Gemini'ye yeniden bağlanın.\n{detail}",
   "error.provider.antigravityRequestRejected":
     "Gemini bu isteği reddetti. Başka bir model seçin, sonra mesajınızı yeniden gönderin. Yine başarısız olursa yeni bir sohbet başlatın.\n{detail}",
+  "error.provider.antigravitySessionRejected":
+    "Gemini bu isteği reddetti ve nedenini belirtmedi. Buna sohbet geçmişindeki bir öğe, örneğin ajanın açtığı bir görsel neden olabilir. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Yeniden deneyin. Hata sürerse başka bir model seçin.",
+  "error.provider.antigravityHistoryUnreadable":
+    "Gemini bu sohbetin kayıtlı geçmişini okuyamadı. OpenBot, sohbet geçmişiyle yeni bir Gemini oturumu başlattı. Mesajınızı yeniden gönderin.",
   "error.provider.antigravityLocationUnsupported":
     "Google, bu ajanı çalıştıran bilgisayarın ağ konumundan Gemini'nin çalışmasına izin vermiyor. Gemini'yi başka bir bilgisayarda kullanın veya bu ajan için başka bir sağlayıcı seçin.\n{detail}",
   "error.provider.antigravityConnectionLost":
@@ -326,7 +344,7 @@ export const messages = {
   "error.provider.hermesSignIn":
     "Hermes'i kullanmak için Nous Portal ile oturum açın veya bir terminalde `hermes setup` komutunu çalıştırın.",
   "error.provider.hermesTurnFailed":
-    "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Sunucu ayarları › MCP bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
+    "Hermes bu turu bitiremedi. Yanıtı bir neden veriyorsa onu izleyin. Vermiyorsa bu ajanın bir MCP sunucusu kullanılamıyor olabilir: Pazaryeri, Uygulamalar bölümünden kontrol edin, sonra mesajınızı yeniden gönderin.",
   "error.provider.hermesRefused":
     "Hermes bu mesajı başlamadan önce reddetti. Yeniden gönderin. Hermes her mesajı reddediyorsa bu ajanı çalıştıran bilgisayarda OpenBot'u yeniden başlatın.",
   "error.provider.copilotThinkingRejected":
@@ -340,12 +358,18 @@ export const messages = {
     "Claude hizmeti bu isteği engelledi. Bu genellikle Claude tarafında kısa süreli bir sorundur, hesabınızla ilgili değildir. Mesajı birkaç dakika sonra yeniden gönderin.",
   "error.provider.foreignReasoning":
     "Farklı bir hesap veya API anahtarı aldığı için {provider} bu sohbetteki önceki akıl yürütmeyi kabul etmedi. OpenBot sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexHistoryItemMissing":
+    "Kayıtlı geçmişindeki bir öğe eksik olduğu için Codex bu sohbete devam edemedi. OpenBot sohbet geçmişiyle yeni bir Codex oturumu başlattı. Tekrar deneyin.",
+  "error.provider.codexRequestRefused":
+    "{provider}, bu sohbetin isteğini reddetti ve nedenini belirtmedi. Bu, çok sayıda görsel içeren uzun bir sohbette olabilir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooSmall":
     "Görsel çok küçük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageTooLarge":
     "Görsel çok büyük olduğu için model bu sohbetteki bir görseli kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.imageCountLimit":
     "Sohbette çok fazla görsel olduğu için model bu sohbeti kabul etmedi. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
+  "error.provider.imageUnreadable":
+    "Model bu sohbetteki bir görseli okuyamadı. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin. Bir görsel gönderdiyseniz, başka bir görsel gönderin.",
   "error.provider.requestTooLarge":
     "Bu sohbet, modele gönderilemeyecek kadar büyüdü. Bunun nedeni çoğu zaman sohbetteki görsellerdir. OpenBot, sohbet geçmişiyle yeni bir {provider} oturumu başlattı. Tekrar deneyin.",
   "error.provider.opencodeSessionRejected":
@@ -463,6 +487,7 @@ export const messages = {
   "error.provider.nativeNotStarted": "{provider} CLI başlatılamadı.",
   "error.provider.nativeVersionUnreadable": "{provider} CLI sürümü okunamadı.",
   "error.provider.piSessionBusy": "Mevcut Pi turunun bitmesini bekleyin.",
+  "error.provider.acpSessionBusy": "{provider} durdurulan turu hâlâ bitiriyor. Biraz sonra yeniden deneyin.",
   "error.provider.piStopped": "Pi çalışmıyor. Pi'yi bağlayıp tekrar deneyin.",
   "error.provider.piSessionMissing": "Pi oturum dosyası bu bilgisayarda yok.",
   "error.provider.piResumeCancelled": "Pi oturumu sürdürmeyi iptal etti. Tekrar deneyin.",

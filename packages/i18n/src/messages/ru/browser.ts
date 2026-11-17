@@ -39,7 +39,7 @@ export const messages = {
   "browser.tab.closeNamed": "Закрыть {name}",
   "browser.tab.closeUnnamed": "Закрыть вкладку браузера",
   "browser.newTab": "Новая вкладка браузера",
-  "browser.hide": "Скрыть браузер",
+  "browser.backToChat": "Вернуться в чат",
   "browser.goBack": "Назад",
   "browser.goForward": "Вперёд",
   "browser.reload": "Перезагрузить страницу",

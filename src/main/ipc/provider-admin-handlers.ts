@@ -11,6 +11,7 @@ import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
   type AgentProviderId,
   type AgentStatus,
+  DEFAULT_CUSTOM_PROVIDER_HARNESS,
   decodeCustomProviderResult,
   decodeCustomProviderSummaries,
   decodeHostProviderAccountModels,
@@ -32,12 +33,15 @@ import {
   withHostProviderAccountModels,
 } from "@openbot/contracts/ipc";
 import { isDynamicRecord, isString } from "@openbot/contracts/runtime-values";
-import { TEAM_API_ROUTES } from "@openbot/contracts/team-api-routes";
 import type { TeamCurrentCapability } from "@openbot/contracts/team-protocol/current";
 import {
   CUSTOM_PROVIDER_EDIT_CAPABILITY,
   CUSTOM_PROVIDER_EDIT_ROUTES,
 } from "@openbot/contracts/team-protocol/custom-provider-edit-v1";
+import {
+  CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY,
+  CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES,
+} from "@openbot/contracts/team-protocol/custom-provider-harness-choice-v1";
 import {
   CUSTOM_PROVIDER_HARNESS_CAPABILITY,
   CUSTOM_PROVIDER_HARNESS_ROUTES,
@@ -104,7 +108,6 @@ import type { CustomProviderChanges, PeerCustomProviderChanges } from "../custom
 import type { ProviderCredentialStore } from "../provider-credential-store";
 import type { ProviderRuntimeManager } from "../provider-runtime-manager";
 import {
-  decodeAgentStatusFromHost,
   decodeHostDefaultProviderFromHost,
   decodeHostProviderAccountsFromHost,
   decodeProviderUsageResetOutcomeFromHost,
@@ -133,6 +136,7 @@ import {
   parseSetProviderAccountPoolInput,
   signInCodexWithApiKey,
 } from "./provider-handlers";
+import { readRemoteAgentStatus } from "./remote-agent-status";
 import { scopedHandler, scopedQueryHandler } from "./scoped-handler";
 import { isObject, requireString } from "./validation";
 
@@ -197,7 +201,7 @@ export function providerAdminIpcHandlers({
   /** A change, then the host's status, so the result is the same `AgentStatus` the local change gives. */
   async function remoteChange(serverId: string, path: string, body: unknown): Promise<AgentStatus> {
     await remote(serverId, path, body, acceptEmpty);
-    return runCauseEffect(remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost));
+    return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
   }
 
   /**
@@ -364,10 +368,13 @@ export function providerAdminIpcHandlers({
   }
 
   /**
+   * `custom-provider-harness-choice-v1` also lets a save or an edit name the harness;
    * `custom-provider-edit-v1` also names the header names of each endpoint, so an edit keeps them;
    * `custom-provider-harness-v1` names the harness of each endpoint; `providers-v1` does neither.
    */
   function customRoutes(serverId: string) {
+    if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY))
+      return CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES;
     if (remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY)) return CUSTOM_PROVIDER_EDIT_ROUTES;
     return remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CAPABILITY)
       ? CUSTOM_PROVIDER_HARNESS_ROUTES
@@ -599,9 +606,7 @@ export function providerAdminIpcHandlers({
       ),
       cancelRelaySignIn: relaySignIn(parseProviderId, async (provider, serverId) => {
         await stopRelay(relayKey(serverId, provider));
-        return runCauseEffect(
-          remoteServers.request(serverId, TEAM_API_ROUTES.agents.status, decodeAgentStatusFromHost),
-        );
+        return runCauseEffect(readRemoteAgentStatus(remoteServers, serverId));
       }),
       getApiKeyState: scopedHandler(parseProviderId, {
         local: (provider) => ({ provider, status: credentials.status(provider) }),
@@ -665,8 +670,16 @@ export function providerAdminIpcHandlers({
       }),
       saveCustomProvider: scopedHandler(parseSaveCustomProvider, {
         local: (input) => runCauseEffect(customProviders.save(input)),
-        remote: (input, serverId) =>
-          remote(serverId, customRoutes(serverId).customSave, input, decodeCustomProviderResult),
+        remote: (input, serverId) => {
+          const routes = customRoutes(serverId);
+          // The harness choice route needs a harness; a client that names none adds the endpoint on
+          // the default one, as the older routes do.
+          const body =
+            routes === CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES
+              ? { ...input, harness: input.harness ?? DEFAULT_CUSTOM_PROVIDER_HARNESS }
+              : input;
+          return remote(serverId, routes.customSave, body, decodeCustomProviderResult);
+        },
       }),
       updateCustomProvider: scopedHandler(parseUpdateCustomProvider, {
         local: (input) => runCauseEffect(customProviders.update(input)),
@@ -674,20 +687,28 @@ export function providerAdminIpcHandlers({
           // A host without `custom-provider-edit-v1` has no edit route.
           if (!remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_EDIT_CAPABILITY))
             throw new Error(sourceText("error.provider.localOnly"));
-          // The host keeps the harness and the model settings; the wire has neither.
-          return remote(
-            serverId,
-            CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate,
-            {
-              id: input.id,
-              name: input.name,
-              baseUrl: input.baseUrl,
-              models: input.models.map(({ id, name }) => ({ id, name })),
-              ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
-              ...(input.headers !== undefined ? { headers: input.headers } : {}),
-            },
-            decodeCustomProviderResult,
-          );
+          // The host keeps the model settings; the wire has none. An edit that names a harness moves
+          // the endpoint to it on a host with `custom-provider-harness-choice-v1`; otherwise the
+          // endpoint keeps its harness.
+          const body = {
+            id: input.id,
+            name: input.name,
+            baseUrl: input.baseUrl,
+            models: input.models.map(({ id, name }) => ({ id, name })),
+            ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+            ...(input.headers !== undefined ? { headers: input.headers } : {}),
+          };
+          if (
+            input.harness !== undefined &&
+            remoteServers.supportsCapability(serverId, CUSTOM_PROVIDER_HARNESS_CHOICE_CAPABILITY)
+          )
+            return remote(
+              serverId,
+              CUSTOM_PROVIDER_HARNESS_CHOICE_ROUTES.customUpdate,
+              { ...body, harness: input.harness },
+              decodeCustomProviderResult,
+            );
+          return remote(serverId, CUSTOM_PROVIDER_EDIT_ROUTES.customUpdate, body, decodeCustomProviderResult);
         },
       }),
       deleteCustomProvider: scopedHandler(parseDeleteCustomProvider, {

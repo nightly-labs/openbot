@@ -87,6 +87,8 @@ const PROVIDERS = MANAGED_RUNTIME_PROVIDERS;
  */
 const RUNTIMES = [...MANAGED_RUNTIME_PROVIDERS, ...MANAGED_TOOL_RUNTIMES] as const;
 const FREE_SPACE_HEADROOM = 100_000_000;
+/** What tar and the system write for ENOSPC, when the failure has no error code. */
+const DISK_FULL_OUTPUT = /no space left on device|not enough space on the disk/iu;
 /**
  * How long a leftover staging or replaced directory is left alone.
  *
@@ -1243,7 +1245,7 @@ export class ProviderRuntimeManager extends EventEmitter<ProviderRuntimeManagerE
       }
 
       return yield* this.#installEffect(spec, partialPath);
-    }).pipe(Effect.scoped);
+    }).pipe(Effect.scoped, Effect.mapError(diskFullFailure));
   }
 
   /** Answers whether this instance committed the install, or adopted the one it found. */
@@ -1819,9 +1821,13 @@ const verifyInstalledRuntime = Effect.fn("ProviderRuntime.verifyInstalledRuntime
   const versionFile = descriptor.versionFile;
   const output = versionFile
     ? yield* runtimeIO(() => readFile(join(root, versionFile), "utf8"))
-    : (yield* runtimeIO(() => execFileAsync(executable, ["--version"], { encoding: "utf8", windowsHide: true })).pipe(
-        Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)),
-      )).stdout;
+    : (yield* runtimeIO(() =>
+        execFileAsync(executable, ["--version"], {
+          encoding: "utf8",
+          env: { ...process.env, ...descriptor.versionEnvironment },
+          windowsHide: true,
+        }),
+      ).pipe(Effect.mapError((failure) => unsupportedProcessorFailure(spec.runtime, failure)))).stdout;
   if ((yield* runtimeSync(() => descriptor.parseVersion(output))) !== spec.version) {
     return yield* new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.unexpectedVersion")) });
   }
@@ -1850,6 +1856,25 @@ function unsupportedProcessorFailure(
   )
     return failure;
   return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.cpuUnsupported"), { cause }) });
+}
+
+/**
+ * A disk that fills during the download or the install. The space check runs before both, but it
+ * cannot see every write, so the failure itself also names the cause: a Retry on the same disk fails
+ * in the same way, and "Try again" does not tell the user to free space (#10191). tar reports a full
+ * disk in its output, not as an error code. The log keeps the original failure.
+ */
+function diskFullFailure(failure: ProviderRuntimeFailure): ProviderRuntimeFailure {
+  const { cause } = failure;
+  const diskFull = (error: unknown, depth: number): boolean =>
+    error instanceof Error &&
+    (errorCode(error) === "ENOSPC" ||
+      errorCode(error) === "EDQUOT" ||
+      DISK_FULL_OUTPUT.test(error.message) ||
+      ("stderr" in error && typeof error.stderr === "string" && DISK_FULL_OUTPUT.test(error.stderr)) ||
+      (depth < 3 && diskFull(error.cause, depth + 1)));
+  if (!diskFull(cause, 0)) return failure;
+  return new ProviderRuntimeFailure({ cause: new Error(sourceText("error.provider.diskSpace"), { cause }) });
 }
 
 /** Bump when `verifyInstalledRuntime` checks something new, so a record from an older build is not trusted. */

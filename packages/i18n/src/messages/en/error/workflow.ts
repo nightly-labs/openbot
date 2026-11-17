@@ -30,6 +30,8 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.pictureMissing": "The picture is no longer on the server. Send it again.",
   "error.workflow.pictureType": "Use a PNG, JPEG or WebP picture.",
   "error.workflow.mediaInputMissing": "A picture from a step before this one is not available. Run that step again.",
+  "error.workflow.mediaEmptyRequest":
+    "Write a description, or run the steps before this one so that a text or a picture comes in.",
   "error.workflow.mediaInputNotImage":
     "This step takes only pictures, not videos. Remove the connection from the video.",
   "error.workflow.stepMissing": "This step no longer exists.",
@@ -87,4 +89,14 @@ export const messages = defineMessages("error.workflow", {
   "error.workflow.sunraFailed": "Sunra could not make the file: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra did not finish the file in time. Look in the OpenBot project on sunra.ai before you run the step again.",
+  "error.workflow.higgsfieldSignIn": "Sign in to Higgsfield in Apps to use Higgsfield models.",
+  "error.workflow.higgsfieldNoCredits":
+    "Your Higgsfield account does not have sufficient credits. Add credits at higgsfield.ai/pricing, then run the step again.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "This Higgsfield model needs a Higgsfield plan. Get a plan at higgsfield.ai/pricing, or select a different model.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield did not make the file because its content check stopped it. Change the prompt or the input pictures, then run the step again.",
+  "error.workflow.higgsfieldFailed": "Higgsfield could not make the file: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield did not finish the file in time. Look in your history on higgsfield.ai before you run the step again.",
 });

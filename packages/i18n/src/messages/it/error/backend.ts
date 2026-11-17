@@ -252,9 +252,15 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot non può salvare questa configurazione del server MCP.",
   "error.backend.mcpServerNoAnswer": "Il server non ha risposto entro {seconds} secondi.",
   "error.backend.mcpSignInNotAccepted": "Il server non ha accettato quell'accesso.",
+  "error.backend.mcpSignInAccountRefused":
+    "Il server ha rifiutato l'account con cui hai effettuato l'accesso. Verifica che questo account possa usare il servizio. Per usare un altro account, esci e poi accedi di nuovo.",
   "error.backend.mcpSignInClientRefused":
     "Il server di accesso non ha accettato OpenBot al completamento dell'accesso. Accedi di nuovo: OpenBot si registra di nuovo sul server.",
+  "error.backend.mcpSignInAppRefused":
+    "Il server di accesso non ha accettato l'app di accesso di questo server. Controlla l'ID client e il secret del client dell'app di accesso, poi accedi di nuovo.",
   "error.backend.mcpCommandNotFound": "Comando non trovato: {command}",
+  "error.backend.mcpProviderLimit":
+    "Questo agente può usare solo un numero limitato di server MCP. Per usare questo server, disattiva un server MCP che non serve all’agente.",
   "error.backend.mcpRegistrationRefused":
     "Il server di accesso non accetta ancora OpenBot come app. La causa non è il tuo account. Usa un altro modo per connetterti, ad esempio un server MCP locale.",
   "error.backend.mcpSignInAbandonedGeneric": "L'accesso è stato abbandonato.",
@@ -282,9 +288,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "Il suo strumento {tool} ha un formato di input che questo provider non riesce a leggere. Gli agenti con altri provider ricevono ancora il server.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} non è riuscito a usare il server MCP {name} perché il server chiede l’accesso. Apri le impostazioni MCP e scegli Accedi.",
+    "{provider} non è riuscito a usare il server MCP {name} perché il server chiede l’accesso. Apri {name} in Marketplace, App, e scegli Accedi.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} non è riuscito ad avviare il server MCP {name}. Apri le impostazioni MCP e scegli Prova la connessione per vedere la causa.",
+    "{provider} non è riuscito ad avviare il server MCP {name}. Apri {name} in Marketplace, App, e scegli Prova la connessione per vedere la causa.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} non è riuscito ad avviare il server MCP {name}. I suoi strumenti non sono disponibili per {provider}. {provider} avvia il server da solo, quindi la prova di connessione in OpenBot può riuscire. Avvia una nuova chat per riprovare.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -293,6 +299,8 @@ export const messages = {
     "OpenBot non è riuscito ad avviare la connessione di accesso locale per questo server. Riavvia OpenBot e riprova.",
   "error.backend.mcpOAuthSignInNeeded":
     "L'accesso a questo server MCP è terminato. L'utente deve accedere di nuovo in OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot non è riuscito a rinnovare ora l'accesso a questo server MCP. L'accesso resta salvato e la prossima richiesta riproverà. Se l'errore continua, l'utente può disconnettersi dal server in OpenBot e accedere di nuovo.",
   "error.backend.mcpServerUnreachable": "OpenBot non è riuscito a raggiungere il server. Controlla l'URL e la rete.",
   "error.backend.mcpLocalServerOff":
     "Nessun server risponde all'indirizzo {address} su questo computer. Avvia il server, o attivalo nell'app che lo esegue, poi riprova.",
@@ -352,6 +360,8 @@ export const messages = {
   "error.backend.promptInactive": "Questo prompt non è più attivo.",
   "error.backend.promptAnswerMismatch": "La risposta al prompt non corrisponde a una domanda attiva.",
   "error.backend.approvalInactive": "Questa approvazione non è più attiva.",
+  "error.backend.feedbackNeedsPhone":
+    "Solo l'app OpenBot del telefono può inviare questa segnalazione, perché aggiunge la versione e il log di assistenza del telefono. Apri questa chat sul telefono. Se vedi questo messaggio lì, aggiorna l'app del telefono.",
   "error.backend.takeoverInactive": "Questo intervento nel browser non è più attivo.",
   "error.backend.authSubmitting": "L'invio dell'autenticazione è già in corso.",
   "error.backend.apiKeySaveFailed": "OpenBot non è riuscito a salvare la chiave API. Riprova.",
@@ -435,6 +445,8 @@ export const messages = {
   "error.backend.branchSourceBusy": "Interrompi il turno in corso prima di creare un ramo di questa chat.",
   "error.backend.branchMessageNotFound": "Puoi creare un ramo solo da una risposta completata dell'agente.",
   "error.backend.branchRemoteUnsupported": "I rami sono disponibili solo per gli agenti su questo computer.",
+  "error.backend.feedbackWithdrawRemoteUnsupported":
+    "Per rimuovere questa segnalazione, chiedi all’agente di rimuoverla.",
   "error.backend.threadMoveRefused":
     "Solo un messaggio che hai inviato soltanto a questo agente può essere eseguito in un nuovo thread.",
   "error.backend.taskTitleRequired": "Dai all'attività un titolo breve.",

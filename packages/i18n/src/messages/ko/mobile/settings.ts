@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "지원 로그를 지울까요?",
   "mobile.settings.support.clearBody": "이 휴대전화의 로그에서 모든 이벤트가 삭제돼요.",
   "mobile.settings.support.logFooter":
-    "로그는 이 휴대전화에만 남고 OpenBot이 전송하지 않아요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
+    "로그는 이 휴대전화에 남아요. OpenBot은 직접 보내는 휴대폰 앱 버그 신고에만 로그의 일부 줄을 함께 보내고, 보내기 전에 신고 카드에 먼저 보여 줘요. 연결 단계, 요청, 오류를 기록해요. 메시지나 파일은 기록하지 않고, 비밀번호와 토큰은 가려요. 공유하기 전에 파일을 확인해 주세요.",
   "mobile.settings.support.saveFailed": "로그 파일을 저장할 수 없었어요. 다시 시도해 주세요.",
   "mobile.settings.support.sharingUnavailable": "이 휴대전화에서는 공유를 사용할 수 없어요.",
   "mobile.settings.support.newestFirst": "최신순이에요.",
@@ -122,6 +122,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "밝기",
   "mobile.settings.appearance.messageColorFooter":
     "에이전트 색상을 선택하면 에이전트 채팅에서 내 메시지가 해당 에이전트의 색상을 사용해요. 사용자 지정 색상을 선택하면 모든 채팅에서 내 메시지가 선택한 색상을 사용해요. 글자 색은 읽기 쉽도록 바뀌어요.",
+  "mobile.settings.appearance.chatBackground": "채팅 배경",
+  "mobile.settings.appearance.chatBackgroundDefault": "기본값",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "테마마다 고유한 색상을 유지합니다. 글자를 읽기 어려운 색상은 더 어둡거나 밝아집니다.",
   "mobile.settings.appearance.collapseRoutines": "루틴 활동 접기",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "채팅에서 연속된 루틴 이벤트를 접힌 한 줄로 표시해요. 줄을 탭하면 펼쳐져요.",

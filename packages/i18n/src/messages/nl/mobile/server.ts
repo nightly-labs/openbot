@@ -455,7 +455,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Geen tijdzone komt overeen met deze zoekopdracht.",
   "mobile.server.settings.timezoneMore": "Typ meer van de naam om andere tijdzones te zien.",
   "mobile.server.settings.timezoneDescription":
-    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt.",
+    "Nieuwe routines gebruiken deze tijdzone als het bericht de tijdzone van de afzender niet vermeldt. Op een server gebruikt ook de browser deze tijdzone na de volgende herstart.",
   "mobile.server.settings.timezoneLoading": "Tijdzone laden…",
   "mobile.server.settings.timezoneLoadFailed": "Kan de tijdzone van de server niet laden.",
   "mobile.server.settings.timezoneSaveFailed": "Kan de tijdzone niet opslaan. Probeer het opnieuw.",
@@ -887,6 +887,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Bericht “Mee bezig…”",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot stuurt het terwijl de agent werkt en vervangt het daarna door het antwoord. Zet dit uit om alleen het antwoord te sturen.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Statusreacties",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reageert met 👀 als er een bericht binnenkomt en met ✅ als het antwoord klaar is. Zet dit uit om geen reacties te sturen.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Deze agent ontvangt de berichten voor OpenBot van al je gekoppelde nummers. Korte berichten beantwoordt hij zelf, ander werk geeft hij aan de juiste agent, en hij antwoordt in WhatsApp.",
@@ -1113,6 +1116,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "Standaard van Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Kan de compressiegrootte van deze server niet laden.",
+  "mobile.server.environment.row": "Variabelen",
+  "mobile.server.environment.title": "Omgeving",
+  "mobile.server.environment.hint":
+    "API-sleutels, basis-URL’s en andere instellingen die elk {name}-proces krijgt. Een wijziging geldt als de lopende beurten klaar zijn.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL stuurt met OPENAI_API_KEY als sleutel de modelverzoeken van ChatGPT naar dat adres.",
+  "mobile.server.environment.shellNote": "De opdrachten die agents uitvoeren, kunnen deze waarden lezen.",
+  "mobile.server.environment.add": "Variabele toevoegen",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Waarde",
+  "mobile.server.environment.saved": "Opgeslagen",
+  "mobile.server.environment.sensitive": "Gevoelig",
+  "mobile.server.environment.remove": "Verwijderen",
+  "mobile.server.environment.save": "Opslaan",
+  "mobile.server.environment.loadFailed": "Kan de variabelen van {name} niet laden.",
+  "mobile.server.environment.invalid": "Verbeter eerst de namen.",
   "mobile.server.providers.disconnect": "Ontkoppelen",
   "mobile.server.providers.disconnectTitle": "{name} ontkoppelen?",
   "mobile.server.providers.disconnectBody":

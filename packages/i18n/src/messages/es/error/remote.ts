@@ -152,6 +152,7 @@ export const messages = {
   "error.remote.attachmentRejected": "El host rechazó el archivo adjunto.",
   "error.remote.attachmentTooLarge": "Los archivos adjuntos deben tener 10 MB o menos.",
   "error.remote.attachmentBusy": "Espera a que termine el archivo adjunto actual.",
+  "error.remote.attachmentChanged": "El archivo cambió o no está disponible. Selecciónalo de nuevo.",
   "error.remote.uploadTimeout": "Se agotó el tiempo de carga del archivo adjunto.",
   "error.remote.hostSessionActive": "El host ya tiene una sesión remota activa.",
   "error.remote.tooManyConnections": "Hay demasiadas conexiones remotas activas.",

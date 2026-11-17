@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "아이디어가 있나요? 실현해 봅시다.",
   "prompt.approval.report.dontSend": "나중에",
   "prompt.approval.report.send": "OpenBot 팀에 보내기",
+  "prompt.approval.report.phoneOnly":
+    "OpenBot 휴대폰 앱에서 이 채팅을 열고 거기서 신고를 보내 주세요. 휴대폰이 버전, 시스템 정보, 지원 로그를 추가해요. 휴대폰이 연결되지 않으면 휴대폰 앱에서 설정 > 지원을 열고 GitHub에서 문제를 신고해 주세요.",
   "prompt.approval.title.command": "명령 실행",
   "prompt.approval.title.fileChange": "파일 변경",
   "prompt.approval.title.permissions": "권한 부여",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "{host} 로그인이 취소되었어요",
   "prompt.browser.signInBlocked.body":
     "이 컴퓨터에서 로그인해 주세요. OpenBot은 {host} 로그인 정보만 {server}에 보내고, {name}이(가) 이어서 진행해요.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host}은(는) 서버에서의 로그인을 받지 않아요. 내 컴퓨터의 OpenBot 데스크톱 앱에서 이 채팅을 열고 그곳에서 로그인해 주세요. 그러면 {name}이(가) 이어서 진행해요.",
   "prompt.browser.signInBlocked.cancelledBody": "로그인이 취소되었어요.",
   "prompt.browser.signInBlocked.waiting": "로그인을 기다리는 중",
   "prompt.browser.signInBlocked.waitingButton": "로그인을 기다리는 중…",

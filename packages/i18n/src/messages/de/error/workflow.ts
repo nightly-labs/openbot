@@ -35,6 +35,8 @@ export const messages = {
   "error.workflow.pictureType": "Verwende ein PNG-, JPEG- oder WebP-Bild.",
   "error.workflow.mediaInputMissing":
     "Ein Bild aus einem vorherigen Schritt ist nicht verfügbar. Führe diesen Schritt erneut aus.",
+  "error.workflow.mediaEmptyRequest":
+    "Schreibe eine Beschreibung oder führe die Schritte davor aus, damit ein Text oder ein Bild ankommt.",
   "error.workflow.mediaInputNotImage":
     "Dieser Schritt nimmt nur Bilder an, keine Videos. Entferne die Verbindung vom Video.",
   "error.workflow.stepMissing": "Dieser Schritt existiert nicht mehr.",
@@ -96,4 +98,14 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra konnte die Datei nicht erstellen: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra hat die Datei nicht rechtzeitig fertiggestellt. Sieh im Projekt OpenBot auf sunra.ai nach, bevor du den Schritt erneut ausführst.",
+  "error.workflow.higgsfieldSignIn": "Melde dich unter Apps bei Higgsfield an, um Higgsfield-Modelle zu verwenden.",
+  "error.workflow.higgsfieldNoCredits":
+    "Dein Higgsfield-Konto hat nicht genug Credits. Füge Credits unter higgsfield.ai/pricing hinzu und führe den Schritt dann erneut aus.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Dieses Higgsfield-Modell braucht einen Higgsfield-Plan. Wähle einen Plan unter higgsfield.ai/pricing oder ein anderes Modell.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield hat die Datei nicht erstellt, weil die Inhaltsprüfung sie gestoppt hat. Ändere den Prompt oder die Eingabebilder und führe den Schritt dann erneut aus.",
+  "error.workflow.higgsfieldFailed": "Higgsfield konnte die Datei nicht erstellen: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield hat die Datei nicht rechtzeitig fertiggestellt. Sieh in deinem Verlauf auf higgsfield.ai nach, bevor du den Schritt erneut ausführst.",
 } as const satisfies PartialTranslation<typeof source>;

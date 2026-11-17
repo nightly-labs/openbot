@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Cancellare il log di assistenza?",
   "mobile.settings.support.clearBody": "Verranno rimossi tutti gli eventi del log su questo telefono.",
   "mobile.settings.support.logFooter":
-    "Il log resta su questo telefono e OpenBot non lo invia. Registra i passaggi di connessione, le richieste e gli errori. Non registra messaggi o file e nasconde password e token. Leggi il file prima di condividerlo.",
+    "Il log resta su questo telefono. OpenBot ne invia alcune righe solo con una segnalazione di bug sull'app del telefono che invii tu, e la scheda della segnalazione le mostra prima. Registra i passaggi di connessione, le richieste e gli errori. Non registra messaggi o file e nasconde password e token. Leggi il file prima di condividerlo.",
   "mobile.settings.support.saveFailed": "Impossibile salvare il file del log. Riprova.",
   "mobile.settings.support.sharingUnavailable": "La condivisione non è disponibile su questo telefono.",
   "mobile.settings.support.newestFirst": "Prima i più recenti.",
@@ -124,6 +124,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosità",
   "mobile.settings.appearance.messageColorFooter":
     "Con Colore dell'agente, i tuoi messaggi in una chat con un agente usano il colore di quell'agente. Con Colore personalizzato, i tuoi messaggi in tutte le chat usano il colore che scegli. Il colore del testo cambia per restare leggibile.",
+  "mobile.settings.appearance.chatBackground": "Sfondo della chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Predefinito",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Ogni tema mantiene il proprio colore. Un colore che rende il testo difficile da leggere diventa più scuro o più chiaro.",
   "mobile.settings.appearance.collapseRoutines": "Comprimi attività delle routine",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Gli eventi consecutivi delle routine in una chat appaiono come una riga compressa. Tocca la riga per mostrarli.",

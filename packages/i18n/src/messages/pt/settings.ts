@@ -43,6 +43,19 @@ export const messages = {
   "settings.chatBackground.light": "Fundo do chat no tema Claro",
   "settings.chatBackground.dark": "Fundo do chat no tema Escuro",
   "settings.chatBackground.default": "Padrão",
+  "settings.chatBackdrop.title": "Fundo da janela",
+  "settings.chatBackdrop.description":
+    "Uma cena, imagem ou GIF atrás de toda a janela neste dispositivo. Peça uma cena a um agente e depois escolha “Usar como fundo” na resposta dele.",
+  "settings.chatBackdrop.none": "Nenhum",
+  "settings.chatBackdrop.pond": "Lago de carpas",
+  "settings.chatBackdrop.jellyfish": "Águas-vivas",
+  "settings.chatBackdrop.sunset": "Pôr do sol retrô",
+  "settings.chatBackdrop.snowfall": "Neve caindo",
+  "settings.chatBackdrop.fireflies": "Vaga-lumes",
+  "settings.chatBackdrop.upload": "Enviar imagem…",
+  "settings.chatBackdrop.uploadRefused": "Use uma imagem PNG, JPEG, GIF, WebP ou AVIF de até 20 MB.",
+  "settings.chatBackdrop.saveFailed": "O fundo não foi salvo.",
+  "settings.chatBackdrop.removeFailed": "O fundo não foi removido.",
   "settings.chatColor.title": "Cor do chat",
   "settings.chatColor.description":
     "Dá um tom aos balões das suas mensagens. As pessoas dos seus servidores também a veem.",
@@ -105,7 +118,7 @@ export const messages = {
   "settings.sendShortcut.title": "Atalho de envio",
   "settings.sendShortcut.description": "Escolha as teclas que enviam uma mensagem neste dispositivo e navegador.",
   "settings.chatOrder.description":
-    "Escolha onde a barra lateral mostra as conversas não lidas neste dispositivo. Manual desativa o grupo Não lidas.",
+    "Escolha como a barra lateral ordena as conversas neste dispositivo. Manual e Atividade recente desativam o grupo Não lidas.",
   "settings.sendShortcut.enter": "Enter para enviar",
   "settings.sendShortcut.modEnterMac": "⌘Enter para enviar",
   "settings.sendShortcut.modEnterWin": "Ctrl+Enter para enviar",
@@ -666,6 +679,10 @@ export const messages = {
   "settings.voice.language.parakeetUnifiedEnglishOnly":
     "O Parakeet Unified reconhece só inglês. Para definir um idioma, use o Whisper, o Cohere ou o ElevenLabs.",
   "settings.voice.language.automatic": "Automático",
+  "settings.voice.pause.title": "Pausa antes de enviar",
+  "settings.voice.pause.description":
+    "Em uma conversa por voz, o OpenBot envia suas palavras quando você para de falar por esse tempo. Escolha uma pausa maior se você fala devagar ou para para pensar. A voz ao vivo do Codex encontra o fim sozinha.",
+  "settings.voice.pause.seconds": "{seconds} s",
   "settings.voice.loadFailed": "Não foi possível ler os modelos de voz.",
   "settings.voice.saveFailed": "Não foi possível salvar a configuração de voz. Tente de novo.",
   "settings.voice.downloadFailed": "Não foi possível iniciar o download. Tente de novo.",

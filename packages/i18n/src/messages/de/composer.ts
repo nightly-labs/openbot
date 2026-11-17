@@ -5,6 +5,9 @@ export const messages = {
   "composer.queueEdit.body":
     "Du bearbeitest eine Nachricht in der Warteschlange. Speichere die Änderung oder brich sie ab, damit die Nachricht ausgeführt werden kann.",
   "composer.queueEdit.cancel": "Bearbeitung abbrechen",
+  "composer.feedbackFix.body":
+    "Bericht #{number} wird korrigiert. Sende die Anfrage, oder brich ab, damit der Bericht bleibt, wie er ist.",
+  "composer.feedbackFix.cancel": "Abbrechen",
   "composer.providerWait.offlineTitle": "Keine Internetverbindung",
   "composer.providerWait.offline": "{provider} kann erst antworten, wenn dieser Computer wieder online ist.",
   "composer.providerWait.silent": "{provider} hat seit {duration} nichts gesendet.",
@@ -20,6 +23,11 @@ export const messages = {
   "composer.update.manual": "Aktualisiere {provider} auf dem Computer, auf dem es läuft, um fortzufahren.",
   "composer.update.pending": "Wird aktualisiert…",
   "composer.update.action": "Aktualisieren",
+  "composer.imageInput.body":
+    "{model} erhält nur Text und sieht die angehängten Bilder nicht. Wenn dieses Modell Bilder lesen kann, schalte Bilder dafür ein.",
+  "composer.imageInput.label": "Bilder für {model} einschalten",
+  "composer.imageInput.pending": "Wird eingeschaltet…",
+  "composer.imageInput.action": "Bilder einschalten",
   "composer.usageLimit.credits":
     "Du hast das Planlimit von {provider} erreicht. Deine Agenten nutzen jetzt dein Guthaben.",
   "composer.usageLimit.creditsResets":
@@ -116,6 +124,13 @@ export const messages = {
   "composer.error.cancelEdit": "Die Bearbeitung der Warteschlange konnte nicht abgebrochen werden. Versuche es erneut.",
   "composer.error.updateQueued":
     "Die Nachricht in der Warteschlange konnte nicht aktualisiert werden. Versuche es erneut.",
+  "composer.queueEdit.received": "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet.",
+  "composer.queueEdit.receivedKept":
+    "Der Agent hat diese Nachricht schon erhalten. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.deletedKept":
+    "Diese Nachricht wurde gelöscht. Deine Bearbeitung ist beendet. Deine Änderungen stehen noch im Nachrichtenfeld.",
+  "composer.queueEdit.endedKept":
+    "Diese Bearbeitung wurde beendet, bevor sie gespeichert wurde. Deine Änderungen stehen noch im Nachrichtenfeld.",
   "composer.voice.prepareFailed": "Das Sprachmodell konnte nicht vorbereitet werden. Versuche es erneut.",
   "composer.voice.noSpeechRecorded": "Es wurde keine Sprache aufgenommen.",
   "composer.voice.noSpeechDetected": "Es wurde keine Sprache erkannt.",
@@ -162,6 +177,7 @@ export const messages = {
   "composer.picker.section.files": "Dateien",
   "composer.picker.section.tabs": "Browser-Tabs",
   "composer.picker.section.threads": "Threads",
+  "composer.picker.section.messages": "In Nachrichten",
   "composer.token.tab": "Browser-Tab {name}",
   "composer.token.thread": "Thread {name}",
   "composer.token.unavailableTab": "Geschlossener Browser-Tab {name}",

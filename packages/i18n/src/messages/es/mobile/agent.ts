@@ -315,6 +315,8 @@ export const messages = {
   "mobile.agent.runtime.noModels": "No hay modelos disponibles para este proveedor.",
   "mobile.agent.runtime.searchModels": "Buscar modelos",
   "mobile.agent.runtime.noMatches": "Ningún modelo coincide con tu búsqueda.",
+  "mobile.agent.runtime.workspaceOnlyUnavailable":
+    "Este proveedor no funciona con «Solo espacio de trabajo» en Windows y Linux. Para usarlo, cambia primero los «Permisos».",
   "mobile.agent.runtime.usageLimit": "Límite de uso alcanzado",
   "mobile.agent.runtime.usageLimitWindow": "Límite ({window})",
   "mobile.agent.runtime.usageLimitResets": "{limit} · Se restablece el {time}",
@@ -605,6 +607,7 @@ export const messages = {
   "mobile.agent.home.markAllRead": "Marcar todo como leído",
   "mobile.agent.home.sort.title": "Ordenar chats",
   "mobile.agent.home.sort.manual": "Manual",
+  "mobile.agent.home.sort.recent": "Actividad reciente",
   "mobile.agent.home.sort.unreadGroup": "No leídos en un grupo",
   "mobile.agent.home.sort.unreadFirst": "No leídos primero en carpetas",
   "mobile.agent.route.appearance": "Apariencia",

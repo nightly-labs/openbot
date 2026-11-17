@@ -254,9 +254,15 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot はこの MCP サーバーの設定を保存できません。",
   "error.backend.mcpServerNoAnswer": "サーバーは {seconds} 秒以内に応答しませんでした。",
   "error.backend.mcpSignInNotAccepted": "サーバーはそのサインインを受け付けませんでした。",
+  "error.backend.mcpSignInAccountRefused":
+    "サーバーは、サインインに使ったアカウントを拒否しました。このアカウントがサービスを使えるか確認してください。別のアカウントを使うには、サインアウトしてからもう一度サインインしてください。",
   "error.backend.mcpSignInClientRefused":
     "サインインの完了時に、サインインサーバーが OpenBot を受け付けませんでした。もう一度サインインしてください。OpenBot はサーバーに再登録します。",
+  "error.backend.mcpSignInAppRefused":
+    "サインインサーバーがこのサーバーのサインインアプリを受け付けませんでした。サインインアプリのクライアント ID とクライアントシークレットを確認してから、もう一度サインインしてください。",
   "error.backend.mcpCommandNotFound": "コマンドが見つかりません: {command}",
+  "error.backend.mcpProviderLimit":
+    "このエージェントが使える MCP サーバーの数には上限があります。このサーバーを使うには、エージェントに不要な MCP サーバーをオフにしてください。",
   "error.backend.mcpRegistrationRefused":
     "サインインサーバーはまだ OpenBot をアプリとして受け付けていません。原因はお使いのアカウントではありません。ローカル MCP サーバーなど、別の方法で接続してください。",
   "error.backend.mcpSignInAbandonedGeneric": "サインインは中止されました。",
@@ -285,9 +291,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "このサーバーのツール {tool} の入力形式を、このプロバイダーは読み取れません。ほかのプロバイダーのエージェントは引き続きこのサーバーを使えます。",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。MCP 設定を開いて「サインイン」を選択してください。",
+    "{provider} は MCP サーバー {name} を使用できませんでした。サーバーがサインインを求めています。マーケットプレイス、アプリで {name} を開いて「サインイン」を選択してください。",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} は MCP サーバー {name} を起動できませんでした。MCP 設定を開いて「接続をテスト」を選択すると、原因を確認できます。",
+    "{provider} は MCP サーバー {name} を起動できませんでした。マーケットプレイス、アプリで {name} を開いて「接続をテスト」を選択すると、原因を確認できます。",
   "error.backend.mcpServerFailedInProvider":
     "{provider} は MCP サーバー {name} を起動できませんでした。{provider} はこのサーバーのツールを使えません。{provider} はサーバーを自分で起動するため、OpenBot の接続テストは成功することがあります。新しいチャットを開始して、もう一度お試しください。",
   "error.backend.mcpServerTimedOutInProvider":
@@ -296,6 +302,8 @@ export const messages = {
     "OpenBot はこのサーバーのローカルサインイン接続を開始できませんでした。OpenBot を再起動してから、もう一度お試しください。",
   "error.backend.mcpOAuthSignInNeeded":
     "この MCP サーバーへのサインインは終了しました。ユーザーは OpenBot でもう一度サインインする必要があります。",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot は今この MCP サーバーのサインインを更新できませんでした。サインインは保持され、次のリクエストで再試行します。このエラーが続く場合、ユーザーは OpenBot でこのサーバーからサインアウトし、もう一度サインインできます。",
   "error.backend.mcpServerUnreachable":
     "OpenBot はサーバーに接続できませんでした。URL とネットワークを確認してください。",
   "error.backend.mcpLocalServerOff":
@@ -355,6 +363,8 @@ export const messages = {
   "error.backend.promptInactive": "この質問はもう有効ではありません。",
   "error.backend.promptAnswerMismatch": "回答が有効な質問と一致しません。",
   "error.backend.approvalInactive": "この承認はもう有効ではありません。",
+  "error.backend.feedbackNeedsPhone":
+    "このレポートを送信できるのは OpenBot のスマートフォンアプリだけです。スマートフォンのバージョンとサポートログを追加するためです。スマートフォンでこのチャットを開いてください。そこでもこのメッセージが表示される場合は、スマートフォンアプリを更新してください。",
   "error.backend.takeoverInactive": "このブラウザーの操作引き継ぎはもう有効ではありません。",
   "error.backend.authSubmitting": "認証の送信はすでに実行中です。",
   "error.backend.apiKeySaveFailed": "API キーを保存できませんでした。もう一度お試しください。",
@@ -436,6 +446,8 @@ export const messages = {
   "error.backend.branchSourceBusy": "このチャットを分岐する前に、現在のターンを停止してください。",
   "error.backend.branchMessageNotFound": "分岐できるのは、エージェントの完了した回答からのみです。",
   "error.backend.branchRemoteUnsupported": "分岐は、このコンピューター上のエージェントでのみ利用できます。",
+  "error.backend.feedbackWithdrawRemoteUnsupported":
+    "このレポートを削除するには、エージェントに削除を依頼してください。",
   "error.backend.threadMoveRefused":
     "新しいスレッドで実行できるのは、このエージェントだけに送信したメッセージのみです。",
   "error.backend.taskTitleRequired": "タスクに短いタイトルを付けてください。",

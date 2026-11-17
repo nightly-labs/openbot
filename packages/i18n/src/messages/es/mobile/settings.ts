@@ -64,7 +64,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "¿Borrar el registro de soporte?",
   "mobile.settings.support.clearBody": "Esto elimina todos los eventos del registro de este teléfono.",
   "mobile.settings.support.logFooter":
-    "El registro permanece en este teléfono y OpenBot no lo envía. Registra los pasos de conexión, las solicitudes y los errores. No registra mensajes ni archivos, y oculta contraseñas y tokens. Lee el archivo antes de compartirlo.",
+    "El registro permanece en este teléfono. OpenBot envía líneas del registro solo con un informe de error de la app del teléfono que tú envías, y la tarjeta del informe las muestra antes. Registra los pasos de conexión, las solicitudes y los errores. No registra mensajes ni archivos, y oculta contraseñas y tokens. Lee el archivo antes de compartirlo.",
   "mobile.settings.support.saveFailed": "No se pudo guardar el archivo de registro. Vuelve a intentarlo.",
   "mobile.settings.support.sharingUnavailable": "La función de compartir no está disponible en este teléfono.",
   "mobile.settings.support.newestFirst": "Los más recientes primero.",
@@ -128,6 +128,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidad",
   "mobile.settings.appearance.messageColorFooter":
     "Con Color del agente, tus mensajes en el chat de un agente usan su color. Con Color personalizado, tus mensajes en todos los chats usan el color que elijas. El color del texto cambia para que siga siendo legible.",
+  "mobile.settings.appearance.chatBackground": "Fondo del chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Predeterminado",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Cada tema conserva su propio color. Un color que dificulta leer el texto se vuelve más oscuro o más claro.",
   "mobile.settings.appearance.collapseRoutines": "Contraer actividad de rutinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Los eventos de rutinas consecutivos de un chat se muestran como una fila contraída. Toca la fila para verlos.",

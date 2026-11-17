@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Ondersteuningslog wissen?",
   "mobile.settings.support.clearBody": "Hiermee verwijder je alle gebeurtenissen uit het log op deze telefoon.",
   "mobile.settings.support.logFooter":
-    "Het log blijft op deze telefoon en OpenBot verstuurt het niet. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
+    "Het log blijft op deze telefoon. OpenBot verstuurt er alleen regels van met een bugrapport over de telefoon-app dat je zelf verstuurt, en de rapportkaart toont ze eerst. Het legt verbindingsstappen, verzoeken en fouten vast. Het legt geen berichten of bestanden vast en het maskeert wachtwoorden en tokens. Lees het bestand voordat je het deelt.",
   "mobile.settings.support.saveFailed": "Kan het logbestand niet opslaan. Probeer het opnieuw.",
   "mobile.settings.support.sharingUnavailable": "Delen is niet beschikbaar op deze telefoon.",
   "mobile.settings.support.newestFirst": "Nieuwste eerst.",
@@ -123,6 +123,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Lichtheid",
   "mobile.settings.appearance.messageColorFooter":
     "Met Agentkleur gebruiken je berichten in een agentchat de kleur van die agent. Met Eigen kleur gebruiken je berichten in alle chats de kleur die je kiest. De tekstkleur past zich aan, zodat de tekst leesbaar blijft.",
+  "mobile.settings.appearance.chatBackground": "Chatachtergrond",
+  "mobile.settings.appearance.chatBackgroundDefault": "Standaard",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Elk thema houdt een eigen kleur. Een kleur die tekst moeilijk leesbaar maakt, wordt donkerder of lichter.",
   "mobile.settings.appearance.collapseRoutines": "Routine-activiteit inklappen",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Opeenvolgende routinegebeurtenissen in een chat staan in één ingeklapte rij. Tik op de rij om ze te tonen.",

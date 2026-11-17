@@ -178,7 +178,7 @@ three start routes, and `provider-account-relay-v1` and `-v2` add one more each.
 
 | Start route | What it signs in | How the host delivers the callback |
 | --- | --- | --- |
-| `mcp/start` | A URL MCP server, from server settings or the Marketplace | It gives the code to `McpOAuth` (owned flow). |
+| `mcp/start` | A URL MCP server, from the Marketplace | It gives the code to `McpOAuth` (owned flow). |
 | `provider/start` | The CLI of a provider in `SIGN_IN_RELAY_PROVIDERS`: Codex, Claude, Gemini (`antigravity`) and Muse | It replays the query to the CLI's own loopback listener on the host. A Muse device page has no callback: the client only opens it. |
 | `link/start` | A sign-in page that an agent of the host printed in its conversation | It replays the query to the loopback address of that page. |
 | `provider-account/start` | An account after the first of Codex or Claude (`PROVIDER_ACCOUNT_RELAY_PROVIDERS`), new or signed out. The separate capability `provider-account-relay-v1` adds this route ([`provider-account-relay-v1.ts`](../../packages/contracts/src/team-protocol/provider-account-relay-v1.ts)) | It replays the query to the loopback listener of the account's CLI on the host, as for `provider/start`. |
@@ -559,6 +559,19 @@ A reply of `stop` still stops the request; in a group, the person replies to the
 because there is no status post to reply to. The released `whatsapp-connector-v1` overview cannot
 carry the value, so a client reads this list and merges it (`withWhatsAppWorkingMessages`). A client
 hides the switch while the host does not have the capability. Only protocol 9 peers get it.
+
+The optional capability `whatsapp-status-reactions-v1`
+([`whatsapp-status-reactions-v1.ts`](../../packages/contracts/src/team-protocol/whatsapp-status-reactions-v1.ts),
+host route [`route-whatsapp-status-reactions.ts`](../../src/main/team-api/route-whatsapp-status-reactions.ts))
+reads and sets, for each WhatsApp number, whether OpenBot puts status reactions on a message: 👀 when
+it arrives, then ✅, ❌ or 🫡 when the request ends. The setting is on by default and is kept with the
+number's connection values, so it needs no migration. `MessagingService` reads it at each reaction,
+so with the setting off a WhatsApp message gets no reaction, and the posts do not change. A removal
+still goes out, so a request that started before the setting went off loses its 👀 at its end. In a
+quiet chat of a personal number, a failed or stopped request then shows nothing to the other person. With both this setting and “Working on it…”
+off, only the answer shows that OpenBot read the message. A client reads this list and merges it into
+the released overview (`withWhatsAppStatusReactions`), and hides the switch while the host does not
+have the capability. Only protocol 9 peers get it.
 
 The phone uses the same routes in Marketplace › Apps › WhatsApp
 (`apps/mobile/src/features/servers/components/whatsapp-connector-page.tsx`). It links only with a

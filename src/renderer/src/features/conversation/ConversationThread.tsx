@@ -21,10 +21,13 @@ import { ConversationBrowserTakeover } from "./ConversationBrowserTakeover";
 import { ConversationQuestionPrompt } from "./ConversationQuestionPrompt";
 import { chatSearchOpensMessage } from "./chat-search";
 import { latestVisibleAgentMessageId } from "./conversation-read-state";
+import { conversationRuntime } from "./conversation-runtime";
 import { useConversationViewScope } from "./conversation-scope";
 import type { ConversationThreads } from "./conversation-types";
 import { useThreadMarketplaceSuggestionCard } from "./MarketplaceSuggestionChatCard";
 import { useThreadMcpSignInCard } from "./McpSignInChatCard";
+import { useMessageBackdropAction } from "./message-backdrop";
+import { useThreadSettingLinkCard } from "./SettingLinkChatCard";
 import { createTurnSteps } from "./turn-steps";
 
 /** The open side thread of the agent, in the place of the agent's own chat and its message box. */
@@ -69,7 +72,9 @@ export function ConversationThread() {
     copyMessage,
     copiedMessageId,
     branchThread,
+    changeMarkerActions,
   } = useConversationViewScope();
+  const backdropAction = useMessageBackdropAction(conversationRuntime(props));
   const { t, errorMessage } = useText();
   const [picker, setPicker] = createSignal<HTMLInputElement>();
   /** A failed answer shows here, where the person answered, and not in the agent's own chat. */
@@ -228,6 +233,7 @@ export function ConversationThread() {
     (body) => props.threads?.onSend(body, [], null) ?? Promise.resolve(false),
   );
   const marketplaceCard = useThreadMarketplaceSuggestionCard();
+  const settingLinkCard = useThreadSettingLinkCard();
   /** A visual reply page shows as in the agent's chat, and writes in this thread's message box. */
   const visualReplyCard = useThreadVisualReplyCard(threadComposer.openDraftKey, requestThreadFocus);
   /** The cards that the thread waits for: its browser takeover, and its question as a form. */
@@ -307,6 +313,7 @@ export function ConversationThread() {
             onStop={() => current().threads.onStop()}
             onOpenLink={(url) => void openExternalMessageUrl(url)}
             onSelectAgent={props.onSelectAgent}
+            changeMarkerActions={changeMarkerActions}
             onPreview={(attachment) => void previewAttachment(attachment)}
             onAttachmentAction={attachmentAction}
             mediaSource={props.runtime?.attachmentMedia}
@@ -321,7 +328,10 @@ export function ConversationThread() {
             waitsForAnswer={props.prompt !== undefined || props.browserTakeover !== undefined}
             attention={attention()}
             messageCard={(message, quote) =>
-              visualReplyCard(message, quote) ?? mcpSignInCard(message) ?? marketplaceCard(message)
+              visualReplyCard(message, quote) ??
+              mcpSignInCard(message) ??
+              marketplaceCard(message) ??
+              settingLinkCard(message)
             }
             olderMessages={current().threads.olderMessages}
             newerMessages={current().threads.newerMessages}
@@ -338,6 +348,7 @@ export function ConversationThread() {
             onDeleteMessage={deleteMessage(current().threads)}
             messagePins={threadPins(current().threads.open?.id)}
             canDeleteMessage={props.canDeleteMessage}
+            backdropAction={backdropAction}
             branchSource={branchSource(current().threads, current().agent.name)}
             focusMessage={focusMessage(current().threads)}
             onReply={reply(current().threads)}

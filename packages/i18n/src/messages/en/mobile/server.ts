@@ -554,7 +554,7 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.settings.timezoneNoMatch": "No timezone matches this search.",
   "mobile.server.settings.timezoneMore": "Type more of the name to see other timezones.",
   "mobile.server.settings.timezoneDescription":
-    "New routines use this timezone when the message does not give the sender's timezone.",
+    "New routines use this timezone when the message does not give the sender's timezone. On a server, the browser also uses it after the next restart.",
   "mobile.server.settings.timezoneLoading": "Loading timezone…",
   "mobile.server.settings.timezoneLoadFailed": "Could not load the server timezone.",
   "mobile.server.settings.timezoneSaveFailed": "Could not save the timezone. Try again.",
@@ -810,6 +810,17 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.vault.variableNameHint":
     "The environment variable that a program reads: capital letters, digits and _. Agents find the key by this name.",
   "mobile.server.vault.apiKey": "API key",
+  "mobile.server.vault.agents": "Agents",
+  "mobile.server.vault.agentsAll": "All agents",
+  "mobile.server.vault.agentsAllHint": "All agents also includes each agent that is added later.",
+  "mobile.server.vault.agentsNone": "Choose at least one agent.",
+  "mobile.server.vault.agentsSome": "{chosen} of {total}",
+  "mobile.server.vault.agentsListed": "Agents: {agents}",
+  "mobile.server.vault.searchAgents": "Search agents",
+  "mobile.server.vault.noAgentMatches": "No agents match this search.",
+  "mobile.server.vault.agentOptions": "Options",
+  "mobile.server.vault.selectAll": "Select all",
+  "mobile.server.vault.deselectAll": "Deselect all",
   "mobile.server.vault.delete": "Delete item",
   "mobile.server.vault.deleteTitle": "Delete this item?",
   "mobile.server.vault.deleteBody": "Agents on {host} can no longer use it. You cannot undo this.",
@@ -1174,6 +1185,9 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.connectors.whatsapp.workingMessage": "“Working on it…” message",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot posts it while the agent works, then replaces it with the answer. Turn off to post only the answer.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Status reactions",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot reacts with 👀 when a message arrives and with ✅ when the answer is ready. Turn off to send no reactions.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "WhatsApp Orchestrator",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "This agent receives the messages for OpenBot from all your linked numbers. It answers short ones itself, gives other work to the right agent, and answers in WhatsApp.",
@@ -1415,6 +1429,22 @@ export const messages = defineMessages("mobile.server", {
   "mobile.server.providers.compactWindowDefault": "Claude Code default",
   "mobile.server.providers.compactWindowTokens": "{size} tokens",
   "mobile.server.providers.compactWindowLoadFailed": "Could not load the compaction size of this server.",
+  "mobile.server.environment.row": "Variables",
+  "mobile.server.environment.title": "Environment",
+  "mobile.server.environment.hint":
+    "API keys, base URLs and other settings that each {name} process gets. A change applies when the current turns end.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL, with OPENAI_API_KEY as its key, sends the model requests of ChatGPT to that address.",
+  "mobile.server.environment.shellNote": "The commands that agents run can read these values.",
+  "mobile.server.environment.add": "Add variable",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Value",
+  "mobile.server.environment.saved": "Saved",
+  "mobile.server.environment.sensitive": "Sensitive",
+  "mobile.server.environment.remove": "Remove",
+  "mobile.server.environment.save": "Save",
+  "mobile.server.environment.loadFailed": "Could not load the variables of {name}.",
+  "mobile.server.environment.invalid": "Correct the names first.",
   "mobile.server.providers.disconnect": "Disconnect",
   "mobile.server.providers.disconnectTitle": "Disconnect {name}?",
   "mobile.server.providers.disconnectBody":

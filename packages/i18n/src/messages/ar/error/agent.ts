@@ -17,6 +17,9 @@ export const messages = {
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. استخدم الاسم المؤهل الدقيق الذي يعطيه tool_search، مثل openbot_browser.snapshot.",
   "error.agent.toolCallUnknownToolSuggest":
     "لم تعمل الأداة. لم يجد tool_call أداة بهذا الاسم. قد يكون الاسم المؤهل {name}. إذا كان كذلك، فأرسل الاستدعاء مرة أخرى بهذا الاسم.",
+  "error.agent.toolDescribeUnknownNames":
+    "لم يعثر tool_describe على أداة OpenBot باسم {names}. يصف فقط أدوات OpenBot والمتصفح التي يسردها openbot.tool_search، وليس أدوات MCP.",
+  "error.agent.toolDescribeDiscoveryNames": "استدعِ {names} مباشرةً. لا يصف tool_describe أدوات البحث.",
   "error.agent.routineScheduleArgumentsInvalid":
     "جدول المهمة الدورية غير صالح: {detail} صحّح الجدول وحاول مرة أخرى. يعطي openbot.tool_describe المخطط.",
   "error.agent.approvalWhileDeleting": "لا يمكن منح الموافقة أثناء حذف الوكيل.",
@@ -84,8 +87,11 @@ export const messages = {
     "توقّف {provider} عن الاستجابة، لذا أنهى OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
   "error.agent.toolLoopStopped":
     "كرر {provider} خطوة فاشلة مرات كثيرة، لذلك أوقف OpenBot هذا الدور. أرسل الرسالة مرة أخرى، أو اختر نموذجًا آخر.",
+  "error.agent.answerCutOff": "توقف الوكيل قبل أن ينهي إجابته، لذلك الإجابة غير كاملة. أرسل الرسالة مرة أخرى.",
   "error.agent.compactionConnectionLost":
     "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت، ثم أرسل رسالة للمتابعة.",
+  "error.agent.compactionConnectionLostAddress":
+    "توقف الاتصال أثناء ضغط الوكيل لسياقه، لذلك توقفت المهمة. تحقق من اتصالك بالإنترنت. وتأكد أيضًا أن {variable} ضمن المتغيرات في إعدادات {provider} هو عنوان API لخدمة النموذج لديك، وغالبًا ما ينتهي بـ /v1. ثم أرسل رسالة.",
   "error.agent.compactionLoopStopped":
     "ضغط {provider} السياق مرارًا، وبقي ممتلئًا جدًا في كل مرة فلم يستطع المتابعة، لذلك أوقف OpenBot هذا الدور. أوقف خوادم MCP أو استخدام الكمبيوتر التي لا يحتاجها هذا الوكيل، ثم أرسل رسالة. إذا غيّرت أنت أو الوكيل وقت ضغط {provider}، فتراجع عن هذا التغيير.",
   "error.agent.selectedGone": "لم يعد الوكيل المحدد موجودًا.",
@@ -141,6 +147,10 @@ export const messages = {
     "يحتاج خيار «مساحة العمل فقط» إلى بيئة Codex المعزولة، ولا يستطيع Codex تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر «السؤال أولًا» أو «وصول كامل» في إعدادات الوكيل.",
   "error.agent.claudeSandboxUnavailable":
     "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب: {reason}. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
+  "error.agent.claudeNoSandbox":
+    "لا يستطيع Claude استخدام بيئة معزولة على هذا الحاسوب، لذا لا يعمل معه خيار «مساحة العمل فقط». اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
+  "error.agent.claudeSandboxBlocked":
+    "يحتاج خيار «مساحة العمل فقط» إلى بيئة Claude المعزولة، ولا يستطيع Claude تشغيلها على هذا الحاسوب، لذلك تفشل أوامر الوكيل. اختر الوصول الكامل أو مزوّدًا آخر في إعدادات الوكيل.",
   "error.agent.screenCaptureOff":
     "التقاط الشاشة متوقف لهذا الوكيل. يمكن للمستخدم تشغيل التحكم في الحاسوب في إعدادات الوكيل.",
   "error.agent.screenCaptureUnavailable": "التقاط الشاشة غير متاح على هذا الحاسوب.",
@@ -151,7 +161,7 @@ export const messages = {
   "error.agent.mcpToolDeclined": "لم يسمح المستخدم باستدعاء أداة MCP هذه. لم تعمل الأداة.",
   "error.agent.mcpServerNotSaved": "لم يستجب خادم MCP، لذا لم يُحفظ. {error}",
   "error.agent.mcpServerKeysMove":
-    "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في إعدادات الخادم، MCP.",
+    "يحتفظ خادم MCP {name} بمفاتيح لخادمه الحالي. اطلب من المستخدم تغيير عنوانه أو أمره أو وسائطه أو طريقة نقله في المتجر، التطبيقات، {name}.",
   "error.agent.mcpServerBuiltIn":
     "{name} جزء من OpenBot، لذلك لا يمكن لأدوات MCP اختباره أو تشغيله أو إيقافه أو إزالته. يتحكم فيه المستخدم على الحاسوب الذي يشغّل OpenBot: اتصال GitHub في المتجر، التطبيقات، GitHub، والتحكم في الحاسوب في الإعدادات، التحكم في الحاسوب.",
   "error.agent.mcpServerUnknown": "لا يوجد خادم MCP باسم {name}. استدعِ list_mcp_servers لمعرفة الأسماء.",

@@ -71,6 +71,7 @@ import {
   unsentHandoff,
 } from "./handoff-history";
 import { decodeCapturedSteps, readCapturedSteps } from "./handoff-tool-steps";
+import { mcpFallbackRunsServer } from "./mcp-tools";
 import { isProviderTimeout } from "./provider-status";
 import { sessionSettingsIdentity } from "./session-settings";
 import { isArchivedThreadError, isMissingProviderSessionError, providerLabel } from "./thread-items";
@@ -1208,6 +1209,8 @@ export class ThreadLifecycle {
             ...(excluded.length ? [["excluded", ...excluded]] : []),
             ...(agentAutomationAllowed(agent, this.#store.agentDefaults()) ? ["automation"] : []),
             ...(agentQuickAcknowledgementEnabled(agent, this.#store.agentDefaults()) ? ["quick-acknowledgement"] : []),
+            // Only "off" adds a value: on is the default, so its sessions keep their fingerprint (#10033).
+            ...(this.#store.agentDefaults().commitCoAuthor ? [] : ["no-commit-co-author"]),
           ],
           ...(Object.keys(environment).length > 0 ? [Object.entries(environment).sort()] : []),
           ...(legacySection ? [legacySection.members.map((member) => member.id).sort()] : []),
@@ -1516,10 +1519,16 @@ export class ThreadLifecycle {
           : client.provider === "opencode"
             ? openCodeMcpServers(mcpServers).map((config) => config.name)
             : // Antigravity 1.5 leaves the tools over its schema budget out (#7427). OpenBot runs the
-              // tools of the saved http rows through tool_call, so only those are listed.
+              // tools of the saved rows through tool_call, so only the rows that it can run are listed.
+              // The built-in servers are not saved rows.
               client.provider === "antigravity"
               ? mcpServers
-                  .filter((config) => config.transport === "http" && config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID)
+                  .filter(
+                    (config) =>
+                      mcpFallbackRunsServer(config, agent) &&
+                      config.id !== GITHUB_CONNECTOR_MCP_SERVER_ID &&
+                      config.id !== COMPUTER_USE_MCP_SERVER_ID,
+                  )
                   .map((config) => providerMcpServerName(config.name))
               : [],
       catalogAsMcpTools: client.catalogAsMcpTools?.(agent.model) === true,

@@ -32,6 +32,8 @@ export const messages = {
   "error.workflow.pictureMissing": "Изображения больше нет на сервере. Отправьте его снова.",
   "error.workflow.pictureType": "Используйте изображение PNG, JPEG или WebP.",
   "error.workflow.mediaInputMissing": "Изображение из предыдущего шага недоступно. Запустите этот шаг снова.",
+  "error.workflow.mediaEmptyRequest":
+    "Напишите описание или запустите предыдущие шаги, чтобы пришёл текст или изображение.",
   "error.workflow.mediaInputNotImage": "Этот шаг принимает только изображения, не видео. Удалите связь от видео.",
   "error.workflow.stepMissing": "Этого шага больше нет.",
   "error.workflow.nodeMissing": "Этого шага нет в рабочем процессе.",
@@ -90,4 +92,15 @@ export const messages = {
   "error.workflow.sunraFailed": "Sunra не удалось создать файл: {reason}",
   "error.workflow.sunraTimeout":
     "Sunra не завершила файл вовремя. Проверьте проект OpenBot на sunra.ai, прежде чем запускать шаг снова.",
+  "error.workflow.higgsfieldSignIn":
+    "Войдите в Higgsfield в разделе «Приложения», чтобы использовать модели Higgsfield.",
+  "error.workflow.higgsfieldNoCredits":
+    "На вашем аккаунте Higgsfield недостаточно кредитов. Пополните кредиты на higgsfield.ai/pricing и запустите шаг снова.",
+  "error.workflow.higgsfieldNeedsPlan":
+    "Для этой модели Higgsfield нужен тариф Higgsfield. Выберите тариф на higgsfield.ai/pricing или другую модель.",
+  "error.workflow.higgsfieldBlocked":
+    "Higgsfield не создал файл: его остановила проверка содержимого. Измените промпт или входные изображения и запустите шаг снова.",
+  "error.workflow.higgsfieldFailed": "Higgsfield не смог создать файл: {reason}",
+  "error.workflow.higgsfieldTimeout":
+    "Higgsfield не успел создать файл вовремя. Проверьте историю на higgsfield.ai, прежде чем запускать шаг снова.",
 } as const satisfies PartialTranslation<typeof source>;

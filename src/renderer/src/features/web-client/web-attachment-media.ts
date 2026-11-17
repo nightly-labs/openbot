@@ -33,6 +33,8 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
   "audio/mp4",
   "audio/wav",
   "audio/aac",
+  "audio/ogg",
+  "audio/flac",
   "video/quicktime",
   "video/mp4",
 ]);
@@ -42,13 +44,28 @@ const MEDIA_TYPES: ReadonlySet<string> = new Set([
  */
 const SVG_TYPE = "image/svg+xml";
 
+/** A file that the chat already read from the host. */
+interface WebMediaFile {
+  name: string;
+  blob: Blob;
+}
+
 export interface WebAttachmentMedia extends AttachmentMediaSource {
+  /**
+   * The file of an attachment that the chat holds, or that a running load gets. Null when neither,
+   * so the caller reads it from the host. It starts no download.
+   */
+  file(attachmentId: string): Promise<WebMediaFile | null>;
+  /** Holds the bytes of a file that the caller read from the host, so the chat and a later open use them. */
+  keep(attachment: AttachmentSummary, bytes: Uint8Array<ArrayBuffer>): void;
   /** Revokes every object URL. */
   dispose(): void;
 }
 
 interface Entry {
   url: string;
+  name: string;
+  blob: Blob;
   bytes: number;
   /** A `data:` URL has nothing to revoke. */
   object: boolean;
@@ -117,6 +134,17 @@ export function createWebAttachmentMedia(
     waiting.shift()?.();
   };
 
+  const entryFor = (attachment: AttachmentSummary, type: string, bytes: Uint8Array<ArrayBuffer>): Entry => {
+    const blob = new Blob([bytes], { type });
+    const base = { name: attachment.name, blob, bytes: bytes.byteLength };
+    return type === SVG_TYPE
+      ? { ...base, url: `data:${SVG_TYPE};base64,${bytesToBase64(bytes)}`, object: false }
+      : { ...base, url: urls.create(blob), object: true };
+  };
+  /** The largest file of this type that the chat holds. */
+  const limitFor = (type: string, size: "thumbnail" | "generated") =>
+    playableMediaKind(type) ? WEB_MEDIA_BYTES : size === "generated" ? WEB_GENERATED_IMAGE_BYTES : WEB_THUMBNAIL_BYTES;
+
   async function download(attachment: AttachmentSummary, type: string, limit: number, key: string) {
     const started = generation;
     await slot();
@@ -125,12 +153,7 @@ export function createWebAttachmentMedia(
       const file = await remote.download(attachment.id);
       const bytes = base64ToBytes(file.base64);
       if (bytes.byteLength > limit || generation !== started) return false;
-      store(
-        key,
-        type === SVG_TYPE
-          ? { url: `data:${SVG_TYPE};base64,${bytesToBase64(bytes)}`, bytes: bytes.byteLength, object: false }
-          : { url: urls.create(new Blob([bytes], { type })), bytes: bytes.byteLength, object: true },
-      );
+      store(key, entryFor(attachment, type, bytes));
       return true;
     } catch {
       // The card keeps its icon and its download button.
@@ -158,17 +181,29 @@ export function createWebAttachmentMedia(
       if (running) return running;
       const type = mediaType(attachment);
       if (!type) return Promise.resolve(false);
-      const limit = playableMediaKind(type)
-        ? WEB_MEDIA_BYTES
-        : size === "generated"
-          ? WEB_GENERATED_IMAGE_BYTES
-          : WEB_THUMBNAIL_BYTES;
+      const limit = limitFor(type, size);
       if (attachment.size > limit) return Promise.resolve(false);
       const job = download(attachment, type, limit, key).finally(() => {
         if (loading.get(key) === job) loading.delete(key);
       });
       loading.set(key, job);
       return job;
+    },
+    async file(attachmentId) {
+      if (disposed) return null;
+      const key = `${currentHost()}:${attachmentId}`;
+      const running = loading.get(key);
+      if (running && !(await running)) return null;
+      const entry = entries.get(key);
+      return entry ? { name: entry.name, blob: entry.blob } : null;
+    },
+    keep(attachment, bytes) {
+      if (disposed) return;
+      const key = `${currentHost()}:${attachment.id}`;
+      const type = mediaType(attachment);
+      // A running load stores the same file itself.
+      if (!type || entries.has(key) || loading.has(key) || bytes.byteLength > limitFor(type, "generated")) return;
+      store(key, entryFor(attachment, type, bytes));
     },
     dispose() {
       disposed = true;

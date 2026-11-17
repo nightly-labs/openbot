@@ -1,5 +1,5 @@
 /**
- * What the MCP settings panel needs beyond the shared contract: a blank draft, a reopened draft,
+ * What the Marketplace MCP server form and controls need beyond the shared contract: a blank draft, a reopened draft,
  * the dirty check, and the badge text and variant.
  *
  * The types and the rules the main process also applies - validation, normalization, the id - live
@@ -42,9 +42,11 @@ const FAILURE_KINDS: Partial<Record<string, McpFailureKind>> = {
   "error.backend.mcpSignInTimedOut": "sign-in",
   "error.mcp.signInOnHost": "sign-in",
   "error.backend.mcpSignInNotAccepted": "refused",
+  "error.backend.mcpSignInAccountRefused": "refused",
   "error.backend.mcpServerHttpCredentials": "refused",
   "error.backend.mcpServerBearerKey": "refused",
   "error.backend.mcpRegistrationRefused": "refused",
+  "error.backend.mcpSignInAppRefused": "refused",
   "error.backend.mcpSignInNeedsHttps": "url",
   "error.backend.mcpServerHttpUrl": "url",
   "error.backend.mcpServerNoAnswer": "timeout",

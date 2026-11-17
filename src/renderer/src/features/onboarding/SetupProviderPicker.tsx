@@ -51,6 +51,8 @@ export interface SetupProviderProps {
    * as Cursor, then has a row only when the host's status lists it, as in Settings.
    */
   hostProviders?: boolean | undefined;
+  /** The host has `custom-provider-harness-choice-v1`: the endpoint form offers "Runs on", as on this computer. */
+  customProviderHarnessChoice?: boolean | undefined;
   refreshingProviders?: boolean | undefined;
   providerRuntimeStatuses?: Partial<Record<AgentProviderId, ProviderRuntimeStatus>> | undefined;
   /** The newer runtime main offers per provider; the row's actions menu offers it as in Settings. */
@@ -313,11 +315,11 @@ export function createSetupProviders(
   }
 
   /**
-   * The providers that can run an endpoint, for "Runs on". It is of this computer: a joined server's
-   * host keeps the harness of each endpoint, as in Settings.
+   * The providers that can run an endpoint, for "Runs on": those of this computer, or of a joined
+   * server's host that lets an admin choose the harness, as in Settings.
    */
   const harnesses = createMemo((): CustomProviderHarnessChoice[] | undefined =>
-    props.hostProviders
+    props.hostProviders && !props.customProviderHarnessChoice
       ? undefined
       : CUSTOM_PROVIDER_HARNESSES.map((id) => {
           const option = providerOptions().find((item) => item.id === id);

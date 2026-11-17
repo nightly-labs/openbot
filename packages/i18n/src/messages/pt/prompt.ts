@@ -31,6 +31,8 @@ export const messages = {
   "prompt.approval.report.ideaHeadline": "Tem uma ideia? Vamos torná-la real.",
   "prompt.approval.report.dontSend": "Agora não",
   "prompt.approval.report.send": "Enviar para a equipe do OpenBot",
+  "prompt.approval.report.phoneOnly":
+    "Abra este chat no app do OpenBot no celular e envie o relato por lá. O celular adiciona a versão, o sistema e o registro de suporte dele. Se o celular não conseguir se conectar, abra Configurações > Suporte no app do celular e relate o problema no GitHub.",
   "prompt.approval.title.command": "Executar um comando",
   "prompt.approval.title.fileChange": "Alterar arquivos",
   "prompt.approval.title.permissions": "Conceder permissões",
@@ -56,6 +58,8 @@ export const messages = {
   "prompt.browser.signInBlocked.cancelledTitle": "Login em {host} cancelado",
   "prompt.browser.signInBlocked.body":
     "Entre neste computador. O OpenBot envia apenas o login de {host} para {server}, e {name} continua.",
+  "prompt.browser.signInBlocked.desktopBody":
+    "{host} não aceita um login a partir do servidor. Abra este chat no app OpenBot para computador e entre por lá. Depois, {name} continua.",
   "prompt.browser.signInBlocked.cancelledBody": "O login foi cancelado.",
   "prompt.browser.signInBlocked.waiting": "Aguardando o login",
   "prompt.browser.signInBlocked.waitingButton": "Aguardando o login…",

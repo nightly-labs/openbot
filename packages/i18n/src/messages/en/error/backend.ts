@@ -239,9 +239,15 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpServerInvalid": "OpenBot cannot save this MCP server configuration.",
   "error.backend.mcpServerNoAnswer": "The server did not answer in {seconds} seconds.",
   "error.backend.mcpSignInNotAccepted": "The server did not accept that sign-in.",
+  "error.backend.mcpSignInAccountRefused":
+    "The server refused the account that you signed in with. Check that this account can use the service. To use another account, sign out, then sign in again.",
   "error.backend.mcpSignInClientRefused":
     "The sign-in server did not accept OpenBot when it completed the sign-in. Sign in again: OpenBot registers with the server again.",
+  "error.backend.mcpSignInAppRefused":
+    "The sign-in server did not accept the sign-in app of this server. Check the client ID and the client secret of the sign-in app, then sign in again.",
   "error.backend.mcpCommandNotFound": "Command not found: {command}",
+  "error.backend.mcpProviderLimit":
+    "This agent can use only a limited number of MCP servers. To use this server, turn off an MCP server that the agent does not need.",
   "error.backend.mcpRegistrationRefused":
     "The sign-in server does not accept OpenBot as an app yet. Your account is not the cause. Use another way to connect, such as a local MCP server.",
   "error.backend.mcpSignInAbandonedGeneric": "The sign-in was abandoned.",
@@ -268,9 +274,9 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpToolSchemaRefused":
     "Its tool {tool} has an input format that this provider cannot read. Agents on other providers still get the server.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open the MCP settings and choose Sign in.",
+    "{provider} could not use the MCP server {name}, because the server asks for a sign-in. Open {name} in Marketplace, Apps, and choose Sign in.",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} could not start the MCP server {name}. Open the MCP settings and choose Test connection to see the cause.",
+    "{provider} could not start the MCP server {name}. Open {name} in Marketplace, Apps, and choose Test connection to see the cause.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} could not start the MCP server {name}. Its tools are not available to {provider}. {provider} starts the server itself, so the connection test in OpenBot can pass. Start a new chat to try again.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -278,7 +284,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.mcpAppReconnect":
     "{name} on ChatGPT asks you to sign in again. Reconnect {name} on ChatGPT, then ask the agent again.",
   "error.backend.mcpServerSignInPage":
-    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open the MCP settings and sign in to {name}, then ask the agent again.",
+    "The MCP server {name} asked you to sign in on a web page. OpenBot does not open this page for a server, so it declined. Open {name} in Marketplace, Apps, and sign in, then ask the agent again.",
   "error.backend.mcpServerRequestDeclined":
     "The MCP server {name} asked for something that OpenBot cannot show, so OpenBot declined it.",
   "error.backend.mcpRequestDeclined":
@@ -287,6 +293,8 @@ export const messages = defineMessages("error.backend", {
     "OpenBot could not start its local sign-in connection for this server. Restart OpenBot, then try again.",
   "error.backend.mcpOAuthSignInNeeded":
     "The sign-in to this MCP server has ended. The user must sign in to it again in OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot could not renew the sign-in to this MCP server now. The sign-in is kept, and the next request tries again. If this error continues, the user can sign out of the server in OpenBot and sign in again.",
   "error.backend.mcpOAuthRequestRefused":
     "The MCP server refused this request, but the sign-in to it is still active. Possibly the account cannot use this tool, or the sign-in did not give all the necessary access. The user can examine the plan and the access of the account at the service, or sign in to the server again in OpenBot and allow all the access that it asks for.",
   "error.backend.mcpServerUnreachable": "OpenBot could not reach the server. Check the URL and your network.",
@@ -350,6 +358,8 @@ export const messages = defineMessages("error.backend", {
   "error.backend.uiBlockActionNotAllowed": "Only the server owner or an admin can choose this action.",
   "error.backend.approvalInactive": "This approval is no longer active.",
   "error.backend.approvalOwnerOnly": "Only the server owner can approve this action.",
+  "error.backend.feedbackNeedsPhone":
+    "Only the OpenBot phone app can send this report, because it adds the phone's version and support log. Open this chat on the phone. If you see this message there, update the phone app.",
   "error.backend.takeoverInactive": "This browser takeover is no longer active.",
   "error.backend.authSubmitting": "Authentication submission is already in progress.",
   "error.backend.apiKeySaveFailed": "OpenBot could not save the API key. Try again.",
@@ -439,6 +449,7 @@ export const messages = defineMessages("error.backend", {
   "error.backend.branchSourceBusy": "Stop the current turn before you branch this chat.",
   "error.backend.branchMessageNotFound": "You can branch only from a finished answer of the agent.",
   "error.backend.branchRemoteUnsupported": "Branches are only available for agents on this computer.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "To remove this report, ask the agent to remove it.",
   "error.backend.threadMoveRefused": "Only a message that you sent to this agent alone can run in a new thread.",
   "error.backend.taskTitleRequired": "Give the task a short title.",
   "error.backend.taskToolInvalid": "Give the task a title of at most 120 characters and a brief that says what to do.",

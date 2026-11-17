@@ -58,7 +58,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "清空支持日志？",
   "mobile.settings.support.clearBody": "这会删除这台手机上日志中的所有事件。",
   "mobile.settings.support.logFooter":
-    "日志只保存在这台手机上，OpenBot 不会发送它。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
+    "日志保存在这台手机上。只有在你发送手机应用的错误报告时，OpenBot 才会随报告发送其中几行，报告卡片会先显示这些内容。日志记录连接步骤、请求和错误，不记录消息或文件，并会遮蔽密码与令牌。分享前请先自行查看文件内容。",
   "mobile.settings.support.saveFailed": "无法保存日志文件，请重试。",
   "mobile.settings.support.sharingUnavailable": "这台手机不支持分享。",
   "mobile.settings.support.newestFirst": "最新的在最前面。",
@@ -118,6 +118,9 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "亮度",
   "mobile.settings.appearance.messageColorFooter":
     "选择助手颜色时，助手对话中你的消息使用该助手的颜色。选择自定义颜色时，所有对话中你的消息使用你选的颜色。文字颜色会自动调整，保持清晰可读。",
+  "mobile.settings.appearance.chatBackground": "聊天背景",
+  "mobile.settings.appearance.chatBackgroundDefault": "默认",
+  "mobile.settings.appearance.chatBackgroundFooter": "每个主题保留各自的颜色。让文字难以阅读的颜色会变深或变浅。",
   "mobile.settings.appearance.collapseRoutines": "折叠自动化任务动态",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "聊天中连续的自动化任务事件会显示为一行折叠的条目。轻点该行即可展开。",

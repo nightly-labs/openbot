@@ -672,7 +672,9 @@ async function seed(page: Page): Promise<Seed> {
   );
 
   // A saved custom agent restarts the provider. Until the restarted process has listed its models,
-  // the host refuses the model with "listed no models"; that refusal is the state to wait out.
+  // the host refuses the model. While the provider is not yet `available`, the refusal says "is not
+  // connected"; after that, "listed no models". Both are the state to wait out (v0.72.0 release run
+  // 43976002755 failed on the first one on Linux x64).
   const createAgent = (name: string) =>
     waitFor(`agent ${name} to be created`, TURN_LIMIT_MS, async () => {
       try {
@@ -690,7 +692,7 @@ async function seed(page: Page): Promise<Seed> {
           { name, model: `${CUSTOM_AGENT_ID}/default` },
         );
       } catch (error) {
-        if (error instanceof Error && error.message.includes("listed no models")) return null;
+        if (error instanceof Error && /is not connected|listed no models/u.test(error.message)) return null;
         throw error;
       }
     });

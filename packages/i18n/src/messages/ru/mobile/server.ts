@@ -507,7 +507,7 @@ export const messages = {
   "mobile.server.settings.timezoneNoMatch": "Нет часовых поясов, подходящих под запрос.",
   "mobile.server.settings.timezoneMore": "Введите больше букв названия, чтобы увидеть другие часовые пояса.",
   "mobile.server.settings.timezoneDescription":
-    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя.",
+    "Новые регулярные задачи используют этот часовой пояс, если в сообщении нет часового пояса отправителя. На сервере браузер тоже использует его после следующего перезапуска.",
   "mobile.server.settings.timezoneLoading": "Загрузка часового пояса…",
   "mobile.server.settings.timezoneLoadFailed": "Не удалось загрузить часовой пояс сервера.",
   "mobile.server.settings.timezoneSaveFailed": "Не удалось сохранить часовой пояс. Повторите попытку.",
@@ -1012,6 +1012,9 @@ export const messages = {
   "mobile.server.connectors.whatsapp.workingMessage": "Сообщение «Уже работаю…»",
   "mobile.server.connectors.whatsapp.workingMessageDescription":
     "OpenBot отправляет его, пока агент работает, а затем заменяет ответом. Выключите, чтобы отправлять только ответ.",
+  "mobile.server.connectors.whatsapp.statusReactions": "Реакции статуса",
+  "mobile.server.connectors.whatsapp.statusReactionsDescription":
+    "OpenBot ставит 👀, когда приходит сообщение, и ✅, когда ответ готов. Выключите, чтобы не отправлять реакции.",
   "mobile.server.connectors.whatsapp.orchestratorTitle": "Оркестратор WhatsApp",
   "mobile.server.connectors.whatsapp.orchestratorDescription":
     "Этот агент получает сообщения для OpenBot со всех ваших привязанных номеров. Короткие он обрабатывает сам, остальную работу передаёт нужному агенту и отвечает в WhatsApp.",
@@ -1245,6 +1248,22 @@ export const messages = {
   "mobile.server.providers.compactWindowDefault": "По умолчанию Claude Code",
   "mobile.server.providers.compactWindowTokens": "{size} токенов",
   "mobile.server.providers.compactWindowLoadFailed": "Не удалось загрузить размер сжатия этого сервера.",
+  "mobile.server.environment.row": "Переменные",
+  "mobile.server.environment.title": "Окружение",
+  "mobile.server.environment.hint":
+    "Ключи API, базовые адреса и другие настройки, которые получает каждый процесс {name}. Изменение действует, когда закончатся текущие ходы.",
+  "mobile.server.environment.codexHint":
+    "OPENAI_BASE_URL с ключом OPENAI_API_KEY отправляет запросы ChatGPT к моделям по этому адресу.",
+  "mobile.server.environment.shellNote": "Команды, которые запускают агенты, могут читать эти значения.",
+  "mobile.server.environment.add": "Добавить переменную",
+  "mobile.server.environment.namePlaceholder": "VARIABLE_NAME",
+  "mobile.server.environment.valuePlaceholder": "Значение",
+  "mobile.server.environment.saved": "Сохранено",
+  "mobile.server.environment.sensitive": "Секретная",
+  "mobile.server.environment.remove": "Удалить",
+  "mobile.server.environment.save": "Сохранить",
+  "mobile.server.environment.loadFailed": "Не удалось загрузить переменные {name}.",
+  "mobile.server.environment.invalid": "Сначала исправьте имена.",
   "mobile.server.providers.disconnect": "Отключить",
   "mobile.server.providers.disconnectTitle": "Отключить {name}?",
   "mobile.server.providers.disconnectBody":

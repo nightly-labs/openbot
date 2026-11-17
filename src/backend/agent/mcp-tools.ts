@@ -1,11 +1,13 @@
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { INPUT_LIMITS } from "@openbot/contracts/input-limits";
 import {
+  type AgentAccess,
   MCP_TRANSPORTS,
   type McpServerConfig,
   type McpSignInState,
   mcpConfigErrors,
   normalizeMcpConfig,
+  workspaceAccessEnforced,
 } from "@openbot/contracts/ipc";
 import { sourceText } from "@openbot/i18n/source";
 import { Effect } from "effect";
@@ -24,7 +26,7 @@ import { ToolOperationFailed, toolStep } from "./tool-operation";
  * OpenBot server when the user asks. A server applies to every agent there, so each change waits
  * for the user's approval as other tools do, and an agent with Full access is answered for.
  *
- * No value of a header or of the environment goes in or out: a key stays in Server settings, where
+ * No value of a header or of the environment goes in or out: a key stays in the Marketplace form, where
  * the user enters it. A sign-in is handed to the user with a card in the conversation.
  */
 
@@ -69,7 +71,7 @@ export const MCP_SERVER_TOOL_DEFINITIONS = [
   },
   {
     name: "save_mcp_server",
-    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (the user enters the key in Server settings, MCP; never ask for a key in the chat), or the error. Headers and environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Server settings, MCP. A server that holds keys keeps its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
+    description: `Add an MCP server, or change one by its name, only when the user asks for it. ${MCP_SCOPE} ${MCP_APPROVAL} Then OpenBot connects to the server and saves it when it answers or needs only a sign-in or a key. The result is ready with its tools, needs_sign_in (a Sign in card is in the conversation: wait for the user), needs_key (the user enters the key in Marketplace, Apps; never ask for a key in the chat), or the error. Headers and environment values are not set here: a stdio server that cannot start without a key in its environment is added by the user in Marketplace, Apps. A server that holds keys keeps its transport, address origin, command, arguments and folder. New tools reach the agents from their next turn.`,
     shape: saveMcpServerToolSchema.shape,
   },
   {
@@ -116,7 +118,7 @@ export interface AgentMcpServers {
   signInOffer(config: McpServerConfig): Effect.Effect<McpSignInOffer>;
   /** Masks the MCP secret values in a text that goes back to the agent. */
   redact(text: string): string;
-  /** The saved, enabled http servers that the agent gets. */
+  /** The saved, enabled servers that the agent gets and that `mcpFallbackRunsServer` allows. */
   forAgent(agentId: string): McpServerConfig[];
   /** Runs one tool of a saved server, silent like `inspect`: its result, or the failure sentence. */
   callTool(
@@ -124,6 +126,16 @@ export interface AgentMcpServers {
     name: string,
     args: McpToolArguments,
   ): Effect.Effect<{ result: McpToolCallResult } | { error: string }, ToolOperationFailed>;
+}
+
+/**
+ * Whether OpenBot can run a tool of this server itself, for a provider that left the tool out (#7427).
+ * An http server can always run. A stdio server runs only for a Full access agent: a Workspace only
+ * provider starts it in its sandbox, and OpenBot would start it outside. A Full access provider has
+ * no sandbox, so OpenBot starts the server as the Test button does (#10146).
+ */
+export function mcpFallbackRunsServer(config: McpServerConfig, agent: { access?: AgentAccess | undefined }): boolean {
+  return config.transport === "http" || !workspaceAccessEnforced(agent);
 }
 
 /**
@@ -182,6 +194,9 @@ export function mcpServersFromGateway(
   const toToolFailure = Effect.mapError(
     (failure: McpGatewayFailed) => new ToolOperationFailed({ cause: failure.cause }),
   );
+  // A stdio server that the fallback starts waits for the same runtimes as a test (#10146).
+  const prepared = (config: McpServerConfig) =>
+    (prepareTest?.(config) ?? Effect.void).pipe(Effect.mapError((cause) => new ToolOperationFailed({ cause })));
   return {
     list: () => gateway.list(),
     builtIn: () => gateway.builtIn(),
@@ -190,14 +205,12 @@ export function mcpServersFromGateway(
     setEnabled: (mcpServerId, enabled) => gateway.setEnabled({ mcpServerId, enabled }).pipe(toToolFailure),
     remove: (mcpServerId) => gateway.remove({ mcpServerId }).pipe(toToolFailure),
     inspect: (config, tested) =>
-      (prepareTest?.(config) ?? Effect.void).pipe(
-        Effect.mapError((cause) => new ToolOperationFailed({ cause })),
-        Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure)),
-      ),
+      prepared(config).pipe(Effect.andThen(gateway.inspect(config, tested).pipe(toToolFailure))),
     signInOffer: (config) => gateway.signInOffer(config),
     redact: (text) => gateway.redact(text),
     forAgent,
-    callTool: (config, name, args) => gateway.callTool(config, name, args).pipe(toToolFailure),
+    callTool: (config, name, args) =>
+      prepared(config).pipe(Effect.andThen(gateway.callTool(config, name, args).pipe(toToolFailure))),
   };
 }
 
@@ -247,7 +260,7 @@ const runMarketplaceAppStatus = Effect.fn("McpServerTools.marketplaceAppStatus")
     return openBotToolResult({
       status: "disabled",
       server,
-      next: "The app is installed and turned off. Tell the user to turn it on in Server settings, MCP, or call openbot.set_mcp_server_enabled when the user asks.",
+      next: "The app is installed and turned off. Tell the user to turn it on in Marketplace, Apps, or call openbot.set_mcp_server_enabled when the user asks.",
     });
   const outcome = yield* servers.inspect(config);
   if (outcome.error === null)
@@ -333,7 +346,7 @@ const runMcpServerTool = Effect.fn("McpServerTools.handle")(function* (
       const invalid = errors.name ?? errors.command ?? errors.url;
       if (invalid) return openBotToolFailure(invalid);
       // The keys of a row were given for its server. A change that points them at another server, or
-      // that drops them with the other transport, is the user's to make in Server settings.
+      // that drops them with the other transport, is the user's to make in the Marketplace.
       if (existing && holdsKeys(existing) && serverMoves(existing, config))
         return openBotToolFailure(sourceText("error.agent.mcpServerKeysMove", { name: existing.name }));
       const key = existing ? "status.agent.mcpServerChange" : "status.agent.mcpServerAdd";
@@ -463,7 +476,7 @@ const report = Effect.fnUntraced(function* (
       status: "needs_key",
       server,
       error,
-      next: "Ask the user to enter the key in Server settings, MCP. Do not ask for the key in the chat.",
+      next: "Ask the user to enter the key with Edit on the server's page in Marketplace, Apps. Do not ask for the key in the chat.",
     });
   return openBotToolResult({ status: "error", server, error });
 });

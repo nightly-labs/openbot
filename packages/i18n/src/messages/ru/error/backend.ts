@@ -245,9 +245,15 @@ export const messages = {
   "error.backend.mcpServerInvalid": "OpenBot не может сохранить эту конфигурацию сервера MCP.",
   "error.backend.mcpServerNoAnswer": "Сервер не ответил за {seconds} с.",
   "error.backend.mcpSignInNotAccepted": "Сервер не принял этот вход.",
+  "error.backend.mcpSignInAccountRefused":
+    "Сервер отклонил аккаунт, с которым вы вошли. Проверьте, что у этого аккаунта есть доступ к сервису. Чтобы использовать другой аккаунт, выйдите и войдите снова.",
   "error.backend.mcpSignInClientRefused":
     "Сервер входа не принял OpenBot при завершении входа. Войдите снова: OpenBot заново зарегистрируется на сервере.",
+  "error.backend.mcpSignInAppRefused":
+    "Сервер входа не принял приложение входа этого сервера. Проверьте ID клиента и секрет клиента приложения входа, затем войдите снова.",
   "error.backend.mcpCommandNotFound": "Команда не найдена: {command}",
+  "error.backend.mcpProviderLimit":
+    "Этот агент может использовать только ограниченное число серверов MCP. Чтобы использовать этот сервер, выключите сервер MCP, который агенту не нужен.",
   "error.backend.mcpRegistrationRefused":
     "Сервер входа пока не принимает OpenBot как приложение. Дело не в вашем аккаунте. Подключитесь другим способом, например через локальный сервер MCP.",
   "error.backend.mcpSignInAbandonedGeneric": "Вход прерван.",
@@ -274,9 +280,9 @@ export const messages = {
   "error.backend.mcpToolSchemaRefused":
     "Его инструмент {tool} использует формат входных данных, который этот провайдер не может прочитать. Агенты других провайдеров по-прежнему получают сервер.",
   "error.backend.mcpServerSignInForProvider":
-    "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте настройки MCP и выберите «Войти».",
+    "{provider} не может использовать MCP-сервер {name}: сервер требует входа. Откройте {name} в разделе Каталог, Приложения и выберите «Войти».",
   "error.backend.mcpServerFailedForProvider":
-    "{provider} не может запустить MCP-сервер {name}. Откройте настройки MCP и выберите «Проверить подключение», чтобы увидеть причину.",
+    "{provider} не может запустить MCP-сервер {name}. Откройте {name} в разделе Каталог, Приложения и выберите «Проверить подключение», чтобы увидеть причину.",
   "error.backend.mcpServerFailedInProvider":
     "{provider} не может запустить MCP-сервер {name}. Его инструменты недоступны для {provider}. {provider} запускает сервер сам, поэтому проверка подключения в OpenBot может пройти успешно. Начните новый чат, чтобы попробовать снова.",
   "error.backend.mcpServerTimedOutInProvider":
@@ -285,6 +291,8 @@ export const messages = {
     "OpenBot не смог запустить локальное подключение для входа на этот сервер. Перезапустите OpenBot и повторите попытку.",
   "error.backend.mcpOAuthSignInNeeded":
     "Вход на этот MCP-сервер завершён. Пользователю нужно снова войти на него в OpenBot.",
+  "error.backend.mcpOAuthRenewalFailed":
+    "OpenBot не смог сейчас обновить вход на этот MCP-сервер. Вход сохранён, следующий запрос попробует снова. Если ошибка повторяется, пользователь может выйти из сервера в OpenBot и войти снова.",
   "error.backend.mcpServerUnreachable": "OpenBot не смог связаться с сервером. Проверьте URL и сеть.",
   "error.backend.mcpLocalServerOff":
     "На этом компьютере по адресу {address} не отвечает ни один сервер. Запустите сервер или включите его в приложении, которое его запускает, и повторите попытку.",
@@ -345,6 +353,8 @@ export const messages = {
   "error.backend.uiBlockAnswerInvalid": "Этот ответ не подходит к блоку агента.",
   "error.backend.uiBlockActionNotAllowed": "Это действие может выбрать только владелец или админ сервера.",
   "error.backend.approvalInactive": "Это подтверждение больше не активно.",
+  "error.backend.feedbackNeedsPhone":
+    "Этот отчёт может отправить только приложение OpenBot на телефоне: оно добавляет версию и журнал поддержки телефона. Откройте этот чат на телефоне. Если вы видите это сообщение там, обновите приложение на телефоне.",
   "error.backend.takeoverInactive": "Этот перехват браузера больше не активен.",
   "error.backend.authSubmitting": "Отправка аутентификации уже выполняется.",
   "error.backend.apiKeySaveFailed": "OpenBot не удалось сохранить ключ API. Повторите попытку.",
@@ -425,6 +435,7 @@ export const messages = {
   "error.backend.branchSourceBusy": "Остановите текущий ход, прежде чем создать ответвление этого чата.",
   "error.backend.branchMessageNotFound": "Ответвление можно создать только от завершённого ответа агента.",
   "error.backend.branchRemoteUnsupported": "Ответвления доступны только для агентов на этом компьютере.",
+  "error.backend.feedbackWithdrawRemoteUnsupported": "Чтобы удалить этот отчёт, попросите агента удалить его.",
   "error.backend.threadMoveRefused":
     "В новой ветке можно запустить только сообщение, которое вы отправили одному этому агенту.",
   "error.backend.taskTitleRequired": "Дайте задаче короткое название.",

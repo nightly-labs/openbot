@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Limpar o registro de suporte?",
   "mobile.settings.support.clearBody": "Isso remove todos os eventos do registro neste celular.",
   "mobile.settings.support.logFooter":
-    "O registro fica neste celular e o OpenBot não o envia. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
+    "O registro fica neste celular. O OpenBot envia linhas dele só com um relato de bug do app do celular que você envia, e o cartão do relato as mostra antes. Ele registra etapas de conexão, solicitações e erros. Ele não registra mensagens nem arquivos e oculta senhas e tokens. Leia o arquivo antes de compartilhá-lo.",
   "mobile.settings.support.saveFailed": "Não foi possível salvar o arquivo de registro. Tente novamente.",
   "mobile.settings.support.sharingUnavailable": "O compartilhamento não está disponível neste celular.",
   "mobile.settings.support.newestFirst": "Mais recentes primeiro.",
@@ -125,6 +125,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosidade",
   "mobile.settings.appearance.messageColorFooter":
     "Com Cor do agente, suas mensagens no chat de um agente usam a cor dele. Com Cor personalizada, suas mensagens em todos os chats usam a cor que você escolher. A cor do texto muda para continuar legível.",
+  "mobile.settings.appearance.chatBackground": "Fundo do chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Padrão",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Cada tema mantém a sua própria cor. Uma cor que dificulta a leitura do texto fica mais escura ou mais clara.",
   "mobile.settings.appearance.collapseRoutines": "Recolher atividade de rotinas",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Eventos de rotinas seguidos em um chat aparecem como uma linha recolhida. Toque na linha para vê-los.",

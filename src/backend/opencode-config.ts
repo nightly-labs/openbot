@@ -41,6 +41,7 @@ export function customProvidersOn(source: CustomProviderSource, harness: CustomP
  * prompt for more than OpenCode's 5 minutes before its first token, and more so while the computer
  * does other work (#3823, #7330). Two limits get this value: OpenCode's wait for the response
  * headers (`headerTimeout`, 300,000 ms by default in OpenCode 2.2.7) and OpenBot's own stall limit.
+ * OpenBot waits a little longer than OpenCode, so OpenCode's retry after its wait can start (#9941).
  */
 export const CUSTOM_ENDPOINT_SILENCE_MS = 30 * 60_000;
 
@@ -85,6 +86,24 @@ interface OpenCodeProviderEntry {
   readonly models: Readonly<Record<string, OpenCodeModelEntry>>;
 }
 
+/** One model of an endpoint in OpenCode's own `providers` format. See {@link nativeModelEntry}. */
+interface OpenCodeNativeModelEntry {
+  readonly name: string;
+  readonly limit?: { readonly context: number; readonly output: number };
+  readonly capabilities?: { readonly input: readonly string[]; readonly output: readonly string[] };
+  readonly variants?: readonly { readonly id: string; readonly settings: { readonly reasoningEffort: string } }[];
+}
+
+/** One entry under OpenCode's own `providers` key, the format that can set `compatibility`. */
+interface OpenCodeNativeProviderEntry {
+  readonly package: string;
+  readonly name: string;
+  readonly compatibility: { readonly requireReasoning: false };
+  readonly settings: Omit<OpenCodeProviderOptions, "headers">;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly models: Readonly<Record<string, OpenCodeNativeModelEntry>>;
+}
+
 /**
  * The stored OpenCode Go key, under the built-in `opencode-go` provider.
  *
@@ -105,10 +124,11 @@ interface OpenCodeConfig {
   readonly agent?: { readonly title: { readonly disable: true } };
   readonly permission?: OpenCodePermissionLayer;
   readonly provider?: Readonly<Record<string, OpenCodeProviderEntry | OpenCodeKeyEntry>>;
+  readonly providers?: Readonly<Record<string, OpenCodeNativeProviderEntry>>;
 }
 
 /** What a caller starts from: every layer except the ones this module adds. */
-export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider">;
+export type OpenCodeConfigBase = Omit<OpenCodeConfig, "agent" | "provider" | "providers">;
 
 /**
  * OpenBot names its own chats and never reads OpenCode's titles. OpenCode asks its `small_model` for
@@ -156,13 +176,13 @@ const OPENCODE_GO_PROVIDER = "opencode-go";
 /** What a plain OpenCode user needs, now that the free models run without an account at all. */
 const OPENCODE_GO_ADVICE = "OpenCode listed no model. Add an OpenCode Go key to continue.";
 
-/** The provider adapter OpenCode bundles for an OpenAI-compatible endpoint. */
+/** The provider adapter OpenCode installs with npm for an OpenAI-compatible endpoint. */
 const OPENCODE_COMPATIBLE_NPM = "@ai-sdk/openai-compatible";
 
-/** The adapter OpenCode bundles for its own Anthropic provider. */
+/** The adapter OpenCode installs with npm for its own Anthropic provider. */
 const OPENCODE_ANTHROPIC_NPM = "@ai-sdk/anthropic";
 
-/** The adapter OpenCode bundles for OpenAI, which calls the Responses API. */
+/** The adapter OpenCode installs with npm for OpenAI, which calls the Responses API. */
 const OPENCODE_OPENAI_NPM = "@ai-sdk/openai";
 
 /**
@@ -260,11 +280,79 @@ function customProviderEntries(
 }
 
 /**
+ * Mistral's API refuses a field that it does not know, and OpenCode 2.2.5 adds an empty
+ * `reasoning_content` to each earlier assistant message when the model id contains `deepseek`, on any
+ * host (`requireReasoning` in `packages/ai/src/protocols/openai-chat.ts`). So a DeepSeek model on
+ * Mistral's API failed with HTTP 422 `extra_forbidden` after its first tool call (#10094). The
+ * `provider` format cannot turn this off: OpenCode reads `compatibility` only from `providers`.
+ */
+function isMistralApi(baseUrl: string): boolean {
+  const url = URL.parse(baseUrl);
+  return url?.protocol === "https:" && (url.hostname === "mistral.ai" || url.hostname.endsWith(".mistral.ai"));
+}
+
+/**
+ * The package of an endpoint on Mistral's API in the `providers` format. With reasoning on, Mistral
+ * streams `delta.content` as a list of `thinking` and `text` parts. The OpenAI-compatible adapter
+ * reads only a string there, so each such turn stopped with "Invalid … openai-compatible-chat stream
+ * event" (#10591). OpenCode's own catalog uses this package for `api.mistral.ai`; it reads the parts,
+ * and it never adds `reasoning_content`.
+ *
+ * Only with a key: without `apiKey`, this adapter reads `MISTRAL_API_KEY` from the environment that
+ * OpenCode inherits, and that key would replace the `Authorization` header of a keyless endpoint. The
+ * OpenAI-compatible adapter reads no environment variable, so a keyless endpoint keeps it.
+ */
+const OPENCODE_MISTRAL_PACKAGE = "aisdk:@ai-sdk/mistral";
+
+/**
+ * The `provider` entry in OpenCode's `providers` format, with Mistral's own adapter when the endpoint
+ * has a key, and `requireReasoning` off. Only the OpenAI-compatible adapter reads `requireReasoning`,
+ * so it still protects a keyless endpoint from #10094. OpenCode 2.2.5 and 2.3.0 use a `providers` entry
+ * in place of the `provider` entry of the same id, as a whole, so this one carries every field of
+ * {@link providerEntry}, moved as OpenCode moves them (`migrateStandardProvider` in
+ * `packages/core/src/v1/config/migrate.ts`). OpenCode 1.19.5 ignores `providers`, so the `provider`
+ * entry stays for a user's own OpenCode 1. Checked with `scripts/opencode-mistral-reasoning-e2e.ts`.
+ */
+function nativeProviderEntry({ npm, name, options, models }: OpenCodeProviderEntry): OpenCodeNativeProviderEntry {
+  const { headers, ...settings } = options;
+  return {
+    package: options.apiKey ? OPENCODE_MISTRAL_PACKAGE : `aisdk:${npm}`,
+    name,
+    compatibility: { requireReasoning: false },
+    settings,
+    ...(headers ? { headers } : {}),
+    models: Object.fromEntries(Object.entries(models).map(([id, model]) => [id, nativeModelEntry(model)])),
+  };
+}
+
+/** One model of {@link nativeProviderEntry}: `modalities` become capabilities, efforts a list. */
+function nativeModelEntry({ name, limit, modalities, variants }: OpenCodeModelEntry): OpenCodeNativeModelEntry {
+  return {
+    name,
+    ...(limit ? { limit } : {}),
+    ...(modalities ? { capabilities: modalities } : {}),
+    ...(variants ? { variants: Object.entries(variants).map(([id, settings]) => ({ id, settings })) } : {}),
+  };
+}
+
+/**
+ * The `providers` block: the endpoints on Mistral's API, or null when there is none. They also stay
+ * in the `provider` block, for OpenCode 1 (see {@link nativeProviderEntry}).
+ */
+function nativeProviderEntries(
+  providers: readonly CustomProviderConfig[],
+): Readonly<Record<string, OpenCodeNativeProviderEntry>> | null {
+  const usable = providers.filter((provider) => provider.models.length > 0 && isMistralApi(provider.baseUrl));
+  if (usable.length === 0) return null;
+  return Object.fromEntries(usable.map((provider) => [provider.id, nativeProviderEntry(providerEntry(provider))]));
+}
+
+/**
  * Merges the custom providers and the stored key into a base layer. Providers only ever land under
- * the `provider` key, so no provider id can reach a sibling setting: an endpoint named `permission`
- * is a provider named `permission`, not a permission rule. The custom entries come last: an
- * endpoint saved as `opencode-go` replaces that built-in provider, so the stored key must not drop
- * its URL and models.
+ * the `provider` key, and also `providers` for an endpoint on Mistral's API, so no provider id can
+ * reach a sibling setting: an endpoint named `permission` is a provider named `permission`, not a
+ * permission rule. The custom entries come last: an endpoint saved as `opencode-go` replaces that
+ * built-in provider, so the stored key must not drop its URL and models.
  */
 function mergeOpenCodeConfig(
   base: OpenCodeConfigBase,
@@ -275,7 +363,13 @@ function mergeOpenCodeConfig(
     ...(apiKey ? { [OPENCODE_GO_PROVIDER]: { options: { apiKey } } } : {}),
     ...customProviderEntries(providers),
   };
-  return { ...base, agent: OPENCODE_TITLE_OFF, ...(Object.keys(entries).length > 0 ? { provider: entries } : {}) };
+  const native = nativeProviderEntries(providers);
+  return {
+    ...base,
+    agent: OPENCODE_TITLE_OFF,
+    ...(Object.keys(entries).length > 0 ? { provider: entries } : {}),
+    ...(native ? { providers: native } : {}),
+  };
 }
 
 /**

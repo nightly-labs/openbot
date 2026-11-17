@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "Effacer le journal d’assistance ?",
   "mobile.settings.support.clearBody": "Tous les événements du journal seront supprimés de ce téléphone.",
   "mobile.settings.support.logFooter":
-    "Le journal reste sur ce téléphone et OpenBot ne l’envoie pas. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
+    "Le journal reste sur ce téléphone. OpenBot en envoie des lignes uniquement avec un rapport de bug sur l’app du téléphone que vous envoyez, et la carte du rapport les affiche d’abord. Il enregistre les étapes de connexion, les requêtes et les erreurs. Il n’enregistre ni les messages ni les fichiers, et il masque les mots de passe et les jetons. Lisez le fichier avant de le partager.",
   "mobile.settings.support.saveFailed": "Impossible d’enregistrer le fichier du journal. Réessayez.",
   "mobile.settings.support.sharingUnavailable": "Le partage n’est pas disponible sur ce téléphone.",
   "mobile.settings.support.newestFirst": "Les plus récents en premier.",
@@ -125,6 +125,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "Luminosité",
   "mobile.settings.appearance.messageColorFooter":
     "Avec Couleur de l’agent, vos messages dans une discussion avec un agent prennent la couleur de cet agent. Avec Couleur personnalisée, vos messages dans toutes les discussions prennent la couleur choisie. La couleur du texte change pour rester lisible.",
+  "mobile.settings.appearance.chatBackground": "Arrière-plan du chat",
+  "mobile.settings.appearance.chatBackgroundDefault": "Par défaut",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Chaque thème garde sa propre couleur. Une couleur qui rend le texte difficile à lire devient plus foncée ou plus claire.",
   "mobile.settings.appearance.collapseRoutines": "Réduire l’activité des routines",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Les événements de routines consécutifs d’une discussion s’affichent sur une seule ligne réduite. Touchez la ligne pour les afficher.",

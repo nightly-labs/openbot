@@ -29,6 +29,7 @@ import SharedAgentSettingsPanel, {
   type AgentNotificationLevelOptions,
   type AgentSettingsPanelProps as SharedAgentSettingsPanelProps,
 } from "@openbot/ui/features/conversation/AgentSettingsPanel";
+import type { AgentSettingLinkId, AgentSettingReveal } from "@openbot/ui/features/conversation/agent-setting-links";
 import { agentFilesLinkValue } from "@openbot/ui/features/files/AgentFilesView";
 import { useText } from "@openbot/ui/text";
 import { createEffect, createMemo, createSignal, createStore, Show, untrack } from "solid-js";
@@ -60,7 +61,15 @@ import { SharedTablesModal } from "./SharedTablesModal";
 interface AgentSettingsPanelProps
   extends Omit<
     SharedAgentSettingsPanelProps,
-    "width" | "onResize" | "onResizeEnd" | "links" | "detailOpen" | "children" | "browserProfiles" | "notificationLevel"
+    | "width"
+    | "onResize"
+    | "onResizeEnd"
+    | "links"
+    | "detailOpen"
+    | "children"
+    | "browserProfiles"
+    | "notificationLevel"
+    | "reveal"
   > {
   remoteClient?: boolean;
   /** The marketplace skills catalog of a remote client. Absent, its skills show only what the host sends. */
@@ -86,6 +95,10 @@ interface AgentSettingsPanelProps
   instructionsFile?: AgentInstructionsCalls | undefined;
   /** Opens the Instructions page, from the chat line that says the agent changed the file. */
   instructionsRequest?: { agentId: string } | null | undefined;
+  /** Shows one setting, from a setting card in the chat. A new object shows it again. */
+  settingReveal?: AgentSettingReveal | null | undefined;
+  /** The panel took the `settingReveal` with this nonce. */
+  onSettingRevealHandled?: ((nonce: number) => void) | undefined;
   routineSelectionRequest?: RoutineSelectionRequest | null | undefined;
   onRoutineSelectionRequestHandled?: ((nonce: number) => void) | undefined;
   onOpenRoutineRun?: ((messageId: string, routineId?: string) => void) | undefined;
@@ -500,9 +513,37 @@ export default function AgentSettingsPanel(props: AgentSettingsPanelProps) {
       });
   });
 
+  // A setting card opens the page of a link row here, and gives each other row to the shared panel.
+  const settingReveal = createMemo(() => props.settingReveal);
+  const [panelReveal, setPanelReveal] = createSignal<AgentSettingReveal | null>(null);
+  createEffect(settingReveal, (request) => {
+    if (!request) return;
+    const detail = revealDetail(request.settingId);
+    setDraft((state) => {
+      state.instructions.open = detail === "instructions";
+      state.memories.open = detail === "memories";
+      state.skills.open = detail === "skills";
+      state.routines.open = detail === "routines";
+      state.files.open = false;
+    });
+    // A detail page covers the panel, and its Back goes to the root list that holds its link row, so the
+    // panel still moves to that page. The skills dialog opens over the page that the panel shows.
+    setPanelReveal(detail === "skills" ? null : request);
+    props.onSettingRevealHandled?.(request.nonce);
+  });
+  /** The page that a link row opens for the setting, when this agent shows that row. */
+  function revealDetail(settingId: AgentSettingLinkId): "instructions" | "memories" | "skills" | "routines" | null {
+    if (settingId === "agent.instructions" && props.instructionsFile) return "instructions";
+    if (settingId === "agent.memories" && memoriesShown()) return "memories";
+    if (settingId === "agent.skills" && skillsMode() !== "hidden") return "skills";
+    if (settingId === "agent.routines" && routinesShown()) return "routines";
+    return null;
+  }
+
   return (
     <SharedAgentSettingsPanel
       {...props}
+      reveal={panelReveal()}
       browserProfiles={browserProfileOptions()}
       notificationLevel={notificationLevelOptions()}
       width={panelWidth()}

@@ -37,7 +37,7 @@ export interface WhatsAppRuntimeOptions {
 /** A download writes a `.part` file first. One this old belongs to a download that stopped with the app. */
 const PART_FILE_MAX_AGE_MS = 60 * 60_000;
 
-const NO_RULES: WhatsAppSenderRules = { ownNumber: true, contacts: new Set(), groups: new Set() };
+const NO_RULES: WhatsAppSenderRules = { ownNumber: true, contacts: new Map(), groups: new Set() };
 
 /**
  * The WhatsApp side that the driver and the link flow share: the open store and session of each

@@ -1,5 +1,6 @@
 import {
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONTEXT_RESET_ITEM_TYPE,
   type ConversationTurnTrace,
   isConversationTurnTrace,
@@ -62,7 +63,7 @@ export class AgentHistoryQueries {
       SELECT message_json,
         (SELECT provider_session_id FROM projection_turns WHERE thread_id = ? AND turn_id = json_extract(allowed.message_json, '$.turnId')) AS provider_session_id
       FROM allowed WHERE author IN ('user', 'assistant', 'agent')
-        AND COALESCE(item_type, '') NOT IN ('commentary', '${AGENT_WELCOME_ITEM_TYPE}')
+        AND COALESCE(item_type, '') NOT IN ('commentary', '${AGENT_WELCOME_ITEM_TYPE}', '${CHANNEL_RESUME_ITEM_TYPE}')
         AND COALESCE(json_extract(message_json, '$.delivery.status'), 'completed') IN ('completed', 'failed', 'interrupted')
         AND (? IS NULL OR author = ?)
         AND (? IS NULL OR message_id = ?)

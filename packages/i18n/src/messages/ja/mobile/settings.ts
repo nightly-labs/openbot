@@ -61,7 +61,7 @@ export const messages = {
   "mobile.settings.support.clearTitle": "サポートログを消去しますか？",
   "mobile.settings.support.clearBody": "このスマートフォンのログから、すべてのイベントを削除します。",
   "mobile.settings.support.logFooter":
-    "ログはこのスマートフォンに保存され、OpenBot が送信することはありません。接続の手順、リクエスト、エラーを記録します。メッセージやファイルは記録せず、パスワードとトークンは伏せて記録します。共有する前にファイルの内容を確認してください。",
+    "ログはこのスマートフォンに保存されます。OpenBot がログの行を送信するのは、あなたがスマートフォンアプリのバグレポートを送信するときだけで、送信前にレポートのカードに表示されます。接続の手順、リクエスト、エラーを記録します。メッセージやファイルは記録せず、パスワードとトークンは伏せて記録します。共有する前にファイルの内容を確認してください。",
   "mobile.settings.support.saveFailed": "ログファイルを保存できませんでした。もう一度お試しください。",
   "mobile.settings.support.sharingUnavailable": "このスマートフォンでは共有を利用できません。",
   "mobile.settings.support.newestFirst": "新しい順に表示しています。",
@@ -124,6 +124,10 @@ export const messages = {
   "mobile.settings.appearance.messageColorLightness": "明度",
   "mobile.settings.appearance.messageColorFooter":
     "「エージェントの色」では、エージェントとのチャットで自分のメッセージにそのエージェントの色を使います。「カスタムの色」では、すべてのチャットで選んだ色を使います。文字の色は読みやすいように変わります。",
+  "mobile.settings.appearance.chatBackground": "チャットの背景",
+  "mobile.settings.appearance.chatBackgroundDefault": "デフォルト",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "テーマごとに色を保持します。文字が読みにくい色は、暗くまたは明るくなります。",
   "mobile.settings.appearance.collapseRoutines": "ルーティンのアクティビティを折りたたむ",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "チャット内で連続するルーティンのイベントを、折りたたんだ1行で表示します。行をタップすると表示されます。",

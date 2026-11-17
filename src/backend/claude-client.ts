@@ -43,6 +43,7 @@ import {
   startClaudePlanTurn,
 } from "./agent/plan-updates";
 import { isBalanceDiagnostic, isPlanLimitDiagnostic } from "./agent/provider-diagnostics";
+import { ROUTINE_NO_UPDATE_TOOL } from "./agent/routine-quiet-runs";
 import {
   endSubagentTurn,
   foldClaudeSubagentCall,
@@ -329,26 +330,42 @@ const OPENBOT_CLAUDE_CLIENT = {
  * more text. When a step ends with no text, Claude Code asks the model for a visible answer, and the agent
  * wrote its channel result again (#6923). The CLI does not ask after a successful call of a tool in
  * `CLAUDE_CODE_TERMINAL_MCP_TOOLS` (2.1.309 and 2.1.322). A refused call is a failed call
- * (`terminalChannelRefusal`), so after a refusal the CLI still asks. The CLI knows only the direct
+ * (`terminalToolRefusal`), so after a refusal the CLI still asks. The CLI knows only the direct
  * name of a tool, not a call through `tool_call`, so a channel thread gets these tools directly.
  */
 const CLAUDE_TERMINAL_CHANNEL_TOOLS: readonly string[] = [
   "mcp__openbot__channel_result",
   "mcp__openbot__channel_reply",
 ];
+/**
+ * The no-update tool ends a quiet turn in the same way: its `quiet` result tells the agent to end the
+ * turn. Without it in `CLAUDE_CODE_TERMINAL_MCP_TOOLS`, the CLI asked again, and after a teammate's
+ * request the agent wrote its result once more in the user's chat (#7465). Every thread has the tool.
+ * Any other result is a failed call (`terminalToolRefusal`), so the CLI still asks for the answer.
+ */
+const CLAUDE_TERMINAL_NO_UPDATE_TOOL = `mcp__openbot__${ROUTINE_NO_UPDATE_TOOL}`;
+
+/** The tools that end a Claude turn: the no-update tool, and in a channel thread the channel tools. */
+function claudeTerminalTools(channelTools: boolean): readonly string[] {
+  return channelTools
+    ? [CLAUDE_TERMINAL_NO_UPDATE_TOOL, ...CLAUDE_TERMINAL_CHANNEL_TOOLS]
+    : [CLAUDE_TERMINAL_NO_UPDATE_TOOL];
+}
 
 /**
- * A refused call of a tool in `CLAUDE_TERMINAL_CHANNEL_TOOLS` (`accepted: false`). The agent still
- * has work to do, so Claude gets the refusal as a failed call, and the CLI asks for an answer when the
- * turn then ends empty, as before #6923. The other providers keep the refusal as a result.
+ * A refused call of a tool in `CLAUDE_TERMINAL_CHANNEL_TOOLS` (`accepted: false`), or a no-update call
+ * that does not end the turn quiet (`shown`: someone waits for the answer). The agent still has work to
+ * do, so Claude gets it as a failed call, and the CLI asks for an answer when the turn then ends empty,
+ * as before #6923. The other providers keep the result as it is.
  */
-function terminalChannelRefusal(namespace: string, name: string, content: CallToolResult["content"]): boolean {
-  if (namespace !== "openbot" || !CLAUDE_TERMINAL_CHANNEL_TOOLS.includes(`mcp__openbot__${name}`)) return false;
+function terminalToolRefusal(namespace: string, name: string, content: CallToolResult["content"]): boolean {
+  if (namespace !== "openbot" || !claudeTerminalTools(true).includes(`mcp__openbot__${name}`)) return false;
   const [first] = content;
   if (first?.type !== "text") return false;
   try {
     const value = JSON.parse(first.text);
-    return isRecord(value) && value.accepted === false;
+    if (!isRecord(value)) return false;
+    return name === ROUTINE_NO_UPDATE_TOOL ? value.status !== "quiet" : value.accepted === false;
   } catch {
     return false;
   }
@@ -464,6 +481,8 @@ interface ActiveTurn {
   billingFailed: boolean;
   /** Set by an `api_retry` until the next reply frame, which shows that the request got through. */
   retrying: boolean;
+  /** The chat already told the user in this turn that the sandbox cannot start a command (#9909). */
+  sandboxBlockedWarned: boolean;
   /** The CLI started this turn itself, with no message from OpenBot, such as after a background task ended. */
   unprompted: boolean;
   /**
@@ -471,6 +490,8 @@ interface ActiveTurn {
    * its saved session holds and ends no turn, so the message goes again with a new uuid (#9270).
    */
   prompt: { requestedId: string | null; message: SDKUserMessage; retries: number } | null;
+  /** The uuids of the messages that OpenBot sent in this turn: the prompt, its new uuids and the steers. */
+  messageIds: Set<string>;
   /** The CLI started the prompt, or sent a frame of the turn. */
   promptStarted: boolean;
 }
@@ -589,6 +610,8 @@ interface ClaudeStreamMessage {
   /** The structured result of the tool a `user` message answers, such as the task a `TaskCreate` made. */
   tool_use_result?: unknown;
   is_error?: boolean;
+  /** The HTTP status of the API error that ended the turn, such as 429 or 529. An older CLI does not send it. */
+  api_error_status?: number | null;
   /** Why an assistant message is a refusal, such as `rate_limit`. */
   error?: string;
   /** Why an API error refused the request, such as `usage_limit_reached`. The SDK types do not declare it. */
@@ -603,6 +626,12 @@ interface ClaudeStreamMessage {
   state?: unknown;
   /** The uuid of the user message that the turn answers, on the turn's first stream event and assistant message. */
   user_message_uuid?: string;
+  /** `result`: the uuids of all user messages that the turn took. */
+  user_message_uuids?: unknown;
+  /** `result`: what started the turn, such as `{ kind: "task-notification" }`. */
+  origin?: unknown;
+  /** `result`: the model requests of the turn. */
+  num_turns?: unknown;
   /** Set when the turn runs an interrupted turn again, and `user_message_uuid` names that turn's prompt. */
   resume_reason?: string;
   /** `api_retry`: the retry that starts next, its limit, and the HTTP status, null when no answer came. */
@@ -668,6 +697,24 @@ const readClaudeSettingsFile = Effect.fn("readClaudeSettingsFile")(function* (pa
   const record: DynamicRecord = isDynamicRecord(parsed) ? parsed : {};
   return record;
 });
+
+/**
+ * The copied user `env` without the variables that choose the API and its credential, when OpenBot
+ * gives the process a gateway of its own: the provider's variables set `ANTHROPIC_BASE_URL`, with a
+ * token or a key. The flag settings come before the process environment, so the copy would send the
+ * requests to the user's own gateway. With the user setup the user settings file loads as it is, and
+ * its values still win.
+ */
+function withoutReplacedGateway(
+  settings: Settings,
+  environment: Readonly<Record<string, string>> | undefined,
+): Settings {
+  if (!environment?.ANTHROPIC_BASE_URL || !settings.env) return settings;
+  const replaced = new Set<string>([...CLAUDE_OTHER_API_VARIABLES, "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY"]);
+  const env = Object.fromEntries(Object.entries(settings.env).filter(([name]) => !replaced.has(name)));
+  const { env: _copied, ...rest } = settings;
+  return Object.keys(env).length > 0 ? { ...rest, env } : rest;
+}
 
 /**
  * The sign-in part of the user settings, for a query that does not load the user settings: the
@@ -1398,7 +1445,9 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     // The user setup brings the whole user settings file. A profile generation loads no settings
     // files, but it still needs the sign-in keys: without them a gateway set in `env` is lost (#6025).
     const userSettingsFile = yield* readClaudeSettingsFile(join(configDirectory, "settings.json"));
-    const signInSettings: Settings = userSetup ? {} : claudeSignInSettings(userSettingsFile);
+    const signInSettings: Settings = userSetup
+      ? {}
+      : withoutReplacedGateway(claudeSignInSettings(userSettingsFile), this.#agentEnvironment?.());
     const homeSkillPlugin =
       stateDirectory && userSetup
         ? yield* claudeHomeSkillPlugin(stateDirectory, configDirectory, config.cwd).pipe(
@@ -1562,9 +1611,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
             // kept a second store under `~/.claude/projects` that the app cannot see, and its rules
             // took about 0.7k tokens in each request. The files stay on disk.
             CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
-            ...(config.channelTools && handoff
-              ? { CLAUDE_CODE_TERMINAL_MCP_TOOLS: CLAUDE_TERMINAL_CHANNEL_TOOLS.join(",") }
-              : {}),
+            ...(handoff ? { CLAUDE_CODE_TERMINAL_MCP_TOOLS: claudeTerminalTools(config.channelTools).join(",") } : {}),
           },
         },
       }),
@@ -1700,6 +1747,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       session_id: threadId,
     };
     turn.prompt = { requestedId: requestedTurnId ?? null, message, retries: 0 };
+    turn.messageIds.add(turnId);
     runtime.input.push(message);
     return { turn: { id: turnId, status: "inProgress" } };
   });
@@ -1735,8 +1783,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       balanceSpent: false,
       billingFailed: false,
       retrying: false,
+      sandboxBlockedWarned: false,
       unprompted,
       prompt: null,
+      messageIds: new Set<string>(),
       promptStarted: false,
     };
     runtime.activeTurn = turn;
@@ -1778,6 +1828,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const clientId = getString(params, "clientUserMessageId");
     const messageId = promptUuid(runtime, clientId);
     takePrompt(runtime, messageId);
+    runtime.activeTurn.messageIds.add(messageId);
     runtime.input.push({
       type: "user",
       message: { role: "user", content: readInputText(params) },
@@ -1812,6 +1863,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const retryId = promptUuid(runtime, prompt.requestedId ?? turn.id);
     takePrompt(runtime, retryId);
     prompt.message = { ...prompt.message, uuid: retryId };
+    turn.messageIds.add(retryId);
     prompt.retries += 1;
     queryLogger.warn("Claude skipped a message that its session holds, so it goes again with a new id.", {
       threadId: runtime.id,
@@ -1857,6 +1909,19 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       const error = runtime.stderr.addTo(caught);
       const activeTurn = runtime.activeTurn;
       if (activeTurn) yield* this.#completeTurn(runtime, "failed", error);
+      // A query with no sandbox for its Workspace only setting fails on its own thread, not on Claude:
+      // the other agents keep their queries, and the stop does not count as a failed start (#9925).
+      // The close waits for this consumer, so it runs in the client's scope.
+      if (CLAUDE_SANDBOX_UNAVAILABLE.test(String(error))) {
+        queryLogger.warn("Claude cannot start its sandbox for a Workspace only thread.", {
+          threadId: runtime.id,
+          error: redactText(String(error)),
+        });
+        yield* runtime.config.persistSession
+          ? this.#threads.releaseNow(runtime)
+          : Effect.forkIn(this.#threads.close(runtime), this.#scope, { startImmediately: true });
+        return;
+      }
       this.#fail(error instanceof Error ? error : new Error(String(error)));
     }
   });
@@ -2151,6 +2216,20 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
         if (!call) continue;
         turn.toolCalls.delete(toolCallId);
         this.#emitToolCall(runtime, toolCallId, call.name, true, call.input, isError ? text : null);
+        if (
+          isError &&
+          call.name === "Bash" &&
+          runtime.config.workspaceOnly &&
+          !turn.sandboxBlockedWarned &&
+          CLAUDE_SANDBOX_BLOCKED.test(text)
+        ) {
+          turn.sandboxBlockedWarned = true;
+          queryLogger.warn("The Claude sandbox cannot start the agent's commands.");
+          this.emit("notification", {
+            method: "warning",
+            params: { threadId: runtime.id, turnId: turn.id, message: sourceText("error.agent.claudeSandboxBlocked") },
+          });
+        }
       }
       return;
     }
@@ -2200,21 +2279,30 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       message.terminal_reason === "aborted_streaming" ||
       message.terminal_reason === "aborted_tools" ||
       errors.some((error) => /interrupt|abort/i.test(error));
+    const turn = runtime.activeTurn;
+    /* The CLI can first end a turn of its own, such as for a background task's notification. The
+       message's turn goes on, and its own result ends it (#9812). A stop ends the turn at once. */
+    if (turn?.prompt && !interrupted && isOtherTurnResult(message, turn.messageIds)) {
+      queryLogger.info("Claude ended a turn of its own before the message's turn.", { threadId: runtime.id });
+      return;
+    }
     // "success" with `is_error` is a turn that ended on an API error, and `result` holds its text.
     const apiError = message.subtype === "success" && message.is_error === true;
-    const turn = runtime.activeTurn;
     if (turn) {
       for (const [toolCallId, { name }] of turn.toolCalls) {
         this.#emitToolCall(runtime, toolCallId, name, true);
       }
       turn.toolCalls.clear();
       // A rejected window alone is not a failure: the request can still run on overage. Only the
-      // refusal message, or a request that then failed with an API error, ends the turn on the limit.
+      // refusal message, or a request that then failed with a rate-limit error, ends the turn on the
+      // limit. Another API error, such as a 529 overload, stays a provider error (#10486). An older CLI
+      // sends no status, so its API error still counts.
       const limit = turn.usageLimit;
+      const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
       if (
         limit &&
         !interrupted &&
-        (limit.text !== null || apiError) &&
+        (limit.text !== null || limitError) &&
         !isBalanceDiagnostic(limit.text ?? `${errors.join("\n")}\n${fallback}`)
       ) {
         this.emit("notification", {
@@ -2787,7 +2875,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     if (Array.isArray(result.contentItems)) {
       for (const item of result.contentItems) content.push(...dynamicContent(item));
     }
-    return { content, isError: result.success === false || terminalChannelRefusal(namespace, name, content) };
+    return { content, isError: result.success === false || terminalToolRefusal(namespace, name, content) };
   });
 
   readonly #requestUserInputEffect = Effect.fn("ClaudeAgentClient.requestUserInput")(function* (
@@ -3029,9 +3117,21 @@ function removeClaudeQueryFile(file: string | null): Effect.Effect<void> {
  * The error of a Workspace only query when the CLI cannot make its sandbox (`failIfUnavailable`).
  * It tells the user to set `sandbox.failIfUnavailable=false`, which OpenBot does not show and which
  * would let commands run with no sandbox. Windows gets it on every turn: the Windows sandbox of
- * Claude Code 2.1.309 is behind a feature gate (#4094).
+ * Claude Code 2.1.309 is behind a feature gate (#4094). The chat gives no CLI words, such as the
+ * feature gate or the tools that Linux lacks (#9925); `#consume` writes the reason to the log.
+ * `error.agent.claudeSandboxUnavailable` stays in the catalog for the text of an older host.
  */
 const CLAUDE_SANDBOX_UNAVAILABLE = /Sandbox required but unavailable: (.+?)\.? Set sandbox\.failIfUnavailable=false/s;
+
+/**
+ * The start of a Bash command that the Claude sandbox could not set up, because the host does not
+ * let it make a user namespace with capabilities. Claude's `apply-seccomp` helper stops before the
+ * command runs, for example with `apply-seccomp: write /proc/self/setgroups (nested userns is
+ * capability-restricted; caller must provide CAP_SYS_ADMIN): Permission denied` under Ubuntu's
+ * AppArmor profile `bwrap-userns-restrict` (Claude Code 2.1.323, #9909). The CLI's own start-up check
+ * passes on such a host, so the turn continues and the user saw only failed commands.
+ */
+const CLAUDE_SANDBOX_BLOCKED = /^apply-seccomp: (?:unshare\(|write \/proc\/self\/(?:setgroups|uid_map|gid_map)\b)/mu;
 
 /**
  * The CLI's report of an Anthropic API key with no API credit: "Credit balance is too low", from the
@@ -3091,8 +3191,7 @@ function claudeTurnError(error: unknown, apiKey: boolean): string {
   // With an API key there is no sign-in to renew, so the key turn keeps the CLI text.
   if (!apiKey && CLAUDE_NOT_LOGGED_IN.test(text))
     return sourceText("error.provider.signInExpired", { provider: agentProviderName("claude") });
-  const reason = CLAUDE_SANDBOX_UNAVAILABLE.exec(text)?.[1];
-  return reason ? sourceText("error.agent.claudeSandboxUnavailable", { reason }) : text;
+  return CLAUDE_SANDBOX_UNAVAILABLE.test(text) ? sourceText("error.agent.claudeNoSandbox") : text;
 }
 
 /**
@@ -3520,6 +3619,25 @@ function takePrompt(runtime: ThreadRuntime, uuid: string): void {
     if (runtime.promptIds.size <= TAKEN_PROMPT_LIMIT) break;
     runtime.promptIds.delete(old);
   }
+}
+
+/**
+ * Whether a result ends a turn that did not take any of the turn's messages. The result names the
+ * messages that its turn took. A background task's notification that made no model request names
+ * none, and ends with no text.
+ */
+function isOtherTurnResult(message: ClaudeStreamMessage, messageIds: ReadonlySet<string>): boolean {
+  const listed = Array.isArray(message.user_message_uuids) ? message.user_message_uuids.filter(isString) : [];
+  const taken = listed.length > 0 ? listed : message.user_message_uuid ? [message.user_message_uuid] : [];
+  if (taken.length > 0) return !taken.some((uuid) => messageIds.has(uuid));
+  return (
+    isRecord(message.origin) &&
+    message.origin.kind === "task-notification" &&
+    message.num_turns === 0 &&
+    message.subtype === "success" &&
+    message.is_error !== true &&
+    !message.result
+  );
 }
 
 function isUuid(value: string): value is UUID {

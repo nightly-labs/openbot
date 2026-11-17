@@ -60,7 +60,7 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.support.clearTitle": "Clear the support log?",
   "mobile.settings.support.clearBody": "This removes all events from the log on this phone.",
   "mobile.settings.support.logFooter":
-    "The log stays on this phone, and OpenBot does not send it. It records connection steps, requests and errors. It does not record messages or files, and it masks passwords and tokens. Read the file before you share it.",
+    "The log stays on this phone. OpenBot sends lines of it only with a bug report about the phone app that you send, and the report card shows them first. It records connection steps, requests and errors. It does not record messages or files, and it masks passwords and tokens. Read the file before you share it.",
   "mobile.settings.support.saveFailed": "Could not save the log file. Try again.",
   "mobile.settings.support.sharingUnavailable": "Sharing is not available on this phone.",
   "mobile.settings.support.newestFirst": "Newest first.",
@@ -122,6 +122,10 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.appearance.messageColorLightness": "Lightness",
   "mobile.settings.appearance.messageColorFooter":
     "With Agent color, your messages in an agent chat use the color of that agent. With Custom color, your messages in all chats use the color that you select. The text color changes so that it stays readable.",
+  "mobile.settings.appearance.chatBackground": "Chat background",
+  "mobile.settings.appearance.chatBackgroundDefault": "Default",
+  "mobile.settings.appearance.chatBackgroundFooter":
+    "Each theme keeps its own color. A color that makes text hard to read becomes darker or lighter.",
   "mobile.settings.appearance.collapseRoutines": "Collapse routine activity",
   "mobile.settings.appearance.collapseRoutinesFooter":
     "Consecutive routine events in a chat show as one closed row. Tap the row to show them.",
