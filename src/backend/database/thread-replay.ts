@@ -9,6 +9,7 @@ import { databaseRows, decodeThreadAgentRow, objectValue, requiredEventRow } fro
 import { withoutDeletedMessages } from "./deleted-thread-messages";
 import { currentConversationMessage } from "./legacy-conversation-message";
 import type { ProviderSession } from "./provider-sessions";
+import { withTransaction } from "./sqlite-transaction";
 import { refreshThreadOrder } from "./thread-message-order";
 import type { StoredThreadSummary } from "./thread-summaries";
 
@@ -168,8 +169,7 @@ export class ThreadReplay {
     // An event from before a delete can still name the message. The record of the delete wins.
     latest.messages = withoutDeletedMessages(db, threadId, latest.messages);
 
-    db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       db.prepare("DELETE FROM projection_thread_activities WHERE thread_id = ?").run(threadId);
       db.prepare("DELETE FROM projection_turns WHERE thread_id = ?").run(threadId);
       db.prepare("DELETE FROM projection_thread_messages WHERE thread_id = ?").run(threadId);
@@ -323,14 +323,7 @@ export class ThreadReplay {
         `UPDATE projection_threads
          SET active_turn_id = ?, updated_at = ?, last_event_sequence = ? WHERE thread_id = ?`,
       ).run(latest.activeTurnId, new Date().toISOString(), latestSequence, threadId);
-      db.exec("COMMIT");
-    } catch (error) {
-      // SQLite auto-rolls back on some failures (a full disk, a statement-level abort). An
-      // unguarded ROLLBACK then throws "cannot rollback - no transaction is active" and replaces
-      // the original error, so the user is told about the rollback instead of the full disk.
-      if (db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
     return this.#conversations.readConversation(thread.agent_id, threadId);
   }
 }

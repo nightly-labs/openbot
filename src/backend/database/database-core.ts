@@ -7,6 +7,7 @@ import { Effect, Result } from "effect";
 import { migrateOpenBotDatabase } from "../openbot-database-schema";
 import { storedIO, storedSync } from "../stored-state-effects";
 import { databaseRow, errorCode, requiredNumberColumn, requiredStringColumn } from "./database-rows";
+import { withTransaction } from "./sqlite-transaction";
 
 export interface OrchestrationEventInput {
   aggregateType: string;
@@ -118,9 +119,7 @@ export class DatabaseCore {
     );
     if (receipt) return JSON.parse(receipt.result_json);
 
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    return withTransaction(db, () => {
       const sequences: number[] = [];
       const append = db.prepare(`
         INSERT INTO orchestration_events (
@@ -157,12 +156,8 @@ export class DatabaseCore {
           JSON.stringify(result ?? null),
         );
       }
-      if (ownsTransaction) db.exec("COMMIT");
       return result;
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   commandResult(commandId: string): unknown | undefined {
@@ -176,16 +171,10 @@ export class DatabaseCore {
 
   deleteEventsAndReceipt(commandId: string): void {
     const db = this.connection;
-    const ownsTransaction = !db.isTransaction;
-    if (ownsTransaction) db.exec("BEGIN IMMEDIATE");
-    try {
+    withTransaction(db, () => {
       db.prepare("DELETE FROM orchestration_events WHERE command_id = ?").run(commandId);
       db.prepare("DELETE FROM orchestration_command_receipts WHERE command_id = ?").run(commandId);
-      if (ownsTransaction) db.exec("COMMIT");
-    } catch (error) {
-      if (ownsTransaction && db.isTransaction) db.exec("ROLLBACK");
-      throw error;
-    }
+    });
   }
 
   backupLegacyFile = Effect.fn("DatabaseCore.backupLegacyFile")(function* (this: DatabaseCore, path: string) {

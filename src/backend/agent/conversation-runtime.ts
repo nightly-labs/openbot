@@ -13,6 +13,7 @@ import { createOpenBotLogger } from "@openbot/logging";
 import type { AgentClient } from "../agent-client";
 import type { AgentStore } from "../agent-store";
 import { withoutQueuePositions } from "../database/conversation-writer";
+import { withTransaction } from "../database/sqlite-transaction";
 import { MAILBOX_CONVERSATION_MESSAGE_LIMIT } from "../mailbox-store";
 import type { OpenBotDatabase } from "../openbot-database";
 import { conversationContentSignature } from "./delivery-content";
@@ -49,15 +50,16 @@ const logger = createOpenBotLogger("conversation-runtime");
 const openTransactions = new WeakMap<OpenBotDatabase, TransactionScope>();
 
 /**
- * Runs `work` inside a SQLite transaction, opening one only when the caller is not already inside
- * another. Nesting is load-bearing: `deleteRoutine` drives a routine mutation whose `beforeMutate`
- * hook appends a run transition in the same transaction, and an approval response can append a
- * hosted-site event inside an outer one. This is the only `BEGIN IMMEDIATE` under `src/backend/agent`.
+ * Runs `work` inside a SQLite transaction (`withTransaction`), opening one only when the caller is
+ * not already inside another. Nesting is load-bearing: `deleteRoutine` drives a routine mutation
+ * whose `beforeMutate` hook appends a run transition in the same transaction, and an approval
+ * response can append a hosted-site event inside an outer one. A nested call runs in a savepoint,
+ * so its failure rolls back only its own rows, and its `onRollback` runs at once.
  *
  * `onCommit` exists because a nested caller must not publish in-memory state the owner can still
- * discard: there is no partial rollback here, so effects that make rows visible to the rest of the
- * app are queued on the owner and run once, after `COMMIT`. `onRollback` is queued the same way, so
- * an owner that fails *after* a nested call succeeded still undoes that call's in-memory slice.
+ * discard: effects that make rows visible to the rest of the app are queued on the owner and run
+ * once, after `COMMIT`. `onRollback` is queued the same way, so an owner that fails *after* a
+ * nested call succeeded still undoes that call's in-memory slice.
  */
 export function withDatabaseTransaction<T>(
   database: OpenBotDatabase,
@@ -65,16 +67,17 @@ export function withDatabaseTransaction<T>(
   onRollback?: () => void,
   onCommit?: () => void,
 ): T {
-  // `isTransaction`, not the map, decides who opens one: a transaction started anywhere else would
-  // otherwise make this call BEGIN IMMEDIATE inside it, which SQLite rejects.
-  if (database.connection.isTransaction) {
+  // `isTransaction`, not the map, decides who owns one: a transaction started anywhere else has no
+  // scope in the map, and this call must still join it.
+  const connection = database.connection;
+  if (connection.isTransaction) {
     const owner = openTransactions.get(database);
     let result: T;
     try {
-      result = work();
+      result = withTransaction(connection, work);
     } catch (error) {
-      // Our own work failed, so undo our in-memory slice now rather than queueing it: the owner's
-      // ROLLBACK will undo the rows, and a queued restorer would run a second time.
+      // Our own work failed and its savepoint is rolled back, so undo our in-memory slice now
+      // rather than queueing it: a queued restorer would run a second time.
       onRollback?.();
       throw error;
     }
@@ -88,16 +91,19 @@ export function withDatabaseTransaction<T>(
     }
     return result;
   }
-  database.connection.exec("BEGIN IMMEDIATE");
   const scope: TransactionScope = { rollback: [], commit: [] };
-  openTransactions.set(database, scope);
+  let opened = false;
   let result: T;
   try {
-    result = work();
-    database.connection.exec("COMMIT");
+    result = withTransaction(connection, () => {
+      opened = true;
+      openTransactions.set(database, scope);
+      return work();
+    });
   } catch (error) {
-    if (database.connection.isTransaction) database.connection.exec("ROLLBACK");
     openTransactions.delete(database);
+    // A failed `BEGIN IMMEDIATE` ran no work, so there is nothing to restore.
+    if (!opened) throw error;
     // Innermost first, so each restorer sees the state the one after it has already put back.
     for (const restore of [...scope.rollback].reverse()) restore();
     onRollback?.();
