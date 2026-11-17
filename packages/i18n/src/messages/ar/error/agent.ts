@@ -55,6 +55,8 @@ export const messages = {
   "error.agent.modelProviderMismatch": "النموذج المحدد لا ينتمي إلى هذا المزوّد.",
   "error.agent.modelNotListed": "النموذج «{model}» غير متاح. النماذج المتاحة: {models}.",
   "error.agent.providerNotListed": "لا يتوفر أي نموذج من {provider} الآن. استدعِ list_models لعرض النماذج المتاحة.",
+  "error.agent.creatorModelNotListed":
+    "نموذجك «{model}» غير موجود في قائمة النماذج الآن، لذلك لا يمكن أن يبدأ الوكيل الجديد عليه. حاول مرة أخرى بعد بضع ثوانٍ، أو عيّن provider وmodel إلى نموذج يعرضه list_models.",
   "error.agent.reasoningEffortUnsupported":
     "النموذج «{model}» لا يدعم مستوى الاستدلال «{effort}». المستويات المدعومة: {efforts}.",
   "error.agent.reasoningEffortNotConfigurable":

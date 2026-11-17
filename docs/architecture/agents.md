@@ -1069,6 +1069,8 @@ model or an unsupported effort is an error that names the valid values; OpenBot 
 it creates the agent. Without a provider and a model, the new agent starts on the calling agent's
 provider, model and reasoning effort, so a team that one agent creates runs where that agent runs.
 When the caller's provider no longer lists its model, the new agent starts on the user's default.
+When that provider lists no model now, or the caller is a custom agent, the call fails and asks the
+caller to try again or to name a model: an empty or partial list is no proof that the model is gone (#11033).
 Creation stays this small. The calling agent then configures the new agent, or any other local
 agent, with the same tools that act on itself. `openbot.read_agent` returns one agent's setup:
 profile, runtime, access, Computer Use, notifications, auto-approve, installed skills, routines,
