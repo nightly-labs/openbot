@@ -1,4 +1,5 @@
 import { browserSignInCookieFitsHost } from "@openbot/contracts/team-protocol/browser-sign-in-v1";
+import { getDomain } from "tldts";
 
 /** Words in a path or a query that sign-in, sign-up and recovery steps of most sites use. */
 const SIGN_IN_WORD =
@@ -20,10 +21,18 @@ export function isBrowserSignInAddress(url: string): boolean {
   return SIGN_IN_WORD.test(parsed.pathname) || SIGN_IN_WORD.test(parsed.search);
 }
 
-/** True when the page is on the site of the sign-in: the same host, a parent domain or a subdomain. */
+/**
+ * True when the page is on the site of the sign-in: the same host, a parent domain, a subdomain, or
+ * another subdomain of the same registrable domain. Some sites sign in on one subdomain and then show
+ * the signed-in page on another, such as `auth.leboncoin.fr` and `www.leboncoin.fr` (#11219).
+ * Private suffixes such as `github.io` keep their subdomains apart.
+ */
 export function isBrowserSignInSite(url: string, host: string): boolean {
   const parsed = parsedUrl(url);
-  return parsed !== null && browserSignInCookieFitsHost(parsed.hostname, host);
+  if (!parsed) return false;
+  if (browserSignInCookieFitsHost(parsed.hostname, host)) return true;
+  const site = getDomain(host, { allowPrivateDomains: true });
+  return site !== null && site === getDomain(parsed.hostname, { allowPrivateDomains: true });
 }
 
 /** The site shows a page after the sign-in: on the same site, and not a step of the sign-in. */

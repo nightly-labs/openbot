@@ -752,7 +752,9 @@ on this computer and has no "I'm done" button. A sign-in that sets cookies compl
 that tab.
 The window also sends by itself (`src/main/browser-sign-in-page.ts`): after a page with a sign-in
 address or a visible password field, a new `HttpOnly` cookie of the site, and then a page of the site
-that is not a sign-in step. This is a guess, so after that send the desktop reads the server's tab
+that is not a sign-in step. For the page, the site also includes the other subdomains of the same
+registrable domain (`tldts`, private suffixes kept apart), because some sites sign in on one
+subdomain and then show the page on another (#11219). This is a guess, so after that send the desktop reads the server's tab
 list. When the tab still shows a sign-in step, it opens the window's page in the tab (with
 `browser-navigation`) and reads the list again. The window closes only when the tab left the sign-in
 steps; otherwise it stays open and waits for the next cookie. Done sends without this check.
