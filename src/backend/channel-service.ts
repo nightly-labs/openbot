@@ -3792,14 +3792,18 @@ export class ChannelService {
     if (!root) return yield* channelFailure(new Error("The root task is unavailable."));
     // A member that answers the same request in a task of its own already gives its answer. A second
     // task for that request made it post the same answer again, once for each member that gave it (#11082).
+    // The current request counts, not the older messages that a resumed task keeps, and a stopped or
+    // failed task gives no answer.
     if (
       tasks.some(
         (item) =>
           item.id !== root.id &&
           item.parentTaskId === null &&
           item.ownerAgentId === recipientAgentId &&
+          item.requestMessageId === root.requestMessageId &&
           item.state !== "cancelled" &&
-          sameRequest(item, root),
+          item.state !== "failed" &&
+          item.state !== "paused",
       )
     )
       return refuse(
