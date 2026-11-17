@@ -243,6 +243,11 @@ try {
     `The second chat must reach its tool: ${report.toolResults[1]}`,
   );
   assert.equal(report.toolCalls.length, 2, "Each chat must call OpenBot's tool once.");
+  assert.deepEqual(
+    report.diagnostics,
+    ["OpenCode did not load OpenBot's tools in time. The session opens again."],
+    "Only the first chat must open again, and it must load the tools then.",
+  );
   report.passed = true;
 } catch (error) {
   report.error = error instanceof Error ? (error.stack ?? error.message) : String(error);

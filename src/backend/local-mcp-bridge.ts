@@ -49,7 +49,10 @@ export interface LocalMcpSession {
    * Such a server is marked, so a session that joins it later gets a new token.
    */
   dropped(sentAt: number, limitMs: number): boolean;
-  /** Gives each marked server a new token, which all sessions of its directory share, and returns `servers`. */
+  /**
+   * Gives each marked server a new token, which all sessions of its directory share. `servers` then
+   * has the new tokens, and is returned.
+   */
   renew(): LocalMcpSession["servers"];
   close(): void;
 }
@@ -206,8 +209,10 @@ export class LocalMcpBridge {
         url: `http://127.0.0.1:${this.#port}/mcp`,
         headers: [{ name: "Authorization", value: `Bearer ${route.tokens.at(-1)}` }],
       }));
+    // One array for the session: a renew changes it in place, so a caller that kept its entries still finds them.
+    const current = servers();
     return {
-      servers: servers(),
+      servers: current,
       setThreadId: (nextThreadId) => {
         member.threadId = nextThreadId;
       },
@@ -229,7 +234,8 @@ export class LocalMcpBridge {
       },
       renew: () => {
         for (const route of routes) if (route.dropped) this.#renewToken(route, member);
-        return servers();
+        current.splice(0, current.length, ...servers());
+        return current;
       },
       close: () => {
         for (const route of routes) {
