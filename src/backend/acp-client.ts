@@ -3614,6 +3614,17 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
       if (!turn.text.trim() && turn.interruptedAnswer) turn.text = turn.interruptedAnswer;
       turn.interruptedAnswer = null;
     }
+    // A later step follows the empty-step failure, so the model went on: the failure is not news, and
+    // a quiet routine run that then succeeded showed it (#11010).
+    const failureAt = turn.sdkFailureAt;
+    if (
+      phase === "commentary" &&
+      failureAt !== null &&
+      this.#flavor.sdkHarness?.emptyOutputFailure?.test(turn.text.slice(failureAt))
+    ) {
+      turn.text = turn.text.slice(0, failureAt);
+      turn.sdkFailureAt = null;
+    }
     if (!turn.text) return;
     const item = {
       id: turn.itemId,
