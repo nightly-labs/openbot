@@ -932,6 +932,11 @@ const CUSTOM_AGENT_FLAVORS: Readonly<Partial<Record<string, AcpFlavor>>> = {
   // Kimi Code added as a custom agent (`kimi acp`) keeps the custom rules and the tools of its first
   // turn, as for the Kimi provider (#8931).
   kimi: { ...CUSTOM_ACP_FLAVOR, mcpToolsFixedAtStart: true },
+  // Kiro CLI (`kiro-cli acp`) stops each request to an HTTP MCP server after 120 s: its `reqwest`
+  // client has a total timeout of the server's `timeout`, 120 s by default, and it ignores progress.
+  // A session server cannot set that timeout, so a question card closed with "Transport closed"
+  // before the user answered (#11049).
+  "kiro-cli": { ...CUSTOM_ACP_FLAVOR, mcpToolCallLimitMs: 120_000 },
 };
 
 /**
