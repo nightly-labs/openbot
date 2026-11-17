@@ -8,7 +8,7 @@ import {
 } from "@openbot/contracts/ipc";
 import { Effect } from "effect";
 import type { AgentClient } from "../agent-client";
-import { decodeRecordResponse, getRecord, getString } from "../protocol";
+import { decodeRecordResponse, getRecord, getString, isRecord } from "../protocol";
 
 /** Codex's own provider id. Every other id is a model provider that the user's settings select. */
 const OPENAI_PROVIDER_ID = "openai";
@@ -55,22 +55,28 @@ function builtInName(providerId: string): string {
  * as they are now, also to a process that started before they changed. Codex itself keeps the same
  * fields to know when its list is out of date (`app-server/src/model_catalog.rs`). Other values of
  * `config.toml`, such as trusted projects that Codex writes itself, are not in it.
+ *
+ * Null when the file read timed out or failed: the settings are not known, so nothing is compared. A
+ * missing file is a value: Codex gives no models from it either.
  */
-function codexStartSettings(config: unknown) {
+function codexStartSettings(config: unknown, timeoutMs: number) {
   const providerId = getString(config, "model_provider")?.trim() || OPENAI_PROVIDER_ID;
   const provider = getRecord(getRecord(config, "model_providers"), providerId);
   // Codex resolves the path. Codex 0.167 gives it as a path; newer versions give a `file:` URI.
   const catalog = getString(config, "model_catalog_json")?.trim() || null;
-  return Effect.tryPromise(async () =>
-    catalog
-      ? createHash("sha256")
-          .update(await readFile(catalog.startsWith("file:") ? fileURLToPath(catalog) : catalog))
-          .digest("hex")
-      : null,
-  ).pipe(
-    // A file that Codex cannot read either gives no models of its own.
-    Effect.orElseSucceed(() => null),
-    Effect.map((catalogHash) => JSON.stringify([providerId, provider, catalog, catalogHash])),
+  const key = (catalogHash: string | null) => JSON.stringify([providerId, provider, catalog, catalogHash]);
+  if (!catalog) return Effect.succeed(key(null));
+  return Effect.tryPromise({
+    try: async (signal) =>
+      createHash("sha256")
+        .update(await readFile(catalog.startsWith("file:") ? fileURLToPath(catalog) : catalog, { signal }))
+        .digest("hex"),
+    catch: (cause) => cause,
+  }).pipe(
+    // A file on a mount that does not answer must not hold the catalogue of every provider.
+    Effect.timeout(timeoutMs),
+    Effect.map(key),
+    Effect.catch((cause) => Effect.succeed(isRecord(cause) && cause.code === "ENOENT" ? key("missing") : null)),
   );
 }
 
@@ -81,5 +87,5 @@ export const readCodexModelSource = Effect.fn("Agent.readCodexModelSource")(func
 ) {
   const response = yield* client.request("config/read", { includeLayers: false }, decodeRecordResponse, timeoutMs);
   const config = getRecord(response, "config");
-  return { source: codexModelSource(config), startSettings: yield* codexStartSettings(config) };
+  return { source: codexModelSource(config), startSettings: yield* codexStartSettings(config, timeoutMs) };
 });

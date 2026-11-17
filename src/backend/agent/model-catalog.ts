@@ -77,9 +77,9 @@ export class ModelCatalog {
     if (this.#options.client(provider) !== client) return false;
     if (Result.isFailure(result)) logger.warn("A provider did not give the source of its models.", { provider });
     const source = Result.isSuccess(result) ? result.success.source : null;
-    if (Result.isSuccess(result)) {
+    const startSettings = Result.isSuccess(result) ? result.success.startSettings : null;
+    if (startSettings !== null) {
       // The first read of a client is near its start, so it gives the settings that its process read.
-      const { startSettings } = result.success;
       const atStart = this.#startSettings.get(client);
       this.#startSettings.set(client, startSettings);
       if (atStart !== undefined && atStart !== startSettings) {

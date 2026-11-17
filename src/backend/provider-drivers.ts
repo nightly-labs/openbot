@@ -825,12 +825,13 @@ interface ProviderModelCatalog {
    * clears it, so the picker never shows a source that it could not check.
    *
    * `startSettings`: the settings, as they are now, that the CLI reads into its list only at its start.
-   * When they change while the process runs, the process restarts when its turns end (#10268).
+   * When they change while the process runs, the process restarts when its turns end (#10268). Null
+   * when they are not known this time, so nothing is compared.
    */
   source?(
     client: AgentClient,
     timeoutMs: number,
-  ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string }, unknown>;
+  ): Effect.Effect<{ source: ProviderModelSource | null; startSettings: string | null }, unknown>;
 }
 
 /**
