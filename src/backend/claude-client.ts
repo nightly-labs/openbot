@@ -468,12 +468,8 @@ interface ActiveTurn {
    * message that only states the limit, so its text is held here and not published as the answer.
    */
   usageLimit: { resetsAt: number | null; text: string | null } | null;
-  /**
-   * The plan refused a request of a subagent for a spent window. The subagent runs on the same account,
-   * but the turn's own requests can still pass, as on a limit of another model. So it ends the turn on
-   * the limit only when the turn gave no answer (#11141).
-   */
-  subagentLimit: { resetsAt: number | null; text: string } | null;
+  /** The turn called a tool, so its own requests passed. */
+  ranTools: boolean;
   /** The CLI refused the turn with `authentication_failed`, so a backup model can take it (#7014). */
   authenticationFailed: boolean;
   /**
@@ -547,7 +543,10 @@ interface ThreadRuntime {
    * turn. The turn that the CLI then starts to answer the results continues them (#10847).
    */
   endedTaskTurns: (string | null)[];
-  /** The subagent limit refusal that came while no turn ran. The next turn that the CLI starts takes it. */
+  /**
+   * The plan's refusal of a subagent's request, until a turn that the CLI started ends. A person's turn
+   * clears it: that turn reads the reports, and its own requests show a limit (#11141).
+   */
   subagentLimit: { resetsAt: number | null; text: string } | null;
   /** When the process last sent a message. With no turn, only background work sends one. */
   lastOutputAt: number;
@@ -1841,11 +1840,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       assistantMessages: new Map<string, string>(),
       toolCalls: new Map<string, { name: string; input: Record<string, string> }>(),
       usageLimit: null,
-      // A refusal that a reset ended since is old.
-      subagentLimit:
-        unprompted && runtime.subagentLimit && (runtime.subagentLimit.resetsAt ?? Infinity) * 1_000 > Date.now()
-          ? runtime.subagentLimit
-          : null,
+      ranTools: false,
       authenticationFailed: false,
       balanceSpent: false,
       billingFailed: false,
@@ -1861,7 +1856,7 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const continues =
       unprompted && !runtime.endedTaskTurns.includes(null) ? runtime.endedTaskTurns.filter(isString) : [];
     runtime.endedTaskTurns = [];
-    runtime.subagentLimit = null;
+    if (!unprompted) runtime.subagentLimit = null;
     runtime.activeTurn = turn;
     runtime.nextTurnId = null;
     runtime.awaitsResultTurn = false;
@@ -1890,9 +1885,11 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
     const text = messageText(message.message);
     const refusal = claudeUsageLimitRefusal(message);
     if (isBalanceDiagnostic(text) || (!refusal && !isPlanLimitDiagnostic(text))) return;
-    const limit = { resetsAt: refusal?.resetsAt ?? null, text: text || sourceText("error.provider.usageLimitReached") };
-    if (runtime.activeTurn) runtime.activeTurn.subagentLimit = limit;
-    else runtime.subagentLimit = limit;
+    if (runtime.activeTurn && !runtime.activeTurn.unprompted) return;
+    runtime.subagentLimit = {
+      resetsAt: refusal?.resetsAt ?? null,
+      text: text || sourceText("error.provider.usageLimitReached"),
+    };
   }
 
   /**
@@ -2284,7 +2281,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       }
       const toolCalls = messageToolCalls(message.message);
       // A tool call closes the step, which makes the text before it narration rather than an answer.
-      if (toolCalls.length > 0) this.#flushNarration(runtime);
+      if (toolCalls.length > 0) {
+        turn.ranTools = true;
+        this.#flushNarration(runtime);
+      }
       for (const toolCall of toolCalls) {
         if (turn.toolCalls.has(toolCall.id)) continue;
         const name = claudeBridgedToolName(toolCall.name, toolCall.input);
@@ -2409,12 +2409,28 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       // refusal message, or a request that then failed with a rate-limit error, ends the turn on the
       // limit. Another API error, such as a 529 overload, stays a provider error (#10486). An older CLI
       // sends no status, so its API error still counts.
-      // A subagent's refusal ends a turn on the limit when the turn has no answer and no refusal of its own.
-      const subagentLimit = turn.usageLimit?.text == null && !turn.seenText && !fallback ? turn.subagentLimit : null;
+      const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
+      // A turn that the CLI started for the reports ends on a subagent's refusal when its own requests gave
+      // no answer, no tool call, no refusal and no other error. A refusal that a reset ended since is old.
+      const held = turn.unprompted ? runtime.subagentLimit : null;
+      if (turn.unprompted) runtime.subagentLimit = null;
+      const subagentLimit =
+        held &&
+        (held.resetsAt ?? Number.POSITIVE_INFINITY) * 1_000 > Date.now() &&
+        turn.usageLimit?.text == null &&
+        !turn.seenText &&
+        !fallback &&
+        !turn.ranTools &&
+        !turn.balanceSpent &&
+        !turn.billingFailed &&
+        !turn.authenticationFailed &&
+        message.subtype === "success" &&
+        (!apiError || limitError)
+          ? held
+          : null;
       const limit = subagentLimit
         ? { resetsAt: subagentLimit.resetsAt ?? turn.usageLimit?.resetsAt ?? null, text: subagentLimit.text }
         : turn.usageLimit;
-      const limitError = apiError && (message.api_error_status == null || message.api_error_status === 429);
       if (
         limit &&
         !interrupted &&
