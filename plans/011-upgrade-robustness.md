@@ -91,7 +91,7 @@ Not confirmed: desktop users other than the developer (no central source).
 | # | Item | State |
 |---|---|---|
 | 1 | The bootstrap capability list stays at 64; one size check per protocol | IN REVIEW (#10777, reopened) |
-| 2 | Minimum protocol follows the window; a deletion date per protocol | BLOCKED: clients check only protocol 3 (3 prerequisite steps) |
+| 2 | Minimum protocol follows the window; a deletion date per protocol | BLOCKED: clients check only protocol 3 (step 1 in review: #10811) |
 | 3 | A server stops a start loop and reports the reason through the Team API | TODO |
 | 4 | Desktop start recovery offers only a release that can open the database | TODO |
 | 5 | Versioned JSON stores keep data after a downgrade; agent-data database has a version | TODO |
