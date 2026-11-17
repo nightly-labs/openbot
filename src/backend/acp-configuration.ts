@@ -332,13 +332,9 @@ export class AcpConfiguration {
       // variant is split only from the options that named it: the answer, or the catalog of a list
       // that declares no efforts.
       const options = response?.configOptions ?? (withoutEfforts ? probe.configOptions : undefined) ?? [];
-      probed.push(
-        efforts
-          ? expandSpeed({ ...model, ...efforts }, options)
-          : withoutEfforts
-            ? expandSpeed(model, options)
-            : [{ ...model, reasoningEffortConfigurable: true }],
-      );
+      if (efforts) probed.push(...expandSpeed({ ...model, ...efforts }, options));
+      else if (withoutEfforts) probed.push(...expandSpeed(model, options));
+      else probed.push({ ...model, reasoningEffortConfigurable: true });
     }
     // Back to the model the session opened on. The session is closed next, but an agent that keeps a
     // "last used model" outside the session would otherwise remember the end of this sweep, and the
@@ -832,18 +828,6 @@ function modelsFromConfig(options: SessionConfigOption[]): AcpModel[] {
     ...reasoning,
     usesModelReasoningEffort: null,
   }));
-}
-
-function thoughtLevelOption(
-  options: readonly SessionConfigOption[],
-): Extract<SessionConfigOption, { type: "select" }> | undefined {
-  return selectOption(options, (option) => option.category === "thought_level");
-}
-
-/** True when a Cursor model id already names one effort, as the one-variant catalog does. */
-function modelIdFixesReasoning(id: string): boolean {
-  const params = parseModelParameters(id)?.params;
-  return params?.has("reasoning") === true || params?.has("effort") === true;
 }
 
 function selectOption(

@@ -1715,14 +1715,10 @@ export class AcpAgentClient extends EventEmitter<ClientEvents> {
     return providerCall(() =>
       connection.initialize({
         protocolVersion: 1,
-<<<<<<< HEAD
         // OpenCode sends its subagents' work only to a client that asks for it, and else in the parent's stream.
         clientCapabilities: this.#flavor.childSessionUpdates
-          ? { ...OPENBOT_ACP_CLIENT_CAPABILITIES, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
-          : OPENBOT_ACP_CLIENT_CAPABILITIES,
-=======
-        clientCapabilities,
->>>>>>> 6646a9dba (Backend: list Cursor fast and standard model speeds)
+          ? { ...clientCapabilities, _meta: { [OPENCODE_CHILD_SESSION_UPDATES]: true } }
+          : clientCapabilities,
         clientInfo: this.#flavor.clientInfo ?? OPENBOT_ACP_CLIENT_INFO,
       }),
     );
