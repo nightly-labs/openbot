@@ -1572,6 +1572,14 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
       skipAtLimit: (task) => this.#channelRoutines.skipAtLimit(task.channelId, task.requestMessageId),
       quietRoutineRequest: (requestMessageId) => this.#channelRoutines.quietRun(requestMessageId),
       usageLimitBackup: (agentId) => this.#usageLimitBackup(agentId) !== undefined || this.#poolBackup(agentId),
+      steersWhenBusy: (agentId) => {
+        const agent = this.#store.list().find((item) => item.id === agentId);
+        return (
+          agent !== undefined &&
+          (agent.busyMessageMode ?? this.#busyMessageMode()) === "steer" &&
+          agentSteersTurns({ provider: providerForAgent(agent), model: agent.model }, this.#endpoints.available())
+        );
+      },
       steer: (agentId, threadId, turnId, messageId, text) =>
         Effect.gen({ self: this }, function* () {
           // A person's correction joins the turn and waits for its answer.
