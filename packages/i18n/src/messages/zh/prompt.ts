@@ -49,6 +49,7 @@ export const messages = {
   "prompt.browser.cancelledBody": "浏览器步骤已取消。",
   "prompt.browser.pendingBody": "请打开页面完成登录、验证或授权，然后让 {name} 继续。",
   "prompt.browser.openPage": "打开 {title}",
+  "prompt.browser.openFailed": "无法在主窗口中打开页面，请重试。",
   "prompt.browser.done": "我已完成",
   "prompt.browser.pageFallback": "浏览器页面",
   "prompt.browser.hostFallback": "浏览器",

@@ -50,6 +50,7 @@ export const messages = defineMessages("prompt", {
   "prompt.browser.pendingBody":
     "Open the page to finish the sign-in, verification, or consent. Then let {name} continue.",
   "prompt.browser.openPage": "Open {title}",
+  "prompt.browser.openFailed": "Could not open the page in the main window. Try again.",
   "prompt.browser.done": "I’m done",
   "prompt.browser.pageFallback": "Browser page",
   "prompt.browser.hostFallback": "the browser",
