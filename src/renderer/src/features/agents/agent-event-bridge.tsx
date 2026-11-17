@@ -86,12 +86,12 @@ export function AgentEventBridge() {
   const { activeServer, activeServerId } = useServers();
   const { setSkillsMarketplaceOpen } = useSettings();
   const { applyAccountUsage, accountUsageTargetKey, refreshAccountUsage, centralAuth } = useAuth();
-  const { currentTeamMember } = usePresence();
+  const { readerMemberId } = usePresence();
   /** Whether a sender id is the reader, so a backdrop that another member asked for stays off. */
   const isReader = (senderId: string) => {
     const state = centralAuth();
     return isReaderAuthor(senderId, {
-      memberId: currentTeamMember()?.id ?? null,
+      memberId: readerMemberId(),
       accountUserId: state.status === "signed_in" ? state.user.id : null,
       onOwnComputer: activeServer()?.kind === "local",
     });

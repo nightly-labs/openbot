@@ -330,6 +330,22 @@ export class RoutineScheduler implements RoutineDueSource {
   }
 
   /**
+   * Keeps why a routine is paused when a scheduled run of its own paused it (#10048), so Routines and
+   * the chat card say so. A failure of this record leaves the pause as it is.
+   */
+  notePausedByRun(agentId: string, routineId: string, scheduledFor: string): void {
+    try {
+      this.#routines.markPausedByRun(routineId, { scheduledFor });
+    } catch (error) {
+      logger.warn("OpenBot could not keep why a run paused its routine.", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    this.stateChanged(agentId);
+  }
+
+  /**
    * Turns on again the routine that a run paused before it reported a failure (#9856). Its card joins
    * the run's turn, as the card of the pause did. A routine that changed after the pause, such as one
    * that the user edited or deleted, stays as it is ("kept"). "failed" when the change failed.

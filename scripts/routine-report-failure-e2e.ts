@@ -7,10 +7,13 @@
 // still wins, that a failed script run is never quiet, that the tool fails outside a routine run, that
 // a teammate's update that wants no answer can end quiet (#6821), that a teammate's answer to a
 // request of a quiet run can end quiet and the answer to a Test run's request cannot (#8364), that a
-// teammate's request can end quiet only after the agent sent its result to that teammate (#7465), that
+// teammate's request can end quiet after the agent sent its result to that teammate (#7465) or after
+// OpenBot sent the turn's answer to it (#8021), that
 // a flow skips the agents after a failed owner or linked step, that a result destination gets the
-// answer of a reported failure but not of a provider failure, and that a failed run does not pause its
-// own routine in either call order (#9856).
+// answer of a reported failure but not of a provider failure, that a failed run does not pause its
+// own routine in either call order (#9856), and that a routine that its own run paused says which run
+// until the next change of the routine, also after a restart (#10048), and that the routine prompt
+// says that a request to a teammate is not a failure (#10928).
 // `bun scripts/routine-report-failure-e2e.ts`. Writes .openbot-build/routine-report-failure-e2e/report.json.
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -237,6 +240,8 @@ const report: {
   runs: Record<string, Pick<RoutineRun, "status" | "error"> & { deliveryStatus?: string | null }>;
   flowSteps: Record<string, { agent: string; status: string; error: string | null }[]>;
   resultRuns: string[];
+  /** The run time that each routine list gives for the routine that its own run paused (#10048). */
+  pauseReasons?: Record<string, string | undefined>;
   checks: { name: string; passed: boolean }[];
   passed: boolean;
   error?: string;
@@ -592,13 +597,35 @@ try {
       latestTurnAnswer(textRequest.answers, textRequest.turn.turnId) === undefined,
     textRequest,
   );
+  // With no reply, OpenBot sends the turn's answer to the teammate as its result. The teammate has it,
+  // so the turn ends quiet too, and the history import decides the same (#8021).
   const unanswered = await requestTurnOf("Check the site build. TEAMMATE-REQUEST-NOREPLY");
+  const unansweredMessageId = /Message ID: (\S+)/.exec(unanswered.turn.text ?? "")?.[1];
+  const sentResults = await waitFor("the result for the unanswered request", () => {
+    const results = agents
+      .listQueue(relay.id)
+      .deliveries.filter(
+        (delivery) =>
+          delivery.sender.kind === "agent" &&
+          delivery.sender.agentId === checker.id &&
+          delivery.replyToMessageId === unansweredMessageId,
+      );
+    return results.length > 0 && results;
+  });
+  const unansweredDelivery = mailbox.completedDeliveriesOfTurn(checker.id, unanswered.turn.turnId)[0]?.delivery;
   pass(
-    "A teammate request with no reply keeps its answer in the chat",
+    "A teammate request with no reply ends quiet after OpenBot sent its answer to the teammate",
     unanswered.event.type === "turn-completed" &&
-      unanswered.event.quiet !== true &&
-      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId)?.text === "All good.",
-    unanswered,
+      unanswered.event.quiet === true &&
+      unanswered.answers.some((message) => message.text === "All good.") &&
+      unanswered.answers.every((message) => message.itemType === ROUTINE_QUIET_ANSWER_ITEM_TYPE) &&
+      latestTurnAnswer(unanswered.answers, unanswered.turn.turnId) === undefined &&
+      sentResults.length === 1 &&
+      sentResults[0]?.text.includes("All good.") === true &&
+      unansweredDelivery !== undefined &&
+      !mailbox.hasOwnReplyFrom(unansweredDelivery.id) &&
+      mailbox.hasSentResultFor(unansweredDelivery.id),
+    { unanswered, sentResults, unansweredDelivery },
   );
 
   // A Test run that reports a failure.
@@ -640,6 +667,13 @@ try {
     (entry) => entry.method === "turn/start" && entry.turnId === healthRun.delivery.turnId,
   )?.text;
   pass("The Test-run prompt names the tool", healthPrompt?.includes("call the routine_report_failure tool") === true);
+  // A run that waited for teammates reported a failure before their replies came (#10928).
+  pass(
+    "The routine prompt says that a teammate request is not a failure",
+    healthPrompt?.includes("A request to a teammate is not a failure") === true &&
+      healthPrompt.includes("Do not call the routine_report_failure tool only because a reply has not come yet."),
+    healthPrompt,
+  );
   pass(
     "The routine prompt does not forbid listing routines",
     healthPrompt?.includes("Do not create, update, delete, or test routines during this run.") === true &&
@@ -927,11 +961,38 @@ try {
     stopped.active === false && stopped.ran.run.status === "succeeded",
     { active: stopped.active, run: stopped.ran.run.status },
   );
+  // Routines and the chat card say which run paused the routine (#10048).
+  const stoppedId = stopped.ran.run.routineId;
+  const pausedBy = (list: readonly { id: string; pausedByRun?: { scheduledFor: string } }[]) =>
+    list.find((entry) => entry.id === stoppedId)?.pausedByRun?.scheduledFor;
+  const reasons = {
+    routine: pausedBy(agents.listRoutines(checker.id)),
+    record: pausedBy(agents.routineRecords.list({ kind: "agent", id: checker.id })),
+    // A second store on the same database reads what a restart reads.
+    restarted: pausedBy(new AgentRoutineStore(store.database).list(checker.id)),
+    run: stopped.ran.run.scheduledFor,
+  };
+  report.pauseReasons = reasons;
+  pass(
+    "A routine that its own run paused names that run in both routine lists and after a restart (#10048)",
+    reasons.routine === reasons.run && reasons.record === reasons.run && reasons.restarted === reasons.run,
+    reasons,
+  );
+  agents.updateRoutine({ agentId: checker.id, routineId: stoppedId, active: true });
+  agents.updateRoutine({ agentId: checker.id, routineId: stoppedId, active: false });
+  const userPaused = pausedBy(agents.listRoutines(checker.id));
+  pass("A person's resume and pause clear the run that paused the routine (#10048)", userPaused === undefined, {
+    userPaused,
+  });
   const pausedThenFailed = await selfPausing("Paused then failed", (id) => [pauseRoutine(id), reportFailure(REASON)]);
   const resumedResult = toolResults(pausedThenFailed.turnId, "routine_report_failure")[0]?.result;
+  const pausedThenFailedReason = agents
+    .listRoutines(checker.id)
+    .find((entry) => entry.id === pausedThenFailed.ran.run.routineId)?.pausedByRun;
   pass(
     "A run that pauses its own routine and then reports a failure turns the routine on again (#9856)",
-    pausedThenFailed.active === true &&
+    pausedThenFailedReason === undefined &&
+      pausedThenFailed.active === true &&
       pausedThenFailed.ran.run.status === "failed" &&
       resumedResult?.contentItems.some((item) => item.text.includes("the routine is on again")) === true,
     { active: pausedThenFailed.active, run: pausedThenFailed.ran.run.status, resumedResult },

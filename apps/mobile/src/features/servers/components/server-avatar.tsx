@@ -48,9 +48,10 @@ function serverInitials(name: string): string {
 }
 
 /**
- * A squircle with the server logo; with no logo, the felt plush that an owner or admin chose
- * (`host-appearance-v1`), or else initials in the agent avatar palette. A dot shows the connection
- * state. `logoUri` replaces the saved logo with a draft; `null` shows no logo.
+ * A squircle with the server logo; with no logo, the felt plush: the shape and colour that an owner
+ * or admin chose (`host-appearance-v1`), or else the squircle in the automatic colour of the server
+ * ID. This computer shows a monitor icon until a plush is chosen for it, and a plush that cannot be drawn shows initials. A dot
+ * shows the connection state. `logoUri` replaces the saved logo with a draft; `null` shows no logo.
  * `showStatus={false}` leaves out the dot and the dimming, for a place that shows the logo only.
  */
 export function ServerAvatar({
@@ -95,16 +96,19 @@ export function ServerAvatar({
         : offline;
   const muted = showStatus && !online;
   const showsLogo = Boolean(logo && !logoFailed);
+  // This computer keeps its monitor icon unless an owner or admin chose a plush for it.
+  const showsPlush = !showsLogo && (server.kind !== "local" || Boolean(server.appearance));
   const plush = useServerPlush(
     server.id,
-    showsLogo ? null : server.appearance,
+    server.appearance,
     size,
     muted ? DISCONNECTED_APPEARANCE.saturation : 1,
+    showsPlush,
   );
   // The plush has no tile: its shape shows on the background. It is empty while it is drawn, and a
   // plush that cannot be drawn shows the initials.
   const tile =
-    server.appearance && !showsLogo && !plush.failed ? (
+    showsPlush && !plush.failed ? (
       <View style={{ height: size, opacity: muted ? DISCONNECTED_APPEARANCE.opacity : 1, width: size }}>
         {plush.uri ? (
           <Image

@@ -1804,7 +1804,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const whatsApp = live.record.platform === "whatsapp";
     return yield* live.adapter.places().pipe(
-      Effect.map((places) => (whatsApp ? { places, note: WHATSAPP_ALLOWED_PLACES } : { places })),
+      Effect.map((list) => (whatsApp ? { ...list, note: WHATSAPP_ALLOWED_PLACES } : list)),
       Effect.catch((failure) => Effect.succeed({ error: refusal(failure) })),
     );
   });
@@ -1824,7 +1824,7 @@ export class MessagingService {
     if (!live?.identity) return { error: MESSAGING_NOT_RUNNING };
     const platform = live.record.platform;
     return yield* Effect.gen(function* () {
-      const place = (yield* live.adapter.places()).find((candidate) => candidate.id === placeId);
+      const place = (yield* live.adapter.places()).places.find((candidate) => candidate.id === placeId);
       if (!place)
         return {
           error:

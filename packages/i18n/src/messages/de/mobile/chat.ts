@@ -199,9 +199,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "Antwort abbrechen",
   "mobile.chat.composer.messageAgent": "Nachricht an {name}",
   "mobile.chat.composer.pasteFailed": "Eingefügter Text konnte nicht angehängt werden",
-  "mobile.chat.composer.cancelDictation": "Diktat abbrechen",
   "mobile.chat.voice.listening": "Hört zu…",
-  "mobile.chat.voice.continue": "Diktat fortsetzen",
   "mobile.chat.liveVoice.start": "Sprachgespräch starten",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "Startet",
@@ -376,7 +374,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "Melde dich auf deinem Computer an",
   "mobile.chat.browserSecret.signInBlockedBody":
     "Diese Website akzeptiert keine Anmeldung vom Server. Öffne diesen Chat in der OpenBot-Desktop-App auf deinem Computer und melde dich dort an.",
-  "mobile.chat.browserSecret.takeoverReload": "Lade dann die Seite neu, bevor du „Fertig“ wählst.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot konnte das Passwort oder den Code nicht vollständig eingeben. Gib auf der Seite ein, was fehlt. Lade dann die Seite neu, bevor du „Fertig“ wählst.",
   "mobile.chat.browserSecret.takeoverFailed": "Die Anfrage konnte nicht abgeschlossen werden.",
   "mobile.chat.browserSecret.done": "Fertig",
   "mobile.chat.browserSecret.submitOnce": "Einmal an {origin} senden. Dieser Wert wird nicht zum Chat hinzugefügt.",
@@ -548,6 +547,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "Agent stoppen und nächste Nachricht in der Warteschlange jetzt senden",
   "mobile.chat.queue.deleteNext": "Nächste Nachricht in der Warteschlange löschen",
   "mobile.chat.queue.moveFirst": "An erste Stelle verschieben",
+  "mobile.chat.queue.runInNewThread": "In neuem Thread ausführen",
+  "mobile.chat.queue.runNextInNewThread": "Nächste Nachricht in der Warteschlange in neuem Thread ausführen",
   "mobile.chat.queue.deleteTitle": "Nachricht aus der Warteschlange löschen?",
   "mobile.chat.queue.deleteMessage": "Der Agent erhält sie nie.",
   "mobile.chat.queue.keep": "Behalten",

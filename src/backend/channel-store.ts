@@ -378,6 +378,10 @@ export class ChannelStore {
    * reads has to name the cause as well. The same reason keeps this to one query: reaching a
    * channel through `list` parses every stored message of every channel. States are tried in the
    * order given, so a running assignment is reported before one that is only queued.
+   *
+   * A deleted (archived) channel is never the cause the user reads. Its stopped turn can hold the
+   * agent until the provider ends it, but that channel shows no work, so the scheduler alone counts
+   * that hold (#10472).
    */
   agentAssignment(
     agentId: string,
@@ -394,6 +398,7 @@ export class ChannelStore {
              JOIN projection_channels AS channels ON channels.channel_id = assignments.channel_id
             WHERE json_extract(assignments.assignment_json, '$.agentId') = ?
               AND json_extract(assignments.assignment_json, '$.state') IN (${placeholders})
+              AND COALESCE(json_extract(channels.channel_json, '$.archived'), 0) = 0
             ORDER BY CASE json_extract(assignments.assignment_json, '$.state') ${ranking} END,
                      assignments.rowid
             LIMIT 1`,

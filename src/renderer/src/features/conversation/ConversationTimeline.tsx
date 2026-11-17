@@ -1790,10 +1790,13 @@ export function ConversationTimeline() {
             </Show>
             {/* Under an open side thread, the thread draws the card of its own question. */}
             <Show when={!sideThreadOpen()}>
-              <ConversationQuestionPrompt
-                elementRef={setRequiredInteractionElement}
-                registerComposerAnswer={registerPromptComposerAnswer}
-              />
+              {/* A channel shows agent faces, so the card starts after their column, as their bubbles do. */}
+              <div class={{ "question-prompt-with-author": Boolean(channel) }}>
+                <ConversationQuestionPrompt
+                  elementRef={setRequiredInteractionElement}
+                  registerComposerAnswer={registerPromptComposerAnswer}
+                />
+              </div>
             </Show>
             <Show keyed when={props.approval ?? heldFeedback()}>
               {(approval) => (

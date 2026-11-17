@@ -29,4 +29,6 @@ export const messages = {
     "Claude respondió a la velocidad estándar. El modo rápido está desactivado en los ajustes de Claude Code o por tu organización.",
   "status.provider.claudeFastModeUnavailable":
     "Claude respondió a la velocidad estándar. Claude Code no pudo usar el modo rápido en este turno.",
+  "status.provider.claudeOwnApiKey":
+    "Claude Code está configurado para usar una clave de API de Anthropic. Anthropic cobra cada solicitud al crédito de API de la clave, no a tu plan de Claude. Para usar tu plan, quita la clave de la configuración de Claude Code o de las variables de entorno y luego reinicia OpenBot.",
 } as const satisfies PartialTranslation<typeof source>;

@@ -687,14 +687,14 @@ function AuthenticatedStack() {
       <Stack.Screen name="server-workflows/github-events" options={largeTitlePage} />
       <Stack.Screen
         name="workflow-editor"
-        // One sheet for the editor: its pages are in the stack of `workflow-editor/_layout.tsx`.
+        // The editor is a page: it comes in from the right, so a wide flow and a long list have room.
+        // Its pages are in the stack of `workflow-editor/_layout.tsx`. Back, or the swipe from the
+        // edge, leaves it; its discard guard asks before it drops changes.
         options={{
           contentStyle: { backgroundColor: sheetBackground },
           headerShown: false,
           scrollEdgeEffects: { top: "hidden", bottom: "soft" },
-          presentation: "formSheet",
-          sheetAllowedDetents: [0.85],
-          sheetGrabberVisible: true,
+          presentation: "card",
         }}
       />
       <Stack.Screen name="server-usage/index" options={largeTitlePage} />

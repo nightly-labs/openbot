@@ -91,6 +91,7 @@ export const messages = {
   "marketplace.app.partialDescription":
     "一部のアプリまたはスキルがインストールされていません。再接続するとインストールされます。",
   "marketplace.app.notConnected": "未接続",
+  "marketplace.app.paused": "一時停止中",
   "marketplace.app.custom": "MCP サーバー",
   "marketplace.app.githubTagline": "リポジトリ、Issue、プルリクエスト",
   "marketplace.app.onePasswordTagline": "共有したログイン情報でサイトにサインイン",
@@ -401,7 +402,7 @@ export const messages = {
   "marketplace.plugin.obsidian.prompt.save": "この決定を保管庫に新しいノートとして保存してください。",
   "marketplace.plugin.obsidian.prompt.log": "今日の作業のまとめを「作業ログ」ノートに追加してください。",
   "marketplace.plugin.obsidian.hint.apiKey":
-    'Obsidian で Settings > Local REST API を開きます。API キーをコピーし、"Enable non-encrypted (HTTP) server" をオンにしてください。',
+    "Obsidian で Settings > Local REST API を開き、API キーをコピーしてください。",
   "marketplace.plugin.resend.tagline": "トランザクションメール",
   "marketplace.plugin.resend.description":
     "Resend を使うと、エージェントは 1 つの API でトランザクションメールを送信し、配信を確認できます。Resend ダッシュボードの API キーは、1 つの環境変数としてローカルサーバーに渡されます。",

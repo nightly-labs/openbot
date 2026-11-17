@@ -196,9 +196,7 @@ export const messages = {
   "mobile.chat.composer.cancelReply": "답장 취소",
   "mobile.chat.composer.messageAgent": "{name}에게 메시지 보내기",
   "mobile.chat.composer.pasteFailed": "붙여넣은 텍스트를 첨부할 수 없어요",
-  "mobile.chat.composer.cancelDictation": "음성 입력 취소",
   "mobile.chat.voice.listening": "듣는 중…",
-  "mobile.chat.voice.continue": "음성 입력 계속",
   "mobile.chat.liveVoice.start": "음성 대화 시작",
   "mobile.chat.liveVoice.status": "{name} · {phase}",
   "mobile.chat.liveVoice.phase.starting": "시작 중",
@@ -363,7 +361,8 @@ export const messages = {
   "mobile.chat.browserSecret.signInBlockedTitle": "내 컴퓨터에서 로그인해 주세요",
   "mobile.chat.browserSecret.signInBlockedBody":
     "이 사이트는 서버에서의 로그인을 받지 않아요. 내 컴퓨터의 OpenBot 데스크톱 앱에서 이 채팅을 열고 그곳에서 로그인해 주세요.",
-  "mobile.chat.browserSecret.takeoverReload": "그런 다음 ‘완료’를 누르기 전에 페이지를 새로 고쳐 주세요.",
+  "mobile.chat.browserSecret.takeoverReload":
+    "OpenBot이 비밀번호 또는 코드를 끝까지 입력하지 못했어요. 페이지에서 빠진 부분을 입력해 주세요. 그런 다음 ‘완료’를 누르기 전에 페이지를 새로 고쳐 주세요.",
   "mobile.chat.browserSecret.takeoverFailed": "요청을 완료할 수 없어요.",
   "mobile.chat.browserSecret.done": "완료",
   "mobile.chat.browserSecret.submitOnce": "{origin}에 한 번만 제출해요. 이 값은 채팅에 추가되지 않아요.",
@@ -526,6 +525,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "에이전트를 멈추고 다음 대기 메시지를 지금 보내기",
   "mobile.chat.queue.deleteNext": "다음 대기 메시지 삭제",
   "mobile.chat.queue.moveFirst": "맨 앞으로 이동",
+  "mobile.chat.queue.runInNewThread": "새 스레드에서 실행",
+  "mobile.chat.queue.runNextInNewThread": "대기 중인 다음 메시지를 새 스레드에서 실행",
   "mobile.chat.queue.deleteTitle": "대기 중인 메시지를 삭제할까요?",
   "mobile.chat.queue.deleteMessage": "에이전트는 이 메시지를 받지 못해요.",
   "mobile.chat.queue.keep": "유지",

@@ -21,7 +21,7 @@ import {
   type MessagingDriver,
   type MessagingDriverOptions,
   type MessagingIngress,
-  type MessagingPlace,
+  type MessagingPlaces,
   type RecentMessages,
   type StatusReaction,
   TelegramCallError,
@@ -258,8 +258,10 @@ class TelegramAdapter implements MessagingAdapter {
   }
 
   /** One connection is one chat, and Signal lets this host post only in its linked chats. */
-  places(): Effect.Effect<MessagingPlace[], MessagingAdapterError> {
-    return Effect.sync(() => [{ id: this.#chatId, name: this.#state.title || this.#chatId, kind: "chat" }]);
+  places(): Effect.Effect<MessagingPlaces, MessagingAdapterError> {
+    return Effect.sync(() => ({
+      places: [{ id: this.#chatId, name: this.#state.title || this.#chatId, kind: "chat" }],
+    }));
   }
 
   /**

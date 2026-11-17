@@ -53,7 +53,10 @@ export function pluginAppConfig(app: MobilePluginApp): McpServerConfig {
     enabled: true,
     command: app.server.transport === "stdio" ? app.server.command : "",
     args: app.server.transport === "stdio" ? [...app.server.args] : [],
-    env: [],
+    env:
+      app.server.transport === "stdio"
+        ? Object.entries(app.server.env ?? {}).map(([key, value]) => ({ key, value }))
+        : [],
     envPassthrough: [],
     workingDirectory: "",
     url: app.server.transport === "http" ? app.server.url : "",

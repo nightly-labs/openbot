@@ -518,6 +518,11 @@ export function createServerConversationState() {
   const [markingRead, setMarkingRead] = createSignal(false);
   const [dropActive, setDropActive] = createSignal(false);
   const [rightPanels, setRightPanels] = createSignal<Record<string, RightPanelMode>>({});
+  // A chat window asked the main window to show the page of a browser takeover. The agent's view opens it.
+  const [browserTakeoverPageRequest, setBrowserTakeoverPageRequest] = createSignal<{
+    agentId: string;
+    tabId: string;
+  } | null>(null);
   const [sidePanels, setSidePanels] = createStore<SidePanelsState>({ side: {}, subagents: {}, threads: {} });
   // True when the user left the side panel open. Another agent or channel opens with the panel in the same state.
   const [sidePanelShown, setSidePanelShown] = createSignal(false);
@@ -567,6 +572,8 @@ export function createServerConversationState() {
     setDropActive,
     rightPanels,
     setRightPanels,
+    browserTakeoverPageRequest,
+    setBrowserTakeoverPageRequest,
     sidePanels,
     setSidePanels,
     sidePanelShown,

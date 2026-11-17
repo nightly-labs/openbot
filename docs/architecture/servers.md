@@ -585,6 +585,15 @@ the item and the last four digits of a card; it never holds a secret value. The 
 Vault card with it and answers through the released prompt route. A client without it gets the form
 as questions. The desktop transports do not copy it yet.
 
+`ui-block-preview-edit-v1` (`team-protocol/ui-block-preview-edit-v1.ts`, protocol 9 only) adds
+nothing to the wire of a block. A host with it reads one more key, `_preview`
+(`UI_CONFIRM_PREVIEW_ANSWER_ID`), beside the answers of a confirm that has a preview: the text that
+the person edited in the card after they pressed the `edit_preview` button. The host gives the text
+to the agent as `preview` and stores it as the block's preview and in its fallback question and text,
+so the closed card shows what the agent got; the stored resolution leaves the key out. A host without it refuses the key, so the desktop, the
+web client and the mobile app open the editor only on a host that advertises it. Elsewhere the
+`edit_preview` button answers as any other button, and the agent asks what to change.
+
 ### Subagents
 
 `subagents-v1` carries the subagents that an agent started in one turn (see
@@ -1437,8 +1446,9 @@ creates them and the Customer Portal settings.
     with the customer, the subscription and the two countries.
   - A customer with no country (a client from before this step) gets a Checkout with Stripe Tax
     (`automatic_tax`, tax ID collection) and no VAT metadata, as before. With the Worker setting
-    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Turn the
-    setting on after the desktop release and the live run of `scripts/stripe-vat-migrate.ts`. Checkout requires the billing address; when its country differs from the saved
+    `BILLING_COUNTRY_REQUIRED=true` it gets 409 `billing_country_required` and must update. Production
+    sets it in `wrangler.jsonc` since desktop 0.72.0; run `scripts/stripe-vat-migrate.ts` once more
+    after the deploy, for plans that older clients bought with Stripe Tax before it. Checkout requires the billing address; when its country differs from the saved
     one, the webhook writes a log line and sends a [pool alert](../hosted-servers.md#pool-alerts)
     with the Checkout session ID and the two countries.
   - Consumers in other EU countries pay Polish VAT only below the EU limit of EUR 10,000 a year.

@@ -12,6 +12,9 @@ export const messages = {
     "{provider} ha perso l’accesso, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} ha rifiutato un messaggio, quindi OpenBot ha terminato il suo processo. Invia di nuovo il messaggio.",
+  "error.provider.acpServerLost": "{provider} ha perso la connessione. Invia di nuovo il messaggio.",
+  "error.provider.acpServerLostEnded":
+    "{provider} ha perso la connessione, quindi OpenBot ha terminato il suo processo.",
   "error.provider.acpSettingsTimedOut": "{provider} non ha risposto in tempo. Riprova tra un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} segnala che il tuo piano è esaurito. Scegli un altro modello o passa a un piano {provider} superiore.",
@@ -242,6 +245,8 @@ export const messages = {
     "I modelli gratuiti di OpenCode hanno raggiunto il limite di utilizzo. Tutti i modelli gratuiti condividono questo limite. Per continuare, incolla una chiave OpenCode Go nelle impostazioni di OpenCode, oppure scegli un modello di un altro provider.",
   "error.provider.opencodeProviderFailed":
     "Il provider del modello è andato in errore dal suo lato. La tua connessione non c'entra. Riprova più tardi o scegli un altro modello.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Questo modello non è disponibile per te. Scegli un altro modello per questo agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La risposta del modello si è interrotta o non era valida. Invia di nuovo il messaggio o scegli un altro modello.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -345,6 +350,8 @@ export const messages = {
     "Hermes non è riuscito a completare questo turno. Se la risposta indica un motivo, segui le sue indicazioni. Altrimenti un server MCP di questo agente potrebbe non essere disponibile: controllalo in Marketplace, App, poi invia di nuovo il messaggio.",
   "error.provider.hermesRefused":
     "Hermes ha rifiutato questo messaggio prima di iniziare. Invialo di nuovo. Se Hermes rifiuta ogni messaggio, riavvia OpenBot sul computer che esegue questo agente.",
+  "error.provider.hermesConnectionLost":
+    "Hermes ha perso la connessione durante questo messaggio, quindi non sa se il lavoro è finito. Controlla cosa ha fatto l'agente prima di inviare di nuovo il messaggio.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot non ha potuto usare questo modello: il modello non ha accettato la sua impostazione di ragionamento. Seleziona un altro modello per questo agente, poi invia di nuovo il messaggio.",
   "error.provider.usageLimitReached": "L'account ha raggiunto il limite di utilizzo.",

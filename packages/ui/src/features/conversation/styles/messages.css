@@ -19,7 +19,8 @@
    little shorter than a one-line bubble, so it reads at the size of the sidebar faces. */
 .message-entry-with-author,
 .message-author-gutter,
-.chat-visual-with-author {
+.chat-visual-with-author,
+.question-prompt-with-author {
   --message-author-face-size: var(--openbot-space-8);
   --message-author-column: calc(var(--message-author-face-size) + var(--openbot-space-1));
 }

@@ -346,6 +346,7 @@ import type {
   UpdateCustomProviderInput,
 } from "./ipc-custom-providers";
 import type {
+  BrowserTakeoverPage,
   DynamicIslandAction,
   DynamicIslandGeometry,
   DynamicIslandPreference,
@@ -1060,6 +1061,8 @@ export const IPC_ENDPOINTS = {
     performAction: request<DynamicIslandAction, void>()("dynamic-island:perform-action"),
     performHaptic: request<undefined, void>()("dynamic-island:perform-haptic"),
     action: event<DynamicIslandAction>()("dynamic-island:action"),
+    /** Only a chat window: it has no browser, so main brings up the main window on the takeover page. */
+    openBrowserTakeover: request<BrowserTakeoverPage, void>()("dynamic-island:open-browser-takeover"),
     setInteractive: request<SetDynamicIslandInteractiveInput, void>()("dynamic-island:set-interactive"),
     /** X11: the parts of the island window that take the pointer and show, as for the agent dock. */
     setInputRegion: request<AgentDockInputRect[], void>()("dynamic-island:set-input-region"),

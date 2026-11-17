@@ -36,7 +36,9 @@ import {
 import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  Extrapolation,
   FadeInDown,
+  interpolate,
   Keyframe,
   ReduceMotion,
   type SharedValue,
@@ -84,6 +86,7 @@ import {
 } from "@/features/chat/model/chat-messages";
 import type { TurnStepsSummary } from "@/features/chat/model/turn-thinking";
 import { readableOn } from "@/features/onboarding/model/onboarding-colors";
+import { useChatRowShown, useThinkingDisplayPreference } from "@/features/settings/model/chat-details";
 import { useMessageColor } from "@/features/settings/model/message-color";
 import { useRoutineCollapsePreference } from "@/features/settings/model/routine-collapse";
 import { stopReadAloud } from "@/features/voice/model/message-reading";
@@ -102,6 +105,7 @@ import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
+import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
@@ -113,7 +117,14 @@ import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } fro
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
-import { type ChatSwipeGesture, ChatSwipeGestureContext } from "./chat-swipe-gesture";
+import {
+  type ChatSwipeGesture,
+  ChatSwipeGestureContext,
+  type ChatTimeReveal,
+  ChatTimeRevealContext,
+  ChatTimesMountedContext,
+  MESSAGE_TIME_WIDTH,
+} from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
 import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
@@ -855,9 +866,9 @@ const MessageRow = memo(function MessageRow({
   );
   const rendered =
     message.kind === "routine" ? (
-      <RoutineMarkerRow key={message.id} message={message} muted={muted} />
+      <RoutineMarkerRow key={message.id} message={message} />
     ) : message.kind === "routine-run-group" ? (
-      <RoutineRunGroupRow key={message.id} group={message} muted={muted} />
+      <RoutineRunGroupRow key={message.id} group={message} />
     ) : message.kind === "context-reset" ? (
       <ContextResetMarkerRow key={message.id} muted={muted} />
     ) : message.kind === "app-suggestion" ? (
@@ -1169,18 +1180,99 @@ function FocusHighlight({ rowId, color, shown }: { rowId: string; color: string;
 
 const RowContext = createContext<RowContextValue | null>(null);
 
+const MESSAGE_TIME = { hour: "numeric", minute: "2-digit" } as const;
+
+/**
+ * The time of a message, at the middle height of the message, so each time is level with its own
+ * bubble. It comes in from past the end of the chat with the swipe, fading in, and stops at the end
+ * of the screen once it is in; the bubbles can move on past that. A screen reader reads the time in
+ * the actions sheet.
+ */
+function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const mounted = useContext(ChatTimesMountedContext);
+  return mounted ? <MessageTimeLabel createdAt={createdAt} reveal={reveal} /> : null;
+}
+
+function MessageTimeLabel({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const { format } = useText();
+  const label = useMemo(() => {
+    const at = messageTime(createdAt);
+    return Number.isNaN(at) ? null : format.date(new Date(at), MESSAGE_TIME);
+  }, [createdAt, format]);
+  const style = useAnimatedStyle(() => {
+    const distance = reveal.get();
+    return {
+      opacity: interpolate(distance, [MESSAGE_TIME_WIDTH * 0.25, MESSAGE_TIME_WIDTH], [0, 1], Extrapolation.CLAMP),
+      transform: [{ translateX: Math.max(0, MESSAGE_TIME_WIDTH - distance) * END_X }],
+    };
+  });
+  if (!label) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="absolute top-0 bottom-0 items-end justify-center"
+      // The time ends 12 pt before the edge of the screen, inside the side padding of the list.
+      style={[{ end: -(LIST_PADDING - 12), width: MESSAGE_TIME_WIDTH }, style]}
+    >
+      <Typography.Paragraph type="body-xs" numberOfLines={1} className="text-muted">
+        {label}
+      </Typography.Paragraph>
+    </Animated.View>
+  );
+}
+
+/**
+ * A message bubble and its time. Only the bubble moves with the swipe that shows the times: the day
+ * label, the steps row, markers and dividers of the chat stay in place.
+ */
+function MessageWithTime({
+  createdAt,
+  reveal,
+  children,
+}: PropsWithChildren<{ createdAt: string | undefined; reveal: SharedValue<number> }>) {
+  const moved = useAnimatedStyle(() => ({ transform: [{ translateX: -reveal.get() * END_X }] }));
+  return (
+    <View>
+      <Animated.View style={moved}>{children}</Animated.View>
+      {createdAt ? <MessageTime createdAt={createdAt} reveal={reveal} /> : null}
+    </View>
+  );
+}
+
 /**
  * `item` is the row as the list holds it. The list keeps its rows while only their content changes
  * (see `useListRows`), so the row reads its message from the context.
  */
 function ChatRow({ item }: { item: VisibleMessage }) {
   const row = useContext(RowContext);
+  const timeReveal = useContext(ChatTimeRevealContext);
   if (!row) return null;
   const message = row.rowsById.get(item.id) ?? item;
   const response = row.responseIds.has(message.id);
   const turn = row.turnSummaries?.get(message.id);
   const openTurn = row.onOpenTurn;
   const day = row.dayLabels.get(message.id);
+  const messageRow =
+    message.kind === "thinking" ? null : (
+      <MessageRow
+        message={message}
+        isFirstUser={message.id === row.firstUserId}
+        source={
+          message.kind === "message" && message.replyToMessageId
+            ? row.messagesById.get(message.replyToMessageId)
+            : undefined
+        }
+        questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+        upload={row.upload?.messageId === message.id ? row.upload : undefined}
+        outbox={row.outboxStatuses?.get(message.id)}
+        selecting={message.id === row.selectingMessageId}
+        arriving={row.arrivals.has(message.id)}
+        revealed={row.revealedIds.has(message.id)}
+        shared={row.shared}
+      />
+    );
   return (
     <Animated.View
       style={[ROW_STYLE, response ? row.responseStyle : undefined]}
@@ -1205,23 +1297,12 @@ function ChatRow({ item }: { item: VisibleMessage }) {
           onPress={openTurn ? () => openTurn(turn.turnId) : undefined}
         />
       ) : null}
-      {message.kind === "thinking" ? null : (
-        <MessageRow
-          message={message}
-          isFirstUser={message.id === row.firstUserId}
-          source={
-            message.kind === "message" && message.replyToMessageId
-              ? row.messagesById.get(message.replyToMessageId)
-              : undefined
-          }
-          questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-          upload={row.upload?.messageId === message.id ? row.upload : undefined}
-          outbox={row.outboxStatuses?.get(message.id)}
-          selecting={message.id === row.selectingMessageId}
-          arriving={row.arrivals.has(message.id)}
-          revealed={row.revealedIds.has(message.id)}
-          shared={row.shared}
-        />
+      {message.kind === "message" && timeReveal ? (
+        <MessageWithTime createdAt={message.createdAt} reveal={timeReveal.offset}>
+          {messageRow}
+        </MessageWithTime>
+      ) : (
+        messageRow
       )}
       {row.branchDivider?.rowId === message.id ? (
         <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
@@ -1429,6 +1510,13 @@ export const ChatMessageList = memo(function ChatMessageList({
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
+  // How far the bubbles move to show the message times. A swipe on a message bubble sets it.
+  const timeOffset = useSharedValue(0);
+  const [timesMounted, setTimesMounted] = useState(false);
+  const timeReveal = useMemo<ChatTimeReveal>(
+    () => ({ offset: timeOffset, mount: () => setTimesMounted(true) }),
+    [timeOffset],
+  );
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
@@ -1533,11 +1621,18 @@ export const ChatMessageList = memo(function ChatMessageList({
     return { backgroundColor: `rgb(${r}, ${g}, ${b})` };
   });
 
+  const rowShown = useChatRowShown(turnSummaries);
   const visibleMessages = useMemo(
     () =>
       groupRoutineRunMarkers(
         groupExchangeMarkers(
-          messages.filter((message) => message.kind !== "thinking" || turnSummaries?.has(message.id)),
+          // The row that the chat opens at and the row before a branch line stay, also when a
+          // setting hides their kind.
+          messages.filter(
+            (message) =>
+              rowShown(message) ||
+              (message.kind !== "thinking" && (message.id === focusMessageId || message.id === branchDivider?.afterId)),
+          ),
         ),
         {
           unreadMessageIds: unreadLineMessageIds,
@@ -1546,7 +1641,7 @@ export const ChatMessageList = memo(function ChatMessageList({
           branchRowId: branchDivider?.afterId,
         },
       ),
-    [messages, turnSummaries, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
+    [messages, rowShown, unreadLineMessageIds, focusMessageId, focusUnread, branchDivider?.afterId],
   );
   // One pass over the loaded rows when they change; the rows read their label from the context.
   const dayLabels = useMemo(
@@ -1896,6 +1991,7 @@ export const ChatMessageList = memo(function ChatMessageList({
       highlightColor,
     ],
   );
+  const showThinking = useThinkingDisplayPreference((state) => state.enabled);
   const activitySpec = (activity?: MobileAgentActivity): ChatActivitySpec | null => {
     const latestThinking = messages.findLast(
       (message) => message.kind === "thinking" && message.turnId === (activity?.turnId ?? activeTurnId),
@@ -1909,7 +2005,9 @@ export const ChatMessageList = memo(function ChatMessageList({
         (!activity?.agentId || !message.speaker || message.speaker.id === activity.agentId),
     );
     // One run of text, as desktop shows it: the row clamps the label, and blank lines would fill it.
-    const latestStep = !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
+    // With the thinking display off, the row says only that the agent thinks.
+    const latestStep =
+      showThinking && !replying && latestThinking?.kind === "thinking" ? latestThinking.steps.at(-1) : undefined;
     // A progress update shows as a message, so the row does not say it again.
     const thinkingDetail = latestStep && !latestStep.progress ? latestStep.text.replace(/\s+/gu, " ").trim() : null;
     const activityLabel =
@@ -2169,9 +2267,13 @@ export const ChatMessageList = memo(function ChatMessageList({
               <KeptOpenContext value={replySession.keptOpen}>
                 <RowContext value={rowContext}>
                   <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                    <ListHeaderContext value={listHeader}>
-                      <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                    </ListHeaderContext>
+                    <ChatTimeRevealContext value={timeReveal}>
+                      <ChatTimesMountedContext value={timesMounted}>
+                        <ListHeaderContext value={listHeader}>
+                          <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                        </ListHeaderContext>
+                      </ChatTimesMountedContext>
+                    </ChatTimeRevealContext>
                   </ChatSwipeGestureContext>
                 </RowContext>
               </KeptOpenContext>

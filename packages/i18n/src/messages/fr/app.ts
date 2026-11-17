@@ -112,6 +112,7 @@ export const messages = {
   "app.settingsPage.searchPlaceholder": "Rechercher dans les réglages…",
   "app.settingsPage.results": "Résultats de recherche des réglages",
   "app.settingsPage.noResults": "Aucun réglage correspondant.",
+  "app.settingsPage.marketplaceApps": "Connecteurs et serveurs MCP",
   "app.settingsPage.resultCount": {
     one: "{count} réglage correspondant.",
     other: "{count} réglages correspondants.",

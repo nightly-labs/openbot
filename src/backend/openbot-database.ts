@@ -18,7 +18,7 @@ import { type AgentModelChange, AgentRoster } from "./database/agent-roster";
 import { AgentUsage } from "./database/agent-usage";
 import { type ConversationMarkerExclusions, ConversationQueries } from "./database/conversation-queries";
 import { ConversationWriter } from "./database/conversation-writer";
-import { DatabaseCore, type OrchestrationEventInput } from "./database/database-core";
+import { DatabaseCore, type DatabaseCoreOptions, type OrchestrationEventInput } from "./database/database-core";
 import { deletedThreadMessageIds, threadMessageIds } from "./database/deleted-thread-messages";
 import {
   type ActiveHostedSiteConversationEvent,
@@ -93,8 +93,11 @@ export class OpenBotDatabase {
   readonly #providerHistory: ProviderHistoryStore;
   readonly #summaries: ThreadSummaries;
 
-  constructor(readonly userDataPath: string) {
-    this.#core = new DatabaseCore({ userDataPath });
+  constructor(
+    readonly userDataPath: string,
+    checkIntegrity?: DatabaseCoreOptions["checkIntegrity"],
+  ) {
+    this.#core = new DatabaseCore({ userDataPath, checkIntegrity });
     this.usage = new AgentUsage(this.#core);
     this.#conversations = new ConversationQueries({ core: this.#core });
     this.#roster = new AgentRoster({ core: this.#core });

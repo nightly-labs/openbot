@@ -253,7 +253,7 @@ interface BrowserTakeoverCardProps {
   preview: BrowserPreview | null;
   previewStatus: "idle" | "loading" | "ready" | "failed";
   decision?: "complete" | "cancel" | null;
-  onOpen?: () => void;
+  onOpen?: (() => void) | undefined;
   onComplete: () => Promise<boolean>;
   onCancel: () => Promise<boolean>;
   /** A sign-in on this computer for the tab, when the page refuses a sign-in from the server. */

@@ -12,6 +12,8 @@ export const messages = {
     "{provider} perdió su inicio de sesión, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
   "error.provider.acpRefusedUntilRestart":
     "{provider} rechazó un mensaje, así que OpenBot terminó su proceso. Envía tu mensaje de nuevo.",
+  "error.provider.acpServerLost": "{provider} perdió su conexión. Envía tu mensaje de nuevo.",
+  "error.provider.acpServerLostEnded": "{provider} perdió su conexión, así que OpenBot terminó su proceso.",
   "error.provider.acpSettingsTimedOut": "{provider} no respondió a tiempo. Vuelve a intentarlo en un momento.",
   "error.provider.acpPlanUsedUp":
     "{provider} indica que tu plan está agotado. Elige otro modelo o mejora tu plan de {provider}.",
@@ -247,6 +249,8 @@ export const messages = {
     "Los modelos gratuitos de OpenCode alcanzaron su límite de uso. Todos los modelos gratuitos comparten este límite. Para continuar, pega una clave de OpenCode Go en los ajustes de OpenCode o elige un modelo de otro proveedor.",
   "error.provider.opencodeProviderFailed":
     "El proveedor del modelo tuvo un fallo interno. Tu conexión no es la causa. Inténtalo más tarde o elige otro modelo.\n{detail}",
+  "error.provider.opencodeModelUnavailable":
+    "Este modelo no está disponible para ti. Elige otro modelo para este agente.\n{detail}",
   "error.provider.opencodeIncompleteReply":
     "La respuesta del modelo se cortó o no era válida. Envía tu mensaje de nuevo o elige otro modelo.\n{detail}",
   "error.provider.opencodeReasoningOverlap":
@@ -349,6 +353,8 @@ export const messages = {
     "Hermes no pudo terminar este turno. Si su respuesta da un motivo, haz lo que indica. Si no, puede que un servidor MCP de este agente no esté disponible: revísalo en Marketplace, Apps, y vuelve a enviar tu mensaje.",
   "error.provider.hermesRefused":
     "Hermes rechazó este mensaje antes de empezar. Envíalo de nuevo. Si Hermes rechaza cada mensaje, reinicia OpenBot en el ordenador que ejecuta este agente.",
+  "error.provider.hermesConnectionLost":
+    "Hermes perdió su conexión durante este mensaje, así que no sabe si el trabajo terminó. Revisa lo que hizo el agente antes de enviar el mensaje de nuevo.",
   "error.provider.copilotThinkingRejected":
     "GitHub Copilot no pudo usar este modelo: el modelo no aceptó su ajuste de razonamiento. Selecciona otro modelo para este agente y envía tu mensaje de nuevo.",
   "error.provider.usageLimitReached": "La cuenta alcanzó su límite de uso.",
