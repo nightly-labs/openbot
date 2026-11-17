@@ -338,6 +338,35 @@ function redactFailure(failure: AgentDatabaseFailure, databasePath: string): Age
   return { ...failure, message: failure.message.replaceAll(databasePath, basename(databasePath)) };
 }
 
+/**
+ * Runs `PRAGMA quick_check(20)` on `openbot.db` and returns one row for each line that it reports.
+ * The connection is its own and has no authorizer: the statement is fixed and the main process gives
+ * the path. The main process keeps its own connection open during the check, so this close is not the
+ * last one and does not checkpoint or remove the write-ahead log.
+ */
+function checkIntegrity(databasePath: string): Effect.Effect<AgentDatabaseRows, HostFailure> {
+  return Effect.try({
+    try: () => {
+      const database = new DatabaseSync(databasePath);
+      try {
+        const rows = database
+          .prepare("PRAGMA quick_check(20)")
+          .all()
+          .map((row): AgentDatabaseValue[] => [String(row.quick_check)]);
+        return { columns: ["quick_check"], rows, truncated: false, changes: 0, lastInsertRowid: null };
+      } finally {
+        database.close();
+      }
+    },
+    catch: (error) => {
+      const message = error instanceof Error ? error.message : String(error);
+      const code =
+        typeof error === "object" && error !== null && "errcode" in error ? Number(error.errcode) : undefined;
+      return new HostFailure("sqlite", message.replaceAll(databasePath, basename(databasePath)), code);
+    },
+  });
+}
+
 function databaseCall<A>(request: AgentDatabaseStatement, operation: () => A): Effect.Effect<A, HostFailure> {
   return Effect.try({
     try: operation,
@@ -407,6 +436,7 @@ class AgentDatabaseHost extends Context.Service<
           yield* Effect.sync(() => closePath(request.databasePath));
           return { columns: [], rows: [], truncated: false, changes: 0, lastInsertRowid: null };
         }
+        if (request.kind === "integrity-check") return yield* checkIntegrity(request.databasePath);
         // These Effects are synchronous. Do not yield asynchronous work while authorizer state is set.
         return yield* Effect.acquireUseRelease(
           Effect.sync(() => {

@@ -51,7 +51,18 @@ interface AgentDatabaseClose {
   databasePath: string;
 }
 
-export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose;
+/**
+ * `PRAGMA quick_check` of `openbot.db` after a stop that did not close it. The check reads every page,
+ * minutes on a large file, so the main process asks a host of its own for it. Only the main process
+ * sends it; no agent request can carry it.
+ */
+export interface AgentDatabaseIntegrityCheck {
+  kind: "integrity-check";
+  id: number;
+  databasePath: string;
+}
+
+export type AgentDatabaseRequest = AgentDatabaseStatement | AgentDatabaseClose | AgentDatabaseIntegrityCheck;
 
 /**
  * A request before the supervisor numbers it. Spelled as a union of two `Omit`s rather than

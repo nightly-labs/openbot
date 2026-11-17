@@ -1280,10 +1280,16 @@ function readOldForeignKeyViolations(db: DatabaseSync): Map<string, number> {
 }
 
 function assertQuickCheck(db: DatabaseSync): void {
-  const problems = db
-    .prepare("PRAGMA quick_check(20)")
-    .all()
-    .map((row) => (isDynamicRecord(row) ? row.quick_check : row));
+  assertQuickCheckResult(
+    db
+      .prepare("PRAGMA quick_check(20)")
+      .all()
+      .map((row) => (isDynamicRecord(row) ? row.quick_check : row)),
+  );
+}
+
+/** Throws the integrity error unless the lines of a `PRAGMA quick_check` are the one line "ok". */
+export function assertQuickCheckResult(problems: readonly unknown[]): void {
   if (problems.length === 1 && problems[0] === "ok") return;
   // The lines name the damaged pages and tables, which tell a page left by a disk save from a bad index.
   logger.error("The OpenBot database failed its integrity check.", { problems });
