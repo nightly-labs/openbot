@@ -769,13 +769,15 @@ export const OPENBOT_TOOL_DEFINITIONS: readonly OpenBotToolDefinition[] = [
   {
     name: "show_setting",
     description:
-      "When the user asks how to do something in OpenBot or asks for a feature, find the setting that does it and show a card in the chat that opens it: a row of OpenBot Settings, or of your own agent settings. Only the user changes it. Words return the matching settings; then call again with one id.",
+      "When the user asks how to do something in OpenBot or asks for a feature, find the setting that does it and show a card in the chat that opens it: a row of OpenBot Settings, or of your own agent settings. It also finds server actions with no card, such as removing the server of an old computer. Only the user changes it. Words return the matching settings; then call again with one id.",
     shape: {
       setting: z
         .string()
         .min(1)
         .max(200)
-        .describe("A setting id from an earlier result, or a few words for the feature, such as dark mode or speech."),
+        .describe(
+          "A setting id from an earlier result, or a few English words for the feature, such as dark mode or speech.",
+        ),
     },
   },
   {
