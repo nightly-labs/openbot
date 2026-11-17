@@ -587,6 +587,7 @@ export type ExternalDestination =
   | "agent-setup"
   | "claude-install"
   | "hermes-install"
+  | "kiro-install"
   | "feedback"
   // The GitHub bug report form, from the Help menu, with the version and the system filled in.
   | "report-problem"

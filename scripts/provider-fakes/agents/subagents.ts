@@ -7,6 +7,9 @@
 //   while it runs, and its result at the end.
 // - `cline` (Cline 3.0.68): a `spawn_agent: <task>` tool call with `rawInput` `{ systemPrompt, task }`.
 // - `hermes`: a `delegate_task: <goal>` tool call with no `rawInput`.
+// - `kiro` (Kiro CLI 2.37.1, engine V2): a "Spawning agent crew" call in the parent session, the roster of the
+//   process in `_kiro.dev/subagent/list_update` (no parent session in it), and the work of each subagent as
+//   updates of its own session.
 // The prompt `work` starts the foreground subagents; `background` starts one that runs on after the turn,
 // for `FAKE_BACKGROUND_MS` (200 by default).
 import type { SessionUpdate } from "@agentclientprotocol/sdk";
@@ -286,6 +289,81 @@ function clineWork(peer: AcpPeer, root: string): void {
   });
 }
 
+/** One entry of the Kiro roster, as a real run sent it. */
+function kiroEntry(id: string, type: "working" | "terminated", query: string) {
+  return {
+    sessionId: id,
+    sessionName: id,
+    agentName: "worker-lite",
+    initialQuery: query,
+    status: type === "working" ? { type, message: "Running" } : { type },
+    group: "crew-test",
+    role: "worker-lite",
+    dependsOn: [],
+    hasLoop: false,
+    loopIteration: 0,
+    loopMaxIterations: 0,
+    createdAtMs: 1,
+  };
+}
+
+function kiroWork(peer: AcpPeer, root: string): void {
+  const first = `${root}_sub1`;
+  const second = `${root}_sub2`;
+  peer.update(root, {
+    sessionUpdate: "tool_call",
+    toolCallId: "crew_1",
+    title: "Spawning agent crew",
+    kind: "other",
+    status: "in_progress",
+  });
+  notify("_kiro.dev/subagent/list_update", {
+    subagents: [kiroEntry(first, "working", "Find the tests.\nList the files.")],
+    pendingStages: [],
+  });
+  notify("_kiro.dev/subagent/list_update", {
+    subagents: [
+      kiroEntry(first, "working", "Find the tests.\nList the files."),
+      kiroEntry(second, "working", "Fix it."),
+    ],
+    pendingStages: [],
+  });
+  kiroMetadata(root, 1.5);
+  kiroMetadata(`${root}_other`, 80);
+  kiroMetadata(root, 2.5);
+  // The work of a subagent is in the updates of its own session.
+  peer.update(first, {
+    sessionUpdate: "tool_call",
+    toolCallId: "call_find",
+    title: "Searching tests",
+    kind: "search",
+    status: "in_progress",
+    rawInput: { pattern: "*.test.ts" },
+  });
+  peer.update(first, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "12 test files." } });
+  notify("_kiro.dev/subagent/list_update", {
+    subagents: [
+      kiroEntry(first, "terminated", "Find the tests.\nList the files."),
+      kiroEntry(second, "working", "Fix it."),
+    ],
+    pendingStages: [],
+  });
+  // Kiro takes a terminated subagent off the roster, and the second one with it.
+  notify("_kiro.dev/subagent/list_update", { subagents: [], pendingStages: [] });
+}
+
+/**
+ * `_kiro.dev/metadata` of Kiro CLI 2.37.1: the context fill of a session as a percentage, sent while a turn
+ * runs and again at its end, also for the session of a subagent that the client does not know.
+ */
+function kiroMetadata(sessionId: string, percent: number) {
+  notify("_kiro.dev/metadata", {
+    sessionId,
+    contextUsagePercentage: percent,
+    reasoning: { support: "unavailable", effortLevels: ["low", "high"] },
+  });
+}
+
 function hermesWork(peer: AcpPeer, root: string): void {
   peer.update(root, {
     sessionUpdate: "tool_call",
@@ -328,7 +406,10 @@ serveFakeAcpAgent(
       count += 1;
       peer.reply(request, {
         sessionId: `ses_${process.pid}_${count}`,
-        models: { availableModels: [{ modelId: MODEL, name: "Fake" }], currentModelId: MODEL },
+        models: {
+          availableModels: [{ modelId: MODEL, name: "Fake", description: "A fake model with 1M context window" }],
+          currentModelId: MODEL,
+        },
       });
     },
     "session/prompt": (request, peer) => {
@@ -347,6 +428,7 @@ serveFakeAcpAgent(
       else if (STYLE === "kimi") kimiWork(peer, root);
       else if (STYLE === "cline") clineWork(peer, root);
       else if (STYLE === "hermes") hermesWork(peer, root);
+      else if (STYLE === "kiro") kiroWork(peer, root);
       peer.say(root, "Done.");
       reply();
     },

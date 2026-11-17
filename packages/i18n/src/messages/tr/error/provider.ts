@@ -341,6 +341,11 @@ export const messages = {
     "GitHub Copilot'ı kullanmak için GitHub ile oturum açın veya COPILOT_GITHUB_TOKEN ayarlayın.",
   "error.provider.mistralSignIn":
     "Mistral'ı kullanmak için Mistral ile oturum açın veya MISTRAL_API_KEY değişkenini ayarlayın.",
+  "error.provider.kiroMissing": "Kiro CLI yüklü değil. Yükleyip tekrar deneyin.",
+  "error.provider.kiroNotStarted": "Kiro CLI başlatılamadı. Bir terminalde `kiro-cli --version` komutunu çalıştırın.",
+  "error.provider.kiroVersionUnreadable": "Kiro CLI sürümü okunamıyor.",
+  "error.provider.kiroSignIn":
+    "Kiro'yu kullanmak için bir terminalde `kiro-cli login` komutunu çalıştırın, sonra yeniden bağlanın.",
   "error.provider.hermesMissing": "Hermes Agent yüklü değil. Yükleyin ve yeniden deneyin.",
   "error.provider.hermesNotStarted":
     "Hermes Agent başlatılamadı. Bir terminalde `hermes --version` komutunu çalıştırın.",

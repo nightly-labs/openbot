@@ -327,6 +327,21 @@ export interface AcpFlavor {
    */
   modelRetryUpdate?: (update: SessionUpdate) => boolean;
   /**
+   * The agent sends the roster of its subagents as an extension notification (`method`, with no leading
+   * underscore), and the work of each subagent as session updates of the subagent's own session.
+   * `tools` are the names that the parent's tool call that starts them can have, as its start (case
+   * ignored). The notification names no parent session, so a roster belongs to the one running turn,
+   * or else to the turn whose call of one of the `tools` was newest.
+   */
+  subagentRoster?: { readonly method: string; readonly tools: readonly string[] };
+  /**
+   * The agent reports how full a session's context is as a percentage, in an extension notification
+   * (`method`, with no leading underscore) with `sessionId` and `contextUsagePercentage`. `window` reads the
+   * size in tokens from the description of the session's model, or gives null: the percentage then shows
+   * nothing, because OpenBot does not guess a size.
+   */
+  contextPercentNotice?: { readonly method: string; window(modelDescription: string): number | null };
+  /**
    * The tools that run a subagent and send no events of it, as the tool name or `<name>: <description>`.
    * Each call shows as a subagent with its task, state, and report.
    */
@@ -862,6 +877,34 @@ export const DEVIN_ACP_FLAVOR: AcpFlavor = {
     return typeof run === "string" ? run : undefined;
   },
 };
+
+/**
+ * Kiro CLI 2.37 and later, started while the user is signed out, answers every request after
+ * `initialize` with ACP's `authRequired` error (https://kiro.dev/docs/cli/acp/). A saved sign-in that
+ * stops working, such as an expired Identity Center session, gives the same error to a new session,
+ * and the client must then report the sign-out.
+ */
+export const KIRO_ACP_FLAVOR: AcpFlavor = {
+  authRequiredSignsOut: true,
+  // Kiro CLI stops each request to an HTTP MCP server after 120 s and ignores progress, so a question card
+  // answers the call before the limit and the late answer goes to the chat. The custom agent `kiro-cli` has
+  // the same limit (#11049).
+  mcpToolCallLimitMs: 120_000,
+  // `_kiro.dev/metadata` carries `contextUsagePercentage`; the model list says "... with 1M context window".
+  contextPercentNotice: { method: "kiro.dev/metadata", window: kiroContextWindow },
+  // Kiro CLI 2.37.1 sends the roster of its subagents (`agentName`, `initialQuery`, `status.type` of
+  // `working` or `terminated`) in this notification, and a subagent's own tool calls in session updates.
+  // The parent's call is `subagent` in `_kiro.dev/session/update`, and its approval is titled "Spawning agent crew".
+  subagentRoster: { method: "kiro.dev/subagent/list_update", tools: ["subagent", "spawning agent"] },
+};
+
+/** The context size in tokens that a Kiro model description names, such as "Claude Sonnet 5.5 model with 1M context window". */
+export function kiroContextWindow(description: string): number | null {
+  const match = /\b(\d+(?:\.\d+)?)\s*([KM])\s+context window\b/iu.exec(description);
+  if (!match?.[1] || !match[2]) return null;
+  const size = Number(match[1]) * (match[2].toUpperCase() === "M" ? 1_000_000 : 1_000);
+  return Number.isFinite(size) && size > 0 ? Math.round(size) : null;
+}
 
 /**
  * Mistral Vibe 3.1.0 refuses `session/load` and `session/resume` of a session that it does not have
