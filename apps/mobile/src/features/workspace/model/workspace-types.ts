@@ -1109,6 +1109,8 @@ export interface MobileWorkspaceContextValue {
   searchFiles: (query: string, serverId: string, cursor?: string) => Promise<ConversationFileSearchPage>;
   /** True when the host advertises `agent-tasks-v1`. A member who can message an agent can use its tasks. */
   canUseTasks: (serverId: string) => boolean;
+  /** True when the host advertises `agent-queue-task-v1`: a queued message of the agent's chat can run in a new thread. */
+  canRunQueuedMessageAsTask: (serverId: string) => boolean;
   /** True when the host advertises `agent-threads-v1`: a member who can message an agent can rename and delete its threads. */
   canEditThreads: (serverId: string) => boolean;
   /** True when the host advertises `agent-thread-reads-v1`: the host keeps the person's read mark of each thread. */
@@ -1169,6 +1171,11 @@ export interface MobileWorkspaceContextValue {
     input: { agentId: string; text: string; attachmentDraftIds?: string[]; clientMessageId: string },
     serverId: string,
   ) => Promise<AgentTask>;
+  /**
+   * Moves a message that waits in the queue of the agent's own chat into a new thread, where it
+   * starts beside the chat. Needs `canRunQueuedMessageAsTask`.
+   */
+  runQueuedMessageAsTask: (input: { agentId: string; deliveryId: string }, serverId: string) => Promise<AgentTask>;
   /** Steers the running turn of the task, or queues the message in the task. */
   sendAgentTaskMessage: (
     input: AgentTaskInput & { text: string; attachmentDraftIds?: string[]; clientMessageId: string },
@@ -1293,6 +1300,7 @@ export type MobileWorkspaceCapabilityCheck =
   | "canInstallAgentTemplate"
   | "canSearchFiles"
   | "canUseTasks"
+  | "canRunQueuedMessageAsTask"
   | "canEditThreads"
   | "canReadThreads"
   | "canAttachThreadFiles"

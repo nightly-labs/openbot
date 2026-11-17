@@ -529,6 +529,8 @@ export const messages = {
   "mobile.chat.queue.sendNowNext": "エージェントを停止して、次の待機中メッセージを今すぐ送信",
   "mobile.chat.queue.deleteNext": "次の待機中メッセージを削除",
   "mobile.chat.queue.moveFirst": "先頭に移動",
+  "mobile.chat.queue.runInNewThread": "新しいスレッドで実行",
+  "mobile.chat.queue.runNextInNewThread": "次のキュー内のメッセージを新しいスレッドで実行",
   "mobile.chat.queue.deleteTitle": "キューのメッセージを削除しますか？",
   "mobile.chat.queue.deleteMessage": "エージェントはこのメッセージを受け取りません。",
   "mobile.chat.queue.keep": "残す",

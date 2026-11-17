@@ -85,6 +85,7 @@ import {
   AGENT_PLAN_CARD_ROUTES,
 } from "@openbot/contracts/team-protocol/agent-plan-card-v1";
 import { AGENT_PUBLISH_CAPABILITY } from "@openbot/contracts/team-protocol/agent-publish-v1";
+import { AGENT_QUEUE_TASK_CAPABILITY } from "@openbot/contracts/team-protocol/agent-queue-task-v1";
 import { AGENT_SESSION_SETTINGS_CAPABILITY } from "@openbot/contracts/team-protocol/agent-session-settings-v1";
 import { AGENT_SPEED_CAPABILITY, AGENT_SPEED_ROUTES } from "@openbot/contracts/team-protocol/agent-speed-v1";
 import {
@@ -345,6 +346,7 @@ import {
   readAgentMemorySelection,
   readAgentTask,
   renameAgentThread,
+  runQueuedMessageAsAgentTask,
   sendAgentTaskMessage,
   setAgentMemoryInclusion,
   setMessagePinned,
@@ -430,6 +432,7 @@ type HostRequestActions = Pick<
   | "loadAgentTasks"
   | "loadAgentTaskConversation"
   | "startAgentTask"
+  | "runQueuedMessageAsTask"
   | "sendAgentTaskMessage"
   | "controlAgentTask"
   | "renameAgentThread"
@@ -675,6 +678,9 @@ export function createHostRequestChecks(capabilities: ServerCapabilities): HostR
   return {
     canSearchFiles: (serverId) => has(serverId, CONVERSATION_FILE_SEARCH_CAPABILITY),
     canUseTasks: (serverId) => has(serverId, AGENT_TASKS_CAPABILITY),
+    // The host grants `agent-tasks-v1` with it, and the phone opens the new thread through those routes.
+    canRunQueuedMessageAsTask: (serverId) =>
+      has(serverId, AGENT_QUEUE_TASK_CAPABILITY) && has(serverId, AGENT_TASKS_CAPABILITY),
     canEditThreads: (serverId) => has(serverId, AGENT_THREADS_CAPABILITY),
     canReadThreads: (serverId) => has(serverId, AGENT_THREAD_READS_CAPABILITY),
     canAttachThreadFiles: (serverId) => has(serverId, AGENT_THREAD_FILES_CAPABILITY),
@@ -771,6 +777,9 @@ export function createHostRequestActions({
   /** The tasks are an optional route set. Any member who can message the agent can use them. */
   const tasksApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_TASKS_CAPABILITY, "mobile.server.threads.unsupported");
+  /** "Run in new thread" on a queued message is an optional route beside the tasks. */
+  const queueTaskApi = (serverId: string) =>
+    capabilityApi(serverId, AGENT_QUEUE_TASK_CAPABILITY, "mobile.server.threads.unsupported");
   /** Rename and delete of a thread are an optional route set beside the tasks. */
   const threadsApi = (serverId: string) =>
     capabilityApi(serverId, AGENT_THREADS_CAPABILITY, "mobile.chat.threads.unsupported");
@@ -1310,6 +1319,8 @@ export function createHostRequestActions({
     loadAgentTaskConversation: async (input, serverId) => runTeamRequest(readAgentTask(tasksApi(serverId), input)),
     startAgentTask: async (input, serverId) =>
       runTeamRequest(startAgentTask(threadMessageApi(serverId, input.attachmentDraftIds), input)),
+    runQueuedMessageAsTask: async (input, serverId) =>
+      runTeamRequest(runQueuedMessageAsAgentTask(queueTaskApi(serverId), input)),
     sendAgentTaskMessage: async (input, serverId) =>
       runTeamRequest(sendAgentTaskMessage(threadMessageApi(serverId, input.attachmentDraftIds), input)),
     controlAgentTask: async (action, input, serverId) =>
