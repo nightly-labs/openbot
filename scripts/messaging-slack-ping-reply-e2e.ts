@@ -10,6 +10,7 @@
 //    reaches the Orchestrator only with a mention.
 // 5. A pinged person's first reply that mentions OpenBot also gets the post as context.
 // 6. A thread reply that mentions OpenBot is left to its `app_mention` event.
+// 7. A thread reply without a mention that starts with another person's mention reaches no agent (#10669).
 // Writes .openbot-build/messaging-slack-ping-reply-e2e/report.json and exits non-zero on a failure.
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -353,6 +354,14 @@ try {
     assert.equal(event("message", PINGED, thread, `<@${BOT}> also make it bigger`), null);
     assert.ok(event("app_mention", PINGED, thread, `<@${BOT}> also make it bigger`));
     return { messageEvent: null, appMention: "kept" };
+  });
+
+  await step("a thread reply that starts with another person's mention talks to that person (#10669)", async () => {
+    assert.equal(event("message", PINGED, thread, `<@${OTHER}> what do you think?`), null);
+    assert.equal(event("message", PINGED, thread, ` <@${OTHER}|ola> what do you think?`), null);
+    assert.ok(event("message", PINGED, thread, `Also ask <@${OTHER}> about it.`), "A later mention dropped a reply.");
+    assert.ok(event("message", PINGED, thread, "<!here> also make it bigger"), "A room mention dropped a reply.");
+    return { leadingMention: null, laterMention: "kept", roomMention: "kept" };
   });
 
   report.passed = true;
