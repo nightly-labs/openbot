@@ -2033,9 +2033,10 @@ export class ClaudeAgentClient extends EventEmitter<ClientEvents> {
       runtime.backgroundTasks = Array.isArray(message.tasks)
         ? message.tasks.filter((task) => !(isRecord(task) && task.ambient === true)).length
         : 0;
-      // The level can arrive after the turn that started the work ended, so it holds or frees the idle timer.
-      // When the work ends, the CLI starts a turn of its own to answer the result. Until that turn shows
-      // output, the idle limit must not close the thread (#6557).
+      // Claude Code 2.1.322 sends the first level after the Bash or Agent call with `run_in_background`, before
+      // its tool result, so before the result of that turn. The level that ends the work comes with no turn.
+      // With no turn, a level holds or frees the idle timer. When the work ends, the CLI starts a turn of its
+      // own to answer the result. Until that turn shows output, the idle limit must not close the thread (#6557).
       if (!runtime.activeTurn) {
         if (before === 0 && runtime.backgroundTasks > 0) this.#threads.holdForTurn(runtime);
         else if (before > 0 && runtime.backgroundTasks === 0) {
