@@ -244,8 +244,9 @@ export const messages = defineMessages("mobile.settings", {
   "mobile.settings.conversations.swipeRight": "Swipe right in an agent chat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Off",
   "mobile.settings.conversations.swipeFooter":
-    "A swipe away from Back in an agent's chat opens this. A swipe on a message still replies to it.",
+    "A swipe away from Back in an agent's chat opens this. The same swipe on a message shows the times of the messages.",
   "mobile.settings.conversations.pullInfo": "Pull up for info",
   "mobile.settings.conversations.pullInfoFooter":
     "Pull up past the latest message in a chat, a channel or a thread, and release, to open its info.",

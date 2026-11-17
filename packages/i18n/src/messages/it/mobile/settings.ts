@@ -248,8 +248,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Scorri a destra in una chat",
   "mobile.settings.conversations.swipeThreads": "Thread",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Disattivato",
   "mobile.settings.conversations.swipeFooter":
-    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Uno scorrimento su un messaggio risponde ancora.",
+    "Uno scorrimento opposto a Indietro nella chat di un agente apre questo. Lo stesso scorrimento su un messaggio mostra l’ora dei messaggi.",
   "mobile.settings.conversations.pullInfo": "Trascina in su per le info",
   "mobile.settings.conversations.pullInfoFooter":
     "In una chat, un canale o un thread trascina in su oltre l’ultimo messaggio e rilascia per aprirne le info.",

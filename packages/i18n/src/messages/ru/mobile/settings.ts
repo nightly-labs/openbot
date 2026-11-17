@@ -256,8 +256,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Свайп вправо в чате агента",
   "mobile.settings.conversations.swipeThreads": "Ветки",
   "mobile.settings.conversations.swipeBrowser": "Браузер",
+  "mobile.settings.conversations.swipeOff": "Выкл.",
   "mobile.settings.conversations.swipeFooter":
-    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Свайп по сообщению по-прежнему отвечает на него.",
+    "Свайп в сторону, обратную «Назад», в чате агента открывает это. Тот же свайп по сообщению показывает время сообщений.",
   "mobile.settings.conversations.pullInfo": "Потянуть вверх: сведения",
   "mobile.settings.conversations.pullInfoFooter":
     "Потяните вверх за последнее сообщение в чате, канале или ветке и отпустите, чтобы открыть сведения.",

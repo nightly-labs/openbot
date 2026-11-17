@@ -36,7 +36,9 @@ import {
 import { GestureDetector, type PanGesture } from "react-native-gesture-handler";
 import Animated, {
   Easing,
+  Extrapolation,
   FadeInDown,
+  interpolate,
   Keyframe,
   ReduceMotion,
   type SharedValue,
@@ -102,6 +104,7 @@ import { chatDayLabels } from "../model/chat-day-markers";
 import { mentionDraft } from "../model/chat-mentions";
 import type { ChatTarget } from "../model/chat-target";
 import { type MessageFileTarget, messageFileDirectory, messageFileTarget } from "../model/message-file-target";
+import { messageTime } from "../model/message-time";
 import { isStreamingReply } from "../model/reply-reveal";
 import { uploadProgressAt } from "../model/upload-progress";
 import { type AttachmentTint, ChatAttachmentView } from "./chat-attachment";
@@ -113,7 +116,12 @@ import { ChatMessageActionsButton, ChatMessageReactions, useMessageActions } fro
 import { ChatMessageGesture } from "./chat-message-gesture";
 import { ChatOutboxStatus, OutboxMessageMenu, type OutboxRowStatus } from "./chat-outbox-status";
 import { ChatSelectableText } from "./chat-selectable-text";
-import { type ChatSwipeGesture, ChatSwipeGestureContext } from "./chat-swipe-gesture";
+import {
+  type ChatSwipeGesture,
+  ChatSwipeGestureContext,
+  ChatTimeRevealContext,
+  MESSAGE_TIME_WIDTH,
+} from "./chat-swipe-gesture";
 import { ChatTagActionsContext, useTaggedTabOpener } from "./chat-tag-actions";
 import { ChatVideoGeneration } from "./chat-video-generation";
 import { HistoryShownContext } from "./use-history-shown";
@@ -1169,12 +1177,68 @@ function FocusHighlight({ rowId, color, shown }: { rowId: string; color: string;
 
 const RowContext = createContext<RowContextValue | null>(null);
 
+const MESSAGE_TIME = { hour: "numeric", minute: "2-digit" } as const;
+const NO_TIME_REVEAL = { transform: [{ translateX: 0 }] };
+
+/**
+ * The time of a message, beside the chat past the end of its row, at the middle height of the
+ * message, so each time is level with its own bubble. It shows when a swipe moves the rows away
+ * from Back, and fades in as it comes. A screen reader reads the time in the actions sheet.
+ */
+function MessageTime({ createdAt, reveal }: { createdAt: string; reveal: SharedValue<number> }) {
+  const { format } = useText();
+  const label = useMemo(() => {
+    const at = messageTime(createdAt);
+    return Number.isNaN(at) ? null : format.date(new Date(at), MESSAGE_TIME);
+  }, [createdAt, format]);
+  const style = useAnimatedStyle(() => ({
+    opacity: interpolate(reveal.get(), [MESSAGE_TIME_WIDTH * 0.25, MESSAGE_TIME_WIDTH], [0, 1], Extrapolation.CLAMP),
+  }));
+  if (!label) return null;
+  return (
+    <Animated.View
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      className="absolute top-0 bottom-0 items-center justify-center"
+      style={[{ end: -MESSAGE_TIME_WIDTH, width: MESSAGE_TIME_WIDTH }, style]}
+    >
+      <Typography.Paragraph type="body-xs" numberOfLines={1} className="text-muted">
+        {label}
+      </Typography.Paragraph>
+    </Animated.View>
+  );
+}
+
+/**
+ * A message and its time. The time is placed against the message only, not against the day label,
+ * the steps row or the divider of the same row.
+ */
+function MessageWithTime({
+  createdAt,
+  reveal,
+  children,
+}: PropsWithChildren<{ createdAt: string | undefined; reveal: SharedValue<number> | null }>) {
+  if (!createdAt || !reveal) return children;
+  return (
+    <View>
+      {children}
+      <MessageTime createdAt={createdAt} reveal={reveal} />
+    </View>
+  );
+}
+
 /**
  * `item` is the row as the list holds it. The list keeps its rows while only their content changes
  * (see `useListRows`), so the row reads its message from the context.
  */
 function ChatRow({ item }: { item: VisibleMessage }) {
   const row = useContext(RowContext);
+  const timeReveal = useContext(ChatTimeRevealContext);
+  // The swipe that shows the message times moves each row away from Back.
+  const revealStyle = useAnimatedStyle(() =>
+    timeReveal ? { transform: [{ translateX: -timeReveal.get() * END_X }] } : NO_TIME_REVEAL,
+  );
   if (!row) return null;
   const message = row.rowsById.get(item.id) ?? item;
   const response = row.responseIds.has(message.id);
@@ -1183,7 +1247,7 @@ function ChatRow({ item }: { item: VisibleMessage }) {
   const day = row.dayLabels.get(message.id);
   return (
     <Animated.View
-      style={[ROW_STYLE, response ? row.responseStyle : undefined]}
+      style={[ROW_STYLE, response ? row.responseStyle : undefined, revealStyle]}
       accessibilityElementsHidden={response && !row.responseVisible}
       importantForAccessibility={response && !row.responseVisible ? "no-hide-descendants" : "auto"}
     >
@@ -1206,22 +1270,24 @@ function ChatRow({ item }: { item: VisibleMessage }) {
         />
       ) : null}
       {message.kind === "thinking" ? null : (
-        <MessageRow
-          message={message}
-          isFirstUser={message.id === row.firstUserId}
-          source={
-            message.kind === "message" && message.replyToMessageId
-              ? row.messagesById.get(message.replyToMessageId)
-              : undefined
-          }
-          questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
-          upload={row.upload?.messageId === message.id ? row.upload : undefined}
-          outbox={row.outboxStatuses?.get(message.id)}
-          selecting={message.id === row.selectingMessageId}
-          arriving={row.arrivals.has(message.id)}
-          revealed={row.revealedIds.has(message.id)}
-          shared={row.shared}
-        />
+        <MessageWithTime createdAt={message.kind === "message" ? message.createdAt : undefined} reveal={timeReveal}>
+          <MessageRow
+            message={message}
+            isFirstUser={message.id === row.firstUserId}
+            source={
+              message.kind === "message" && message.replyToMessageId
+                ? row.messagesById.get(message.replyToMessageId)
+                : undefined
+            }
+            questionForm={message.id === row.promptController?.messageId ? row.promptController : undefined}
+            upload={row.upload?.messageId === message.id ? row.upload : undefined}
+            outbox={row.outboxStatuses?.get(message.id)}
+            selecting={message.id === row.selectingMessageId}
+            arriving={row.arrivals.has(message.id)}
+            revealed={row.revealedIds.has(message.id)}
+            shared={row.shared}
+          />
+        </MessageWithTime>
       )}
       {row.branchDivider?.rowId === message.id ? (
         <BranchDividerRow label={row.branchDivider.label} onOpen={row.branchDivider.onOpen} muted={row.shared.muted} />
@@ -1429,6 +1495,8 @@ export const ChatMessageList = memo(function ChatMessageList({
 }: ChatMessageListProps) {
   const { t, format, sourceText } = useText();
   const isFocused = useIsFocused();
+  // How far the rows move to show the message times. A swipe on the reader's own bubble sets it.
+  const timeReveal = useSharedValue(0);
   const agentsById = useMemo(() => new Map(agents.map((agent) => [agent.id, agent])), [agents]);
   const messagesById = useMemo(
     () => indexChatMessages(messages, messageAliases, referenceMessages),
@@ -2169,9 +2237,11 @@ export const ChatMessageList = memo(function ChatMessageList({
               <KeptOpenContext value={replySession.keptOpen}>
                 <RowContext value={rowContext}>
                   <ChatSwipeGestureContext value={swipeGesture ?? null}>
-                    <ListHeaderContext value={listHeader}>
-                      <ListFooterContext value={listFooter}>{list}</ListFooterContext>
-                    </ListHeaderContext>
+                    <ChatTimeRevealContext value={timeReveal}>
+                      <ListHeaderContext value={listHeader}>
+                        <ListFooterContext value={listFooter}>{list}</ListFooterContext>
+                      </ListHeaderContext>
+                    </ChatTimeRevealContext>
                   </ChatSwipeGestureContext>
                 </RowContext>
               </KeptOpenContext>

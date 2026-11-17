@@ -256,8 +256,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "السحب لليمين في محادثة وكيل",
   "mobile.settings.conversations.swipeThreads": "السلاسل",
   "mobile.settings.conversations.swipeBrowser": "المتصفح",
+  "mobile.settings.conversations.swipeOff": "إيقاف",
   "mobile.settings.conversations.swipeFooter":
-    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب على رسالة لا يزال يرد عليها.",
+    "السحب عكس اتجاه الرجوع في محادثة وكيل يفتح هذا. السحب نفسه على رسالة يعرض أوقات الرسائل.",
   "mobile.settings.conversations.pullInfo": "السحب لأعلى للمعلومات",
   "mobile.settings.conversations.pullInfoFooter":
     "اسحب لأعلى بعد آخر رسالة في محادثة أو قناة أو سلسلة ثم أفلت لفتح معلوماتها.",

@@ -246,8 +246,9 @@ export const messages = {
   "mobile.settings.conversations.swipeRight": "Naar rechts vegen in een agentchat",
   "mobile.settings.conversations.swipeThreads": "Threads",
   "mobile.settings.conversations.swipeBrowser": "Browser",
+  "mobile.settings.conversations.swipeOff": "Uit",
   "mobile.settings.conversations.swipeFooter":
-    "Vegen weg van Terug in de chat van een agent opent dit. Vegen over een bericht beantwoordt het nog steeds.",
+    "Vegen weg van Terug in de chat van een agent opent dit. Dezelfde veeg over een bericht toont de tijden van de berichten.",
   "mobile.settings.conversations.pullInfo": "Omhoog trekken voor info",
   "mobile.settings.conversations.pullInfoFooter":
     "Trek in een chat, kanaal of thread omhoog voorbij het laatste bericht en laat los om de info te openen.",

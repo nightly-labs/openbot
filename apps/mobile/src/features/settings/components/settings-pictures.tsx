@@ -282,20 +282,34 @@ export function ComposerPicture({ compact, play }: { compact: boolean; play: num
 /** The part of the picture that the chat moves aside for the panel. */
 const PANEL_SHARE = 0.54;
 
+/** With "off", the chat moves a little with the swipe and comes back: no screen opens. */
+const OFF_NUDGE = 0.08;
+
 /**
  * Settings > Conversations > swipe in an agent chat. The picture shows the panel open beside the
- * chat; the demonstration closes it and opens it again, as a swipe does.
+ * chat; the demonstration closes it and opens it again, as a swipe does. "Off" shows only the chat.
  */
-export function SwipePicture({ target, play }: { target: "threads" | "browser"; play: number }) {
+
+export function SwipePicture({ target, play }: { target: "threads" | "browser" | "off"; play: number }) {
   const width = useSharedValue(0);
   const shown = useSharedValue(1);
   useDemonstration(play, () => {
     const slide = { duration: 320, easing: SLIDE };
-    shown.value = withSequence(withTiming(0, slide), withDelay(600, withTiming(1, slide)));
+    shown.value =
+      target === "off"
+        ? withSequence(withTiming(0, { duration: 220, easing: OUT }), withTiming(1, { duration: 360, easing: SLIDE }))
+        : withSequence(withTiming(0, slide), withDelay(600, withTiming(1, slide)));
   });
   // React Native mirrors the layout in RTL (the panel opens from the left), but not translateX.
   const chatStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: -END_X * shown.value * width.value * (PANEL_SHARE - 0.08) }],
+    transform: [
+      {
+        translateX:
+          target === "off"
+            ? -END_X * (1 - shown.value) * width.value * OFF_NUDGE
+            : -END_X * shown.value * width.value * (PANEL_SHARE - 0.08),
+      },
+    ],
   }));
   const panelStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: END_X * (1 - shown.value) * width.value * PANEL_SHARE }],
@@ -312,24 +326,26 @@ export function SwipePicture({ target, play }: { target: "threads" | "browser"; 
         <Bar strong className="h-[7px] w-1/2 self-end" />
         <Bar className="h-[7px] w-[70%]" />
       </Animated.View>
-      <Animated.View
-        className="absolute inset-y-0 right-0 gap-1.5 border-grouped-border border-l bg-grouped px-2 py-2.5"
-        style={[{ width: `${PANEL_SHARE * 100}%` }, panelStyle]}
-      >
-        {target === "threads" ? (
-          <>
-            <Bar strong className="h-[7px] w-[55%]" />
-            <Bar className="h-1.5 w-full" />
-            <Bar className="h-1.5 w-[60%]" />
-            <Bar className="h-1.5 w-full" />
-          </>
-        ) : (
-          <>
-            <Bar className="h-3 w-full" />
-            <View className="h-[38px] w-full rounded-md bg-grouped-border" style={{ opacity: 0.7 }} />
-          </>
-        )}
-      </Animated.View>
+      {target === "off" ? null : (
+        <Animated.View
+          className="absolute inset-y-0 right-0 gap-1.5 border-grouped-border border-l bg-grouped px-2 py-2.5"
+          style={[{ width: `${PANEL_SHARE * 100}%` }, panelStyle]}
+        >
+          {target === "threads" ? (
+            <>
+              <Bar strong className="h-[7px] w-[55%]" />
+              <Bar className="h-1.5 w-full" />
+              <Bar className="h-1.5 w-[60%]" />
+              <Bar className="h-1.5 w-full" />
+            </>
+          ) : (
+            <>
+              <Bar className="h-3 w-full" />
+              <View className="h-[38px] w-full rounded-md bg-grouped-border" style={{ opacity: 0.7 }} />
+            </>
+          )}
+        </Animated.View>
+      )}
     </View>
   );
 }
