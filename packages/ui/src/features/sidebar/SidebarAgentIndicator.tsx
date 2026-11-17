@@ -110,6 +110,10 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
     if (state) return state;
     return isFeltBadge(previous) && previous !== gone() && !prefersReducedMotion() ? previous : undefined;
   });
+  /* The last badge that showed, for the reads inside the badge. When `shown` closes, Solid can run
+     the badge's effects once more before `Show` removes the badge. A read of `shown` there gave
+     undefined and threw, which stopped all updates of the window. */
+  const held = createMemo<SidebarAgentState | undefined>((previous) => shown() ?? previous);
   /* The badge that `shown` keeps while it shrinks away. */
   let leaving: SidebarBadgeSnapshot | undefined;
   let badge: HTMLSpanElement | undefined;
@@ -239,61 +243,66 @@ export function SidebarAgentIndicator(props: { state: () => SidebarAgentState | 
 
   return (
     <Show when={shown()}>
-      {(state) => (
-        <span
-          ref={badge}
-          class={[
-            "agent-row-agent-status",
-            `agent-row-agent-status-${state().kind}`,
-            routinePhase(state()) ? `agent-row-agent-status-routine-${routinePhase(state())}` : "",
-            {
-              "agent-row-agent-status-entering": phase() === "in",
-              "agent-row-agent-status-bumping": phase() === "bump",
-              "agent-row-agent-status-bumping-b": phase() === "bump-b",
-              "agent-row-agent-status-leaving": phase() === "out",
-            },
-          ]}
-          aria-hidden="true"
-          onAnimationEnd={animationEnded}
-          onAnimationCancel={animationCancelled}
-        >
-          <Show when={state().kind === "working"}>
-            <TypingDots class="agent-row-thinking-dots" />
-          </Show>
-          <Show
-            when={
-              routinePhase(state()) === "running" || routinePhase(state()) === "queued" || state().kind === "limited"
-            }
+      {(state) => {
+        const current = () => held() ?? state();
+        return (
+          <span
+            ref={badge}
+            class={[
+              "agent-row-agent-status",
+              `agent-row-agent-status-${current().kind}`,
+              routinePhase(current()) ? `agent-row-agent-status-routine-${routinePhase(current())}` : "",
+              {
+                "agent-row-agent-status-entering": phase() === "in",
+                "agent-row-agent-status-bumping": phase() === "bump",
+                "agent-row-agent-status-bumping-b": phase() === "bump-b",
+                "agent-row-agent-status-leaving": phase() === "out",
+              },
+            ]}
+            aria-hidden="true"
+            onAnimationEnd={animationEnded}
+            onAnimationCancel={animationCancelled}
           >
-            <Clock3 aria-hidden="true" />
-          </Show>
-          <Show when={waitReason(state())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
-          <Show when={routinePhase(state()) === "failed"}>
-            <X aria-hidden="true" />
-          </Show>
-          <Show when={state().kind === "responded"}>
-            <svg viewBox="0 0 12 12">
-              <title>{t("sidebar.state.responded")}</title>
-              <path d="m3 6.2 1.8 1.8L9 3.8" />
-            </svg>
-          </Show>
-          <Show when={state().kind === "unread"}>
-            <Show when={previousCount()}>
-              {(previous) => (
-                <span
-                  class={["agent-row-unread-count agent-row-unread-count-old", rollClass("out")]}
-                  onAnimationEnd={() => setPreviousCount(null)}
-                >
-                  {previous()}
-                </span>
-              )}
+            <Show when={current().kind === "working"}>
+              <TypingDots class="agent-row-thinking-dots" />
             </Show>
-            <Show when={count() > 0}>
-              <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+            <Show
+              when={
+                routinePhase(current()) === "running" ||
+                routinePhase(current()) === "queued" ||
+                current().kind === "limited"
+              }
+            >
+              <Clock3 aria-hidden="true" />
             </Show>
-          </Show>
-        </span>
-      )}
+            <Show when={waitReason(current())}>{(reason) => <SidebarWaitIcon reason={reason()} />}</Show>
+            <Show when={routinePhase(current()) === "failed"}>
+              <X aria-hidden="true" />
+            </Show>
+            <Show when={current().kind === "responded"}>
+              <svg viewBox="0 0 12 12">
+                <title>{t("sidebar.state.responded")}</title>
+                <path d="m3 6.2 1.8 1.8L9 3.8" />
+              </svg>
+            </Show>
+            <Show when={current().kind === "unread"}>
+              <Show when={previousCount()}>
+                {(previous) => (
+                  <span
+                    class={["agent-row-unread-count agent-row-unread-count-old", rollClass("out")]}
+                    onAnimationEnd={() => setPreviousCount(null)}
+                  >
+                    {previous()}
+                  </span>
+                )}
+              </Show>
+              <Show when={count() > 0}>
+                <span class={["agent-row-unread-count", rollClass("in")]}>{count()}</span>
+              </Show>
+            </Show>
+          </span>
+        );
+      }}
     </Show>
   );
 }
