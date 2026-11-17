@@ -80,6 +80,19 @@ export function isOpenCodeInternalFailure(error: unknown): boolean {
 }
 
 /**
+ * OpenCode 2.2.7's error for each open prompt when its event stream from its own server ends: "OpenCode
+ * server is unavailable", with `data.errorName` `ServerUnavailable`. Its process can exit a moment later.
+ */
+function isOpenCodeServerLost(error: unknown): boolean {
+  return (
+    error instanceof RequestError &&
+    error.code === -32603 &&
+    isRecord(error.data) &&
+    error.data.errorName === "ServerUnavailable"
+  );
+}
+
+/**
  * OpenCode 2.1.1 answers a turn whose model provider has no credentials with the protocol's
  * `-32000` and "provider authentication required", and no provider ID. A user with no key can pick
  * a paid or third-party model, and met that text with no next step (#2746). The model ID names the
@@ -269,11 +282,12 @@ export const OPENCODE_ACP_FLAVOR: AcpFlavor = {
       return sourceText("error.provider.opencodeCredentialsRejected", {
         detail: shownFailureDetail(detail.replace(/^RequestError:\s*Internal error:\s*/u, "")),
       });
-    if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error))
+    if (isOpenCodeServiceFailure(error) || isOpenCodeInternalFailure(error) || isOpenCodeServerLost(error))
       return sourceText("error.provider.opencodeServiceFailure");
     return openCodeRequestFailure(error, detail, redact, log);
   },
   failureCause: openCodeFailureCause,
+  serverLost: isOpenCodeServerLost,
   // OpenCode reports a model reply with no text, or with reasoning only, as a successful empty
   // turn and logs no error. OpenCode 1.18.31 failed the prompt on a rate limit and on a refused
   // connection; other provider errors can still end here. Do not invent the upstream cause or
