@@ -67,6 +67,17 @@ function geminiAccountLink(text: string): string | null {
  */
 const GEMINI_EMPTY_OUTPUT_FAILURE =
   /\bmodel output must contain either output text or tool calls, these cannot both be empty\b|\bModel produced invalid output\b/iu;
+/**
+ * A Gemini model can write its tool call as answer text, such as
+ * `call:default_api:run_command{...}` or `print(default_api.run_command(...))`. `default_api` is the
+ * name under which Gemini sees its tools. The CLI does not run such text, and the chat showed it as
+ * the agent's answer (#11087). Only an answer that is wholly calls is one: an answer that explains
+ * this syntax has other text.
+ */
+const GEMINI_TEXT_TOOL_CALL = {
+  start: /^\s*(?:call:default_api:|(?:print\()?default_api\.[\w-]+\()/u,
+  whole: /^\s*(?:call:default_api:[\w-]+\s*\{[\s\S]*\}|(?:print\()?default_api\.[\w-]+\([\s\S]*\))\s*$/u,
+};
 
 /**
  * A failed MCP server start, which ends the turn. Antigravity 1.4.4 writes `mcp_load_failed_message`:
@@ -462,6 +473,7 @@ export const ANTIGRAVITY_ACP_FLAVOR: AcpFlavor = {
     failedSession: (stderrLine) => GEMINI_SDK_FAILURE.exec(stderrLine)?.[1],
     answerIsFailure: GEMINI_FAILURE_ANSWER,
     emptyOutputFailure: GEMINI_EMPTY_OUTPUT_FAILURE,
+    textToolCall: GEMINI_TEXT_TOOL_CALL,
     turnFailure: geminiTurnFailure,
     accountLink: antigravityAccountLink,
     accountVerification: GEMINI_VERIFICATION_REQUIRED_ANSWER,
