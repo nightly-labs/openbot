@@ -19,9 +19,8 @@
 //   route, the event socket and a WebRTC event; any other client gets the released limits (#7689).
 // - browser-vault-skip-v1: a protocol 9 client that asks for it gets why a saved login was not filled on
 //   the event socket and a WebRTC event; any other client gets the released takeover request (#7262).
-// - WebRTC client range: mobile, the share sender and the web client compare the host range with the
-//   protocols that they speak, so a host that raises its minimum still connects, and the side that is
-//   too old is named.
+// - WebRTC client range: mobile and the web client compare the host range with the protocols that they
+//   speak, so a host that raises its minimum still connects, and the side that is too old is named.
 // Run: `bun scripts/team-api-legacy-clients-e2e.ts`.
 // Writes .openbot-build/team-api-legacy-clients-e2e/report.json.
 import assert from "node:assert/strict";
@@ -1448,7 +1447,7 @@ try {
   });
 
   await step("WebRTC client range: the highest common protocol, or the side that must update", async () => {
-    // The compatibility read that mobile, the share sender and the web client make over WebRTC.
+    // The compatibility read that mobile and the web client make over WebRTC.
     const requestId = randomUUID();
     const from = v2.bridge.sent.length;
     v2.bridge.emit(
