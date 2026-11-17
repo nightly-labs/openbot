@@ -1796,7 +1796,8 @@ query, and no other part of the chat, to one of the web search services that it 
 Exa, Firecrawl, Parallel, Tavily or TinyFish. OpenCode 2 asks before its first search; OpenBot gives
 the answer "allow" for it, so that an agent in a Slack, Discord, Telegram or WhatsApp chat can search
 too. OpenBot does not give this answer when OpenCode already has an answer that you gave, or when
-your OpenCode configuration sets `websearch`. Set `"websearch": false` in it to stop web search.
+your global OpenCode configuration file or the project's `opencode.json` sets `websearch`. Set
+`"websearch": false` in one of them to stop web search.
 
 An OpenCode Go key is optional and unlocks the paid catalog. OpenBot encrypts it with the operating
 system's secret storage, writes it to a file that only your user account can read, and passes it

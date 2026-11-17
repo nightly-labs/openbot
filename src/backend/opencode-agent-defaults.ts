@@ -44,8 +44,8 @@ const OPENCODE_SKILL_DEFAULTS = { report: "deny", opencode: "deny" } as const sa
  * The answer "Allow search via …" to the question that OpenCode 2 asks before its first web search.
  * OpenCode fails the search with "Web search cancelled" when nobody answers in a minute, and an agent
  * in a Slack, Discord, Telegram or WhatsApp chat cannot show the question, so each search there
- * failed (#11315). The `websearch` setting gives the answer (OpenCode 2.3.0, `config/websearch.ts`),
- * and a later config layer, such as the project's, still wins. A setting beats the answer that OpenCode
+ * failed (#11315). The `websearch` setting, which OpenCode reads since 2.0.0, gives the answer, and a
+ * later config layer, such as the project's, still wins. A setting beats the answer that OpenCode
  * saved, so OpenBot leaves it out when an answer is saved.
  */
 const OPENCODE_WEB_SEARCH_DEFAULT = { provider: "random" } as const;
