@@ -2090,6 +2090,8 @@ export class MessagingService {
       this.#threads.awaitsTeammate(activity.link.linkId),
       this.#quietEnd(activity.link.connectionId, target),
       this.#withoutStatusPost(activity.link.connectionId),
+      // The files go out below only when this connection runs now.
+      live !== undefined,
     );
     // In a thread that a ping opened, a person that the answer pings can reply without a mention too.
     if (final.answer && live?.record.platform === "slack") {
@@ -2652,13 +2654,14 @@ function token(): string {
  * The last post of a request and the reaction on the person's message, from how its turn ended. In a
  * quiet chat, a failed or stopped request posts no text: an empty text takes back the status post.
  * With `answerOnly`, a stopped request, or one that ends without an answer, posts no text either; a
- * failed one still does.
+ * failed one still does. A request that ends with files and no text has its answer in the files.
  */
 function finalPost(
   activity: Exclude<MessagingActivity, { type: "started" | "progress" }>,
   awaitsTeammate: boolean,
   quiet: boolean,
   answerOnly: boolean,
+  sendsFiles: boolean,
 ): PendingFinal {
   // A follow-up turn answers a teammate's reply: the person's message already shows how its own turn ended.
   const reacts = activity.type === "cancelled" || !activity.followUp;
@@ -2685,6 +2688,9 @@ function finalPost(
   // A turn that only asked a teammate has nothing to say yet: the answer comes back to this thread.
   if (!activity.followUp && awaitsTeammate)
     return { answer: false, text: sourceText("status.messaging.delegated"), reaction };
+  // The files are the answer, such as an edited image: an empty text takes back the status post where
+  // the platform can delete it.
+  if (sendsFiles && activity.files.length) return { answer: false, text: "", reaction };
   return { answer: false, text: sourceText("status.messaging.noAnswer"), reaction };
 }
 
