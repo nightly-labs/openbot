@@ -1002,7 +1002,10 @@ WhatsApp do not steer automatically: each starts a turn of its own. A question b
 expects a reply) asks for no `send_message` reply, so it stays queued and its own turn's answer goes
 back. Channel, messaging and task work, and each answer to a request that went to two or more teammates, stay queued
 (`MailboxStore.joinsChatTurn`), so those answers still start together. A message from an agent that
-cannot steer gets no fallback reason on its row.
+cannot steer gets no fallback reason on its row. A message from an agent also stays queued while a
+turn that only the person's messages started runs, and starts as a turn of its own after it: the tools
+that only a person's message can start check each message of the turn, and a message from an agent
+in the person's turn would make them refuse the person's own request (#11165).
 The person can steer any queued answer into the running turn from the waiting block on desktop, the
 web and mobile; it has no other queue action. That is the person's choice, so it can take one answer
 of a group before the others.

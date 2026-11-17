@@ -27,8 +27,9 @@
 //    the answer: it runs next in the side thread, and A's own chat does not get it.
 // 12. The same, but A archives the side thread. The answer goes to A's own chat.
 // 13. B steers busy messages and runs a turn in a new own chat. A notice from A (expectsReply false)
-//    goes into that running turn. A request from A also goes into it, and its result comes back to
-//    A's own chat. It needs a provider that steers natively.
+//    waits while a turn that the person started runs, and starts after it (#11165). In a turn that a
+//    message from A started, a notice from A goes into that running turn. A request from A also goes
+//    into it, and its result comes back to A's own chat. It needs a provider that steers natively.
 // 14. B asks A's side thread a question back without replyToMessageId. A answers with expectsReply
 //    false, and B sends the result without replyToMessageId. The question and the result come to the
 //    side thread, because it still waits for B, not to A's own chat.
@@ -662,8 +663,10 @@ try {
     assert.equal(details.threadHasAnswer, false, "The archived side thread also shows the answer.");
   });
 
-  // 13. A notice and a request join the running turn of a recipient that steers busy messages, and
-  //     the result of the request comes back to the sender.
+  // 13. B steers busy messages and runs a turn in a new own chat. A notice from A waits while a turn
+  //     that the person started runs, and starts after it (#11165). In a turn that a message from A
+  //     started, a notice and a request from A join the running turn, and the result of the request
+  //     comes back to A.
   await step("notice and request steer the recipient's running turn", async (details) => {
     const provider = toAgentInfo.provider;
     if (!isAgentProvider(provider) || agentProviderDescriptor(provider).steer !== "native") {
@@ -672,7 +675,10 @@ try {
     }
     const word = `M13${run}`;
     const notice = `N13${run}`;
+    const start = `S13${run}`;
     const slept = `SLEPT13${run}`;
+    const personNotice = `P13${run}`;
+    const personSlept = `PSLEPT13${run}`;
     const settings = await page.evaluate((agentId) => window.openbot.agent.getAgentHostSettings(agentId), to);
     const mode = (busyMessageMode: "steer" | "queue" | null) =>
       page.evaluate((input) => window.openbot.agent.updateAgentHostSettings(input), {
@@ -683,28 +689,62 @@ try {
       const queue = await page.evaluate((agentId) => window.openbot.agent.listQueue(agentId), to);
       return queue.deliveries.find((entry) => entry.sender.kind === "agent" && entry.text.includes(text)) ?? null;
     };
+    const sendFromA = (text: string) =>
+      bridge.send(
+        from,
+        [
+          `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply false:`,
+          `"${text}"`,
+          "Then end your turn and reply with the single word SENT.",
+        ].join("\n"),
+      );
     // A new chat, so a wait that B refused earlier in its own chat does not make it refuse this one.
     await waitFor(page, "B's own chat is idle", () => bridge.main(to), idle, TURN_MS);
     await page.evaluate((agentId) => window.openbot.agent.clearContext(agentId), to);
     await mode("steer");
     try {
-      await bridge.send(to, `First ${busyFor(120)}, then reply with the single word ${slept}.`);
-      const busy = await waitFor(
+      // A turn that the person started keeps only the person's messages.
+      await bridge.send(to, `First ${busyFor(120)}, then reply with the single word ${personSlept}.`);
+      const personBusy = await waitFor(
         page,
-        "B's own chat runs",
+        "B's own chat runs the person's turn",
         () => bridge.main(to),
         (s) => !idle(s),
         TURN_MS,
       );
-      const turnId = busy.activeTurnId;
-      await bridge.send(
-        from,
-        [
-          `Use openbot.send_message to send ${toAgentInfo.name} (agent id "${to}") this message, with expectsReply false:`,
-          `"${notice}: For your information, the build number is 14. No answer is necessary."`,
-          "Then end your turn and reply with the single word SENT.",
-        ].join("\n"),
+      const personTurnId = personBusy.activeTurnId;
+      await sendFromA(`${personNotice}: For your information, the build number is 12. No answer is necessary.`);
+      // send_message answers after the steer decision, and A's turn ends after that answer.
+      await waitFor(page, "A's own chat is idle", () => bridge.main(from), idle, TURN_MS);
+      const waiting = await fromA(personNotice);
+      details.personTurnStillRuns = (await bridge.main(to)).activeTurnId === personTurnId;
+      details.personNoticeStatus = waiting?.status ?? null;
+      assert.equal(details.personTurnStillRuns, true, "B's turn ended before A sent the notice.");
+      assert.equal(details.personNoticeStatus, "queued", "The notice joined the person's running turn.");
+      await waitFor(page, "B's person turn ends", () => bridge.main(to), idle, TURN_MS);
+      const after = await waitFor(
+        page,
+        "the notice leaves B's queue",
+        () => fromA(personNotice),
+        (entry) => entry === null || entry.status !== "queued",
+        TURN_MS,
       );
+      details.personNoticeTurnId = after?.turnId ?? null;
+      assert.notEqual(details.personNoticeTurnId, personTurnId, "The notice ran in the person's turn.");
+      await waitFor(page, "B's own chat is idle again", () => bridge.main(to), idle, TURN_MS);
+
+      // A turn that a message from A started takes A's next messages.
+      await sendFromA(`${start}: First ${busyFor(120)}, then reply with the single word ${slept}.`);
+      const started = await waitFor(
+        page,
+        "A's message starts B's turn",
+        () => fromA(start),
+        (entry) => entry !== null && entry.status !== "queued" && Boolean(entry.turnId),
+        TURN_MS,
+      );
+      const turnId = started?.turnId;
+      await waitFor(page, "A's own chat is idle", () => bridge.main(from), idle, TURN_MS);
+      await sendFromA(`${notice}: For your information, the build number is 14. No answer is necessary.`);
       const joined = await waitFor(
         page,
         "the notice leaves B's queue",
