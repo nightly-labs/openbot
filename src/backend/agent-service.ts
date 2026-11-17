@@ -7034,14 +7034,36 @@ export class AgentService extends EventEmitter<AgentServiceEvents> {
    * a message from the user does (`MailboxStore.joinsChatTurn`). Only a message for the recipient's
    * own chat can go into its running turn. The person did not send it, so a message that cannot
    * steer waits with no reason on its row. With `wait`, the sender learns if the message joined the
-   * running turn, or why it waits (#6475).
+   * running turn, or why it waits (#6475). A turn that only a person's messages started stays theirs:
+   * a message from an agent in it would make the tools that only a person can start refuse the
+   * person's own request (#11165), so the message waits for a turn of its own.
    */
   #steerAgentMessage(recipientAgentId: string, deliveryId: string, wait: boolean): Effect.Effect<AgentMessageSteer> {
     const agent = this.#store.list().find((item) => item.id === recipientAgentId);
     // A recipient with no loaded chat runs no turn, so its page is not read for this.
     const snapshot = this.#conversation.snapshotToUpdate(recipientAgentId);
     if (!agent || !snapshot || !this.#mailbox.joinsChatTurn(deliveryId)) return Effect.succeed(null);
+    if (snapshot.activeTurnId && this.#personTurn(recipientAgentId, snapshot.activeTurnId)) return Effect.succeed(null);
     return this.#steerWhenBusy(agent, null, snapshot, deliveryId, false, wait);
+  }
+
+  /**
+   * Whether only people on this computer sent the messages of this running turn. The drain links the
+   * messages to a turn a moment after it publishes the turn, so until then the messages that start it
+   * count. A team member on another computer cannot use the person-only tools, so their turn does not
+   * hold messages from agents back.
+   */
+  #personTurn(agentId: string, turnId: string): boolean {
+    const linked = this.#mailbox.findDeliveriesByTurn(agentId, turnId);
+    const deliveries = linked.length > 0 ? linked : this.#mailbox.startingDeliveriesForAgent(agentId, null);
+    return (
+      deliveries.length > 0 &&
+      deliveries.every(({ delivery }) => {
+        if (delivery.sender.kind !== "user") return false;
+        const member = this.#mailbox.senderMember(delivery.messageId);
+        return member === undefined || !(this.channels.hooks.remotePerson?.(member.id) ?? false);
+      })
+    );
   }
 
   /**
