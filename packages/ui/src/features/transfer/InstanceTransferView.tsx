@@ -31,7 +31,7 @@ import {
   Upload,
 } from "@openbot/ui";
 import type { JSX } from "@solidjs/web";
-import { createMemo, createSignal, createUniqueId, For, Show, untrack } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For, onCleanup, Show, untrack } from "solid-js";
 import { RollingPrice } from "../../rolling-price";
 import { useText } from "../../text";
 import { AgentAvatar } from "../agents/AgentAvatar";
@@ -789,9 +789,48 @@ export function uploadLabel<Fallback extends string>(
   return progress.sent < progress.total ? "settings.transfer.upload.sending" : "settings.transfer.upload.serverReading";
 }
 
+/** The speed of the bytes that arrived in this time gives the time left. */
+const TIME_LEFT_WINDOW_MS = 30_000;
+/** No time left before the upload has sent for this long: the first parts give no stable speed. */
+const TIME_LEFT_FIRST_MS = 3_000;
+
+/**
+ * The seconds until the server has the whole file, from the speed of the last 30 seconds, or null.
+ * The clock moves the estimate between reports, so an upload that stops gets a longer time, and
+ * after 30 seconds with no new bytes it has none. A resumed upload measures from its first report,
+ * so the parts that the server already had do not count as speed.
+ */
+function createSecondsLeft(progress: () => TransferUploadState) {
+  const samples: { at: number; sent: number }[] = [];
+  const [now, setNow] = createSignal(Date.now());
+  const timer = setInterval(() => setNow(Date.now()), 1000);
+  onCleanup(() => clearInterval(timer));
+  return createMemo(() => {
+    const { sent, total } = progress();
+    if (samples.at(-1)?.sent !== sent) samples.push({ at: Date.now(), sent });
+    const time = Math.max(now(), samples.at(-1)?.at ?? 0);
+    while (samples.length > 1 && time - (samples[0]?.at ?? time) > TIME_LEFT_WINDOW_MS) samples.shift();
+    const first = samples[0];
+    const last = samples.at(-1);
+    if (!first || !last || sent >= total || time - last.at > TIME_LEFT_WINDOW_MS) return null;
+    const elapsed = time - first.at;
+    const bytesPerMs = (last.sent - first.sent) / elapsed;
+    if (elapsed < TIME_LEFT_FIRST_MS || !(bytesPerMs > 0)) return null;
+    return (total - sent) / bytesPerMs / 1000;
+  });
+}
+
+function timeLeftText(t: AppTranslate, seconds: number): string {
+  if (seconds < 60) return t("settings.transfer.upload.etaSoon");
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 60) return t("settings.transfer.upload.etaMinutes", { minutes });
+  return t("settings.transfer.upload.etaHours", { hours: Math.floor(minutes / 60), minutes: minutes % 60 });
+}
+
 /** How much of the file a joined server has. After the last byte, the server reads the file. */
 export function TransferUploadProgress(props: { progress: TransferUploadState }) {
   const { t, format } = useText();
+  const secondsLeft = createSecondsLeft(() => props.progress);
   const percent = () =>
     props.progress.total > 0 ? Math.min(100, Math.floor((props.progress.sent / props.progress.total) * 100)) : 0;
   return (
@@ -807,6 +846,9 @@ export function TransferUploadProgress(props: { progress: TransferUploadState })
           total: format.fileSize(props.progress.total),
         })}
       </p>
+      <Show when={secondsLeft()}>
+        {(seconds) => <p class="instance-transfer-upload-status">{timeLeftText(t, seconds())}</p>}
+      </Show>
     </div>
   );
 }
