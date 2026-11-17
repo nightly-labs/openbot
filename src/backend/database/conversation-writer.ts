@@ -191,12 +191,7 @@ export class ConversationWriter {
             WHERE projection_turns.completed_at IS NULL
           `).run(snapshot.activeTurnId, snapshot.threadId, snapshot.threadId, new Date().toISOString(), sequence);
         }
-        if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(eventType) &&
-          isDynamicRecord(payload) &&
-          "turnId" in payload &&
-          isString(payload.turnId)
-        ) {
+        if (isTurnEndEvent(eventType) && isDynamicRecord(payload) && "turnId" in payload && isString(payload.turnId)) {
           const status =
             "status" in payload && isString(payload.status)
               ? payload.status
@@ -607,9 +602,7 @@ export class ConversationWriter {
           `).run(input.activeTurnId, input.threadId, input.threadId, new Date().toISOString(), sequence);
         }
         if (
-          ["turn.completed", "turn.reconciled-after-restart", "turn.interrupted-by-restart"].includes(
-            input.eventType,
-          ) &&
+          isTurnEndEvent(input.eventType) &&
           isDynamicRecord(input.detail) &&
           "turnId" in input.detail &&
           isString(input.detail.turnId)

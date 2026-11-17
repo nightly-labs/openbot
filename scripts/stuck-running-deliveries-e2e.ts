@@ -711,6 +711,8 @@ try {
     if (row?.status !== "failed") return "The stored turn of the failed request is not closed as failed.";
     return null;
   });
+  // The next cases run turns that do not fail.
+  await control({ holdTurns: false, turnMs: 100 });
 
   await runCase("h: a running turn row that no thread names is closed at restart", async (details) => {
     const agent = second.store.list()[0];
