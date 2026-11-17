@@ -51,6 +51,7 @@ export const messages = {
   "prompt.browser.pendingBody":
     "Откройте страницу, чтобы завершить вход, проверку или подтвердить согласие. Затем позвольте {name} продолжить.",
   "prompt.browser.openPage": "Открыть {title}",
+  "prompt.browser.openFailed": "Не удалось открыть страницу в главном окне. Попробуйте ещё раз.",
   "prompt.browser.done": "Готово",
   "prompt.browser.pageFallback": "Страница браузера",
   "prompt.browser.hostFallback": "странице браузера",

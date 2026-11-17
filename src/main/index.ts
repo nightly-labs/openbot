@@ -956,6 +956,7 @@ function registerIpcHandlers({
     }),
     ...dynamicIslandIpcHandlers({
       dynamicIsland,
+      chatRendererIds: () => new Set(windows.getChatWindows().map((window) => window.webContents.id)),
       setXWayland: (enabled) => setAboveAppsXWayland(app.getPath("userData"), "dynamic-island", enabled),
       keepXWayland: () => keepAboveAppsXWayland(app.getPath("userData"), "dynamic-island"),
     }),
