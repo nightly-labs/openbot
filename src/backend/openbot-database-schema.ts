@@ -715,6 +715,11 @@ export interface OpenBotMigrationOptions {
   warn?: (message: string, error: unknown) => void;
   /** The last connection closed cleanly, so SQLite removed the write-ahead log. */
   closedCleanly?: boolean;
+  /**
+   * Stops an existing database after this version. Tests use it to make the database of an older
+   * release (`src/backend/migration-harness.ts`). A new database always gets the latest version.
+   */
+  throughVersion?: number;
 }
 
 const logger = createOpenBotLogger("openbot-database-schema");
@@ -1061,7 +1066,10 @@ export function migrateOpenBotDatabase(db: DatabaseSync, options: OpenBotMigrati
   const appliedVersions = readAppliedVersions(db);
   validateAppliedVersions(appliedVersions);
   const currentVersion = latestAppliedVersion(appliedVersions);
-  const pending = MIGRATIONS.filter((migration) => migration.version > currentVersion);
+  const throughVersion = options.throughVersion ?? LATEST_SCHEMA_VERSION;
+  const pending = MIGRATIONS.filter(
+    (migration) => migration.version > currentVersion && migration.version <= throughVersion,
+  );
   // A database can hold broken references from before this upgrade. A migration that does not touch them must not
   // stop on them, and deleting them would lose rows, so each migration is checked only for the ones it adds.
   let violations: Map<string, number> | undefined;
