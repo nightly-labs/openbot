@@ -9,6 +9,7 @@ import type {
 import {
   AGENT_INSTRUCTIONS_CHANGE_ITEM_TYPE,
   AGENT_WELCOME_ITEM_TYPE,
+  CHANNEL_RESUME_ITEM_TYPE,
   CONVERSATION_MEMORY_CHANGES_ITEM_TYPE,
   CONVERSATION_PLAN_ITEM_TYPE,
   CONVERSATION_SUBAGENTS_ITEM_TYPE,
@@ -268,7 +269,8 @@ export function toAgentMessages(
       continue;
     }
     // A new agent's setup message is for the agent only: the chat starts with the agent's welcome.
-    if (message.itemType === AGENT_WELCOME_ITEM_TYPE) continue;
+    // The continuation of a channel request is for the agent only too (#8812).
+    if (message.itemType === AGENT_WELCOME_ITEM_TYPE || message.itemType === CHANNEL_RESUME_ITEM_TYPE) continue;
     if (message.author !== "assistant" || message.itemType !== "commentary") {
       result.push(convert(message, index));
       continue;

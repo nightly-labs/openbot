@@ -2542,6 +2542,33 @@ export class ChannelService {
     yield* this.wake();
   }).bind(this);
 
+  /** Whether this channel delivery continues its request after the sub-tasks that it waited for ended. */
+  resumesAfterSubtasks(deliveryId: string): boolean {
+    const assignment = this.store.assignmentForDelivery(deliveryId);
+    return assignment !== null && this.#resumesAfterSubtasks(assignment);
+  }
+
+  /**
+   * An earlier assignment of the same request waited for fewer tasks, so this one continues that
+   * request with the results of the new ones. Its delivery repeats the request, but the person did not
+   * send it again (#8812). A turn that a usage limit stopped runs again with the same tasks: that is
+   * not a continuation after sub-tasks.
+   */
+  #resumesAfterSubtasks(assignment: ChannelAssignment): boolean {
+    if (assignment.awaitedTaskIds.length === 0) return false;
+    const earlier = this.store
+      .assignments(assignment.channelId)
+      .filter(
+        (item) =>
+          item.id !== assignment.id &&
+          item.taskId === assignment.taskId &&
+          item.requestMessageId === assignment.requestMessageId &&
+          item.taskRevision < assignment.taskRevision,
+      )
+      .at(-1);
+    return earlier !== undefined && assignment.awaitedTaskIds.some((id) => !earlier.awaitedTaskIds.includes(id));
+  }
+
   readonly prepare = Effect.fn("ChannelService.prepare")(function* (
     this: ChannelService,
     delivery: DeliveryContext,
@@ -2569,6 +2596,7 @@ export class ChannelService {
       delivered,
       this.#peers(tasks, task),
       budget,
+      this.#resumesAfterSubtasks(assignment),
     );
     if (delivered && history.delta !== null)
       this.#deltas.set(delivery.delivery.id, { sessionId: delivered.sessionId, text: history.delta });
