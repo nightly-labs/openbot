@@ -30,6 +30,8 @@ import { type DynamicToolResult, getArray, getRecord, getString, isRecord } from
 const MCP_ELICITATION_ALLOW_ONCE = "Allow once";
 const MCP_ELICITATION_ALLOW_ALWAYS = "Always allow";
 const MCP_ELICITATION_DECLINE = "Don't allow";
+const MCP_SIGN_IN_PAGE_DONE = sourceText("status.agent.mcpSignInPageDone");
+const MCP_SIGN_IN_PAGE_DECLINE = sourceText("status.agent.mcpSignInPageDecline");
 /** Field names a plugin uses for a credential. A match keeps the answer out of stored history. */
 const SECRET_FIELD_PATTERN = /api[_-]?key|secret|token|password|passphrase|credential/i;
 
@@ -158,17 +160,59 @@ export function elicitationFieldQuestions(params: unknown, subject: string): Age
   });
 }
 
+/**
+ * The sign-in page of a URL request as a Markdown link destination, or null when the card must not
+ * link to it. As Codex checks it: https, with a host and with no user name or password.
+ */
+function mcpSignInPageUrl(params: unknown): string | null {
+  const url = getString(params, "url");
+  if (!url || !URL.canParse(url)) return null;
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) return null;
+  // A parenthesis ends a Markdown link destination.
+  return parsed.href.replaceAll("(", "%28").replaceAll(")", "%29");
+}
+
+/**
+ * A server's request to open its sign-in page, for example after its tool answered -32042 (#10152).
+ * The card links to the page; the answer that the user signed in accepts the request, and the
+ * provider runs the tool call again. Codex's own server for ChatGPT apps keeps its reconnect notice.
+ */
+function mcpSignInPageQuestion(params: unknown, serverName: string | null): AgentPromptQuestion | null {
+  const url = mcpSignInPageUrl(params);
+  const name = serverName?.trim();
+  if (!url || !name || name === CODEX_APPS_MCP_SERVER_NAME) return null;
+  const subject = name === COMPUTER_USE_MCP_SERVER_NAME ? "Computer Use" : name;
+  const message = getString(params, "message")?.trim();
+  return {
+    id: MCP_ELICITATION_DECISION_QUESTION_ID,
+    header: subject.slice(0, INPUT_LIMITS.promptHeader),
+    question: sourceText("status.agent.mcpSignInPage", { name: subject, url }),
+    ...(message ? { detail: message.slice(0, INPUT_LIMITS.promptQuestion) } : {}),
+    isSecret: false,
+    options: [
+      { label: MCP_SIGN_IN_PAGE_DONE, description: sourceText("status.agent.mcpSignInPageDoneDetail") },
+      { label: MCP_SIGN_IN_PAGE_DECLINE, description: sourceText("status.agent.mcpSignInPageDeclineDetail") },
+    ],
+  };
+}
+
 export function mcpElicitationQuestions(params: unknown): AgentPromptQuestion[] | null {
   const serverName = getString(params, "serverName");
   const mode = getString(params, "mode") ?? "form";
   const requestedSchema = getRecord(params, "requestedSchema");
   const properties = getRecord(requestedSchema, "properties");
-  if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
-
-  const questions =
-    Object.keys(properties).length === 0
-      ? [elicitationConsentQuestion(params, serverName)].filter((question) => question !== null)
-      : elicitationFieldQuestions(params, serverName ?? "This plugin");
+  let questions: AgentPromptQuestion[];
+  if (mode === "url") {
+    const question = mcpSignInPageQuestion(params, serverName);
+    if (!question) return null;
+    questions = [question];
+  } else if ((mode !== "form" && mode !== "openai/form") || !requestedSchema || !properties) return null;
+  else
+    questions =
+      Object.keys(properties).length === 0
+        ? [elicitationConsentQuestion(params, serverName)].filter((question) => question !== null)
+        : elicitationFieldQuestions(params, serverName ?? "This plugin");
   return validPromptQuestions(questions) ? questions : null;
 }
 
@@ -228,6 +272,12 @@ export function mcpElicitationResult(
   params: unknown,
   answers: Record<string, string[]>,
 ): { action: "accept" | "cancel" | "decline"; content: DynamicRecord | null; _meta: DynamicRecord | null } {
+  if (getString(params, "mode") === "url") {
+    const selected = answers[MCP_ELICITATION_DECISION_QUESTION_ID]?.[0];
+    if (selected === MCP_SIGN_IN_PAGE_DONE) return { action: "accept", content: null, _meta: null };
+    if (selected === MCP_SIGN_IN_PAGE_DECLINE) return { action: "decline", content: null, _meta: null };
+    return { action: "cancel", content: null, _meta: null };
+  }
   const properties = getRecord(getRecord(params, "requestedSchema"), "properties");
   if (properties && Object.keys(properties).length > 0) {
     return elicitationFieldResult(params, properties, answers);
