@@ -260,7 +260,8 @@ path part that looks like a code, such as a reset token, with `:id`) or a press 
 (`before-mouse-event` mouseDown; `browser-user-click.ts` reads the role and the name in the CDP
 automation world, with a 1 second limit). The read goes into open shadow roots and into frames, also
 frames of another process. A press in such a frame gives no `input-event` and its point is in the
-frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A press
+frame's own pixels, so a press without an `input-event` finds its frame by `:hover` (#10912). A live
+view's press does not move `:hover`; the engine gives its point in the page's pixels. A press
 outside a control, on a password field, or on a field whose
 `autocomplete` is a password, a one-time code or a card value, gives no step. A field gives its label,
 never its value; key presses are never read. `UserBrowsingLog` keeps the steps in
