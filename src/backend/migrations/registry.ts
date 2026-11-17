@@ -56,10 +56,7 @@ import { migration as migration0062 } from "./0062-messaging-history";
 import { migration as migration0063 } from "./0063-crm";
 import type { OpenBotMigration } from "./migration";
 
-/**
- * Every migration, in order. A new migration is a new file with the next version, added at the end.
- * `scripts/check-frozen-migrations.ts` keeps each released file unchanged.
- */
+/** Every migration, in order. A new migration is a new file with the next version, added at the end. */
 export const MIGRATIONS: readonly OpenBotMigration[] = [
   migration0008,
   migration0009,

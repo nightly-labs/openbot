@@ -2,7 +2,6 @@ import type { DatabaseSync } from "node:sqlite";
 import type { OpenBotMigration } from "./migration";
 import { type DynamicRecord, isDynamicRecord, isString } from "./runtime-values";
 
-/** Owns the agent-memory search index and selection schema, never the database facade. */
 export const AGENT_MEMORY_SELECTION_SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS agent_memory_selections (
     memory_id TEXT PRIMARY KEY REFERENCES projection_agent_memories(memory_id) ON DELETE CASCADE,
@@ -27,10 +26,8 @@ export const AGENT_MEMORY_SELECTION_SCHEMA_SQL = `
   END;
 `;
 
-// Copies of the helpers that this migration used when it shipped: `databaseRows` and
-// `requiredStringColumn` (`database/database-rows.ts`), and the budget and memory format of
-// `@openbot/contracts/agent-memory-context`. The copies keep the first selection the same when the
-// live helpers change.
+// Frozen copies of `databaseRows`, `requiredStringColumn` and the memory budget and format of
+// `@openbot/contracts/agent-memory-context`, as this migration shipped them.
 const AGENT_MEMORY_CONTEXT_BUDGET_BYTES = 8192;
 
 interface SelectedMemory {
@@ -39,13 +36,9 @@ interface SelectedMemory {
   readonly origin: "manual" | "automatic";
 }
 
-function serializeEssentialMemories(memories: readonly SelectedMemory[]): string {
-  const entries = memories.map(({ id, text, origin }) => ({ id, text, origin }));
-  return `<agent_memories count="${entries.length}">\n${JSON.stringify(entries)}\n</agent_memories>`;
-}
-
 function essentialMemoryBytes(memories: readonly SelectedMemory[]): number {
-  return new TextEncoder().encode(serializeEssentialMemories(memories)).byteLength;
+  const block = `<agent_memories count="${memories.length}">\n${JSON.stringify(memories)}\n</agent_memories>`;
+  return new TextEncoder().encode(block).byteLength;
 }
 
 function databaseRows(value: unknown): DynamicRecord[] {

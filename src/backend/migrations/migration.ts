@@ -1,16 +1,12 @@
 import type { DatabaseSync } from "node:sqlite";
 
 /**
- * One database migration. `migrateOpenBotDatabase` runs `up` in one transaction with the
- * `schema_migrations` marker of `version`.
- *
- * Each migration has its own file, `<version>-<name>.ts`. A released file never changes:
- * `scripts/check-frozen-migrations.ts` compares it with the newest release tag. To fix a released
- * migration, add a new one.
+ * One database migration, in its own frozen file `<version>-<name>.ts` (see `src/backend/AGENTS.md`).
+ * `migrateOpenBotDatabase` runs `up` in one transaction with the `schema_migrations` marker of `version`.
  */
 export interface OpenBotMigration {
   readonly version: number;
-  /** A stable kebab-case name, unique among the migrations. The file name has it after the version. */
+  /** Stable, unique, kebab-case, and the same as in the file name. */
   readonly name: string;
   readonly disableForeignKeys?: boolean;
   readonly vacuumAfterCommit?: boolean;

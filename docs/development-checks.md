@@ -419,8 +419,7 @@ CI checks out one commit and no tags, so the script fetches only that tag commit
 `--tag <tag>` compares with another tag. The rules and the fix for a released bug are in
 [src/backend/AGENTS.md](../src/backend/AGENTS.md#frozen-migrations); the rule fixtures are in
 `scripts/check-frozen-migrations.test.ts`. A tag from before the folder (v0.72.0 and earlier) has
-no frozen files, so the script reads its newest version from `openbot-database-schema.ts` and checks
-only the version rules.
+no frozen files, so only the rules on the current folder apply.
 
 ### Plugin cost
 
